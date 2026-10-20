@@ -28,6 +28,7 @@ public sealed class GameState : IGameStateView
     }
 
     public WorldDefinition World { get; }
+    public Ruleset Ruleset => World.Ruleset;
     public ulong Seed { get; }
     public int RollCount { get; private set; }
     public SceneId? CurrentScene { get; private set; }
