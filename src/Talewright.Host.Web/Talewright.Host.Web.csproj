@@ -12,6 +12,12 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.13" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- Bundled sample stories, embedded as stories/<Story>/<path> (see EmbeddedStoryLibrary). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml"
+                      LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Talewright.Player\Talewright.Player.csproj" />
   </ItemGroup>
