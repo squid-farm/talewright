@@ -103,6 +103,18 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 
 Metadata lines are only recognized directly after the `===` header. Lines starting with `//` are comments.
 
+**Where a scene goes next.** A choice with its own `-> target` (or a skill check) goes there. A choice with
+*no* target — e.g. `* [Take the torch] { give player torch }` — **falls through** to the scene's own
+`-> target` lines (like an ink "gather"), and so does a check outcome without `-> target`. A scene must have
+at least one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise it's a compile error.
+
+**Conditional structure.** Choices, `~` effects and `->` diverts inside a block `{if}` only apply when the
+condition holds (a choice's own `requires` is combined with it using `and`). With several `->` lines, the
+first whose condition holds wins, so put conditional diverts before an unconditional fallback.
+
+**Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
+by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
+
 ## 3. Substitutions
 
 `{reference#modifier#modifier…}`
@@ -176,3 +188,14 @@ failure: -> temple.hall
 Optional actor: `skill-check guide survival dc 10`. Resolution is defined by the ruleset
 (generic: `d20 + attribute modifier + skill rank ≥ DC`). Dice are seeded and recorded as events.
 With `randomness: off`, checks are deterministic (`10 + modifiers ≥ DC`).
+
+## 7. Diagnostics
+
+Every compiler message has a stable code and a `file:line:column` location.
+
+| Range | Area | Examples |
+|---|---|---|
+| `TW1xxx` | Syntax | `TW1005` unbalanced `{if}`/`{else}`/`{/if}`, `TW1009` missing `success:`/`failure:`, `TW1011` malformed choice |
+| `TW2xxx` | References and types | `TW2001` unknown character/stat/item/faction, `TW2002` unknown scene, `TW2003` type mismatch, `TW2004` flag/var never set, `TW2005` unknown `@predicate`, `TW2006` unknown `#modifier` |
+| `TW3xxx` | Story structure | `TW3002` dead-end scene, `TW3003` fall-through with nowhere to fall, `TW3005` skill check without a check rule, `TW3007` missing start scene, `TW3010` duplicate scene; warnings `TW3008` empty hub, `TW3009` unreachable scene |
+| `TW4xxx` | story.yaml | `TW4001` invalid YAML, `TW4002` missing required key, `TW4003` bad value, `TW4004` unknown ruleset, `TW4005` unknown stat/item; warning `TW4006` unknown key |
