@@ -1,0 +1,7 @@
+@* Desktop root: the shared player, auto-opening a story passed on the command line. *@
+<TalewrightApp AutoStartStoryId="@Options.AutoStartStoryId" />
+
+@code {
+    [Inject]
+    private DesktopOptions Options { get; set; } = default!;
+}
