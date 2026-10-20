@@ -206,30 +206,32 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
   - Web: arbitrary DLLs are fragile under trimming, so **sandboxed script plugins (Jint/MoonSharp) are preferred**.
   - Roslyn scripting in the browser was rejected (10+ MB, slow).
 
-## 7. Todos (M0 + M1; tracked in SQL)
+## 7. Todos (M0 + M1)
 
-| id | title | depends on |
-|---|---|---|
-| repo-init | git init, .gitignore, LICENSE (MPL-2.0), README, docs/PLAN.md, ARCHITECTURE.md, TALE-SYNTAX.md, initial ADRs; first commit | — |
-| solution-skeleton | Talewright.sln, Directory.Build.props (net10.0, nullable, warnings-as-errors), global.json, all src/tests projects, build+test green | repo-init |
-| core-entities | Typed IDs, Entity + components, stat definitions, ruleset builder (add/remove/replace) | solution-skeleton |
-| core-events | GameEvent records, event store, state projection (fold), read-only IGameStateView, history queries | core-entities |
-| core-inventory-factions | Inventory relations, factions/relationships with ruleset-defined tiers, levels/XP hooks | core-events |
-| core-rng | Seeded IRandomSource, DiceRolled events, deterministic replay | core-events |
-| ruleset-generic | Generic d20-ish attributes/skills/tiers/skill-check rule as an opt-out module | core-inventory-factions |
-| rules-predicates | Expression/predicate AST + evaluator + named predicate registry | core-events |
-| rules-storylets | Storylet eligibility/selection, diverts vs hubs, priority/tags | rules-predicates |
-| rules-modifiers-triggers | Derived stats/modifiers, bounded triggers | rules-predicates, core-inventory-factions |
-| rules-skill-checks | Skill-check resolution via ruleset + RNG, per-story randomness config | rules-predicates, core-rng, ruleset-generic |
-| narrative-model | Template AST + RenderedDocument model (incl. MediaPlaceholder) | solution-skeleton |
-| narrative-renderer | Renderer: substitutions, conditionals, modifier pipeline, English grammar (possessive, a/an, capitalize), pronoun sets | narrative-model, rules-predicates |
-| tale-compiler | Markdig + YAML front matter + story.yaml → StoryDefinition; v0 directives; diagnostics with line/col; schema validation | narrative-model, rules-storylets, rules-skill-checks, ruleset-generic |
-| runtime-session | IStorySession: commands → events → triggers → selection → render → RenderedFrame | tale-compiler, narrative-renderer, rules-modifiers-triggers |
-| player-rcl | Blazor RCL: transcript, choices, ruleset-driven character sheet, theme | runtime-session |
-| host-desktop | Photino.Blazor host: open story folder/zip | player-rcl |
-| host-web | Blazor WASM host: load bundled story / file picker; verify static publish | player-rcl |
-| sample-lost-relic | samples/LostRelic: female treasure hunter in an ancient temple; exercises stats, inventory, faction gate, skill check, pronouns/possessives, branching + convergence | tale-compiler |
-| e2e-tests | End-to-end test that compiles + plays LostRelic through scripted choices with fixed seed | runtime-session, sample-lost-relic |
+**M0 and M1 are done** (all rows below). See section 9 for what was built and how it differs from the plan.
+
+| id | title | depends on | status |
+|---|---|---|---|
+| repo-init | git init, .gitignore, LICENSE (MPL-2.0), README, docs/PLAN.md, ARCHITECTURE.md, TALE-SYNTAX.md, initial ADRs; first commit | — | done |
+| solution-skeleton | Talewright.sln, Directory.Build.props (net10.0, nullable, warnings-as-errors), global.json, all src/tests projects, build+test green | repo-init | done |
+| core-entities | Typed IDs, Entity + components, stat definitions, ruleset builder (add/remove/replace) | solution-skeleton | done |
+| core-events | GameEvent records, event store, state projection (fold), read-only IGameStateView, history queries | core-entities | done |
+| core-inventory-factions | Inventory relations, factions/relationships with ruleset-defined tiers, levels/XP hooks | core-events | done |
+| core-rng | Seeded IRandomSource, DiceRolled events, deterministic replay | core-events | done |
+| ruleset-generic | Generic d20-ish attributes/skills/tiers/skill-check rule as an opt-out module | core-inventory-factions | done |
+| rules-predicates | Expression/predicate AST + evaluator + named predicate registry | core-events | done |
+| rules-storylets | Storylet eligibility/selection, diverts vs hubs, priority/tags | rules-predicates | done |
+| rules-modifiers-triggers | Derived stats/modifiers, bounded triggers | rules-predicates, core-inventory-factions | done |
+| rules-skill-checks | Skill-check resolution via ruleset + RNG, per-story randomness config | rules-predicates, core-rng, ruleset-generic | done |
+| narrative-model | Template AST + RenderedDocument model (incl. MediaPlaceholder) | solution-skeleton | done |
+| narrative-renderer | Renderer: substitutions, conditionals, modifier pipeline, English grammar (possessive, a/an, capitalize), pronoun sets | narrative-model, rules-predicates | done |
+| tale-compiler | Markdig + YAML front matter + story.yaml → StoryDefinition; v0 directives; diagnostics with line/col; schema validation | narrative-model, rules-storylets, rules-skill-checks, ruleset-generic | done |
+| runtime-session | IStorySession: commands → events → triggers → selection → render → StoryFrame | tale-compiler, narrative-renderer, rules-modifiers-triggers | done |
+| player-rcl | Blazor RCL: transcript, choices, ruleset-driven character sheet, theme | runtime-session | done |
+| host-desktop | Photino.Blazor host: open story folder/zip | player-rcl | done |
+| host-web | Blazor WASM host: load bundled story / file picker; verify static publish | player-rcl | done |
+| sample-lost-relic | samples/LostRelic: female treasure hunter in an ancient temple; exercises stats, inventory, faction gate, skill check, pronouns/possessives, branching + convergence | tale-compiler | done |
+| e2e-tests | End-to-end test that compiles + plays LostRelic through scripted choices with fixed seed | runtime-session, sample-lost-relic | done |
 
 ## 8. Risks / notes
 - **itch.io and Blazor WASM:** itch serves from a CDN subpath inside an iframe. We need a relative `<base href>` and must check how pre-compressed `.br`/`.gz` files are served (we may need to ship uncompressed). To be verified in M2.
@@ -245,3 +247,38 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 - **Path syntax:** use `entity:path` **everywhere**, in both substitutions and expressions, for consistency (e.g. `player:dex >= 12`). Flagged in case you prefer `player.dex` in expressions.
 - **Event-log growth** in long open-world games: snapshots come later. Not an M1 concern.
 - The no-code path parses text **once at load**. That is accepted under D5; per-frame rendering never parses strings.
+
+## 9. M1 outcome (what was actually built)
+
+Read [ARCHITECTURE.md](ARCHITECTURE.md) for the code tour. Summary of where reality differs from, or sharpens,
+the plan above:
+
+- **Solution file** is `Talewright.slnx` (the new XML format), not `.sln`.
+- **Rendered output type** is `StoryFrame` (Runtime), not `RenderedFrame`. The media placeholder is
+  `RenderedMedia`, not `MediaPlaceholder`.
+- **`Entity` + components** (from `core-entities`) became simpler: characters are `CharacterDefinition` plus stats
+  and inventory in `GameState`. An entity/component model can come with open-world needs; nothing outside Core
+  depends on the representation.
+- **RNG** is a pure function, `DeterministicDice.Roll(seed, index, sides)`, rather than an `IRandomSource`
+  object. Same guarantees, nothing to serialise.
+- **Fall-through diverts:** a choice or check outcome without `-> target` continues at the scene's first matching
+  `->`, evaluated *after* its effects. This was not in the original syntax draft; it removes a lot of repetition.
+  Documented in TALE-SYNTAX.md.
+- **Built-in rulesets:** `generic` and `none` (no stats or checks; tiers only).
+- **Bundled stories** are embedded resources in each host (`stories/<Story>/<path>`), read through
+  `IStoryLibrary`. No HTTP manifest. Desktop also takes folders/zips on the command line; both hosts accept a zip
+  upload.
+- **Web host has no router** (one screen), so subfolder static hosting needs only a `<base href>` change.
+- **Validator** suppresses "unreachable scene" warnings while errors exist (one broken divert used to flood the
+  list).
+- **Verification:** 69 automated tests including 300 seeded random playthroughs of the sample; the desktop
+  app was launched against the sample; the published web build was played to an ending in headless Chromium, and
+  good and broken zips were uploaded.
+
+### Open questions for review
+
+1. Fall-through divert semantics (above): keep?
+2. The `none` ruleset keeps the generic reputation tiers. Should it have no tiers?
+3. Embedding all of `samples/` in both hosts: fine for now, to be replaced by `talewright publish` in M2?
+4. Item names are lowercase in the sample ("sputtering torch") and appear that way on the character sheet. Should
+   the sheet capitalise, or should authors write display case?

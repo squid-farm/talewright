@@ -18,7 +18,9 @@ stats, factions and items. No code is needed. Programmers can extend the engine 
 
 ## Status
 
-Early development. See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
+**Milestone 1 (vertical slice) is complete:** the engine, the `.tale` compiler, the shared Blazor player, and the
+desktop and web hosts all work, and the sample story *The Lost Relic* is playable end to end on both.
+Saves, a publishing CLI, and character creation are next (M2). See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
 
 ## Layout
 
@@ -41,16 +43,25 @@ Requires the .NET 10 SDK.
 ```bash
 dotnet build
 dotnet test
-dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic   # desktop
-dotnet run --project src/Talewright.Host.Web                            # web
+
+# Desktop: native window; bundled samples plus any story folders/zips you pass
+dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic
+
+# Web: dev server (prints a URL)
+dotnet run --project src/Talewright.Host.Web
+
+# Web: static build you can put on any file host
+dotnet publish src/Talewright.Host.Web -c Release -o out/web
+python3 -m http.server 8080 --directory out/web/wwwroot
 ```
 
-On Linux the desktop host needs WebKitGTK (`libwebkit2gtk-4.1`).
+On Linux the desktop host needs WebKitGTK (`libwebkit2gtk-4.1`). Each project has its own README with details.
 
 ## Docs
 
 - [Plan and roadmap](docs/PLAN.md)
-- [Architecture](docs/ARCHITECTURE.md)
+- [Architecture](docs/ARCHITECTURE.md): start here when reading the code; a guided tour with a "where to find X" table
+- Per-project READMEs in each `src/*` folder, plus [samples/README.md](samples/README.md)
 - [`.tale` syntax](docs/TALE-SYNTAX.md)
 - [Architecture decision records](docs/adr/)
 
