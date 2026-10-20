@@ -1,0 +1,68 @@
+// Chapter 2 — the trail and the temple. Shows skill checks, item-gated choices, an entry check,
+// and branches that converge again.
+
+=== trail.river
+@title The River
+
+The trail ends at a brown river, swollen with last night's rain. On the far bank, through the trees, you
+can make out a stair of green stone.
+
+* [Tie off the rope and cross carefully] (requires: player has rope) { player:xp += 25 } -> trail.far-bank
+* [Swim for it] skill-check athletics dc 12
+  success: -> trail.far-bank
+  failure: { player:hp -= 3 } -> trail.swept
+* [Let Tomas find a ford] skill-check guide survival dc 13
+  success: -> trail.far-bank
+  failure: { player:hp -= 1 } -> trail.swept
+
+=== trail.swept
+The current takes your legs out from under you. You claw your way onto the far bank a long way downstream,
+coughing up river and dignity in equal measure.
+{if player:hp < 8}
+You are bleeding from a gash along your arm.
+{/if}
+-> trail.far-bank
+
+=== trail.far-bank
+Tomas squelches up the bank behind you and stares up at the stair.
+
+> guide: Well, {player:first-name}. It's real.
+
+-> temple.door
+
+=== temple.door
+@title The Sealed Door
+
+A door of a single slab blocks the top of the stair. Three glyphs are cut deep into it: a spiral, a closed
+eye, a hand.
+
+* [Close your eyes and press the hand] (requires: flag:knows-glyphs) { faction:explorers-guild += 5; player:xp += 50 } -> temple.hall
+* [Force the door] skill-check athletics dc 14
+  success: { set flag:door-damaged; faction:explorers-guild -= 10 } -> temple.hall
+  failure: { player:hp -= 2 } -> temple.side
+* [Look for another way in] -> temple.side
+
+=== temple.side
+Around the side of the temple, roots have pried open a gap between the stones. It's tight, dark and smells
+of something old.
+
+* [Squeeze through] { player:xp += 10 } -> temple.hall
+
+=== temple.hall
+@title The Hall of Eyes
+
+~ player:xp += 25
+
+Your torch light slides over walls carved with thousands of eyes, all closed{if flag:door-damaged}, and
+over the cracks your forcing left in the doorway{/if}.
+
+::: skill-check perception dc 13
+success: -> temple.niche
+failure: -> temple.altar
+:::
+
+=== temple.niche
+One of the eyes is open. Behind it, in a niche no bigger than your fist, sits a small idol of obsidian.
+
+* [Take the idol] { give player idol; player:xp += 50 } -> temple.altar
+* [Leave it be] -> temple.altar

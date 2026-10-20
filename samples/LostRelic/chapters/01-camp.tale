@@ -1,0 +1,79 @@
+// Chapter 1 — the camp. Shows a hub (@hub) whose options are storylets tagged "camp".
+
+=== camp.arrival
+@title Base Camp
+
+![A clearing at the jungle's edge, tents sagging in the heat](camp-art)
+
+The boat leaves {player:first-name} at the edge of the jungle with a pack, a {item:torch#lower} and
+three weeks of unanswered letters. The {faction:explorers-guild.name} has given {player:pronoun.object}
+one season to find the **Relic of Ysh** before they hand the expedition to someone more *reliable*.
+
+> guide: Ms {player:last-name}. You're later than your letter promised. I'm Tomas — the guild sent me.
+
+{player:last-name#possessive} reputation for punctuality is, {player:pronoun.subject} has to admit, deserved.
+
+-> camp.hub
+
+=== camp.hub
+@title The Camp
+@hub camp
+
+The camp hums with insects. Tomas sharpens a machete by the fire{if var:supplies > 0}, eyeing the supplies
+you bought{/if}.
+
+* [Set out for the temple] -> trail.river
+
+=== camp.supplies
+@title Haggle for supplies
+@tags camp
+@once
+
+A trader with a gold tooth unrolls a blanket of goods. You come away with a {item:rope#lower} and a
+{item:charm#lower} he swears keeps the river spirits polite.
+
+~ give player rope
+~ give player charm
+~ var:supplies += 2
+-> camp.hub
+
+=== camp.guide
+@title Ask Tomas about the temple
+@tags camp
+@once
+
+> guide: The old ones built it to keep something *in*, not people out. The guild knows that. They never write it down.
+
+Tomas tells you about the river crossing, and about the explorer who went in last spring and came out
+talking only in numbers.
+
+{if faction:explorers-guild >= friendly}
+> guide: The guild speaks well of you. I'll do what I can.
+{else}
+> guide: Between us, the guild expects you to fail.
+{/if}
+
+~ faction:explorers-guild += 5
+-> camp.hub
+
+=== camp.journal
+@title Study your journal
+@tags camp
+@once
+@priority 5
+
+You spread {player:pronoun.possessive} field journal across your knees. The glyph rubbings from the museum
+are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
+
+* [Puzzle out the glyphs] skill-check history dc 12
+  success: { set flag:knows-glyphs; player:xp += 50 } -> camp.journal-solved
+  failure: -> camp.journal-failed
+
+=== camp.journal-solved
+It's a warning and an instruction at once: *close your eyes before the spiral, and the hand will open the way.*
+You underline it twice.
+-> camp.hub
+
+=== camp.journal-failed
+The marks blur into each other. You close the journal with a headache and nothing else.
+-> camp.hub

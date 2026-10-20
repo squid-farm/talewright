@@ -1,0 +1,53 @@
+# The Lost Relic — Talewright sample story.
+# Every story is a folder: this manifest plus any number of .tale files (subfolders allowed).
+# See docs/TALE-SYNTAX.md for the full format.
+
+id: lost-relic
+title: The Lost Relic
+version: 0.1.0
+start: camp.arrival
+randomness: checks-only     # dice are rolled only for skill-check directives
+# seed: 1234                # uncomment for the same rolls every playthrough
+
+ruleset:
+  base: generic             # d20-style attributes, skills, hp, xp and levels
+
+characters:
+  player:
+    first-name: Mara
+    last-name: Wilkins
+    pronouns: she
+    stats:
+      str: 12
+      dex: 14
+      int: 13
+      wis: 12
+      athletics: 2
+      perception: 2
+      history: 3
+    inventory: [torch, journal]
+  guide:
+    first-name: Tomas
+    last-name: Okafor
+    pronouns: he
+    stats: { survival: 4, wis: 14 }
+
+factions:
+  explorers-guild: { name: "Explorers' Guild", standing: 5 }
+
+items:
+  torch:   { name: sputtering torch }
+  journal: { name: field journal }
+  rope:    { name: coil of rope }
+  charm:   { name: jade charm, modifiers: { wis: 2 } }
+  idol:    { name: obsidian idol }
+  relic:   { name: Relic of Ysh, modifiers: { cha: 2 } }
+
+vars:
+  supplies: 0
+
+triggers:
+  - id: guild-wary
+    when: faction:explorers-guild <= unfriendly
+    do: set flag:guild-wary
+    once: true

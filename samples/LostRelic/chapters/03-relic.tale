@@ -1,0 +1,51 @@
+// Chapter 3 — the relic and the endings. Shows faction gates, triggers (guild-wary in story.yaml),
+// conditional diverts and several endings.
+
+=== temple.altar
+@title The Altar
+
+At the heart of the temple, on an altar worn smooth by centuries of nothing, lies the **Relic of Ysh**: a
+disc of pale gold, warm as skin.
+
+> guide: {player:first-name}. Whatever you do next, the guild will hear about it.
+
+* [Take the relic] { give player relic; player:xp += 100 } -> ending.return
+* [Leave it where it lies] -> ending.return
+
+=== ending.return
+@title The Return
+
+The walk back to camp is quiet. Tomas keeps glancing at your pack.
+
+{if player has relic}
+* [Hand the relic to the guild] (requires: faction:explorers-guild >= neutral) { take player relic; faction:explorers-guild += 20 } -> ending.guild
+* [Keep it for yourself] { faction:explorers-guild -= 30 } -> ending.keep
+{/if}
+
+-> ending.empty-handed
+
+=== ending.guild
+@title Honoured
+
+The {faction:explorers-guild.name} hangs {player:last-name#possessive} portrait in the great hall, a little
+crooked. Your standing with them is now *{faction:explorers-guild.tier#lower}*.
+{if player has idol}
+Nobody asks about the obsidian idol on your desk.
+{/if}
+-> END
+
+=== ending.keep
+@title The Keeper
+
+You keep the relic. It keeps you, too: you sleep less, and dream of a door with a closed eye.
+{if flag:guild-wary}
+The guild's letters stop coming. Then the guild's people start coming instead.
+{/if}
+-> END
+
+=== ending.empty-handed
+@title Empty-Handed
+
+You return with nothing but {player:pronoun.possessive} notes and a story nobody at the guild quite
+believes. Tomas, at least, buys you a drink.
+-> END
