@@ -1,0 +1,88 @@
+@* Character sheet generated entirely from ruleset metadata: whatever stats a story's ruleset defines are shown,
+   grouped by category. Nothing here knows about "strength" or "hit points". *@
+
+<aside class="tw-sheet" aria-label="Character sheet">
+    <h2>@Character.FullName</h2>
+
+    @foreach (var group in Ruleset.Stats.GroupBy(s => s.Category))
+    {
+        var stats = group.Where(s => group.Key != StatCategory.Skill || State.GetStat(CharacterId, s.Id) > 0).ToList();
+        if (stats.Count == 0)
+        {
+            continue;
+        }
+
+        <h3>@CategoryName(group.Key)</h3>
+        <dl class="tw-stats">
+            @foreach (var stat in stats)
+            {
+                var value = State.GetStat(CharacterId, stat.Id);
+                var baseValue = State.GetBaseStat(CharacterId, stat.Id);
+                <dt>@stat.Name</dt>
+                <dd>
+                    @value
+                    @if (value != baseValue)
+                    {
+                        <span class="tw-modified" title="Base @baseValue, modified by items or rules">(@Signed(value - baseValue))</span>
+                    }
+                </dd>
+            }
+        </dl>
+    }
+
+    @{ var inventory = State.GetInventory(CharacterId).Where(i => i.Value > 0).ToList(); }
+    <h3>Inventory</h3>
+    @if (inventory.Count == 0)
+    {
+        <p class="tw-empty">Nothing.</p>
+    }
+    else
+    {
+        <ul class="tw-inventory">
+            @foreach (var (item, count) in inventory)
+            {
+                <li>@ItemName(item)@(count > 1 ? $" ×{count}" : string.Empty)</li>
+            }
+        </ul>
+    }
+
+    @if (CharacterId == EntityId.Player && State.World.Factions.Count > 0)
+    {
+        <h3>Standing</h3>
+        <dl class="tw-stats">
+            @foreach (var faction in State.World.Factions.Values)
+            {
+                var standing = State.GetStanding(faction.Id);
+                <dt>@faction.Name</dt>
+                <dd>@(Ruleset.TierFor(standing)?.Name ?? standing.ToString()) <span class="tw-modified">(@standing)</span></dd>
+            }
+        </dl>
+    }
+</aside>
+
+@code {
+    /// <summary>Game state to read from.</summary>
+    [Parameter, EditorRequired]
+    public IGameStateView State { get; set; } = default!;
+
+    /// <summary>Whose sheet to show; defaults to the player.</summary>
+    [Parameter]
+    public EntityId CharacterId { get; set; } = EntityId.Player;
+
+    private Ruleset Ruleset => State.World.Ruleset;
+
+    private CharacterDefinition Character => State.GetCharacterDefinition(CharacterId);
+
+    private string ItemName(ItemId id) => State.World.Items.TryGetValue(id, out var item) ? item.Name : id.Value;
+
+    private static string Signed(int value) => value < 0 ? $"−{-value}" : $"+{value}";
+
+    private static string CategoryName(StatCategory category) => category switch
+    {
+        StatCategory.Attribute => "Attributes",
+        StatCategory.Skill => "Skills",
+        StatCategory.Resource => "Resources",
+        StatCategory.Progression => "Progress",
+        _ => "Other",
+    };
+}

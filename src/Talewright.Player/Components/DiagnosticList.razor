@@ -1,0 +1,21 @@
+@* Shows compiler errors and warnings with file:line:column so authors can fix their story. *@
+
+@if (Diagnostics.Count > 0)
+{
+    <ul class="tw-diagnostics">
+        @foreach (var d in Diagnostics.OrderByDescending(d => d.Severity).ThenBy(d => d.Location.File).ThenBy(d => d.Location.Line))
+        {
+            <li class="tw-diagnostic tw-@d.Severity.ToString().ToLowerInvariant()">
+                <span class="tw-diagnostic-where">@d.Location</span>
+                <span class="tw-diagnostic-code">@d.Code</span>
+                <span class="tw-diagnostic-message">@d.Message</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    /// <summary>The diagnostics to list (errors are shown first).</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Diagnostic> Diagnostics { get; set; } = [];
+}

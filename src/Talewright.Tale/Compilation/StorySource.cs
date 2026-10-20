@@ -70,6 +70,31 @@ public sealed class StorySource
         return new StorySource(files);
     }
 
+    /// <summary>
+    /// Reads just <c>title</c> from story.yaml, without compiling (for story pickers). Returns null if it can't.
+    /// </summary>
+    public string? ReadTitle()
+    {
+        if (!Files.TryGetValue(ManifestFileName, out var yaml))
+        {
+            return null;
+        }
+
+        try
+        {
+            var stream = new YamlDotNet.RepresentationModel.YamlStream();
+            stream.Load(new StringReader(yaml));
+            return stream.Documents.FirstOrDefault()?.RootNode is YamlDotNet.RepresentationModel.YamlMappingNode root
+                && root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("title"), out var title)
+                ? (title as YamlDotNet.RepresentationModel.YamlScalarNode)?.Value
+                : null;
+        }
+        catch (YamlDotNet.Core.YamlException)
+        {
+            return null;
+        }
+    }
+
     private static bool IsStoryFile(string path) =>
         Path.GetFileName(path) == ManifestFileName || path.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase);
 }

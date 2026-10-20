@@ -1,0 +1,135 @@
+@* Plays one compiled story: transcript of everything so far, current choices, and a character sheet. *@
+
+<div class="tw-player">
+    <header class="tw-bar">
+        <h1>@Story.Title</h1>
+        <div class="tw-bar-actions">
+            <button type="button" class="tw-link" @onclick="Restart">Restart</button>
+            @if (OnExit.HasDelegate)
+            {
+                <button type="button" class="tw-link" @onclick="() => OnExit.InvokeAsync()">Library</button>
+            }
+        </div>
+    </header>
+
+    <div class="tw-columns">
+        <main class="tw-transcript" aria-live="polite">
+            @for (var i = 0; i < _transcript.Count; i++)
+            {
+                var entry = _transcript[i];
+                var isLatest = i == _transcript.Count - 1;
+                <section class="tw-frame @(isLatest ? "tw-latest" : "tw-past")" tabindex="-1" @ref="_frameRefs[i]">
+                    @if (!string.IsNullOrEmpty(entry.Frame.Title))
+                    {
+                        <h2 class="tw-scene-title">@entry.Frame.Title</h2>
+                    }
+
+                    <DocumentView Document="entry.Frame.Document" />
+
+                    @if (entry.Chosen is not null)
+                    {
+                        <p class="tw-chosen">→ <InlineView Inlines="entry.Chosen" /></p>
+                    }
+                </section>
+            }
+
+            @if (_session.Current is { } current)
+            {
+                if (current.IsEnded)
+                {
+                    <p class="tw-the-end">The End</p>
+                    <button type="button" class="tw-choice" @onclick="Restart">Play again</button>
+                }
+                else
+                {
+                    <ol class="tw-choices">
+                        @for (var i = 0; i < current.Choices.Count; i++)
+                        {
+                            var choice = current.Choices[i];
+                            <li>
+                                <button type="button" class="tw-choice" @onclick="() => Choose(choice)">
+                                    <span class="tw-choice-number">@(i + 1).</span>
+                                    <InlineView Inlines="choice.Label" />
+                                </button>
+                            </li>
+                        }
+                    </ol>
+                }
+            }
+        </main>
+
+        <CharacterSheet State="_session.State" />
+    </div>
+</div>
+
+@code {
+    /// <summary>The compiled story to play.</summary>
+    [Parameter, EditorRequired]
+    public StoryDefinition Story { get; set; } = default!;
+
+    /// <summary>Optional fixed seed (for reproducing a playthrough); otherwise the story's seed or a random one.</summary>
+    [Parameter]
+    public ulong? Seed { get; set; }
+
+    /// <summary>Raised when the player asks to go back to the library. The button is hidden if unset.</summary>
+    [Parameter]
+    public EventCallback OnExit { get; set; }
+
+    private sealed record TranscriptEntry(StoryFrame Frame)
+    {
+        public IReadOnlyList<RenderedInline>? Chosen { get; set; }
+    }
+
+    private readonly List<TranscriptEntry> _transcript = [];
+    private ElementReference[] _frameRefs = [];
+    private StorySession _session = default!;
+    private StoryDefinition? _startedStory;
+    private bool _focusLatest;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_startedStory, Story))
+        {
+            Restart();
+        }
+    }
+
+    private void Restart()
+    {
+        _startedStory = Story;
+        _session = new StorySession(Story, Seed);
+        _transcript.Clear();
+        Append(_session.Start());
+    }
+
+    private void Choose(ChoiceView choice)
+    {
+        _transcript[^1].Chosen = choice.Label;
+        Append(_session.Choose(choice.Key));
+    }
+
+    private void Append(StoryFrame frame)
+    {
+        _transcript.Add(new TranscriptEntry(frame));
+        _frameRefs = new ElementReference[_transcript.Count];
+        _focusLatest = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusLatest && _frameRefs.Length > 0)
+        {
+            _focusLatest = false;
+
+            // Focusing the newest frame scrolls it into view and moves screen readers to the new text, with no JS interop.
+            try
+            {
+                await _frameRefs[^1].FocusAsync();
+            }
+            catch (InvalidOperationException)
+            {
+                // The element can disappear if the player restarts mid-render; nothing to focus then.
+            }
+        }
+    }
+}

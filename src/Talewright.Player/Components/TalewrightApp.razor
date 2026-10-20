@@ -1,0 +1,138 @@
+@* The whole player: pick a story from the library (or upload a .zip), compile it, then play it.
+   Hosts render just this component; everything else is shared between desktop and web. *@
+@inject IStoryLibrary Library
+
+<div class="tw-app">
+    @if (_story is not null)
+    {
+        <StoryPlayer Story="_story" OnExit="BackToLibrary" />
+    }
+    else
+    {
+        <section class="tw-library">
+            <h1>Talewright</h1>
+
+            @if (_entries is null)
+            {
+                <p>Loading stories…</p>
+            }
+            else
+            {
+                <h2>Stories</h2>
+                @if (_entries.Count == 0)
+                {
+                    <p class="tw-empty">No stories found.</p>
+                }
+                <ul class="tw-story-list">
+                    @foreach (var entry in _entries)
+                    {
+                        <li>
+                            <button type="button" class="tw-choice" @onclick="() => OpenAsync(entry)">
+                                <span class="tw-story-title">@entry.Title</span>
+                                <span class="tw-story-origin">@entry.Origin</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+
+                <h2>Open a story file</h2>
+                <p>Choose a <code>.zip</code> containing <code>story.yaml</code> and its <code>.tale</code> files.</p>
+                <InputFile OnChange="UploadAsync" accept=".zip" />
+            }
+
+            @if (_error is not null)
+            {
+                <p class="tw-error" role="alert">@_error</p>
+            }
+
+            @if (_diagnostics.Count > 0)
+            {
+                <h2>@(_failedTitle ?? "Story") has problems</h2>
+                <DiagnosticList Diagnostics="_diagnostics" />
+            }
+        </section>
+    }
+</div>
+
+@code {
+    /// <summary>Library id of a story to open immediately (the desktop host passes this for a command-line path).</summary>
+    [Parameter]
+    public string? AutoStartStoryId { get; set; }
+
+    /// <summary>Largest upload accepted, in bytes.</summary>
+    [Parameter]
+    public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
+
+    private IReadOnlyList<StoryEntry>? _entries;
+    private StoryDefinition? _story;
+    private IReadOnlyList<Diagnostic> _diagnostics = [];
+    private string? _error;
+    private string? _failedTitle;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _entries = await Library.ListAsync();
+        if (AutoStartStoryId is not null && _entries.FirstOrDefault(e => e.Id == AutoStartStoryId) is { } entry)
+        {
+            await OpenAsync(entry);
+        }
+    }
+
+    private async Task OpenAsync(StoryEntry entry)
+    {
+        Reset();
+        try
+        {
+            Compile(await Library.LoadAsync(entry.Id), entry.Title);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException)
+        {
+            _error = $"Couldn't open {entry.Title}: {ex.Message}";
+        }
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        Reset();
+        try
+        {
+            // FromZip needs a seekable stream; browser streams aren't, so buffer first.
+            using var buffer = new MemoryStream();
+            await using (var upload = e.File.OpenReadStream(MaxUploadBytes))
+            {
+                await upload.CopyToAsync(buffer);
+            }
+
+            buffer.Position = 0;
+            Compile(StorySource.FromZip(buffer), e.File.Name);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            _error = $"Couldn't read {e.File.Name}: {ex.Message}";
+        }
+    }
+
+    private void Compile(StorySource source, string title)
+    {
+        var result = StoryCompiler.Compile(source);
+        _diagnostics = result.Diagnostics;
+        if (result.Success)
+        {
+            _story = result.Story;
+            _diagnostics = [];
+        }
+        else
+        {
+            _failedTitle = title;
+        }
+    }
+
+    private void Reset()
+    {
+        _error = null;
+        _failedTitle = null;
+        _diagnostics = [];
+    }
+
+    private void BackToLibrary() => _story = null;
+}

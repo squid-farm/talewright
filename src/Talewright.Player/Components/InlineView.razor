@@ -1,0 +1,50 @@
+@* Renders rendered inline text (styled runs and line breaks) as HTML. Media placeholders are reserved for a
+   future image layer and intentionally produce nothing yet. *@
+
+@foreach (var inline in Inlines)
+{
+    switch (inline)
+    {
+        case RenderedText text:
+            @Styled(text)
+            break;
+        case RenderedLineBreak:
+            <br />
+            break;
+    }
+}
+
+@code {
+    /// <summary>The inlines to render.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RenderedInline> Inlines { get; set; } = [];
+
+    private static RenderFragment Styled(RenderedText text) => builder =>
+    {
+        // Nest one element per style flag so "***both***" becomes <strong><em>…</em></strong>.
+        var open = 0;
+        if (text.Style.HasFlag(TextStyle.Strong))
+        {
+            builder.OpenElement(0, "strong");
+            open++;
+        }
+
+        if (text.Style.HasFlag(TextStyle.Emphasis))
+        {
+            builder.OpenElement(1, "em");
+            open++;
+        }
+
+        if (text.Style.HasFlag(TextStyle.Code))
+        {
+            builder.OpenElement(2, "code");
+            open++;
+        }
+
+        builder.AddContent(3, text.Text);
+        for (var i = 0; i < open; i++)
+        {
+            builder.CloseElement();
+        }
+    };
+}

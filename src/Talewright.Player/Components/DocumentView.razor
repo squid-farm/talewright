@@ -1,0 +1,26 @@
+@* Renders a RenderedDocument: paragraphs, speech and system notes. *@
+
+@foreach (var block in Document.Blocks)
+{
+    switch (block)
+    {
+        case RenderedParagraph paragraph:
+            <p class="tw-paragraph"><InlineView Inlines="paragraph.Inlines" /></p>
+            break;
+        case RenderedSpeech speech:
+            <p class="tw-speech">
+                <span class="tw-speaker">@speech.SpeakerName</span>
+                <span class="tw-line"><InlineView Inlines="speech.Inlines" /></span>
+            </p>
+            break;
+        case RenderedNote note:
+            <p class="tw-note tw-note-@note.Kind.ToString().ToLowerInvariant()" role="status">@note.Text</p>
+            break;
+    }
+}
+
+@code {
+    /// <summary>The document to render.</summary>
+    [Parameter, EditorRequired]
+    public RenderedDocument Document { get; set; } = RenderedDocument.Empty;
+}
