@@ -39,7 +39,9 @@ internal static class StoryValidator
             }
         }
 
-        if (!byId.ContainsKey(start))
+        // Broken references distort the scene graph, so a single bad divert would flag everything after it as
+        // unreachable. Only report reachability once the story is otherwise error-free.
+        if (!byId.ContainsKey(start) || diagnostics.HasErrors)
         {
             return;
         }

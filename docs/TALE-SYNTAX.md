@@ -197,5 +197,5 @@ Every compiler message has a stable code and a `file:line:column` location.
 |---|---|---|
 | `TW1xxx` | Syntax | `TW1005` unbalanced `{if}`/`{else}`/`{/if}`, `TW1009` missing `success:`/`failure:`, `TW1011` malformed choice |
 | `TW2xxx` | References and types | `TW2001` unknown character/stat/item/faction, `TW2002` unknown scene, `TW2003` type mismatch, `TW2004` flag/var never set, `TW2005` unknown `@predicate`, `TW2006` unknown `#modifier` |
-| `TW3xxx` | Story structure | `TW3002` dead-end scene, `TW3003` fall-through with nowhere to fall, `TW3005` skill check without a check rule, `TW3007` missing start scene, `TW3010` duplicate scene; warnings `TW3008` empty hub, `TW3009` unreachable scene |
+| `TW3xxx` | Story structure | `TW3002` dead-end scene, `TW3003` fall-through with nowhere to fall, `TW3005` skill check without a check rule, `TW3007` missing start scene, `TW3010` duplicate scene; warnings `TW3008` empty hub, `TW3009` unreachable scene (only reported once there are no errors, so one broken divert doesn't bury you in warnings) |
 | `TW4xxx` | story.yaml | `TW4001` invalid YAML, `TW4002` missing required key, `TW4003` bad value, `TW4004` unknown ruleset, `TW4005` unknown stat/item; warning `TW4006` unknown key |

@@ -308,6 +308,15 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Broken_diverts_do_not_cascade_into_unreachable_warnings()
+    {
+        var result = Compile("=== a\n-> typo\n=== b\n-> c\n=== c\n-> END");
+
+        Assert.Contains(result.Errors, e => e.Code == "TW2002");
+        Assert.DoesNotContain(result.Warnings, w => w.Code == "TW3009");
+    }
+
+    [Fact]
     public void Inline_conditionals_cannot_cross_formatting()
     {
         Error("=== a\n*{if true}a*{/if}\n-> END", "TW1005");
