@@ -387,6 +387,30 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Rejects_duplicate_trigger_ids()
+    {
+        const string yaml = """
+            id: test
+            title: Test
+            start: a
+            characters:
+              player: { first-name: Mara, pronouns: she }
+            triggers:
+              - id: duplicate
+                when: true
+                do: set flag:first
+              - id: duplicate
+                when: true
+                do: set flag:second
+            """;
+
+        var error = Error("=== a\n-> END", "TW4007", yaml);
+
+        Assert.Contains("Trigger id 'duplicate' is declared more than once", error.Message);
+        Assert.Equal(10, error.Location.Line);
+    }
+
+    [Fact]
     public void Custom_pronouns_and_named_predicates()
     {
         var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive: xyr, possessive-pronoun: xyrs, reflexive: xemself }");

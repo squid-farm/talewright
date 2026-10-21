@@ -388,6 +388,7 @@ internal sealed class StoryYamlReader
             return;
         }
 
+        var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in Sequence(node, "triggers"))
         {
             if (Mapping(item, "trigger") is not { } map)
@@ -396,10 +397,22 @@ internal sealed class StoryYamlReader
             }
 
             CheckKeys(map, "id", "when", "do", "once");
+            var idNode = Get(map, "id");
             var id = RequiredScalar(map, "id");
+            if (id is null)
+            {
+                continue;
+            }
+
+            if (!ids.Add(id))
+            {
+                _diagnostics.Error("TW4007", $"Trigger id '{id}' is declared more than once.", At(idNode ?? item));
+                continue;
+            }
+
             var when = RequiredScalar(map, "when");
             var effects = RequiredScalar(map, "do");
-            if (id is null || when is null || effects is null)
+            if (when is null || effects is null)
             {
                 continue;
             }
