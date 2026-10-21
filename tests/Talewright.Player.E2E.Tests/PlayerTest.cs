@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System.Diagnostics;
 using Microsoft.Playwright;
 using Talewright.Testing;
 using Xunit.Abstractions;
@@ -12,17 +12,30 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     private readonly List<string> _errors = [];
     private readonly string _artifacts = Path.Combine(
         Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? Path.Combine(AppContext.BaseDirectory, "test-results"),
-        host.BrowserName, Guid.NewGuid().ToString("N"));
+        PlayerTarget.IsDesktop ? "linux" : host.BrowserName, Guid.NewGuid().ToString("N"));
+    protected IPlayerDriver Driver { get; private set; } = null!;
     protected IBrowserContext Context { get; private set; } = null!;
     protected IPage Page { get; private set; } = null!;
     protected ILocator Latest => Page.GetByRole(AriaRole.Region, new() { Name = "Current passage" });
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
+    protected virtual bool AutoStartDesktop => true;
 
     public async Task InitializeAsync()
     {
         Directory.CreateDirectory(_artifacts);
         output.WriteLine($"Evidence: {_artifacts}");
+        if (PlayerTarget.IsDesktop)
+        {
+            Driver = new NativePlayerDriver(_artifacts);
+            if (AutoStartDesktop)
+            {
+                await Driver.StartAsync();
+            }
+
+            return;
+        }
+
         output.WriteLine($"Browser: {host.BrowserName} {host.Browser.Version}; .NET: {Environment.Version}");
         Context = await host.Browser.NewContextAsync(new BrowserNewContextOptions
         {
@@ -32,6 +45,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         Context.SetDefaultTimeout(10_000);
         await Context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true, Sources = true });
         Page = await Context.NewPageAsync();
+        Driver = new BrowserPlayerDriver(Page);
         Page.PageError += (_, error) => _errors.Add("Uncaught: " + error);
         Page.Console += (_, message) =>
         {
@@ -58,49 +72,62 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         await UploadBytes(fixture.Id + ".zip", fixture.Zip(prefix));
 
     protected async Task UploadBytes(string name, byte[] bytes) =>
-        await Page.GetByLabel("Story archive").SetInputFilesAsync(new FilePayload
-        {
-            Name = name,
-            MimeType = "application/zip",
-            Buffer = bytes,
-        });
+        await Driver.UploadAsync(name, bytes);
 
     protected async Task Choose(string label) =>
-        await Choices.Filter(new() { HasTextRegex = new Regex(@"^\s*\d+\.\s*" + Regex.Escape(label) + @"\s*$") }).ClickAsync();
+        await Driver.ChooseAsync(label);
 
-    protected async Task Library() => await Page.GetByRole(AriaRole.Button, new() { Name = "Library", Exact = true }).ClickAsync();
+    protected async Task Library() => await Driver.ClickAsync("Library");
 
     protected async Task Observe(PlayerStep step)
     {
-        await Expect(Latest).ToBeVisibleAsync();
-        if (step.Contains.Length > 0)
+        await AssertState(state =>
         {
-            await Expect(Latest).ToContainTextAsync(step.Contains);
-        }
-
-        if (step.Choices is not null)
-        {
-            await Expect(Choices).ToHaveCountAsync(step.Choices.Length);
-            for (var i = 0; i < step.Choices.Length; i++)
+            Assert.True(state.PassageVisible, "Current passage is visible.");
+            Assert.Contains(step.Contains, state.Passage);
+            if (step.Choices is not null)
             {
-                await Expect(Choices.Nth(i)).ToHaveTextAsync($"{i + 1}. {step.Choices[i]}");
+                Assert.Equal(step.Choices, state.Choices);
             }
-        }
 
-        foreach (var text in step.Sheet ?? [])
-        {
-            await Expect(Sheet).ToContainTextAsync(text);
-        }
+            foreach (var text in step.Sheet ?? [])
+            {
+                Assert.Contains(text, state.Sheet);
+            }
 
-        if (step.Ended)
+            if (step.Ended)
+            {
+                Assert.True(state.Ended, "The ended story offers Play again.");
+                Assert.Contains("THE END", state.Transcript.ToUpperInvariant());
+            }
+        });
+    }
+
+    protected async Task AssertState(Action<PlayerObservation> assertion)
+    {
+        var timer = Stopwatch.StartNew();
+        while (true)
         {
-            await Expect(Page.GetByText("The End", new() { Exact = true })).ToBeVisibleAsync();
-            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Play again", Exact = true })).ToBeVisibleAsync();
+            var state = await Driver.ObserveAsync();
+            try
+            {
+                assertion(state);
+                return;
+            }
+            catch (Xunit.Sdk.XunitException) when (timer.Elapsed < TimeSpan.FromSeconds(15))
+            {
+                await Task.Delay(100);
+            }
         }
     }
 
-    public async Task DisposeAsync()
+    public virtual async Task DisposeAsync()
     {
+        if (Driver is not null)
+        {
+            await Driver.DisposeAsync();
+        }
+
         if (Context is null)
         {
             return;

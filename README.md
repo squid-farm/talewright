@@ -70,7 +70,8 @@ python3 tests/run_e2e.py web       # Chromium, Firefox, WebKit; real Release-pub
 python3 tests/run_e2e.py linux     # real Photino / installed WebKitGTK, through AT-SPI
 ```
 
-These suites use shared, programmatically defined stories rather than sample-specific playthroughs.
+Both targets use one C#/xUnit E2E project with shared, programmatically defined stories rather than
+sample-specific playthroughs. Playwright drives browsers; a thin AT-SPI adapter drives Linux Photino.
 UI tests are opt-in; ordinary `dotnet test` still runs the fast .NET suite without browsers.
 See [tests/README.md](tests/README.md) for Linux prerequisites, targeted commands, coverage, artifacts,
 and Windows/macOS desktop options.

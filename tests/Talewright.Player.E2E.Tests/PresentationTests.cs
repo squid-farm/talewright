@@ -5,6 +5,7 @@ using static Microsoft.Playwright.Assertions;
 
 namespace Talewright.Player.E2E.Tests;
 
+[Trait("Host", "Browser")]
 public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
     [Theory]

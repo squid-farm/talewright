@@ -409,10 +409,11 @@ One xUnit test project per engine project, under `tests/` (the generic ruleset i
 | `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
 | `Talewright.Tale.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
 | `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, and sample compilation smoke |
-| `Talewright.Player.E2E.Tests` | production Release web host in Chromium, Firefox, and WebKit; opt-in, outside the root solution |
+| `Talewright.Player.E2E.Tests` | one C#/xUnit suite: production Release web host in Chromium, Firefox, and WebKit plus real Linux Photino; opt-in, outside the root solution |
 
-The player has persistent browser regression tests and actual Linux Photino tests through AT-SPI.
-Both reuse C#-defined story fixtures from `tests/Talewright.TestStories`; generated ZIPs and folders are not
+The player has one C#/xUnit authoring surface with shared assertions behind browser and Linux drivers.
+Playwright handles browsers; Python is only a thin AT-SPI command adapter for actual Linux Photino,
+not a second test suite. Both reuse C#-defined story fixtures from `tests/Talewright.TestStories`; generated ZIPs and folders are not
 checked in or shipped. Sample-specific routes are deliberately not the detailed UI test contract.
 See [testing guidance](../tests/README.md) for the per-host coverage matrix, native prerequisites, commands,
 failure evidence, and the distinction between Playwright WebKit and system webviews.
