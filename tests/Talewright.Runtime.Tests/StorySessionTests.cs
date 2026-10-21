@@ -257,4 +257,33 @@ public class StorySessionTests
         var frame = session.Start();
         Assert.Equal("Level 2.\n\n[Experience +150 (150)]\n\n[Level 2!]", Text(frame));
     }
+
+    [Fact]
+    public void Level_triggers_fire_after_the_level_up_in_the_same_choice()
+    {
+        const string yaml = """
+            id: test
+            title: Test
+            start: camp
+            randomness: off
+            characters:
+              player: { first-name: Mara, pronouns: she }
+            triggers:
+              - id: level-two
+                when: player:level >= 2
+                do: set flag:leveled
+                once: true
+            """;
+        var session = new StorySession(Compile("""
+            === camp
+            * [Earn experience] { player:xp += 150 } -> END
+            """, yaml));
+
+        session.Start();
+        var frame = session.Choose("c0");
+
+        Assert.True(frame.IsEnded);
+        Assert.True(session.State.GetFlag(new FlagId("leveled")));
+        Assert.Contains(session.Events, e => e is TriggerFired { TriggerId: "level-two" });
+    }
 }

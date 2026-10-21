@@ -247,11 +247,35 @@ public sealed class StorySession : IStorySession
     /// <summary>Runs triggers, then applies any level-ups, after any batch of changes.</summary>
     private void AfterChanges()
     {
+        for (var pass = 0; pass < TriggerEngine.MaxPasses; pass++)
+        {
+            _triggers.Run(_log);
+            var levelChanges = LevelChanges();
+            if (levelChanges.Count == 0)
+            {
+                return;
+            }
+
+            _log.AppendRange(levelChanges);
+        }
+
         _triggers.Run(_log);
+        if (LevelChanges().Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Level-up consequences did not settle after {TriggerEngine.MaxPasses} passes.");
+        }
+    }
+
+    private List<GameEvent> LevelChanges()
+    {
+        var changes = new List<GameEvent>();
         foreach (var character in Story.World.Characters.Keys)
         {
-            _log.AppendRange(StateChanges.CheckLevel(_log.State, character).ToList());
+            changes.AddRange(StateChanges.CheckLevel(_log.State, character));
         }
+
+        return changes;
     }
 
     private DivertTarget? FirstMatchingDivert(SceneDefinition scene) =>

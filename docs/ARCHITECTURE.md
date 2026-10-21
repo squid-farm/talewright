@@ -178,7 +178,8 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
   result, and appends `SkillCheckResolved`.
 - **`Triggers/TriggerEngine.cs`**: `TriggerDefinition(Id, When, Effects, Once)`. After every change the runtime
   calls `Run(log)`, which fires triggers whose condition has become true (edge-triggered: it fires on
-  false→true, not every frame). It loops until stable, capped at `MaxPasses = 8` to stop trigger ping-pong.
+  false→true, not every frame). It loops until stable, capped at `MaxPasses = 32`; reaching the cap with
+  eligible triggers remaining throws an error instead of silently skipping effects.
 - **`Storylets/StoryletSelector.cs`**: `IStorylet` (Id, Requires, Tags, Priority, Once) and `SelectEligible(…,
 tag, context)`. Eligible = has the tag, requirements hold, and not already visited if `Once`. Ordered by
   priority (high first), then declaration order. `SceneDefinition` implements `IStorylet`.

@@ -17,7 +17,7 @@ public sealed record TriggerDefinition(string Id, Expr When, IReadOnlyList<Effec
 /// </summary>
 public sealed class TriggerEngine
 {
-    public const int MaxPasses = 8;
+    public const int MaxPasses = 32;
 
     private readonly IReadOnlyList<TriggerDefinition> _triggers;
     private readonly NamedPredicateRegistry _predicates;
@@ -51,9 +51,10 @@ public sealed class TriggerEngine
     public IReadOnlyList<string> Run(EventLog log)
     {
         var fired = new List<string>();
-        for (var pass = 0; pass < MaxPasses; pass++)
+        for (var pass = 0; pass <= MaxPasses; pass++)
         {
             var firedThisPass = false;
+            var pending = new List<string>();
             foreach (var trigger in _triggers)
             {
                 var isTrue = ExpressionEvaluator.IsTrue(trigger.When, new EvaluationContext(log.State, _predicates));
@@ -70,18 +71,37 @@ public sealed class TriggerEngine
                     continue;
                 }
 
+                if (pass == MaxPasses)
+                {
+                    pending.Add(trigger.Id);
+                    continue;
+                }
+
                 log.Append(new TriggerFired(trigger.Id));
                 EffectExecutor.ExecuteAll(trigger.Effects, log, _predicates);
                 fired.Add(trigger.Id);
                 firedThisPass = true;
             }
 
+            if (pass == MaxPasses)
+            {
+                if (pending.Count > 0)
+                {
+                    var firedIds = string.Join(", ", fired.Distinct(StringComparer.Ordinal));
+                    throw new InvalidOperationException(
+                        $"Trigger cascade did not settle after {MaxPasses} passes. " +
+                        $"Fired: {firedIds}. Still eligible: {string.Join(", ", pending)}.");
+                }
+
+                return fired;
+            }
+
             if (!firedThisPass)
             {
-                break;
+                return fired;
             }
         }
 
-        return fired;
+        throw new InvalidOperationException("Trigger cascade pass accounting failed.");
     }
 }

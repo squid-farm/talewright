@@ -156,6 +156,28 @@ public class RulesTests
     }
 
     [Fact]
+    public void Triggers_cascade_through_more_than_eight_passes()
+    {
+        var (engine, log, flags) = CreateTriggerChain(32);
+
+        var fired = engine.Run(log);
+
+        Assert.Equal(32, fired.Count);
+        Assert.True(log.State.GetFlag(flags[^1]));
+    }
+
+    [Fact]
+    public void Trigger_cascade_throws_when_it_does_not_settle_within_the_limit()
+    {
+        var (engine, log, _) = CreateTriggerChain(40);
+
+        var error = Assert.Throws<InvalidOperationException>(() => engine.Run(log));
+
+        Assert.Contains($"did not settle after {TriggerEngine.MaxPasses} passes", error.Message);
+        Assert.Contains("chain-32", error.Message);
+    }
+
+    [Fact]
     public void Skill_checks_roll_seeded_dice_and_record_events()
     {
         var check = new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14));
@@ -170,6 +192,23 @@ public class RulesTests
         Assert.IsType<DiceRolled>(first.Events[0]);
         Assert.IsType<SkillCheckResolved>(first.Events[1]);
         Assert.Equal(1, first.State.RollCount);
+    }
+
+    private (TriggerEngine Engine, EventLog Log, FlagId[] Flags) CreateTriggerChain(int count)
+    {
+        var log = NewLog();
+        var flags = Enumerable.Range(0, count + 1).Select(index => new FlagId($"chain-{index}")).ToArray();
+        var triggers = Enumerable.Range(0, count)
+            .Reverse()
+            .Select(index => new TriggerDefinition(
+                $"chain-{index}",
+                new FlagRef(flags[index]),
+                [new SetFlag(flags[index + 1], true)],
+                Once: false))
+            .ToArray();
+        var engine = new TriggerEngine(triggers, NamedPredicateRegistry.Empty, log.State);
+        EffectExecutor.Execute(new SetFlag(flags[0], true), log, NamedPredicateRegistry.Empty);
+        return (engine, log, flags);
     }
 
     [Fact]
