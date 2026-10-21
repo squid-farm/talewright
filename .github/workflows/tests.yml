@@ -20,7 +20,7 @@ jobs:
       - name: Check bounded story and replay performance budgets
         env:
           DOTNET_TieredCompilation: '0'
-        run: dotnet run --project tests/Talewright.Benchmarks -c Release --no-build
+        run: dotnet run --project tests/Talewright.Benchmarks -c Release
       - name: Require executed unit tests
         run: |
           python3 - <<'PY'
