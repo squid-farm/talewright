@@ -20,6 +20,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
     protected virtual bool AutoStartDesktop => true;
+    protected virtual bool StartsInLibrary => true;
 
     public async Task InitializeAsync()
     {
@@ -64,8 +65,11 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
             }
         };
         await Page.GotoAsync(host.BaseUrl);
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
+        if (StartsInLibrary)
+        {
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
+        }
     }
 
     protected async Task Upload(StoryFixture fixture, string prefix = "") =>

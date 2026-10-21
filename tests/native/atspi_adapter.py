@@ -40,8 +40,9 @@ class Desktop:
         self.output = output
         output.mkdir(parents=True, exist_ok=True)
         self.log = (output / "app.log").open("w")
+        command = ["dotnet", str(executable)] if executable.suffix == ".dll" else [str(executable)]
         self.process = subprocess.Popen(
-            ["dotnet", str(executable), *paths], cwd=executable.parent,
+            [*command, *paths], cwd=executable.parent,
             stdout=self.log, stderr=subprocess.STDOUT,
         )
 

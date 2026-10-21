@@ -23,7 +23,9 @@ jobs:
           from pathlib import Path
           import xml.etree.ElementTree as ET
           reports = list(Path("artifacts/unit").glob("*.trx"))
-          assert len(reports) == 5, f"Expected five unit test reports; found {len(reports)}"
+          projects = ET.parse("Talewright.slnx").findall(".//Project")
+          expected = sum(project.attrib["Path"].endswith(".Tests.csproj") for project in projects)
+          assert len(reports) == expected, f"Expected {expected} unit test reports; found {len(reports)}"
           for report in reports:
               counters = ET.parse(report).find(".//{*}Counters")
               assert counters is not None and int(counters.attrib["executed"]) > 0, f"No tests executed: {report}"
@@ -50,6 +52,17 @@ jobs:
           global-json-file: global.json
       - run: python3 tests/run_e2e.py install-browsers --browser ${{ matrix.browser }}
       - run: python3 tests/run_e2e.py web --browser ${{ matrix.browser }}
+      - name: Verify standalone story under a nested static path
+        env:
+          BROWSER: ${{ matrix.browser }}
+          TALEWRIGHT_STANDALONE: '1'
+          TALEWRIGHT_WEB_ROOT: ${{ github.workspace }}/artifacts/standalone-web
+          TALEWRIGHT_WEB_BASE_PATH: /games/published
+        run: |
+          dotnet run --project src/Talewright.Cli -c Release -- publish samples/LostRelic -a --target web --output artifacts/standalone-web.zip
+          unzip -q artifacts/standalone-web.zip -d artifacts/standalone-web
+          dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build --filter Artifact=Standalone \
+            --logger "trx;LogFileName=standalone-${BROWSER}.trx" --results-directory artifacts/test-results
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -74,6 +87,16 @@ jobs:
       - name: Verify native chooser and accessibility before the full suite
         run: python3 tests/run_e2e.py linux --probe
       - run: python3 tests/run_e2e.py linux
+      - name: Verify self-contained standalone desktop executable
+        env:
+          TALEWRIGHT_STANDALONE: '1'
+          TALEWRIGHT_DESKTOP_EXECUTABLE: ${{ github.workspace }}/artifacts/standalone-linux/start.sh
+        run: |
+          cp artifacts/test-results/linux.trx artifacts/test-results/linux-regression.trx
+          dotnet run --project src/Talewright.Cli -c Release -- publish samples/LostRelic -a --target desktop --output artifacts/standalone-linux.zip
+          unzip -q artifacts/standalone-linux.zip -d artifacts/standalone-linux
+          python3 tests/run_e2e.py linux --filter Artifact=Standalone
+          mv artifacts/test-results/linux.trx artifacts/test-results/linux-standalone.trx
       - uses: actions/upload-artifact@v4
         if: always()
         with:

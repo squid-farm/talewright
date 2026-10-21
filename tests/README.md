@@ -38,7 +38,8 @@ dependency. CI packs the `Talewright` and `Talewright.Player` libraries and the 
 and builds isolated engine-only and Razor consumers using a fresh package cache.
 This checks real package references, the Player's transitive engine dependency,
 and its CSS/JavaScript assets, not just project-reference builds. CI also packs and installs
-the separate `Talewright.Cli` tool, running JSON validation outside the checkout.
+the separate `Talewright.Cli` tool, running JSON validation and story/standalone
+publication outside the checkout.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_ci.py' -v
@@ -97,6 +98,36 @@ TALEWRIGHT_WEB_ROOT="$PWD/artifacts/web/wwwroot" BROWSER=webkit \
 ```
 
 Use the helper for the normal path; direct invocation requires the matching browser binaries to be installed.
+
+### Standalone publisher artifacts
+
+CI also publishes a selected story with no development samples and tests the
+extracted ZIP. Standalone cases are explicitly skipped in normal development-host
+runs; opt in with `TALEWRIGHT_STANDALONE=1` and `Artifact=Standalone`.
+These checks verify auto-start, title, play, save/load across a host restart,
+history, and (in browsers) a one-story library, real styling, JS and network errors.
+
+```bash
+dotnet run --project src/Talewright.Cli -c Release -- \
+  publish samples/LostRelic -a --target web --output artifacts/game-web.zip
+unzip artifacts/game-web.zip -d artifacts/game-web
+TALEWRIGHT_STANDALONE=1 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/game-web" \
+  TALEWRIGHT_WEB_BASE_PATH=/games/published BROWSER=chromium \
+  dotnet test tests/Talewright.Player.E2E.Tests -c Release --filter Artifact=Standalone
+
+dotnet run --project src/Talewright.Cli -c Release -- \
+  publish samples/LostRelic -a --target desktop --output artifacts/game-desktop.zip
+unzip artifacts/game-desktop.zip -d artifacts/game-desktop
+TALEWRIGHT_STANDALONE=1 TALEWRIGHT_DESKTOP_EXECUTABLE="$PWD/artifacts/game-desktop/start.sh" \
+  python3 tests/run_e2e.py linux --filter Artifact=Standalone
+```
+
+The second command publishes all six OS/CPU builds; the native test launches the
+universal ZIP's actual launcher and selected self-contained Linux binary.
+`--runtime linux-x64` instead creates a flat single-runtime archive; point
+`TALEWRIGHT_DESKTOP_EXECUTABLE` at its `Talewright.Host.Desktop` binary.
+`TALEWRIGHT_PUBLISHED_TITLE` overrides the expected title for another story.
+Windows/macOS/ARM64 build verification is not a substitute for runtime testing.
 
 Each case records a screenshot, DOM, trace, and browser-error list under
 `artifacts/test-results/<browser>/<case-id>/`. The xUnit output associates the case with that directory.

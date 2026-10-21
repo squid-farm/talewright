@@ -83,7 +83,8 @@ def main():
         environment = dict(os.environ, GTK_MODULES="gail:atk-bridge", GIO_USE_VFS="local",
                            GIO_USE_VOLUME_MONITOR="unix", TALEWRIGHT_TARGET="linux",
                            TALEWRIGHT_TEST_RESULTS=str(results),
-                           TALEWRIGHT_DESKTOP_EXECUTABLE=str(ROOT / "src/Talewright.Host.Desktop/bin/Release/net10.0/Talewright.Host.Desktop.dll"))
+                           TALEWRIGHT_DESKTOP_EXECUTABLE=os.environ.get("TALEWRIGHT_DESKTOP_EXECUTABLE",
+                               str(ROOT / "src/Talewright.Host.Desktop/bin/Release/net10.0/Talewright.Host.Desktop.dll")))
         for variable, child in [("XDG_CONFIG_HOME", "config"), ("XDG_CACHE_HOME", "cache"),
                                 ("XDG_DATA_HOME", "data"), ("XDG_RUNTIME_DIR", "runtime")]:
             directory = temporary / child
