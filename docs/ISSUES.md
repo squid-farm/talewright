@@ -44,14 +44,14 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 | Id                  | Sev | Status | Area        | Summary                                                               | Effort |
 | ------------------- | --- | ------ | ----------- | --------------------------------------------------------------------- | ------ |
-| [BUG-001](#bug-001) | S1  | open   | Tale / yaml | A stat with `min > max` compiles, then crashes when the story starts  | XS     |
-| [BUG-002](#bug-002) | S2  | open   | Runtime     | Triggers that depend on `level` are not re-evaluated after a level-up | XS     |
-| [BUG-003](#bug-003) | S2  | open   | Tale / yaml | Duplicate trigger ids compile and silently suppress each other        | XS     |
-| [BUG-004](#bug-004) | S2  | open   | Tale / zip  | Zip loading has no limit on decompressed size (zip bomb)              | S      |
-| [BUG-005](#bug-005) | S3  | open   | Rules       | The trigger cascade stops silently at 8 passes                        | S      |
-| [BUG-006](#bug-006) | S3  | open   | Rules       | Integer overflow in effects and arithmetic wraps instead of clamping  | S      |
-| [BUG-007](#bug-007) | S3  | open   | Core        | `Ruleset` collections can be mutated by casting them back             | XS     |
-| [BUG-008](#bug-008) | S3  | open   | Tale        | Commented-out `set flag:` / `var:` assignments still auto-declare     | S      |
+| [BUG-001](#bug-001) | S1  | fixed (`c61a79f`)  | Tale / yaml | A stat with `min > max` compiles, then crashes when the story starts  | XS     |
+| [BUG-002](#bug-002) | S2  | fixed (`e0b7e7d`)  | Runtime     | Triggers that depend on `level` are not re-evaluated after a level-up | XS     |
+| [BUG-003](#bug-003) | S2  | fixed (`a0bfecb`)  | Tale / yaml | Duplicate trigger ids compile and silently suppress each other        | XS     |
+| [BUG-004](#bug-004) | S2  | fixed (`14e2d37`)  | Tale / zip  | Zip loading has no limit on decompressed size (zip bomb)              | S      |
+| [BUG-005](#bug-005) | S3  | fixed (`e0b7e7d`)  | Rules       | The trigger cascade stops silently at 8 passes                        | S      |
+| [BUG-006](#bug-006) | S3  | deferred (M2)      | Rules       | Integer overflow in effects and arithmetic wraps instead of clamping  | S      |
+| [BUG-007](#bug-007) | S3  | fixed (`124f14e`)  | Core        | `Ruleset` collections can be mutated by casting them back             | XS     |
+| [BUG-008](#bug-008) | S3  | deferred (M2)      | Tale        | Commented-out `set flag:` / `var:` assignments still auto-declare     | S      |
 
 ---
 
@@ -60,7 +60,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **A stat with `min > max` compiles, then crashes when the story starts.**
 
 - **Severity:** S1 _[reviewer: P1]_
-- **Status:** open
+- **Status:** fixed (`c61a79f`)
 - **Area / location:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs` (custom `ruleset.stats` reading, around
   line 176); the crash is in `GameState.CreateInitial` → `StatDefinition.Clamp` → `Math.Clamp`.
 - **Source:** review session 2026-10-20
@@ -69,9 +69,8 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
   generic error banner instead of a diagnostic.
 - **Why it matters:** this breaks the compiler's promise that a clean compile means a playable story. It is easy
   to hit with a typo.
-- **Proposed fix:** in the YAML reader, report `TW4003` ("min must not be greater than max") on the `min` node and
-  skip the stat. Optionally also warn when `default` is outside the range (it is clamped today, so that is not a
-  crash). Add a compiler test.
+- **Resolution:** the YAML reader reports `TW4003` on the `min` node and skips the invalid stat. A compiler
+  regression test covers the diagnostic.
 - **Effort:** XS
 
 ### BUG-002
@@ -79,7 +78,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **Triggers that depend on `level` are not re-evaluated after a level-up.**
 
 - **Severity:** S2 _[reviewer: P1]_
-- **Status:** open
+- **Status:** fixed (`e0b7e7d`)
 - **Area / location:** `src/Talewright.Runtime/StorySession.cs`, `AfterChanges()` (around line 248).
 - **Source:** review session 2026-10-20
 - **What happens:** `AfterChanges` runs triggers, then `CheckLevel`. A trigger such as `when: player:level >= 3`
@@ -87,9 +86,9 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
   to an unrelated choice. If the level-up happens in the final scene, the trigger never fires at all. The reverse
   also applies: a trigger that grants XP can cause a level-up, which is handled, but a level-up that should then
   fire another trigger is not.
-- **Proposed fix:** loop `triggers.Run` and `CheckLevel` until neither produces events, with a bounded iteration
-  count (same idea as `TriggerEngine.MaxPasses`). Add a runtime test with an XP grant leading to a level trigger in
-  the same choice.
+- **Resolution:** triggers and level checks now repeat until stable, bounded by 32 passes; failure to settle throws
+  an explicit error. A runtime regression test verifies a level-dependent trigger fires on the same choice that
+  grants the XP.
 - **Effort:** XS
 
 ### BUG-003
@@ -97,7 +96,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **Duplicate trigger ids compile and silently suppress each other.**
 
 - **Severity:** S2 _[reviewer: P1]_
-- **Status:** open
+- **Status:** fixed (`a0bfecb`)
 - **Area / location:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs`, `ReadTriggers` (around line 401);
   behaviour in `src/Talewright.Rules/Triggers/TriggerEngine.cs`.
 - **Source:** review session 2026-10-20
@@ -106,8 +105,8 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
   `once` triggers with the same id also block each other.
 - **Why it matters:** this is likely when copy-pasting triggers. It produces no error and the behaviour looks
   random.
-- **Proposed fix:** report an error (new code, e.g. `TW4007` duplicate trigger id) on the second occurrence. Add it
-  to the diagnostics table in TALE-SYNTAX.md §7 and add a compiler test.
+- **Resolution:** the second occurrence reports `TW4007`; the code is documented in TALE-SYNTAX.md §7 and covered
+  by a compiler regression test.
 - **Effort:** XS
 
 ### BUG-004
@@ -115,7 +114,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **Zip loading has no limit on decompressed size (zip bomb).**
 
 - **Severity:** S2 _[reviewer: P1]_
-- **Status:** open
+- **Status:** fixed (`14e2d37`)
 - **Area / location:** `src/Talewright.Tale/Compilation/StorySource.cs`, `FromZip` (around line 67).
 - **Source:** review session 2026-10-20
 - **What happens:** every story-file entry is read fully into memory. The 20 MB upload limit in `TalewrightApp`
@@ -124,10 +123,10 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 - **Why S2 rather than S1:** everything runs client-side, so the only victim is the person who opened the file. No
   server or other user is affected. It matters more once stories are shared in the community, because opening a
   story from a stranger should be safe.
-- **Proposed fix:** add limits to `FromZip` (a parameter or `CompilerOptions`-style options), for example a
-  maximum entry count, maximum bytes per file (e.g. 5 MB) and maximum total expanded bytes (e.g. 50 MB). Enforce
-  them by counting bytes as they are read, not by trusting `entry.Length`. Throw `InvalidDataException` with a
-  clear message; `TalewrightApp` already shows that error. Add a test with a highly compressible entry.
+- **Resolution:** `FromZip` counts actual bytes read and caps accepted story files at 1,000 entries, 5 MiB per
+  file, and 50 MiB total. It throws a clear `InvalidDataException` on a limit breach; tests cover highly
+  compressible input, aggregate expansion, and entry count. These limits apply to text files only; future media
+  support should define separate type-specific limits.
 - **Effort:** S
 
 ### BUG-005
@@ -135,20 +134,16 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **The trigger cascade stops silently at 8 passes.**
 
 - **Severity:** S3 _[reviewer: P2]_
-- **Status:** open
+- **Status:** fixed (`e0b7e7d`)
 - **Area / location:** `src/Talewright.Rules/Triggers/TriggerEngine.cs`, `Run` (around line 54).
 - **Source:** review session 2026-10-20
-- **What happens:** `Run` stops after `MaxPasses = 8` even if triggers are still becoming true. Their effects are
-  skipped until some later change happens to call `Run` again. Nothing reports that the cap was hit.
+- **What happens:** `Run` stopped after `MaxPasses = 8` even if triggers were still becoming true. Their effects
+  were skipped until some later change happened to call `Run` again, without reporting that the cap was hit.
 - **Why S3:** it needs a chain of more than 8 dependent triggers, or a ping-pong loop, which is unusual in VN-sized
   stories. But when it does happen it is very hard to debug.
-- **Proposed fix:** decide which behaviour is wanted:
-  - **(a)** If the last allowed pass still fired something, throw a descriptive exception naming the triggers
-    involved. That treats it as an authoring bug, matching how a ping-pong loop really is one.
-  - **(b)** Keep running but emit a diagnostic event or note.
-
-  Recommendation: (a), plus raising the cap (e.g. 32) so long legitimate chains work. Add a test for both the
-  long-chain and the ping-pong cases.
+- **Resolution:** the limit is now 32 passes. A final read-only eligibility pass detects work remaining beyond
+  the limit and throws an `InvalidOperationException` naming fired and still-eligible triggers. Tests cover a
+  32-pass chain and a cascade that exceeds the limit.
 
 - **Effort:** S
 
@@ -157,7 +152,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **Integer overflow in effects and arithmetic wraps instead of clamping.**
 
 - **Severity:** S3 _[reviewer: P2]_
-- **Status:** open
+- **Status:** deferred (M2)
 - **Area / location:** `src/Talewright.Rules/Effects/Effects.cs`, `Apply` (around line 66);
   `src/Talewright.Rules/Expressions/ExpressionEvaluator.cs` (`+`, `-`, `*` on `int`).
 - **Source:** review session 2026-10-20
@@ -169,13 +164,14 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
   `Effects.Apply` and the evaluator's `+ - *`. This is preferred over `checked`, which would crash at play time.
   Optionally, the compiler could warn on literal constants that exceed range.
 - **Effort:** S
+- **Deferral:** revisit during M2; the reported extreme-value scenario is not needed for the M1 core play loop.
 
 ### BUG-007
 
 **`Ruleset` collections can be mutated by casting them back.**
 
 - **Severity:** S3 _[reviewer: P2]_
-- **Status:** open
+- **Status:** fixed (`124f14e`)
 - **Area / location:** `src/Talewright.Core/Rulesets/Ruleset.cs`, constructor (lines 24–26).
 - **Source:** review session 2026-10-20
 - **What happens:** `Stats`, `Tiers` and `Modifiers` are arrays and `StatsById` is a `Dictionary`, exposed as
@@ -183,8 +179,8 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
   by running games, and `Stats` and `StatsById` can drift apart.
 - **Why S3:** only C# extension code could do this, and only deliberately. No story can. It is worth fixing before
   the NuGet packages are public (M2), because the docs promise rulesets are immutable.
-- **Proposed fix:** store `Array.AsReadOnly(...)`/`ReadOnlyCollection` and a `FrozenDictionary` (available in
-  .NET 8+, and trim-safe). Add a test that the exposed collections can't be cast to a mutable type.
+- **Resolution:** the list properties now expose read-only copies, and `StatsById` uses a `FrozenDictionary`.
+  Tests verify that casting to collection interfaces does not permit mutation.
 - **Effort:** XS
 
 ### BUG-008
@@ -192,7 +188,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 **Commented-out `set flag:` / `var:` assignments still declare the flag or variable.**
 
 - **Severity:** S3
-- **Status:** open
+- **Status:** deferred (M2)
 - **Area / location:** `src/Talewright.Tale/Compilation/StoryCompiler.cs`, `WithAutoDeclarations` and the
   `FlagAssignment` / `VariableAssignment` regexes.
 - **Source:** Project Lead (review comment on the pre-scan regexes); verified 2026-10-20
@@ -216,6 +212,8 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
   compiler shape and also removes the `SceneHeader` regex. Cheaper interim fix: strip `//` comment lines before
   running the regexes.
 - **Effort:** S (interim) / M (two-pass)
+- **Deferral:** revisit with the M2 compiler integration; the complete parsed two-pass fix is broader than this
+  pre-M2 correctness pass, and the comment-strip workaround would leave prose false positives.
 
 ---
 
