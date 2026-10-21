@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <TalewrightIncludeSamples Condition="'$(TalewrightIncludeSamples)' == ''">true</TalewrightIncludeSamples>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +15,7 @@
   </ItemGroup>
 
   <!-- Bundled sample stories, embedded as stories/<Story>/<path> (see EmbeddedStoryLibrary). -->
-  <ItemGroup>
+  <ItemGroup Condition="'$(TalewrightIncludeSamples)' == 'true'">
     <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml" LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 

@@ -6,11 +6,19 @@ namespace Talewright.Cli;
 
 public static class CommandLine
 {
-    public const string Usage = "Usage: talewright validate <story-root> [--format human|json] [--warnings-as-errors]";
+    public const string Usage = """
+        Usage:
+          talewright validate <story-root> [--format human|json] [--warnings-as-errors]
+          talewright publish <story-root> --output <zip> [-a|--all-in-one] [--target web|desktop] [--runtime <rid>] [--force]
+        """;
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
         var json = args.Zip(args.Skip(1)).Any(pair => pair.First == "--format" && pair.Second == "json");
+        if (args.FirstOrDefault() == "publish")
+        {
+            return PublishCommand.Run(args.Skip(1).ToArray(), output, error);
+        }
         if (args is ["--help"] or ["-h"])
         {
             output.WriteLine(Usage);
@@ -60,7 +68,7 @@ public static class CommandLine
         {
             source = StorySource.FromDirectory(root);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return Failure("TWCLI002", $"Couldn't read story '{root}': {ex.Message}", json, output, error);
         }

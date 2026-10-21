@@ -28,8 +28,10 @@ Slot replacement is explicit and atomic; incompatible/corrupt loads leave the cu
 
 ## Packaging
 
-Not done in M1. `dotnet publish -c Release -r <rid> --self-contained` produces a runnable folder; M2's
-`talewright publish` will produce itch-ready zips with a single story baked in.
+`talewright publish story-folder -a --target desktop --output game.zip` produces a self-contained
+ZIP with a single story baked in and no samples. An optional `--runtime win-x64` cross-publishes;
+see the [CLI reference](../Talewright.Cli/README.md#publishing) for targets and verification limits.
+`TalewrightIncludeSamples=false` disables development sample embedding in custom builds.
 
 ## Native regression tests
 

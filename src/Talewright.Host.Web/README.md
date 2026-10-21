@@ -11,6 +11,11 @@ dotnet run --project src/Talewright.Host.Web          # dev server, prints the U
 
 ## Publish and host
 
+For a standalone game with exactly one story and relative URLs:
+`talewright publish story-folder -a --target web --output game.zip`.
+See the [CLI reference](../Talewright.Cli/README.md#publishing). Development hosts retain samples by
+default; `TalewrightIncludeSamples=false` disables them in custom builds.
+
 ```bash
 dotnet publish src/Talewright.Host.Web -c Release -o out/web
 # then serve out/web/wwwroot with anything static, e.g.

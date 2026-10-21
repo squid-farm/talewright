@@ -32,7 +32,7 @@ snippets, live validation, completion, and hover help, delivered in independentl
 Later milestones preserve the feature backlog: **M4** image/media support, **M5** world simulation,
 **M6** combat, **M7** runtime plugins, **M8** save migration, and **M9** safe `lint --fix` (lowest priority).
 Dependencies, not milestone numbers alone, determine when independent work can start; none blocks M2/M3.
-CLI `validate` is available; publishing and editor tools remain planned. They share the compiler rather
+CLI `validate` and `publish` are available; editor tools remain planned. They share the compiler rather
 than duplicate its analysis. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
 
 ## Work tracking
@@ -54,7 +54,7 @@ assignee and branch/worktree comment. See [the migration index and workflow](doc
 | `src/Talewright.Rulesets.Generic` | Default d20 ruleset |
 | `src/Talewright.Tale` | Story compiler and diagnostics |
 | `src/Talewright.Runtime` | Story sessions and frames |
-| `src/Talewright.Cli` | `talewright validate` tool with human/JSON compiler diagnostics |
+| `src/Talewright.Cli` | `talewright validate` and story-only/standalone `publish` tool |
 | `src/Talewright.Player` | Blazor UI (Razor Class Library) |
 | `src/Talewright.Host.Desktop` / `.Host.Web` | Photino desktop host / Blazor WASM host |
 | `samples/LostRelic` | Sample story (not part of the engine) |
@@ -88,7 +88,8 @@ folder in the desktop player or upload its ZIP in the web player. The published
 [sample player](https://squid-farm.github.io/talewright/) includes all bundled samples.
 Validate from source with `dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`.
 See the [CLI reference](src/Talewright.Cli/README.md) for JSON output and exit policy.
-The VS Code authoring extension and CLI publishing remain roadmap work, not prerequisites.
+Use `talewright publish story-folder --output story.zip` for a portable story archive, or add
+`-a --target web|desktop` for a complete deployable game. The VS Code authoring extension remains roadmap work.
 
 ## C# customization packages
 

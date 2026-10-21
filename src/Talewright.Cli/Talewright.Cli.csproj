@@ -8,5 +8,23 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Talewright.Tale/Talewright.Tale.csproj" />
+    <ProjectReference Include="../Talewright.Runtime/Talewright.Runtime.csproj" />
+    <ProjectReference Include="../Talewright.Player/Talewright.Player.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Pack="false" Include="../Talewright.Host.Web/*.cs;../Talewright.Host.Web/*.razor;../Talewright.Host.Web/*.csproj"
+             Link="publish-assets/web/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../Talewright.Host.Web/wwwroot/**"
+             Link="publish-assets/web/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../Talewright.Host.Desktop/*.cs;../Talewright.Host.Desktop/*.razor;../Talewright.Host.Desktop/*.csproj"
+             Link="publish-assets/desktop/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../Talewright.Host.Desktop/wwwroot/**"
+             Link="publish-assets/desktop/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../Talewright.Player/wwwroot/**"
+             Link="publish-assets/player/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../Talewright.Player/Components/*.razor.js"
+             Link="publish-assets/player/Components/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../../LICENSE" Link="publish-assets/ENGINE-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Update="PublishAssets/*" Link="publish-assets/launchers/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

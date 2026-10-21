@@ -18,6 +18,38 @@ ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Rules", "Narrative", "Rulesets.Generic", "Tale", "Runtime")}
 
 
+def verify_desktop_archive(path):
+    with ZipFile(path) as archive:
+        names = set(archive.namelist())
+        required = {"start.sh", "start.cmd", "start.command", "ENGINE-LICENSE.txt", "DEPLOYMENT.txt"}
+        for os_name, native, runtime in [("linux", "Photino.Native.so", "libcoreclr.so"),
+                                        ("win", "Photino.Native.dll", "coreclr.dll"),
+                                        ("osx", "Photino.Native.dylib", "libcoreclr.dylib")]:
+            for cpu in ["x64", "arm64"]:
+                rid = f"{os_name}-{cpu}"
+                executable = "Talewright.Host.Desktop" + (".exe" if os_name == "win" else "")
+                required.update(f"{rid}/{name}" for name in [
+                    executable, native, runtime, "Talewright.Host.Desktop.dll",
+                    "wwwroot/index.html", "wwwroot/_content/Talewright.Player/talewright.css",
+                    "wwwroot/_content/Talewright.Player/Components/StoryPlayer.razor.js",
+                    "wwwroot/_content/Talewright.Player/Saves/IndexedDbSaveStore.js"])
+                if os_name == "win":
+                    required.add(f"{rid}/WebView2Loader.dll")
+                config = json.loads(archive.read(f"{rid}/Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
+                frameworks = config.get("includedFrameworks", [])
+                if "framework" in config or "frameworks" in config or not any(
+                        framework["name"] == "Microsoft.NETCore.App" for framework in frameworks):
+                    raise ValueError(f"{rid}: desktop output requires an installed .NET runtime")
+        if not required <= names:
+            raise ValueError(f"Universal desktop archive is missing {sorted(required - names)}")
+        for name in ["start.sh", "start.command", *(
+                f"{os_name}-{cpu}/Talewright.Host.Desktop" for os_name in ["linux", "osx"]
+                for cpu in ["x64", "arm64"])]:
+            if not (archive.getinfo(name).external_attr >> 16) & 0o111:
+                raise ValueError(f"Missing executable permissions: {name}")
+    print("Verified six self-contained desktop builds and launchers", flush=True)
+
+
 def verify(directory, version):
     version_from_tag("v" + version)
     found = {}
@@ -40,7 +72,16 @@ def verify(directory, version):
                 required_files = ["README.md", "tools/net10.0/any/DotnetToolSettings.xml",
                                   "tools/net10.0/any/Talewright.Cli.dll",
                                   "tools/net10.0/any/Talewright.Cli.deps.json",
-                                  "tools/net10.0/any/Talewright.Cli.runtimeconfig.json"]
+                                  "tools/net10.0/any/Talewright.Cli.runtimeconfig.json",
+                                  "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
+                                  "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
+                                  "tools/net10.0/any/publish-assets/player/talewright.css",
+                                  "tools/net10.0/any/publish-assets/player/Components/StoryPlayer.razor.js",
+                                  "tools/net10.0/any/publish-assets/player/Saves/IndexedDbSaveStore.js",
+                                  "tools/net10.0/any/publish-assets/launchers/start.sh",
+                                  "tools/net10.0/any/publish-assets/launchers/start.command",
+                                  "tools/net10.0/any/publish-assets/launchers/start.cmd",
+                                  "tools/net10.0/any/publish-assets/ENGINE-LICENSE.txt"]
             for required in required_files:
                 if required not in names:
                     raise ValueError(f"{path}: missing {required}")
@@ -52,7 +93,7 @@ def verify(directory, version):
                 if command is None or command.attrib != {
                         "Name": "talewright", "EntryPoint": "Talewright.Cli.dll", "Runner": "dotnet"}:
                     raise ValueError(f"{path}: invalid talewright tool command")
-                for assembly in ENGINE_ASSEMBLIES - {"Talewright.Runtime"}:
+                for assembly in ENGINE_ASSEMBLIES | {"Talewright.Player"}:
                     if f"tools/net10.0/any/{assembly}.dll" not in names:
                         raise ValueError(f"{path}: missing CLI compiler assembly {assembly}")
             elif identity == "Talewright.Player":
@@ -172,6 +213,23 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                                 cwd=root, env=environment, check=True, capture_output=True, text=True)
         if json.loads(result.stdout) != {"schemaVersion": 1, "success": True, "diagnostics": []}:
             raise ValueError("Installed CLI did not validate an isolated story")
+        archive = root / "story.zip"
+        subprocess.run([str(tool_path / "talewright"), "publish", str(story), "--output", str(archive)],
+                       cwd=root, env=environment, check=True)
+        with ZipFile(archive) as published:
+            if set(published.namelist()) != {"story.yaml", "main.tale"}:
+                raise ValueError("Installed CLI did not produce a story-only archive")
+        web = root / "web.zip"
+        subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
+                        "--target", "web", "--output", str(web)], cwd=root, env=environment, check=True)
+        with ZipFile(web) as published:
+            if "index.html" not in published.namelist() or not any(
+                    name.startswith("_framework/") for name in published.namelist()):
+                raise ValueError("Installed CLI did not publish a complete standalone web site")
+        desktop = root / "desktop.zip"
+        subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
+                        "--target", "desktop", "--output", str(desktop)], cwd=root, env=environment, check=True)
+        verify_desktop_archive(desktop)
         print("Both library consumers and installed CLI passed", flush=True)
 
 
