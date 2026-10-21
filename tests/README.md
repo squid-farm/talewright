@@ -40,16 +40,23 @@ This checks real package references, the Player's transitive engine dependency,
 and its CSS/JavaScript assets, not just project-reference builds. CI also packs and installs
 the separate `Talewright.Cli` tool, running JSON validation and story/standalone
 publication outside the checkout.
+The same isolated package check builds the C# authoring example's web and desktop
+hosts, then injects invalid Tale into its temporary copy and requires the build
+to fail with the exact file/line and stable compiler code.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_ci.py' -v
 dotnet build Talewright.slnx -c Release -p:Version=0.1.0-preview.1
-dotnet pack Talewright.slnx -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack src/Talewright -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack src/Talewright.Player -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack src/Talewright.Cli -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
 python3 .github/scripts/verify_packages.py artifacts/packages 0.1.0-preview.1 --smoke
 ```
 
 Use a fresh output directory when changing package versions: verification rejects
 unexpected/duplicate packages instead of accidentally publishing stale files.
+Pack the three projects sequentially: solution-wide packing can evaluate the
+CLI's publish graph concurrently with RCL packing and omit static assets.
 
 Pages publishing also checks the real static output under the configured base
 path. To reproduce a project-subpath deployment after installing Chromium:

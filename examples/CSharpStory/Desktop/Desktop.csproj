@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TalewrightStoryProject>$(MSBuildProjectDirectory)/../Validator/Validator.csproj</TalewrightStoryProject>
+    <TalewrightStoryRoot>$(MSBuildProjectDirectory)/../Story/Content</TalewrightStoryRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Talewright.Player" Version="$(TalewrightVersion)" />
+    <PackageReference Include="Photino.Blazor" Version="4.0.13" />
+    <ProjectReference Include="../Story/Story.csproj" />
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+</Project>

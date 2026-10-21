@@ -86,6 +86,7 @@ class PackageBoundaryTests(unittest.TestCase):
             else:
                 package.writestr(f"lib/net10.0/{identity}.dll", b"test placeholder")
             if identity == "Talewright":
+                package.writestr("buildTransitive/Talewright.targets", "")
                 for assembly in ENGINE_ASSEMBLIES:
                     for extension in ("dll", "xml"):
                         package.writestr(f"lib/net10.0/{assembly}.{extension}", b"test placeholder")

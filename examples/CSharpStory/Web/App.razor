@@ -1,0 +1,5 @@
+@using CSharpStory
+<Talewright.Player.Components.TalewrightApp AutoStartStoryId="Custom" Options="@_options" />
+@code {
+    private readonly Talewright.Tale.Compilation.CompilerOptions _options = StoryExtensions.Create();
+}

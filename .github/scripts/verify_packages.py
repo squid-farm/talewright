@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -106,6 +107,8 @@ def verify(directory, version):
                     if required not in names:
                         raise ValueError(f"{path}: missing Razor asset {required}")
             else:
+                if "buildTransitive/Talewright.targets" not in names:
+                    raise ValueError(f"{path}: missing story validation build target")
                 if any(name.startswith(("Talewright.", "Microsoft.AspNetCore."))
                        for name in dependencies):
                     raise ValueError(f"{path}: headless engine has a UI/component dependency")
@@ -230,6 +233,19 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
                         "--target", "desktop", "--output", str(desktop)], cwd=root, env=environment, check=True)
         verify_desktop_archive(desktop)
+        example = root / "CSharpStory"
+        shutil.copytree(Path(__file__).resolve().parents[2] / "examples/CSharpStory", example,
+                        ignore=shutil.ignore_patterns("bin", "obj"))
+        for host in ["Web", "Desktop"]:
+            subprocess.run(["dotnet", "build", str(example / host), "-c", "Release",
+                            f"-p:TalewrightVersion={version}"], cwd=root, env=environment, check=True)
+        tale = example / "Story/Content/main.tale"
+        tale.write_text("=== beginning\n-> missing\n")
+        invalid = subprocess.run(["dotnet", "build", str(example / "Web"), "-c", "Release",
+                                  f"-p:TalewrightVersion={version}"],
+                                 cwd=root, env=environment, capture_output=True, text=True)
+        if invalid.returncode == 0 or "main.tale(2," not in invalid.stdout or "error TW2002:" not in invalid.stdout:
+            raise ValueError(f"Invalid C# story did not fail with source diagnostics:\n{invalid.stdout}\n{invalid.stderr}")
         print("Both library consumers and installed CLI passed", flush=True)
 
 

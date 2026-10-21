@@ -81,6 +81,10 @@
     [Parameter]
     public EventCallback<string?> OnTitleChanged { get; set; }
 
+    /// <summary>Explicit extensions shared with the author's build-time compiler.</summary>
+    [Parameter]
+    public CompilerOptions Options { get; set; } = CompilerOptions.Default;
+
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
     private bool _showLibrary;
@@ -133,7 +137,7 @@
 
     private async Task CompileAsync(StorySource source, string title)
     {
-        var result = StoryCompiler.Compile(source);
+        var result = StoryCompiler.Compile(source, Options);
         _diagnostics = result.Diagnostics;
         if (result.Success)
         {

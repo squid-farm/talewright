@@ -46,7 +46,9 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          dotnet pack Talewright.slnx -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
+          dotnet pack src/Talewright -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
+          dotnet pack src/Talewright.Player -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
+          dotnet pack src/Talewright.Cli -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
           python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION" --smoke
       - uses: actions/upload-artifact@v4
         with:

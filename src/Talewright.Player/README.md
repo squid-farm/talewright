@@ -32,6 +32,9 @@ See [registry setup](../../README.md#c-customization-packages).
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
+Pass `TalewrightApp.Options` for custom `CompilerOptions`; its default preserves
+built-in behavior. Use one explicit options factory for the player and build-time
+validation, as in the [C# example](../../examples/CSharpStory/README.md).
 `TalewrightApp.OnTitleChanged` reports the loaded/resumed story title or null on library return.
 The web host uses `PageTitle`; the desktop host updates its native window title.
 

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <TalewrightStoryProject>$(MSBuildProjectDirectory)/../Validator/Validator.csproj</TalewrightStoryProject>
+    <TalewrightStoryRoot>$(MSBuildProjectDirectory)/../Story/Content</TalewrightStoryRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Talewright.Player" Version="$(TalewrightVersion)" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.13" />
+    <ProjectReference Include="../Story/Story.csproj" />
+  </ItemGroup>
+</Project>
