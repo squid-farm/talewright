@@ -24,8 +24,9 @@ buffer overlays, and invalidation when Tale/YAML files change. Do not burden the
 state. C# custom registrations require explicit project integration or exported metadata shared across
 CLI, MSBuild, and LSP; editing must not implicitly execute arbitrary project code.
 
-`talewright lint --fix` is deferred to M4, lowest priority. Only safe, deterministic, non-overlapping edits
-are eligible: preserve prose/comments, detect files changed since analysis, reanalyze after edits, and
+`talewright lint --fix` is an unscheduled, lowest-priority authoring follow-up, not an M3 or M4 release gate.
+Only safe, deterministic, non-overlapping edits are eligible: preserve prose/comments, detect files
+changed since analysis, reanalyze after edits, and
 require idempotence. Ambiguous story repairs and general formatting are not part of this decision.
 Generic Markdown linting/formatting cannot be applied wholesale because Tale has different structural
 semantics.

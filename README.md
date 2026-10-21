@@ -25,9 +25,12 @@ stats, factions and items. No code is needed. Programmers can extend the engine 
 
 **Milestone 1 (vertical slice) is complete:** the engine, the `.tale` compiler, the shared Blazor player, and the
 desktop and web hosts all work, and the sample story *The Lost Relic* is playable end to end on both.
-Saves, a CLI with `validate` and `publish`, and character creation are next (M2).
+Core reliability and release verification come first in M2, alongside saves with compatibility safeguards,
+a CLI with `validate` and `publish`, and character creation.
 M3 adds `lint` and editor-neutral language-server support with a thin VS Code extension for Tale highlighting,
-snippets, live validation, completion, and hover help. Safe `lint --fix` support is lowest priority (M4).
+snippets, live validation, completion, and hover help, delivered in independently usable slices.
+M4 focuses on bounded image/media support. Combat, world simulation, save migration, and runtime plugins
+are deferred, separately scoped work; safe `lint --fix` is an unscheduled, lowest-priority follow-up.
 These commands and editor tools are planned, not available yet; they will share the compiler's analysis
 rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
 

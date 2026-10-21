@@ -228,7 +228,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 | **Low**    | Nice to have, polish, or an idea worth remembering.                                      |
 
 **Status:** `idea`, `accepted`, `planned (<milestone>)`, `in progress`, `done (<commit>)`, `declined (<reason>)`.
-**Target** is the milestone it's aimed at (see [PLAN.md](PLAN.md) §7), or `unscheduled`.
+**Target** is the milestone it's aimed at (see [PLAN.md](PLAN.md#6-milestones)), or `unscheduled`.
 
 ### Feature request index
 
@@ -257,7 +257,9 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 | [FR-021](#fr-021) | Medium | planned (M3) | M3 | Tale / analysis | Partial symbols and source ranges for shared authoring analysis | TBD |
 | [FR-022](#fr-022) | Medium | planned (M3) | M3 | CLI / analysis | Configurable Tale-aware `talewright lint` | TBD |
 | [FR-023](#fr-023) | Medium | planned (M3) | M3 | Editors / LSP | VS Code syntax support, live validation, completion, and hover help | TBD |
-| [FR-024](#fr-024) | Low | planned (M4) | M4 | CLI / analysis | Safe, opt-in `talewright lint --fix` | TBD |
+| [FR-024](#fr-024) | Low | accepted | unscheduled | CLI / analysis | Safe, opt-in `talewright lint --fix` | TBD |
+| [FR-025](#fr-025) | High | planned (M2) | M2 | Core / release | Establish production-readiness gates before feature expansion | TBD |
+| [FR-026](#fr-026) | High | planned (M2) | M2 | Saves / Runtime | Version saves and reject incompatible data non-destructively | TBD |
 
 FR-020 through FR-024 have relative complexity assessments in [PLAN.md §4.5](PLAN.md#45-tale-compiler-talewrighttale);
 their time-based effort classifications remain TBD.
@@ -734,8 +736,8 @@ stats: shown | hidden }`, plus an optional player-side toggle in the Player, the
 **Apply only safe, opt-in fixes through `talewright lint --fix`.**
 
 - **Priority:** Low
-- **Status:** planned (M4)
-- **Target:** M4, lowest priority
+- **Status:** accepted
+- **Target:** unscheduled, lowest-priority authoring follow-up; not an M3/M4 release gate
 - **Area:** CLI, shared lint rules / source edits
 - **Source:** Project Lead, authoring tooling planning session
 - **Shortcoming:** future lint guidance will otherwise require every repair to be made manually.
@@ -747,6 +749,55 @@ stats: shown | hidden }`, plus an optional player-side toggle in the Player, the
 - **Acceptance:** fixtures prove exact preservation outside edit spans and repeat-run idempotence.
   Tests cover overlapping edits, stale files, write failures, post-fix diagnostics, and exit behavior.
   No general formatter or promised autofix for every lint rule.
+
+---
+
+### FR-025
+
+**Establish production-readiness gates before feature expansion.**
+
+- **Priority:** High
+- **Status:** planned (M2)
+- **Target:** M2
+- **Area:** Core, compiler, Runtime, player/hosts, CLI, testing/release
+- **Source:** Project Lead, production-first roadmap rescoping
+- **Shortcoming:** a working vertical slice is not evidence of release readiness. The old M3 bucket mixed
+  authoring with media, combat, world simulation, migration, and plugins without a core reliability gate.
+- **Depends on:** existing engine/player regression suites and the M2 save/publish/CLI deliverables;
+  [FR-026](#fr-026) supplies save compatibility safeguards.
+- **Scope:** use the [roadmap release gates](PLAN.md#core-production-readiness-gates-m2) as the release
+  checklist. Resolve known S1/S2 bugs and the M2-deferred BUG-006/BUG-008 with regressions; explicitly
+  triage other risks. Verify bounded story/archive inputs, visible failure handling, and representative
+  story load/validation/save/replay behavior with measured, agreed budgets.
+- **Acceptance:** record CI/build/regression results and verify published Release artifacts for the
+  documented platform matrix, including load/play/save, trimming, static/subpath hosting, and install/
+  publish instructions. Document limitations and unverified platforms. Do not mark readiness complete
+  based only on development-host tests or because no new features are planned.
+- **Boundaries:** this is a release-verification umbrella, not a new engine subsystem or an instruction
+  to implement every deferred feature. M3 authoring ships in useful slices; M4 presentation and later
+  gameplay/plugin work must not displace the core gate.
+
+### FR-026
+
+**Version saves and reject incompatible data without damaging saves or sessions.**
+
+- **Priority:** High
+- **Status:** planned (M2)
+- **Target:** M2, alongside `ISaveStore`
+- **Area:** Save format, Runtime loading, desktop/web save stores
+- **Source:** Project Lead, production-first roadmap rescoping
+- **Shortcoming:** event-sourced state supports replay, but does not guarantee that old saves can be
+  safely loaded after changes to a story or save/event schema.
+- **Depends on:** the M2 save format and desktop/web stores; define this contract as part of saves,
+  not as a requirement to implement a migration framework first.
+- **Scope:** record save-format version and story identity/version; define/document the compatibility
+  policy. Report corrupt, unsupported, wrong-story, and incompatible-version saves explicitly, preserving
+  the original data and leaving the active session unchanged on failure. Surface save write failures.
+- **Acceptance:** desktop/web round-trip and deterministic replay tests, plus fixtures for malformed
+  saves, unsupported formats, incompatible story identities/versions, and failed reads/writes. Verify
+  failed loads do not partially mutate a session or overwrite the original save.
+- **Deferred:** actual migration across story/save versions needs a concrete old/new compatibility
+  change and dedicated fixtures. It is unscheduled, not a requirement of M3 authoring.
 
 ---
 

@@ -63,12 +63,13 @@ Reusable pieces:
 | D10 | Combat is **out of scope** for early milestones (to be a future module). |
 | D11 | **Predefined protagonist** in M1. The MVP story's player is female. **Pronoun/grammar system** is in scope. |
 | D12 | The core ruleset is **generic, d20-style** (STR/DEX/CON/INT/WIS/CHA plus skills). It ships as a module that can be **disabled or replaced**. |
-| D13 | Saves are **deferred to M2**. Event sourcing keeps them cheap; save migration across story versions comes in M3. |
+| D13 | Saves are **deferred to M2**, including save-format/story version identifiers and explicit rejection of incompatible saves without modifying them. Migration across versions is deferred until a concrete compatibility change requires it; it is not an M3 requirement. |
 | D14 | The story is **never built into the engine**. Samples live in `samples/` as standalone story folders/projects. |
 | D15 | Distribution: M1 points the player at a folder or zip. M2 adds a `talewright publish` command that **bakes a story into the player** to produce itch.io-ready web and desktop zips. |
 | D16 | Repo: `git init`; commit `README.md`, `LICENSE`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/TALE-SYNTAX.md`, and `docs/adr/*`. |
 | D17 | Authoring tools are **editor-neutral**: CLI, MSBuild, and a C# Language Server Protocol (LSP) server reuse shared Tale analysis and diagnostics. The VS Code extension is a thin client, not a second semantic implementation. |
-| D18 | Phase authoring support: **M2** CLI validation; **M3** shared partial analysis, linting, and LSP/VS Code intelligence; **M4** safe autofixes, lowest priority. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
+| D18 | Phase authoring support: **M2** CLI validation; **M3** shared partial analysis, linting, and LSP/VS Code intelligence. Safe autofixes are an unscheduled, lowest-priority follow-up, not a milestone gate. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
+| D19 | **Production readiness before breadth.** M2 prioritizes core reliability and release verification; M3 focuses on authoring; M4 adds bounded image/media presentation. Combat, world simulation, save migration, and Tier 2 plugins are independently scoped future work without committed milestone numbers. |
 
 ## 4. Architecture
 
@@ -143,7 +144,7 @@ Reusable pieces:
 - **Diagnostics** carry file, line, column, code and message. The same diagnostics will feed the CLI, MSBuild and the VS Code language server (M3).
 - Output: an immutable typed `StoryDefinition`, which can be serialized to a compact bundle for publishing later.
 
-#### Planned authoring tooling (M2-M4; not implemented)
+#### Planned authoring tooling (M2-M3 and deferred follow-ups; not implemented)
 
 The compiler already reports syntax, reference/type, YAML, and structural diagnostics. Authoring tools
 will reuse that work rather than build a separate parser or duplicate checks in each front end:
@@ -174,7 +175,7 @@ The commands below describe planned contracts, not commands available today:
   context-aware completion, and hover/syntax help. VS Code supplies highlighting, language configuration,
   and snippets, then delegates intelligence to LSP. Other editors can launch the same server; they do not
   need VS Code. Do not invoke one-shot CLI validation for every completion request.
-- **`talewright lint --fix` (M4):** opt-in, deterministic edits for an explicitly safe subset of lint rules.
+- **`talewright lint --fix` (unscheduled, lowest priority):** opt-in, deterministic edits for an explicitly safe subset of lint rules.
   Preserve prose, comments, and unrelated formatting; reject overlapping edits and do not overwrite files
   changed since analysis. Reanalyze after fixing, report applied fixes and remaining diagnostics, and use
   the resulting diagnostics for the exit policy. Repeated fixes must be idempotent. Ambiguous or
@@ -261,28 +262,64 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 
 - **M0 — Foundations:** git repo, docs, license, solution skeleton, build and test green.
 - **M1 — Vertical slice (desktop):** core engine, generic ruleset, rules, narrative, `.tale` v0 compiler, runtime, Player UI and Photino host. *The Lost Relic* is playable from a folder. The web host builds and runs the same story.
-- **M2 — Ship it:**
-  - saves through `ISaveStore` (file on desktop, IndexedDB on web);
+- **M2 — Ship stories reliably:**
+  - prioritize the core production-readiness gates below before expanding gameplay or presentation;
+  - saves through `ISaveStore` (file on desktop, IndexedDB on web), with format/story version identifiers and explicit, non-destructive rejection of incompatible saves;
   - a `talewright` CLI (`validate` with human/JSON diagnostics and explicit exit policy, `publish` producing itch-ready web and desktop zips);
   - the C# story project path (Tier 1): NuGet packaging plus an MSBuild task giving build-time diagnostics;
   - richer hubs/storylets;
   - character creation.
-- **M3 — Ecosystem:**
-  - shared partial/source-aware Tale analysis, then `talewright lint` with configurable rules;
-  - editor-neutral C# LSP server (proposed host: `talewright lsp`) and a thin VS Code extension with syntax highlighting, snippets, live validation, context-aware completion, and hover help;
-  - save migration;
-  - media/images;
-  - combat module;
-  - open-world locations, time and clocks;
-  - Tier 2 plugins: sandboxed scripting via Jint or MoonSharp, and/or desktop DLL plugins.
-- **M4 — Authoring polish (lowest priority):**
-  - `talewright lint --fix` for an explicitly safe subset of rules, after linting and source-aware analysis;
-  - preserve prose/comments, reject conflicting edits, reanalyze, and verify idempotence; no general formatter or automatic story-logic repairs.
+- **M3 — Author stories comfortably:** shared analysis, editor-neutral LSP, VS Code support, and a bounded initial lint rule set. Deliver independently usable slices:
+  1. Tale syntax highlighting, language configuration, and snippets (independent of LSP).
+  2. Shared partial/source-aware analysis and LSP-backed live validation.
+  3. Context-aware completion and hover help in a thin VS Code client; document use from other LSP editors.
+  4. `talewright lint` with a small, agreed initial rule set and shared CLI/editor diagnostics.
+  These are delivery slices, not a requirement to hold all releases until every slice is complete.
+- **M4 — Presentation:** bounded image/media support, including asset resolution/loading, safe paths,
+  publishing/bundling, and consistent desktop/web behavior. Agree supported asset types and limits before implementation.
+
+### Core production-readiness gates (M2)
+
+These are planned release criteria, not claims that the current engine is production-ready. Existing M2
+features remain in scope, but reliability work takes precedence over additional features.
+
+- **Correctness:** resolve known S1/S2 bugs in [ISSUES.md](ISSUES.md) and explicitly triage remaining
+  release risks. Cover the existing M2-deferred arithmetic overflow and commented-out auto-declaration
+  bugs (BUG-006/BUG-008) with fixes and regression tests before release.
+- **Save safety:** round-trip saves on desktop and web; preserve deterministic state/choices on reload;
+  reject corrupt, unsupported, or incompatible saves with actionable errors and without partial session
+  mutation or overwriting the original. Define compatibility policy before claiming cross-version support.
+- **Input and failure handling:** maintain bounded untrusted story/archive loading, test malformed input,
+  and surface load/save/validation/publish failures clearly rather than failing silently or appearing successful.
+- **Release verification:** build/test in CI; run the existing player regression suites and verify published
+  Release artifacts, not only development hosts. Check desktop and web load/play/save flows, static hosting
+  and itch.io-style subpaths, trimming, and install/publish instructions. Document the tested platform matrix
+  and any unverified platforms rather than treating a Linux test as evidence for every desktop OS.
+- **Operational clarity:** document supported story/save formats, CLI diagnostic/exit policies, and known
+  limitations. Measure representative story load/validation and save/replay behavior; agree explicit budgets
+  from those measurements rather than adding speculative optimization or declaring performance acceptable.
+
+Track the readiness and save-compatibility work in [FR-025](ISSUES.md#fr-025) and [FR-026](ISSUES.md#fr-026).
+
+### Deferred work (no committed milestone)
+
+- **Safe lint autofixes:** lowest-priority authoring follow-up after lint rules/source spans stabilize
+  ([FR-024](ISSUES.md#fr-024)); preserve prose/comments, reject conflicts, and verify idempotence. No
+  general formatter or automatic story-logic repair; does not block M3 or M4.
+- **Save migration:** add targeted migrations when a real save-format or story-version change requires
+  them, with fixtures for the actual old/new formats. Versioning/rejection safeguards belong in M2.
+- **World simulation:** independently scope locations, time, and clocks around concrete story needs,
+  building on existing hubs/storylets; not coupled to the authoring release.
+- **Combat:** independently scope an optional module around concrete gameplay requirements; not a
+  prerequisite for a production-ready narrative engine.
+- **Tier 2 plugins:** defer pending demonstrated needs beyond the M2 C# project extension path and an
+  explicit API, trust/sandbox, persistence, versioning, and desktop/web design. No plugin platform is required
+  for core readiness, authoring, or media.
 
 ### Code-extension tiers (for reference)
 - **Tier 0 (M1):** `.tale` plus YAML only.
 - **Tier 1 (M2):** a C# story project references `Talewright.*` NuGet packages, registers named predicates, stats, modifiers, grammar modifiers and rulesets, and builds its own desktop and web app.
-- **Tier 2 (M3+):** plugins inside the generic player.
+- **Tier 2 (deferred; no committed milestone):** possible future plugins inside the generic player.
   - Desktop: AssemblyLoadContext (full trust, no sandbox).
   - Web: arbitrary DLLs are fragile under trimming, so **sandboxed script plugins (Jint/MoonSharp) are preferred**.
   - Roslyn scripting in the browser was rejected (10+ MB, slow).

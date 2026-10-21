@@ -427,7 +427,7 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 - **No saves yet.** The event log + seed make this straightforward (M2: `ISaveStore`).
 - **Predefined protagonist.** No character creation screen (M2).
 - **Media.** `MediaTemplate`/`RenderedMedia` exist and flow through every layer, but the Player renders nothing.
-  Images/sprites slot in at `InlineView.razor` and a future media resolver (M3).
+  Images/sprites slot in at `InlineView.razor` and a future media resolver (M4: Presentation).
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.
 - **One language.** `EnglishGrammar` only; the `IGrammar` seam is there.
