@@ -93,6 +93,7 @@ public class LostRelicTests
     public void Random_playthroughs_always_finish_and_reach_every_ending()
     {
         var endings = new HashSet<string>();
+        var keeperOutcomes = new HashSet<string>();
         for (var seed = 1UL; seed <= 300; seed++)
         {
             var session = new StorySession(Story, seed);
@@ -106,8 +107,19 @@ public class LostRelicTests
             }
 
             endings.Add(frame.Scene!.Value.Value);
+            var text = frame.Document.ToPlainText();
+            foreach (var outcome in new[] { "rested and unhurried", "idol watching", "under your pillow" })
+            {
+                if (text.Contains(outcome, StringComparison.Ordinal))
+                {
+                    keeperOutcomes.Add(outcome);
+                }
+            }
         }
 
         Assert.Equal(["ending.empty-handed", "ending.guild", "ending.keep"], endings.Order());
+
+        // Every branch of the nested {if} in ending.keep is reachable.
+        Assert.Equal(["idol watching", "rested and unhurried", "under your pillow"], keeperOutcomes.Order());
     }
 }

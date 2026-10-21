@@ -40,6 +40,14 @@ Nobody asks about the obsidian idol on your desk.
 You keep the relic. It keeps you, too: you sleep less, and dream of a door with a closed eye.
 {if flag:guild-wary}
 The guild's letters stop coming. Then the guild's people start coming instead.
+// Nested conditionals and a compound and/or test. Blocks nest to any depth; `and` binds tighter than `or`,
+// and parentheses group as usual.
+{if player:level >= 2 and (player has idol or visited(temple.side))}
+You meet them at the door, rested and unhurried{if player has idol}, the obsidian idol watching from the
+mantel behind you{/if}. They leave without the relic, and never quite work out why.
+{else}
+You start sleeping with the relic under your pillow.
+{/if}
 {/if}
 -> END
 

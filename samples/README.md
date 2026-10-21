@@ -18,6 +18,7 @@ Explorers' Guild watches.
 | Faction standing, tiers and a trigger | Explorers' Guild; trigger `guild-wary` fires at unfriendly or worse |
 | Pronouns and possessives | prose throughout (`{player:last-name#possessive}` → "Wilkins's") |
 | Inline and block `{if}` conditional prose, XP and level-up | throughout all three chapters |
+| Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
 
 Play it: `dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic`.
 
