@@ -12,6 +12,8 @@ mutate the active session or overwrite the original save. Round-trip and determi
 release criteria on desktop and web.
 
 Event sourcing does not by itself make saves compatible with changed stories or event schemas. Migration
-machinery is deferred until a concrete compatibility change establishes the old/new formats and desired
-behavior; it is not part of the M3 authoring milestone.
-See [the roadmap](../PLAN.md#core-production-readiness-gates-m2) and [FR-026](../ISSUES.md#fr-026).
+machinery has its own M8 milestone with explicit old/new contracts and fixtures; it is not part of M3
+authoring. M8 depends on M2 saves, not on intervening gameplay milestones, and can be pulled forward
+when compatibility changes require it.
+See [the roadmap](../PLAN.md#core-production-readiness-gates-m2), [FR-026](../ISSUES.md#fr-026),
+and [FR-031](../ISSUES.md#fr-031).

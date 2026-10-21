@@ -63,13 +63,13 @@ Reusable pieces:
 | D10 | Combat is **out of scope** for early milestones (to be a future module). |
 | D11 | **Predefined protagonist** in M1. The MVP story's player is female. **Pronoun/grammar system** is in scope. |
 | D12 | The core ruleset is **generic, d20-style** (STR/DEX/CON/INT/WIS/CHA plus skills). It ships as a module that can be **disabled or replaced**. |
-| D13 | Saves are **deferred to M2**, including save-format/story version identifiers and explicit rejection of incompatible saves without modifying them. Migration across versions is deferred until a concrete compatibility change requires it; it is not an M3 requirement. |
+| D13 | Saves are **planned for M2**, including save-format/story version identifiers and explicit rejection of incompatible saves without modifying them. Version-to-version migration is a separate **M8** milestone with explicit migration contracts and old/new fixtures; it is not an M3 requirement. |
 | D14 | The story is **never built into the engine**. Samples live in `samples/` as standalone story folders/projects. |
 | D15 | Distribution: M1 points the player at a folder or zip. M2 adds a `talewright publish` command that **bakes a story into the player** to produce itch.io-ready web and desktop zips. |
 | D16 | Repo: `git init`; commit `README.md`, `LICENSE`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/TALE-SYNTAX.md`, and `docs/adr/*`. |
 | D17 | Authoring tools are **editor-neutral**: CLI, MSBuild, and a C# Language Server Protocol (LSP) server reuse shared Tale analysis and diagnostics. The VS Code extension is a thin client, not a second semantic implementation. |
-| D18 | Phase authoring support: **M2** CLI validation; **M3** shared partial analysis, linting, and LSP/VS Code intelligence. Safe autofixes are an unscheduled, lowest-priority follow-up, not a milestone gate. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
-| D19 | **Production readiness before breadth.** M2 prioritizes core reliability and release verification; M3 focuses on authoring; M4 adds bounded image/media presentation. Combat, world simulation, save migration, and Tier 2 plugins are independently scoped future work without committed milestone numbers. |
+| D18 | Phase authoring support: **M2** CLI validation; **M3** shared partial analysis, linting, and LSP/VS Code intelligence; **M9** safe autofixes, lowest priority. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
+| D19 | **Production readiness before breadth, not backlog removal.** M2 prioritizes core reliability; M3 focuses on authoring. Preserve previously milestone-scoped features as numbered milestones: M4 media, M5 world simulation, M6 combat, M7 runtime plugins, M8 save migration, M9 autofix. Supporting work is organized as epics with explicit dependencies and acceptance criteria. |
 
 ## 4. Architecture
 
@@ -144,7 +144,7 @@ Reusable pieces:
 - **Diagnostics** carry file, line, column, code and message. The same diagnostics will feed the CLI, MSBuild and the VS Code language server (M3).
 - Output: an immutable typed `StoryDefinition`, which can be serialized to a compact bundle for publishing later.
 
-#### Planned authoring tooling (M2-M3 and deferred follow-ups; not implemented)
+#### Planned authoring tooling (M2-M3 and M9; not implemented)
 
 The compiler already reports syntax, reference/type, YAML, and structural diagnostics. Authoring tools
 will reuse that work rather than build a separate parser or duplicate checks in each front end:
@@ -175,7 +175,7 @@ The commands below describe planned contracts, not commands available today:
   context-aware completion, and hover/syntax help. VS Code supplies highlighting, language configuration,
   and snippets, then delegates intelligence to LSP. Other editors can launch the same server; they do not
   need VS Code. Do not invoke one-shot CLI validation for every completion request.
-- **`talewright lint --fix` (unscheduled, lowest priority):** opt-in, deterministic edits for an explicitly safe subset of lint rules.
+- **`talewright lint --fix` (M9, lowest priority):** opt-in, deterministic edits for an explicitly safe subset of lint rules.
   Preserve prose, comments, and unrelated formatting; reject overlapping edits and do not overwrite files
   changed since analysis. Reanalyze after fixing, report applied fixes and remaining diagnostics, and use
   the resulting diagnostics for the exit policy. Repeated fixes must be idempotent. Ambiguous or
@@ -277,6 +277,26 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
   These are delivery slices, not a requirement to hold all releases until every slice is complete.
 - **M4 — Presentation:** bounded image/media support, including asset resolution/loading, safe paths,
   publishing/bundling, and consistent desktop/web behavior. Agree supported asset types and limits before implementation.
+- **M5 — World simulation:** locations/travel, deterministic time advancement, and event-backed clocks;
+  expose world state to storylet eligibility and Tale authoring. Build on hubs rather than replace them
+  ([FR-028](ISSUES.md#fr-028)).
+- **M6 — Combat:** an optional ruleset-driven module, with explicit encounter/turn/outcome contracts,
+  deterministic events/replay, narrative transitions, and desktop/web presentation
+  ([FR-029](ISSUES.md#fr-029)).
+- **M7 — Runtime plugins:** a versioned extension API, bounded sandboxed scripting for desktop/web, and
+  an explicitly trusted desktop DLL path; include packaging, persistence, diagnostics, and compatibility
+  contracts ([FR-030](ISSUES.md#fr-030)).
+- **M8 — Save migration:** explicit save-format and story-version migration paths, migration fixtures,
+  non-destructive conversion, and desktop/web load integration ([FR-031](ISSUES.md#fr-031)).
+- **M9 — Safe authoring fixes (lowest priority):** a documented safe subset of `talewright lint --fix`,
+  with conflict detection, preservation, reanalysis, and idempotence ([FR-024](ISSUES.md#fr-024)).
+
+Milestone numbers express the planned phases, not artificial dependencies. M2 readiness comes first;
+later milestones can ship independently once their stated prerequisites are met. In particular, M8 depends
+on M2 saves, not on combat or plugins, and migration work can be pulled forward for a compatibility change.
+M9 depends on M3 analysis/lint, not on M4-M8. None of M4-M9 blocks the core or authoring release.
+Each milestone needs its own acceptance evidence; moving it later does not remove it from the backlog.
+M4's concrete deliverables are tracked in [FR-027](ISSUES.md#fr-027).
 
 ### Core production-readiness gates (M2)
 
@@ -301,25 +321,19 @@ features remain in scope, but reliability work takes precedence over additional 
 
 Track the readiness and save-compatibility work in [FR-025](ISSUES.md#fr-025) and [FR-026](ISSUES.md#fr-026).
 
-### Deferred work (no committed milestone)
+### Backlog organization for GitHub
 
-- **Safe lint autofixes:** lowest-priority authoring follow-up after lint rules/source spans stabilize
-  ([FR-024](ISSUES.md#fr-024)); preserve prose/comments, reject conflicts, and verify idempotence. No
-  general formatter or automatic story-logic repair; does not block M3 or M4.
-- **Save migration:** add targeted migrations when a real save-format or story-version change requires
-  them, with fixtures for the actual old/new formats. Versioning/rejection safeguards belong in M2.
-- **World simulation:** independently scope locations, time, and clocks around concrete story needs,
-  building on existing hubs/storylets; not coupled to the authoring release.
-- **Combat:** independently scope an optional module around concrete gameplay requirements; not a
-  prerequisite for a production-ready narrative engine.
-- **Tier 2 plugins:** defer pending demonstrated needs beyond the M2 C# project extension path and an
-  explicit API, trust/sandbox, persistence, versioning, and desktop/web design. No plugin platform is required
-  for core readiness, authoring, or media.
+Preserve FR/BUG identifiers when importing issues. Milestones are release targets; epics group related
+issues and can span milestones. The [epic map](ISSUES.md#epic-map-for-github-import) groups existing
+requests without silently promoting ideas to accepted work. Each milestone feature has a dedicated
+issue with prerequisites, implementation slices, decisions to resolve, and measurable acceptance checks.
+Import those slices as linked child issues; do not use numeric milestone order as a substitute for
+actual dependency links. Retain exploratory ideas in their epics rather than dropping them.
 
 ### Code-extension tiers (for reference)
 - **Tier 0 (M1):** `.tale` plus YAML only.
 - **Tier 1 (M2):** a C# story project references `Talewright.*` NuGet packages, registers named predicates, stats, modifiers, grammar modifiers and rulesets, and builds its own desktop and web app.
-- **Tier 2 (deferred; no committed milestone):** possible future plugins inside the generic player.
+- **Tier 2 (M7):** plugins inside the generic player.
   - Desktop: AssemblyLoadContext (full trust, no sandbox).
   - Web: arbitrary DLLs are fragile under trimming, so **sandboxed script plugins (Jint/MoonSharp) are preferred**.
   - Roslyn scripting in the browser was rejected (10+ MB, slow).

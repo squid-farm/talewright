@@ -21,6 +21,7 @@ If you're unsure which it is, file it as an FR; it can be moved later.
 
 - [Bugs](#bugs)
 - [Feature requests and shortcomings](#feature-requests-and-shortcomings)
+- [Epic map for GitHub import](#epic-map-for-github-import)
 - [Templates](#templates)
 
 ---
@@ -257,9 +258,14 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 | [FR-021](#fr-021) | Medium | planned (M3) | M3 | Tale / analysis | Partial symbols and source ranges for shared authoring analysis | TBD |
 | [FR-022](#fr-022) | Medium | planned (M3) | M3 | CLI / analysis | Configurable Tale-aware `talewright lint` | TBD |
 | [FR-023](#fr-023) | Medium | planned (M3) | M3 | Editors / LSP | VS Code syntax support, live validation, completion, and hover help | TBD |
-| [FR-024](#fr-024) | Low | accepted | unscheduled | CLI / analysis | Safe, opt-in `talewright lint --fix` | TBD |
+| [FR-024](#fr-024) | Low | planned (M9) | M9 | CLI / analysis | Safe, opt-in `talewright lint --fix` | TBD |
 | [FR-025](#fr-025) | High | planned (M2) | M2 | Core / release | Establish production-readiness gates before feature expansion | TBD |
 | [FR-026](#fr-026) | High | planned (M2) | M2 | Saves / Runtime | Version saves and reject incompatible data non-destructively | TBD |
+| [FR-027](#fr-027) | Medium | planned (M4) | M4 | Media / publishing | Resolve, package, and render story images safely | TBD |
+| [FR-028](#fr-028) | Medium | planned (M5) | M5 | World / Runtime | Locations, travel, deterministic time, and clocks | TBD |
+| [FR-029](#fr-029) | Medium | planned (M6) | M6 | Rules / Player | Optional deterministic combat module | TBD |
+| [FR-030](#fr-030) | Medium | planned (M7) | M7 | Plugins / hosts | Versioned scripting and trusted desktop plugin paths | TBD |
+| [FR-031](#fr-031) | Medium | planned (M8) | M8 | Saves / Runtime | Explicit save-format and story-version migration | TBD |
 
 FR-020 through FR-024 have relative complexity assessments in [PLAN.md §4.5](PLAN.md#45-tale-compiler-talewrighttale);
 their time-based effort classifications remain TBD.
@@ -736,8 +742,8 @@ stats: shown | hidden }`, plus an optional player-side toggle in the Player, the
 **Apply only safe, opt-in fixes through `talewright lint --fix`.**
 
 - **Priority:** Low
-- **Status:** accepted
-- **Target:** unscheduled, lowest-priority authoring follow-up; not an M3/M4 release gate
+- **Status:** planned (M9)
+- **Target:** M9, lowest priority; not an M3/M4 release gate
 - **Area:** CLI, shared lint rules / source edits
 - **Source:** Project Lead, authoring tooling planning session
 - **Shortcoming:** future lint guidance will otherwise require every repair to be made manually.
@@ -796,8 +802,161 @@ stats: shown | hidden }`, plus an optional player-side toggle in the Player, the
 - **Acceptance:** desktop/web round-trip and deterministic replay tests, plus fixtures for malformed
   saves, unsupported formats, incompatible story identities/versions, and failed reads/writes. Verify
   failed loads do not partially mutate a session or overwrite the original save.
-- **Deferred:** actual migration across story/save versions needs a concrete old/new compatibility
-  change and dedicated fixtures. It is unscheduled, not a requirement of M3 authoring.
+- **Follow-up:** actual migration across story/save versions is tracked in [FR-031](#fr-031), M8,
+  with concrete old/new contracts and dedicated fixtures; it is not a requirement of M3 authoring.
+
+---
+
+### FR-027
+
+**Resolve, package, and render story images safely.**
+
+- **Priority:** Medium
+- **Status:** planned (M4)
+- **Target:** M4, Presentation
+- **Area:** Tale media model, asset resolver, Player, desktop/web hosts, publishing
+- **Source:** Project Lead, phased feature backlog
+- **Shortcoming:** media placeholders flow through the engine but are not rendered; writers cannot ship
+  illustrated stories using the normal authoring/publishing path.
+- **Depends on:** existing media AST/document seams and M2 publishing; no dependency on combat/plugins.
+- **Implementation slices:**
+  1. Define supported image formats, identifiers/relative paths, alt text, missing-asset diagnostics,
+     and per-file/aggregate limits. Validate references without executing or fetching remote content.
+  2. Implement bounded asset resolution for folders/archives and publish bundles; reject escaping paths,
+     unsupported files, and oversized assets with actionable diagnostics.
+  3. Render images accessibly in desktop/web, including static-host subpaths; integrate fixture assets
+     into compiler, publish, and player regression tests.
+- **Acceptance:** a story with images works from a folder/archive and published desktop/web bundles;
+  accessible text is available; missing, escaping, unsupported, and oversized assets fail clearly.
+  Text-only stories retain their behavior and package shape unless intentionally versioned.
+- **Boundaries:** video/audio playback, animation, sprite staging, and arbitrary remote URLs are not
+  implicit requirements of the first media release; record separate child issues if selected.
+
+### FR-028
+
+**Add locations, travel, deterministic time, and event-backed clocks.**
+
+- **Priority:** Medium
+- **Status:** planned (M5)
+- **Target:** M5, World simulation
+- **Area:** Core events/state, Rules storylets, Tale schema/directives, Runtime, Player
+- **Source:** Project Lead, phased feature backlog
+- **Shortcoming:** hubs support non-linear scenes, but authors have no shared location/travel or
+  time/clock model for persistent worlds.
+- **Depends on:** existing hubs/storylet selection, event sourcing, and M2 save compatibility safeguards;
+  no requirement for media, combat, or runtime plugins.
+- **Implementation slices:**
+  1. Define location IDs, current location, travel connections/requirements, and explicit movement
+     events; expose location predicates to Tale and eligible storylets through existing selection.
+  2. Define logical time units, which actions advance time, clock progress/thresholds, and bounded
+     trigger processing. Advance time through recorded events, not wall-clock timers.
+  3. Integrate navigation/time presentation, save/replay, validation/completion metadata, and a small
+     sample world with gated travel and a clock-driven narrative change.
+- **Decisions before implementation:** travel costs, clock reset/repetition, simultaneous threshold
+  ordering, and whether waiting is an explicit player action. Specify these rather than infer defaults.
+- **Acceptance:** gated travel and time-dependent storylets behave predictably; the same seed/actions
+  reproduce location/time/clock events after reload. Invalid locations/connections/clocks produce
+  compiler diagnostics; trigger cycles fail explicitly. Existing on-rails stories require no world schema.
+
+### FR-029
+
+**Provide an optional, ruleset-driven deterministic combat module.**
+
+- **Priority:** Medium
+- **Status:** planned (M6)
+- **Target:** M6, Combat
+- **Area:** Rules module, Core events, Tale encounter authoring, Runtime, Player
+- **Source:** Project Lead, phased feature backlog
+- **Shortcoming:** authors can script skill checks but lack reusable encounters, turn resolution, and
+  combat outcomes tied back into narrative state.
+- **Depends on:** existing typed stats/rulesets, seeded RNG/event sourcing, and M2 saves; world locations
+  are optional integration, not a prerequisite.
+- **Implementation slices:**
+  1. Agree a bounded initial combat ruleset and contracts for participants, encounter state, legal
+     actions, turn order, and victory/defeat/escape outcomes; keep engine-wide stats generic.
+  2. Implement rules/event transitions, recorded randomness, and Tale encounter/outcome references;
+     reject invalid encounters and actions with explicit diagnostics/errors.
+  3. Add desktop/web combat presentation, narrative handoff, save/resume during an encounter, and
+     a deterministic sample encounter exercising each supported outcome.
+- **Decisions before implementation:** action economy, damage/defense, incapacitation, escape,
+  rewards, and supported encounter scale. No tactical grid or real-time simulation by implication.
+- **Acceptance:** fixed seed/actions reproduce results and reload mid-encounter; invalid actions cannot
+  mutate state; outcomes enter the intended narrative branches exactly once. Disabling the module
+  leaves existing non-combat stories and replaceable rulesets unaffected.
+
+### FR-030
+
+**Provide versioned scripting plugins and an explicitly trusted desktop DLL path.**
+
+- **Priority:** Medium
+- **Status:** planned (M7)
+- **Target:** M7, Runtime plugins (Tier 2)
+- **Area:** Extension API, Runtime, compiler registrations, desktop/web hosts, packaging
+- **Source:** Project Lead, phased feature backlog
+- **Shortcoming:** M2 C# story projects require a custom app build; the generic player has no supported
+  runtime extension package contract for author-defined behavior.
+- **Depends on:** M2 C# registration/publishing contracts, M3 custom-symbol analysis metadata, and
+  versioned save safeguards; no dependency on combat or world simulation.
+- **Implementation slices:**
+  1. Specify extension manifests/API versions, permitted capabilities, compiler metadata, event/state
+     persistence, deterministic replay requirements, dependency resolution, and failure reporting.
+  2. Select Jint or MoonSharp against documented desktop/WASM constraints; implement bounded
+     execution and capability-controlled host APIs with fixture plugins and explicit resource failures.
+  3. Implement a separately opt-in, full-trust desktop DLL loading path, compatibility checks, and
+     publish packaging. Document that DLL plugins are not sandboxed and are not a browser feature.
+- **Decisions before implementation:** script engine, execution/memory limits, host API allowlist,
+  trust consent, plugin update/unload behavior, and persistence/version policy.
+- **Acceptance:** a supported script package runs on desktop/web with consistent recorded outcomes;
+  unavailable capabilities, exceeded limits, and incompatible API/package versions fail clearly.
+  Plugins cannot silently bypass event-sourced mutation. Desktop DLL loading requires explicit trust;
+  normal no-plugin stories run unchanged. Document supported trimming and platform constraints.
+
+### FR-031
+
+**Migrate supported save-format and story-version changes without losing the original save.**
+
+- **Priority:** Medium
+- **Status:** planned (M8)
+- **Target:** M8, Save migration; can be pulled forward when compatibility changes require it
+- **Area:** Save format, story migration registration, Runtime, desktop/web save stores
+- **Source:** Project Lead, phased feature backlog
+- **Shortcoming:** M2 correctly rejects incompatible saves, but does not offer an explicit conversion
+  path for supported older saves when schemas or story identifiers change.
+- **Depends on:** [FR-026](#fr-026) save identity/version checks and desktop/web stores, not M4-M7.
+- **Implementation slices:**
+  1. Define separate engine-format and story-version migration contracts, allowed version paths,
+     author-provided scene/choice/state mappings, and missing/ambiguous mapping diagnostics.
+  2. Implement deterministic conversion on a copy, validate the converted result, and commit only a
+     successful result while retaining the original. Unsupported paths remain explicit rejections.
+  3. Integrate load-time migration reporting on desktop/web, fixtures for supported old/new formats,
+     and author documentation for adding and testing story-specific migration paths.
+- **Decisions before implementation:** migration chaining, output storage/backup policy, handling of
+  removed choices/scenes, and preservation of recorded random outcomes. Never guess story intent.
+- **Acceptance:** supported fixtures migrate and load to expected state; corrupt input, missing paths,
+  failing conversions, and failed writes preserve the original and active session. Repeat loads do not
+  repeatedly migrate an already-current save. No promise of universal compatibility with arbitrary edits.
+
+---
+
+## Epic map for GitHub import
+
+Milestone-scoped features remain milestones. The following are grouping epics for the rest of the backlog,
+not replacement release targets. Keep existing FR/BUG IDs and statuses when importing; inclusion in an
+epic does not approve an idea or change its priority. Create linked child issues from the implementation
+slices above and preserve their acceptance criteria and actual dependencies.
+
+| Epic | Existing issue members | Outcome / boundary |
+|---|---|---|
+| Core reliability and release | [FR-025](#fr-025), [FR-026](#fr-026), [BUG-006](#bug-006), [BUG-008](#bug-008) | M2 release evidence and safe persistence; migration implementation remains M8 |
+| Scalable authoring and content organization | [FR-003](#fr-003), [FR-014](#fr-014), [FR-020](#fr-020), [FR-021](#fr-021), [FR-022](#fr-022), [FR-023](#fr-023), [FR-024](#fr-024) | Split content, shared analysis, CLI/editor workflow; spans M2/M3/M9 |
+| Player presentation and accessibility | [FR-001](#fr-001), [FR-004](#fr-004), [FR-005](#fr-005), [FR-009](#fr-009), [FR-010](#fr-010), [FR-011](#fr-011), [FR-015](#fr-015), [FR-016](#fr-016), [FR-017](#fr-017), [FR-027](#fr-027) | Understandable character/state views and author-controlled presentation; media retains M4 |
+| Ruleset and narrative expressiveness | [FR-002](#fr-002), [FR-008](#fr-008), [FR-012](#fr-012), [FR-028](#fr-028), [FR-029](#fr-029) | Relationships, grammar, alternative skill models, world/combat modules; retain each issue's scope |
+| Distribution and extensibility | [FR-006](#fr-006), [FR-007](#fr-007), [FR-018](#fr-018), [FR-030](#fr-030) | Packaging and host extension paths; custom JavaScript is not silently treated as a sandboxed plugin |
+| Session lifecycle and compatibility | [FR-013](#fr-013), [FR-019](#fr-019), [FR-026](#fr-026), [FR-031](#fr-031) | Runtime seams, rewind, persistence and migration; save safety in M2, conversion in M8 |
+
+Cross-cutting issues can belong to multiple epics; this is not a request to duplicate them. Milestone
+assignment is independent of epic grouping. Unscheduled ideas stay discoverable in these epics until
+prioritized rather than being discarded from the plan.
 
 ---
 

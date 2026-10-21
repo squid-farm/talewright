@@ -29,8 +29,9 @@ Core reliability and release verification come first in M2, alongside saves with
 a CLI with `validate` and `publish`, and character creation.
 M3 adds `lint` and editor-neutral language-server support with a thin VS Code extension for Tale highlighting,
 snippets, live validation, completion, and hover help, delivered in independently usable slices.
-M4 focuses on bounded image/media support. Combat, world simulation, save migration, and runtime plugins
-are deferred, separately scoped work; safe `lint --fix` is an unscheduled, lowest-priority follow-up.
+Later milestones preserve the feature backlog: **M4** image/media support, **M5** world simulation,
+**M6** combat, **M7** runtime plugins, **M8** save migration, and **M9** safe `lint --fix` (lowest priority).
+Dependencies, not milestone numbers alone, determine when independent work can start; none blocks M2/M3.
 These commands and editor tools are planned, not available yet; they will share the compiler's analysis
 rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
 
