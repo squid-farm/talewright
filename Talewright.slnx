@@ -13,6 +13,7 @@
     <Project Path="src/Talewright.Tale/Talewright.Tale.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Talewright.Benchmarks/Talewright.Benchmarks.csproj" />
     <Project Path="tests/Talewright.Cli.Tests/Talewright.Cli.Tests.csproj" />
     <Project Path="tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />
     <Project Path="tests/Talewright.Narrative.Tests/Talewright.Narrative.Tests.csproj" />

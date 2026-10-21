@@ -24,6 +24,11 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
     public async Task Selected_story_autostarts_plays_saves_and_reloads_without_other_samples()
     {
         var title = Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_TITLE") ?? "The Lost Relic";
+        var creation = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1";
+        if (creation)
+        {
+            await Driver.ClickAsync("Start story");
+        }
         await AssertState(state =>
         {
             Assert.True(state.PassageVisible);
@@ -31,6 +36,10 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
             Assert.NotEmpty(state.Choices);
         });
         var first = await Driver.ObserveAsync();
+        if (creation)
+        {
+            Assert.Contains(Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_CHARACTER") ?? "Tester", first.Passage);
+        }
         await Choose(first.Choices[0]);
         await AssertState(state => Assert.NotEqual(first.Passage, state.Passage));
         var checkpoint = await Driver.ObserveAsync();
@@ -48,6 +57,10 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
             await Page.ReloadAsync();
         }
 
+        if (creation)
+        {
+            await Driver.ClickAsync("Start story");
+        }
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
         await Driver.ClickAsync("Saved games");
         await Driver.ClickAsync("Load My save");

@@ -17,6 +17,10 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet test Talewright.slnx -c Release --logger trx --results-directory artifacts/unit
+      - name: Check bounded story and replay performance budgets
+        env:
+          DOTNET_TieredCompilation: '0'
+        run: dotnet run --project tests/Talewright.Benchmarks -c Release --no-build
       - name: Require executed unit tests
         run: |
           python3 - <<'PY'

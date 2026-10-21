@@ -9,6 +9,44 @@ dotnet test
 The root solution includes compiler, runtime, rules, narrative, and core tests. It does **not** discover UI
 tests or require downloaded browsers. `Talewright.E2E.slnx` is a separate, opt-in solution in this directory.
 
+### Reproducible performance budgets
+
+```bash
+DOTNET_TieredCompilation=0 dotnet run --project tests/Talewright.Benchmarks -c Release
+python3 tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
+```
+
+The dependency-free console workload generates 100/1,000/10,000-scene stories
+with substitutions, effects and choices. It measures in-memory validation/compilation,
+ZIP load+compile, startup, save serialization, full restore and Back+Forward at
+100/1,000/10,000 choices (the save format's upper limit). Restore verifies cursor
+and event counts. Each operation warms once, then reports median, nearest-rank
+p95 (the maximum of seven samples), current-thread managed allocations and its
+budget. It exits nonzero on any p95 over budget. First compile includes compiler
+JIT cost; later sizes share a warmed process. Timings are not cold OS/process
+startup measurements, peak memory or guarantees for arbitrary author code.
+Run without other build/test work for comparable results.
+
+Budgets deliberately allow slower CI/author machines: compile 100/1,000 scenes
+500 ms and 10,000 scenes 2.5 s; ZIP load+compile 750 ms / 3 s; startup 250 ms;
+save 500 ms; restore and Back+Forward 2 s. Browser tests independently enforce
+upload+WASM compile+first playable render within 5 s (1,000 scenes) and 15 s
+(10,000 scenes), then actually activate the next choice. They include ZIP
+generation/transport, not engine compilation alone. They run with the ordinary
+three-browser suite against trimmed Release output.
+
+M2 local baseline (.NET 10.0.13, Linux Mint 22.3 x64, tiered compilation disabled):
+10,000-scene compile median 138 ms/p95 145 ms, ZIP load+compile 135/149 ms;
+10,000-choice restore 106/115 ms, Back+Forward 112/172 ms; save 0.23/0.24 ms.
+Managed allocations were about 118 MiB for compile and 81 MiB for restore,
+not retained/peak memory. Under concurrent build load, compile p95 rose to 878 ms,
+illustrating why runtime configuration and machine load matter. Browser
+1,000/10,000-scene upload+compile+playable-render measurements were
+416/1,444 ms (Chromium), 572/1,856 ms (Firefox), 505/1,335 ms (WebKit).
+These bounded source workloads
+do not currently justify a second compiled-bundle format, serializer or compatibility
+surface (#26); revisit with real complex stories and constrained-device profiling.
+
 ## One test-authoring surface
 
 All player E2E cases and assertions live in **C#/xUnit** in `Talewright.Player.E2E.Tests`.
@@ -134,7 +172,37 @@ universal ZIP's actual launcher and selected self-contained Linux binary.
 `--runtime linux-x64` instead creates a flat single-runtime archive; point
 `TALEWRIGHT_DESKTOP_EXECUTABLE` at its `Talewright.Host.Desktop` binary.
 `TALEWRIGHT_PUBLISHED_TITLE` overrides the expected title for another story.
+For a story with opt-in character creation, set `TALEWRIGHT_STANDALONE_CREATION=1`;
+the same extracted-artifact test must complete creation before initial play and
+after process/browser restart. Its initial passage must contain
+`TALEWRIGHT_PUBLISHED_CHARACTER` (default `Tester`), proving identity substitution
+survives trimming. All normal title, choices, save/restore, Back and library
+assertions remain enabled.
 Windows/macOS/ARM64 build verification is not a substitute for runtime testing.
+
+### M2 verified matrix and remaining release checks
+
+Local final gates on Linux x64 (.NET 10.0.13):
+
+| Surface | Evidence |
+|---|---|
+| Headless Release | Build with no warnings; 248 tests passed across six projects |
+| Player in browsers | 64 passed each in Chromium, Firefox and Playwright WebKit; standalone case intentionally skipped in ordinary runs |
+| Native Linux player | 52 passed against the actual Photino window; separate native preflight passed |
+| Extracted standalone web ZIPs | Lost Relic and a creation-enabled story passed in all three browsers beneath `/games/final`; real styles/modules, title, choices, save/reload/Back, one-story library, no JS/network errors |
+| Extracted standalone desktop ZIPs | Universal launcher's Linux x64 selection and a creation-enabled single-RID binary passed play/save/process-restart/load/Back |
+| Desktop payloads | Linux/Windows/macOS x64+ARM64 self-contained builds, Photino libraries, .NET payload, executable modes and launchers verified |
+| Installed packages | Three `0.1.0-m2.7` local packages passed fresh-cache consumers, installed CLI validate/story/web/universal publication, C# web/desktop builds and intentional invalid-Tale build failure |
+| CI scripts | 12 Python contract tests passed; actual GitHub Actions run still requires pushing/review |
+
+This matrix is local evidence, not an assertion that a release has been published.
+Playwright WebKit is not macOS WKWebView. Windows, macOS and ARM64 native
+execution remain unverified; signing, notarization, installers and macOS `.app`
+bundles are not supplied. Before distributing a target platform, extract the ZIP
+on that machine, run its launcher and verify title/play, manual save, process
+restart/load, Back/Forward and library. Windows requires WebView2, Linux
+WebKitGTK; macOS uses its system webview. A build-only payload check cannot replace
+this execution matrix.
 
 Each case records a screenshot, DOM, trace, and browser-error list under
 `artifacts/test-results/<browser>/<case-id>/`. The xUnit output associates the case with that directory.
