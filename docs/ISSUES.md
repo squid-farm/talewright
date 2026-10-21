@@ -243,7 +243,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 | [FR-005](#fr-005) | Medium | idea        | unscheduled | Player / hosts     | Theming: story/host stylesheets, overrides, SCSS                  | M      |
 | [FR-006](#fr-006) | Low    | idea        | unscheduled | Hosts              | Custom JavaScript and extension of default scripts                | M      |
 | [FR-007](#fr-007) | Medium | idea        | M2          | Hosts / packaging  | Publish without the bundled sample stories                        | S      |
-| [FR-008](#fr-008) | Low    | idea        | unscheduled | Narrative          | Use libraries (AvsAn, Humanizer) for English grammar              | S–M    |
+| [FR-008](#fr-008) | Low    | deferred    | unscheduled | Narrative          | Use libraries (AvsAn, Humanizer) for English grammar              | S–M    |
 | [FR-009](#fr-009) | Low    | idea        | unscheduled | Player / Core      | Character sheet shows active modifiers and their sources          | S      |
 | [FR-010](#fr-010) | Medium | idea        | unscheduled | Player             | Authors can switch off sheet sections (inventory, factions, …)    | S      |
 | [FR-011](#fr-011) | Medium | idea        | unscheduled | Player / syntax    | Customizable end screen: text, credits, links                     | M      |
@@ -384,7 +384,7 @@ publish` compile a story's `.scss` if present.
 **Use established libraries for English grammar instead of hand-rolled rules.**
 
 - **Priority:** Low
-- **Status:** idea
+- **Status:** deferred (Project Lead, 2026-10-20: keep the in-house rules and see how far they go; revisit if grammar edge cases start hurting)
 - **Target:** unscheduled
 - **Area:** `src/Talewright.Narrative/Grammar/EnglishGrammar.cs`
 - **Source:** Project Lead (review comment on `EnglishGrammar`)
