@@ -240,6 +240,9 @@ python3 tests/run_e2e.py linux --filter 'FullyQualifiedName~Explicit_story_scena
 The runner builds the production desktop host and the same C# test project, and starts
 a private Xvfb/D-Bus/accessibility session and Xfwm4 window manager, with isolated XDG
 configuration/cache/data/runtime directories.
+GSettings use the isolated keyfile backend with the GTK file chooser pinned to `startup-mode='cwd'`.
+Distributions differ here (Linux Mint overrides it to `cwd`; Ubuntu keeps the upstream `recent` default),
+and in Recent mode GTK ignores a typed location when Open is activated.
 It uses `/usr/bin/python3` so a Python virtualenv does not hide the distro's GI/AT-SPI bindings.
 Each case generates its own ZIP bytes or CLI directory directly from the C# fixtures, starts a fresh
 Photino process through a JSON-lines adapter, and removes its temporary story files on disposal.

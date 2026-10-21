@@ -90,6 +90,12 @@ def main():
             directory = temporary / child
             directory.mkdir(mode=0o700)
             environment[variable] = str(directory)
+        # Pin GTK settings instead of inheriting distro overrides: the upstream file chooser default
+        # (startup-mode=recent) ignores a typed location when Open is activated.
+        environment["GSETTINGS_BACKEND"] = "keyfile"
+        settings = temporary / "config/glib-2.0/settings"
+        settings.mkdir(parents=True)
+        (settings / "keyfile").write_text("[org/gtk/settings/file-chooser]\nstartup-mode='cwd'\n")
         run(["dpkg-query", "-W", "libwebkit2gtk-4.1-0", "python3-pyatspi", "at-spi2-core", "xfwm4"])
         command = ["xvfb-run", "-a", "-s", "-screen 0 1440x1000x24", "dbus-run-session", "--",
                    "/usr/bin/python3", ROOT / "tests/native/atspi_adapter.py", "session",
