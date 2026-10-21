@@ -137,7 +137,7 @@ public sealed class NativePlayerDriver(string artifacts) : IPlayerDriver
         var choices = Named("Story choices")?.Descendants()
             .Where(node => node.Role == "push button")
             .Select(node => Regex.Replace(node.Name, @"^\d+\.\s*", "")).ToArray() ?? [];
-        var window = nodes.FirstOrDefault(node => node.Role == "frame" && node.Name == "Talewright");
+        var window = nodes.FirstOrDefault(node => node.Role == "frame");
         return new(
             passage?.Content ?? "", transcript?.Content ?? "", sheet?.Content ?? "",
             passage is null ? root.Content : "", choices,
@@ -148,7 +148,8 @@ public sealed class NativePlayerDriver(string artifacts) : IPlayerDriver
                 passage.Bounds.Y + passage.Bounds.Height <= window.Bounds.Y + window.Bounds.Height,
             sheet is not null && transcript is not null &&
                 sheet.Bounds.Y >= transcript.Bounds.Y + transcript.Bounds.Height - 1,
-            window?.Bounds.Width ?? 0);
+            window?.Bounds.Width ?? 0,
+            window?.Name ?? "");
     }
 
     public async ValueTask DisposeAsync()

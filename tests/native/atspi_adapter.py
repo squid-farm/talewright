@@ -195,7 +195,12 @@ def serve(args):
                 elif command == "key":
                     app.key(**arguments)
                 elif command == "resize":
-                    subprocess.run(["wmctrl", "-r", "Talewright", "-e",
+                    windows = subprocess.check_output(["wmctrl", "-lp"], text=True).splitlines()
+                    window = next((line.split()[0] for line in windows
+                                   if len(line.split()) >= 3 and line.split()[2] == str(app.process.pid)), None)
+                    if window is None:
+                        raise RuntimeError("No window belongs to the Photino process")
+                    subprocess.run(["wmctrl", "-ir", window, "-e",
                                     f"0,-1,-1,{arguments['width']},{arguments['height']}"], check=True)
                 elif command == "close":
                     try:

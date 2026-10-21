@@ -32,6 +32,8 @@ See [registry setup](../../README.md#c-customization-packages).
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
+`TalewrightApp.OnTitleChanged` reports the loaded/resumed story title or null on library return.
+The web host uses `PageTitle`; the desktop host updates its native window title.
 
 ## Saves and history
 

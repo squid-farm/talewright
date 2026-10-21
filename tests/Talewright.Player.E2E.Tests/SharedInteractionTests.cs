@@ -6,6 +6,17 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class SharedInteractionTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
     [Fact]
+    public async Task Window_title_follows_story_and_library_resume()
+    {
+        await Upload(TestStories.Linear);
+        await AssertState(state => Assert.Equal("Player Test", state.WindowTitle));
+        await Library();
+        await AssertState(state => Assert.Equal("Talewright", state.WindowTitle));
+        await Driver.ClickAsync("Back to Player Test Continue where you left off");
+        await AssertState(state => Assert.Equal("Player Test", state.WindowTitle));
+    }
+
+    [Fact]
     public async Task Keyboard_activates_choices_using_native_focus()
     {
         await Upload(TestStories.Linear);

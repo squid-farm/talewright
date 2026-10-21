@@ -78,6 +78,9 @@
     [Parameter]
     public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
 
+    [Parameter]
+    public EventCallback<string?> OnTitleChanged { get; set; }
+
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
     private bool _showLibrary;
@@ -99,7 +102,7 @@
         Reset();
         try
         {
-            Compile(await Library.LoadAsync(entry.Id), entry.Title);
+            await CompileAsync(await Library.LoadAsync(entry.Id), entry.Title);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException)
         {
@@ -120,7 +123,7 @@
             }
 
             buffer.Position = 0;
-            Compile(StorySource.FromZip(buffer), e.File.Name);
+            await CompileAsync(StorySource.FromZip(buffer), e.File.Name);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
@@ -128,7 +131,7 @@
         }
     }
 
-    private void Compile(StorySource source, string title)
+    private async Task CompileAsync(StorySource source, string title)
     {
         var result = StoryCompiler.Compile(source);
         _diagnostics = result.Diagnostics;
@@ -137,6 +140,7 @@
             _story = result.Story;
             _showLibrary = false;
             _diagnostics = [];
+            await OnTitleChanged.InvokeAsync(_story!.Title);
         }
         else
         {
@@ -151,15 +155,17 @@
         _diagnostics = [];
     }
 
-    private void ShowLibrary()
+    private async Task ShowLibrary()
     {
         Reset();
         _showLibrary = true;
+        await OnTitleChanged.InvokeAsync(null);
     }
 
-    private void ResumeStory()
+    private async Task ResumeStory()
     {
         Reset();
         _showLibrary = false;
+        await OnTitleChanged.InvokeAsync(_story!.Title);
     }
 }

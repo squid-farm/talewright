@@ -1,7 +1,9 @@
 @* Desktop root: the shared player, auto-opening a story passed on the command line. *@
-<TalewrightApp AutoStartStoryId="@Options.AutoStartStoryId" />
+<TalewrightApp AutoStartStoryId="@Options.AutoStartStoryId" OnTitleChanged="UpdateTitle" />
 
 @code {
     [Inject]
     private DesktopOptions Options { get; set; } = default!;
+
+    private void UpdateTitle(string? title) => Options.SetTitle?.Invoke(title ?? "Talewright");
 }
