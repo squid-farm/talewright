@@ -43,7 +43,9 @@ one below 52rem.
 
 ## Not here yet
 
-Saves/loading (M2), character creation (M2), images (M3), settings (text size, theme picker).
+Saves/loading with compatibility safeguards (M2), character creation (M2), images (M4: Presentation),
+settings (text size, theme picker; unscheduled). Core release verification takes precedence over new
+presentation features; see [the roadmap](../../docs/PLAN.md#core-production-readiness-gates-m2).
 
 ## Regression testing
 

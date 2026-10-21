@@ -4,7 +4,10 @@
 > Desktop (Photino) + Web (Blazor WASM). On rails first, open world later.
 > License: MPL-2.0. Story files: `.tale` (Markdown superset).
 
-This is the living plan. Todo status is tracked here: update the table in section 7 as work lands.
+This is the living roadmap, not the live task board. Track requirements, status, blockers, and implementation
+in [GitHub Issues](https://github.com/squid-farm/talewright/issues) and the
+[Development Project](https://github.com/orgs/squid-farm/projects/1). Section 7 preserves completed M0/M1
+history; new work belongs in GitHub. See [the migration index](ISSUES.md) for legacy IDs and coordination.
 
 Distribution now uses two packages without changing the project layout:
 `Talewright` is a packaging shell containing the six existing headless assemblies;
@@ -70,10 +73,13 @@ Reusable pieces:
 | D10 | Combat is **out of scope** for early milestones (to be a future module). |
 | D11 | **Predefined protagonist** in M1. The MVP story's player is female. **Pronoun/grammar system** is in scope. |
 | D12 | The core ruleset is **generic, d20-style** (STR/DEX/CON/INT/WIS/CHA plus skills). It ships as a module that can be **disabled or replaced**. |
-| D13 | Saves are **deferred to M2**. Event sourcing keeps them cheap; save migration across story versions comes in M3. |
+| D13 | Saves are **planned for M2**, including save-format/story version identifiers and explicit rejection of incompatible saves without modifying them. Version-to-version migration is a separate **M8** milestone with explicit migration contracts and old/new fixtures; it is not an M3 requirement. |
 | D14 | The story is **never built into the engine**. Samples live in `samples/` as standalone story folders/projects. |
 | D15 | Distribution: M1 points the player at a folder or zip. M2 adds a `talewright publish` command that **bakes a story into the player** to produce itch.io-ready web and desktop zips. |
 | D16 | Repo: `git init`; commit `README.md`, `LICENSE`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/TALE-SYNTAX.md`, and `docs/adr/*`. |
+| D17 | Authoring tools are **editor-neutral**: CLI, MSBuild, and a C# Language Server Protocol (LSP) server reuse shared Tale analysis and diagnostics. The VS Code extension is a thin client, not a second semantic implementation. |
+| D18 | Phase authoring support: **M2** CLI validation; **M3** shared partial analysis, linting, and LSP/VS Code intelligence; **M9** safe autofixes, lowest priority. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
+| D19 | **Production readiness before breadth, not backlog removal.** M2 prioritizes core reliability; M3 focuses on authoring. Preserve previously milestone-scoped features as numbered milestones: M4 media, M5 world simulation, M6 combat, M7 runtime plugins, M8 save migration, M9 autofix. Supporting work is organized as epics with explicit dependencies and acceptance criteria. |
 
 ## 4. Architecture
 
@@ -148,6 +154,81 @@ Reusable pieces:
 - **Diagnostics** carry file, line, column, code and message. The same diagnostics will feed the CLI, MSBuild and the VS Code language server (M3).
 - Output: an immutable typed `StoryDefinition`, which can be serialized to a compact bundle for publishing later.
 
+#### Planned authoring tooling (M2-M3 and M9; not implemented)
+
+The compiler already reports syntax, reference/type, YAML, and structural diagnostics. Authoring tools
+will reuse that work rather than build a separate parser or duplicate checks in each front end:
+
+```text
+Shared Tale compiler / analysis / lint rules
+  +-- talewright validate
+  +-- talewright lint [--fix]
+  +-- MSBuild diagnostics for C# story projects
+  +-- C# LSP server (proposed CLI host: talewright lsp)
+        +-- Thin VS Code extension
+        +-- Other LSP-capable editors
+```
+
+The commands below describe planned contracts, not commands available today:
+
+- **`talewright validate` (M2):** compile/check a story root and report all compiler diagnostics, including
+  warnings. Provide human-readable `file:line:column` output and machine-readable JSON with stable codes
+  and severities. Return success with warnings by default, fail on validation errors, and offer an explicit
+  warnings-as-errors policy. Invalid arguments and I/O failures must be visible and fail the command.
+  This is static validation, not proof that every conditional path is playable.
+- **`talewright lint` (M3):** include compiler diagnostics plus configurable authoring/style rules with stable
+  rule IDs, severities, configuration, and explicit suppression. Do not reimplement existing compiler checks.
+  Begin with a bounded, documented Tale-aware rule set; agree the exact rules and defaults before implementation.
+  Share human/JSON output and failure policy with validation. Do not apply generic Markdown linting wholesale:
+  Tale choices and directives have their own structural meanings.
+- **LSP + VS Code (M3):** a long-running C# language server handles live syntax/semantic diagnostics,
+  context-aware completion, and hover/syntax help. VS Code supplies highlighting, language configuration,
+  and snippets, then delegates intelligence to LSP. Other editors can launch the same server; they do not
+  need VS Code. Do not invoke one-shot CLI validation for every completion request.
+- **`talewright lint --fix` (M9, lowest priority):** opt-in, deterministic edits for an explicitly safe subset of lint rules.
+  Preserve prose, comments, and unrelated formatting; reject overlapping edits and do not overwrite files
+  changed since analysis. Reanalyze after fixing, report applied fixes and remaining diagnostics, and use
+  the resulting diagnostics for the exit policy. Repeated fixes must be idempotent. Ambiguous or
+  story-changing repairs remain suggestions, not automatic edits.
+
+**Shared-analysis prerequisite:** the current compiler targets runtime execution. Its symbols are internal,
+diagnostics have point locations rather than ranges, and `CompilationResult.Story` is null on errors.
+Add an editor-facing analysis result that retains partial symbols, source spans/declaration locations, and
+useful context even for incomplete input. Keep this separate from the source-free runtime AST.
+Use the existing in-memory `StorySource` to overlay unsaved buffers on the story's other files; discover
+the story root, invalidate analysis when Tale/YAML files change, and avoid publishing stale results.
+Start with debounced whole-story analysis; incremental compilation is not an initial requirement and
+should follow measured need.
+
+**Initial editor scope:** highlight Tale directives/expressions alongside supported Markdown; provide
+snippets for scenes, choices, conditions, and skill checks; complete scene IDs (including across files),
+characters, stats, items, factions, flags, variables, directives, predicates, and text modifiers in the
+appropriate context. Hover help should expose available schema descriptions/types and syntax documentation,
+not execute story logic or imply knowledge of live gameplay values. Signature help, inlay hints, rename,
+general formatting, and full YAML authoring assistance are outside the initial scope. YAML changes must
+still refresh Tale analysis and compiler diagnostics for `story.yaml`.
+
+**C# extensions:** CLI, MSBuild, and editor analysis must agree on custom predicate/modifier/ruleset
+registrations, either through an explicit project integration or exported metadata. Choose that contract
+before claiming C# project support; missing metadata must be reported rather than silently treating custom
+symbols as built-ins or executing arbitrary project code during editing.
+
+**Relative effort and dependencies** (including tests/docs, not schedule estimates):
+
+| Deliverable | Relative effort | Prerequisite / main work |
+|---|---|---|
+| CLI validation | Small | CLI foundation; existing compiler API, output/exit policy, integration tests |
+| Highlighting, language configuration, snippets | Small | Can land independently of LSP; must follow Tale rather than generic Markdown semantics |
+| Shared analysis + live diagnostics | Medium | Partial symbols/source spans, unsaved buffers, root discovery, invalidation, LSP synchronization |
+| Context-aware IntelliSense + hover help | Large overall | Shared analysis and LSP; useful behavior while expressions are incomplete |
+| CLI lint | Medium | CLI foundation; shared analysis for source-aware rules; rule/configuration/suppression design |
+| Safe autofix subset | Medium-large increment | Lint rules and precise source spans; non-destructive edits and idempotence |
+
+Acceptance checks belong with each deliverable: CLI output shape and exit policies; matching diagnostics
+across front ends; completion on incomplete text and cross-file symbols; unsaved Tale/YAML updates and stale
+diagnostic clearing; C# metadata consistency; and autofix preservation, edit-conflict, and repeat-run tests.
+Track validation in [#28](https://github.com/squid-farm/talewright/issues/28), shared analysis in [#29](https://github.com/squid-farm/talewright/issues/29), lint in [#30](https://github.com/squid-farm/talewright/issues/30), LSP/VS Code in [#31](https://github.com/squid-farm/talewright/issues/31), and autofix in [#32](https://github.com/squid-farm/talewright/issues/32).
+
 ### 4.6 Presentation (`Talewright.Player` RCL plus hosts)
 - Renders `RenderedFrame` → HTML via Blazor components. **It holds no game logic** and only knows `IStorySession`.
 - Includes a scroll-back transcript, choice list, character sheet panel (generated from ruleset metadata, so disabled stats disappear automatically) and a basic theme (CSS variables).
@@ -189,26 +270,81 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 
 ## 6. Milestones
 
-- **M0 — Foundations:** git repo, docs, license, solution skeleton, build and test green.
-- **M1 — Vertical slice (desktop):** core engine, generic ruleset, rules, narrative, `.tale` v0 compiler, runtime, Player UI and Photino host. *The Lost Relic* is playable from a folder. The web host builds and runs the same story.
-- **M2 — Ship it:**
-  - saves through `ISaveStore` (file on desktop, IndexedDB on web);
-  - a `talewright` CLI (`validate`, `publish` producing itch-ready web and desktop zips);
-  - the C# story project path (Tier 1): NuGet packaging plus an MSBuild task giving build-time diagnostics;
-  - richer hubs/storylets;
-  - character creation.
-- **M3 — Ecosystem:**
-  - VS Code extension with a C# language server (reusing `Talewright.Tale` diagnostics), syntax highlighting and completion against the story schema;
-  - save migration;
-  - media/images;
-  - combat module;
-  - open-world locations, time and clocks;
-  - Tier 2 plugins: sandboxed scripting via Jint or MoonSharp, and/or desktop DLL plugins.
+- **M0 — Foundations:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/1)) git repo, docs, license, solution skeleton, build and test green.
+- **M1 — Vertical slice (desktop):** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/2)) core engine, generic ruleset, rules, narrative, `.tale` v0 compiler, runtime, Player UI and Photino host. *The Lost Relic* is playable from a folder. The web host builds and runs the same story.
+- **M2 — Ship stories reliably:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/3))
+  - prioritize the core production-readiness gates below before expanding gameplay or presentation;
+  - saves through `ISaveStore` (file on desktop, IndexedDB on web), with format/story version identifiers and explicit, non-destructive rejection of incompatible saves ([#40](https://github.com/squid-farm/talewright/issues/40), [#34](https://github.com/squid-farm/talewright/issues/34));
+  - a `talewright` CLI (`validate` with human/JSON diagnostics and explicit exit policy, `publish` producing itch-ready web and desktop zips) ([#28](https://github.com/squid-farm/talewright/issues/28), [#41](https://github.com/squid-farm/talewright/issues/41));
+  - the C# story project path (Tier 1): NuGet packaging plus an MSBuild task giving build-time diagnostics ([#42](https://github.com/squid-farm/talewright/issues/42));
+  - richer hubs/storylets ([#44](https://github.com/squid-farm/talewright/issues/44));
+  - character creation ([#43](https://github.com/squid-farm/talewright/issues/43)).
+- **M3 — Author stories comfortably:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/4)) shared analysis, editor-neutral LSP, VS Code support, and a bounded initial lint rule set. Deliver independently usable slices:
+  1. Tale syntax highlighting, language configuration, and snippets (independent of LSP; [#31](https://github.com/squid-farm/talewright/issues/31)).
+  2. Shared partial/source-aware analysis and LSP-backed live validation ([#29](https://github.com/squid-farm/talewright/issues/29), [#31](https://github.com/squid-farm/talewright/issues/31)).
+  3. Context-aware completion and hover help in a thin VS Code client; document use from other LSP editors ([#31](https://github.com/squid-farm/talewright/issues/31)).
+  4. `talewright lint` with a small, agreed initial rule set and shared CLI/editor diagnostics ([#30](https://github.com/squid-farm/talewright/issues/30)).
+  These are delivery slices, not a requirement to hold all releases until every slice is complete.
+- **M4 — Presentation:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/5)) bounded image/media support, including asset resolution/loading, safe paths,
+  publishing/bundling, and consistent desktop/web behavior. Agree supported asset types and limits before implementation.
+- **M5 — World simulation:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/6)) locations/travel, deterministic time advancement, and event-backed clocks;
+  expose world state to storylet eligibility and Tale authoring. Build on hubs rather than replace them
+  ([FR-028 / #36](https://github.com/squid-farm/talewright/issues/36)).
+- **M6 — Combat:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/7)) an optional ruleset-driven module, with explicit encounter/turn/outcome contracts,
+  deterministic events/replay, narrative transitions, and desktop/web presentation
+  ([FR-029 / #37](https://github.com/squid-farm/talewright/issues/37)).
+- **M7 — Runtime plugins:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/8)) a versioned extension API, bounded sandboxed scripting for desktop/web, and
+  an explicitly trusted desktop DLL path; include packaging, persistence, diagnostics, and compatibility
+  contracts ([FR-030 / #38](https://github.com/squid-farm/talewright/issues/38)).
+- **M8 — Save migration:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/9)) explicit save-format and story-version migration paths, migration fixtures,
+  non-destructive conversion, and desktop/web load integration ([FR-031 / #39](https://github.com/squid-farm/talewright/issues/39)).
+- **M9 — Safe authoring fixes (lowest priority):** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/10)) a documented safe subset of `talewright lint --fix`,
+  with conflict detection, preservation, reanalysis, and idempotence ([FR-024 / #32](https://github.com/squid-farm/talewright/issues/32)).
+
+Milestone numbers express the planned phases, not artificial dependencies. M2 readiness comes first;
+later milestones can ship independently once their stated prerequisites are met. In particular, M8 depends
+on M2 saves, not on combat or plugins, and migration work can be pulled forward for a compatibility change.
+M9 depends on M3 analysis/lint, not on M4-M8. None of M4-M9 blocks the core or authoring release.
+Each milestone needs its own acceptance evidence; moving it later does not remove it from the backlog.
+M4's concrete deliverables are tracked in [FR-027 / #35](https://github.com/squid-farm/talewright/issues/35).
+
+### Core production-readiness gates (M2)
+
+These are planned release criteria, not claims that the current engine is production-ready. Existing M2
+features remain in scope, but reliability work takes precedence over additional features.
+
+- **Correctness:** resolve known S1/S2 bugs in [ISSUES.md](ISSUES.md) and explicitly triage remaining
+  release risks. Cover the existing M2-deferred arithmetic overflow and commented-out auto-declaration
+  bugs ([#6](https://github.com/squid-farm/talewright/issues/6)/[#8](https://github.com/squid-farm/talewright/issues/8)) with fixes and regression tests before release.
+- **Save safety:** round-trip saves on desktop and web; preserve deterministic state/choices on reload;
+  reject corrupt, unsupported, or incompatible saves with actionable errors and without partial session
+  mutation or overwriting the original. Define compatibility policy before claiming cross-version support.
+- **Input and failure handling:** maintain bounded untrusted story/archive loading, test malformed input,
+  and surface load/save/validation/publish failures clearly rather than failing silently or appearing successful.
+- **Release verification:** build/test in CI; run the existing player regression suites and verify published
+  Release artifacts, not only development hosts. Check desktop and web load/play/save flows, static hosting
+  and itch.io-style subpaths, trimming, and install/publish instructions. Document the tested platform matrix
+  and any unverified platforms rather than treating a Linux test as evidence for every desktop OS.
+- **Operational clarity:** document supported story/save formats, CLI diagnostic/exit policies, and known
+  limitations. Measure representative story load/validation and save/replay behavior; agree explicit budgets
+  from those measurements rather than adding speculative optimization or declaring performance acceptable.
+
+Track the readiness and save-compatibility work in [FR-025 / #33](https://github.com/squid-farm/talewright/issues/33) and [FR-026 / #34](https://github.com/squid-farm/talewright/issues/34).
+
+### Backlog organization for GitHub
+
+The migration is complete: [GitHub Issues](https://github.com/squid-farm/talewright/issues) holds the live
+backlog, preserving FR/BUG identifiers. [Milestones](https://github.com/squid-farm/talewright/milestones)
+are release targets; [epics](ISSUES.md#epics) group work across milestones without promoting exploratory
+ideas to approved tasks. Each milestone feature has a dedicated issue with prerequisites, implementation
+slices, decisions, and acceptance checks. Split slices into linked child issues when taking up the work;
+use native blockers, not numeric milestone order, for actual dependencies. Update live requirements in
+GitHub instead of recreating a local board.
 
 ### Code-extension tiers (for reference)
 - **Tier 0 (M1):** `.tale` plus YAML only.
 - **Tier 1 (M2):** a C# story project references `Talewright.*` NuGet packages, registers named predicates, stats, modifiers, grammar modifiers and rulesets, and builds its own desktop and web app.
-- **Tier 2 (M3+):** plugins inside the generic player.
+- **Tier 2 (M7):** plugins inside the generic player.
   - Desktop: AssemblyLoadContext (full trust, no sandbox).
   - Web: arbitrary DLLs are fragile under trimming, so **sandboxed script plugins (Jint/MoonSharp) are preferred**.
   - Roslyn scripting in the browser was rejected (10+ MB, slow).

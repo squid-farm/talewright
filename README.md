@@ -25,7 +25,23 @@ stats, factions and items. No code is needed. Programmers can extend the engine 
 
 **Milestone 1 (vertical slice) is complete:** the engine, the `.tale` compiler, the shared Blazor player, and the
 desktop and web hosts all work, and the sample story *The Lost Relic* is playable end to end on both.
-Saves, a publishing CLI, and character creation are next (M2). See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
+Core reliability and release verification come first in M2, alongside saves with compatibility safeguards,
+a CLI with `validate` and `publish`, and character creation.
+M3 adds `lint` and editor-neutral language-server support with a thin VS Code extension for Tale highlighting,
+snippets, live validation, completion, and hover help, delivered in independently usable slices.
+Later milestones preserve the feature backlog: **M4** image/media support, **M5** world simulation,
+**M6** combat, **M7** runtime plugins, **M8** save migration, and **M9** safe `lint --fix` (lowest priority).
+Dependencies, not milestone numbers alone, determine when independent work can start; none blocks M2/M3.
+These commands and editor tools are planned, not available yet; they will share the compiler's analysis
+rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
+
+## Work tracking
+
+[GitHub Issues](https://github.com/squid-farm/talewright/issues) is the live backlog.
+Use the [Development Project](https://github.com/orgs/squid-farm/projects/1) for status/priority views and
+[milestones](https://github.com/squid-farm/talewright/milestones) for release targets.
+Before starting work, read the issue's blockers and parent, check existing claims/PRs, and claim it with an
+assignee and branch/worktree comment. See [the migration index and workflow](docs/ISSUES.md) for bot coordination.
 
 ## Layout
 
