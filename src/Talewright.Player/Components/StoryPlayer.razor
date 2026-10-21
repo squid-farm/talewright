@@ -1,4 +1,6 @@
 @* Plays one compiled story: transcript of everything so far, current choices, and a character sheet. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 
 <div class="tw-player">
     <header class="tw-bar">
@@ -70,6 +72,10 @@
     [Parameter]
     public EventCallback OnExit { get; set; }
 
+    /// <summary>False while the host hides the player (e.g. behind the library); becoming visible again re-reveals the newest frame.</summary>
+    [Parameter]
+    public bool Visible { get; set; } = true;
+
     private sealed record TranscriptEntry(StoryFrame Frame)
     {
         public IReadOnlyList<RenderedInline>? Chosen { get; set; }
@@ -80,6 +86,8 @@
     private StorySession _session = default!;
     private StoryDefinition? _startedStory;
     private bool _focusLatest;
+    private bool _wasVisible = true;
+    private IJSObjectReference? _module;
 
     private RenderFragment FrameContent(TranscriptEntry entry) => @<text>
         @if (!string.IsNullOrEmpty(entry.Frame.Title))
@@ -101,6 +109,13 @@
         {
             Restart();
         }
+
+        if (Visible && !_wasVisible)
+        {
+            _focusLatest = true;
+        }
+
+        _wasVisible = Visible;
     }
 
     private void Restart()
@@ -125,18 +140,51 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusLatest)
+        if (_focusLatest && Visible)
         {
             _focusLatest = false;
 
-            // Focusing the newest frame scrolls it into view and moves screen readers to the new text, with no JS interop.
+            // Scroll the newest frame to the top and focus it, so the new text is visible and screen readers move to it.
             try
             {
-                await _latestFrame.FocusAsync();
+                _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
+                await _module.InvokeVoidAsync("revealLatest", _latestFrame, _transcript.Count == 1);
+            }
+            catch (JSException)
+            {
+                await FocusLatestAsync();
+            }
+            catch (JSDisconnectedException)
+            {
             }
             catch (InvalidOperationException)
             {
-                // The element can disappear if the player restarts mid-render; nothing to focus then.
+                // The element can disappear if the player restarts mid-render; nothing to reveal then.
+            }
+        }
+    }
+
+    private async Task FocusLatestAsync()
+    {
+        try
+        {
+            await _latestFrame.FocusAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JSException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
             }
         }
     }

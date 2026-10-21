@@ -5,12 +5,24 @@
 <div class="tw-app">
     @if (_story is not null)
     {
-        <StoryPlayer Story="_story" OnExit="BackToLibrary" />
+        @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
+        <div hidden="@_showLibrary">
+            <StoryPlayer Story="_story" Visible="!_showLibrary" OnExit="ShowLibrary" />
+        </div>
     }
-    else
+
+    @if (_story is null || _showLibrary)
     {
         <section class="tw-library">
             <h1>Talewright</h1>
+
+            @if (_story is not null)
+            {
+                <button type="button" class="tw-choice tw-resume" @onclick="ResumeStory">
+                    <span class="tw-story-title">Back to @_story.Title</span>
+                    <span class="tw-story-origin">Continue where you left off</span>
+                </button>
+            }
 
             @if (_entries is null)
             {
@@ -65,6 +77,7 @@
 
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
+    private bool _showLibrary;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
     private string? _failedTitle;
@@ -119,6 +132,7 @@
         if (result.Success)
         {
             _story = result.Story;
+            _showLibrary = false;
             _diagnostics = [];
         }
         else
@@ -134,5 +148,15 @@
         _diagnostics = [];
     }
 
-    private void BackToLibrary() => _story = null;
+    private void ShowLibrary()
+    {
+        Reset();
+        _showLibrary = true;
+    }
+
+    private void ResumeStory()
+    {
+        Reset();
+        _showLibrary = false;
+    }
 }

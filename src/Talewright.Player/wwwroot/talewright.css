@@ -47,6 +47,7 @@ button { font: inherit; color: inherit; }
 .tw-story-title { display: block; font-weight: bold; }
 .tw-story-origin { display: block; font-family: var(--tw-ui-font); font-size: 0.8rem; color: var(--tw-muted); }
 .tw-error { color: var(--tw-error); }
+.tw-resume { margin: 1rem 0; }
 .tw-empty { color: var(--tw-muted); font-style: italic; }
 
 /* Player layout */

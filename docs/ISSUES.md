@@ -252,6 +252,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 | [FR-016](#fr-016) | Low    | idea        | unscheduled | Narrative / Player | Per-character speech colours, changeable during play              | S–M    |
 | [FR-017](#fr-017) | Medium | idea        | unscheduled | Runtime / Player   | Option to hide notes (rolls, stat changes)                        | S      |
 | [FR-018](#fr-018) | Low    | idea        | M2+         | Tale / publish     | Ship a precompiled story bundle instead of parsing at runtime     | M      |
+| [FR-019](#fr-019) | Medium | idea        | M2          | Runtime / Player   | Global back/forward buttons (roll state back and forward)         | M      |
 
 ---
 
@@ -597,6 +598,36 @@ stats: shown | hidden }`, plus an optional player-side toggle in the Player, the
   their names and the host re-binds them from the story's C# assembly. PLAN §4 already anticipates this
   ("serialized to a compact bundle for publishing later"). Benchmark before committing to it: it's only worth it
   if real stories compile slowly.
+- **Effort:** M
+
+### FR-019
+
+**Global back/forward buttons that roll the playthrough's state back and forward.**
+
+- **Priority:** Medium
+- **Status:** idea
+- **Target:** M2 (alongside saves, which use the same mechanism)
+- **Area:** Runtime (`StorySession` / a history wrapper), Player (`StoryPlayer.razor`), `story.yaml`
+- **Source:** Project Lead, 2026-10-20
+- **Shortcoming:** the only way to see what another option does is to restart and replay. Players who like to
+  try every option before committing to a path can't step back one choice, look at the alternative, and step
+  forward again. PLAN D9 says event sourcing "enables rewind", but no milestone schedules it.
+- **Ideas:**
+  - **Behaviour:** Back undoes the last choice and restores the previous frame, state, and transcript. Forward
+    re-applies an undone choice. Making a different choice after going back clears the forward stack (normal
+    undo/redo, not a branching tree).
+  - **Authoring:** on by default. Authors can hide it with a top-level `undo: false` in `story.yaml`, for
+    example in stories where choices are meant to be irreversible.
+  - **Mechanism:** replay, not truncation. Rebuild a fresh `StorySession` with the same seed and the
+    choice-key prefix (the determinism contract in ARCHITECTURE.md; the same "seed + keys" that M2 saves will
+    store). `EventLog.Truncate` alone isn't enough, because `TriggerEngine` keeps its edge state
+    (`_currentlyTrue`) outside the event log. Replay costs O(choices) per step, which is negligible for
+    interactive fiction. A good home is a runtime-level history wrapper (`Choose`, `Back`, `Forward`,
+    `CanBack`, `CanForward`, frames for the transcript), so it can be unit-tested without the UI.
+  - **Dice:** rolls are a function of `(seed, roll index)`, so going back and retrying returns the same roll.
+    That is intended: it keeps exploration honest and matches the anti-save-scumming stance of
+    `DeterministicDice`.
+  - **Possible extras:** keyboard shortcuts (e.g. Alt+←/→), and a frame showing which option was taken last time.
 - **Effort:** M
 
 ---

@@ -247,10 +247,12 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
 ### 3.7 `Talewright.Player` — the shared Blazor UI (Razor Class Library)
 
 - `Components/TalewrightApp.razor`: the whole app. Library screen (list + `.zip` upload) → compile → either show
-  diagnostics or play. Hosts render only this.
+  diagnostics or play. Hosts render only this. Opening the library mid-story keeps the player mounted (hidden),
+  so a "Back to …" button resumes the playthrough; picking a story from the list starts it fresh.
 - `Components/StoryPlayer.razor`: one playthrough. Keeps a transcript of past frames (echoing the chosen label),
-  shows current choices, Restart/Library buttons, and focuses the newest frame (scrolls it into view and moves
-  screen readers to it without JS interop).
+  shows current choices and Restart/Library buttons. Its collocated `StoryPlayer.razor.js` module scrolls the
+  newest frame to the top of the viewport and focuses it (moving screen readers to it); plain `focus()` would
+  not scroll a frame that is already partly visible.
 - `Components/DocumentView.razor`, `InlineView.razor`: `RenderedDocument` → HTML (`<p>`, `<em>`, `<strong>`,
   `<code>`). `RenderedMedia` renders nothing yet.
 - `Components/CharacterSheet.razor`: generated from ruleset metadata; whatever stats the story's ruleset has,
