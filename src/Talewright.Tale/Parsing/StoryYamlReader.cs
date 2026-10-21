@@ -173,6 +173,12 @@ internal sealed class StoryYamlReader
 
                 var min = Int(Get(stat, "min")) ?? 0;
                 var max = Int(Get(stat, "max")) ?? int.MaxValue;
+                if (min > max)
+                {
+                    Error(Get(stat, "min") ?? stat, "TW4003", $"Stat '{id}' minimum ({min}) must not be greater than its maximum ({max}).", 0);
+                    continue;
+                }
+
                 var definition = new StatDefinition(new StatId(id), Scalar(Get(stat, "name")) ?? id, parsedCategory, min, max, Int(Get(stat, "default")) ?? min);
                 if (builder.HasStat(definition.Id))
                 {

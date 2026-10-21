@@ -366,6 +366,27 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Rejects_custom_stats_with_minimum_greater_than_maximum()
+    {
+        const string yaml = """
+            id: test
+            title: Test
+            start: a
+            ruleset:
+              base: none
+              stats:
+                - { id: love, min: 10, max: 0 }
+            characters:
+              player: { first-name: Mara, pronouns: she }
+            """;
+
+        var error = Error("=== a\n-> END", "TW4003", yaml);
+
+        Assert.Contains("minimum (10) must not be greater than its maximum (0)", error.Message);
+        Assert.Equal("story.yaml", error.Location.File);
+    }
+
+    [Fact]
     public void Custom_pronouns_and_named_predicates()
     {
         var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive: xyr, possessive-pronoun: xyrs, reflexive: xemself }");
