@@ -170,15 +170,10 @@ public sealed class StorySession : IStorySession
             }
         }
 
-        if (!string.IsNullOrEmpty(scene.HubTag))
+        if (scene.HubSelection is { } hub)
         {
-            foreach (var storylet in StoryletSelector.SelectEligible(Story.Scenes, scene.HubTag, Context))
+            foreach (var storylet in StoryletSelector.SelectEligible(Story.Scenes, hub, Context, scene.Id, scene.HubLimit))
             {
-                if (storylet.Id == scene.Id)
-                {
-                    continue;
-                }
-
                 var label = new RenderedInline[] { new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None) };
                 var key = StoryletKeyPrefix + storylet.Id.Value;
                 offered.Add((new ChoiceView(key, label), notes =>

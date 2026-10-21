@@ -196,7 +196,7 @@ internal sealed partial class TaleParser
 
     // ---- metadata --------------------------------------------------------------------------------------------------
 
-    private static readonly string[] MetadataKeys = ["title", "requires", "tags", "priority", "once", "hub"];
+    private static readonly string[] MetadataKeys = ["title", "requires", "tags", "priority", "once", "hub", "hub-limit"];
 
     private static bool IsMetadataKey(string line)
     {
@@ -211,6 +211,11 @@ internal sealed partial class TaleParser
         var value = parts.Length > 1 ? parts[1] : string.Empty;
         var valueColumn = indent + line.IndexOf(' ', StringComparison.Ordinal) + 1;
         var scene = _scene!;
+        if (key is "hub" or "hub-limit" && !scene.HubDirectives.Add(key))
+        {
+            _diagnostics.Error("TW1006", $"Duplicate @{key} directive.", At(indent));
+            return true;
+        }
         switch (key)
         {
             case "title":
@@ -241,12 +246,33 @@ internal sealed partial class TaleParser
                 scene.Once = true;
                 return true;
             case "hub":
-                if (value.Length == 0)
+                var grouped = value.StartsWith("all(", StringComparison.Ordinal) || value.StartsWith("any(", StringComparison.Ordinal);
+                var tags = grouped && value.EndsWith(')')
+                    ? value[4..^1].Split(',', StringSplitOptions.TrimEntries)
+                    : new[] { value };
+                if (tags.Any(t => string.IsNullOrWhiteSpace(t) || t.Any(c => char.IsWhiteSpace(c) || c is '(' or ')' or ',')) ||
+                    tags.Distinct(StringComparer.Ordinal).Count() != tags.Length)
                 {
-                    _diagnostics.Error("TW1006", "@hub needs a tag: '@hub camp'.", At(indent));
+                    _diagnostics.Error("TW1006", "@hub needs a tag or all(tag, tag)/any(tag, tag) with distinct nonempty tags.", At(indent));
                 }
-
-                scene.HubTag = value;
+                else if (grouped)
+                {
+                    scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, value.StartsWith("all(", StringComparison.Ordinal));
+                }
+                else
+                {
+                    scene.HubTag = value;
+                }
+                return true;
+            case "hub-limit":
+                if (int.TryParse(value, out var limit) && limit > 0)
+                {
+                    scene.HubLimit = limit;
+                }
+                else
+                {
+                    _diagnostics.Error("TW1006", "@hub-limit needs a positive whole number.", At(indent));
+                }
                 return true;
             default:
                 // Not metadata (e.g. a paragraph starting with "@"); treat the line as prose.
@@ -750,6 +776,9 @@ internal sealed partial class TaleParser
         public int Priority { get; set; }
         public bool Once { get; set; }
         public string? HubTag { get; set; }
+        public Talewright.Rules.Storylets.StoryletTags? Hub { get; set; }
+        public int? HubLimit { get; set; }
+        public HashSet<string> HubDirectives { get; } = [];
         public List<ConditionalEffect> EntryEffects { get; } = [];
         public List<TemplateBlock> Body { get; } = [];
         public CheckBranch? EntryCheck { get; set; }
@@ -775,6 +804,8 @@ internal sealed partial class TaleParser
             Priority = Priority,
             Once = Once,
             HubTag = HubTag,
+            Hub = Hub,
+            HubLimit = HubLimit,
             EntryEffects = EntryEffects,
             Body = Body,
             EntryCheck = EntryCheck,

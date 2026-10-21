@@ -103,6 +103,9 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
 | `@once`                                            | Storylet is ineligible after it was visited once.                                              |
 | `@hub tag`                                         | At this scene, offer every eligible scene tagged `tag` as a choice.                            |
+| `@hub all(tag, tag)`                               | Offer storylets carrying every listed tag.                                                   |
+| `@hub any(tag, tag)`                               | Offer storylets carrying at least one listed tag.                                             |
+| `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (inline Markdown).                                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `![alt](media-id)`                                 | Media placeholder (ignored by the M1 player; reserved for images).                             |
@@ -117,6 +120,14 @@ Metadata lines are only recognized directly after the `===` header. Lines starti
 _no_ target — e.g. `* [Take the torch] { give player torch }` — **falls through** to the scene's own
 `-> target` lines (like an ink "gather"), and so does a check outcome without `-> target`. A scene must have
 at least one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise it's a compile error.
+
+Hub tags must be distinct and nonempty. A scene may have only one `@hub` and one
+`@hub-limit`. The selector excludes the hub itself, applies requirements and
+`@once`, then sorts by descending priority and stable declaration order before
+limiting. Multiple matching tags never duplicate a choice. Explicit choices are
+not capped. A fallback `->` applies only when no explicit or generated choices
+are available. Reachability conservatively considers all tag matches, not just
+the current capped selection, because state changes may alter eligibility.
 
 **Conditional structure.** Choices, `~` effects and `->` diverts inside a block `{if}` only apply when the
 condition holds (a choice's own `requires` is combined with it using `and`). With several `->` lines, the

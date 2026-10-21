@@ -24,6 +24,27 @@ public interface IStorylet
     bool Once { get; }
 }
 
+/// <summary>Deterministic all/any tag matching shared by runtime selection and conservative validation.</summary>
+public sealed class StoryletTags
+{
+    public StoryletTags(IEnumerable<string> tags, bool matchAll = false)
+    {
+        var values = tags.ToArray();
+        if (values.Length == 0 || values.Any(string.IsNullOrWhiteSpace) ||
+            values.Distinct(StringComparer.Ordinal).Count() != values.Length)
+        {
+            throw new ArgumentException("A tag query requires nonempty distinct tags.", nameof(tags));
+        }
+
+        Tags = Array.AsReadOnly(values);
+        MatchAll = matchAll;
+    }
+
+    public IReadOnlyList<string> Tags { get; }
+    public bool MatchAll { get; }
+    public bool Matches(IReadOnlySet<string> tags) => MatchAll ? Tags.All(tags.Contains) : Tags.Any(tags.Contains);
+}
+
 /// <summary>
 /// Quality-based narrative selection. "On rails" stories mostly use explicit diverts; hubs and (later)
 /// open-world locations ask the selector for everything currently eligible.
@@ -38,12 +59,26 @@ public static class StoryletSelector
     /// Eligible storylets carrying <paramref name="tag"/>, ordered by descending priority then declaration order.
     /// </summary>
     public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, string tag, EvaluationContext context)
-        where T : IStorylet =>
-        storylets
+        where T : IStorylet => SelectEligible(storylets, new StoryletTags([tag]), context);
+
+    /// <summary>Filters before stable ordering and limiting; excludes the hub itself and duplicate scene ids.</summary>
+    public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, StoryletTags tags,
+        EvaluationContext context, SceneId? exclude = null, int? limit = null)
+        where T : IStorylet
+    {
+        if (limit is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), "A storylet limit must be positive.");
+        }
+
+        return storylets
             .Select((s, index) => (s, index))
-            .Where(x => x.s.Tags.Contains(tag) && IsEligible(x.s, context))
+            .Where(x => x.s.Id != exclude && tags.Matches(x.s.Tags) && IsEligible(x.s, context))
             .OrderByDescending(x => x.s.Priority)
             .ThenBy(x => x.index)
             .Select(x => x.s)
+            .DistinctBy(s => s.Id)
+            .Take(limit ?? int.MaxValue)
             .ToArray();
+    }
 }

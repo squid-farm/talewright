@@ -26,16 +26,18 @@ internal static class StoryValidator
             diagnostics.Error("TW3007", $"Start scene '{manifest.Start}' does not exist.", manifest.StartLocation);
         }
 
-        var tagged = scenes
-            .SelectMany(s => s.Definition.Tags.Select(t => (Tag: t, s.Definition.Id)))
-            .ToLookup(x => x.Tag, x => x.Id);
+        var definitions = scenes.Select(s => s.Definition).ToArray();
 
         foreach (var (scene, location) in scenes)
         {
             CheckExits(scene, location, diagnostics);
-            if (scene.HubTag is { Length: > 0 } hub && !tagged.Contains(hub))
+            if (scene.HubLimit is not null && scene.HubSelection is null)
             {
-                diagnostics.Warning("TW3008", $"Hub '{hub}' has no scenes tagged '{hub}', so it offers nothing.", location);
+                diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
+            }
+            if (scene.HubSelection is { } hub && !definitions.Any(s => s.Id != scene.Id && hub.Matches(s.Tags)))
+            {
+                diagnostics.Warning("TW3008", $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
             }
         }
 
@@ -50,7 +52,7 @@ internal static class StoryValidator
         var queue = new Queue<SceneId>([start]);
         while (queue.Count > 0)
         {
-            foreach (var next in Successors(byId[queue.Dequeue()].Definition, tagged))
+            foreach (var next in Successors(byId[queue.Dequeue()].Definition, definitions))
             {
                 if (byId.ContainsKey(next) && reached.Add(next))
                 {
@@ -71,7 +73,7 @@ internal static class StoryValidator
     private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)
     {
         var hasOwnDivert = scene.Diverts.Count > 0;
-        if (!hasOwnDivert && scene.Choices.Count == 0 && scene.EntryCheck is null && string.IsNullOrEmpty(scene.HubTag))
+        if (!hasOwnDivert && scene.Choices.Count == 0 && scene.EntryCheck is null && scene.HubSelection is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
             return;
@@ -92,7 +94,7 @@ internal static class StoryValidator
         }
     }
 
-    private static IEnumerable<SceneId> Successors(SceneDefinition scene, ILookup<string, SceneId> tagged)
+    private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyList<SceneDefinition> scenes)
     {
         IEnumerable<DivertTarget?> targets = scene.Diverts.Select(d => d.Target)
             .Concat(scene.Choices.Select(c => c.Divert))
@@ -106,11 +108,11 @@ internal static class StoryValidator
             }
         }
 
-        if (!string.IsNullOrEmpty(scene.HubTag))
+        if (scene.HubSelection is { } hub)
         {
-            foreach (var id in tagged[scene.HubTag])
+            foreach (var candidate in scenes.Where(s => s.Id != scene.Id && hub.Matches(s.Tags)))
             {
-                yield return id;
+                yield return candidate.Id;
             }
         }
     }

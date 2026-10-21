@@ -85,6 +85,10 @@ public sealed class SceneDefinition : IStorylet
     /// <summary>When set, every eligible scene tagged with this is offered as a choice here.</summary>
     public string? HubTag { get; init; }
 
+    public StoryletTags? Hub { get; init; }
+    public int? HubLimit { get; init; }
+    public StoryletTags? HubSelection => Hub ?? (string.IsNullOrEmpty(HubTag) ? null : new StoryletTags([HubTag]));
+
     public IReadOnlyList<ConditionalEffect> EntryEffects { get; init; } = [];
     public IReadOnlyList<TemplateBlock> Body { get; init; } = [];
     public CheckBranch? EntryCheck { get; init; }
