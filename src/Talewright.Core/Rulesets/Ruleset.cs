@@ -63,7 +63,16 @@ public sealed class Ruleset
             }
         }
 
-        return result ?? (Tiers.Count > 0 ? Tiers[0] : null);
+        if (result is null && Tiers.Count > 0)
+        {
+            return Tiers[0];
+        }
+        else if (Tiers.Count == 0)
+        {
+            return null;
+        }
+
+        return result;
     }
 
     public ReputationTier? FindTier(string id) => Tiers.FirstOrDefault(t => t.Id == id);
