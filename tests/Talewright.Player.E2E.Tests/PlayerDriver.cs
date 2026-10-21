@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Playwright;
 
 namespace Talewright.Player.E2E.Tests;
@@ -37,8 +38,6 @@ public interface IPlayerDriver : IAsyncDisposable
 
 public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
 {
-    private ILocator Latest => page.GetByRole(AriaRole.Region, new() { Name = "Current passage" });
-
     public Task StartAsync(params string[] paths)
     {
         if (paths.Length != 0)
@@ -65,31 +64,41 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
     public Task PressAsync(string key) => page.Keyboard.PressAsync(key);
     public Task ResizeAsync(int width, int height) => page.SetViewportSizeAsync(width, height);
 
+    // One synchronous DOM read prevents observations from straddling a Blazor render.
     public async Task<PlayerObservation> ObserveAsync()
     {
-        var visible = await Latest.CountAsync() != 0;
-        var transcript = page.GetByRole(AriaRole.Main, new() { Name = "Story transcript" });
-        var sheet = page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
-        var library = page.Locator(".tw-library");
-        var choices = page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
-        var passageBounds = visible ? await Latest.BoundingBoxAsync() : null;
-        var transcriptBounds = visible ? await transcript.BoundingBoxAsync() : null;
-        var sheetBounds = visible ? await sheet.BoundingBoxAsync() : null;
-        return new(
-            visible ? await Latest.InnerTextAsync() : "",
-            visible ? await transcript.InnerTextAsync() : "",
-            visible ? await sheet.InnerTextAsync() : "",
-            await library.IsVisibleAsync() ? await library.InnerTextAsync() : "",
-            visible ? (await choices.AllTextContentsAsync()).Select(text =>
-                System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"^\d+\.\s*", "")).ToArray() : [],
-            visible && await page.GetByRole(AriaRole.Button, new() { Name = "Play again", Exact = true }).IsVisibleAsync(),
-            visible,
-            visible && await Latest.EvaluateAsync<bool>("e => e === document.activeElement"),
-            passageBounds is not null && passageBounds.Y >= 0 &&
-                passageBounds.Y + passageBounds.Height <= page.ViewportSize!.Height,
-            sheetBounds is not null && transcriptBounds is not null &&
-                sheetBounds.Y >= transcriptBounds.Y + transcriptBounds.Height - 1,
-            page.ViewportSize!.Width);
+        var snapshot = await page.EvaluateAsync<JsonElement>("""
+        () => {
+            const passage = document.querySelector('[aria-label="Current passage"]');
+            const transcript = document.querySelector('[aria-label="Story transcript"]');
+            const sheet = document.querySelector('[aria-label="Character sheet"]');
+            const library = document.querySelector('.tw-library');
+            const displayed = element => element !== null && element.checkVisibility();
+            const active = displayed(transcript);
+            const passageBounds = active ? passage?.getBoundingClientRect() : null;
+            const transcriptBounds = active ? transcript.getBoundingClientRect() : null;
+            const sheetBounds = active ? sheet?.getBoundingClientRect() : null;
+            return {
+                Passage: active ? passage?.innerText ?? '' : '',
+                Transcript: active ? transcript.innerText : '',
+                Sheet: active ? sheet?.innerText ?? '' : '',
+                Library: displayed(library) ? library.innerText : '',
+                Choices: active ? Array.from(document.querySelectorAll('[aria-label="Story choices"] button'),
+                    button => button.textContent.trim().replace(/^\d+\.\s*/, '')) : [],
+                Ended: active && Array.from(transcript.querySelectorAll('button'))
+                    .some(button => button.textContent.trim() === 'Play again' && displayed(button)),
+                PassageVisible: active && passage !== null,
+                PassageFocused: active && passage !== null && passage === document.activeElement,
+                PassageInWindow: passageBounds !== null && passageBounds.top >= 0 &&
+                    passageBounds.bottom <= innerHeight,
+                SheetStacked: sheetBounds !== null && transcriptBounds !== null &&
+                    sheetBounds.top >= transcriptBounds.bottom - 1,
+                WindowWidth: innerWidth
+            };
+        }
+        """);
+        return snapshot.Deserialize<PlayerObservation>()
+            ?? throw new InvalidDataException("Missing browser observation.");
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

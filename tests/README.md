@@ -21,6 +21,8 @@ Use the same xUnit assertions, fixture definitions, and `dotnet test --filter` s
 DOM/CSS/media checks are explicitly marked `Host=Browser`; CLI/host checks are marked `Host=Linux`.
 The runner excludes the other host's cases and combines that scope with your filter. Shared cases have
 neither host trait and run on both. Native execution initializes neither Playwright nor a web server.
+Browser observations read the DOM in one synchronous snapshot so an upload or library transition cannot
+remove controls between a presence check and a text read. A driver regression exercises rapid replacements.
 
 ## Browser player tests
 
