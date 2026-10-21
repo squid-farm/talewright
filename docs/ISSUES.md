@@ -1,7 +1,30 @@
-# Bug tracker
+# Issues
 
-Known defects and review findings. Add new entries at the bottom of the index and as a new section below it;
-never reuse an id. When something is fixed, set its status to `fixed (<commit>)` rather than deleting it.
+One board for everything that's wrong or missing. There are two kinds of entry:
+
+- **Bugs (`BUG-nnn`):** the engine does something it shouldn't, such as a crash, wrong behaviour, or an unsafe
+  input.
+- **Feature requests and shortcomings (`FR-nnn`):** the engine works as designed, but the design falls short.
+  For example, something you need is missing, is awkward to author, or is limited.
+
+If you're unsure which it is, file it as an FR; it can be moved later.
+
+**Rules for both kinds:**
+- Add new entries at the bottom of the relevant index and as a new section under it. Never reuse an id.
+- When an entry is resolved, update its status (`fixed (<commit>)`, `done (<commit>)`, `won't fix (<reason>)`,
+  …) instead of deleting it, so the history stays readable.
+- **Source** records who raised it, e.g. `review session 2026-10-20` or `Joel`.
+- **Effort:** XS < 30 min, S < 2 h, M < 1 day, L > 1 day (including tests and docs).
+
+## Contents
+
+- [Bugs](#bugs)
+- [Feature requests and shortcomings](#feature-requests-and-shortcomings)
+- [Templates](#templates)
+
+---
+
+## Bugs
 
 **Severity**
 
@@ -12,13 +35,11 @@ never reuse an id. When something is fixed, set its status to `fixed (<commit>)`
 | **S3** | Edge case, hardening, or a defensive fix. It only shows up with unusual input or misuse. |
 
 **Status:** `open`, `triaged`, `in progress`, `fixed (<commit>)`, `won't fix (<reason>)`, `deferred (<milestone>)`.
+Where the original reviewer rated an entry differently, their rating is kept in brackets.
 
-**Source:** who found it, e.g. `review session 2026-10-20` or `Joel`. The original reviewer's own rating is kept
-in brackets where it differs.
+### Bug index
 
-## Index
-
-Ranked by priority (severity, then how easy it is to hit, then cost of fixing).
+Ranked by priority: severity first, then how easy the bug is to hit, then the cost of fixing it.
 
 | Id | Sev | Status | Area | Summary | Effort |
 |---|---|---|---|---|---|
@@ -30,11 +51,9 @@ Ranked by priority (severity, then how easy it is to hit, then cost of fixing).
 | [BUG-006](#bug-006) | S3 | open | Rules | Integer overflow in effects and arithmetic wraps instead of clamping | S |
 | [BUG-007](#bug-007) | S3 | open | Core | `Ruleset` collections can be mutated by casting them back | XS |
 
-Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
-
 ---
 
-## BUG-001
+### BUG-001
 
 **A stat with `min > max` compiles, then crashes when the story starts.**
 
@@ -53,7 +72,7 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
   crash). Add a compiler test.
 - **Effort:** XS
 
-## BUG-002
+### BUG-002
 
 **Triggers that depend on `level` are not re-evaluated after a level-up.**
 
@@ -71,7 +90,7 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
   the same choice.
 - **Effort:** XS
 
-## BUG-003
+### BUG-003
 
 **Duplicate trigger ids compile and silently suppress each other.**
 
@@ -89,7 +108,7 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
   to the diagnostics table in TALE-SYNTAX.md §7 and add a compiler test.
 - **Effort:** XS
 
-## BUG-004
+### BUG-004
 
 **Zip loading has no limit on decompressed size (zip bomb).**
 
@@ -109,7 +128,7 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
   clear message; `TalewrightApp` already shows that error. Add a test with a highly compressible entry.
 - **Effort:** S
 
-## BUG-005
+### BUG-005
 
 **The trigger cascade stops silently at 8 passes.**
 
@@ -130,7 +149,7 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
   long-chain and the ping-pong cases.
 - **Effort:** S
 
-## BUG-006
+### BUG-006
 
 **Integer overflow in effects and arithmetic wraps instead of clamping.**
 
@@ -148,7 +167,7 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
   Optionally, the compiler could warn on literal constants that exceed range.
 - **Effort:** S
 
-## BUG-007
+### BUG-007
 
 **`Ruleset` collections can be mutated by casting them back.**
 
@@ -167,10 +186,66 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
 
 ---
 
-## Template for new entries
+## Feature requests and shortcomings
+
+**Priority**
+
+| Level | Meaning |
+|---|---|
+| **High** | Blocks a story you actually want to write, or would be embarrassing in a public release. |
+| **Medium** | Would clearly help, and there is a workaround in the meantime. |
+| **Low** | Nice to have, polish, or an idea worth remembering. |
+
+**Status:** `idea`, `accepted`, `planned (<milestone>)`, `in progress`, `done (<commit>)`, `declined (<reason>)`.
+**Target** is the milestone it's aimed at (see [PLAN.md](PLAN.md) §7), or `unscheduled`.
+
+### Feature request index
+
+| Id | Pri | Status | Target | Area | Summary | Effort |
+|---|---|---|---|---|---|---|
+| [FR-001](#fr-001) | Medium | idea | unscheduled | Player | Character sheet shows only the player, not NPCs | S |
+| [FR-002](#fr-002) | Medium | idea | unscheduled | Core / Rules | No NPC↔NPC relationships; faction standing is always the player's | M |
+
+---
+
+### FR-001
+
+**The character sheet shows only the player, not NPCs.**
+
+- **Priority:** Medium
+- **Status:** idea
+- **Target:** unscheduled
+- **Area:** `src/Talewright.Player/Components/CharacterSheet.razor`
+- **Source:** M1 review Q&A, 2026-10-20
+- **Shortcoming:** every character has stats (e.g. `guide:love`), but the sheet only displays `player`. Players
+  only learn about NPC stats from change notes such as "Tomas: Affection +1". For a dating sim, seeing relationship
+  stats is often the whole point.
+- **Ideas:** a per-character tab or panel. Each NPC needs an author-controlled visibility setting, such as `shown`,
+  `hidden`, or `after flag:met-tomas`, so the sheet doesn't spoil hidden values. Each NPC stat probably needs a
+  visibility switch too.
+
+### FR-002
+
+**There are no NPC↔NPC relationships, and faction standing is always the player's.**
+
+- **Priority:** Medium
+- **Status:** idea
+- **Target:** unscheduled
+- **Area:** Core (`GameState`), Rules (expressions/effects), Tale syntax
+- **Source:** M1 review Q&A, 2026-10-20
+- **Shortcoming:** `faction:x` stores how faction *x* feels about the player. A per-person faction such as
+  `faction:tomas` works for "Tomas likes the player". There is no way to express "Tomas dislikes Mara" or "the
+  Guild is at war with the Crown" without inventing variables (`var:tomas-mara`), which can't be tiered or
+  displayed.
+- **Ideas:** a relationship store keyed by (from, to), with syntax like `rel:tomas>mara += 1`, reusing the
+  reputation tiers. It matters more for open-world (factions acting on each other).
+
+---
+
+## Templates
 
 ```markdown
-## BUG-NNN
+### BUG-NNN
 
 **One-line summary.**
 
@@ -180,5 +255,20 @@ Effort: XS < 30 min, S < 2 h, M < 1 day, L > 1 day (fix plus test).
 - **Source:** who found it
 - **What happens:** steps or input, expected vs actual
 - **Proposed fix:** (optional)
+- **Effort:** XS / S / M / L (optional)
+```
+
+```markdown
+### FR-NNN
+
+**One-line summary of what's missing or awkward.**
+
+- **Priority:** High / Medium / Low
+- **Status:** idea
+- **Target:** unscheduled
+- **Area:** project, file, or "authoring" / "syntax"
+- **Source:** who raised it
+- **Shortcoming:** what you tried to do and why the engine made it hard or impossible
+- **Ideas:** (optional) possible designs, workarounds in the meantime
 - **Effort:** XS / S / M / L (optional)
 ```

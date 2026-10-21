@@ -64,7 +64,7 @@ On Linux the desktop host needs WebKitGTK (`libwebkit2gtk-4.1`). Each project ha
 - Per-project READMEs in each `src/*` folder, plus [samples/README.md](samples/README.md)
 - [`.tale` syntax](docs/TALE-SYNTAX.md)
 - [Architecture decision records](docs/adr/)
-- [Bug tracker](docs/BUGS.md): known defects and review findings, ranked
+- [Issues](docs/ISSUES.md): bugs and feature requests/shortcomings, ranked
 
 ## License
 
