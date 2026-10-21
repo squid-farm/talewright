@@ -10,5 +10,14 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <Authors>Talewright contributors</Authors>
     <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+    <IsPackable>false</IsPackable>
+    <Description>A stat-driven, branching narrative RPG engine for .NET.</Description>
+    <RepositoryUrl>https://github.com/squid-farm/talewright</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/squid-farm/talewright</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 </Project>

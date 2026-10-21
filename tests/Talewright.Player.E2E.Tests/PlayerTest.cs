@@ -49,7 +49,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
                 _errors.Add($"HTTP {response.Status}: {response.Url}");
             }
         };
-        await Page.GotoAsync("/");
+        await Page.GotoAsync(host.BaseUrl);
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
     }

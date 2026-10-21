@@ -19,8 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Talewright.Core\Talewright.Core.csproj" />
-    <ProjectReference Include="..\..\src\Talewright.Rulesets.Generic\Talewright.Rulesets.Generic.csproj" />
+    <ProjectReference Include="../../src/Talewright/Talewright.csproj" />
   </ItemGroup>
 
 </Project>

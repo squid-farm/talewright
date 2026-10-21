@@ -1,5 +1,7 @@
 # Talewright.Rulesets.Generic — the default ruleset
 
+This namespace is a module in the [Talewright engine](../README.md), not a separate package.
+
 A familiar d20-flavoured set of stats and rules, used by stories that say `ruleset: { base: generic }`. It is
 **opt-out**: a story can disable parts of it (`disable: [cha, hp]`) or use `base: none` and define everything.
 
@@ -30,5 +32,5 @@ A familiar d20-flavoured set of stats and rules, used by stories that say `rules
 ## Writing your own ruleset
 
 Copy the shape of `Create()`: a `RulesetBuilder`, your stats, tiers and rules. To make it available to `.tale`
-stories, register it in `CompilerOptions.Rulesets` (name → factory). Tests for this project live in
+stories, register it in `CompilerOptions.Rulesets` (name → factory). Tests for this module live in
 `tests/Talewright.Core.Tests`.

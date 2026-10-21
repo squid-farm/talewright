@@ -28,3 +28,11 @@ Play it: `dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic`
 Copy `LostRelic/`, edit `story.yaml` and the `.tale` files (see [TALE-SYNTAX.md](../docs/TALE-SYNTAX.md)), then
 open the folder with the desktop app or zip it and use "Open a story file" on the web. Compile errors are listed
 with file and line.
+
+## Published samples
+
+The [GitHub Pages player](https://squid-farm.github.io/talewright/) includes every
+bundled story. It is deployed after Build and all test jobs pass on a `main` push;
+the workflow verifies published assets, sample opening, and a choice at the Pages
+base path. Sample story contents are embedded in the hosts, never in either NuGet
+package. See [repository setup](../README.md#github-actions-and-releases).

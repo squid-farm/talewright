@@ -1,8 +1,7 @@
 name: Tests
 
 on:
-  push:
-  pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -18,11 +17,24 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet test Talewright.slnx -c Release --logger trx --results-directory artifacts/unit
+      - name: Require executed unit tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = list(Path("artifacts/unit").glob("*.trx"))
+          assert len(reports) == 5, f"Expected five unit test reports; found {len(reports)}"
+          for report in reports:
+              counters = ET.parse(report).find(".//{*}Counters")
+              assert counters is not None and int(counters.attrib["executed"]) > 0, f"No tests executed: {report}"
+              assert int(counters.attrib["failed"]) == 0, f"Failed tests: {report}"
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit-results
           path: artifacts/unit
+          if-no-files-found: error
 
   browser:
     runs-on: ubuntu-24.04
@@ -43,6 +55,7 @@ jobs:
         with:
           name: player-${{ matrix.browser }}
           path: artifacts/test-results
+          if-no-files-found: error
 
   linux-desktop:
     runs-on: ubuntu-24.04
@@ -64,3 +77,4 @@ jobs:
         with:
           name: player-linux-desktop
           path: artifacts/test-results
+          if-no-files-found: error

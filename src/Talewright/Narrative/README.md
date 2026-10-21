@@ -1,5 +1,7 @@
 # Talewright.Narrative — the template renderer
 
+This namespace is a module in the [Talewright engine](../README.md), not a separate package.
+
 Turns a **typed template AST** plus game state into a **presentation-agnostic document**. It never parses text
 (the compiler builds the AST) and never emits HTML (the Player does that).
 

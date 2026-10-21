@@ -1,0 +1,69 @@
+name: Publish Samples
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/configure-pages@v5
+        id: pages
+      - name: Publish the bundled sample player
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: python3 .github/scripts/publish_samples.py --base-path "$BASE_PATH" --output artifacts/pages
+      - run: python3 tests/run_e2e.py install-browsers --browser chromium
+      - name: Smoke-test the deployment path
+        env:
+          BROWSER: chromium
+          TALEWRIGHT_WEB_ROOT: ${{ github.workspace }}/artifacts/pages/wwwroot
+          TALEWRIGHT_WEB_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          TALEWRIGHT_TEST_RESULTS: ${{ github.workspace }}/artifacts/test-results/pages
+        run: |
+          dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build \
+            --filter FullyQualifiedName~Bundled_sample_opens_without_a_sample_specific_route \
+            --logger 'trx;LogFileName=pages.trx' --results-directory artifacts/test-results/pages
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          counters = ET.parse("artifacts/test-results/pages/pages.trx").find(".//{*}Counters")
+          assert counters is not None and int(counters.attrib["passed"]) == 1, "Pages smoke must run and pass one test"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pages-smoke-results
+          path: artifacts/test-results/pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/pages/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

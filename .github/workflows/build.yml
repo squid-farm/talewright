@@ -1,0 +1,77 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version=$(python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME")
+          else
+            version=$(python3 .github/scripts/package_version.py --ci "$GITHUB_RUN_NUMBER")
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: python3 -m unittest discover -s tests -p 'test_ci.py' -v
+      - run: dotnet restore Talewright.slnx
+      - name: Build Release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: dotnet build Talewright.slnx -c Release --no-restore -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+      - name: Pack and verify clean consumers
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet pack Talewright.slnx -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
+          python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION" --smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  publish-samples:
+    needs: [build, tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/publish-samples.yml
+
+  publish-nuget:
+    needs: [build, tests]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-nuget.yml
+    with:
+      version: ${{ needs.build.outputs.version }}

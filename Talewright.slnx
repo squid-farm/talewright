@@ -1,14 +1,9 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Talewright.Core/Talewright.Core.csproj" />
     <Project Path="src/Talewright.Host.Desktop/Talewright.Host.Desktop.csproj" />
     <Project Path="src/Talewright.Host.Web/Talewright.Host.Web.csproj" />
-    <Project Path="src/Talewright.Narrative/Talewright.Narrative.csproj" />
     <Project Path="src/Talewright.Player/Talewright.Player.csproj" />
-    <Project Path="src/Talewright.Rules/Talewright.Rules.csproj" />
-    <Project Path="src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" />
-    <Project Path="src/Talewright.Runtime/Talewright.Runtime.csproj" />
-    <Project Path="src/Talewright.Tale/Talewright.Tale.csproj" />
+    <Project Path="src/Talewright/Talewright.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />

@@ -1,0 +1,45 @@
+name: Publish NuGet
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/packages
+      - name: Verify release identity and packages
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME")" = "$VERSION"
+          python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION"
+      - name: Push engine, then player
+        env:
+          VERSION: ${{ inputs.version }}
+          NUGET_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          source="https://nuget.pkg.github.com/${GITHUB_REPOSITORY_OWNER,,}/index.json"
+          dotnet nuget push "artifacts/packages/Talewright.$VERSION.nupkg" \
+            --source "$source" --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate
+          dotnet nuget push "artifacts/packages/Talewright.Player.$VERSION.nupkg" \
+            --source "$source" --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate

@@ -1,5 +1,7 @@
 # Talewright.Rules — the rules engine
 
+This namespace is a module in the [Talewright engine](../README.md), not a separate package.
+
 Evaluates conditions, applies effects, resolves skill checks, fires triggers and selects storylets, all against
 the read-only `IGameStateView` from Core, writing changes back only as events through `EventLog`.
 
