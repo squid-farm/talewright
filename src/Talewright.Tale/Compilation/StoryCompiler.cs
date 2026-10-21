@@ -131,6 +131,7 @@ public static class StoryCompiler
             Version = manifest.Version,
             ContentFingerprint = Fingerprint(source, options.CompatibilityId),
             UndoEnabled = manifest.UndoEnabled,
+            Creation = manifest.Creation,
             Start = new SceneId(manifest.Start),
             Randomness = manifest.Randomness,
             Seed = manifest.Seed,

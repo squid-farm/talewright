@@ -54,6 +54,9 @@ navigation, not persistence.
 `Save()` returns bounded UTF-8 JSON bytes. `StoryHistory.Restore(story, bytes)` creates and validates a
 separate candidate, including redo choices. Only replace an active history after this succeeds.
 The v1 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices and cursor.
+It also has an optional `character` selection for opt-in creation stories. Older
+fixed-protagonist v1 saves without it remain readable; creation stories require a
+valid selection. Schema/source changes still invalidate mismatched fingerprints.
 The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
 unsupported formats and incompatible stories fail explicitly. No migration is attempted.
 
@@ -67,3 +70,14 @@ default. `FileSaveStore` stores desktop files under per-user local application d
 using encoded slot names and hashed story directories. Replacements use a flushed same-directory temporary
 file and atomic rename. Failed reads/writes throw explicit errors; the store never interprets or migrates
 the save payload. Names are limited to 64 UTF-8 bytes, without control characters or surrounding spaces.
+
+## Character initialization
+
+For stories with `StoryDefinition.Creation`, supply a validated `CharacterSelection`
+to `StoryHistory` or the `character` argument of `StorySession`. Missing/illegal
+choices throw before creating a session; fixed stories reject unexpected creation
+input. Selections are snapshotted. `CharacterIdentityChanged` and ordered
+`StatChanged` events precede scene entry. The static world stays unchanged;
+`IGameStateView.GetCharacterDefinition` returns the effective identity. Initial
+trigger priming uses the fully initialized character, preserving rising-edge
+semantics rather than treating creation as an in-story stat change.

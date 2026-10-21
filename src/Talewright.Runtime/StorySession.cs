@@ -2,6 +2,7 @@ using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Narrative.Grammar;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
@@ -49,11 +50,35 @@ public sealed class StorySession : IStorySession
     private readonly Dictionary<string, Action<List<RenderedBlock>>> _actions = new(StringComparer.Ordinal);
 
     /// <summary>Creates a session. <paramref name="seed"/> defaults to the story's seed, else a random one.</summary>
-    public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null)
+    public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null, CharacterSelection? character = null)
     {
+        character = CharacterSelection.Validate(story, character);
         Story = story;
         Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);
+        if (character is not null)
+        {
+            var player = story.World.Characters[EntityId.Player];
+            _log.Append(new CharacterIdentityChanged(EntityId.Player,
+                character.FirstName ?? player.FirstName, character.LastName ?? player.LastName,
+                character.Pronouns is null ? player.Pronouns : Pronouns.FromKeyword(character.Pronouns)!));
+            var stats = new Dictionary<StatId, int>();
+            if (story.Creation!.Presets.FirstOrDefault(p => p.Id == character.Preset) is { } preset)
+            {
+                foreach (var (stat, value) in preset.Stats)
+                {
+                    stats[stat] = value;
+                }
+            }
+            foreach (var (stat, value) in character.Stats)
+            {
+                stats[new StatId(stat)] = value;
+            }
+            foreach (var (stat, value) in stats.OrderBy(kv => kv.Key.Value, StringComparer.Ordinal))
+            {
+                _log.Append(new StatChanged(EntityId.Player, stat, _log.State.GetBaseStat(EntityId.Player, stat), value));
+            }
+        }
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State);
         _renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
     }

@@ -19,6 +19,7 @@ public sealed class StoryDefinition
     public required string Version { get; init; }
     public string? ContentFingerprint { get; init; }
     public bool UndoEnabled { get; init; } = true;
+    public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
 

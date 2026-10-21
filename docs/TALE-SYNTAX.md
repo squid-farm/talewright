@@ -73,6 +73,44 @@ pronouns:
   }
 ```
 
+### Optional character creation
+
+Without `creation`, the authored protagonist starts unchanged. With it, the shared
+player requires a legal selection before play. The `player` declaration remains
+required and provides identity, inventory and other stat defaults.
+
+```yaml
+creation:
+  name: true
+  pronouns: [they, she, he]
+  stats:
+    str: [8, 12, 16]
+  presets:
+    explorer:
+      label: Explorer
+      stats: {str: 12, hp: 15}
+    scholar:
+      label: Scholar
+      stats: {str: 8, hp: 10}
+```
+
+All fields are optional. `name: true` allows first/last names (trimmed, no control
+characters, at most 80 characters each, nonempty first name). Pronoun choices are
+distinct built-in keywords; omit them to preserve an authored custom pronoun set.
+Stat choices must exist in the final ruleset and be distinct integers within its
+bounds: up to 32 selectable stats, each with 1–100 values. Up to 16 presets may set
+starting stats, also within ruleset bounds; selectable preset stats must be legal
+options. The first preset/pronoun is the default. For each selectable stat, its
+preset value (or authored protagonist value) is used if legal, otherwise the first
+listed option is the default. Player selections override preset stats.
+
+Initialization events precede scene entry and are replayed identically on undo,
+redo and load. Saves retain the created character. Restart retains that identity
+and selection; reopening a story from the library offers creation again. To load
+an existing save after reopening, complete creation and use **Saved games**; the
+saved character replaces the temporary selection. This is not point-buy, a class
+designer or a race system.
+
 ## 2. Scenes
 
 ```tale

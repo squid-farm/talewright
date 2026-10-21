@@ -19,14 +19,16 @@ public sealed class StoryHistory
     private StorySession _session;
     private List<HistoryFrame> _frames;
 
-    public StoryHistory(StoryDefinition story, ulong? seed = null)
+    public StoryHistory(StoryDefinition story, ulong? seed = null, CharacterSelection? character = null)
     {
+        Character = CharacterSelection.Validate(story, character);
         Story = story;
-        _session = new StorySession(story, seed);
+        _session = new StorySession(story, seed, character: Character);
         _frames = [new HistoryFrame(_session.Start())];
     }
 
     public StoryDefinition Story { get; }
+    public CharacterSelection? Character { get; }
     public ulong Seed => _session.Seed;
     public IGameStateView State => _session.State;
     public IReadOnlyList<GameEvent> Events => _session.Events;
@@ -75,7 +77,7 @@ public sealed class StoryHistory
 
     private void MoveTo(int cursor)
     {
-        var (session, frames) = Replay(Story, Seed, _choices.Take(cursor));
+        var (session, frames) = Replay(Story, Seed, _choices.Take(cursor), Character);
         _session = session;
         _frames = frames;
         Cursor = cursor;
@@ -102,6 +104,7 @@ public sealed class StoryHistory
             Seed = Seed,
             Choices = _choices.ToArray(),
             Cursor = Cursor,
+            Character = Character,
         }, SaveJsonContext.Default.SavedHistory);
         if (data.Length > MaxSaveBytes)
         {
@@ -148,17 +151,26 @@ public sealed class StoryHistory
         }
 
         // Validate redo choices too, not just the visible prefix.
-        Replay(story, save.Seed, save.Choices);
-        var result = new StoryHistory(story, save.Seed);
+        CharacterSelection? character;
+        try
+        {
+            character = CharacterSelection.Validate(story, save.Character);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
+        }
+        Replay(story, save.Seed, save.Choices, character);
+        var result = new StoryHistory(story, save.Seed, character);
         result._choices.AddRange(save.Choices);
         result.MoveTo(save.Cursor);
         return result;
     }
 
     private static (StorySession Session, List<HistoryFrame> Frames) Replay(
-        StoryDefinition story, ulong seed, IEnumerable<string> choices)
+        StoryDefinition story, ulong seed, IEnumerable<string> choices, CharacterSelection? character)
     {
-        var session = new StorySession(story, seed);
+        var session = new StorySession(story, seed, character: character);
         var frames = new List<HistoryFrame> { new(session.Start()) };
         foreach (var key in choices)
         {
@@ -185,6 +197,7 @@ internal sealed class SavedHistory
     public required ulong Seed { get; init; }
     public required string[] Choices { get; init; }
     public required int Cursor { get; init; }
+    public CharacterSelection? Character { get; init; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
