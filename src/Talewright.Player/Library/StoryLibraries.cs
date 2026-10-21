@@ -12,7 +12,9 @@ public sealed record StoryEntry(string Id, string Title, string Origin);
 /// <summary>
 /// Where stories come from. Each host registers one (or a <see cref="CompositeStoryLibrary"/>): the web host
 /// uses stories embedded in its assembly, the desktop host adds folders/zips from the command line.
-/// Stories are always distributed separately from the engine; this is just how a host finds them.
+/// A library is only the lookup mechanism; it says nothing about packaging. Today the bundled samples are embedded
+/// in each host, and a published game (planned: <c>talewright publish</c>, M2) will be a single output containing
+/// the engine plus one story, served through the same interface.
 /// </summary>
 public interface IStoryLibrary
 {
