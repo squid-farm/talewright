@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Talewright.Core.Identity;
 
 namespace Talewright.Core.Rulesets;
@@ -21,12 +22,12 @@ public sealed class Ruleset
         IReadOnlyList<IStatModifier> modifiers)
     {
         Id = id;
-        Stats = stats;
-        StatsById = stats.ToDictionary(s => s.Id);
-        Tiers = tiers.OrderBy(t => t.Minimum).ToArray();
+        Stats = Array.AsReadOnly(stats.ToArray());
+        StatsById = Stats.ToFrozenDictionary(s => s.Id);
+        Tiers = Array.AsReadOnly(tiers.OrderBy(t => t.Minimum).ToArray());
         SkillCheckRule = skillCheckRule;
         LevelingRule = levelingRule;
-        Modifiers = modifiers;
+        Modifiers = Array.AsReadOnly(modifiers.ToArray());
     }
 
     /// <summary>A ruleset with no stats, no tiers and no rules.</summary>

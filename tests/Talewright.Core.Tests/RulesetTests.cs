@@ -34,6 +34,27 @@ public class RulesetTests
         Assert.Null(ruleset.LevelingRule);
     }
 
+    [Fact]
+    public void Ruleset_collections_cannot_be_mutated_by_casting_them_back()
+    {
+        var ruleset = GenericRuleset.Create();
+        var stat = new StatDefinition(new StatId("charm"), "Charm", StatCategory.Attribute, 0, 20, 5);
+        var stats = Assert.IsAssignableFrom<IList<StatDefinition>>(ruleset.Stats);
+
+        Assert.True(stats.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => stats[0] = stat);
+        Assert.IsNotType<StatDefinition[]>(ruleset.Stats);
+        Assert.IsNotType<Dictionary<StatId, StatDefinition>>(ruleset.StatsById);
+        var statsById = Assert.IsAssignableFrom<IDictionary<StatId, StatDefinition>>(ruleset.StatsById);
+        Assert.True(statsById.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => statsById[new StatId("charm")] = stat);
+        Assert.IsNotType<ReputationTier[]>(ruleset.Tiers);
+        Assert.IsNotType<IStatModifier[]>(ruleset.Modifiers);
+        Assert.True(Assert.IsAssignableFrom<IList<ReputationTier>>(ruleset.Tiers).IsReadOnly);
+        Assert.True(Assert.IsAssignableFrom<IList<IStatModifier>>(ruleset.Modifiers).IsReadOnly);
+        Assert.Equal(ruleset.Stats.Count, ruleset.StatsById.Count);
+    }
+
     [Theory]
     [InlineData(-100, "hostile")]
     [InlineData(-30, "unfriendly")]
