@@ -1,8 +1,8 @@
 # Architecture
 
 This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
-extension points are, and where to look when something breaks. [PLAN.md](PLAN.md) records *why* (decisions,
-research, roadmap); this document records *what is actually built*. The [ADRs](adr/) hold the big decisions in
+extension points are, and where to look when something breaks. [PLAN.md](PLAN.md) records _why_ (decisions,
+research, roadmap); this document records _what is actually built_. The [ADRs](adr/) hold the big decisions in
 long form, and [TALE-SYNTAX.md](TALE-SYNTAX.md) is the authoritative reference for the story language.
 
 Contents:
@@ -21,7 +21,7 @@ Contents:
 
 ## 1. The big picture
 
-Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of *scenes*. Each
+Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of _scenes_. Each
 scene has prose (a template), optional requirements, effects, skill checks, choices and diverts. Nothing about
 "which scene comes next" is hard-wired into the engine: scenes say where to go (`-> scene`, "rails"), or a hub scene
 offers every storylet whose requirements currently hold ("hubs"). The same mechanism will later drive
@@ -29,17 +29,17 @@ open-world locations.
 
 The three tiers you asked for map onto projects like this:
 
-| Your tier | Projects | One-line job |
-|---|---|---|
-| **RPG engine** | `Talewright.Core`, `Talewright.Rulesets.Generic` | Who exists, what they have, what has happened. Pure state + events. |
-| **Rules engine** | `Talewright.Rules` | Evaluate conditions, apply effects, resolve checks, fire triggers, select storylets. |
-| **Template renderer** | `Talewright.Narrative` | Turn a typed template AST + state into a presentation-agnostic document. |
-| **Presentation** | `Talewright.Player`, `Talewright.Host.Desktop`, `Talewright.Host.Web` | Blazor UI and the two native/web shells. |
+| Your tier             | Projects                                                              | One-line job                                                                         |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **RPG engine**        | `Talewright.Core`, `Talewright.Rulesets.Generic`                      | Who exists, what they have, what has happened. Pure state + events.                  |
+| **Rules engine**      | `Talewright.Rules`                                                    | Evaluate conditions, apply effects, resolve checks, fire triggers, select storylets. |
+| **Template renderer** | `Talewright.Narrative`                                                | Turn a typed template AST + state into a presentation-agnostic document.             |
+| **Presentation**      | `Talewright.Player`, `Talewright.Host.Desktop`, `Talewright.Host.Web` | Blazor UI and the two native/web shells.                                             |
 
 Two more projects glue it together:
 
 - `Talewright.Tale` is the **compiler**: it turns `.tale` + `story.yaml` text into the typed objects the other
-  layers use. It is the *only* place that parses strings, and it runs once when a story loads.
+  layers use. It is the _only_ place that parses strings, and it runs once when a story loads.
 - `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
   frame). It is the only project that knows about all the others.
 
@@ -72,15 +72,15 @@ evaluator as everything else.)
 
 ### The data that flows between tiers
 
-| Boundary | Type | Defined in |
-|---|---|---|
-| Story files → engine | `StorySource` (path → text map) | Tale |
-| Compiler → runtime | `StoryDefinition` (world, scenes, triggers, predicates) | Tale |
-| Rules ↔ state | `IGameStateView` (read) and `GameEvent`s (write) | Core |
-| Templates → renderer | `TemplateBlock` / `TemplateInline` AST | Narrative |
-| Renderer → UI | `RenderedDocument` (blocks, styled runs, notes, media placeholders) | Narrative |
-| Runtime → UI | `StoryFrame` (scene title, document, `ChoiceView`s, ended flag) | Runtime |
-| UI → runtime | a choice **key** string (`IStorySession.Choose(key)`) | Runtime |
+| Boundary             | Type                                                                | Defined in |
+| -------------------- | ------------------------------------------------------------------- | ---------- |
+| Story files → engine | `StorySource` (path → text map)                                     | Tale       |
+| Compiler → runtime   | `StoryDefinition` (world, scenes, triggers, predicates)             | Tale       |
+| Rules ↔ state        | `IGameStateView` (read) and `GameEvent`s (write)                    | Core       |
+| Templates → renderer | `TemplateBlock` / `TemplateInline` AST                              | Narrative  |
+| Renderer → UI        | `RenderedDocument` (blocks, styled runs, notes, media placeholders) | Narrative  |
+| Runtime → UI         | `StoryFrame` (scene title, document, `ChoiceView`s, ended flag)     | Runtime    |
+| UI → runtime         | a choice **key** string (`IStorySession.Choose(key)`)               | Runtime    |
 
 The UI never sees `Expr`, `Effect`, scenes or events directly. It renders frames and sends back keys. It also
 reads `IGameStateView` for the character sheet.
@@ -144,7 +144,7 @@ Folders:
     `IStatModifier` + held items' modifiers, clamped to the stat's bounds.
   - `EventLog`: owns a `GameState` and the event list. `Append`, `AppendRange`, `Replay(world, seed, events)`,
     `Truncate(count)` (for future undo), and an `Appended` event.
-  - `StateChanges`: helpers that *compute* the events for a change (`AdjustStat`, `GiveItem`, `SetStanding`,
+  - `StateChanges`: helpers that _compute_ the events for a change (`AdjustStat`, `GiveItem`, `SetStanding`,
     `CheckLevel` …). They clamp values and return nothing if nothing changes. Use these rather than building
     events by hand.
 - **`Randomness/DeterministicDice.cs`**: SplitMix64-based `Roll(seed, index, sides)`. The index is
@@ -155,7 +155,7 @@ Folders:
 `GenericRuleset.Create()` builds: six attributes (`str dex con int wis cha`, 1–30, default 10), a list of skills
 each governed by an attribute (athletics→STR, perception→WIS, history→INT, survival→WIS …), `hp`, `xp`, `level`,
 the five reputation tiers, `D20SkillCheckRule` (d20 + skill + attribute modifier vs DC; with randomness off it
-"takes 10"), and `ExperienceLevelingRule` (level *n* needs 100 × *n* × (*n* − 1) / 2 XP: 0, 100, 300, 600 …; max 20). It is registered under the name `generic`.
+"takes 10"), and `ExperienceLevelingRule` (level _n_ needs 100 × _n_ × (_n_ − 1) / 2 XP: 0, 100, 300, 600 …; max 20). It is registered under the name `generic`.
 There is also `none` (no stats, no checks, just the tiers) for stories such as dating sims that want to define
 everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
 
@@ -180,7 +180,7 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
   calls `Run(log)`, which fires triggers whose condition has become true (edge-triggered: it fires on
   false→true, not every frame). It loops until stable, capped at `MaxPasses = 8` to stop trigger ping-pong.
 - **`Storylets/StoryletSelector.cs`**: `IStorylet` (Id, Requires, Tags, Priority, Once) and `SelectEligible(…,
-  tag, context)`. Eligible = has the tag, requirements hold, and not already visited if `Once`. Ordered by
+tag, context)`. Eligible = has the tag, requirements hold, and not already visited if `Once`. Ordered by
   priority (high first), then declaration order. `SceneDefinition` implements `IStorylet`.
 
 ### 3.4 `Talewright.Narrative` — the template renderer
@@ -194,7 +194,7 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
     compiles to `SubstitutionTemplate(NameRef(player, First), [possessive])`.
 - **`Templates/TextModifiers.cs`**: `ITextModifier` (`#possessive`, `#capitalize`, `#upper`, `#lower`, `#a` …) and
   `TextModifierRegistry`. Register your own to add `#whatever`.
-- **`Grammar/EnglishGrammar.cs`**: `IGrammar` with Chicago-style possessives (`Wilkins's`, `the guards'`),
+- **`Grammar/EnglishGrammar.cs`**: `IGrammar` with Chicago-style possessives (`Burns's`, `the guards'`),
   a/an, capitalisation. Swap the grammar to localise or change style.
 - **`Rendering/`**: `TemplateRenderer.Render(blocks, state)` → `RenderedDocument`. Output types:
   `RenderedParagraph`, `RenderedSpeech`, `RenderedNote` (system messages like "Gained: rope", with a
@@ -316,7 +316,7 @@ All of this is in `src/Talewright.Runtime/StorySession.cs` (the class remarks re
 1. Append `SceneEntered(scene)` (this increments the visit count).
 2. Run entry effects (`~` lines), each only if its `{if}` condition holds.
 3. `AfterChanges()`: run triggers until stable, then `StateChanges.CheckLevel` for every character.
-4. Render the scene body with the *current* state, so text reflects the entry effects.
+4. Render the scene body with the _current_ state, so text reflects the entry effects.
 5. Append notes describing what changed (`EventNarrator`).
 6. Decide what to offer:
    - **Entry skill check** (`::: skill-check` at the top level of a scene): resolve it now, apply the outcome's
@@ -333,9 +333,9 @@ All of this is in `src/Talewright.Runtime/StorySession.cs` (the class remarks re
 3. If the choice has a skill check, resolve it (`DiceRolled` + `SkillCheckResolved`) and run the success or
    failure effects.
 4. `AfterChanges()` (triggers, leveling).
-5. Collect notes for everything that happened. They are shown at the top of the *next* frame.
+5. Collect notes for everything that happened. They are shown at the top of the _next_ frame.
 6. Go to the choice's (or outcome's) target. **If none was given, fall through** to the current scene's first
-   matching `->`, evaluated *after* the effects. This lets an author write
+   matching `->`, evaluated _after_ the effects. This lets an author write
    `* [Bribe him] { var:gold -= 5 }` and let a single `-> market` below handle every choice.
 
 Invalid keys throw `InvalidOperationException` listing the valid ones. The UI only ever sends keys it was given.
@@ -350,20 +350,20 @@ saves (M2: store seed + keys, replay).
 
 This is how the "dating sim doesn't want strength" requirement is met, and where a community author plugs in.
 
-| I want to… | Today (no code, story.yaml) | With C# (Tier 1, polished in M2) |
-|---|---|---|
-| Remove default stats | `ruleset: { base: generic, disable: [str, con] }` | `GenericRuleset.Create().ToBuilder().RemoveStat(...)` |
-| Start from nothing | `ruleset: { base: none }` | `new RulesetBuilder("mine")` |
-| Add stats (affection, sanity…) | `ruleset: { stats: [ { id: affection, name: Affection, category: custom, max: 100 } ] }` | `builder.AddStat(new StatDefinition(...))` |
-| Change how checks work (2d6, percentile, no dice) | pick a ruleset that has the rule | implement `ISkillCheckRule`, `WithSkillCheckRule` |
-| Change levelling | — | implement `ILevelingRule` |
-| Derived stats, conditions, auras | items with `modifiers` | implement `IStatModifier`, `AddModifier` |
-| Rename reputation tiers | — | `WithTiers(...)` |
-| Complex conditions | — | `NamedPredicateRegistry.Register("IsMidnight", s => …)`, use `@IsMidnight` |
-| New text modifier (`#shout`) | — | `TextModifierRegistry.Register(new DelegateTextModifier("shout", …))` |
-| Other language / possessive style | — | implement `IGrammar`, pass to `StorySession` |
-| Different story source (database, HTTP) | — | implement `IStoryLibrary` and register it in the host |
-| Different UI (console, Unity, MAUI) | — | consume `IStorySession` + `RenderedDocument`; ignore `Talewright.Player` |
+| I want to…                                        | Today (no code, story.yaml)                                                              | With C# (Tier 1, polished in M2)                                           |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Remove default stats                              | `ruleset: { base: generic, disable: [str, con] }`                                        | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
+| Start from nothing                                | `ruleset: { base: none }`                                                                | `new RulesetBuilder("mine")`                                               |
+| Add stats (affection, sanity…)                    | `ruleset: { stats: [ { id: affection, name: Affection, category: custom, max: 100 } ] }` | `builder.AddStat(new StatDefinition(...))`                                 |
+| Change how checks work (2d6, percentile, no dice) | pick a ruleset that has the rule                                                         | implement `ISkillCheckRule`, `WithSkillCheckRule`                          |
+| Change levelling                                  | —                                                                                        | implement `ILevelingRule`                                                  |
+| Derived stats, conditions, auras                  | items with `modifiers`                                                                   | implement `IStatModifier`, `AddModifier`                                   |
+| Rename reputation tiers                           | —                                                                                        | `WithTiers(...)`                                                           |
+| Complex conditions                                | —                                                                                        | `NamedPredicateRegistry.Register("IsMidnight", s => …)`, use `@IsMidnight` |
+| New text modifier (`#shout`)                      | —                                                                                        | `TextModifierRegistry.Register(new DelegateTextModifier("shout", …))`      |
+| Other language / possessive style                 | —                                                                                        | implement `IGrammar`, pass to `StorySession`                               |
+| Different story source (database, HTTP)           | —                                                                                        | implement `IStoryLibrary` and register it in the host                      |
+| Different UI (console, Unity, MAUI)               | —                                                                                        | consume `IStorySession` + `RenderedDocument`; ignore `Talewright.Player`   |
 
 The C# column already works if you reference the projects and pass a custom `CompilerOptions`
 (`Rulesets`, `Predicates`, `Modifiers`); what M2 adds is packaging (NuGet) and a template project.
@@ -375,23 +375,23 @@ event means touching `GameState.Apply`), and save formats.
 
 ## 7. Where to find X
 
-| Question | Look in |
-|---|---|
-| Where does a stat's value come from? | `GameState.GetStat` (base + `IStatModifier`s + held items, clamped) |
-| Why did a skill check pass/fail? | `D20SkillCheckRule.Resolve` (generic) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
-| Why was a choice not offered? | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices |
-| Why isn't a storylet showing in a hub? | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count |
-| Why did a trigger fire / not fire? | `TriggerEngine.Run` (edge-triggered, `MaxPasses`) |
-| What can `story.yaml` contain? | `StoryYamlReader` and TALE-SYNTAX.md §2 |
-| How is a `.tale` line classified? | `TaleParser` (line kinds), TALE-SYNTAX.md |
-| How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution` |
-| What does error TWxxxx mean? | TALE-SYNTAX.md §7 and `grep -rn TWxxxx src/` |
-| Where do "Gained: X" lines come from? | `EventNarrator.Describe` |
-| Where is the HTML? | `Talewright.Player/Components/*.razor` |
-| Where are the styles? | `Talewright.Player/wwwroot/talewright.css` |
-| How do bundled stories get into the app? | `EmbeddedResource` in the host `.csproj` + `EmbeddedStoryLibrary` |
-| How does the desktop app take a path? | `Talewright.Host.Desktop/Program.cs` |
-| The default stats/skills list | `GenericRuleset.Create` and `GenericRuleset.Skills` |
+| Question                                   | Look in                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Where does a stat's value come from?       | `GameState.GetStat` (base + `IStatModifier`s + held items, clamped)                                           |
+| Why did a skill check pass/fail?           | `D20SkillCheckRule.Resolve` (generic) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
+| Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
+| Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
+| Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
+| What can `story.yaml` contain?             | `StoryYamlReader` and TALE-SYNTAX.md §2                                                                       |
+| How is a `.tale` line classified?          | `TaleParser` (line kinds), TALE-SYNTAX.md                                                                     |
+| How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
+| What does error TWxxxx mean?               | TALE-SYNTAX.md §7 and `grep -rn TWxxxx src/`                                                                  |
+| Where do "Gained: X" lines come from?      | `EventNarrator.Describe`                                                                                      |
+| Where is the HTML?                         | `Talewright.Player/Components/*.razor`                                                                        |
+| Where are the styles?                      | `Talewright.Player/wwwroot/talewright.css`                                                                    |
+| How do bundled stories get into the app?   | `EmbeddedResource` in the host `.csproj` + `EmbeddedStoryLibrary`                                             |
+| How does the desktop app take a path?      | `Talewright.Host.Desktop/Program.cs`                                                                          |
+| The default stats/skills list              | `GenericRuleset.Create` and `GenericRuleset.Skills`                                                           |
 
 ---
 
@@ -399,13 +399,13 @@ event means touching `GameState.Apply`), and save formats.
 
 One xUnit test project per engine project, under `tests/` (the generic ruleset is tested in `Talewright.Core.Tests`):
 
-| Project | What it covers |
-|---|---|
-| `Talewright.Core.Tests` | initial state, clamping, item modifiers, no-op changes, replay/truncate, dice, removing/replacing stats, tiers, d20 checks, leveling |
-| `Talewright.Rules.Tests` | expression evaluation, effects, triggers (once, edge, pass cap), storylet selection, checks |
-| `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech |
-| `Talewright.Tale.Tests` | compiler: every construct, every diagnostic family, zip loading |
-| `Talewright.Runtime.Tests` | session loop (`StorySessionTests`) and the full sample (`LostRelicTests`: compiles clean, a scripted ending, and 300 random seeded playthroughs that must reach all endings without errors) |
+| Project                      | What it covers                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Talewright.Core.Tests`      | initial state, clamping, item modifiers, no-op changes, replay/truncate, dice, removing/replacing stats, tiers, d20 checks, leveling                                                        |
+| `Talewright.Rules.Tests`     | expression evaluation, effects, triggers (once, edge, pass cap), storylet selection, checks                                                                                                 |
+| `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
+| `Talewright.Tale.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
+| `Talewright.Runtime.Tests`   | session loop (`StorySessionTests`) and the full sample (`LostRelicTests`: compiles clean, a scripted ending, and 300 random seeded playthroughs that must reach all endings without errors) |
 
 The UI is not unit tested. It was verified by running the desktop app and by a scripted browser playthrough of
 the published web build (library → play to an ending → zip upload, good and broken).

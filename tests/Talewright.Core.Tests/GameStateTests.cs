@@ -16,7 +16,7 @@ public class GameStateTests
 
     private static WorldDefinition CreateWorld(Ruleset? ruleset = null) => new(
         ruleset ?? GenericRuleset.Create(),
-        [new CharacterDefinition(EntityId.Player, "Mara", "Wilkins", Pronouns.She,
+        [new CharacterDefinition(EntityId.Player, "Mara", "Burns", Pronouns.She,
             new Dictionary<StatId, int> { [GenericRuleset.Dexterity] = 14 },
             new Dictionary<ItemId, int> { [Rope] = 1 })],
         [new ItemDefinition(Rope, "rope", new Dictionary<StatId, int>()),

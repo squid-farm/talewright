@@ -23,7 +23,7 @@ public class CompilerTests
         characters:
           player:
             first-name: Mara
-            last-name: Wilkins
+            last-name: Burns
             pronouns: she
             stats: { dex: 14, athletics: 2 }
             inventory: [rope]
@@ -81,7 +81,7 @@ public class CompilerTests
         Assert.Equal(42UL, story.Seed);
         Assert.Equal(RandomnessMode.ChecksOnly, story.Randomness);
         var player = story.World.Characters[EntityId.Player];
-        Assert.Equal("Mara Wilkins", player.FullName);
+        Assert.Equal("Mara Burns", player.FullName);
         Assert.Equal(14, player.Stats[new StatId("dex")]);
         Assert.Equal(1, player.Inventory[new ItemId("rope")]);
         Assert.True(story.World.Characters[new EntityId("guards")].IsPluralName);
@@ -132,7 +132,7 @@ public class CompilerTests
 
         var text = Render(story, story.GetScene(new SceneId("a")));
         Assert.Equal(
-            "Mara's torch gutters. Wilkins's map is old. The guards' post. She carries a coil of rope.\n\nthe guards: Halt, Mara Wilkins!",
+            "Mara's torch gutters. Burns's map is old. The guards' post. She carries a coil of rope.\n\nthe guards: Halt, Mara Burns!",
             text);
 
         var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("a")).Body[0]);

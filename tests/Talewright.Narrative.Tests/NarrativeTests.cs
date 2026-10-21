@@ -18,7 +18,7 @@ public class NarrativeTests
         new WorldDefinition(
             Ruleset.Empty,
             [
-                new CharacterDefinition(EntityId.Player, "Joel", "Wilkins", Pronouns.She, new Dictionary<StatId, int>(), new Dictionary<ItemId, int>()),
+                new CharacterDefinition(EntityId.Player, "Mara", "Burns", Pronouns.She, new Dictionary<StatId, int>(), new Dictionary<ItemId, int>()),
                 new CharacterDefinition(Guards, "the guards", "", Pronouns.They, new Dictionary<StatId, int>(), new Dictionary<ItemId, int>(), IsPluralName: true),
             ],
             [], [], [new FlagId("lit")], new Dictionary<VarId, int>()),
@@ -30,8 +30,8 @@ public class NarrativeTests
         RenderedInline.ToPlainText(new TemplateRenderer().RenderInlines(inlines, State()));
 
     [Theory]
-    [InlineData("Joel", false, "Joel's")]
-    [InlineData("Wilkins", false, "Wilkins's")]
+    [InlineData("Mara", false, "Mara's")]
+    [InlineData("Burns", false, "Burns's")]
     [InlineData("the guards", true, "the guards'")]
     [InlineData("the children", true, "the children's")]
     public void Possessives_follow_chicago_style(string word, bool plural, string expected)
@@ -62,7 +62,7 @@ public class NarrativeTests
             new SubstitutionTemplate(new PronounRef(EntityId.Player, PronounForm.Subject), [Mod("capitalize")]),
             new TextTemplate(" smiles."));
 
-        Assert.Equal("Joel's and Wilkins's and The guards'. She smiles.", text);
+        Assert.Equal("Mara's and Burns's and The guards'. She smiles.", text);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class NarrativeTests
             new SpeechTemplate(EntityId.Player, [new TextTemplate("Hello.")]),
         ], State());
 
-        Assert.Equal("Cold air rushes\n\nDarkness.\n\nJoel: Hello.", document.ToPlainText());
+        Assert.Equal("Cold air rushes\n\nDarkness.\n\nMara: Hello.", document.ToPlainText());
         var first = Assert.IsType<RenderedParagraph>(document.Blocks[0]);
         Assert.Equal(
             [new RenderedText("Cold ", TextStyle.None), new RenderedText("air ", TextStyle.Strong), new RenderedText("rushes", TextStyle.Strong | TextStyle.Emphasis)],

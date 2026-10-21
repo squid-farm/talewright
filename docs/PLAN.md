@@ -130,7 +130,7 @@ Reusable pieces:
 ### 4.4 Narrative / Template renderer (`Talewright.Narrative`)
 - **Template AST (input):** `Text`, `Emphasis/Strong`, `Paragraph`, `SpeakerLine`, `Substitution(path, modifiers[])`, `Conditional(predicate, then, else)`, `MediaRef(kind, id)`, `Choice(...)`.
 - **Document model (output):** a presentation-agnostic `RenderedDocument` of blocks and inlines with **all substitutions resolved**. Media refs pass through as `MediaPlaceholder` nodes that M1 ignores, reserving room for images and sprites.
-- **Substitutions:** `{player:first-name#possessive}` → "Joel's", `{player:last-name#possessive}` → "Wilkins's" (Chicago-correct by default; see Risks/notes).
+- **Substitutions:** `{player:first-name#possessive}` → "Mara's", `{player:last-name#possessive}` → "Burns's" (Chicago-correct by default; see Risks/notes).
 - **Modifier pipeline:** `#possessive`, `#capitalize`, `#upper`, `#lower`, `#plural`, `#a` (a/an). Modifiers can be chained and new ones can be registered.
 - **Pronouns:** `{player:pronoun.subject}` → she; `.object` → her; `.possessive` → her; `.possessive-pronoun` → hers; `.reflexive` → herself. Built-in she/he/they sets plus custom sets. Verb agreement helper is a stretch goal (`{player:pronoun.subject} {player:verb.is}`).
 - **Grammar provider seam:** the `IGrammar` interface ships with English first, which keeps localization possible later.
@@ -238,12 +238,12 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 - **Photino on Linux** requires WebKitGTK (`libwebkit2gtk-4.1`). Document it in the README.
 - **Trimming:** avoid reflection-heavy designs, and use source-generated `System.Text.Json` contexts so WASM trimming stays safe.
 - **Possessive style:** the default is **grammatically correct English** following Chicago Manual of Style rules:
-  - singular nouns and names always take `'s` (`Joel's`, `Wilkins's`);
+  - singular nouns and names always take `'s` (`Mara's`, `Burns's`);
   - plurals ending in `s` take only `'` (`the guards'`);
   - irregular plurals take `'s` (`the children's`).
   - Names and nouns carry a `plural` flag so the renderer can tell singular from plural.
   - Overrides (AP style, or invented sci-fi/fantasy forms) are a **future phase**, handled through the `IGrammar` seam.
-  - Note: this makes `{player:last-name#possessive}` → `Wilkins's`, not the `Wilkins'` from the original example.
+  - Note: this makes `{player:last-name#possessive}` → `Burns's`, not the `Burns'` from the original example.
 - **Path syntax:** use `entity:path` **everywhere**, in both substitutions and expressions, for consistency (e.g. `player:dex >= 12`). Flagged in case you prefer `player.dex` in expressions.
 - **Event-log growth** in long open-world games: snapshots come later. Not an M1 concern.
 - The no-code path parses text **once at load**. That is accepted under D5; per-frame rendering never parses strings.

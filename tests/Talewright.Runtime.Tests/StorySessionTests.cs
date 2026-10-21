@@ -16,7 +16,7 @@ public class StorySessionTests
         characters:
           player:
             first-name: Mara
-            last-name: Wilkins
+            last-name: Burns
             pronouns: she
             stats: { dex: 14, athletics: 2 }
         factions:

@@ -14,7 +14,7 @@ If you're unsure which it is, file it as an FR; it can be moved later.
 - Add new entries at the bottom of the relevant index and as a new section under it. Never reuse an id.
 - When an entry is resolved, update its status (`fixed (<commit>)`, `done (<commit>)`, `won't fix (<reason>)`,
   …) instead of deleting it, so the history stays readable.
-- **Source** records who raised it, e.g. `review session 2026-10-20` or `Joel`.
+- **Source** records who raised it, e.g. `review session 2026-10-20` or `Mara`.
 - **Effort:** XS < 30 min, S < 2 h, M < 1 day, L > 1 day (including tests and docs).
 
 ## Contents

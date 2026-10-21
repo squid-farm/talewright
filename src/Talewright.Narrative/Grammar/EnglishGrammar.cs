@@ -17,7 +17,7 @@ public interface IGrammar
 }
 
 /// <summary>
-/// English following the Chicago Manual of Style: singular nouns always take <c>'s</c> (Joel's, Wilkins's);
+/// English following the Chicago Manual of Style: singular nouns always take <c>'s</c> (Mara's, Burns's);
 /// plurals ending in s take only an apostrophe (the guards'); irregular plurals take <c>'s</c> (the children's).
 /// </summary>
 public sealed class EnglishGrammar : IGrammar

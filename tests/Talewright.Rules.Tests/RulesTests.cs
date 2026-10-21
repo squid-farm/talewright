@@ -20,7 +20,7 @@ public class RulesTests
     private static EventLog NewLog(ulong seed = 7) => new(
         new WorldDefinition(
             GenericRuleset.Create(),
-            [new CharacterDefinition(EntityId.Player, "Mara", "Wilkins", Pronouns.She,
+            [new CharacterDefinition(EntityId.Player, "Mara", "Burns", Pronouns.She,
                 new Dictionary<StatId, int> { [GenericRuleset.Strength] = 14, [Athletics] = 2 },
                 new Dictionary<ItemId, int> { [Rope] = 1 })],
             [new ItemDefinition(Rope, "coil of rope", new Dictionary<StatId, int>())],
@@ -43,7 +43,7 @@ public class RulesTests
 
         Assert.True(Eval(expr, log).Bool);
         Assert.Equal("her", Eval(new PronounRef(EntityId.Player, PronounForm.Possessive), log).Text);
-        Assert.Equal("Mara Wilkins", Eval(new NameRef(EntityId.Player, NamePart.Full), log).Text);
+        Assert.Equal("Mara Burns", Eval(new NameRef(EntityId.Player, NamePart.Full), log).Text);
     }
 
     [Fact]
