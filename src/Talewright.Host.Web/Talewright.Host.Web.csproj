@@ -15,12 +15,12 @@
 
   <!-- Bundled sample stories, embedded as stories/<Story>/<path> (see EmbeddedStoryLibrary). -->
   <ItemGroup>
-    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml"
-                      LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml" LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Talewright.Player\Talewright.Player.csproj" />
+    <ProjectReference Include="..\Talewright.Runtime\Talewright.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

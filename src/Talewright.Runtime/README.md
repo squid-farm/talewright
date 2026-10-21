@@ -61,3 +61,9 @@ Built-in compiler options provide a compatibility identity. Custom C# hosts must
 `CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;
 otherwise saving is disabled. Extensions must themselves be deterministic. A matching source fingerprint
 cannot prove an arbitrary delegate is deterministic.
+
+`Saves/ISaveStore` lists, reads and writes named slots scoped by story ID. Writes refuse replacement by
+default. `FileSaveStore` stores desktop files under per-user local application data (`Talewright/saves`),
+using encoded slot names and hashed story directories. Replacements use a flushed same-directory temporary
+file and atomic rename. Failed reads/writes throw explicit errors; the store never interprets or migrates
+the save payload. Names are limited to 64 UTF-8 bytes, without control characters or surrounding spaces.

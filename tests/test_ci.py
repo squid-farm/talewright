@@ -82,6 +82,7 @@ class PackageBoundaryTests(unittest.TestCase):
             if identity.endswith(".Player"):
                 for name in ["staticwebassets/talewright.css",
                              "staticwebassets/Components/StoryPlayer.razor.js",
+                             "staticwebassets/Saves/IndexedDbSaveStore.js",
                              "buildTransitive/Talewright.Player.props"]:
                     package.writestr(name, "")
         return path

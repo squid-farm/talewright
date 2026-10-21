@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor;
 using Talewright.Player.Library;
+using Talewright.Runtime.Saves;
 
 namespace Talewright.Host.Desktop;
 
@@ -23,6 +24,7 @@ internal static class Program
 
         // Composite ids are "<library index>|<id>"; the file-system library is index 1 and uses full paths.
         builder.Services.AddSingleton(new DesktopOptions(paths.Count > 0 ? $"1|{Path.GetFullPath(paths[0])}" : null));
+        builder.Services.AddSingleton<ISaveStore>(new FileSaveStore(FileSaveStore.DefaultRoot));
         builder.RootComponents.Add<App>("app");
 
         var app = builder.Build();

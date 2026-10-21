@@ -60,6 +60,7 @@ def verify(directory, version):
                     raise ValueError(f"{path}: Player must depend on engine version {version}")
                 for required in ["staticwebassets/talewright.css",
                                  "staticwebassets/Components/StoryPlayer.razor.js",
+                                 "staticwebassets/Saves/IndexedDbSaveStore.js",
                                  "buildTransitive/Talewright.Player.props"]:
                     if required not in names:
                         raise ValueError(f"{path}: missing Razor asset {required}")
@@ -156,7 +157,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                 manifest = json.loads((project / "obj/Release/net10.0/staticwebassets.build.json").read_text())
                 paths = {asset["RelativePath"] for asset in manifest["Assets"]
                          if asset["BasePath"] == "_content/Talewright.Player"}
-                if not {"talewright.css", "Components/StoryPlayer.razor.js"} <= paths:
+                if not {"talewright.css", "Components/StoryPlayer.razor.js", "Saves/IndexedDbSaveStore.js"} <= paths:
                     raise ValueError("Player consumer is missing transitive Razor static assets")
         tool_path = root / "tools"
         subprocess.run(["dotnet", "tool", "install", "Talewright.Cli", "--version", version,
