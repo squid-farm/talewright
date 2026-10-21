@@ -63,7 +63,18 @@ class PackageBoundaryTests(unittest.TestCase):
             package.writestr(f"{identity}.nuspec", f"""<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
 <metadata><id>{identity}</id><version>{version}</version>{dependencies}</metadata></package>""")
             package.writestr("README.md", "Package readme")
-            package.writestr(f"lib/net10.0/{identity}.dll", b"test placeholder")
+            if identity == "Talewright.Cli":
+                prefix = "tools/net10.0/any/"
+                for name in ["Talewright.Cli.dll", "Talewright.Cli.deps.json",
+                             "Talewright.Cli.runtimeconfig.json"]:
+                    package.writestr(prefix + name, "")
+                package.writestr(prefix + "DotnetToolSettings.xml",
+                                 '<DotNetCliTool><Commands><Command Name="talewright" '
+                                 'EntryPoint="Talewright.Cli.dll" Runner="dotnet" /></Commands></DotNetCliTool>')
+                for assembly in ENGINE_ASSEMBLIES - {"Talewright.Runtime"}:
+                    package.writestr(prefix + assembly + ".dll", "")
+            else:
+                package.writestr(f"lib/net10.0/{identity}.dll", b"test placeholder")
             if identity == "Talewright":
                 for assembly in ENGINE_ASSEMBLIES:
                     for extension in ("dll", "xml"):
@@ -75,13 +86,16 @@ class PackageBoundaryTests(unittest.TestCase):
                     package.writestr(name, "")
         return path
 
-    def test_exactly_two_packages(self):
+    def test_exactly_two_libraries_and_tool(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             self.write_package(directory, "Talewright")
             with self.assertRaises(ValueError):
                 verify(directory, "1.2.3")
             self.write_package(directory, "Talewright.Player")
+            with self.assertRaises(ValueError):
+                verify(directory, "1.2.3")
+            self.write_package(directory, "Talewright.Cli")
             verify(directory, "1.2.3")
             self.write_package(directory, "Talewright.Host.Desktop")
             with self.assertRaises(ValueError):
@@ -91,6 +105,7 @@ class PackageBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             self.write_package(directory, "Talewright")
+            self.write_package(directory, "Talewright.Cli")
             player = self.write_package(directory, "Talewright.Player", dependency="1.0.0")
             with self.assertRaises(ValueError):
                 verify(directory, "1.2.3")
@@ -103,6 +118,7 @@ class PackageBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             self.write_package(directory, "Talewright")
+            self.write_package(directory, "Talewright.Cli")
             player = self.write_package(directory, "Talewright.Player")
             with ZipFile(player) as package:
                 entries = {name: package.read(name) for name in package.namelist()
@@ -117,6 +133,7 @@ class PackageBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             engine = self.write_package(directory, "Talewright")
+            self.write_package(directory, "Talewright.Cli")
             self.write_package(directory, "Talewright.Player")
             with ZipFile(engine) as package:
                 entries = {name: package.read(name) for name in package.namelist()
@@ -125,6 +142,21 @@ class PackageBoundaryTests(unittest.TestCase):
                 for name, content in entries.items():
                     package.writestr(name, content)
             with self.assertRaisesRegex(ValueError, "missing engine assembly asset"):
+                verify(directory, "1.2.3")
+
+    def test_missing_tool_entry_point_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.write_package(directory, "Talewright")
+            self.write_package(directory, "Talewright.Player")
+            tool = self.write_package(directory, "Talewright.Cli")
+            with ZipFile(tool) as package:
+                entries = {name: package.read(name) for name in package.namelist()
+                           if not name.endswith("DotnetToolSettings.xml")}
+            with ZipFile(tool, "w") as package:
+                for name, content in entries.items():
+                    package.writestr(name, content)
+            with self.assertRaisesRegex(ValueError, "missing tools/"):
                 verify(directory, "1.2.3")
 
 

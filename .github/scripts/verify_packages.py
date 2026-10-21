@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the two release packages and optionally build isolated package consumers."""
+"""Check release libraries/tool and optionally run isolated package consumers."""
 
 import argparse
 import json
@@ -13,7 +13,7 @@ from zipfile import ZipFile
 
 from package_version import version_from_tag
 
-PACKAGE_IDS = {"Talewright", "Talewright.Player"}
+PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli"}
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Rules", "Narrative", "Rulesets.Generic", "Tale", "Runtime")}
 
@@ -35,12 +35,27 @@ def verify(directory, version):
                 raise ValueError(f"{path}: unexpected or duplicate package {identity}")
             if metadata.findtext("{*}version") != version:
                 raise ValueError(f"{path}: package version does not match {version}")
-            for required in ["README.md", f"lib/net10.0/{identity}.dll"]:
+            required_files = ["README.md", f"lib/net10.0/{identity}.dll"]
+            if identity == "Talewright.Cli":
+                required_files = ["README.md", "tools/net10.0/any/DotnetToolSettings.xml",
+                                  "tools/net10.0/any/Talewright.Cli.dll",
+                                  "tools/net10.0/any/Talewright.Cli.deps.json",
+                                  "tools/net10.0/any/Talewright.Cli.runtimeconfig.json"]
+            for required in required_files:
                 if required not in names:
                     raise ValueError(f"{path}: missing {required}")
             dependencies = {item.attrib["id"]: item.attrib["version"]
                             for item in metadata.findall(".//{*}dependency")}
-            if identity == "Talewright.Player":
+            if identity == "Talewright.Cli":
+                settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
+                command = settings.find("Commands/Command")
+                if command is None or command.attrib != {
+                        "Name": "talewright", "EntryPoint": "Talewright.Cli.dll", "Runner": "dotnet"}:
+                    raise ValueError(f"{path}: invalid talewright tool command")
+                for assembly in ENGINE_ASSEMBLIES - {"Talewright.Runtime"}:
+                    if f"tools/net10.0/any/{assembly}.dll" not in names:
+                        raise ValueError(f"{path}: missing CLI compiler assembly {assembly}")
+            elif identity == "Talewright.Player":
                 if dependencies.get("Talewright") != version:
                     raise ValueError(f"{path}: Player must depend on engine version {version}")
                 for required in ["staticwebassets/talewright.css",
@@ -60,7 +75,7 @@ def verify(directory, version):
             found[identity] = path
     if found.keys() != PACKAGE_IDS:
         raise ValueError(f"Expected exactly {sorted(PACKAGE_IDS)}; found {sorted(found)}")
-    print(f"Verified both packages at {version}", flush=True)
+    print(f"Verified two libraries and CLI tool at {version}", flush=True)
 
 
 def smoke(directory, version):
@@ -76,7 +91,7 @@ def smoke(directory, version):
   </packageSources>
   <packageSourceMapping>
     <clear />
-    <packageSource key="local"><package pattern="Talewright" /><package pattern="Talewright.Player" /></packageSource>
+    <packageSource key="local"><package pattern="Talewright" /><package pattern="Talewright.Player" /><package pattern="Talewright.Cli" /></packageSource>
     <packageSource key="nuget.org"><package pattern="*" /></packageSource>
   </packageSourceMapping>
 </configuration>
@@ -143,7 +158,20 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                          if asset["BasePath"] == "_content/Talewright.Player"}
                 if not {"talewright.css", "Components/StoryPlayer.razor.js"} <= paths:
                     raise ValueError("Player consumer is missing transitive Razor static assets")
-        print("Both isolated package consumers built successfully", flush=True)
+        tool_path = root / "tools"
+        subprocess.run(["dotnet", "tool", "install", "Talewright.Cli", "--version", version,
+                        "--tool-path", str(tool_path), "--configfile", str(config)],
+                       cwd=root, env=environment, check=True)
+        story = root / "tool-story"
+        story.mkdir()
+        (story / "story.yaml").write_text(
+            "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
+        (story / "main.tale").write_text("=== a\nHello.\n-> END\n")
+        result = subprocess.run([str(tool_path / "talewright"), "validate", str(story), "--format", "json"],
+                                cwd=root, env=environment, check=True, capture_output=True, text=True)
+        if json.loads(result.stdout) != {"schemaVersion": 1, "success": True, "diagnostics": []}:
+            raise ValueError("Installed CLI did not validate an isolated story")
+        print("Both library consumers and installed CLI passed", flush=True)
 
 
 def main():

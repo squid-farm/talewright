@@ -32,8 +32,8 @@ snippets, live validation, completion, and hover help, delivered in independentl
 Later milestones preserve the feature backlog: **M4** image/media support, **M5** world simulation,
 **M6** combat, **M7** runtime plugins, **M8** save migration, and **M9** safe `lint --fix` (lowest priority).
 Dependencies, not milestone numbers alone, determine when independent work can start; none blocks M2/M3.
-These commands and editor tools are planned, not available yet; they will share the compiler's analysis
-rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
+CLI `validate` is available; publishing and editor tools remain planned. They share the compiler rather
+than duplicate its analysis. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
 
 ## Work tracking
 
@@ -54,6 +54,7 @@ assignee and branch/worktree comment. See [the migration index and workflow](doc
 | `src/Talewright.Rulesets.Generic` | Default d20 ruleset |
 | `src/Talewright.Tale` | Story compiler and diagnostics |
 | `src/Talewright.Runtime` | Story sessions and frames |
+| `src/Talewright.Cli` | `talewright validate` tool with human/JSON compiler diagnostics |
 | `src/Talewright.Player` | Blazor UI (Razor Class Library) |
 | `src/Talewright.Host.Desktop` / `.Host.Web` | Photino desktop host / Blazor WASM host |
 | `samples/LostRelic` | Sample story (not part of the engine) |
@@ -85,8 +86,9 @@ No C# project or NuGet dependency is needed to write a story. Copy a story from
 [samples](samples/README.md), edit its `.tale` files and `story.yaml`, and open the
 folder in the desktop player or upload its ZIP in the web player. The published
 [sample player](https://squid-farm.github.io/talewright/) includes all bundled samples.
-The CLI and VS Code authoring extension are roadmap work, not prerequisites or
-commands implemented by this change.
+Validate from source with `dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`.
+See the [CLI reference](src/Talewright.Cli/README.md) for JSON output and exit policy.
+The VS Code authoring extension and CLI publishing remain roadmap work, not prerequisites.
 
 ## C# customization packages
 
@@ -100,6 +102,7 @@ Packages are for C# extensions and custom applications, not ordinary story autho
 Install **only `Talewright.Player`** for the usual C# customization experience.
 Install `Talewright` alone for tooling or a replacement frontend. Both packages
 share one release version. Hosts, sample stories, and test helpers are not packages.
+`Talewright.Cli` is a separate .NET tool package, not a library dependency.
 The Player package is a UI library, not a runnable desktop/web application; a
 custom application still supplies its host and story library.
 

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>talewright</ToolCommandName>
+    <IsPackable>true</IsPackable>
+    <Description>Validate and publish Talewright stories.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Talewright.Tale/Talewright.Tale.csproj" />
+  </ItemGroup>
+</Project>

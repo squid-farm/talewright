@@ -34,10 +34,11 @@ package verification) and Tests must pass before any publishing job.
 Test projects retain their original project references and suite boundaries.
 The `src/Talewright/Talewright.csproj` packaging shell bundles the six headless
 assemblies without moving their source or merging their projects. The engine package has no Blazor
-dependency. CI packs exactly `Talewright` and `Talewright.Player`, then restores
+dependency. CI packs the `Talewright` and `Talewright.Player` libraries and the `Talewright.Cli` tool, then restores
 and builds isolated engine-only and Razor consumers using a fresh package cache.
 This checks real package references, the Player's transitive engine dependency,
-and its CSS/JavaScript assets, not just project-reference builds.
+and its CSS/JavaScript assets, not just project-reference builds. CI also packs and installs
+the separate `Talewright.Cli` tool, running JSON validation outside the checkout.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_ci.py' -v
