@@ -1,992 +1,118 @@
-# Issues
-
-One board for everything that's wrong or missing. There are two kinds of entry:
-
-- **Bugs (`BUG-nnn`):** the engine does something it shouldn't, such as a crash, wrong behaviour, or an unsafe
-  input.
-- **Feature requests and shortcomings (`FR-nnn`):** the engine works as designed, but the design falls short.
-  For example, something you need is missing, is awkward to author, or is limited.
-
-If you're unsure which it is, file it as an FR; it can be moved later.
-
-**Rules for both kinds:**
-
-- Add new entries at the bottom of the relevant index and as a new section under it. Never reuse an id.
-- When an entry is resolved, update its status (`fixed (<commit>)`, `done (<commit>)`, `won't fix (<reason>)`,
-  …) instead of deleting it, so the history stays readable.
-- **Source** records who raised it, e.g. `review session 2026-10-20` or `Mara`.
-- **Effort:** XS < 30 min, S < 2 h, M < 1 day, L > 1 day (including tests and docs).
-
-## Contents
-
-- [Bugs](#bugs)
-- [Feature requests and shortcomings](#feature-requests-and-shortcomings)
-- [Epic map for GitHub import](#epic-map-for-github-import)
-- [Templates](#templates)
-
----
-
-## Bugs
-
-**Severity**
-
-| Level  | Meaning                                                                                                |
-| ------ | ------------------------------------------------------------------------------------------------------ |
-| **S1** | Crash, data loss, or a story that compiles cleanly but can't be played. Fix before the next milestone. |
-| **S2** | Wrong behaviour an author or player can reasonably hit, or a safety issue with a realistic trigger.    |
-| **S3** | Edge case, hardening, or a defensive fix. It only shows up with unusual input or misuse.               |
-
-**Status:** `open`, `triaged`, `in progress`, `fixed (<commit>)`, `won't fix (<reason>)`, `deferred (<milestone>)`.
-Where the original reviewer rated an entry differently, their rating is kept in brackets.
-
-### Bug index
-
-Ranked by priority: severity first, then how easy the bug is to hit, then the cost of fixing it.
-
-| Id                  | Sev | Status | Area        | Summary                                                               | Effort |
-| ------------------- | --- | ------ | ----------- | --------------------------------------------------------------------- | ------ |
-| [BUG-001](#bug-001) | S1  | fixed (`c61a79f`)  | Tale / yaml | A stat with `min > max` compiles, then crashes when the story starts  | XS     |
-| [BUG-002](#bug-002) | S2  | fixed (`e0b7e7d`)  | Runtime     | Triggers that depend on `level` are not re-evaluated after a level-up | XS     |
-| [BUG-003](#bug-003) | S2  | fixed (`a0bfecb`)  | Tale / yaml | Duplicate trigger ids compile and silently suppress each other        | XS     |
-| [BUG-004](#bug-004) | S2  | fixed (`14e2d37`)  | Tale / zip  | Zip loading has no limit on decompressed size (zip bomb)              | S      |
-| [BUG-005](#bug-005) | S3  | fixed (`e0b7e7d`)  | Rules       | The trigger cascade stops silently at 8 passes                        | S      |
-| [BUG-006](#bug-006) | S3  | deferred (M2)      | Rules       | Integer overflow in effects and arithmetic wraps instead of clamping  | S      |
-| [BUG-007](#bug-007) | S3  | fixed (`124f14e`)  | Core        | `Ruleset` collections can be mutated by casting them back             | XS     |
-| [BUG-008](#bug-008) | S3  | deferred (M2)      | Tale        | Commented-out `set flag:` / `var:` assignments still auto-declare     | S      |
-
----
-
-### BUG-001
-
-**A stat with `min > max` compiles, then crashes when the story starts.**
-
-- **Severity:** S1 _[reviewer: P1]_
-- **Status:** fixed (`c61a79f`)
-- **Area / location:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs` (custom `ruleset.stats` reading, around
-  line 176); the crash is in `GameState.CreateInitial` → `StatDefinition.Clamp` → `Math.Clamp`.
-- **Source:** review session 2026-10-20
-- **What happens:** `stats: [ { id: love, min: 10, max: 0 } ]` produces no diagnostic. The story compiles and
-  appears in the library. Pressing play throws `ArgumentException` from `Math.Clamp`, and the user sees Blazor's
-  generic error banner instead of a diagnostic.
-- **Why it matters:** this breaks the compiler's promise that a clean compile means a playable story. It is easy
-  to hit with a typo.
-- **Resolution:** the YAML reader reports `TW4003` on the `min` node and skips the invalid stat. A compiler
-  regression test covers the diagnostic.
-- **Effort:** XS
-
-### BUG-002
-
-**Triggers that depend on `level` are not re-evaluated after a level-up.**
-
-- **Severity:** S2 _[reviewer: P1]_
-- **Status:** fixed (`e0b7e7d`)
-- **Area / location:** `src/Talewright.Runtime/StorySession.cs`, `AfterChanges()` (around line 248).
-- **Source:** review session 2026-10-20
-- **What happens:** `AfterChanges` runs triggers, then `CheckLevel`. A trigger such as `when: player:level >= 3`
-  does not see the new level until the _next_ action. Its effects (and notes) then appear one step late, attached
-  to an unrelated choice. If the level-up happens in the final scene, the trigger never fires at all. The reverse
-  also applies: a trigger that grants XP can cause a level-up, which is handled, but a level-up that should then
-  fire another trigger is not.
-- **Resolution:** triggers and level checks now repeat until stable, bounded by 32 passes; failure to settle throws
-  an explicit error. A runtime regression test verifies a level-dependent trigger fires on the same choice that
-  grants the XP.
-- **Effort:** XS
-
-### BUG-003
-
-**Duplicate trigger ids compile and silently suppress each other.**
-
-- **Severity:** S2 _[reviewer: P1]_
-- **Status:** fixed (`a0bfecb`)
-- **Area / location:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs`, `ReadTriggers` (around line 401);
-  behaviour in `src/Talewright.Rules/Triggers/TriggerEngine.cs`.
-- **Source:** review session 2026-10-20
-- **What happens:** `TriggerEngine` keys both its edge memory and the `once` check (`TriggerFired` events) by id.
-  With two triggers named the same, whichever runs first marks the id as true and the second never fires. Two
-  `once` triggers with the same id also block each other.
-- **Why it matters:** this is likely when copy-pasting triggers. It produces no error and the behaviour looks
-  random.
-- **Resolution:** the second occurrence reports `TW4007`; the code is documented in TALE-SYNTAX.md §7 and covered
-  by a compiler regression test.
-- **Effort:** XS
-
-### BUG-004
-
-**Zip loading has no limit on decompressed size (zip bomb).**
-
-- **Severity:** S2 _[reviewer: P1]_
-- **Status:** fixed (`14e2d37`)
-- **Area / location:** `src/Talewright.Tale/Compilation/StorySource.cs`, `FromZip` (around line 67).
-- **Source:** review session 2026-10-20
-- **What happens:** every story-file entry is read fully into memory. The 20 MB upload limit in `TalewrightApp`
-  applies to the _compressed_ bytes, so a small archive that expands to gigabytes can exhaust memory. On the web
-  that crashes the tab; on desktop it can take down the app.
-- **Why S2 rather than S1:** everything runs client-side, so the only victim is the person who opened the file. No
-  server or other user is affected. It matters more once stories are shared in the community, because opening a
-  story from a stranger should be safe.
-- **Resolution:** `FromZip` counts actual bytes read and caps accepted story files at 1,000 entries, 5 MiB per
-  file, and 50 MiB total. It throws a clear `InvalidDataException` on a limit breach; tests cover highly
-  compressible input, aggregate expansion, and entry count. These limits apply to text files only; future media
-  support should define separate type-specific limits.
-- **Effort:** S
-
-### BUG-005
-
-**The trigger cascade stops silently at 8 passes.**
-
-- **Severity:** S3 _[reviewer: P2]_
-- **Status:** fixed (`e0b7e7d`)
-- **Area / location:** `src/Talewright.Rules/Triggers/TriggerEngine.cs`, `Run` (around line 54).
-- **Source:** review session 2026-10-20
-- **What happens:** `Run` stopped after `MaxPasses = 8` even if triggers were still becoming true. Their effects
-  were skipped until some later change happened to call `Run` again, without reporting that the cap was hit.
-- **Why S3:** it needs a chain of more than 8 dependent triggers, or a ping-pong loop, which is unusual in VN-sized
-  stories. But when it does happen it is very hard to debug.
-- **Resolution:** the limit is now 32 passes. A final read-only eligibility pass detects work remaining beyond
-  the limit and throws an `InvalidOperationException` naming fired and still-eligible triggers. Tests cover a
-  32-pass chain and a cascade that exceeds the limit.
-
-- **Effort:** S
-
-### BUG-006
-
-**Integer overflow in effects and arithmetic wraps instead of clamping.**
-
-- **Severity:** S3 _[reviewer: P2]_
-- **Status:** deferred (M2)
-- **Area / location:** `src/Talewright.Rules/Effects/Effects.cs`, `Apply` (around line 66);
-  `src/Talewright.Rules/Expressions/ExpressionEvaluator.cs` (`+`, `-`, `*` on `int`).
-- **Source:** review session 2026-10-20
-- **What happens:** `player:hp += 2147483647` wraps to a negative number, which is then clamped to the stat's
-  _minimum_. Variables and faction standings are unbounded, so they keep the wrapped value.
-- **Why S3:** it needs absurd numbers. The realistic risk is a runaway `var:x *= …` style loop in a long open-world
-  game, or the default `max: int.MaxValue` on custom stats plus a large XP grant.
-- **Proposed fix:** use saturating arithmetic: compute in `long`, then clamp to `int` range. Do this in
-  `Effects.Apply` and the evaluator's `+ - *`. This is preferred over `checked`, which would crash at play time.
-  Optionally, the compiler could warn on literal constants that exceed range.
-- **Effort:** S
-- **Deferral:** revisit during M2; the reported extreme-value scenario is not needed for the M1 core play loop.
-
-### BUG-007
-
-**`Ruleset` collections can be mutated by casting them back.**
-
-- **Severity:** S3 _[reviewer: P2]_
-- **Status:** fixed (`124f14e`)
-- **Area / location:** `src/Talewright.Core/Rulesets/Ruleset.cs`, constructor (lines 24–26).
-- **Source:** review session 2026-10-20
-- **What happens:** `Stats`, `Tiers` and `Modifiers` are arrays and `StatsById` is a `Dictionary`, exposed as
-  read-only interfaces. Code that casts them back (`(StatDefinition[])ruleset.Stats`) can modify a ruleset shared
-  by running games, and `Stats` and `StatsById` can drift apart.
-- **Why S3:** only C# extension code could do this, and only deliberately. No story can. It is worth fixing before
-  the NuGet packages are public (M2), because the docs promise rulesets are immutable.
-- **Resolution:** the list properties now expose read-only copies, and `StatsById` uses a `FrozenDictionary`.
-  Tests verify that casting to collection interfaces does not permit mutation.
-- **Effort:** XS
-
-### BUG-008
-
-**Commented-out `set flag:` / `var:` assignments still declare the flag or variable.**
-
-- **Severity:** S3
-- **Status:** deferred (M2)
-- **Area / location:** `src/Talewright.Tale/Compilation/StoryCompiler.cs`, `WithAutoDeclarations` and the
-  `FlagAssignment` / `VariableAssignment` regexes.
-- **Source:** Project Lead (review comment on the pre-scan regexes); verified 2026-10-20
-- **What happens:** flags and variables are auto-declared by a regex pre-scan of the raw `.tale` text. The regex
-  doesn't know about `//` comments (or prose), so:
-
-  ```
-  === a
-  // ~ set flag:foo        <- commented out
-  {if flag:foo}yes{/if}
-  ```
-
-  compiles cleanly. Remove the comment line and the same file correctly fails with `TW2004` (flag never set). Net
-  effect: a typo-guard is silently disabled whenever the only "assignment" is in a comment or in prose that
-  happens to read `set flag:x`.
-
-- **Why S3:** the story still runs; the flag is just always false. You lose a compile-time warning, not
-  correctness.
-- **Proposed fix:** stop pre-scanning with regex. Parse every file to its syntax tree first (scene headers,
-  effects), collect declarations from the parsed effects, then bind/type-check. That is the standard two-pass
-  compiler shape and also removes the `SceneHeader` regex. Cheaper interim fix: strip `//` comment lines before
-  running the regexes.
-- **Effort:** S (interim) / M (two-pass)
-- **Deferral:** revisit with the M2 compiler integration; the complete parsed two-pass fix is broader than this
-  pre-M2 correctness pass, and the comment-strip workaround would leave prose false positives.
-
----
-
-## Feature requests and shortcomings
-
-**Priority**
-
-| Level      | Meaning                                                                                  |
-| ---------- | ---------------------------------------------------------------------------------------- |
-| **High**   | Blocks a story you actually want to write, or would be embarrassing in a public release. |
-| **Medium** | Would clearly help, and there is a workaround in the meantime.                           |
-| **Low**    | Nice to have, polish, or an idea worth remembering.                                      |
-
-**Status:** `idea`, `accepted`, `planned (<milestone>)`, `in progress`, `done (<commit>)`, `declined (<reason>)`.
-**Target** is the milestone it's aimed at (see [PLAN.md](PLAN.md#6-milestones)), or `unscheduled`.
-
-### Feature request index
-
-| Id                | Pri    | Status      | Target      | Area               | Summary                                                           | Effort |
-| ----------------- | ------ | ----------- | ----------- | ------------------ | ----------------------------------------------------------------- | ------ |
-| [FR-001](#fr-001) | Medium | idea        | unscheduled | Player             | Character sheet shows only the player, not NPCs                   | S      |
-| [FR-002](#fr-002) | Medium | idea        | unscheduled | Core / Rules       | No NPC↔NPC relationships; faction standing is always the player's | M      |
-| [FR-003](#fr-003) | Medium | shortcoming | unscheduled | Authoring          | Large stories need `story.yaml` split across files/folders        | TBD    |
-| [FR-004](#fr-004) | Low    | idea        | M2          | Hosts              | Window/tab title should follow the loaded story                   | S      |
-| [FR-005](#fr-005) | Medium | idea        | unscheduled | Player / hosts     | Theming: story/host stylesheets, overrides, SCSS                  | M      |
-| [FR-006](#fr-006) | Low    | idea        | unscheduled | Hosts              | Custom JavaScript and extension of default scripts                | M      |
-| [FR-007](#fr-007) | Medium | idea        | M2          | Hosts / packaging  | Publish without the bundled sample stories                        | S      |
-| [FR-008](#fr-008) | Low    | deferred    | unscheduled | Narrative          | Use libraries (AvsAn, Humanizer) for English grammar              | S–M    |
-| [FR-009](#fr-009) | Low    | idea        | unscheduled | Player / Core      | Character sheet shows active modifiers and their sources          | S      |
-| [FR-010](#fr-010) | Medium | idea        | unscheduled | Player             | Authors can switch off sheet sections (inventory, factions, …)    | S      |
-| [FR-011](#fr-011) | Medium | idea        | unscheduled | Player / syntax    | Customizable end screen: text, credits, links                     | M      |
-| [FR-012](#fr-012) | Medium | idea        | unscheduled | Rulesets           | Skill model where attributes seed skills instead of always adding | S      |
-| [FR-013](#fr-013) | Low    | idea        | M2          | Runtime            | Refactor: split `StorySession` responsibilities                   | M      |
-| [FR-014](#fr-014) | Low    | idea        | with FR-003 | Tale               | Refactor: split `StoryYamlReader` along its seams                 | S–M    |
-| [FR-015](#fr-015) | Medium | idea        | unscheduled | Syntax / Player    | Author control of transcript vs. clear; conversation flow         | S–M    |
-| [FR-016](#fr-016) | Low    | idea        | unscheduled | Narrative / Player | Per-character speech colours, changeable during play              | S–M    |
-| [FR-017](#fr-017) | Medium | idea        | unscheduled | Runtime / Player   | Option to hide notes (rolls, stat changes)                        | S      |
-| [FR-018](#fr-018) | Low    | idea        | M2+         | Tale / publish     | Ship a precompiled story bundle instead of parsing at runtime     | M      |
-| [FR-019](#fr-019) | Medium | idea        | M2          | Runtime / Player   | Global back/forward buttons (roll state back and forward)         | M      |
-| [FR-020](#fr-020) | Medium | planned (M2) | M2 | CLI / Tale | Expose compiler validation through `talewright validate` | TBD |
-| [FR-021](#fr-021) | Medium | planned (M3) | M3 | Tale / analysis | Partial symbols and source ranges for shared authoring analysis | TBD |
-| [FR-022](#fr-022) | Medium | planned (M3) | M3 | CLI / analysis | Configurable Tale-aware `talewright lint` | TBD |
-| [FR-023](#fr-023) | Medium | planned (M3) | M3 | Editors / LSP | VS Code syntax support, live validation, completion, and hover help | TBD |
-| [FR-024](#fr-024) | Low | planned (M9) | M9 | CLI / analysis | Safe, opt-in `talewright lint --fix` | TBD |
-| [FR-025](#fr-025) | High | planned (M2) | M2 | Core / release | Establish production-readiness gates before feature expansion | TBD |
-| [FR-026](#fr-026) | High | planned (M2) | M2 | Saves / Runtime | Version saves and reject incompatible data non-destructively | TBD |
-| [FR-027](#fr-027) | Medium | planned (M4) | M4 | Media / publishing | Resolve, package, and render story images safely | TBD |
-| [FR-028](#fr-028) | Medium | planned (M5) | M5 | World / Runtime | Locations, travel, deterministic time, and clocks | TBD |
-| [FR-029](#fr-029) | Medium | planned (M6) | M6 | Rules / Player | Optional deterministic combat module | TBD |
-| [FR-030](#fr-030) | Medium | planned (M7) | M7 | Plugins / hosts | Versioned scripting and trusted desktop plugin paths | TBD |
-| [FR-031](#fr-031) | Medium | planned (M8) | M8 | Saves / Runtime | Explicit save-format and story-version migration | TBD |
-
-FR-020 through FR-024 have relative complexity assessments in [PLAN.md §4.5](PLAN.md#45-tale-compiler-talewrighttale);
-their time-based effort classifications remain TBD.
-
----
-
-### FR-001
-
-**The character sheet shows only the player, not NPCs.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** `src/Talewright.Player/Components/CharacterSheet.razor`
-- **Source:** M1 review Q&A, 2026-10-20
-- **Shortcoming:** every character has stats (e.g. `guide:love`), but the sheet only displays `player`. Players
-  only learn about NPC stats from change notes such as "Tomas: Affection +1". For a dating sim, seeing relationship
-  stats is often the whole point.
-- **Ideas:** a per-character tab or panel. Each NPC needs an author-controlled visibility setting, such as `shown`,
-  `hidden`, or `after flag:met-tomas`, so the sheet doesn't spoil hidden values. Each NPC stat probably needs a
-  visibility switch too.
-
-### FR-002
-
-**There are no NPC↔NPC relationships, and faction standing is always the player's.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** Core (`GameState`), Rules (expressions/effects), Tale syntax
-- **Source:** M1 review Q&A, 2026-10-20
-- **Shortcoming:** `faction:x` stores how faction _x_ feels about the player. A per-person faction such as
-  `faction:tomas` works for "Tomas likes the player". There is no way to express "Tomas dislikes Mara" or "the
-  Guild is at war with the Crown" without inventing variables (`var:tomas-mara`), which can't be tiered or
-  displayed.
-- **Ideas:** a relationship store keyed by (from, to), with syntax like `rel:tomas>mara += 1`, reusing the
-  reputation tiers. It matters more for open-world (factions acting on each other).
-
-### FR-003
-
-**Large stories may have extremely large yaml files that become unwieldy and brittle**
-
-- **Priority:** Medium
-- **Status:** shortcoming
-- **Target:** unscheduled
-- **Area:** Authoring
-- **Source:** Project Lead
-- **Shortcoming:** Imagine a story with 300 characters, 20 factions, and 600 items
-- **Ideas:** We should offer the users the ability to create separate yaml files (folder based would be nice). Imagine a "characters" folder that gets automatically read by convention. Imagine an "items" folder. You could separate your items into subfolder "starting-gear", "late-game", or even just put each item into its own yaml file. Would also be great if you could specify your own path (folder only) to allow for organization in the way that makes sense to the author
-- **Effort:** TBD
-
-### FR-004
-
-**The window/tab title is always "Talewright"; it should follow the loaded story.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** M2 (with `talewright publish`)
-- **Area:** Hosts (`Talewright.Host.Desktop/Program.cs`, both `wwwroot/index.html`), Player
-- **Source:** Project Lead (review comments on desktop `SetTitle` and both `index.html` titles)
-- **Shortcoming:** the desktop window title is hard-coded in `Program.cs` and the web `<title>` in
-  `index.html`. Nothing in `story.yaml` can change it. A published game should show its own name.
-- **Ideas:** default to the story `title:` from `story.yaml`, with an optional `window-title:` override. The
-  Player raises a "story started" callback; the desktop host calls Photino's `SetTitle`, and the web host sets
-  `document.title` (Blazor `<PageTitle>` + `HeadOutlet`, no JS needed). When the user returns to the library, the
-  title reverts to the host default.
-- **Effort:** S
-
-### FR-005
-
-**Theming: story- and host-supplied stylesheets, overrides, and composable styles.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** Player (`wwwroot/talewright.css`), hosts, `story.yaml`
-- **Source:** Project Lead (review comments on both `index.html` stylesheet links and on `CharacterSheet.razor`)
-- **Shortcoming:** today you can restyle by editing the host's `index.html` to add a stylesheet after
-  `talewright.css` that overrides the `--tw-*` CSS variables or `.tw-*` classes. That works, but it means editing
-  engine files, and a story can't carry its own look.
-- **What already exists (for reference):** colours and fonts are CSS custom properties (`--tw-bg`,
-  `--tw-accent`, `--tw-font`, …) with a dark-mode variant; every element has a stable `tw-` class. For a radical
-  change, you don't need to touch the engine: the Player components are just one consumer of
-  `StorySession`/`StoryFrame` (plain records, no HTML), so a host can swap `TalewrightApp`/`StoryPlayer` for its
-  own Razor components.
-- **Ideas:**
-  - `theme: theme.css` (or a `theme/` folder) in `story.yaml`, loaded after `talewright.css`. Published games bake
-    it in.
-  - Document the variable list and class names as a supported, versioned theming API.
-  - SCSS: keep the _shipped_ output as plain CSS (no build step for authors). Optionally author the engine's own
-    styles in SCSS via a .NET Sass compiler (e.g. `AspNetCore.SassCompiler`) at build time, and let `talewright
-publish` compile a story's `.scss` if present.
-  - Named theme presets (parchment, terminal, dating-sim pastel) as plain CSS files.
-- **Effort:** M
-
-### FR-006
-
-**Custom JavaScript and extension of the default scripts.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** Hosts (`index.html`), Player
-- **Source:** Project Lead (review comment on desktop `index.html` script tag)
-- **Shortcoming:** there's no supported way for a story or host to add scripts, e.g. analytics on itch.io,
-  custom audio, or a JS-based visual effect.
-- **Ideas:** a `scripts:` list in `story.yaml` injected by the host, plus Blazor JS initializers
-  (`*.lib.module.js`, `beforeWebStart`/`afterWebStarted`), which are the supported hook for extending Blazor's
-  startup. Keep C# the primary extension path; JS is for browser-only concerns. Needs a security note: a story
-  with scripts is code, not data.
-- **Effort:** M
-
-### FR-007
-
-**Publish without the bundled sample stories.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** M2 (with `talewright publish`)
-- **Area:** Hosts (`.csproj` `EmbeddedResource` of `samples/**`), Player NuGet packaging
-- **Source:** Project Lead (review comment on `Talewright.Host.Web/Program.cs`)
-- **Shortcoming:** both hosts embed everything under `samples/`. Fine for the dev build, but a game built from
-  these hosts (or from future NuGet packages) would ship the samples too, and they grow as sample coverage grows.
-- **Ideas:** move the sample embedding behind an MSBuild property (`<TalewrightIncludeSamples>`), on by default
-  for the dev hosts and off for `talewright publish`. Make sure the Player RCL/NuGet packages never contain
-  samples. Covers PLAN §9 open question 3.
-- **Effort:** S
-
-### FR-008
-
-**Use established libraries for English grammar instead of hand-rolled rules.**
-
-- **Priority:** Low
-- **Status:** deferred (Project Lead, 2026-10-20: keep the in-house rules and see how far they go; revisit if grammar edge cases start hurting)
-- **Target:** unscheduled
-- **Area:** `src/Talewright.Narrative/Grammar/EnglishGrammar.cs`
-- **Source:** Project Lead (review comment on `EnglishGrammar`)
-- **Shortcoming:** `#a` (a/an) uses a short exception list, so it gets things like "an FBI agent", "a URL",
-  "an hour" vs "a historian" only partly right. There's no plural, ordinal or number-to-words support.
-- **Ideas:**
-  - **a/an:** the `AvsAn` NuGet package decides from real usage data (Wikipedia corpus) and handles acronyms and
-    odd words. It is small and pure C#. Swap it in behind `IGrammar.WithIndefiniteArticle`. Check the licence
-    before adopting.
-  - **Plurals, ordinals, numbers to words:** `Humanizer` (MIT, supports .NET 10/WASM). Use it to add `#plural`,
-    `#ordinal` (3rd), `#words` (three) modifiers. Use the English-only `Humanizer.Core` package to keep the WASM
-    download small.
-  - **Possessives:** no library does this well; the Chicago rule we implement is the whole rule. Keep ours.
-  - Keep `IGrammar` as the seam so localization can plug in other languages later.
-- **Effort:** S (a/an swap) / M (new modifiers + docs)
-
-### FR-009
-
-**The character sheet should show active modifiers and where they come from.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** `src/Talewright.Player/Components/CharacterSheet.razor`, Core (`GameState` modifier query)
-- **Source:** Project Lead (review comment on `CharacterSheet.razor`)
-- **Shortcoming:** the sheet shows "14 (+2)" and a hover tooltip "modified by items or rules", but not _which_
-  item or rule. With several modifiers stacking, players can't tell why a number changed.
-- **Ideas:** expose the modifier breakdown from Core (`GetStatBreakdown(who, stat)` → base + list of
-  `(source, amount)`). Show it as an expandable row or tooltip ("+2 jade charm"). The same data is useful for
-  skill-check notes ("Perception +3 (WIS +1, charm +2)").
-- **Effort:** S
-
-### FR-010
-
-**Let authors switch off character sheet sections (inventory, factions, skills, even the whole sheet).**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** Player (`CharacterSheet.razor`, `StoryPlayer.razor`), `story.yaml`
-- **Source:** Project Lead (review comment on the inventory section of `CharacterSheet.razor`)
-- **Shortcoming:** the sheet already hides stat categories that don't exist (the `none` ruleset has no stats) and
-  skills at 0. It _always_ shows Inventory ("Nothing.") and Factions when any exist. A dating sim or a light
-  narrative piece may want no inventory panel, or no sheet at all.
-- **Ideas:** a `player-ui:` block in `story.yaml`, e.g.
-  `sheet: { inventory: false, factions: false, stats: [love, trust] }` or `sheet: off`. Sections could also hide
-  automatically when a story declares no items or factions. This is part of the "turn defaults off" goal.
-- **Effort:** S
-
-### FR-011
-
-**Customizable end screen: text, credits, links.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** Player (`StoryPlayer.razor` "The End" block), Tale syntax / `story.yaml`
-- **Source:** Project Lead (review comment on `StoryPlayer.razor`)
-- **Shortcoming:** every ending shows a fixed "The End" plus "Play again". You can put text in the final scene,
-  but you can't replace the end banner, add credits or links, or vary it per ending without hacks.
-- **Ideas:**
-  - `ending:` metadata on a scene (`@ending "The Keeper"` with a title and optional `@credits` reference).
-  - A `credits.tale` scene type rendered after the final frame.
-  - `story.yaml` `end-screen:` with links (itch page, Patreon, sequel) and whether to show "Play again".
-  - It could also record which endings the player has seen (needs persistence, M2+).
-- **Effort:** M
-
-### FR-012
-
-**Skill progression independent of attributes (attribute seeds the skill, doesn't keep adding to it).**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** `src/Talewright.Rulesets.Generic/GenericRuleset.cs` (`D20SkillCheckRule`), ruleset config
-- **Source:** Project Lead (review comment on `GenericRuleset` skills)
-- **How it works today:** skills _are_ stored independently: each is its own stat (rank 0–10), and raising
-  Wisdom never changes your Survival rank. But the d20 check adds both: `d20 + skill rank + attribute modifier`
-  (5e style). So raising Wisdom does make Survival _checks_ easier.
-- **Shortcoming:** the alternative model ("a wise scholar starts with better Survival, but training Wisdom later
-  doesn't make you a better tracker") isn't available without writing a C# `ISkillCheckRule`.
-- **Ideas:** a ruleset option `skill-checks: { attribute-bonus: always | starting-only | none }`. With
-  `starting-only`, the attribute modifier is added once to the skill's starting rank at character creation and not
-  at check time. Per-skill overrides would also be possible. This is data-only, so it fits the "custom rules need
-  no C#" goal.
-- **Effort:** S
-
-### FR-013
-
-**Refactor: `StorySession` carries too many responsibilities.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** before or with M2 save/load
-- **Area:** `src/Talewright.Runtime/StorySession.cs` (~290 lines)
-- **Source:** Project Lead (review comment: "feels too big, give it a good think")
-- **Analysis:** it currently does six jobs:
-  1. Public façade and lifecycle (`Start`, `Choose`, `Current`, seed, event log)
-  2. Navigation: entering scenes, storylet selection, diverts (`Enter`, `ContinueTo`, `FirstMatchingDivert`)
-  3. Building the choice list and its actions (`OfferChoices`)
-  4. Resolving a choice: effects, skill checks (`MakeChoice`, `ResolveCheck`)
-  5. The consequence pipeline after any change: triggers, levelling (`AfterChanges`)
-  6. Presentation: turning events into notes and assembling the `StoryFrame` (`NotesSince`, `Present`,
-     `EndStory`)
-- **Proposed split** (no public API change; `StorySession` stays the façade and owner of the `EventLog`):
-  - `ConsequencePipeline` (5): the natural home for the BUG-002 trigger/level loop and BUG-005's cascade limit.
-  - `FrameBuilder` (6): the natural home for FR-017 (hide notes) and FR-015 (transcript control).
-  - `SceneNavigator` (2–4): pure functions over state + story, easier to unit-test in isolation and the piece
-    that open-world navigation (location graphs) would replace or extend.
-- **When:** do it as the first step of whichever of BUG-002, FR-015 or FR-017 lands first, so the refactor is
-  driven by a real change rather than done speculatively.
-- **Effort:** M
-
-### FR-014
-
-**Refactor: split `StoryYamlReader` along its natural seams.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** with FR-003
-- **Area:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs` (~490 lines)
-- **Source:** Project Lead (review comment on the helpers section: "feels like a natural seam")
-- **Analysis:** the file is one class reading every `story.yaml` section, plus generic YAML node helpers (`Get`,
-  `Scalar`, `RequiredScalar`, location mapping) at the bottom.
-- **Proposed split:** move the helpers to a `YamlNodeReader` (location-aware scalar/mapping access with
-  diagnostics). Then have one small reader per section (`CharacterReader`, `ItemReader`, `FactionReader`,
-  `RulesetReader`, `TriggerReader`) and a manifest reader that orchestrates. This is exactly the shape FR-003
-  needs: per-folder `characters/*.yaml` files feed the same `CharacterReader`.
-- **Effort:** S–M
-
-### FR-015
-
-**Author control over what stays on screen (transcript vs. clear), and conversation-style flow.**
-
-- **Priority:** Medium
-- **Status:** idea (needs discussion)
-- **Target:** unscheduled
-- **Area:** Tale syntax (scene metadata), `StoryFrame`, Player (`StoryPlayer.razor`)
-- **Source:** Project Lead (review comment on `TaleParser.FlushParagraph`)
-- **How it works today:** nothing is ever cleared. `FlushParagraph` only ends a paragraph inside the compiled
-  template (a blank line in prose). The Player keeps a full transcript: every previous frame stays on screen,
-  dimmed, and the new frame is appended below and focused. So a quest-giver conversation that spans several
-  scenes already reads top-to-bottom like a conversation.
-- **Shortcoming:** authors can't control it:
-  - There's no way to clear the screen (chapter break, "three days later…", a game-over screen).
-  - Each scene is a separate visual section with its own `@title` heading, so a conversation split across scenes
-    looks more chopped up than it should.
-  - The transcript grows without bound in a long or open-world game.
-- **Ideas:**
-  - `@clear` scene metadata (clear the transcript when entering), and `@continues` (render into the previous
-    frame without a heading or separator, for conversations).
-  - A per-story default (`presentation: transcript | page`). A visual-novel "page" mode shows one frame at a
-    time, with a backlog/history button.
-  - Carry this as frame metadata (`StoryFrame.Clear`, `StoryFrame.ContinuesPrevious`) so any presentation layer
-    can honour it, and the engine stays UI-agnostic.
-- **Effort:** S–M
-
-### FR-016
-
-**Per-character speech colours and styles, changeable during play.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** `story.yaml` characters, Narrative (`RenderedSpeech`), Player CSS
-- **Source:** Project Lead (review comment on `TaleParser.ParseSpeech`)
-- **Shortcoming:** all speech looks the same. Visual novels commonly give each speaker a colour, and sometimes
-  change it with mood (e.g. red text when enraged).
-- **Ideas:**
-  - Static: `speech: { color: "#a33", class: gruff }` per character in `story.yaml`, rendered as a CSS
-    variable/class on the speech block.
-  - Dynamic: make the style a function of state rather than a mutable setting, e.g.
-    `speech-style: [ { when: flag:tomas-angry, class: angry }, { class: calm } ]`. That keeps it data-driven,
-    replay-safe and consistent with how everything else is derived from events.
-  - The renderer resolves it into `RenderedSpeech.Style` (a class name or token, not raw CSS) so non-HTML
-    presentation layers can map it too.
-- **Effort:** S (static) / M (dynamic)
-
-### FR-017
-
-**Option to hide notes (skill-check rolls, stat changes) for a more immersive experience.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** `src/Talewright.Runtime/StorySession.cs` (`NotesSince`), Player, `story.yaml`
-- **Source:** Project Lead (review comment on `StorySession` notes)
-- **Shortcoming:** every check shows "Perception check: rolled 14 + 3 = 17 vs 15, success", and every change
-  shows "+10 XP" or "Tomas: Affection +1". Some stories want hidden mechanics.
-- **Ideas:** have the engine keep producing notes (they're derived from events, so they cost nothing) and let
-  filtering happen at presentation. Set it with `story.yaml` `notes: { checks: hidden | outcome-only | full,
-stats: shown | hidden }`, plus an optional player-side toggle in the Player, the way many games offer
-  "show dice rolls". Per-stat visibility could reuse FR-001's visibility setting, so hidden stats never leak
-  through notes.
-- **Effort:** S
-
-### FR-018
-
-**Ship a precompiled story bundle instead of parsing `.tale` sources at runtime.**
-
-- **Priority:** Low
-- **Status:** idea
-- **Target:** M2+ (with `talewright publish`)
-- **Area:** Tale (`StoryDefinition` serialization), Runtime loading, publish CLI
-- **Source:** Project Lead (review comment on `Talewright.Tale/README.md`)
-- **Shortcoming:** every launch compiles the story from source. That is fast for the sample (milliseconds), but
-  large stories would pay the parse/validate cost on every start, especially in WASM. Shipping sources also
-  makes a published game's script trivially readable (a mild concern).
-- **Ideas:** `talewright publish` compiles once and writes a versioned bundle (System.Text.Json with source
-  generation, which is trim/WASM-safe, or a compact binary format). The player loads the bundle directly and
-  falls back to source for development. Named C# predicates (`@Name`) can't be serialized; the bundle stores
-  their names and the host re-binds them from the story's C# assembly. PLAN §4 already anticipates this
-  ("serialized to a compact bundle for publishing later"). Benchmark before committing to it: it's only worth it
-  if real stories compile slowly.
-- **Effort:** M
-
-### FR-019
-
-**Global back/forward buttons that roll the playthrough's state back and forward.**
-
-- **Priority:** Medium
-- **Status:** idea
-- **Target:** M2 (alongside saves, which use the same mechanism)
-- **Area:** Runtime (`StorySession` / a history wrapper), Player (`StoryPlayer.razor`), `story.yaml`
-- **Source:** Project Lead, 2026-10-20
-- **Shortcoming:** the only way to see what another option does is to restart and replay. Players who like to
-  try every option before committing to a path can't step back one choice, look at the alternative, and step
-  forward again. PLAN D9 says event sourcing "enables rewind", but no milestone schedules it.
-- **Ideas:**
-  - **Behaviour:** Back undoes the last choice and restores the previous frame, state, and transcript. Forward
-    re-applies an undone choice. Making a different choice after going back clears the forward stack (normal
-    undo/redo, not a branching tree).
-  - **Authoring:** on by default. Authors can hide it with a top-level `undo: false` in `story.yaml`, for
-    example in stories where choices are meant to be irreversible.
-  - **Mechanism:** replay, not truncation. Rebuild a fresh `StorySession` with the same seed and the
-    choice-key prefix (the determinism contract in ARCHITECTURE.md; the same "seed + keys" that M2 saves will
-    store). `EventLog.Truncate` alone isn't enough, because `TriggerEngine` keeps its edge state
-    (`_currentlyTrue`) outside the event log. Replay costs O(choices) per step, which is negligible for
-    interactive fiction. A good home is a runtime-level history wrapper (`Choose`, `Back`, `Forward`,
-    `CanBack`, `CanForward`, frames for the transcript), so it can be unit-tested without the UI.
-  - **Dice:** rolls are a function of `(seed, roll index)`, so going back and retrying returns the same roll.
-    That is intended: it keeps exploration honest and matches the anti-save-scumming stance of
-    `DeterministicDice`.
-  - **Possible extras:** keyboard shortcuts (e.g. Alt+←/→), and a frame showing which option was taken last time.
-- **Effort:** M
-
----
-
-### FR-020
-
-**Expose compiler validation through `talewright validate`.**
-
-- **Priority:** Medium
-- **Status:** planned (M2)
-- **Target:** M2
-- **Area:** CLI, Tale compiler
-- **Source:** Project Lead, authoring tooling planning session
-- **Shortcoming:** compiler checks exist, but authors cannot run them directly from a terminal, another
-  editor, or CI without writing a compiler host.
-- **Depends on:** the M2 CLI foundation; reuse `StoryCompiler` rather than duplicate validation.
-- **Scope:** validate a story root; emit compiler errors and warnings as human-readable file/line/column
-  messages or JSON with stable codes and severities. Warnings succeed by default; support explicit
-  warnings-as-errors. Define and document exact JSON fields and exit codes before implementation.
-  Invalid arguments and I/O failures must fail explicitly, not look like a clean story.
-- **Acceptance:** CLI integration tests cover valid stories, warnings, warnings-as-errors, syntax/type/
-  reference/structural errors, missing manifests, I/O failures, and JSON shape. Diagnostics match the
-  library. Documentation states that static validation does not prove all possible playthroughs succeed.
-
-### FR-021
-
-**Expose partial symbols and source ranges for shared authoring analysis.**
-
-- **Priority:** Medium
-- **Status:** planned (M3)
-- **Target:** M3, before source-aware lint rules and LSP intelligence
-- **Area:** Tale compiler / analysis API
-- **Source:** Project Lead, authoring tooling planning session
-- **Shortcoming:** runtime compilation hides its symbol table, emits point locations, and returns no story
-  on errors. Editor completion and precise fixes need useful context even while text is incomplete.
-- **Depends on:** existing compiler/parsers and `StorySource`; no CLI or editor dependency.
-- **Scope:** a separate analysis result retaining partial symbols, source spans/declaration locations,
-  context, and diagnostics without adding editor state to the runtime AST. Resolve cross-file symbols;
-  support unsaved Tale/YAML overlays, story-root discovery, file invalidation, and stale-result rejection.
-  Begin with debounced whole-story analysis rather than speculative incremental compilation.
-- **C# projects:** define explicit project integration or exported metadata for custom predicates,
-  modifiers, and rulesets shared across CLI, MSBuild, and LSP. Report missing metadata explicitly;
-  do not implicitly execute arbitrary project code while editing.
-- **Acceptance:** tests cover incomplete expressions, invalid YAML, partial symbols, cross-file references,
-  unsaved buffers, file add/change/delete, source-range correctness, and C# registration consistency.
-  Valid compilation and existing diagnostic codes retain their behavior.
-
-### FR-022
-
-**Add configurable Tale-aware `talewright lint`.**
-
-- **Priority:** Medium
-- **Status:** planned (M3)
-- **Target:** M3
-- **Area:** CLI, shared analysis/rules
-- **Source:** Project Lead, authoring tooling planning session
-- **Shortcoming:** compiler correctness checks do not provide configurable authoring/style guidance.
-- **Depends on:** [FR-020](#fr-020) for CLI output/exit policy and [FR-021](#fr-021) for source-aware rules.
-- **Scope:** include compiler diagnostics once, then add a bounded set of lint rules with stable IDs,
-  severities, configuration, and explicit suppression. Agree the initial rules/defaults and configuration
-  format before implementation. No generic Markdown linter wholesale; do not treat meaningful prose or
-  Tale choice/directive syntax as formatting noise.
-- **Acceptance:** rule tests cover positive/negative cases and precise locations; CLI tests cover
-  configuration, suppression, invalid configuration, warning policy, and human/JSON output. CLI and LSP
-  use the same rule implementation/results. Existing structural warnings are not duplicated as new rules.
-
-### FR-023
-
-**Provide Tale syntax support, IntelliSense, and code hints in VS Code and other editors.**
-
-- **Priority:** Medium
-- **Status:** planned (M3)
-- **Target:** M3; highlighting/snippets can ship independently before LSP
-- **Area:** VS Code extension, C# LSP server, shared analysis
-- **Source:** Project Lead, authoring tooling planning session
-- **Shortcoming:** there is no Tale language extension or editor-neutral interactive authoring service.
-- **Depends on:** [FR-021](#fr-021) for LSP intelligence; [FR-022](#fr-022) for lint diagnostics when available.
-  CLI-hosted server packaging can reuse the [FR-020](#fr-020) CLI foundation; no one-shot validation process
-  per completion request.
-- **Scope:** Tale-aware highlighting alongside supported Markdown, comments/brackets, and snippets for
-  scenes/choices/conditions/checks. A long-running C# LSP server (proposed host: `talewright lsp`) provides
-  live diagnostics, context-aware completion, and hover/syntax help; VS Code is a thin client. Other
-  LSP-capable editors can launch the same server.
-- **Completion:** scene IDs across files, characters, stats, items, factions, flags, variables, directives,
-  predicates, and modifiers. Hover shows available schema descriptions/types and language documentation,
-  not evaluated gameplay values.
-- **Boundaries:** signature help, inlay hints, rename, general formatting, and full YAML authoring support
-  are not initial requirements. Changes to `story.yaml` still update Tale analysis and YAML diagnostics.
-- **Acceptance:** grammar/snippet fixtures cover Tale/Markdown overlaps. LSP integration tests cover
-  initialization/shutdown, open/change/close, unsaved Tale/YAML, incomplete-input completion, cross-file
-  symbols, hover, stale-diagnostic clearing, and matching CLI diagnostics. Smoke-test the VS Code client
-  and document how another LSP client launches the server.
-
-### FR-024
-
-**Apply only safe, opt-in fixes through `talewright lint --fix`.**
-
-- **Priority:** Low
-- **Status:** planned (M9)
-- **Target:** M9, lowest priority; not an M3/M4 release gate
-- **Area:** CLI, shared lint rules / source edits
-- **Source:** Project Lead, authoring tooling planning session
-- **Shortcoming:** future lint guidance will otherwise require every repair to be made manually.
-- **Depends on:** [FR-021](#fr-021) source spans and [FR-022](#fr-022) rules/CLI.
-- **Scope:** a documented safe subset of rules emits deterministic edits. Preserve prose, comments, and
-  unrelated formatting; reject overlapping edits and files changed since analysis. Report applied fixes,
-  reanalyze, report remaining diagnostics, and apply the normal failure policy to the result. Surface
-  edit/I/O failures explicitly. Ambiguous or story-changing repairs remain suggestions.
-- **Acceptance:** fixtures prove exact preservation outside edit spans and repeat-run idempotence.
-  Tests cover overlapping edits, stale files, write failures, post-fix diagnostics, and exit behavior.
-  No general formatter or promised autofix for every lint rule.
-
----
-
-### FR-025
-
-**Establish production-readiness gates before feature expansion.**
-
-- **Priority:** High
-- **Status:** planned (M2)
-- **Target:** M2
-- **Area:** Core, compiler, Runtime, player/hosts, CLI, testing/release
-- **Source:** Project Lead, production-first roadmap rescoping
-- **Shortcoming:** a working vertical slice is not evidence of release readiness. The old M3 bucket mixed
-  authoring with media, combat, world simulation, migration, and plugins without a core reliability gate.
-- **Depends on:** existing engine/player regression suites and the M2 save/publish/CLI deliverables;
-  [FR-026](#fr-026) supplies save compatibility safeguards.
-- **Scope:** use the [roadmap release gates](PLAN.md#core-production-readiness-gates-m2) as the release
-  checklist. Resolve known S1/S2 bugs and the M2-deferred BUG-006/BUG-008 with regressions; explicitly
-  triage other risks. Verify bounded story/archive inputs, visible failure handling, and representative
-  story load/validation/save/replay behavior with measured, agreed budgets.
-- **Acceptance:** record CI/build/regression results and verify published Release artifacts for the
-  documented platform matrix, including load/play/save, trimming, static/subpath hosting, and install/
-  publish instructions. Document limitations and unverified platforms. Do not mark readiness complete
-  based only on development-host tests or because no new features are planned.
-- **Boundaries:** this is a release-verification umbrella, not a new engine subsystem or an instruction
-  to implement every deferred feature. M3 authoring ships in useful slices; M4 presentation and later
-  gameplay/plugin work must not displace the core gate.
-
-### FR-026
-
-**Version saves and reject incompatible data without damaging saves or sessions.**
-
-- **Priority:** High
-- **Status:** planned (M2)
-- **Target:** M2, alongside `ISaveStore`
-- **Area:** Save format, Runtime loading, desktop/web save stores
-- **Source:** Project Lead, production-first roadmap rescoping
-- **Shortcoming:** event-sourced state supports replay, but does not guarantee that old saves can be
-  safely loaded after changes to a story or save/event schema.
-- **Depends on:** the M2 save format and desktop/web stores; define this contract as part of saves,
-  not as a requirement to implement a migration framework first.
-- **Scope:** record save-format version and story identity/version; define/document the compatibility
-  policy. Report corrupt, unsupported, wrong-story, and incompatible-version saves explicitly, preserving
-  the original data and leaving the active session unchanged on failure. Surface save write failures.
-- **Acceptance:** desktop/web round-trip and deterministic replay tests, plus fixtures for malformed
-  saves, unsupported formats, incompatible story identities/versions, and failed reads/writes. Verify
-  failed loads do not partially mutate a session or overwrite the original save.
-- **Follow-up:** actual migration across story/save versions is tracked in [FR-031](#fr-031), M8,
-  with concrete old/new contracts and dedicated fixtures; it is not a requirement of M3 authoring.
-
----
-
-### FR-027
-
-**Resolve, package, and render story images safely.**
-
-- **Priority:** Medium
-- **Status:** planned (M4)
-- **Target:** M4, Presentation
-- **Area:** Tale media model, asset resolver, Player, desktop/web hosts, publishing
-- **Source:** Project Lead, phased feature backlog
-- **Shortcoming:** media placeholders flow through the engine but are not rendered; writers cannot ship
-  illustrated stories using the normal authoring/publishing path.
-- **Depends on:** existing media AST/document seams and M2 publishing; no dependency on combat/plugins.
-- **Implementation slices:**
-  1. Define supported image formats, identifiers/relative paths, alt text, missing-asset diagnostics,
-     and per-file/aggregate limits. Validate references without executing or fetching remote content.
-  2. Implement bounded asset resolution for folders/archives and publish bundles; reject escaping paths,
-     unsupported files, and oversized assets with actionable diagnostics.
-  3. Render images accessibly in desktop/web, including static-host subpaths; integrate fixture assets
-     into compiler, publish, and player regression tests.
-- **Acceptance:** a story with images works from a folder/archive and published desktop/web bundles;
-  accessible text is available; missing, escaping, unsupported, and oversized assets fail clearly.
-  Text-only stories retain their behavior and package shape unless intentionally versioned.
-- **Boundaries:** video/audio playback, animation, sprite staging, and arbitrary remote URLs are not
-  implicit requirements of the first media release; record separate child issues if selected.
-
-### FR-028
-
-**Add locations, travel, deterministic time, and event-backed clocks.**
-
-- **Priority:** Medium
-- **Status:** planned (M5)
-- **Target:** M5, World simulation
-- **Area:** Core events/state, Rules storylets, Tale schema/directives, Runtime, Player
-- **Source:** Project Lead, phased feature backlog
-- **Shortcoming:** hubs support non-linear scenes, but authors have no shared location/travel or
-  time/clock model for persistent worlds.
-- **Depends on:** existing hubs/storylet selection, event sourcing, and M2 save compatibility safeguards;
-  no requirement for media, combat, or runtime plugins.
-- **Implementation slices:**
-  1. Define location IDs, current location, travel connections/requirements, and explicit movement
-     events; expose location predicates to Tale and eligible storylets through existing selection.
-  2. Define logical time units, which actions advance time, clock progress/thresholds, and bounded
-     trigger processing. Advance time through recorded events, not wall-clock timers.
-  3. Integrate navigation/time presentation, save/replay, validation/completion metadata, and a small
-     sample world with gated travel and a clock-driven narrative change.
-- **Decisions before implementation:** travel costs, clock reset/repetition, simultaneous threshold
-  ordering, and whether waiting is an explicit player action. Specify these rather than infer defaults.
-- **Acceptance:** gated travel and time-dependent storylets behave predictably; the same seed/actions
-  reproduce location/time/clock events after reload. Invalid locations/connections/clocks produce
-  compiler diagnostics; trigger cycles fail explicitly. Existing on-rails stories require no world schema.
-
-### FR-029
-
-**Provide an optional, ruleset-driven deterministic combat module.**
-
-- **Priority:** Medium
-- **Status:** planned (M6)
-- **Target:** M6, Combat
-- **Area:** Rules module, Core events, Tale encounter authoring, Runtime, Player
-- **Source:** Project Lead, phased feature backlog
-- **Shortcoming:** authors can script skill checks but lack reusable encounters, turn resolution, and
-  combat outcomes tied back into narrative state.
-- **Depends on:** existing typed stats/rulesets, seeded RNG/event sourcing, and M2 saves; world locations
-  are optional integration, not a prerequisite.
-- **Implementation slices:**
-  1. Agree a bounded initial combat ruleset and contracts for participants, encounter state, legal
-     actions, turn order, and victory/defeat/escape outcomes; keep engine-wide stats generic.
-  2. Implement rules/event transitions, recorded randomness, and Tale encounter/outcome references;
-     reject invalid encounters and actions with explicit diagnostics/errors.
-  3. Add desktop/web combat presentation, narrative handoff, save/resume during an encounter, and
-     a deterministic sample encounter exercising each supported outcome.
-- **Decisions before implementation:** action economy, damage/defense, incapacitation, escape,
-  rewards, and supported encounter scale. No tactical grid or real-time simulation by implication.
-- **Acceptance:** fixed seed/actions reproduce results and reload mid-encounter; invalid actions cannot
-  mutate state; outcomes enter the intended narrative branches exactly once. Disabling the module
-  leaves existing non-combat stories and replaceable rulesets unaffected.
-
-### FR-030
-
-**Provide versioned scripting plugins and an explicitly trusted desktop DLL path.**
-
-- **Priority:** Medium
-- **Status:** planned (M7)
-- **Target:** M7, Runtime plugins (Tier 2)
-- **Area:** Extension API, Runtime, compiler registrations, desktop/web hosts, packaging
-- **Source:** Project Lead, phased feature backlog
-- **Shortcoming:** M2 C# story projects require a custom app build; the generic player has no supported
-  runtime extension package contract for author-defined behavior.
-- **Depends on:** M2 C# registration/publishing contracts, M3 custom-symbol analysis metadata, and
-  versioned save safeguards; no dependency on combat or world simulation.
-- **Implementation slices:**
-  1. Specify extension manifests/API versions, permitted capabilities, compiler metadata, event/state
-     persistence, deterministic replay requirements, dependency resolution, and failure reporting.
-  2. Select Jint or MoonSharp against documented desktop/WASM constraints; implement bounded
-     execution and capability-controlled host APIs with fixture plugins and explicit resource failures.
-  3. Implement a separately opt-in, full-trust desktop DLL loading path, compatibility checks, and
-     publish packaging. Document that DLL plugins are not sandboxed and are not a browser feature.
-- **Decisions before implementation:** script engine, execution/memory limits, host API allowlist,
-  trust consent, plugin update/unload behavior, and persistence/version policy.
-- **Acceptance:** a supported script package runs on desktop/web with consistent recorded outcomes;
-  unavailable capabilities, exceeded limits, and incompatible API/package versions fail clearly.
-  Plugins cannot silently bypass event-sourced mutation. Desktop DLL loading requires explicit trust;
-  normal no-plugin stories run unchanged. Document supported trimming and platform constraints.
-
-### FR-031
-
-**Migrate supported save-format and story-version changes without losing the original save.**
-
-- **Priority:** Medium
-- **Status:** planned (M8)
-- **Target:** M8, Save migration; can be pulled forward when compatibility changes require it
-- **Area:** Save format, story migration registration, Runtime, desktop/web save stores
-- **Source:** Project Lead, phased feature backlog
-- **Shortcoming:** M2 correctly rejects incompatible saves, but does not offer an explicit conversion
-  path for supported older saves when schemas or story identifiers change.
-- **Depends on:** [FR-026](#fr-026) save identity/version checks and desktop/web stores, not M4-M7.
-- **Implementation slices:**
-  1. Define separate engine-format and story-version migration contracts, allowed version paths,
-     author-provided scene/choice/state mappings, and missing/ambiguous mapping diagnostics.
-  2. Implement deterministic conversion on a copy, validate the converted result, and commit only a
-     successful result while retaining the original. Unsupported paths remain explicit rejections.
-  3. Integrate load-time migration reporting on desktop/web, fixtures for supported old/new formats,
-     and author documentation for adding and testing story-specific migration paths.
-- **Decisions before implementation:** migration chaining, output storage/backup policy, handling of
-  removed choices/scenes, and preservation of recorded random outcomes. Never guess story intent.
-- **Acceptance:** supported fixtures migrate and load to expected state; corrupt input, missing paths,
-  failing conversions, and failed writes preserve the original and active session. Repeat loads do not
-  repeatedly migrate an already-current save. No promise of universal compatibility with arbitrary edits.
-
----
-
-## Epic map for GitHub import
-
-Milestone-scoped features remain milestones. The following are grouping epics for the rest of the backlog,
-not replacement release targets. Keep existing FR/BUG IDs and statuses when importing; inclusion in an
-epic does not approve an idea or change its priority. Create linked child issues from the implementation
-slices above and preserve their acceptance criteria and actual dependencies.
-
-| Epic | Existing issue members | Outcome / boundary |
+# Issue tracking
+
+**[GitHub Issues](https://github.com/squid-farm/talewright/issues) is the live source of truth.**
+The former local board has been migrated, including descriptions, acceptance criteria, historical
+resolutions, priorities, and original FR/BUG identifiers. Do not maintain a parallel status board here.
+This document is a stable migration index, not a snapshot of current issue state.
+
+- [Development Project](https://github.com/orgs/squid-farm/projects/1): backlog, current work, bugs, milestone planning, and epics.
+- [Milestones](https://github.com/squid-farm/talewright/milestones): M0-M9 release targets.
+- [Roadmap](PLAN.md): architecture, sequencing, and release criteria; issue links carry live execution details.
+
+## Working with issues (humans and bots)
+
+1. Read the issue, parent/sub-issues, and native blocking dependencies. Preserve existing scope and
+   acceptance criteria; exploratory/deferred ideas are not automatically approved work.
+2. Before coding, check assignees, linked PRs, and recent comments. Assign yourself and leave a claim
+   comment naming your branch/worktree. Assignment and Project status are not atomic locks; stop and
+   coordinate if another worker has already claimed the task.
+3. Use an isolated branch/worktree. Move actionable, unblocked work from Backlog to Ready; move claimed
+   work to In progress and completed implementations to In review with test evidence and a linked PR.
+4. Use `Closes #N` only for a fully resolved issue. For partial work or epic progress, use `Refs #N`.
+   Do not close a parent epic merely because one child is complete. Verify closure and Project state.
+5. Put requirement/status changes and new tasks in GitHub. Keep repository architecture/specification docs
+   aligned with implemented behavior, and update roadmap issue links when scope changes.
+
+Project Priority is initialized from priority labels (or bug severity); keep them consistent during triage.
+The Project starts private to the organization. The CLI/API supports the configured views and filters;
+custom milestone grouping/sorting can be adjusted in the GitHub UI. Built-in Project workflows handle
+supported status transitions, but adding an unrelated new issue to the repository does not guarantee it
+is added to the Project. Add it explicitly, or as a sub-issue of an epic already in the Project.
+
+```bash
+gh issue list --repo squid-farm/talewright --state open --limit 100
+gh issue view 33 --repo squid-farm/talewright --comments
+gh project item-add 1 --owner squid-farm --url https://github.com/squid-farm/talewright/issues/33
+gh project field-list 1 --owner squid-farm
+```
+
+For new bugs include severity, reproduction, expected/actual behavior, and regression coverage.
+For features include scope, boundaries, acceptance criteria, dependencies, and an appropriate milestone
+or parent epic. Use native blockers/sub-issues where appropriate; cross-cutting epic references should
+link to the same issue, not duplicate it. New issues use GitHub numbers; do not allocate more local FR IDs.
+
+## Legacy bugs
+
+Fixed bugs were imported as closed issues, retaining their original resolution references.
+
+| Legacy ID | GitHub issue | Summary |
 |---|---|---|
-| Core reliability and release | [FR-025](#fr-025), [FR-026](#fr-026), [BUG-006](#bug-006), [BUG-008](#bug-008) | M2 release evidence and safe persistence; migration implementation remains M8 |
-| Scalable authoring and content organization | [FR-003](#fr-003), [FR-014](#fr-014), [FR-020](#fr-020), [FR-021](#fr-021), [FR-022](#fr-022), [FR-023](#fr-023), [FR-024](#fr-024) | Split content, shared analysis, CLI/editor workflow; spans M2/M3/M9 |
-| Player presentation and accessibility | [FR-001](#fr-001), [FR-004](#fr-004), [FR-005](#fr-005), [FR-009](#fr-009), [FR-010](#fr-010), [FR-011](#fr-011), [FR-015](#fr-015), [FR-016](#fr-016), [FR-017](#fr-017), [FR-027](#fr-027) | Understandable character/state views and author-controlled presentation; media retains M4 |
-| Ruleset and narrative expressiveness | [FR-002](#fr-002), [FR-008](#fr-008), [FR-012](#fr-012), [FR-028](#fr-028), [FR-029](#fr-029) | Relationships, grammar, alternative skill models, world/combat modules; retain each issue's scope |
-| Distribution and extensibility | [FR-006](#fr-006), [FR-007](#fr-007), [FR-018](#fr-018), [FR-030](#fr-030) | Packaging and host extension paths; custom JavaScript is not silently treated as a sandboxed plugin |
-| Session lifecycle and compatibility | [FR-013](#fr-013), [FR-019](#fr-019), [FR-026](#fr-026), [FR-031](#fr-031) | Runtime seams, rewind, persistence and migration; save safety in M2, conversion in M8 |
+| BUG-001 | [#1](https://github.com/squid-farm/talewright/issues/1) | Invalid stat ranges |
+| BUG-002 | [#2](https://github.com/squid-farm/talewright/issues/2) | Level-dependent trigger reevaluation |
+| BUG-003 | [#3](https://github.com/squid-farm/talewright/issues/3) | Duplicate trigger IDs |
+| BUG-004 | [#4](https://github.com/squid-farm/talewright/issues/4) | Expanded ZIP limits |
+| BUG-005 | [#5](https://github.com/squid-farm/talewright/issues/5) | Trigger cascade limit |
+| BUG-006 | [#6](https://github.com/squid-farm/talewright/issues/6) | Arithmetic overflow |
+| BUG-007 | [#7](https://github.com/squid-farm/talewright/issues/7) | Mutable ruleset collections |
+| BUG-008 | [#8](https://github.com/squid-farm/talewright/issues/8) | Comments auto-declare flags/variables |
 
-Cross-cutting issues can belong to multiple epics; this is not a request to duplicate them. Milestone
-assignment is independent of epic grouping. Unscheduled ideas stay discoverable in these epics until
-prioritized rather than being discarded from the plan.
+## Legacy feature requests
 
----
+| Legacy ID | GitHub issue | Summary |
+|---|---|---|
+| FR-001 | [#9](https://github.com/squid-farm/talewright/issues/9) | NPC character sheets |
+| FR-002 | [#10](https://github.com/squid-farm/talewright/issues/10) | NPC relationships |
+| FR-003 | [#11](https://github.com/squid-farm/talewright/issues/11) | Split story configuration |
+| FR-004 | [#12](https://github.com/squid-farm/talewright/issues/12) | Story window/tab title |
+| FR-005 | [#13](https://github.com/squid-farm/talewright/issues/13) | Theming |
+| FR-006 | [#14](https://github.com/squid-farm/talewright/issues/14) | Host JavaScript |
+| FR-007 | [#15](https://github.com/squid-farm/talewright/issues/15) | Publish without samples |
+| FR-008 | [#16](https://github.com/squid-farm/talewright/issues/16) | Grammar libraries |
+| FR-009 | [#17](https://github.com/squid-farm/talewright/issues/17) | Active modifier display |
+| FR-010 | [#18](https://github.com/squid-farm/talewright/issues/18) | Configurable sheet sections |
+| FR-011 | [#19](https://github.com/squid-farm/talewright/issues/19) | End-screen content |
+| FR-012 | [#20](https://github.com/squid-farm/talewright/issues/20) | Alternative skill model |
+| FR-013 | [#21](https://github.com/squid-farm/talewright/issues/21) | Runtime refactoring |
+| FR-014 | [#22](https://github.com/squid-farm/talewright/issues/22) | YAML reader refactoring |
+| FR-015 | [#23](https://github.com/squid-farm/talewright/issues/23) | Transcript/conversation flow |
+| FR-016 | [#24](https://github.com/squid-farm/talewright/issues/24) | Speaker colors |
+| FR-017 | [#25](https://github.com/squid-farm/talewright/issues/25) | Hide mechanical notes |
+| FR-018 | [#26](https://github.com/squid-farm/talewright/issues/26) | Precompiled story bundles |
+| FR-019 | [#27](https://github.com/squid-farm/talewright/issues/27) | Back/forward history |
+| FR-020 | [#28](https://github.com/squid-farm/talewright/issues/28) | CLI validation |
+| FR-021 | [#29](https://github.com/squid-farm/talewright/issues/29) | Shared partial analysis |
+| FR-022 | [#30](https://github.com/squid-farm/talewright/issues/30) | CLI lint |
+| FR-023 | [#31](https://github.com/squid-farm/talewright/issues/31) | LSP and VS Code |
+| FR-024 | [#32](https://github.com/squid-farm/talewright/issues/32) | Safe autofixes |
+| FR-025 | [#33](https://github.com/squid-farm/talewright/issues/33) | Production-readiness gates |
+| FR-026 | [#34](https://github.com/squid-farm/talewright/issues/34) | Save compatibility safeguards |
+| FR-027 | [#35](https://github.com/squid-farm/talewright/issues/35) | Images/media |
+| FR-028 | [#36](https://github.com/squid-farm/talewright/issues/36) | World simulation |
+| FR-029 | [#37](https://github.com/squid-farm/talewright/issues/37) | Combat |
+| FR-030 | [#38](https://github.com/squid-farm/talewright/issues/38) | Runtime plugins |
+| FR-031 | [#39](https://github.com/squid-farm/talewright/issues/39) | Save migration |
 
-## Templates
+## Additional roadmap deliverables
 
-```markdown
-### BUG-NNN
+These M2 items previously existed only in the roadmap. Their IDs were assigned during migration.
 
-**One-line summary.**
+| Migration ID | GitHub issue | Summary |
+|---|---|---|
+| FR-032 | [#40](https://github.com/squid-farm/talewright/issues/40) | Desktop/web save stores and player flows |
+| FR-033 | [#41](https://github.com/squid-farm/talewright/issues/41) | Standalone publishing |
+| FR-034 | [#42](https://github.com/squid-farm/talewright/issues/42) | C# packages and MSBuild |
+| FR-035 | [#43](https://github.com/squid-farm/talewright/issues/43) | Character creation |
+| FR-036 | [#44](https://github.com/squid-farm/talewright/issues/44) | Richer hubs/storylets |
 
-- **Severity:** S1 / S2 / S3
-- **Status:** open
-- **Area / location:** project, file, and line or member
-- **Source:** who found it
-- **What happens:** steps or input, expected vs actual
-- **Proposed fix:** (optional)
-- **Effort:** XS / S / M / L (optional)
-```
+## Epics
 
-```markdown
-### FR-NNN
+Native sub-issues have one parent. Cross-cutting membership is retained as related links in epic bodies.
 
-**One-line summary of what's missing or awkward.**
-
-- **Priority:** High / Medium / Low
-- **Status:** idea
-- **Target:** unscheduled
-- **Area:** project, file, or "authoring" / "syntax"
-- **Source:** who raised it
-- **Shortcoming:** what you tried to do and why the engine made it hard or impossible
-- **Ideas:** (optional) possible designs, workarounds in the meantime
-- **Effort:** XS / S / M / L (optional)
-```
+| Epic | GitHub parent issue |
+|---|---|
+| Core reliability and release | [#45](https://github.com/squid-farm/talewright/issues/45) |
+| Scalable authoring and content organization | [#46](https://github.com/squid-farm/talewright/issues/46) |
+| Player presentation and accessibility | [#47](https://github.com/squid-farm/talewright/issues/47) |
+| Ruleset and narrative expressiveness | [#48](https://github.com/squid-farm/talewright/issues/48) |
+| Distribution and extensibility | [#49](https://github.com/squid-farm/talewright/issues/49) |
+| Session lifecycle and compatibility | [#50](https://github.com/squid-farm/talewright/issues/50) |

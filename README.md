@@ -35,6 +35,14 @@ Dependencies, not milestone numbers alone, determine when independent work can s
 These commands and editor tools are planned, not available yet; they will share the compiler's analysis
 rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
 
+## Work tracking
+
+[GitHub Issues](https://github.com/squid-farm/talewright/issues) is the live backlog.
+Use the [Development Project](https://github.com/orgs/squid-farm/projects/1) for status/priority views and
+[milestones](https://github.com/squid-farm/talewright/milestones) for release targets.
+Before starting work, read the issue's blockers and parent, check existing claims/PRs, and claim it with an
+assignee and branch/worktree comment. See [the migration index and workflow](docs/ISSUES.md) for bot coordination.
+
 ## Layout
 
 | Path | What |
