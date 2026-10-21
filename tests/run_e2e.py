@@ -19,13 +19,28 @@ def run(command, **kwargs):
     subprocess.run(list(map(str, command)), cwd=ROOT, check=True, **kwargs)
 
 
+def verify_report(report):
+    if not report.is_file():
+        raise RuntimeError(f"No test report produced: {report}")
+    counters = ET.parse(report).find(".//{*}Counters")
+    if counters is None or int(counters.attrib["total"]) == 0:
+        raise RuntimeError("No tests ran; check --filter")
+
+
+def host_filter(host, selected):
+    scope = "Host!=Browser" if host == "linux" else "Host!=Linux"
+    return f"{scope}&({selected})" if selected else scope
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("suite", choices=["install-browsers", "web", "linux"])
     parser.add_argument("--browser", choices=["all", "chromium", "firefox", "webkit"], default="all")
     parser.add_argument("--probe", action="store_true", help="Linux accessibility feasibility gate only")
-    parser.add_argument("--filter", help="dotnet test filter (web) or unittest name substring (Linux)")
+    parser.add_argument("--filter", help="dotnet test filter (both hosts)")
     args = parser.parse_args()
+    if args.probe and (args.suite != "linux" or args.filter):
+        parser.error("--probe is Linux-only and cannot be combined with --filter")
     results = ROOT / "artifacts/test-results"
     results.mkdir(parents=True, exist_ok=True)
     if args.suite in ("web", "install-browsers"):
@@ -39,12 +54,11 @@ def main():
             run(["dotnet", "publish", "src/Talewright.Host.Web", "-c", "Release", "-o", temporary])
             failed = []
             for browser in browsers:
-                environment = dict(os.environ, BROWSER=browser, TALEWRIGHT_WEB_ROOT=str(Path(temporary) / "wwwroot"),
+                environment = dict(os.environ, TALEWRIGHT_TARGET="web", BROWSER=browser, TALEWRIGHT_WEB_ROOT=str(Path(temporary) / "wwwroot"),
                                    TALEWRIGHT_TEST_RESULTS=str(results))
                 command = ["dotnet", "test", PROJECT, "-c", "Release", "--no-build",
-                           "--logger", f"trx;LogFileName={browser}.trx", "--results-directory", results]
-                if args.filter:
-                    command += ["--filter", args.filter]
+                           "--logger", f"trx;LogFileName={browser}.trx", "--results-directory", results,
+                           "--filter", host_filter("web", args.filter)]
                 report = results / f"{browser}.trx"
                 report.unlink(missing_ok=True)
                 try:
@@ -52,11 +66,7 @@ def main():
                 except subprocess.CalledProcessError:
                     failed.append(browser)
                     continue
-                if not report.is_file():
-                    raise RuntimeError(f"Browser {browser} produced no test report")
-                counters = ET.parse(report).find(".//{*}Counters")
-                if counters is None or int(counters.attrib["total"]) == 0:
-                    raise RuntimeError(f"Browser {browser} ran no tests; check --filter")
+                verify_report(report)
             if failed:
                 print("Failed browsers:", ", ".join(failed), file=sys.stderr)
                 return 1
@@ -67,27 +77,35 @@ def main():
     if os.geteuid() == 0:
         parser.error("Run the native suite as an unprivileged user; do not disable the WebKit sandbox.")
     run(["dotnet", "build", "src/Talewright.Host.Desktop", "-c", "Release"])
+    run(["dotnet", "build", PROJECT, "-c", "Release"])
     with tempfile.TemporaryDirectory(prefix="talewright-native-") as temporary:
         temporary = Path(temporary)
-        fixtures = temporary / "fixtures"
-        run(["dotnet", "run", "--project", "tests/Talewright.TestStories", "-c", "Release", "--", fixtures])
         environment = dict(os.environ, GTK_MODULES="gail:atk-bridge", GIO_USE_VFS="local",
-                           GIO_USE_VOLUME_MONITOR="unix")
+                           GIO_USE_VOLUME_MONITOR="unix", TALEWRIGHT_TARGET="linux",
+                           TALEWRIGHT_TEST_RESULTS=str(results),
+                           TALEWRIGHT_DESKTOP_EXECUTABLE=str(ROOT / "src/Talewright.Host.Desktop/bin/Release/net10.0/Talewright.Host.Desktop.dll"))
         for variable, child in [("XDG_CONFIG_HOME", "config"), ("XDG_CACHE_HOME", "cache"),
                                 ("XDG_DATA_HOME", "data"), ("XDG_RUNTIME_DIR", "runtime")]:
             directory = temporary / child
             directory.mkdir(mode=0o700)
             environment[variable] = str(directory)
+        # Pin GTK settings instead of inheriting distro overrides: the upstream file chooser default
+        # (startup-mode=recent) ignores a typed location when Open is activated.
+        environment["GSETTINGS_BACKEND"] = "keyfile"
+        settings = temporary / "config/glib-2.0/settings"
+        settings.mkdir(parents=True)
+        (settings / "keyfile").write_text("[org/gtk/settings/file-chooser]\nstartup-mode='cwd'\n")
         run(["dpkg-query", "-W", "libwebkit2gtk-4.1-0", "python3-pyatspi", "at-spi2-core", "xfwm4"])
         command = ["xvfb-run", "-a", "-s", "-screen 0 1440x1000x24", "dbus-run-session", "--",
-                   "/usr/bin/python3", ROOT / "tests/native/player_tests.py",
-                   "--executable", ROOT / "src/Talewright.Host.Desktop/bin/Release/net10.0/Talewright.Host.Desktop.dll",
-                   "--fixtures", fixtures, "--output", results / "linux"]
-        if args.probe:
-            command.append("--probe")
-        if args.filter:
-            command += ["--filter", args.filter]
+                   "/usr/bin/python3", ROOT / "tests/native/atspi_adapter.py", "session",
+                   "--output", results / "linux", "--",
+                   "dotnet", "test", PROJECT, "-c", "Release", "--no-build",
+                   "--logger", "trx;LogFileName=linux.trx", "--results-directory", results,
+                   "--filter", host_filter("linux", "Category=Probe" if args.probe else args.filter)]
+        report = results / "linux.trx"
+        report.unlink(missing_ok=True)
         run(command, env=environment)
+        verify_report(report)
     return 0
 
 

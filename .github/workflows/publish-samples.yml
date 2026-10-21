@@ -38,7 +38,7 @@ jobs:
           TALEWRIGHT_TEST_RESULTS: ${{ github.workspace }}/artifacts/test-results/pages
         run: |
           dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build \
-            --filter FullyQualifiedName~Bundled_sample_opens_without_a_sample_specific_route \
+            --filter FullyQualifiedName~Bundled_sample_assets_work_when_served_at_the_selected_base_path \
             --logger 'trx;LogFileName=pages.trx' --results-directory artifacts/test-results/pages
           python3 - <<'PY'
           import xml.etree.ElementTree as ET

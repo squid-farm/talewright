@@ -27,6 +27,16 @@ public sealed class WebHostFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        if (PlayerTarget.Name is not ("web" or "linux"))
+        {
+            throw new InvalidOperationException($"Unknown TALEWRIGHT_TARGET '{PlayerTarget.Name}'.");
+        }
+
+        if (PlayerTarget.IsDesktop)
+        {
+            return;
+        }
+
         var path = Environment.GetEnvironmentVariable("TALEWRIGHT_WEB_BASE_PATH") ?? "";
         var basePath = path.TrimEnd('/');
         if (basePath.Length > 0 && (!basePath.StartsWith('/') || basePath.Contains("..")))

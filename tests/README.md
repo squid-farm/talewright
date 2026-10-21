@@ -9,6 +9,21 @@ dotnet test
 The root solution includes compiler, runtime, rules, narrative, and core tests. It does **not** discover UI
 tests or require downloaded browsers. `Talewright.E2E.slnx` is a separate, opt-in solution in this directory.
 
+## One test-authoring surface
+
+All player E2E cases and assertions live in **C#/xUnit** in `Talewright.Player.E2E.Tests`.
+Shared behavior tests use `IPlayerDriver`: Playwright drives Chromium, Firefox, and WebKit, while a
+thin Python AT-SPI adapter drives the actual Linux Photino window. The adapter contains native UI
+actions, observations, process cleanup, and evidence capture only: no test discovery, story scenarios,
+expected values, assertions, or separate test-report format.
+
+Use the same xUnit assertions, fixture definitions, and `dotnet test --filter` syntax for both hosts.
+DOM/CSS/media checks are explicitly marked `Host=Browser`; CLI/host checks are marked `Host=Linux`.
+The runner excludes the other host's cases and combines that scope with your filter. Shared cases have
+neither host trait and run on both. Native execution initializes neither Playwright nor a web server.
+Browser observations read the DOM in one synchronous snapshot so an upload or library transition cannot
+remove controls between a presence check and a text read. A driver regression exercises rapid replacements.
+
 ## CI and deployment checks
 
 The Build workflow calls the reusable Tests workflow once per run. Tests retains
@@ -43,7 +58,7 @@ python3 .github/scripts/publish_samples.py --base-path /talewright --output arti
 BROWSER=chromium TALEWRIGHT_WEB_ROOT="$PWD/artifacts/pages/wwwroot" \
   TALEWRIGHT_WEB_BASE_PATH=/talewright TALEWRIGHT_TEST_RESULTS="$PWD/artifacts/test-results/pages" \
   dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build \
-  --filter FullyQualifiedName~Bundled_sample_opens_without_a_sample_specific_route
+  --filter FullyQualifiedName~Bundled_sample_assets_work_when_served_at_the_selected_base_path
 ```
 
 The fixture serves only the selected path, rejecting root requests outside it.
@@ -77,7 +92,7 @@ To run directly against an existing published output:
 ```bash
 dotnet publish src/Talewright.Host.Web -c Release -o artifacts/web
 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/web/wwwroot" BROWSER=webkit \
-  dotnet test tests/Talewright.Player.E2E.Tests
+  dotnet test tests/Talewright.Player.E2E.Tests --filter 'Host!=Linux'
 ```
 
 Use the helper for the normal path; direct invocation requires the matching browser binaries to be installed.
@@ -94,9 +109,12 @@ banner fail a test. Expected bad-story errors must appear in the player UI, not 
 ## Real Linux desktop tests
 
 This suite launches **Photino itself** and drives the installed WebKitGTK accessibility tree, not a browser
-substitute. It uses the distro's Python AT-SPI bindings directly; dogtail is not needed.
+substitute. The same C#/xUnit project uses the distro's Python AT-SPI bindings as a command adapter;
+dogtail and Selenium are not needed.
 
-Supported CI environment: Ubuntu 24.04, distro WebKitGTK 4.1, .NET 10, system Python 3, GTK 3, Xvfb, and AT-SPI.
+The current target is the Linux development machine: Ubuntu 24.04, distro WebKitGTK 4.1, .NET 10,
+system Python 3, GTK 3, Xvfb, and AT-SPI. Windows is tested manually; cross-platform native automation
+is not a prerequisite. GitHub Actions integration is separate from this test-authoring retrofit.
 The distro's security-updated WebKitGTK is intentionally not frozen at a vulnerable package patch version;
 the runner prints the installed versions for diagnosis.
 
@@ -108,21 +126,35 @@ sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify4 libgtk-3-0t64 \
 # Run as your ordinary user, not root.
 python3 tests/run_e2e.py linux --probe
 python3 tests/run_e2e.py linux
-python3 tests/run_e2e.py linux --filter test_scenario_gates
+python3 tests/run_e2e.py linux --filter FullyQualifiedName~PlayerBehaviorTests
+python3 tests/run_e2e.py linux --filter 'FullyQualifiedName~Explicit_story_scenario'
 ```
 
-The runner builds the production desktop host, exports the C# stories to a temporary directory, and starts
+The runner builds the production desktop host and the same C# test project, and starts
 a private Xvfb/D-Bus/accessibility session and Xfwm4 window manager, with isolated XDG
 configuration/cache/data/runtime directories.
+GSettings use the isolated keyfile backend with the GTK file chooser pinned to `startup-mode='cwd'`.
+Distributions differ here (Linux Mint overrides it to `cwd`; Ubuntu keeps the upstream `recent` default),
+and in Recent mode GTK ignores a typed location when Open is activated.
 It uses `/usr/bin/python3` so a Python virtualenv does not hide the distro's GI/AT-SPI bindings.
+Each case generates its own ZIP bytes or CLI directory directly from the C# fixtures, starts a fresh
+Photino process through a JSON-lines adapter, and removes its temporary story files on disposal.
 Tests locate controls by accessible roles/names and activate actions or actual keyboard events; no OCR or
-coordinate-based clicking is used. All native cases run serially. App logs, accessibility-tree dumps,
-screenshots, and a JUnit-style XML report are retained under `artifacts/test-results/linux/`.
+coordinate-based clicking is used. Archive selection invokes the GTK location entry's own accessible
+activation action (rather than sending Enter to the globally focused window) and waits
+for the chooser to close; accepting an AT-SPI action alone does not mean GTK opened the selected file.
+All native cases run serially. App logs, accessibility-tree dumps,
+screenshots, and adapter logs are retained under `artifacts/test-results/linux/<case-id>/`.
+Both hosts produce xUnit results in TRX: `artifacts/test-results/linux.trx` for the native run.
+The xUnit output associates each result with its evidence directory. Old Python unittest filter names
+are no longer supported; use the same .NET filter syntax shown above.
 
 The feasibility probe checks bundled-story opening, choice activation, latest-passage focus, character-sheet
 exposure, and the real native file chooser. Missing prerequisites, inaccessible controls, or unmatched
 native test filters fail explicitly. Neither the native runner nor the browser suite silently skips a
 missing engine. The WebKit sandbox is not disabled.
+CI runs this probe before the full native suite so a broken chooser fails once instead of timing out
+separately in every upload-dependent scenario.
 
 ## Stable, programmatically supplied stories
 
@@ -144,9 +176,9 @@ the ZIP through the normal file input; native tests open the same bytes/folders 
 native chooser; runtime tests compile the source directly. Product assemblies never reference this project.
 
 `PlayerScenario` describes a short sequence of user choices with **explicit**, independently written expected
-passage text, choices, sheet content, and terminal state. The native runner consumes the same exported
-scenario data, so maintaining the fixture does not require rewriting it in Python. Host-specific tests remain
-in their respective runners rather than extending this into a general testing DSL.
+passage text, choices, sheet content, and terminal state. One C# test executes those steps against either
+driver. Host-specific cases and all expectations stay in that same xUnit project rather than extending
+this into a general testing DSL or introducing Python tests.
 
 To inspect generated files deliberately:
 
@@ -155,7 +187,7 @@ dotnet run --project tests/Talewright.TestStories -- /tmp/my-talewright-test-sto
 ```
 
 That command leaves the requested directory for inspection; the normal E2E helpers create and clean their
-own temporary exports. Do not commit generated files. For deterministic checks, prefer `randomness: off`
+own temporary files directly. Do not commit generated files. For deterministic checks, prefer `randomness: off`
 and deliberate DCs. A dedicated seeded fixture tests replay; no test retries until a preferred roll occurs.
 
 ## Coverage and boundaries
@@ -188,7 +220,7 @@ library implementations.
 
 ## Other desktop platforms
 
-- **Windows / WebView2:** Playwright supports attachment through CDP. A future Windows fixture can launch
+- **Windows / WebView2 (manual for now):** Playwright supports attachment through CDP. A future Windows fixture can launch
   Photino with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<owned-port>` and an isolated
   `WEBVIEW2_USER_DATA_FOLDER`, then use `Chromium.ConnectOverCDPAsync`. Verify Photino startup/readiness,
   profile isolation, native chooser coverage, and process cleanup on Windows before claiming this coverage.

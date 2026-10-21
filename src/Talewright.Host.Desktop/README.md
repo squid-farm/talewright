@@ -32,8 +32,10 @@ Not done in M1. `dotnet publish -c Release -r <rid> --self-contained` produces a
 
 `python3 tests/run_e2e.py linux --probe` verifies accessibility and the native chooser;
 `python3 tests/run_e2e.py linux` runs the shared story scenarios and desktop-specific file/startup tests.
-The runner drives this actual Photino host through AT-SPI in an isolated Xvfb/D-Bus session. It needs
-additional distro accessibility packages and runs as an ordinary user.
+The same C#/xUnit project used for browser tests drives this actual Photino host through a thin AT-SPI
+command adapter in an isolated Xvfb/D-Bus session. All scenarios and assertions are authored in C#;
+Python only bridges native actions/observations. It needs additional distro accessibility packages and
+runs as an ordinary user. Linux development-machine coverage is the current target; Windows remains manual.
 
 The Linux app **can be automated**: the suite above does so using the distro's AT-SPI dependencies.
 Playwright itself has no supported direct attachment to Photino's embedded WebKitGTK view.

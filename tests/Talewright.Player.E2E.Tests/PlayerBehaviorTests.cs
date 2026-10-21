@@ -29,6 +29,19 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     [Fact]
     public async Task Bundled_sample_opens_without_a_sample_specific_route()
     {
+        await Driver.OpenBundledAsync();
+        await AssertState(state =>
+        {
+            Assert.True(state.PassageVisible);
+            Assert.NotEmpty(state.Passage);
+            Assert.NotEmpty(state.Sheet);
+        });
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Bundled_sample_assets_work_when_served_at_the_selected_base_path()
+    {
         await Page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
         await Expect(Latest).ToBeVisibleAsync();
         Assert.NotEmpty(await Latest.InnerTextAsync());
@@ -39,6 +52,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
     public async Task Transcript_formats_prose_and_preserves_previous_frames()
     {
         await Upload(TestStories.Linear);
@@ -69,30 +83,35 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Collect supplies");
         await Choose("Continue");
         await Library();
-        await Expect(Latest).ToBeHiddenAsync();
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Back to Player Test Continue where you left off" }).ClickAsync();
-        await Expect(Latest).ToContainTextAsync("Inventory: ready.");
-        await Expect(Sheet).ToContainTextAsync("Test charm");
-        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(2);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true }).ClickAsync();
-        await Expect(Latest).ToContainTextAsync("Inventory: empty.");
-        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(0);
-        await Expect(Sheet).Not.ToContainTextAsync("Test charm");
+        await AssertState(state => Assert.False(state.PassageVisible));
+        await Driver.ClickAsync("Back to Player Test Continue where you left off");
+        await Observe(new(null, "Inventory: ready.", Sheet: ["Test charm"]));
+        await AssertState(state => Assert.Contains("Collect supplies", state.Transcript));
+        await Driver.ClickAsync("Restart");
+        await Observe(new(null, "Inventory: empty."));
+        await AssertState(state =>
+        {
+            Assert.DoesNotContain("Test charm", state.Sheet);
+            Assert.DoesNotContain("Continue", state.Transcript);
+        });
         await Library();
         await Upload(TestStories.Custom);
-        await Expect(Latest).ToContainTextAsync("Alex's quiet story.");
-        await Expect(Sheet).Not.ToContainTextAsync("Mara");
-        await Expect(Sheet).Not.ToContainTextAsync("Attributes");
-        await Expect(Sheet).Not.ToContainTextAsync("Standing");
+        await Observe(new(null, "Alex's quiet story."));
+        await AssertState(state =>
+        {
+            Assert.DoesNotContain("Mara", state.Sheet);
+            Assert.DoesNotContain("Attributes", state.Sheet);
+            Assert.DoesNotContain("Standing", state.Sheet);
+        });
         await Choose("Make a friend");
         await Library();
         await Upload(TestStories.Custom);
-        await Expect(Latest).ToContainTextAsync("Alex's quiet story.");
-        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(0);
-        await Expect(Sheet.Locator("dd")).ToHaveTextAsync("3");
+        await Observe(new(null, "Alex's quiet story.", Sheet: ["3"]));
+        await AssertState(state => Assert.DoesNotContain("Friendship grows.", state.Transcript));
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
     public async Task Sheet_shows_exact_values_modifiers_and_removal()
     {
         await Upload(TestStories.Gates);
@@ -119,14 +138,16 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     {
         await Upload(TestStories.Seeded);
         await Choose("Roll once");
-        var note = await Latest.Locator(".tw-note-check").InnerTextAsync();
-        Assert.Contains("Athletics check:", note);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true }).ClickAsync();
+        await Observe(new(null, "Athletics check:"));
+        var note = (await Driver.ObserveAsync()).Passage;
+        await Driver.ClickAsync("Restart");
+        await Observe(new(null, "", ["Roll once"]));
         await Choose("Roll once");
-        await Expect(Latest.Locator(".tw-note-check")).ToHaveTextAsync(note);
+        await AssertState(state => Assert.Equal(note, state.Passage));
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
     public async Task Story_markup_does_not_execute_scripts()
     {
         await Upload(TestStories.Unicode);

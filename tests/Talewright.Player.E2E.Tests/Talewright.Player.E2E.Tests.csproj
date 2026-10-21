@@ -12,4 +12,7 @@
     <ProjectReference Include="../Talewright.TestStories/Talewright.TestStories.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../native/atspi_adapter.py" Link="native/atspi_adapter.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

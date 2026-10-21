@@ -18,9 +18,9 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         files[prefix + "chapters/main.tale"] = "=== start\nFirst file.\n-> finish";
         files[prefix + "chapters/ending.tale"] = "=== finish\nSecond file.\n-> END";
         await UploadBytes("multi.zip", TestArchives.Create(files));
-        await Expect(Latest).ToContainTextAsync("First file.");
+        await Observe(new(null, "First file."));
         await Choose("Continue");
-        await Expect(Latest).ToContainTextAsync("Second file.");
+        await Observe(new(null, "Second file."));
     }
 
     [Theory]
@@ -31,18 +31,19 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         await Choose("Walk onward");
         await Library();
         await UploadBytes(kind + ".zip", TestArchives.Invalid(kind));
-        await Expect(Page.Locator(".tw-library")).ToContainTextAsync(error);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Back to Player Test Continue where you left off" }).ClickAsync();
-        await Expect(Latest).ToContainTextAsync("Second passage text.");
-        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(1);
+        await AssertState(state => Assert.Contains(error, state.Library));
+        await Driver.ClickAsync("Back to Player Test Continue where you left off");
+        await Observe(new(null, "Second passage text."));
+        await AssertState(state => Assert.Contains("First passage", state.Transcript));
         await Library();
         await Upload(TestStories.Custom);
-        await Expect(Latest).ToContainTextAsync("Alex's quiet story.");
+        await Observe(new(null, "Alex's quiet story."));
         await Library();
-        await Expect(Page.Locator(".tw-error, .tw-diagnostic")).ToHaveCountAsync(0);
+        await AssertState(state => Assert.DoesNotContain(error, state.Library));
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
     public async Task Compiler_diagnostics_include_file_line_column_and_code()
     {
         await UploadBytes("broken.zip", TestArchives.Invalid("tale"));
@@ -64,7 +65,6 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         var bytes = TestArchives.AtUploadLimit();
         Assert.Equal(20 * 1024 * 1024, bytes.Length);
         await UploadBytes("at-limit.zip", bytes);
-        await Expect(Latest).ToContainTextAsync("First passage");
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
+        await Observe(new(null, "First passage"));
     }
 }
