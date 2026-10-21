@@ -1,5 +1,10 @@
 # Talewright
 
+<img width="1408" height="768" alt="image_3ab69b7a" src="https://github.com/user-attachments/assets/7bb26ecc-f688-4b54-98b3-85eb6fa67bcc" />
+
+**DISCLAIMER:** All art is AI generated for now. If this sees success, and it works well for me while I'm dogfooding it, I will work with a real artist to get something one of a kind that our AI overlords haven't ripped off of thousands of artists. This I solemnly swear
+
+
 A C#/.NET engine for **stat-driven, massively branching, text-first RPG visual novels**: on-rails
 tabletop-style stories now, open-world later. Runs on the desktop (Photino) and the web (Blazor WebAssembly).
 
