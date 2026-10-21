@@ -10,4 +10,7 @@
     <ProjectReference Include="../Story/Story.csproj" />
     <SupportedPlatform Include="browser" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

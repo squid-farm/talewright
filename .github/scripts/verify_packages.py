@@ -239,6 +239,9 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         for host in ["Web", "Desktop"]:
             subprocess.run(["dotnet", "build", str(example / host), "-c", "Release",
                             f"-p:TalewrightVersion={version}"], cwd=root, env=environment, check=True)
+        shell = example / "Desktop/bin/Release/net10.0/wwwroot/index.html"
+        if not shell.is_file() or shell.read_bytes() != (example / "Desktop/wwwroot/index.html").read_bytes():
+            raise ValueError("Desktop example did not copy its shell page into the executable output")
         tale = example / "Story/Content/main.tale"
         tale.write_text("=== beginning\n-> missing\n")
         invalid = subprocess.run(["dotnet", "build", str(example / "Web"), "-c", "Release",
