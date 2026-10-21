@@ -42,4 +42,22 @@ Full description in [ARCHITECTURE.md §5](../../docs/ARCHITECTURE.md#5-the-engin
 | `continue` (`StorySession.ContinueKey`) | the synthetic Continue after an entry check or before a divert |
 
 Keys are stable for a given story version, so **seed + list of keys** reproduces a playthrough. That's the
-planned save format (M2).
+save/replay contract.
+
+## History and saves
+
+`StoryHistory` starts a session and owns its transcript and choice history. `Choose`, `Back`, and `Forward`
+maintain a linear undo/redo cursor; choosing after Back discards redo. Rebuilding fresh sessions restores
+trigger edge state and deterministic dice, not just event-backed state. Manifest `undo: false` disables
+navigation, not persistence.
+
+`Save()` returns bounded UTF-8 JSON bytes. `StoryHistory.Restore(story, bytes)` creates and validates a
+separate candidate, including redo choices. Only replace an active history after this succeeds.
+The v1 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices and cursor.
+The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
+unsupported formats and incompatible stories fail explicitly. No migration is attempted.
+
+Built-in compiler options provide a compatibility identity. Custom C# hosts must set
+`CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;
+otherwise saving is disabled. Extensions must themselves be deterministic. A matching source fingerprint
+cannot prove an arbitrary delegate is deterministic.

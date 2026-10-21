@@ -5,6 +5,9 @@ using Talewright.Rules.Triggers;
 using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
 using Talewright.Tale.Parsing;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Talewright.Tale.Compilation;
 
@@ -126,6 +129,8 @@ public static class StoryCompiler
             Id = manifest.Id,
             Title = manifest.Title,
             Version = manifest.Version,
+            ContentFingerprint = Fingerprint(source, options.CompatibilityId),
+            UndoEnabled = manifest.UndoEnabled,
             Start = new SceneId(manifest.Start),
             Randomness = manifest.Randomness,
             Seed = manifest.Seed,
@@ -135,6 +140,34 @@ public static class StoryCompiler
             Predicates = options.Predicates,
         };
         return new CompilationResult(story, diagnostics.Items);
+    }
+
+    private static string? Fingerprint(StorySource source, string? compatibilityId)
+    {
+        if (string.IsNullOrWhiteSpace(compatibilityId))
+        {
+            return null;
+        }
+
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        void Append(string text)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+            Span<byte> length = stackalloc byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+            hash.AppendData(length);
+            hash.AppendData(bytes);
+        }
+
+        Append("talewright-replay-v1");
+        Append(compatibilityId);
+        foreach (var (path, text) in source.Files.OrderBy(f => f.Key, StringComparer.Ordinal))
+        {
+            Append(path);
+            Append(text);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
 
 }

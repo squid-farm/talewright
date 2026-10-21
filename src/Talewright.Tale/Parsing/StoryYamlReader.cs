@@ -23,6 +23,7 @@ internal sealed class StoryManifest
     public SourceLocation StartLocation { get; set; }
     public RandomnessMode Randomness { get; set; } = RandomnessMode.ChecksOnly;
     public ulong? Seed { get; set; }
+    public bool UndoEnabled { get; set; } = true;
     public required WorldDefinition World { get; init; }
     public List<RawTrigger> Triggers { get; } = [];
 
@@ -71,7 +72,7 @@ internal sealed class StoryYamlReader
             return null;
         }
 
-        CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
+        CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "undo", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
 
         var ruleset = ReadRuleset(Get(root, "ruleset"));
         var items = ReadItems(Get(root, "items"), ruleset);
@@ -105,6 +106,13 @@ internal sealed class StoryYamlReader
             manifest.Seed = ulong.TryParse(Scalar(seed), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
                 ? value
                 : Error<ulong?>(seed, "TW4003", "seed must be a non-negative whole number.", null);
+        }
+
+        if (Get(root, "undo") is { } undo)
+        {
+            manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
+                ? enabled
+                : Error(undo, "TW4003", "undo must be true or false.", true);
         }
 
         ReadTriggers(Get(root, "triggers"), manifest.Triggers);

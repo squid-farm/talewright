@@ -18,6 +18,7 @@ version: 0.1.0
 start: camp.arrival # first scene id
 randomness: checks-only # off | checks-only (default)
 seed: 1234 # optional; omitted = random per playthrough
+undo: true # default; false hides Back/Forward without disabling saves
 
 ruleset:
   base: generic # generic | none

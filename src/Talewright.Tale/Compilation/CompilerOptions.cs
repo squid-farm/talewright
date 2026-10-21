@@ -14,7 +14,13 @@ namespace Talewright.Tale.Compilation;
 public sealed class CompilerOptions
 {
     /// <summary>Options with the built-in modifiers and the <c>generic</c> and <c>none</c> rulesets.</summary>
-    public static CompilerOptions Default => new();
+    public static CompilerOptions Default => new() { CompatibilityId = "talewright-builtins-v1" };
+
+    /// <summary>
+    /// Stable version of explicitly registered extensions for deterministic saves. Change it when extension
+    /// behavior changes. Null disables saves; custom C# hosts must opt in with their own identity.
+    /// </summary>
+    public string? CompatibilityId { get; init; }
 
     /// <summary>Predicates usable as <c>@Name</c> in expressions.</summary>
     public NamedPredicateRegistry Predicates { get; init; } = NamedPredicateRegistry.Empty;
