@@ -1,8 +1,14 @@
 # Talewright.Player — the shared Blazor UI
 
 A Razor Class Library containing the whole user interface. Both hosts render a single component,
-`<TalewrightApp />`, so desktop and web are identical. It depends only on `Talewright.Runtime` (and through it
-the compiler); it never reaches into rules or state internals beyond the read-only `IGameStateView`.
+`<TalewrightApp />`, so desktop and web are identical. Its source dependency remains
+`Talewright.Runtime`; its NuGet dependency is the `Talewright` packaging shell.
+It uses the Runtime namespace and the read-only `IGameStateView`,
+not engine implementation internals.
+
+For C# customization, installing only `Talewright.Player` restores the engine automatically.
+This is a Razor UI library, not an executable host. Ordinary story authors need neither package.
+See [registry setup](../../README.md#c-customization-packages).
 
 ## Components (`Components/`)
 
@@ -37,7 +43,9 @@ one below 52rem.
 
 ## Not here yet
 
-Saves/loading (M2), character creation (M2), images (M3), settings (text size, theme picker).
+Saves/loading with compatibility safeguards (M2), character creation (M2), images (M4: Presentation),
+settings (text size, theme picker; unscheduled). Core release verification takes precedence over new
+presentation features; see [the roadmap](../../docs/PLAN.md#core-production-readiness-gates-m2).
 
 ## Regression testing
 

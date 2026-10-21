@@ -110,7 +110,9 @@ class Desktop:
                 and node.getState().contains(pyatspi.STATE_EDITABLE)
                 and node.getState().contains(pyatspi.STATE_FOCUSED)), None)
         self.wait(location, "editable file chooser location").queryEditableText().setTextContents(path)
-        self.click(name="Open", role="push button")
+        # GTK resolves the location asynchronously; entry activation handles that pending selection.
+        self.key("Return")
+        self.wait(lambda: self.find(role="file chooser") is None, "file chooser accepts selected archive")
 
     def snapshot(self):
         root = self.root()

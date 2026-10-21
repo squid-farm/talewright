@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>The Blazor player for Talewright, including the headless engine as a dependency.</Description>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -16,7 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Talewright.Runtime\Talewright.Runtime.csproj" />
+    <ProjectReference Include="..\Talewright.Runtime\Talewright.Runtime.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Talewright\Talewright.csproj" />
   </ItemGroup>
 
 </Project>

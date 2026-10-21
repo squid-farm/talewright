@@ -40,6 +40,19 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Bundled_sample_assets_work_when_served_at_the_selected_base_path()
+    {
+        await Page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
+        await Expect(Latest).ToBeVisibleAsync();
+        Assert.NotEmpty(await Latest.InnerTextAsync());
+        await Expect(Sheet).ToBeVisibleAsync();
+        await Expect(Page.Locator(".tw-columns")).ToHaveCSSAsync("display", "grid");
+        await Choices.First.ClickAsync();
+        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(1);
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Transcript_formats_prose_and_preserves_previous_frames()
     {
         await Upload(TestStories.Linear);

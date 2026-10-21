@@ -24,6 +24,48 @@ neither host trait and run on both. Native execution initializes neither Playwri
 Browser observations read the DOM in one synchronous snapshot so an upload or library transition cannot
 remove controls between a presence check and a text read. A driver regression exercises rapid replacements.
 
+## CI and deployment checks
+
+The Build workflow calls the reusable Tests workflow once per run. Tests retains
+unit, Chromium, Firefox, WebKit, and real Linux Photino jobs on Ubuntu 24.04.
+Each job uploads its reports/evidence even on failure. Both Build (including
+package verification) and Tests must pass before any publishing job.
+
+Test projects retain their original project references and suite boundaries.
+The `src/Talewright/Talewright.csproj` packaging shell bundles the six headless
+assemblies without moving their source or merging their projects. The engine package has no Blazor
+dependency. CI packs exactly `Talewright` and `Talewright.Player`, then restores
+and builds isolated engine-only and Razor consumers using a fresh package cache.
+This checks real package references, the Player's transitive engine dependency,
+and its CSS/JavaScript assets, not just project-reference builds.
+
+```bash
+python3 -m unittest discover -s tests -p 'test_ci.py' -v
+dotnet build Talewright.slnx -c Release -p:Version=0.1.0-preview.1
+dotnet pack Talewright.slnx -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+python3 .github/scripts/verify_packages.py artifacts/packages 0.1.0-preview.1 --smoke
+```
+
+Use a fresh output directory when changing package versions: verification rejects
+unexpected/duplicate packages instead of accidentally publishing stale files.
+
+Pages publishing also checks the real static output under the configured base
+path. To reproduce a project-subpath deployment after installing Chromium:
+
+```bash
+python3 tests/run_e2e.py install-browsers --browser chromium
+python3 .github/scripts/publish_samples.py --base-path /talewright --output artifacts/pages
+BROWSER=chromium TALEWRIGHT_WEB_ROOT="$PWD/artifacts/pages/wwwroot" \
+  TALEWRIGHT_WEB_BASE_PATH=/talewright TALEWRIGHT_TEST_RESULTS="$PWD/artifacts/test-results/pages" \
+  dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build \
+  --filter FullyQualifiedName~Bundled_sample_assets_work_when_served_at_the_selected_base_path
+```
+
+The fixture serves only the selected path, rejecting root requests outside it.
+The check opens a bundled sample, verifies Player styling, and activates a choice;
+resource/console errors fail it. No sample-specific plot text or route is asserted.
+Without `TALEWRIGHT_WEB_BASE_PATH`, ordinary root-hosted browser tests are unchanged.
+
 ## Browser player tests
 
 Requires the .NET 10 SDK and Python 3. No Node/npm project or PowerShell installation is needed.
@@ -95,7 +137,9 @@ It uses `/usr/bin/python3` so a Python virtualenv does not hide the distro's GI/
 Each case generates its own ZIP bytes or CLI directory directly from the C# fixtures, starts a fresh
 Photino process through a JSON-lines adapter, and removes its temporary story files on disposal.
 Tests locate controls by accessible roles/names and activate actions or actual keyboard events; no OCR or
-coordinate-based clicking is used. All native cases run serially. App logs, accessibility-tree dumps,
+coordinate-based clicking is used. Archive selection activates the focused GTK location entry and waits
+for the chooser to close; accepting an AT-SPI action alone does not mean GTK opened the selected file.
+All native cases run serially. App logs, accessibility-tree dumps,
 screenshots, and adapter logs are retained under `artifacts/test-results/linux/<case-id>/`.
 Both hosts produce xUnit results in TRX: `artifacts/test-results/linux.trx` for the native run.
 The xUnit output associates each result with its evidence directory. Old Python unittest filter names

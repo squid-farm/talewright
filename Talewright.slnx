@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Talewright/Talewright.csproj" />
     <Project Path="src/Talewright.Core/Talewright.Core.csproj" />
     <Project Path="src/Talewright.Host.Desktop/Talewright.Host.Desktop.csproj" />
     <Project Path="src/Talewright.Host.Web/Talewright.Host.Web.csproj" />
