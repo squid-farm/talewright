@@ -225,7 +225,7 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
     "pass your own options".
-  - `StoryCompiler`: orchestrates. Order: read `story.yaml` → build ruleset and `WorldDefinition` → pre-scan
+  - `StoryCompiler`: orchestrates. Order: read `story.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
     every `.tale` for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
     validate → assemble `StoryDefinition`. Any error ⇒ `Story` is null.
   - `StoryValidator`: whole-story checks after parsing: start scene exists, dead ends, fall-through with nowhere

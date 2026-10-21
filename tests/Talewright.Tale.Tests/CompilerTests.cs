@@ -119,6 +119,73 @@ public class CompilerTests
         Assert.Equal(new BinaryExpr(BinaryOp.GreaterOrEqual, new StatRef(EntityId.Player, new StatId("dex")), new NumberLiteral(12)), scene.Requires);
     }
 
+    [Theory]
+    [InlineData("// ~ set flag:phantom")]
+    [InlineData("The inscription says set flag:phantom.")]
+    [InlineData("> guards: set flag:phantom")]
+    [InlineData("* [set flag:phantom] -> END")]
+    [InlineData("`set flag:phantom`")]
+    public void Non_effect_text_does_not_declare_flags(string text)
+    {
+        var error = Error($"=== a\n{text}\n{{if flag:phantom}}Never.{{/if}}\n-> END", "TW2004");
+        Assert.Equal(3, error.Location.Line);
+    }
+
+    [Theory]
+    [InlineData("// ~ var:phantom = 1")]
+    [InlineData("The inscription says var:phantom += 1.")]
+    [InlineData("* [var:phantom = 1] -> END")]
+    [InlineData("> guards: var:phantom -= 1")]
+    public void Non_effect_text_does_not_declare_variables(string text)
+    {
+        Error($"=== a\n{text}\n{{var:phantom}}\n-> END", "TW2004");
+    }
+
+    [Fact]
+    public void Discovery_handles_all_effect_positions_and_cross_file_forward_references()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.yaml"] = Yaml,
+            ["01.tale"] = """
+                === a
+                {if flag:entry}Entry.{/if}
+                {if flag:choice}Choice.{/if}
+                {if flag:success}Success.{/if}
+                {if flag:failure}Failure.{/if}
+                {if flag:block-success}Block.{/if}
+                {if flag:block-failure}Block.{/if}
+                {var:later}
+                -> b
+                """,
+            ["02.tale"] = """
+                === b
+                ~ clear flag:entry; var:later = var:other + 1; var:other = 2
+                * [Continue] { set flag:choice } skill-check athletics dc 1
+                  success: { set flag:success } -> c
+                  failure: { clear flag:failure } -> c
+                === c
+                ::: skill-check athletics dc 1
+                  success: { set flag:block-success } -> END
+                  failure: { set flag:block-failure } -> END
+                :::
+                """,
+        }));
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Equal(7, result.Story!.World.Flags.Count);
+        Assert.Contains(new VarId("later"), result.Story.World.Variables.Keys);
+        Assert.Contains(new VarId("other"), result.Story.World.Variables.Keys);
+    }
+
+    [Fact]
+    public void String_contents_inside_effects_do_not_declare_assignments()
+    {
+        var result = Compile("=== a\n~ var:real = \"set flag:phantom; var:fake = 1\"\n{if flag:phantom}No.{/if}\n{var:fake}\n-> END");
+        Assert.False(result.Success);
+        Assert.Equal(2, result.Errors.Count(d => d.Code == "TW2004"));
+    }
+
     [Fact]
     public void Renders_markdown_substitutions_and_grammar()
     {

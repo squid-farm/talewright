@@ -32,16 +32,21 @@ internal sealed partial class TaleParser
     private readonly string[] _lines;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
+    private readonly Action<string>? _discoverEffects;
+    private readonly Action<SceneId, SourceLocation>? _discoverScene;
     private readonly List<ParsedScene> _scenes = [];
     private SceneBuilder? _scene;
     private int _index;
 
-    private TaleParser(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics)
+    private TaleParser(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
+        Action<string>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null)
     {
         _file = file;
         _lines = text.ReplaceLineEndings("\n").Split('\n');
         _symbols = symbols;
         _diagnostics = diagnostics;
+        _discoverEffects = discoverEffects;
+        _discoverScene = discoverScene;
     }
 
     public static List<ParsedScene> Parse(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics)
@@ -50,6 +55,10 @@ internal sealed partial class TaleParser
         parser.Run();
         return parser._scenes;
     }
+
+    public static void Discover(string file, string text, StorySymbols symbols,
+        Action<string> effects, Action<SceneId, SourceLocation> scene) =>
+        new TaleParser(file, text, symbols, new DiagnosticBag(), effects, scene).Run();
 
     private SourceLocation At(int column) => new(_file, _index + 1, column + 1);
 
@@ -91,6 +100,7 @@ internal sealed partial class TaleParser
 
     private void StartScene(string id, SourceLocation location)
     {
+        _discoverScene?.Invoke(new SceneId(id), location);
         _scene = new SceneBuilder(new SceneId(id), location);
         if (!IdPattern().IsMatch(id) || id == "END")
         {
@@ -316,7 +326,7 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var inlines = InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics);
+        var inlines = _discoverEffects is null ? InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics) : [];
         if (inlines.Count > 0)
         {
             scene.CurrentBlocks.Add(new ParagraphTemplate(inlines));
@@ -327,6 +337,11 @@ internal sealed partial class TaleParser
 
     private void ParseSpeech(string line, int indent)
     {
+        if (_discoverEffects is not null)
+        {
+            return;
+        }
+
         var body = line[1..];
         var colon = body.IndexOf(':', StringComparison.Ordinal);
         var who = colon > 0 ? body[..colon].Trim() : string.Empty;
@@ -354,11 +369,22 @@ internal sealed partial class TaleParser
     private void ParseEntryEffects(string text, int column)
     {
         var lead = text.Length - text.TrimStart().Length;
-        var effects = ExpressionParser.ParseEffects(text.Trim(), At(column + lead), _symbols, _diagnostics);
+        var effects = ParseEffects(text.Trim(), At(column + lead));
         foreach (var effect in effects ?? [])
         {
             _scene!.EntryEffects.Add(new ConditionalEffect(_scene.CurrentCondition, effect));
         }
+    }
+
+    private IReadOnlyList<Effect>? ParseEffects(string text, SourceLocation location)
+    {
+        if (_discoverEffects is not null)
+        {
+            _discoverEffects(text);
+            return [];
+        }
+
+        return ExpressionParser.ParseEffects(text, location, _symbols, _diagnostics);
     }
 
     private DivertTarget? ParseDivertTarget(string text, int column)
@@ -407,7 +433,9 @@ internal sealed partial class TaleParser
         }
 
         var labelText = rest[(pos + 1)..close];
-        var label = InlineParser.Parse(SourceText.Single(labelText, At(indent + 1 + pos + 1)), _symbols, _diagnostics);
+        var label = _discoverEffects is null
+            ? InlineParser.Parse(SourceText.Single(labelText, At(indent + 1 + pos + 1)), _symbols, _diagnostics)
+            : [];
         Expr? requires = null;
         IReadOnlyList<Effect> effects = [];
         DivertTarget? divert = null;
@@ -439,7 +467,7 @@ internal sealed partial class TaleParser
                     return;
                 }
 
-                effects = ExpressionParser.ParseEffects(rest[(pos + 1)..end], At(column + 1), _symbols, _diagnostics) ?? [];
+                effects = ParseEffects(rest[(pos + 1)..end], At(column + 1)) ?? [];
                 pos = SkipSpaces(rest, end + 1);
             }
             else if (remaining.StartsWith("->", StringComparison.Ordinal))
@@ -617,7 +645,7 @@ internal sealed partial class TaleParser
                 return null;
             }
 
-            effects = ExpressionParser.ParseEffects(text[(pos + 1)..end], At(column + pos + 1), _symbols, _diagnostics) ?? [];
+            effects = ParseEffects(text[(pos + 1)..end], At(column + pos + 1)) ?? [];
             pos = SkipSpaces(text, end + 1);
         }
 
