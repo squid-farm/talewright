@@ -6,16 +6,16 @@ id: lost-relic
 title: The Lost Relic
 version: 0.1.0
 start: camp.arrival
-randomness: checks-only     # dice are rolled only for skill-check directives
-# seed: 1234                # uncomment for the same rolls every playthrough
+randomness: checks-only # dice are rolled only for skill-check directives
+# seed: 1234            # uncomment for the same rolls every playthrough
 
 ruleset:
-  base: generic             # d20-style attributes, skills, hp, xp and levels
+  base: generic # d20-style attributes, skills, hp, xp and levels
 
 characters:
   player:
     first-name: Mara
-    last-name: Wilkins
+    last-name: Burns
     pronouns: she
     stats:
       str: 12
@@ -36,12 +36,12 @@ factions:
   explorers-guild: { name: "Explorers' Guild", standing: 5 }
 
 items:
-  torch:   { name: sputtering torch }
+  torch: { name: sputtering torch }
   journal: { name: field journal }
-  rope:    { name: coil of rope }
-  charm:   { name: jade charm, modifiers: { wis: 2 } }
-  idol:    { name: obsidian idol }
-  relic:   { name: Relic of Ysh, modifiers: { cha: 2 } }
+  rope: { name: coil of rope }
+  charm: { name: jade charm, modifiers: { wis: 2 } }
+  idol: { name: obsidian idol }
+  relic: { name: Relic of Ysh, modifiers: { cha: 2 } }
 
 vars:
   supplies: 0

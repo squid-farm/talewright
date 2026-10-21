@@ -6,7 +6,7 @@ everything under `samples/` as built-in stories, and the end-to-end tests compil
 ## The Lost Relic (`LostRelic/`)
 
 A short treasure hunt (19 scenes in 3 chapter files, four endings) written to exercise every M1
-feature. Mara Wilkins, a treasure hunter, and her guide Tomas Okafor look for the Relic of Ysh while the
+feature. Mara Burns, a treasure hunter, and her guide Tomas Okafor look for the Relic of Ysh while the
 Explorers' Guild watches.
 
 | Feature | Where |
@@ -16,7 +16,7 @@ Explorers' Guild watches.
 | Entry skill check (resolved on arrival) | `temple.hall` |
 | Gated choices (`requires:` item, flag, faction tier), items modifying stats | rope at the river, glyph door, guild hand-over; `charm` (+2 WIS), `relic` (+2 CHA) |
 | Faction standing, tiers and a trigger | Explorers' Guild; trigger `guild-wary` fires at unfriendly or worse |
-| Pronouns and possessives | prose throughout (`{player:last-name#possessive}` → "Wilkins's") |
+| Pronouns and possessives | prose throughout (`{player:last-name#possessive}` → "Burns's") |
 | Inline and block `{if}` conditional prose, XP and level-up | throughout all three chapters |
 | Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
 

@@ -49,8 +49,8 @@ public class LostRelicTests
     {
         var session = new StorySession(Story, seed: 7);
         var frame = session.Start();
-        Assert.Contains("Wilkins's reputation for punctuality", frame.Document.ToPlainText());
-        Assert.Contains("Tomas: Ms Wilkins.", frame.Document.ToPlainText());
+        Assert.Contains("Burns's reputation for punctuality", frame.Document.ToPlainText());
+        Assert.Contains("Tomas: Ms Burns.", frame.Document.ToPlainText());
 
         frame = Pick(session, "Continue");
         Assert.Equal(new SceneId("camp.hub"), frame.Scene);
@@ -83,7 +83,7 @@ public class LostRelicTests
 
         Assert.True(frame.IsEnded);
         Assert.Equal(new SceneId("ending.guild"), frame.Scene);
-        Assert.Contains("hangs Wilkins's portrait", frame.Document.ToPlainText());
+        Assert.Contains("hangs Burns's portrait", frame.Document.ToPlainText());
         Assert.Contains("now friendly", frame.Document.ToPlainText());
         Assert.Equal(0, session.State.GetItemCount(EntityId.Player, new ItemId("relic")));
         Assert.True(session.State.GetStat(EntityId.Player, new StatId("level")) >= 2);

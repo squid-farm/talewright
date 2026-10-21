@@ -47,6 +47,7 @@ Around the side of the temple, roots have pried open a gap between the stones. I
 of something old.
 
 * [Squeeze through] { player:xp += 10 } -> temple.hall
+* [Back to the temple door] -> temple.door
 
 === temple.hall
 @title The Hall of Eyes
