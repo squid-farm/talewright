@@ -21,6 +21,19 @@ Contents:
 
 ## 1. The big picture
 
+### NuGet distribution
+
+Project boundaries and the dependency graph below remain intact. The
+`src/Talewright/Talewright.csproj` shell references all six headless projects and
+packages their existing assemblies together as `Talewright`; it contains no engine
+implementation. `Talewright.Player` retains its direct Runtime project reference,
+and its published package depends on `Talewright`. Both packages share one version.
+The component projects are not separately published. Source paths, namespaces, and
+assembly identities are unchanged; packaging is independent of code organization.
+
+Ordinary story authors need no NuGet project dependencies. C# customizers normally
+install only `Talewright.Player`; headless/custom-UI consumers install `Talewright`.
+
 Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of _scenes_. Each
 scene has prose (a template), optional requirements, effects, skill checks, choices and diverts. Nothing about
 "which scene comes next" is hard-wired into the engine: scenes say where to go (`-> scene`, "rails"), or a hub scene

@@ -22,6 +22,27 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 - Hosts that don't serve pre-compressed `.br`/`.gz` files still work (the uncompressed files are there too).
   itch.io specifics are an M2 item.
 
+### GitHub Pages
+
+After Build and all test jobs pass on a `main` push, Publish Samples publishes this
+host with every bundled sample. Select **GitHub Actions** as the repository's Pages
+source and permit `main` in the `github-pages` environment.
+
+The workflow obtains the base path from `actions/configure-pages`, applies it
+before publishing (including generated/compressed output), and restores the source
+shell afterward. Local root hosting is unchanged. It smoke-tests the actual publish
+at that path before uploading only `wwwroot` to Pages. No branch full of generated
+site files or 404 rewrite is needed.
+
+To reproduce a repository-subpath publish locally:
+
+```bash
+python3 .github/scripts/publish_samples.py --base-path /talewright --output artifacts/pages
+```
+
+Serve that output under `/talewright/`, not `/`. See the [deployment-path test](../../tests/README.md#ci-and-deployment-checks)
+for the suite-owned subpath server.
+
 ## Files
 
 | File | Contents |

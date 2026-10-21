@@ -33,6 +33,9 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Latest).ToBeVisibleAsync();
         Assert.NotEmpty(await Latest.InnerTextAsync());
         await Expect(Sheet).ToBeVisibleAsync();
+        await Expect(Page.Locator(".tw-columns")).ToHaveCSSAsync("display", "grid");
+        await Choices.First.ClickAsync();
+        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(1);
     }
 
     [Fact]

@@ -9,6 +9,13 @@ in [GitHub Issues](https://github.com/squid-farm/talewright/issues) and the
 [Development Project](https://github.com/orgs/squid-farm/projects/1). Section 7 preserves completed M0/M1
 history; new work belongs in GitHub. See [the migration index](ISSUES.md) for legacy IDs and coordination.
 
+Distribution now uses two packages without changing the project layout:
+`Talewright` is a packaging shell containing the six existing headless assemblies;
+`Talewright.Player` provides the optional UI and depends on that package.
+Component projects remain separate and are not individually published. NuGet is
+for C# customization; ordinary story authors do not need project dependencies.
+CLI/VS Code tooling and plugin loading remain roadmap work.
+
 ---
 
 ## 1. Problem statement

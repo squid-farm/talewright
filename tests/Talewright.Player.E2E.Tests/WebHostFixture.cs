@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Playwright;
 
 namespace Talewright.Player.E2E.Tests;
@@ -26,6 +27,12 @@ public sealed class WebHostFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        var path = Environment.GetEnvironmentVariable("TALEWRIGHT_WEB_BASE_PATH") ?? "";
+        var basePath = path.TrimEnd('/');
+        if (basePath.Length > 0 && (!basePath.StartsWith('/') || basePath.Contains("..")))
+        {
+            throw new InvalidOperationException("TALEWRIGHT_WEB_BASE_PATH must be an absolute URL path.");
+        }
         var root = Environment.GetEnvironmentVariable("TALEWRIGHT_WEB_ROOT")
             ?? throw new InvalidOperationException("Set TALEWRIGHT_WEB_ROOT to the Release-published wwwroot. See tests/README.md.");
         root = Path.GetFullPath(root);
@@ -44,6 +51,20 @@ public sealed class WebHostFixture : IAsyncLifetime
             builder.Logging.SetMinimumLevel(LogLevel.Warning);
             builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
             _server = builder.Build();
+            if (basePath.Length > 0)
+            {
+                _server.Use(async (context, next) =>
+                {
+                    if (!context.Request.Path.StartsWithSegments(basePath))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status404NotFound;
+                        return;
+                    }
+
+                    await next(context);
+                });
+                _server.UsePathBase(basePath);
+            }
             var types = new FileExtensionContentTypeProvider();
             types.Mappings[".wasm"] = "application/wasm";
             types.Mappings[".dat"] = "application/octet-stream";
@@ -51,7 +72,7 @@ public sealed class WebHostFixture : IAsyncLifetime
             _server.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = types });
             await _server.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
             BaseUrl = _server.Services.GetRequiredService<IServer>()
-                .Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+                .Features.Get<IServerAddressesFeature>()!.Addresses.Single() + basePath + "/";
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             using var response = await http.GetAsync(BaseUrl);
             response.EnsureSuccessStatusCode();
