@@ -4,48 +4,15 @@
 @using Talewright.Runtime.Saves
 
 <div class="tw-player">
-    <header class="tw-bar">
-        <h1>@Story.Title</h1>
-        <div class="tw-bar-actions">
-            @if (Story.UndoEnabled)
-            {
-                <button type="button" class="tw-link" disabled="@(_busy || !_session.CanBack)" @onclick="Back">Back</button>
-                <button type="button" class="tw-link" disabled="@(_busy || !_session.CanForward)" @onclick="Forward">Forward</button>
-            }
-            @if (SaveStore is not null)
-            {
-                <button type="button" class="tw-link" disabled="@_busy" @onclick="ShowSavesAsync">Saved games</button>
-            }
-            <button type="button" class="tw-link" disabled="@_busy" @onclick="Restart">Restart</button>
-            @if (OnExit.HasDelegate)
-            {
-                <button type="button" class="tw-link" disabled="@_busy" @onclick="() => OnExit.InvokeAsync()">Library</button>
-            }
-        </div>
-    </header>
+    <PlayerToolbar Title="@Story.Title" Busy="_busy" UndoEnabled="Story.UndoEnabled"
+                   CanBack="_session.CanBack" CanForward="_session.CanForward" CanSave="@(SaveStore is not null)"
+                   OnBack="Back" OnForward="Forward" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit" />
 
     @if (_showSaves && SaveStore is not null)
     {
-        <fieldset class="tw-saves" disabled="@_busy">
-            <legend>Saved games</legend>
-            <label>Save name <input aria-label="Save name" @bind="_slot" maxlength="64" /></label>
-            <button type="button" @onclick="() => SaveAsync(false)">Save game</button>
-            <button type="button" @onclick="RefreshSlotsAsync">Refresh saves</button>
-            @if (_pendingOverwrite == _slot.Trim())
-            {
-                <p>Replace save “@_pendingOverwrite”?</p>
-                <button type="button" @onclick="() => SaveAsync(true)">Confirm overwrite</button>
-                <button type="button" @onclick="() => _pendingOverwrite = null">Cancel overwrite</button>
-            }
-            @if (_slots.Count == 0)
-            {
-                <p>No saved games.</p>
-            }
-            @foreach (var slot in _slots)
-            {
-                <button type="button" @onclick="() => LoadAsync(slot)">Load @slot</button>
-            }
-        </fieldset>
+        <SavedGamesPanel Busy="_busy" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
+                         OnSave="SaveAsync" OnRefresh="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
+                         OnLoad="LoadAsync" />
     }
     @if (_saveMessage is not null)
     {
@@ -60,36 +27,18 @@
                 var isLatest = i == _transcript.Count - 1;
                 if (isLatest)
                 {
-                    <section class="tw-frame tw-latest" aria-label="Current passage" tabindex="-1" @ref="_latestFrame">@FrameContent(entry)</section>
+                    <section class="tw-frame tw-latest" aria-label="Current passage" tabindex="-1" @ref="_latestFrame"><StoryPassage Entry="entry" /></section>
                 }
                 else
                 {
-                    <section class="tw-frame tw-past">@FrameContent(entry)</section>
+                    <section class="tw-frame tw-past"><StoryPassage Entry="entry" /></section>
                 }
             }
 
             @if (_session.Current is { } current)
             {
-                if (current.IsEnded)
-                {
-                    <p class="tw-the-end">The End</p>
-                    <button type="button" class="tw-choice" disabled="@_busy" @onclick="Restart">Play again</button>
-                }
-                else
-                {
-                    <ol class="tw-choices" aria-label="Story choices">
-                        @for (var i = 0; i < current.Choices.Count; i++)
-                        {
-                            var choice = current.Choices[i];
-                            <li>
-                                <button type="button" class="tw-choice" disabled="@_busy" @onclick="() => Choose(choice)">
-                                    <span class="tw-choice-number">@(i + 1).</span>
-                                    <InlineView Inlines="choice.Label" />
-                                </button>
-                            </li>
-                        }
-                    </ol>
-                }
+                <StoryChoices Current="current" Busy="_busy" AtChoiceLimit="@(_session.Cursor >= StoryHistory.MaxChoices)"
+                              OnChoose="Choose" OnRestart="Restart" />
             }
         </main>
 
@@ -136,20 +85,6 @@
     private string? _saveMessage;
     private IReadOnlyList<string> _slots = [];
 
-    private RenderFragment FrameContent(HistoryFrame entry) => @<text>
-        @if (!string.IsNullOrEmpty(entry.Frame.Title))
-        {
-            <h2 class="tw-scene-title">@entry.Frame.Title</h2>
-        }
-
-        <DocumentView Document="entry.Frame.Document" />
-
-        @if (entry.Chosen is not null)
-        {
-            <p class="tw-chosen">→ <InlineView Inlines="entry.Chosen" /></p>
-        }
-    </text>;
-
     protected override void OnParametersSet()
     {
         if (!ReferenceEquals(_startedStory, Story))
@@ -181,6 +116,10 @@
 
     private void Choose(ChoiceView choice)
     {
+        if (_session.Cursor >= StoryHistory.MaxChoices)
+        {
+            return;
+        }
         _session.Choose(choice.Key);
         _focusLatest = true;
     }

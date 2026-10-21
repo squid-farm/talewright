@@ -15,7 +15,11 @@ See [registry setup](../../README.md#c-customization-packages).
 | Component | Job |
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `MaxUploadBytes` (20 MB). |
-| `StoryPlayer` | One `StoryHistory` playthrough with transcript, numbered choices, Back/Forward, manual save/load, Restart, Library and "The End". Its collocated JS module scrolls to and focuses the newest frame, respecting reduced motion. Parameters: `Story`, `Seed`, `OnExit`, `Visible`, optional `SaveStore`. |
+| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
+| `PlayerToolbar` | Title and navigation/save/restart/library buttons; enabled states and actions come from the parent. |
+| `SavedGamesPanel` | Slot-name input, slot list and explicit overwrite confirmation; all persistence and state live in the parent. |
+| `StoryPassage` | One history frame's title, document and chosen-label echo. |
+| `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`. `RenderedMedia` renders nothing yet. |
 | `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
@@ -49,6 +53,9 @@ disable conflicting controls while in flight. Browser saves live only in that or
 clearing browser/site data removes them; no server account or cloud sync exists.
 
 Back/Forward restores state, choices and transcript together. Choosing after Back discards redo.
+At 10,000 choices, an explanatory alert replaces silent failure and disables further
+choices. Save, Back/Forward (when allowed by the story), Restart and Library remain
+usable. Going Back below the cap re-enables choices; returning Forward restores the notice.
 Authors can disable these controls with `undo: false`. Restart starts a fresh playthrough but does not
 delete manual saves. Autosave is a [separate follow-up](https://github.com/squid-farm/talewright/issues/54).
 See the [runtime compatibility policy](../Talewright.Runtime/README.md#history-and-saves).

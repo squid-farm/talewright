@@ -1,0 +1,13 @@
+@if (!string.IsNullOrEmpty(Entry.Frame.Title))
+{
+    <h2 class="tw-scene-title">@Entry.Frame.Title</h2>
+}
+<DocumentView Document="Entry.Frame.Document" />
+@if (Entry.Chosen is not null)
+{
+    <p class="tw-chosen">→ <InlineView Inlines="Entry.Chosen" /></p>
+}
+
+@code {
+    [Parameter, EditorRequired] public HistoryFrame Entry { get; set; } = default!;
+}

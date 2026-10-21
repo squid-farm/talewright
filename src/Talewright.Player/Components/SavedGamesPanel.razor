@@ -1,0 +1,34 @@
+<fieldset class="tw-saves" disabled="@Busy">
+    <legend>Saved games</legend>
+    <label>Save name <input aria-label="Save name" value="@Slot" @onchange="ChangeSlot" maxlength="64" /></label>
+    <button type="button" @onclick="() => OnSave.InvokeAsync(false)">Save game</button>
+    <button type="button" @onclick="OnRefresh">Refresh saves</button>
+    @if (PendingOverwrite == Slot.Trim())
+    {
+        <p>Replace save “@PendingOverwrite”?</p>
+        <button type="button" @onclick="() => OnSave.InvokeAsync(true)">Confirm overwrite</button>
+        <button type="button" @onclick="OnCancelOverwrite">Cancel overwrite</button>
+    }
+    @if (Slots.Count == 0)
+    {
+        <p>No saved games.</p>
+    }
+    @foreach (var slot in Slots)
+    {
+        <button type="button" @onclick="() => OnLoad.InvokeAsync(slot)">Load @slot</button>
+    }
+</fieldset>
+
+@code {
+    [Parameter] public bool Busy { get; set; }
+    [Parameter, EditorRequired] public string Slot { get; set; } = "";
+    [Parameter] public EventCallback<string> SlotChanged { get; set; }
+    [Parameter] public string? PendingOverwrite { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<string> Slots { get; set; } = [];
+    [Parameter] public EventCallback<bool> OnSave { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback OnCancelOverwrite { get; set; }
+    [Parameter] public EventCallback<string> OnLoad { get; set; }
+
+    private Task ChangeSlot(ChangeEventArgs args) => SlotChanged.InvokeAsync(args.Value?.ToString() ?? "");
+}

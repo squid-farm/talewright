@@ -1,0 +1,32 @@
+@if (Current.IsEnded)
+{
+    <p class="tw-the-end">The End</p>
+    <button type="button" class="tw-choice" disabled="@Busy" @onclick="OnRestart">Play again</button>
+}
+else
+{
+    @if (AtChoiceLimit)
+    {
+        <p class="tw-error" role="alert">This playthrough has reached the @StoryHistory.MaxChoices.ToString("N0")-choice limit. You can save, go back, or restart to continue playing.</p>
+    }
+    <ol class="tw-choices" aria-label="Story choices">
+        @for (var i = 0; i < Current.Choices.Count; i++)
+        {
+            var choice = Current.Choices[i];
+            <li>
+                <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit)" @onclick="() => OnChoose.InvokeAsync(choice)">
+                    <span class="tw-choice-number">@(i + 1).</span>
+                    <InlineView Inlines="choice.Label" />
+                </button>
+            </li>
+        }
+    </ol>
+}
+
+@code {
+    [Parameter, EditorRequired] public StoryFrame Current { get; set; } = default!;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool AtChoiceLimit { get; set; }
+    [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
+    [Parameter] public EventCallback OnRestart { get; set; }
+}
