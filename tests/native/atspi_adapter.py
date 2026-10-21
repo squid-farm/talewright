@@ -95,6 +95,7 @@ class Desktop:
         pyatspi.Registry.generateKeyboardEvent(entries[0].keycode, None, event)
 
     def upload(self, path):
+        Path(path).resolve(strict=True)
         self.click(name="Story archive", role="push button")
         self.wait(lambda: self.find(role="file chooser"), "file chooser")
         self.key("Control_L", pyatspi.KEY_PRESS)
@@ -109,9 +110,13 @@ class Desktop:
                 if node.getRoleName() == "text"
                 and node.getState().contains(pyatspi.STATE_EDITABLE)
                 and node.getState().contains(pyatspi.STATE_FOCUSED)), None)
-        self.wait(location, "editable file chooser location").queryEditableText().setTextContents(path)
-        # GTK resolves the location asynchronously; entry activation handles that pending selection.
-        self.key("Return")
+        entry = self.wait(location, "editable file chooser location")
+        entry.queryEditableText().setTextContents(path)
+        actions = entry.queryAction()
+        activate = next((index for index in range(actions.nActions)
+                         if actions.getName(index) == "activate"), None)
+        if activate is None or not actions.doAction(activate):
+            raise RuntimeError("The GTK location entry does not support activation")
         self.wait(lambda: self.find(role="file chooser") is None, "file chooser accepts selected archive")
 
     def snapshot(self):

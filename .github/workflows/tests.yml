@@ -71,6 +71,8 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify4 libgtk-3-0t64 \
             xvfb xauth dbus-x11 at-spi2-core libatk-adaptor python3-pyatspi python3-gi \
             gir1.2-gtk-3.0 xfwm4 wmctrl
+      - name: Verify native chooser and accessibility before the full suite
+        run: python3 tests/run_e2e.py linux --probe
       - run: python3 tests/run_e2e.py linux
       - uses: actions/upload-artifact@v4
         if: always()
