@@ -15,6 +15,11 @@ if (!result.Success)
 var session = new StorySession(result.Story!);
 ```
 
+Folder and ZIP loaders both accept at most 1,000 story files, 5 MiB per file and
+50 MiB total expanded text. Folder traversal rejects symbolic links inside the
+story and paths deeper than 64 directories. Only `story.yaml` and `.tale` files
+are loaded; unrelated files are not published as story content.
+
 ## Pipeline (`StoryCompiler.Compile`)
 
 1. **Manifest.** `StoryYamlReader` reads `story.yaml` (YamlDotNet node model, so error positions are exact and
