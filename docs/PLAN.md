@@ -154,7 +154,7 @@ Reusable pieces:
 - **Diagnostics** carry file, line, column, code and message. The same diagnostics will feed the CLI, MSBuild and the VS Code language server (M3).
 - Output: an immutable typed `StoryDefinition`, which can be serialized to a compact bundle for publishing later.
 
-#### Planned authoring tooling (M2-M3 and M9; not implemented)
+#### Authoring tooling (M2 implemented; M3 and M9 planned)
 
 The compiler already reports syntax, reference/type, YAML, and structural diagnostics. Authoring tools
 will reuse that work rather than build a separate parser or duplicate checks in each front end:
@@ -169,9 +169,10 @@ Shared Tale compiler / analysis / lint rules
         +-- Other LSP-capable editors
 ```
 
-The commands below describe planned contracts, not commands available today:
+`validate` and explicit C# project/MSBuild integration are available. The lint/editor
+commands below remain planned:
 
-- **`talewright validate` (M2):** compile/check a story root and report all compiler diagnostics, including
+- **`talewright validate` (M2, implemented):** compile/check a story root and report all compiler diagnostics, including
   warnings. Provide human-readable `file:line:column` output and machine-readable JSON with stable codes
   and severities. Return success with warnings by default, fail on validation errors, and offer an explicit
   warnings-as-errors policy. Invalid arguments and I/O failures must be visible and fail the command.
@@ -208,10 +209,12 @@ not execute story logic or imply knowledge of live gameplay values. Signature he
 general formatting, and full YAML authoring assistance are outside the initial scope. YAML changes must
 still refresh Tale analysis and compiler diagnostics for `story.yaml`.
 
-**C# extensions:** CLI, MSBuild, and editor analysis must agree on custom predicate/modifier/ruleset
-registrations, either through an explicit project integration or exported metadata. Choose that contract
-before claiming C# project support; missing metadata must be reported rather than silently treating custom
-symbols as built-ins or executing arbitrary project code during editing.
+**C# extensions:** the implemented project integration shares an explicit options factory between the
+validator and both hosts; an opt-in transitive MSBuild target executes the author's validator.
+The data-only CLI does not discover or execute arbitrary C# extensions. See
+[the package-based example](../examples/CSharpStory/README.md). Future editor analysis must agree
+on these registrations through explicit integration or exported metadata, without silently treating
+custom symbols as built-ins or executing arbitrary project code during editing.
 
 **Relative effort and dependencies** (including tests/docs, not schedule estimates):
 
@@ -279,6 +282,15 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
   - the C# story project path (Tier 1): NuGet packaging plus an MSBuild task giving build-time diagnostics ([#42](https://github.com/squid-farm/talewright/issues/42));
   - richer hubs/storylets ([#44](https://github.com/squid-farm/talewright/issues/44));
   - character creation ([#43](https://github.com/squid-farm/talewright/issues/43)).
+
+  All listed feature slices are implemented on the M2 branch, pending review/merge and release gates.
+  Saves are manual named slots with explicit overwrite; compatibility is exact story ID/version/source
+  fingerprint plus extension compatibility ID, with no migration or autosave.
+  `publish` defaults to story-only; `-a --target web|desktop` includes the complete player.
+  Desktop defaults to one archive of six self-contained native builds and selecting launchers, not
+  one portable binary. Creation is opt-in author-bounded names/pronouns/presets/stat choices, not
+  an unrestricted point-buy system. See [performance and artifact checks](../tests/README.md) for
+  measured budgets; source compilation remains the format until precompiled bundles show a real benefit.
 - **M3 — Author stories comfortably:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/4)) shared analysis, editor-neutral LSP, VS Code support, and a bounded initial lint rule set. Deliver independently usable slices:
   1. Tale syntax highlighting, language configuration, and snippets (independent of LSP; [#31](https://github.com/squid-farm/talewright/issues/31)).
   2. Shared partial/source-aware analysis and LSP-backed live validation ([#29](https://github.com/squid-farm/talewright/issues/29), [#31](https://github.com/squid-farm/talewright/issues/31)).

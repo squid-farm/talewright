@@ -25,8 +25,11 @@ stats, factions and items. No code is needed. Programmers can extend the engine 
 
 **Milestone 1 (vertical slice) is complete:** the engine, the `.tale` compiler, the shared Blazor player, and the
 desktop and web hosts all work, and the sample story *The Lost Relic* is playable end to end on both.
-Core reliability and release verification come first in M2, alongside saves with compatibility safeguards,
-a CLI with `validate` and `publish`, and character creation.
+**M2 implementation** adds manual named saves with conservative compatibility checks, deterministic
+Back/Forward history, `validate` and story-only/complete-game `publish`, explicit C# project
+integration, all/any bounded hubs, and opt-in character creation. Save migration, autosave and
+editor tooling are not included. Release readiness is tracked separately in
+[#33](https://github.com/squid-farm/talewright/issues/33); local implementation is not a registry release.
 M3 adds `lint` and editor-neutral language-server support with a thin VS Code extension for Tale highlighting,
 snippets, live validation, completion, and hover help, delivered in independently usable slices.
 Later milestones preserve the feature backlog: **M4** image/media support, **M5** world simulation,
@@ -90,6 +93,12 @@ Validate from source with `dotnet run --project src/Talewright.Cli -- validate s
 See the [CLI reference](src/Talewright.Cli/README.md) for JSON output and exit policy.
 Use `talewright publish story-folder --output story.zip` for a portable story archive, or add
 `-a --target web|desktop` for a complete deployable game. The VS Code authoring extension remains roadmap work.
+Web output is a static site that also works beneath a subpath. Desktop output defaults to one ZIP
+with self-contained Windows/Linux/macOS x64 and ARM64 builds plus launchers that select the right one;
+players do not need .NET, but do need their OS webview. `--runtime` selects a smaller single-platform ZIP.
+This is not a universal native executable or a signed/notarized installer.
+For custom C# registrations and build-time Tale errors, see the package-based
+[C# story example](examples/CSharpStory/README.md).
 
 ## C# customization packages
 
@@ -133,7 +142,7 @@ project reference for compilation and depends on the shell package for distribut
 ## GitHub Actions and releases
 
 The Build workflow runs on PRs targeting `main`, pushes to `main`, version-tag
-pushes, and manual requests. It builds Release and verifies the two packages with
+pushes, and manual requests. It builds Release and verifies both libraries and the CLI tool with
 clean, isolated consumers. Its reusable Tests workflow runs unit tests, Chromium,
 Firefox, WebKit, and actual Linux Photino tests. Both must pass before publishing:
 

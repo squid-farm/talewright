@@ -96,7 +96,8 @@ evaluator as everything else.)
 | UI → runtime         | a choice **key** string (`IStorySession.Choose(key)`)               | Runtime    |
 
 The UI never sees `Expr`, `Effect`, scenes or events directly. It renders frames and sends back keys. It also
-reads `IGameStateView` for the character sheet.
+reads `IGameStateView` for the character sheet. `StoryPlayer` uses the `StoryHistory` wrapper for
+transcript, Back/Forward and save orchestration; presentation does not reimplement replay.
 
 ---
 
@@ -263,7 +264,7 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   diagnostics or play. Hosts render only this. Opening the library mid-story keeps the player mounted (hidden),
   so a "Back to …" button resumes the playthrough; picking a story from the list starts it fresh.
 - `Components/StoryPlayer.razor`: one playthrough. Keeps a transcript of past frames (echoing the chosen label),
-  shows current choices and Restart/Library buttons. Its collocated `StoryPlayer.razor.js` module scrolls the
+  shows current choices, Back/Forward, named manual saves and Restart/Library buttons. Its collocated `StoryPlayer.razor.js` module scrolls the
   newest frame to the top of the viewport and focuses it (moving screen readers to it); plain `focus()` would
   not scroll a frame that is already partly visible.
 - `Components/DocumentView.razor`, `InlineView.razor`: `RenderedDocument` → HTML (`<p>`, `<em>`, `<strong>`,
@@ -271,6 +272,11 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
 - `Components/CharacterSheet.razor`: generated from ruleset metadata; whatever stats the story's ruleset has,
   grouped by `StatCategory`. Skills at 0 are hidden. Shows inventory and faction standings with tiers.
 - `Components/DiagnosticList.razor`: compiler errors/warnings with file:line:col.
+- `Components/CharacterCreator.razor`: optional author-bounded creation form. `TalewrightApp` validates
+  selections before constructing history; presets/identity/stats become initialization events, never
+  changes to shared static world definitions. Restart keeps the active (including restored) character.
+- `Saves/`: `FileSaveStore` uses staged atomic file replacement; `IndexedDbSaveStore` uses browser transactions.
+  Failures are visible and rejected restores do not replace live history or mutate the stored save.
 - `Library/StoryLibraries.cs`: `IStoryLibrary` (List/Load) with `EmbeddedStoryLibrary` (stories compiled into
   the host assembly), `FileSystemStoryLibrary` (folders/zips; desktop only) and `CompositeStoryLibrary`.
 - `wwwroot/talewright.css`: all player styles, driven by CSS variables (`--tw-bg`, `--tw-accent`…), with a dark
@@ -316,8 +322,11 @@ samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Co
      `TriggerDefinition`s.
    - Then every `.tale` file (sorted by path, subfolders allowed) is parsed into `SceneDefinition`s. Names are
      resolved and type-checked here, so `player:strenght` is a TW2xxx error at load time, not a crash at chapter 9.
-3. **Play.** `StorySession` replays nothing at start; it creates an `EventLog` from the world + seed and enters
-   the start scene. Every subsequent `Choose(key)` appends events and returns a new `StoryFrame`.
+3. **Play.** Fixed stories start immediately; creation stories first validate and snapshot an author-approved
+   selection. `StorySession` creates an `EventLog` from world + seed, applies character initialization,
+   primes triggers and enters the start scene. Every `Choose(key)` appends events and returns a new frame.
+   `StoryHistory` replays a fresh session for Back/Forward and validates the entire saved redo sequence
+   before replacement, preserving deterministic dice and trigger edge memory.
 4. **Render.** `StoryPlayer` appends each frame to its transcript and asks `DocumentView` to draw it. The character
    sheet re-reads `IGameStateView` on each render, so it's always current.
 
@@ -338,7 +347,9 @@ All of this is in `src/Talewright.Runtime/StorySession.cs` (the class remarks re
    - **Entry skill check** (`::: skill-check` at the top level of a scene): resolve it now, apply the outcome's
      effects, and offer a single **Continue** that leads to the outcome's target.
    - Otherwise, **choices**: explicit `*` choices whose `requires` hold (keys `c0`, `c1`, …) plus, if the scene is
-     a `@hub tag`, every eligible storylet with that tag (keys `storylet:<scene-id>`).
+     a `@hub tag`, `all(a,b)` or `any(a,b)`, eligible other storylets matching that query
+     (keys `storylet:<scene-id>`). Filter requirements/once/self first, sort by descending priority
+     then declaration order and apply optional positive `@hub-limit` to generated choices only.
    - If that's empty: the **first matching divert** `->` becomes a **Continue**. If that divert is `-> END`, the
      story ends right here and this scene is the final frame.
 
@@ -356,9 +367,10 @@ All of this is in `src/Talewright.Runtime/StorySession.cs` (the class remarks re
 
 Invalid keys throw `InvalidOperationException` listing the valid ones. The UI only ever sends keys it was given.
 
-**Determinism.** Given the same `StoryDefinition`, the same seed and the same sequence of keys, a session
-produces the same events, frames and ending. The 300-seed random-playthrough test relies on this, and so will
-saves (M2: store seed + keys, replay).
+**Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
+keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
+format/story versions and source/extension fingerprint. Unknown/corrupt/incompatible saves are rejected,
+not silently migrated. Older fixed-protagonist v1 saves may omit the optional character field.
 
 ---
 
@@ -422,6 +434,7 @@ One xUnit test project per engine project, under `tests/` (the generic ruleset i
 | `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
 | `Talewright.Tale.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
 | `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, and sample compilation smoke |
+| `Talewright.Cli.Tests`       | validation output/exit policies, bounded publication and archive contracts |
 | `Talewright.Player.E2E.Tests` | one C#/xUnit suite: production Release web host in Chromium, Firefox, and WebKit plus real Linux Photino; opt-in, outside the root solution |
 
 The player has one C#/xUnit authoring surface with shared assertions behind browser and Linux drivers.
@@ -438,13 +451,19 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 
 ## 9. Known limitations and seams left for later
 
-- **No saves yet.** The event log + seed make this straightforward (M2: `ISaveStore`).
-- **Predefined protagonist.** No character creation screen (M2).
+- **No save migration or autosave.** Manual slots reject mismatched content/extensions/version;
+  migration is M8, autosave is a separate follow-up.
+- **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
+  player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
 - **Media.** `MediaTemplate`/`RenderedMedia` exist and flow through every layer, but the Player renders nothing.
   Images/sprites slot in at `InlineView.razor` and a future media resolver (M4: Presentation).
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.
 - **One language.** `EnglishGrammar` only; the `IGrammar` seam is there.
-- **Event log growth.** No snapshots yet; fine for VN-length stories.
-- **Embedded samples** make the host assemblies slightly larger. M2's `publish` command will bake a single
-  chosen story in instead.
+- **Event log growth.** No snapshots yet; histories are bounded to 10,000 choices. Generated load/replay
+  workloads have explicit Release budgets; see [testing](../tests/README.md). Real complex stories and
+  constrained devices may need further profiling before snapshots or a precompiled bundle format.
+- **Development hosts embed samples.** `publish -a` instead includes only the selected story.
+- **Desktop platform matrix.** Universal packages contain six self-contained OS/CPU builds. Linux x64
+  has actual native runtime tests; Windows/macOS/ARM64 builds require separate execution checks.
+  Packages need OS webviews and are not signed/notarized installers or macOS app bundles.
