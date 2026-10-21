@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectre.Console;
+using Spectre.Console.Cli;
 using Talewright.Tale.Compilation;
 
 namespace Talewright.Cli;
@@ -14,55 +16,48 @@ public static class CommandLine
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
-        var json = args.Zip(args.Skip(1)).Any(pair => pair.First == "--format" && pair.Second == "json");
-        if (args.FirstOrDefault() == "publish")
-        {
-            return PublishCommand.Run(args.Skip(1).ToArray(), output, error);
-        }
-        if (args is ["--help"] or ["-h"])
-        {
-            output.WriteLine(Usage);
-            return 0;
-        }
-
-        var warningsAsErrors = false;
-        string? root = null;
-        if (args.Length == 0 || args[0] != "validate")
+        var json = args.Contains("--format=json") ||
+            args.Zip(args.Skip(1)).Any(pair => pair.First == "--format" && pair.Second == "json");
+        if (args.Length == 0)
         {
             return Failure("TWCLI001", Usage, json, output, error);
         }
 
-        for (var i = 1; i < args.Length; i++)
+        var app = new CommandApp();
+        app.Configure(config =>
         {
-            switch (args[i])
+            config.SetApplicationName("talewright");
+            config.CaseSensitivity(CaseSensitivity.All);
+            config.UseStrictParsing();
+            config.PropagateExceptions();
+            config.ConfigureConsole(AnsiConsole.Create(new AnsiConsoleSettings
             {
-                case "--format":
-                    if (++i >= args.Length || args[i] is not ("human" or "json"))
-                    {
-                        return Failure("TWCLI001", "--format requires 'human' or 'json'.", json, output, error);
-                    }
-
-                    json = args[i] == "json";
-                    break;
-                case "--warnings-as-errors":
-                    warningsAsErrors = true;
-                    break;
-                default:
-                    if (args[i].StartsWith('-') || root is not null)
-                    {
-                        return Failure("TWCLI001", $"Unexpected argument '{args[i]}'. {Usage}", json, output, error);
-                    }
-
-                    root = args[i];
-                    break;
-            }
-        }
-
-        if (root is null)
+                Out = new AnsiConsoleOutput(output),
+                Ansi = AnsiSupport.No,
+                ColorSystem = ColorSystemSupport.NoColors,
+            }));
+            var writers = new CommandWriters(output, error);
+            config.AddCommand<ValidateCommand>("validate")
+                .WithDescription("Validate a story folder with stable human or JSON diagnostics.")
+                .WithData(writers);
+            config.AddCommand<PublishCommand>("publish")
+                .WithDescription("Publish a validated story archive or complete deployable game.")
+                .WithData(writers);
+        });
+        try
         {
-            return Failure("TWCLI001", Usage, json, output, error);
+            return app.Run(args);
         }
+        catch (Exception ex) when (ex is CommandParseException or CommandRuntimeException)
+        {
+            return Failure("TWCLI001", ex.Message, json, output, error);
+        }
+    }
 
+    internal static int Validate(ValidationSettings settings, TextWriter output, TextWriter error)
+    {
+        var json = settings.Format == "json";
+        var root = settings.Root;
         StorySource source;
         try
         {
@@ -74,7 +69,7 @@ public static class CommandLine
         }
 
         var result = StoryCompiler.Compile(source);
-        var success = result.Success && (!warningsAsErrors || !result.Warnings.Any());
+        var success = result.Success && (!settings.WarningsAsErrors || !result.Warnings.Any());
         if (json)
         {
             WriteJson(new ValidationOutput(1, success, result.Diagnostics.Select(d => new DiagnosticOutput(
@@ -110,6 +105,33 @@ public static class CommandLine
 
     private static void WriteJson(ValidationOutput result, TextWriter output) =>
         output.WriteLine(JsonSerializer.Serialize(result, CliJsonContext.Default.ValidationOutput));
+}
+
+internal sealed record CommandWriters(TextWriter Output, TextWriter Error);
+
+public sealed class ValidationSettings : CommandSettings
+{
+    [CommandArgument(0, "<story-root>")]
+    public string Root { get; set; } = "";
+
+    [CommandOption("--format <FORMAT>")]
+    [System.ComponentModel.DefaultValue("human")]
+    public string Format { get; set; } = "human";
+
+    [CommandOption("--warnings-as-errors")]
+    public bool WarningsAsErrors { get; set; }
+
+    public override ValidationResult Validate() => Format is "human" or "json"
+        ? ValidationResult.Success() : ValidationResult.Error("--format requires 'human' or 'json'.");
+}
+
+public sealed class ValidateCommand : Command<ValidationSettings>
+{
+    public override int Execute(CommandContext context, ValidationSettings settings, CancellationToken cancellationToken)
+    {
+        var writers = (CommandWriters)context.Data!;
+        return CommandLine.Validate(settings, writers.Output, writers.Error);
+    }
 }
 
 internal sealed record DiagnosticOutput(string Code, string Severity, string Message, string File, int Line, int Column);

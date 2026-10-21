@@ -2,72 +2,69 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Xml.Linq;
+using Spectre.Console;
+using Spectre.Console.Cli;
 using Talewright.Tale.Compilation;
 
 namespace Talewright.Cli;
 
-internal static class PublishCommand
+public sealed class PublishSettings : CommandSettings
 {
-    private static readonly string[] DesktopRuntimes =
+    [CommandArgument(0, "<story-root>")]
+    public string Root { get; set; } = "";
+
+    [CommandOption("-o|--output <ZIP>")]
+    public string? Destination { get; set; }
+
+    [CommandOption("-a|--all-in-one")]
+    public bool AllInOne { get; set; }
+
+    [CommandOption("--target <TARGET>")]
+    public string? Target { get; set; }
+
+    [CommandOption("--runtime <RID>")]
+    public string? Runtime { get; set; }
+
+    [CommandOption("--force")]
+    public bool Force { get; set; }
+
+    public override ValidationResult Validate()
+    {
+        if (Destination is null || !Destination.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Error("--output <file.zip> is required.");
+        }
+
+        if ((!AllInOne && (Target is not null || Runtime is not null)) ||
+            (Target is not null && Target is not ("web" or "desktop")) ||
+            (Runtime is not null && (Target != "desktop" || !PublishCommand.DesktopRuntimes.Contains(Runtime))))
+        {
+            return ValidationResult.Error("Use --all-in-one with --target web|desktop; --runtime is only valid for desktop and must match a supported Photino RID.");
+        }
+
+        return ValidationResult.Success();
+    }
+}
+
+public sealed class PublishCommand : Command<PublishSettings>
+{
+    internal static readonly string[] DesktopRuntimes =
         ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"];
 
-    internal static int Run(string[] args, TextWriter output, TextWriter error)
+    public override int Execute(CommandContext context, PublishSettings settings, CancellationToken cancellationToken)
     {
-        string? root = null;
-        string? destination = null;
-        string? runtime = null;
-        string? target = null;
-        var allInOne = false;
-        var force = false;
-        for (var i = 0; i < args.Length; i++)
-        {
-            var argument = args[i];
-            if (argument is "-a" or "--all-in-one")
-            {
-                allInOne = true;
-            }
-            else if (argument == "--force")
-            {
-                force = true;
-            }
-            else if (argument is "--output" or "-o" or "--target" or "--runtime")
-            {
-                if (++i >= args.Length || args[i].StartsWith('-'))
-                {
-                    return Invalid($"'{argument}' requires a value.", error);
-                }
+        var writers = (CommandWriters)context.Data!;
+        return Run(settings, writers.Output, writers.Error);
+    }
 
-                switch (argument)
-                {
-                    case "--output" or "-o": destination = args[i]; break;
-                    case "--target": target = args[i]; break;
-                    case "--runtime": runtime = args[i]; break;
-                }
-            }
-            else if (!argument.StartsWith('-') && root is null)
-            {
-                root = argument;
-            }
-            else
-            {
-                return Invalid($"Unexpected argument '{argument}'.", error);
-            }
-        }
-
-        if (root is null || destination is null ||
-            !destination.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-        {
-            return Invalid("A story root and --output <file.zip> are required.", error);
-        }
-
-        if ((!allInOne && (target is not null || runtime is not null)) ||
-            (target is not null && target is not ("web" or "desktop")) ||
-            (runtime is not null && (target != "desktop" || !DesktopRuntimes.Contains(runtime))))
-        {
-            return Invalid("Use --all-in-one with --target web|desktop; --runtime is only valid for desktop and must match a supported Photino RID.", error);
-        }
-
-        target ??= "web";
+    private static int Run(PublishSettings settings, TextWriter output, TextWriter error)
+    {
+        var root = settings.Root;
+        var destination = settings.Destination!;
+        var runtime = settings.Runtime;
+        var target = settings.Target ?? "web";
+        var allInOne = settings.AllInOne;
+        var force = settings.Force;
         var universalDesktop = allInOne && target == "desktop" && runtime is null;
 
         string final;
@@ -108,6 +105,8 @@ internal static class PublishCommand
             Directory.CreateDirectory(working);
             var story = Path.Combine(working, "story");
             WriteStory(source, story);
+            // Text may expand when a BOM-detected input is rewritten as UTF-8.
+            _ = StorySource.FromDirectory(story);
             var content = story;
             if (allInOne)
             {
@@ -152,12 +151,6 @@ internal static class PublishCommand
                 Directory.Delete(working, recursive: true);
             }
         }
-    }
-
-    private static int Invalid(string message, TextWriter error)
-    {
-        error.WriteLine($"TWCLI001: {message}\n{CommandLine.Usage}");
-        return 2;
     }
 
     private static string AssetsRoot => Path.Combine(Path.GetDirectoryName(typeof(PublishCommand).Assembly.Location)!, "publish-assets");

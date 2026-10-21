@@ -128,5 +128,40 @@ public sealed class ValidationTests : IDisposable
         Assert.Empty(await error);
     }
 
+    [Theory]
+    [InlineData("--help", "", "validate")]
+    [InlineData("validate", "--help", "--warnings-as-errors")]
+    [InlineData("publish", "--help", "--all-in-one")]
+    public void Framework_help_describes_commands_and_options(string first, string second, string expected)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var args = second.Length == 0 ? new[] { first } : new[] { first, second };
+        Assert.Equal(0, CommandLine.Run(args, output, error));
+        Assert.Contains(expected, output.ToString());
+        Assert.Empty(error.ToString());
+    }
+
+    [Fact]
+    public void Framework_parse_errors_keep_machine_readable_failure_contract()
+    {
+        var result = Run("--format", "json", "--bogus");
+        Assert.Equal(2, result.Code);
+        Assert.Empty(result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        Assert.False(json.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("TWCLI001", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Contains("bogus", json.RootElement.GetProperty("error").GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public void Framework_equals_syntax_preserves_json_output()
+    {
+        var result = Run("--format=json");
+        Assert.Equal(0, result.Code);
+        Assert.Equal("""{"schemaVersion":1,"success":true,"diagnostics":[]}""", result.Output.Trim());
+        Assert.Empty(result.Error);
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

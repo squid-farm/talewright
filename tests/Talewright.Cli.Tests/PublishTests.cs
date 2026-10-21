@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using Talewright.Tale.Compilation;
 
 namespace Talewright.Cli.Tests;
@@ -77,6 +78,26 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(2, result.Code);
         Assert.Contains("5 MiB", result.Error);
         Assert.False(File.Exists(Zip));
+    }
+
+    [Theory]
+    [InlineData(1, 1_800_000, "5 MiB")]
+    [InlineData(12, 1_500_000, "50 MiB")]
+    public void Utf16_input_that_expands_beyond_utf8_limits_preserves_existing_output(int files, int characters, string limit)
+    {
+        Assert.Equal(0, Run().Code);
+        var original = File.ReadAllBytes(Zip);
+        for (var i = 0; i < files; i++)
+        {
+            File.WriteAllText(Path.Combine(Story, $"comment-{i}.tale"),
+                "// " + new string('\u4E00', characters), Encoding.Unicode);
+        }
+        Assert.True(StoryCompiler.Compile(StorySource.FromDirectory(Story)).Success);
+        var result = Run("--force");
+        Assert.Equal(2, result.Code);
+        Assert.Contains(limit, result.Error);
+        Assert.Equal(original, File.ReadAllBytes(Zip));
+        Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
     }
 
     [Fact]

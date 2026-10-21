@@ -7,6 +7,7 @@
     <Description>Validate and publish Talewright stories.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Spectre.Console.Cli" Version="0.57.2" />
     <ProjectReference Include="../Talewright.Tale/Talewright.Tale.csproj" />
     <ProjectReference Include="../Talewright.Runtime/Talewright.Runtime.csproj" />
     <ProjectReference Include="../Talewright.Player/Talewright.Player.csproj" />

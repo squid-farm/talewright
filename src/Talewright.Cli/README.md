@@ -3,6 +3,10 @@
 Requires the .NET 10 SDK. Run from source with
 `dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`.
 The project packs as a .NET tool with command name `talewright`.
+Spectre.Console.Cli supplies typed command/option parsing, strict unknown-option
+rejection and generated help (`--help`, `validate --help`, `publish --help`).
+The validation JSON schema, diagnostics and exit codes below remain independent
+of the CLI framework; JSON output never contains its help or console formatting.
 
 ```bash
 talewright validate path/to/story
@@ -83,6 +87,8 @@ Publishing uses human-readable diagnostics; `--format json` belongs to `validate
 `--a` is invalid, not an alias.
 
 Inputs are bounded to 1,000 story files, 5 MiB each and 50 MiB total text.
+Staged UTF-8 files are rechecked against the same limits before either archive
+or standalone publication, since BOM-detected UTF-16 input can expand on rewrite.
 Folder depth is limited to 64 and symbolic links inside a story are rejected.
 Outputs are bounded to 20,000 files and 512 MiB before compression (1 GiB for the
 six-runtime universal desktop ZIP). Later media
