@@ -67,6 +67,8 @@ Reusable pieces:
 | D14 | The story is **never built into the engine**. Samples live in `samples/` as standalone story folders/projects. |
 | D15 | Distribution: M1 points the player at a folder or zip. M2 adds a `talewright publish` command that **bakes a story into the player** to produce itch.io-ready web and desktop zips. |
 | D16 | Repo: `git init`; commit `README.md`, `LICENSE`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/TALE-SYNTAX.md`, and `docs/adr/*`. |
+| D17 | Authoring tools are **editor-neutral**: CLI, MSBuild, and a C# Language Server Protocol (LSP) server reuse shared Tale analysis and diagnostics. The VS Code extension is a thin client, not a second semantic implementation. |
+| D18 | Phase authoring support: **M2** CLI validation; **M3** shared partial analysis, linting, and LSP/VS Code intelligence; **M4** safe autofixes, lowest priority. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
 
 ## 4. Architecture
 
@@ -141,6 +143,81 @@ Reusable pieces:
 - **Diagnostics** carry file, line, column, code and message. The same diagnostics will feed the CLI, MSBuild and the VS Code language server (M3).
 - Output: an immutable typed `StoryDefinition`, which can be serialized to a compact bundle for publishing later.
 
+#### Planned authoring tooling (M2-M4; not implemented)
+
+The compiler already reports syntax, reference/type, YAML, and structural diagnostics. Authoring tools
+will reuse that work rather than build a separate parser or duplicate checks in each front end:
+
+```text
+Shared Tale compiler / analysis / lint rules
+  +-- talewright validate
+  +-- talewright lint [--fix]
+  +-- MSBuild diagnostics for C# story projects
+  +-- C# LSP server (proposed CLI host: talewright lsp)
+        +-- Thin VS Code extension
+        +-- Other LSP-capable editors
+```
+
+The commands below describe planned contracts, not commands available today:
+
+- **`talewright validate` (M2):** compile/check a story root and report all compiler diagnostics, including
+  warnings. Provide human-readable `file:line:column` output and machine-readable JSON with stable codes
+  and severities. Return success with warnings by default, fail on validation errors, and offer an explicit
+  warnings-as-errors policy. Invalid arguments and I/O failures must be visible and fail the command.
+  This is static validation, not proof that every conditional path is playable.
+- **`talewright lint` (M3):** include compiler diagnostics plus configurable authoring/style rules with stable
+  rule IDs, severities, configuration, and explicit suppression. Do not reimplement existing compiler checks.
+  Begin with a bounded, documented Tale-aware rule set; agree the exact rules and defaults before implementation.
+  Share human/JSON output and failure policy with validation. Do not apply generic Markdown linting wholesale:
+  Tale choices and directives have their own structural meanings.
+- **LSP + VS Code (M3):** a long-running C# language server handles live syntax/semantic diagnostics,
+  context-aware completion, and hover/syntax help. VS Code supplies highlighting, language configuration,
+  and snippets, then delegates intelligence to LSP. Other editors can launch the same server; they do not
+  need VS Code. Do not invoke one-shot CLI validation for every completion request.
+- **`talewright lint --fix` (M4):** opt-in, deterministic edits for an explicitly safe subset of lint rules.
+  Preserve prose, comments, and unrelated formatting; reject overlapping edits and do not overwrite files
+  changed since analysis. Reanalyze after fixing, report applied fixes and remaining diagnostics, and use
+  the resulting diagnostics for the exit policy. Repeated fixes must be idempotent. Ambiguous or
+  story-changing repairs remain suggestions, not automatic edits.
+
+**Shared-analysis prerequisite:** the current compiler targets runtime execution. Its symbols are internal,
+diagnostics have point locations rather than ranges, and `CompilationResult.Story` is null on errors.
+Add an editor-facing analysis result that retains partial symbols, source spans/declaration locations, and
+useful context even for incomplete input. Keep this separate from the source-free runtime AST.
+Use the existing in-memory `StorySource` to overlay unsaved buffers on the story's other files; discover
+the story root, invalidate analysis when Tale/YAML files change, and avoid publishing stale results.
+Start with debounced whole-story analysis; incremental compilation is not an initial requirement and
+should follow measured need.
+
+**Initial editor scope:** highlight Tale directives/expressions alongside supported Markdown; provide
+snippets for scenes, choices, conditions, and skill checks; complete scene IDs (including across files),
+characters, stats, items, factions, flags, variables, directives, predicates, and text modifiers in the
+appropriate context. Hover help should expose available schema descriptions/types and syntax documentation,
+not execute story logic or imply knowledge of live gameplay values. Signature help, inlay hints, rename,
+general formatting, and full YAML authoring assistance are outside the initial scope. YAML changes must
+still refresh Tale analysis and compiler diagnostics for `story.yaml`.
+
+**C# extensions:** CLI, MSBuild, and editor analysis must agree on custom predicate/modifier/ruleset
+registrations, either through an explicit project integration or exported metadata. Choose that contract
+before claiming C# project support; missing metadata must be reported rather than silently treating custom
+symbols as built-ins or executing arbitrary project code during editing.
+
+**Relative effort and dependencies** (including tests/docs, not schedule estimates):
+
+| Deliverable | Relative effort | Prerequisite / main work |
+|---|---|---|
+| CLI validation | Small | CLI foundation; existing compiler API, output/exit policy, integration tests |
+| Highlighting, language configuration, snippets | Small | Can land independently of LSP; must follow Tale rather than generic Markdown semantics |
+| Shared analysis + live diagnostics | Medium | Partial symbols/source spans, unsaved buffers, root discovery, invalidation, LSP synchronization |
+| Context-aware IntelliSense + hover help | Large overall | Shared analysis and LSP; useful behavior while expressions are incomplete |
+| CLI lint | Medium | CLI foundation; shared analysis for source-aware rules; rule/configuration/suppression design |
+| Safe autofix subset | Medium-large increment | Lint rules and precise source spans; non-destructive edits and idempotence |
+
+Acceptance checks belong with each deliverable: CLI output shape and exit policies; matching diagnostics
+across front ends; completion on incomplete text and cross-file symbols; unsaved Tale/YAML updates and stale
+diagnostic clearing; C# metadata consistency; and autofix preservation, edit-conflict, and repeat-run tests.
+Track the concrete work in [FR-020 through FR-024](ISSUES.md#fr-020).
+
 ### 4.6 Presentation (`Talewright.Player` RCL plus hosts)
 - Renders `RenderedFrame` → HTML via Blazor components. **It holds no game logic** and only knows `IStorySession`.
 - Includes a scroll-back transcript, choice list, character sheet panel (generated from ruleset metadata, so disabled stats disappear automatically) and a basic theme (CSS variables).
@@ -186,17 +263,21 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 - **M1 — Vertical slice (desktop):** core engine, generic ruleset, rules, narrative, `.tale` v0 compiler, runtime, Player UI and Photino host. *The Lost Relic* is playable from a folder. The web host builds and runs the same story.
 - **M2 — Ship it:**
   - saves through `ISaveStore` (file on desktop, IndexedDB on web);
-  - a `talewright` CLI (`validate`, `publish` producing itch-ready web and desktop zips);
+  - a `talewright` CLI (`validate` with human/JSON diagnostics and explicit exit policy, `publish` producing itch-ready web and desktop zips);
   - the C# story project path (Tier 1): NuGet packaging plus an MSBuild task giving build-time diagnostics;
   - richer hubs/storylets;
   - character creation.
 - **M3 — Ecosystem:**
-  - VS Code extension with a C# language server (reusing `Talewright.Tale` diagnostics), syntax highlighting and completion against the story schema;
+  - shared partial/source-aware Tale analysis, then `talewright lint` with configurable rules;
+  - editor-neutral C# LSP server (proposed host: `talewright lsp`) and a thin VS Code extension with syntax highlighting, snippets, live validation, context-aware completion, and hover help;
   - save migration;
   - media/images;
   - combat module;
   - open-world locations, time and clocks;
   - Tier 2 plugins: sandboxed scripting via Jint or MoonSharp, and/or desktop DLL plugins.
+- **M4 — Authoring polish (lowest priority):**
+  - `talewright lint --fix` for an explicitly safe subset of rules, after linting and source-aware analysis;
+  - preserve prose/comments, reject conflicting edits, reanalyze, and verify idempotence; no general formatter or automatic story-logic repairs.
 
 ### Code-extension tiers (for reference)
 - **Tier 0 (M1):** `.tale` plus YAML only.

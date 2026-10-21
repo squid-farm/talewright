@@ -253,6 +253,14 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 | [FR-017](#fr-017) | Medium | idea        | unscheduled | Runtime / Player   | Option to hide notes (rolls, stat changes)                        | S      |
 | [FR-018](#fr-018) | Low    | idea        | M2+         | Tale / publish     | Ship a precompiled story bundle instead of parsing at runtime     | M      |
 | [FR-019](#fr-019) | Medium | idea        | M2          | Runtime / Player   | Global back/forward buttons (roll state back and forward)         | M      |
+| [FR-020](#fr-020) | Medium | planned (M2) | M2 | CLI / Tale | Expose compiler validation through `talewright validate` | TBD |
+| [FR-021](#fr-021) | Medium | planned (M3) | M3 | Tale / analysis | Partial symbols and source ranges for shared authoring analysis | TBD |
+| [FR-022](#fr-022) | Medium | planned (M3) | M3 | CLI / analysis | Configurable Tale-aware `talewright lint` | TBD |
+| [FR-023](#fr-023) | Medium | planned (M3) | M3 | Editors / LSP | VS Code syntax support, live validation, completion, and hover help | TBD |
+| [FR-024](#fr-024) | Low | planned (M4) | M4 | CLI / analysis | Safe, opt-in `talewright lint --fix` | TBD |
+
+FR-020 through FR-024 have relative complexity assessments in [PLAN.md §4.5](PLAN.md#45-tale-compiler-talewrighttale);
+their time-based effort classifications remain TBD.
 
 ---
 
@@ -629,6 +637,116 @@ stats: shown | hidden }`, plus an optional player-side toggle in the Player, the
     `DeterministicDice`.
   - **Possible extras:** keyboard shortcuts (e.g. Alt+←/→), and a frame showing which option was taken last time.
 - **Effort:** M
+
+---
+
+### FR-020
+
+**Expose compiler validation through `talewright validate`.**
+
+- **Priority:** Medium
+- **Status:** planned (M2)
+- **Target:** M2
+- **Area:** CLI, Tale compiler
+- **Source:** Project Lead, authoring tooling planning session
+- **Shortcoming:** compiler checks exist, but authors cannot run them directly from a terminal, another
+  editor, or CI without writing a compiler host.
+- **Depends on:** the M2 CLI foundation; reuse `StoryCompiler` rather than duplicate validation.
+- **Scope:** validate a story root; emit compiler errors and warnings as human-readable file/line/column
+  messages or JSON with stable codes and severities. Warnings succeed by default; support explicit
+  warnings-as-errors. Define and document exact JSON fields and exit codes before implementation.
+  Invalid arguments and I/O failures must fail explicitly, not look like a clean story.
+- **Acceptance:** CLI integration tests cover valid stories, warnings, warnings-as-errors, syntax/type/
+  reference/structural errors, missing manifests, I/O failures, and JSON shape. Diagnostics match the
+  library. Documentation states that static validation does not prove all possible playthroughs succeed.
+
+### FR-021
+
+**Expose partial symbols and source ranges for shared authoring analysis.**
+
+- **Priority:** Medium
+- **Status:** planned (M3)
+- **Target:** M3, before source-aware lint rules and LSP intelligence
+- **Area:** Tale compiler / analysis API
+- **Source:** Project Lead, authoring tooling planning session
+- **Shortcoming:** runtime compilation hides its symbol table, emits point locations, and returns no story
+  on errors. Editor completion and precise fixes need useful context even while text is incomplete.
+- **Depends on:** existing compiler/parsers and `StorySource`; no CLI or editor dependency.
+- **Scope:** a separate analysis result retaining partial symbols, source spans/declaration locations,
+  context, and diagnostics without adding editor state to the runtime AST. Resolve cross-file symbols;
+  support unsaved Tale/YAML overlays, story-root discovery, file invalidation, and stale-result rejection.
+  Begin with debounced whole-story analysis rather than speculative incremental compilation.
+- **C# projects:** define explicit project integration or exported metadata for custom predicates,
+  modifiers, and rulesets shared across CLI, MSBuild, and LSP. Report missing metadata explicitly;
+  do not implicitly execute arbitrary project code while editing.
+- **Acceptance:** tests cover incomplete expressions, invalid YAML, partial symbols, cross-file references,
+  unsaved buffers, file add/change/delete, source-range correctness, and C# registration consistency.
+  Valid compilation and existing diagnostic codes retain their behavior.
+
+### FR-022
+
+**Add configurable Tale-aware `talewright lint`.**
+
+- **Priority:** Medium
+- **Status:** planned (M3)
+- **Target:** M3
+- **Area:** CLI, shared analysis/rules
+- **Source:** Project Lead, authoring tooling planning session
+- **Shortcoming:** compiler correctness checks do not provide configurable authoring/style guidance.
+- **Depends on:** [FR-020](#fr-020) for CLI output/exit policy and [FR-021](#fr-021) for source-aware rules.
+- **Scope:** include compiler diagnostics once, then add a bounded set of lint rules with stable IDs,
+  severities, configuration, and explicit suppression. Agree the initial rules/defaults and configuration
+  format before implementation. No generic Markdown linter wholesale; do not treat meaningful prose or
+  Tale choice/directive syntax as formatting noise.
+- **Acceptance:** rule tests cover positive/negative cases and precise locations; CLI tests cover
+  configuration, suppression, invalid configuration, warning policy, and human/JSON output. CLI and LSP
+  use the same rule implementation/results. Existing structural warnings are not duplicated as new rules.
+
+### FR-023
+
+**Provide Tale syntax support, IntelliSense, and code hints in VS Code and other editors.**
+
+- **Priority:** Medium
+- **Status:** planned (M3)
+- **Target:** M3; highlighting/snippets can ship independently before LSP
+- **Area:** VS Code extension, C# LSP server, shared analysis
+- **Source:** Project Lead, authoring tooling planning session
+- **Shortcoming:** there is no Tale language extension or editor-neutral interactive authoring service.
+- **Depends on:** [FR-021](#fr-021) for LSP intelligence; [FR-022](#fr-022) for lint diagnostics when available.
+  CLI-hosted server packaging can reuse the [FR-020](#fr-020) CLI foundation; no one-shot validation process
+  per completion request.
+- **Scope:** Tale-aware highlighting alongside supported Markdown, comments/brackets, and snippets for
+  scenes/choices/conditions/checks. A long-running C# LSP server (proposed host: `talewright lsp`) provides
+  live diagnostics, context-aware completion, and hover/syntax help; VS Code is a thin client. Other
+  LSP-capable editors can launch the same server.
+- **Completion:** scene IDs across files, characters, stats, items, factions, flags, variables, directives,
+  predicates, and modifiers. Hover shows available schema descriptions/types and language documentation,
+  not evaluated gameplay values.
+- **Boundaries:** signature help, inlay hints, rename, general formatting, and full YAML authoring support
+  are not initial requirements. Changes to `story.yaml` still update Tale analysis and YAML diagnostics.
+- **Acceptance:** grammar/snippet fixtures cover Tale/Markdown overlaps. LSP integration tests cover
+  initialization/shutdown, open/change/close, unsaved Tale/YAML, incomplete-input completion, cross-file
+  symbols, hover, stale-diagnostic clearing, and matching CLI diagnostics. Smoke-test the VS Code client
+  and document how another LSP client launches the server.
+
+### FR-024
+
+**Apply only safe, opt-in fixes through `talewright lint --fix`.**
+
+- **Priority:** Low
+- **Status:** planned (M4)
+- **Target:** M4, lowest priority
+- **Area:** CLI, shared lint rules / source edits
+- **Source:** Project Lead, authoring tooling planning session
+- **Shortcoming:** future lint guidance will otherwise require every repair to be made manually.
+- **Depends on:** [FR-021](#fr-021) source spans and [FR-022](#fr-022) rules/CLI.
+- **Scope:** a documented safe subset of rules emits deterministic edits. Preserve prose, comments, and
+  unrelated formatting; reject overlapping edits and files changed since analysis. Report applied fixes,
+  reanalyze, report remaining diagnostics, and apply the normal failure policy to the result. Surface
+  edit/I/O failures explicitly. Ambiguous or story-changing repairs remain suggestions.
+- **Acceptance:** fixtures prove exact preservation outside edit spans and repeat-run idempotence.
+  Tests cover overlapping edits, stale files, write failures, post-fix diagnostics, and exit behavior.
+  No general formatter or promised autofix for every lint rule.
 
 ---
 

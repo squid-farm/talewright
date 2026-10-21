@@ -25,7 +25,11 @@ stats, factions and items. No code is needed. Programmers can extend the engine 
 
 **Milestone 1 (vertical slice) is complete:** the engine, the `.tale` compiler, the shared Blazor player, and the
 desktop and web hosts all work, and the sample story *The Lost Relic* is playable end to end on both.
-Saves, a publishing CLI, and character creation are next (M2). See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
+Saves, a CLI with `validate` and `publish`, and character creation are next (M2).
+M3 adds `lint` and editor-neutral language-server support with a thin VS Code extension for Tale highlighting,
+snippets, live validation, completion, and hover help. Safe `lint --fix` support is lowest priority (M4).
+These commands and editor tools are planned, not available yet; they will share the compiler's analysis
+rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
 
 ## Layout
 
