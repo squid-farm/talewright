@@ -1,18 +1,56 @@
 @* Plays one compiled story: transcript of everything so far, current choices, and a character sheet. *@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@using Talewright.Runtime.Saves
 
 <div class="tw-player">
     <header class="tw-bar">
         <h1>@Story.Title</h1>
         <div class="tw-bar-actions">
-            <button type="button" class="tw-link" @onclick="Restart">Restart</button>
+            @if (Story.UndoEnabled)
+            {
+                <button type="button" class="tw-link" disabled="@(_busy || !_session.CanBack)" @onclick="Back">Back</button>
+                <button type="button" class="tw-link" disabled="@(_busy || !_session.CanForward)" @onclick="Forward">Forward</button>
+            }
+            @if (SaveStore is not null)
+            {
+                <button type="button" class="tw-link" disabled="@_busy" @onclick="ShowSavesAsync">Saved games</button>
+            }
+            <button type="button" class="tw-link" disabled="@_busy" @onclick="Restart">Restart</button>
             @if (OnExit.HasDelegate)
             {
-                <button type="button" class="tw-link" @onclick="() => OnExit.InvokeAsync()">Library</button>
+                <button type="button" class="tw-link" disabled="@_busy" @onclick="() => OnExit.InvokeAsync()">Library</button>
             }
         </div>
     </header>
+
+    @if (_showSaves && SaveStore is not null)
+    {
+        <fieldset class="tw-saves" disabled="@_busy">
+            <legend>Saved games</legend>
+            <label>Save name <input aria-label="Save name" @bind="_slot" maxlength="64" /></label>
+            <button type="button" @onclick="() => SaveAsync(false)">Save game</button>
+            <button type="button" @onclick="RefreshSlotsAsync">Refresh saves</button>
+            @if (_pendingOverwrite == _slot.Trim())
+            {
+                <p>Replace save “@_pendingOverwrite”?</p>
+                <button type="button" @onclick="() => SaveAsync(true)">Confirm overwrite</button>
+                <button type="button" @onclick="() => _pendingOverwrite = null">Cancel overwrite</button>
+            }
+            @if (_slots.Count == 0)
+            {
+                <p>No saved games.</p>
+            }
+            @foreach (var slot in _slots)
+            {
+                <button type="button" @onclick="() => LoadAsync(slot)">Load @slot</button>
+            }
+        </fieldset>
+    }
+    @if (_saveMessage is not null)
+    {
+        <p class="@(_saveError ? "tw-error" : "tw-save-status")" role="@(_saveError ? "alert" : "status")">@_saveMessage</p>
+    }
 
     <div class="tw-columns">
         <main class="tw-transcript" aria-label="Story transcript" aria-live="polite">
@@ -35,7 +73,7 @@
                 if (current.IsEnded)
                 {
                     <p class="tw-the-end">The End</p>
-                    <button type="button" class="tw-choice" @onclick="Restart">Play again</button>
+                    <button type="button" class="tw-choice" disabled="@_busy" @onclick="Restart">Play again</button>
                 }
                 else
                 {
@@ -44,7 +82,7 @@
                         {
                             var choice = current.Choices[i];
                             <li>
-                                <button type="button" class="tw-choice" @onclick="() => Choose(choice)">
+                                <button type="button" class="tw-choice" disabled="@_busy" @onclick="() => Choose(choice)">
                                     <span class="tw-choice-number">@(i + 1).</span>
                                     <InlineView Inlines="choice.Label" />
                                 </button>
@@ -76,20 +114,26 @@
     [Parameter]
     public bool Visible { get; set; } = true;
 
-    private sealed record TranscriptEntry(StoryFrame Frame)
-    {
-        public IReadOnlyList<RenderedInline>? Chosen { get; set; }
-    }
+    [Parameter]
+    public ISaveStore? SaveStore { get; set; }
 
-    private readonly List<TranscriptEntry> _transcript = [];
+    private IReadOnlyList<HistoryFrame> _transcript => _session.Transcript;
     private ElementReference _latestFrame;
-    private StorySession _session = default!;
+    private StoryHistory _session = default!;
     private StoryDefinition? _startedStory;
     private bool _focusLatest;
     private bool _wasVisible = true;
     private IJSObjectReference? _module;
+    private bool _busy;
+    private bool _showSaves;
+    private bool _saveError;
+    private int _generation;
+    private string _slot = "My save";
+    private string? _pendingOverwrite;
+    private string? _saveMessage;
+    private IReadOnlyList<string> _slots = [];
 
-    private RenderFragment FrameContent(TranscriptEntry entry) => @<text>
+    private RenderFragment FrameContent(HistoryFrame entry) => @<text>
         @if (!string.IsNullOrEmpty(entry.Frame.Title))
         {
             <h2 class="tw-scene-title">@entry.Frame.Title</h2>
@@ -121,21 +165,124 @@
     private void Restart()
     {
         _startedStory = Story;
-        _session = new StorySession(Story, Seed);
-        _transcript.Clear();
-        Append(_session.Start());
+        _session = new StoryHistory(Story, Seed);
+        _generation++;
+        _busy = false;
+        _showSaves = false;
+        _pendingOverwrite = null;
+        _saveMessage = null;
+        _slots = [];
+        _focusLatest = true;
     }
 
     private void Choose(ChoiceView choice)
     {
-        _transcript[^1].Chosen = choice.Label;
-        Append(_session.Choose(choice.Key));
+        _session.Choose(choice.Key);
+        _focusLatest = true;
     }
 
-    private void Append(StoryFrame frame)
+    private void Back()
     {
-        _transcript.Add(new TranscriptEntry(frame));
+        _session.Back();
         _focusLatest = true;
+    }
+
+    private void Forward()
+    {
+        _session.Forward();
+        _focusLatest = true;
+    }
+
+    private async Task ShowSavesAsync()
+    {
+        _showSaves = !_showSaves;
+        if (_showSaves)
+        {
+            await RefreshSlotsAsync();
+        }
+    }
+
+    private Task RefreshSlotsAsync() => SaveOperationAsync(async generation =>
+    {
+        var slots = await SaveStore!.ListAsync(Story.Id);
+        if (generation == _generation)
+        {
+            _slots = slots;
+        }
+    });
+
+    private Task SaveAsync(bool overwrite)
+    {
+        var slot = _slot.Trim();
+        if (!overwrite && _slots.Contains(slot, StringComparer.Ordinal))
+        {
+            _pendingOverwrite = slot;
+            return Task.CompletedTask;
+        }
+
+        return SaveOperationAsync(async generation =>
+        {
+            if (overwrite && _pendingOverwrite != slot)
+            {
+                throw new InvalidOperationException("Confirm the selected save before overwriting it.");
+            }
+
+            var id = Story.Id;
+            await SaveStore!.WriteAsync(id, slot, _session.Save(), overwrite);
+            var slots = await SaveStore.ListAsync(id);
+            if (generation == _generation)
+            {
+                _pendingOverwrite = null;
+                _saveMessage = $"Saved '{slot}'.";
+                _slots = slots;
+            }
+        });
+    }
+
+    private Task LoadAsync(string slot) => SaveOperationAsync(async generation =>
+    {
+        var story = Story;
+        var bytes = await SaveStore!.ReadAsync(story.Id, slot);
+        var candidate = StoryHistory.Restore(story, bytes);
+        if (generation == _generation)
+        {
+            _session = candidate;
+            _pendingOverwrite = null;
+            _saveMessage = $"Loaded '{slot}'.";
+            _focusLatest = true;
+        }
+    });
+
+    private async Task SaveOperationAsync(Func<int, Task> operation)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        var generation = _generation;
+        _busy = true;
+        _saveMessage = null;
+        _saveError = false;
+        try
+        {
+            await operation(generation);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or JSException)
+        {
+            if (generation == _generation)
+            {
+                _saveError = true;
+                _saveMessage = $"Couldn't complete save operation: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _busy = false;
+            }
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

@@ -1,13 +1,16 @@
 @* The whole player: pick a story from the library (or upload a .zip), compile it, then play it.
    Hosts render just this component; everything else is shared between desktop and web. *@
 @inject IStoryLibrary Library
+@inject IServiceProvider Services
+@using Microsoft.Extensions.DependencyInjection
+@using Talewright.Runtime.Saves
 
 <div class="tw-app">
     @if (_story is not null)
     {
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
         <div hidden="@_showLibrary">
-            <StoryPlayer Story="_story" Visible="!_showLibrary" OnExit="ShowLibrary" />
+            <StoryPlayer Story="_story" Visible="!_showLibrary" OnExit="ShowLibrary" SaveStore="Services.GetService<ISaveStore>()" />
         </div>
     }
 

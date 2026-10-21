@@ -54,6 +54,8 @@ for the suite-owned subpath server.
 | `Talewright.Host.Web.csproj` | Blazor WASM SDK; embeds `samples/**` like the desktop host. |
 
 Players can open their own stories with the "Open a story file" button (a `.zip` of a story folder).
+Manual saves use IndexedDB scoped to the current origin. Storage/quota/read/write failures are displayed
+in the player; no localStorage fallback or automatic overwrite is used. Clearing site data removes saves.
 
 ## Regression tests
 

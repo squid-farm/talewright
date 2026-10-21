@@ -13,6 +13,9 @@ dotnet run --project src/Talewright.Host.Desktop -- ~/stories/a ~/b.zip   # seve
 ```
 
 Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's equivalent).
+Manual saves use per-user local application data under `Talewright/saves` (normally
+`$XDG_DATA_HOME/Talewright/saves`, or `~/.local/share/Talewright/saves` on Linux).
+Slot replacement is explicit and atomic; incompatible/corrupt loads leave the current playthrough intact.
 
 ## Files
 
