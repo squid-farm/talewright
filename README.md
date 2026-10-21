@@ -62,6 +62,19 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 
 On Linux the desktop host needs WebKitGTK (`libwebkit2gtk-4.1`). Each project has its own README with details.
 
+## Player regression tests
+
+```bash
+python3 tests/run_e2e.py install-browsers
+python3 tests/run_e2e.py web       # Chromium, Firefox, WebKit; real Release-published web host
+python3 tests/run_e2e.py linux     # real Photino / installed WebKitGTK, through AT-SPI
+```
+
+These suites use shared, programmatically defined stories rather than sample-specific playthroughs.
+UI tests are opt-in; ordinary `dotnet test` still runs the fast .NET suite without browsers.
+See [tests/README.md](tests/README.md) for Linux prerequisites, targeted commands, coverage, artifacts,
+and Windows/macOS desktop options.
+
 ## Docs
 
 - [Plan and roadmap](docs/PLAN.md)

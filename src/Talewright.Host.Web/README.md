@@ -33,3 +33,9 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 | `Talewright.Host.Web.csproj` | Blazor WASM SDK; embeds `samples/**` like the desktop host. |
 
 Players can open their own stories with the "Open a story file" button (a `.zip` of a story folder).
+
+## Regression tests
+
+`python3 tests/run_e2e.py web` publishes this host in Release, serves the resulting static files on a
+suite-owned loopback port, and exercises it in Chromium, Firefox, and WebKit. It does not replace the host
+with a test app. See [testing guidance](../../tests/README.md) for browser installation and targeted runs.

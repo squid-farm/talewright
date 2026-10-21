@@ -49,7 +49,7 @@
 
                 <h2>Open a story file</h2>
                 <p>Choose a <code>.zip</code> containing <code>story.yaml</code> and its <code>.tale</code> files.</p>
-                <InputFile OnChange="UploadAsync" accept=".zip" />
+                <InputFile OnChange="UploadAsync" accept=".zip" aria-label="Story archive" />
             }
 
             @if (_error is not null)

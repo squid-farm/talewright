@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet test Talewright.slnx -c Release --logger trx --results-directory artifacts/unit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-results
+          path: artifacts/unit
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: python3 tests/run_e2e.py install-browsers --browser ${{ matrix.browser }}
+      - run: python3 tests/run_e2e.py web --browser ${{ matrix.browser }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: player-${{ matrix.browser }}
+          path: artifacts/test-results
+
+  linux-desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install native GUI prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify4 libgtk-3-0t64 \
+            xvfb xauth dbus-x11 at-spi2-core libatk-adaptor python3-pyatspi python3-gi \
+            gir1.2-gtk-3.0 xfwm4 wmctrl
+      - run: python3 tests/run_e2e.py linux
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: player-linux-desktop
+          path: artifacts/test-results

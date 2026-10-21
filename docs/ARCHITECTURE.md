@@ -408,12 +408,17 @@ One xUnit test project per engine project, under `tests/` (the generic ruleset i
 | `Talewright.Rules.Tests`     | expression evaluation, effects, triggers (once, edge, pass cap), storylet selection, checks                                                                                                 |
 | `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
 | `Talewright.Tale.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
-| `Talewright.Runtime.Tests`   | session loop (`StorySessionTests`) and the full sample (`LostRelicTests`: compiles clean, a scripted ending, and 300 random seeded playthroughs that must reach all endings without errors) |
+| `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, and sample compilation smoke |
+| `Talewright.Player.E2E.Tests` | production Release web host in Chromium, Firefox, and WebKit; opt-in, outside the root solution |
 
-The UI is not unit tested. It was verified by running the desktop app and by a scripted browser playthrough of
-the published web build (library → play to an ending → zip upload, good and broken).
+The player has persistent browser regression tests and actual Linux Photino tests through AT-SPI.
+Both reuse C#-defined story fixtures from `tests/Talewright.TestStories`; generated ZIPs and folders are not
+checked in or shipped. Sample-specific routes are deliberately not the detailed UI test contract.
+See [testing guidance](../tests/README.md) for the per-host coverage matrix, native prerequisites, commands,
+failure evidence, and the distinction between Playwright WebKit and system webviews.
 
-Run everything with `dotnet test` from the repo root.
+Run fast engine tests with `dotnet test` from the repo root. Player UI suites are explicit:
+`python3 tests/run_e2e.py web` and `python3 tests/run_e2e.py linux`.
 
 ---
 

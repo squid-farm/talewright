@@ -16,5 +16,6 @@
     <Project Path="tests/Talewright.Rules.Tests/Talewright.Rules.Tests.csproj" />
     <Project Path="tests/Talewright.Runtime.Tests/Talewright.Runtime.Tests.csproj" />
     <Project Path="tests/Talewright.Tale.Tests/Talewright.Tale.Tests.csproj" />
+    <Project Path="tests/Talewright.TestStories/Talewright.TestStories.csproj" />
   </Folder>
 </Solution>

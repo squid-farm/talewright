@@ -1,11 +1,12 @@
 # Samples
 
 Example stories. They are **not** part of the engine: engine code never references them. The two hosts embed
-everything under `samples/` as built-in stories, and the end-to-end tests compile and play them.
+everything under `samples/` as built-in stories. Integration smoke tests compile the sample and open it
+from the bundled library; detailed player tests use stable, programmatically defined test stories instead.
 
 ## The Lost Relic (`LostRelic/`)
 
-A short treasure hunt (19 scenes in 3 chapter files, four endings) written to exercise every M1
+A short treasure hunt (19 scenes in 3 chapter files, three endings) written to exercise every M1
 feature. Mara Burns, a treasure hunter, and her guide Tomas Okafor look for the Relic of Ysh while the
 Explorers' Guild watches.
 

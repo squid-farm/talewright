@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Talewright.Runtime\Talewright.Runtime.csproj" />
+    <ProjectReference Include="../Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>
 
 </Project>

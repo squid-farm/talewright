@@ -9,7 +9,7 @@ the compiler); it never reaches into rules or state internals beyond the read-on
 | Component | Job |
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `MaxUploadBytes` (20 MB). |
-| `StoryPlayer` | One playthrough. Creates a `StorySession`, keeps a transcript (past frames dimmed, chosen label echoed as "→ …"), numbered choice buttons, Restart, back to Library, "The End". Focuses the newest frame after each choice (scrolls into view and helps screen readers, no JS). Parameters: `Story`, `Seed`, `OnExit`. |
+| `StoryPlayer` | One playthrough. Creates a `StorySession`, keeps a transcript (past frames dimmed, chosen label echoed as "→ …"), numbered choice buttons, Restart, back to Library, "The End". Its collocated JS module scrolls to and focuses the newest frame, respecting reduced motion. Parameters: `Story`, `Seed`, `OnExit`, `Visible`. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`. `RenderedMedia` renders nothing yet. |
 | `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
@@ -38,3 +38,11 @@ one below 52rem.
 ## Not here yet
 
 Saves/loading (M2), character creation (M2), images (M3), settings (text size, theme picker).
+
+## Regression testing
+
+The shared UI is exercised against the production web host in Chromium, Firefox, and WebKit and against
+the real Linux Photino host via AT-SPI. The current passage, transcript, choices, and archive input have
+accessible names shared by assistive technology and the tests. Test stories are defined as C# strings and
+uploaded/opened through normal user workflows; no game-state test hook is exposed.
+See [testing guidance](../../tests/README.md) for commands and the per-host coverage matrix.

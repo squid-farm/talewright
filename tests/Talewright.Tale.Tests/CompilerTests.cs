@@ -496,4 +496,33 @@ public class CompilerTests
         stream.Position = 0;
         return stream;
     }
+
+    [Fact]
+    public void Accepts_exact_expanded_file_and_total_limits()
+    {
+        var text = new string('x', 5 * 1024 * 1024);
+        using var zip = CreateZip(Enumerable.Range(0, 10)
+            .Select(i => new KeyValuePair<string, string>($"{i}.tale", text)));
+        var source = StorySource.FromZip(zip);
+        Assert.Equal(10, source.Files.Count);
+        Assert.Equal(50L * 1024 * 1024, source.Files.Values.Sum(value => (long)value.Length));
+    }
+
+    [Fact]
+    public void Rejects_one_byte_over_the_exact_total_limit()
+    {
+        var text = new string('x', 5 * 1024 * 1024);
+        using var zip = CreateZip(Enumerable.Range(0, 10)
+            .Select(i => new KeyValuePair<string, string>($"{i}.tale", text))
+            .Append(new("extra.tale", "x")));
+        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(zip)).Message);
+    }
+
+    [Fact]
+    public void Accepts_exact_story_file_count_limit()
+    {
+        using var zip = CreateZip(Enumerable.Range(0, 1_000)
+            .Select(i => new KeyValuePair<string, string>($"{i}.tale", "")));
+        Assert.Equal(1_000, StorySource.FromZip(zip).Files.Count);
+    }
 }

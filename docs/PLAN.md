@@ -231,7 +231,7 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 | host-desktop | Photino.Blazor host: open story folder/zip | player-rcl | done |
 | host-web | Blazor WASM host: load bundled story / file picker; verify static publish | player-rcl | done |
 | sample-lost-relic | samples/LostRelic: female treasure hunter in an ancient temple; exercises stats, inventory, faction gate, skill check, pronouns/possessives, branching + convergence | tale-compiler | done |
-| e2e-tests | End-to-end test that compiles + plays LostRelic through scripted choices with fixed seed | runtime-session, sample-lost-relic | done |
+| e2e-tests | Deterministic shared story fixtures, three-engine Playwright player suite, and real Linux Photino tests; LostRelic compilation/bundled-open smoke only (see tests/README.md) | runtime-session, sample-lost-relic | done |
 
 ## 8. Risks / notes
 - **itch.io and Blazor WASM:** itch serves from a CDN subpath inside an iframe. We need a relative `<base href>` and must check how pre-compressed `.br`/`.gz` files are served (we may need to ship uncompressed). To be verified in M2.

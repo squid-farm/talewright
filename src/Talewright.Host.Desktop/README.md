@@ -27,3 +27,18 @@ Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's 
 
 Not done in M1. `dotnet publish -c Release -r <rid> --self-contained` produces a runnable folder; M2's
 `talewright publish` will produce itch-ready zips with a single story baked in.
+
+## Native regression tests
+
+`python3 tests/run_e2e.py linux --probe` verifies accessibility and the native chooser;
+`python3 tests/run_e2e.py linux` runs the shared story scenarios and desktop-specific file/startup tests.
+The runner drives this actual Photino host through AT-SPI in an isolated Xvfb/D-Bus session. It needs
+additional distro accessibility packages and runs as an ordinary user.
+
+The Linux app **can be automated**: the suite above does so using the distro's AT-SPI dependencies.
+Playwright itself has no supported direct attachment to Photino's embedded WebKitGTK view.
+Another option is WebKitWebDriver, but that requires native-host automation hooks and a WebDriver client
+(such as Selenium); installing a dependency alone does not make this view controllable by Playwright.
+Windows WebView2 does support Playwright attachment through CDP; macOS WKWebView needs a separate native
+approach. See [testing guidance](../../tests/README.md) for prerequisites, evidence, coverage limits,
+and expansion options.
