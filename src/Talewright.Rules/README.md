@@ -5,6 +5,10 @@ the read-only `IGameStateView` from Core, writing changes back only as events th
 
 Everything here operates on **typed trees** built by the compiler. Nothing parses strings, nothing uses reflection.
 
+Integer expression arithmetic and assignment effects saturate at `int.MinValue`/`int.MaxValue` rather than
+wrapping. Stat assignments are then clamped to their ruleset bounds. Division by zero retains its existing
+result of zero; negating `int.MinValue` or dividing it by `-1` saturates to `int.MaxValue`.
+
 ## Folders
 
 ### `Expressions/`

@@ -63,7 +63,8 @@ public static class EffectExecutor
     private static int Apply(int current, AssignOp op, int amount) => op switch
     {
         AssignOp.Set => amount,
-        AssignOp.Add => current + amount,
-        _ => current - amount,
+        AssignOp.Add => Arithmetic.Saturate((long)current + amount),
+        AssignOp.Subtract => Arithmetic.Saturate((long)current - amount),
+        _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown assignment operation."),
     };
 }

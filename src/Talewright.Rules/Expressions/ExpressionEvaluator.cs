@@ -59,7 +59,7 @@ public static class ExpressionEvaluator
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
             UnaryExpr { Op: UnaryOp.Not } e => Value.Of(!Evaluate(e.Operand, context).Bool),
-            UnaryExpr { Op: UnaryOp.Negate } e => Value.Of(-Evaluate(e.Operand, context).Number),
+            UnaryExpr { Op: UnaryOp.Negate } e => Value.Of(Arithmetic.Saturate(-(long)Evaluate(e.Operand, context).Number)),
             BinaryExpr e => Binary(e, context),
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };
@@ -82,10 +82,10 @@ public static class ExpressionEvaluator
         var right = Evaluate(e.Right, context);
         return e.Op switch
         {
-            BinaryOp.Add => Value.Of(left.Number + right.Number),
-            BinaryOp.Subtract => Value.Of(left.Number - right.Number),
-            BinaryOp.Multiply => Value.Of(left.Number * right.Number),
-            BinaryOp.Divide => Value.Of(right.Number == 0 ? 0 : left.Number / right.Number),
+            BinaryOp.Add => Value.Of(Arithmetic.Saturate((long)left.Number + right.Number)),
+            BinaryOp.Subtract => Value.Of(Arithmetic.Saturate((long)left.Number - right.Number)),
+            BinaryOp.Multiply => Value.Of(Arithmetic.Saturate((long)left.Number * right.Number)),
+            BinaryOp.Divide => Value.Of(right.Number == 0 ? 0 : Arithmetic.Saturate((long)left.Number / right.Number)),
             BinaryOp.Equal => Value.Of(Compare(left, right, context) == 0),
             BinaryOp.NotEqual => Value.Of(Compare(left, right, context) != 0),
             BinaryOp.Less => Value.Of(Compare(left, right, context) < 0),

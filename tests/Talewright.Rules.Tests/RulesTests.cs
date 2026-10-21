@@ -59,6 +59,73 @@ public class RulesTests
         Assert.Equal("Allied", Eval(new StandingTierRef(Guild), log).ToString());
     }
 
+    [Theory]
+    [InlineData(BinaryOp.Add, int.MaxValue, 1, int.MaxValue)]
+    [InlineData(BinaryOp.Add, int.MinValue, -1, int.MinValue)]
+    [InlineData(BinaryOp.Subtract, int.MinValue, 1, int.MinValue)]
+    [InlineData(BinaryOp.Subtract, int.MaxValue, -1, int.MaxValue)]
+    [InlineData(BinaryOp.Multiply, int.MaxValue, int.MaxValue, int.MaxValue)]
+    [InlineData(BinaryOp.Multiply, int.MinValue, int.MaxValue, int.MinValue)]
+    [InlineData(BinaryOp.Multiply, int.MinValue, -1, int.MaxValue)]
+    [InlineData(BinaryOp.Divide, int.MinValue, -1, int.MaxValue)]
+    [InlineData(BinaryOp.Divide, 12, 0, 0)]
+    [InlineData(BinaryOp.Add, 12, 3, 15)]
+    [InlineData(BinaryOp.Subtract, 12, 3, 9)]
+    [InlineData(BinaryOp.Multiply, -12, 3, -36)]
+    [InlineData(BinaryOp.Divide, -12, 3, -4)]
+    public void Arithmetic_saturates_without_changing_normal_results(BinaryOp op, int left, int right, int expected)
+    {
+        Assert.Equal(expected, Eval(new BinaryExpr(op, new NumberLiteral(left), new NumberLiteral(right)), NewLog()).Number);
+    }
+
+    [Theory]
+    [InlineData(int.MinValue, int.MaxValue)]
+    [InlineData(int.MaxValue, -int.MaxValue)]
+    [InlineData(7, -7)]
+    public void Negation_saturates(int value, int expected)
+    {
+        Assert.Equal(expected, Eval(new UnaryExpr(UnaryOp.Negate, new NumberLiteral(value)), NewLog()).Number);
+    }
+
+    [Theory]
+    [InlineData(AssignOp.Add, int.MaxValue, int.MaxValue)]
+    [InlineData(AssignOp.Subtract, int.MinValue, int.MaxValue)]
+    [InlineData(AssignOp.Add, int.MinValue, int.MinValue)]
+    [InlineData(AssignOp.Subtract, int.MaxValue, int.MinValue)]
+    public void Variable_and_standing_effects_saturate(AssignOp op, int amount, int expected)
+    {
+        var log = NewLog();
+        var variable = new VarId("counter");
+        var initial = expected > 0 ? 10 : -10;
+        EffectExecutor.ExecuteAll(
+        [
+            new ChangeVariable(variable, AssignOp.Set, new NumberLiteral(initial)),
+            new ChangeStanding(Guild, AssignOp.Set, new NumberLiteral(initial)),
+            new ChangeVariable(variable, op, new NumberLiteral(amount)),
+            new ChangeStanding(Guild, op, new NumberLiteral(amount)),
+        ], log, NamedPredicateRegistry.Empty);
+
+        Assert.Equal(expected, log.State.GetVariable(variable));
+        Assert.Equal(expected, log.State.GetStanding(Guild));
+    }
+
+    [Fact]
+    public void Stat_effects_saturate_before_applying_ruleset_bounds()
+    {
+        var log = NewLog();
+        EffectExecutor.Execute(new ChangeStat(EntityId.Player, GenericRuleset.Strength, AssignOp.Add,
+            new NumberLiteral(int.MaxValue)), log, NamedPredicateRegistry.Empty);
+
+        Assert.Equal(log.State.Ruleset.StatsById[GenericRuleset.Strength].Max,
+            log.State.GetBaseStat(EntityId.Player, GenericRuleset.Strength));
+
+        EffectExecutor.Execute(new ChangeStat(EntityId.Player, GenericRuleset.Strength, AssignOp.Subtract,
+            new NumberLiteral(int.MaxValue)), log, NamedPredicateRegistry.Empty);
+
+        Assert.Equal(log.State.Ruleset.StatsById[GenericRuleset.Strength].Min,
+            log.State.GetBaseStat(EntityId.Player, GenericRuleset.Strength));
+    }
+
     [Fact]
     public void Named_predicates_call_registered_csharp()
     {
