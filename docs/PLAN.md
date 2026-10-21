@@ -282,17 +282,7 @@ the plan above:
 3. Embedding all of `samples/` in both hosts: fine for now, to be replaced by `talewright publish` in M2?
 4. Item names are lowercase in the sample ("sputtering torch") and appear that way on the character sheet. Should
    the sheet capitalise, or should authors write display case?
-5. **Licence (pending decision; see ADR 0005).** The Project Lead prefers GPL plus an exception that leaves
-   games free to use any licence, over the current MPL-2.0. Points to settle before changing it:
-   - The GPL doesn't prevent resale of the engine; nothing open-source does. That needs source-available terms
-     or dual licensing.
-   - A published game *contains* the engine DLLs, and games with custom C# (rulesets, predicates, UI) link to
-     it. A "data processed by the engine" exception therefore isn't enough: it must cover linking and
-     distributing the combined game. The vetted precedents are the GCC Runtime Library Exception and the
-     Classpath exception.
-   - Practical difference from MPL: under MPL, closed-source C# *extensions* are allowed. Under GPL with a linking
-     exception, games may be closed, but a redistributed *modified engine* must be released in full.
-   - LGPL is a poor fit, because its relinking requirement is awkward for trimmed/AOT WASM bundles.
-
-   Options: GPL-3.0 + Classpath-style linking exception; GPL-3.0 + an adapted GCC-RLE; or keep MPL-2.0. Get the
-   chosen text reviewed by someone qualified before a public release.
+5. **Licence: decided 2026-10-20, keep MPL-2.0.** GPL-3.0 with a linking exception was considered (the goal being
+   "the engine stays open, games can use any licence"). It was rejected: MPL already gives games that freedom, no
+   open-source licence prevents reselling or copying the engine, and stronger copyleft wouldn't stop anyone
+   determined to reimplement it. Revisit only if dual licensing (a paid commercial tier) is ever wanted.
