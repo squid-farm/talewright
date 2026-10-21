@@ -13,11 +13,16 @@ This document is a stable migration index, not a snapshot of current issue state
 
 1. Read the issue, parent/sub-issues, and native blocking dependencies. Preserve existing scope and
    acceptance criteria; exploratory/deferred ideas are not automatically approved work.
-2. Before coding, check assignees, linked PRs, and recent comments. Assign yourself and leave a claim
-   comment naming your branch/worktree. Assignment and Project status are not atomic locks; stop and
-   coordinate if another worker has already claimed the task.
+2. Before coding, check assignees, linked PRs, recent claim comments, and Project status. Assign yourself
+   and leave a claim comment naming your session/agent identifier, branch, worktree, and implementation
+   slice. Multiple agents may share one GitHub account, so the assignee alone is not evidence of ownership.
+   Assignment and Project status are not atomic locks; stop and coordinate if another worker has already
+   claimed the task.
 3. Use an isolated branch/worktree. Move actionable, unblocked work from Backlog to Ready; move claimed
    work to In progress and completed implementations to In review with test evidence and a linked PR.
+   Read back the assignee and Project status before editing; a claim comment does not update either.
+   For explicitly local-only work, record the commit and test evidence and identify the missing PR/merge
+   step rather than implying a PR exists. Leave partially implemented issues In progress.
 4. Use `Closes #N` only for a fully resolved issue. For partial work or epic progress, use `Refs #N`.
    Do not close a parent epic merely because one child is complete. Verify closure and Project state.
 5. Put requirement/status changes and new tasks in GitHub. Keep repository architecture/specification docs
