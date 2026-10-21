@@ -61,7 +61,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S1 _[reviewer: P1]_
 - **Status:** fixed (`c61a79f`)
-- **Area / location:** `src/Talewright/Tale/Parsing/StoryYamlReader.cs` (custom `ruleset.stats` reading, around
+- **Area / location:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs` (custom `ruleset.stats` reading, around
   line 176); the crash is in `GameState.CreateInitial` → `StatDefinition.Clamp` → `Math.Clamp`.
 - **Source:** review session 2026-10-20
 - **What happens:** `stats: [ { id: love, min: 10, max: 0 } ]` produces no diagnostic. The story compiles and
@@ -79,7 +79,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S2 _[reviewer: P1]_
 - **Status:** fixed (`e0b7e7d`)
-- **Area / location:** `src/Talewright/Runtime/StorySession.cs`, `AfterChanges()` (around line 248).
+- **Area / location:** `src/Talewright.Runtime/StorySession.cs`, `AfterChanges()` (around line 248).
 - **Source:** review session 2026-10-20
 - **What happens:** `AfterChanges` runs triggers, then `CheckLevel`. A trigger such as `when: player:level >= 3`
   does not see the new level until the _next_ action. Its effects (and notes) then appear one step late, attached
@@ -97,8 +97,8 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S2 _[reviewer: P1]_
 - **Status:** fixed (`a0bfecb`)
-- **Area / location:** `src/Talewright/Tale/Parsing/StoryYamlReader.cs`, `ReadTriggers` (around line 401);
-  behaviour in `src/Talewright/Rules/Triggers/TriggerEngine.cs`.
+- **Area / location:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs`, `ReadTriggers` (around line 401);
+  behaviour in `src/Talewright.Rules/Triggers/TriggerEngine.cs`.
 - **Source:** review session 2026-10-20
 - **What happens:** `TriggerEngine` keys both its edge memory and the `once` check (`TriggerFired` events) by id.
   With two triggers named the same, whichever runs first marks the id as true and the second never fires. Two
@@ -115,7 +115,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S2 _[reviewer: P1]_
 - **Status:** fixed (`14e2d37`)
-- **Area / location:** `src/Talewright/Tale/Compilation/StorySource.cs`, `FromZip` (around line 67).
+- **Area / location:** `src/Talewright.Tale/Compilation/StorySource.cs`, `FromZip` (around line 67).
 - **Source:** review session 2026-10-20
 - **What happens:** every story-file entry is read fully into memory. The 20 MB upload limit in `TalewrightApp`
   applies to the _compressed_ bytes, so a small archive that expands to gigabytes can exhaust memory. On the web
@@ -135,7 +135,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S3 _[reviewer: P2]_
 - **Status:** fixed (`e0b7e7d`)
-- **Area / location:** `src/Talewright/Rules/Triggers/TriggerEngine.cs`, `Run` (around line 54).
+- **Area / location:** `src/Talewright.Rules/Triggers/TriggerEngine.cs`, `Run` (around line 54).
 - **Source:** review session 2026-10-20
 - **What happens:** `Run` stopped after `MaxPasses = 8` even if triggers were still becoming true. Their effects
   were skipped until some later change happened to call `Run` again, without reporting that the cap was hit.
@@ -153,8 +153,8 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S3 _[reviewer: P2]_
 - **Status:** deferred (M2)
-- **Area / location:** `src/Talewright/Rules/Effects/Effects.cs`, `Apply` (around line 66);
-  `src/Talewright/Rules/Expressions/ExpressionEvaluator.cs` (`+`, `-`, `*` on `int`).
+- **Area / location:** `src/Talewright.Rules/Effects/Effects.cs`, `Apply` (around line 66);
+  `src/Talewright.Rules/Expressions/ExpressionEvaluator.cs` (`+`, `-`, `*` on `int`).
 - **Source:** review session 2026-10-20
 - **What happens:** `player:hp += 2147483647` wraps to a negative number, which is then clamped to the stat's
   _minimum_. Variables and faction standings are unbounded, so they keep the wrapped value.
@@ -172,7 +172,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S3 _[reviewer: P2]_
 - **Status:** fixed (`124f14e`)
-- **Area / location:** `src/Talewright/Core/Rulesets/Ruleset.cs`, constructor (lines 24–26).
+- **Area / location:** `src/Talewright.Core/Rulesets/Ruleset.cs`, constructor (lines 24–26).
 - **Source:** review session 2026-10-20
 - **What happens:** `Stats`, `Tiers` and `Modifiers` are arrays and `StatsById` is a `Dictionary`, exposed as
   read-only interfaces. Code that casts them back (`(StatDefinition[])ruleset.Stats`) can modify a ruleset shared
@@ -189,7 +189,7 @@ Ranked by priority: severity first, then how easy the bug is to hit, then the co
 
 - **Severity:** S3
 - **Status:** deferred (M2)
-- **Area / location:** `src/Talewright/Tale/Compilation/StoryCompiler.cs`, `WithAutoDeclarations` and the
+- **Area / location:** `src/Talewright.Tale/Compilation/StoryCompiler.cs`, `WithAutoDeclarations` and the
   `FlagAssignment` / `VariableAssignment` regexes.
 - **Source:** Project Lead (review comment on the pre-scan regexes); verified 2026-10-20
 - **What happens:** flags and variables are auto-declared by a regex pre-scan of the raw `.tale` text. The regex
@@ -385,7 +385,7 @@ publish` compile a story's `.scss` if present.
 - **Priority:** Low
 - **Status:** deferred (Project Lead, 2026-10-20: keep the in-house rules and see how far they go; revisit if grammar edge cases start hurting)
 - **Target:** unscheduled
-- **Area:** `src/Talewright/Narrative/Grammar/EnglishGrammar.cs`
+- **Area:** `src/Talewright.Narrative/Grammar/EnglishGrammar.cs`
 - **Source:** Project Lead (review comment on `EnglishGrammar`)
 - **Shortcoming:** `#a` (a/an) uses a short exception list, so it gets things like "an FBI agent", "a URL",
   "an hour" vs "a historian" only partly right. There's no plural, ordinal or number-to-words support.
@@ -458,7 +458,7 @@ publish` compile a story's `.scss` if present.
 - **Priority:** Medium
 - **Status:** idea
 - **Target:** unscheduled
-- **Area:** `src/Talewright/Rulesets.Generic/GenericRuleset.cs` (`D20SkillCheckRule`), ruleset config
+- **Area:** `src/Talewright.Rulesets.Generic/GenericRuleset.cs` (`D20SkillCheckRule`), ruleset config
 - **Source:** Project Lead (review comment on `GenericRuleset` skills)
 - **How it works today:** skills _are_ stored independently: each is its own stat (rank 0–10), and raising
   Wisdom never changes your Survival rank. But the d20 check adds both: `d20 + skill rank + attribute modifier`
@@ -478,7 +478,7 @@ publish` compile a story's `.scss` if present.
 - **Priority:** Low
 - **Status:** idea
 - **Target:** before or with M2 save/load
-- **Area:** `src/Talewright/Runtime/StorySession.cs` (~290 lines)
+- **Area:** `src/Talewright.Runtime/StorySession.cs` (~290 lines)
 - **Source:** Project Lead (review comment: "feels too big, give it a good think")
 - **Analysis:** it currently does six jobs:
   1. Public façade and lifecycle (`Start`, `Choose`, `Current`, seed, event log)
@@ -504,7 +504,7 @@ publish` compile a story's `.scss` if present.
 - **Priority:** Low
 - **Status:** idea
 - **Target:** with FR-003
-- **Area:** `src/Talewright/Tale/Parsing/StoryYamlReader.cs` (~490 lines)
+- **Area:** `src/Talewright.Tale/Parsing/StoryYamlReader.cs` (~490 lines)
 - **Source:** Project Lead (review comment on the helpers section: "feels like a natural seam")
 - **Analysis:** the file is one class reading every `story.yaml` section, plus generic YAML node helpers (`Get`,
   `Scalar`, `RequiredScalar`, location mapping) at the bottom.
@@ -569,7 +569,7 @@ publish` compile a story's `.scss` if present.
 - **Priority:** Medium
 - **Status:** idea
 - **Target:** unscheduled
-- **Area:** `src/Talewright/Runtime/StorySession.cs` (`NotesSince`), Player, `story.yaml`
+- **Area:** `src/Talewright.Runtime/StorySession.cs` (`NotesSince`), Player, `story.yaml`
 - **Source:** Project Lead (review comment on `StorySession` notes)
 - **Shortcoming:** every check shows "Perception check: rolled 14 + 3 = 17 vs 15, success", and every change
   shows "+10 XP" or "Tomas: Affection +1". Some stories want hidden mechanics.

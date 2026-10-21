@@ -1,8 +1,6 @@
 # Talewright.Runtime — the engine loop
 
-This namespace is a module in the [Talewright engine](../README.md), not a separate package.
-
-Runs a compiled `StoryDefinition`. It is the module that coordinates every headless layer: Core state, Rules
+Runs a compiled `StoryDefinition`. It is the only project that touches every layer: Core state, Rules
 (effects, checks, triggers, storylets), Narrative (rendering) and the Tale model. The UI talks to it through one
 small interface.
 
@@ -27,7 +25,7 @@ while (!frame.IsEnded)
 
 ## The loop, briefly
 
-Full description in [ARCHITECTURE.md §5](../../../docs/ARCHITECTURE.md#5-the-engine-loop-in-detail).
+Full description in [ARCHITECTURE.md §5](../../docs/ARCHITECTURE.md#5-the-engine-loop-in-detail).
 
 - **Enter scene:** `SceneEntered` → entry effects → triggers + leveling → render body → notes → entry check
   (offer Continue) *or* choices (explicit + hub storylets) *or* first matching divert as Continue (`-> END` ends

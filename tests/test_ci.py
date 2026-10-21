@@ -11,7 +11,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
 sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
 from publish_samples import normalize_base_path
-from verify_packages import verify
+from verify_packages import ENGINE_ASSEMBLIES, verify
 
 
 class ReleaseVersionTests(unittest.TestCase):
@@ -64,6 +64,10 @@ class PackageBoundaryTests(unittest.TestCase):
 <metadata><id>{identity}</id><version>{version}</version>{dependencies}</metadata></package>""")
             package.writestr("README.md", "Package readme")
             package.writestr(f"lib/net10.0/{identity}.dll", b"test placeholder")
+            if identity == "Talewright":
+                for assembly in ENGINE_ASSEMBLIES:
+                    for extension in ("dll", "xml"):
+                        package.writestr(f"lib/net10.0/{assembly}.{extension}", b"test placeholder")
             if identity.endswith(".Player"):
                 for name in ["staticwebassets/talewright.css",
                              "staticwebassets/Components/StoryPlayer.razor.js",
@@ -107,6 +111,20 @@ class PackageBoundaryTests(unittest.TestCase):
                 for name, content in entries.items():
                     package.writestr(name, content)
             with self.assertRaisesRegex(ValueError, "missing Razor asset"):
+                verify(directory, "1.2.3")
+
+    def test_missing_component_assembly_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            engine = self.write_package(directory, "Talewright")
+            self.write_package(directory, "Talewright.Player")
+            with ZipFile(engine) as package:
+                entries = {name: package.read(name) for name in package.namelist()
+                           if name != "lib/net10.0/Talewright.Narrative.dll"}
+            with ZipFile(engine, "w") as package:
+                for name, content in entries.items():
+                    package.writestr(name, content)
+            with self.assertRaisesRegex(ValueError, "missing engine assembly asset"):
                 verify(directory, "1.2.3")
 
 

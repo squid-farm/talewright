@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Talewright.Runtime\Talewright.Runtime.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Talewright\Talewright.csproj" />
   </ItemGroup>
 

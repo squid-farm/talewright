@@ -14,6 +14,8 @@ from zipfile import ZipFile
 from package_version import version_from_tag
 
 PACKAGE_IDS = {"Talewright", "Talewright.Player"}
+ENGINE_ASSEMBLIES = {"Talewright." + module for module in
+                     ("Core", "Rules", "Narrative", "Rulesets.Generic", "Tale", "Runtime")}
 
 
 def verify(directory, version):
@@ -46,9 +48,15 @@ def verify(directory, version):
                                  "buildTransitive/Talewright.Player.props"]:
                     if required not in names:
                         raise ValueError(f"{path}: missing Razor asset {required}")
-            elif any(name.startswith(("Talewright.", "Microsoft.AspNetCore."))
-                     for name in dependencies):
-                raise ValueError(f"{path}: headless engine has a UI/component dependency")
+            else:
+                if any(name.startswith(("Talewright.", "Microsoft.AspNetCore."))
+                       for name in dependencies):
+                    raise ValueError(f"{path}: headless engine has a UI/component dependency")
+                for assembly in ENGINE_ASSEMBLIES:
+                    for extension in ("dll", "xml"):
+                        required = f"lib/net10.0/{assembly}.{extension}"
+                        if required not in names:
+                            raise ValueError(f"{path}: missing engine assembly asset {required}")
             found[identity] = path
     if found.keys() != PACKAGE_IDS:
         raise ValueError(f"Expected exactly {sorted(PACKAGE_IDS)}; found {sorted(found)}")
@@ -79,8 +87,9 @@ def smoke(directory, version):
             project.mkdir()
             extra = ('<FrameworkReference Include="Microsoft.AspNetCore.App" />'
                      '<SupportedPlatform Include="browser" />') if identity.endswith(".Player") else ""
+            output_type = "<OutputType>Exe</OutputType>" if identity == "Talewright" else ""
             (project / f"{name}.csproj").write_text(f"""<Project Sdk="{sdk}">
-  <PropertyGroup><TargetFramework>net10.0</TargetFramework><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><TreatWarningsAsErrors>true</TreatWarningsAsErrors>{output_type}</PropertyGroup>
   <ItemGroup><PackageReference Include="{identity}" Version="{version}" />{extra}</ItemGroup>
 </Project>
 """)
@@ -89,10 +98,32 @@ def smoke(directory, version):
     public static object CreateRuleset() => new Talewright.Core.Rulesets.RulesetBuilder("consumer").Build();
     public static System.Type Compiler => typeof(Talewright.Tale.Compilation.StoryCompiler);
     public static System.Type Runtime => typeof(Talewright.Runtime.IStorySession);
+    public static string NarrativeAssembly => typeof(Talewright.Narrative.Rendering.RenderedDocument).Assembly.GetName().Name;
 }
 """)
             if identity.endswith(".Player"):
                 (project / "PlayerView.razor").write_text("<Talewright.Player.Components.TalewrightApp />\n")
+            else:
+                (project / "Program.cs").write_text("""using System;
+using System.Collections.Generic;
+using Talewright.Tale.Compilation;
+using Talewright.Runtime;
+
+if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
+    throw new Exception("Original Narrative assembly identity was not preserved.");
+var source = new StorySource(new Dictionary<string, string>
+{
+    ["story.yaml"] = "id: smoke\\ntitle: Smoke\\nstart: start\\nruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",
+    ["main.tale"] = "=== start\\nHello **world**.\\n-> END",
+});
+var result = StoryCompiler.Compile(source);
+if (!result.Success)
+    throw new Exception(string.Join("\\n", result.Diagnostics));
+var frame = new StorySession(result.Story).Start();
+if (!frame.IsEnded || !frame.Document.ToPlainText().Contains("Hello world."))
+    throw new Exception("Packaged engine did not compile, render, and run the story.");
+Console.WriteLine("Original engine assemblies compiled and executed the package story.");
+""")
             for command in [["dotnet", "restore", "--configfile", config, "--no-http-cache"],
                             ["dotnet", "build", "-c", "Release", "--no-restore"]]:
                 print("+", " ".join(map(str, command)), f"({name})", flush=True)
@@ -104,6 +135,8 @@ def smoke(directory, version):
             if identity == "Talewright":
                 if any(name.startswith("Microsoft.AspNetCore.") for name in libraries):
                     raise ValueError("Engine-only consumer unexpectedly restored Blazor dependencies")
+                subprocess.run(["dotnet", "run", "-c", "Release", "--no-build"],
+                               cwd=project, env=environment, check=True)
             else:
                 manifest = json.loads((project / "obj/Release/net10.0/staticwebassets.build.json").read_text())
                 paths = {asset["RelativePath"] for asset in manifest["Assets"]

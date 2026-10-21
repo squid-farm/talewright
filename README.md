@@ -31,7 +31,13 @@ Saves, a publishing CLI, and character creation are next (M2). See [docs/PLAN.md
 
 | Path | What |
 |---|---|
-| `src/Talewright` | Headless engine package; Core, Rules, Narrative, Rulesets.Generic, Tale, and Runtime modules |
+| `src/Talewright` | Packaging shell bundling the six headless project assemblies into one NuGet package |
+| `src/Talewright.Core` | State, events, ruleset contracts, and deterministic randomness |
+| `src/Talewright.Rules` | Conditions, effects, checks, triggers, and storylets |
+| `src/Talewright.Narrative` | Templates, grammar, and presentation-independent documents |
+| `src/Talewright.Rulesets.Generic` | Default d20 ruleset |
+| `src/Talewright.Tale` | Story compiler and diagnostics |
+| `src/Talewright.Runtime` | Story sessions and frames |
 | `src/Talewright.Player` | Blazor UI (Razor Class Library) |
 | `src/Talewright.Host.Desktop` / `.Host.Web` | Photino desktop host / Blazor WASM host |
 | `samples/LostRelic` | Sample story (not part of the engine) |
@@ -99,9 +105,10 @@ dotnet add package Talewright --version VERSION
 ```
 
 Replace `VERSION` with a published version; prereleases must be requested explicitly.
-The six former headless assemblies are now one `Talewright.dll`. Namespaces are
-unchanged, but extensions compiled against the old assembly identities must be rebuilt.
-Internal engine modules are not separate NuGet products.
+The six headless projects retain their original source layout, namespaces, and
+assembly identities. `Talewright` is a packaging shell that ships those assemblies
+together; they are not separate NuGet products. Player retains its direct Runtime
+project reference for compilation and depends on the shell package for distribution.
 
 ## GitHub Actions and releases
 

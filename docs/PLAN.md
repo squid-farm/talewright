@@ -6,16 +6,12 @@
 
 This is the living plan. Todo status is tracked here: update the table in section 7 as work lands.
 
-## Distribution update
-
-The current distribution has two packages: `Talewright` (the six headless modules
-in one assembly) and `Talewright.Player` (the optional Blazor RCL, depending on the
-engine). Module namespaces are unchanged; older assembly identities are not.
-The dependency diagrams below describe logical layers, not six engine projects.
-NuGet supports C# customization; ordinary story authors use the supplied player
-without project package dependencies. CLI, VS Code tooling, templates, and plugin
-loading remain future work. See [architecture](ARCHITECTURE.md) and the root
-[release guidance](../README.md#github-actions-and-releases).
+Distribution now uses two packages without changing the project layout:
+`Talewright` is a packaging shell containing the six existing headless assemblies;
+`Talewright.Player` provides the optional UI and depends on that package.
+Component projects remain separate and are not individually published. NuGet is
+for C# customization; ordinary story authors do not need project dependencies.
+CLI/VS Code tooling and plugin loading remain roadmap work.
 
 ---
 
@@ -159,24 +155,23 @@ Reusable pieces:
 - `Talewright.Host.Web` (WASM): loads a story from a bundled path or a file picker.
 - Each host is a thin wrapper of a few lines.
 
-### 4.7 Current solution layout
+### 4.7 Planned solution layout
 ```
-Talewright.slnx
+Talewright.sln
 README.md  LICENSE  .gitignore  Directory.Build.props  global.json
 docs/  PLAN.md  ARCHITECTURE.md  TALE-SYNTAX.md  adr/0001-…md
 src/
-  Talewright/                   headless engine project/package
-    Core/                       entities, stats, inventory, factions, events, state, RNG
-    Rules/                      predicates, storylets, modifiers, triggers, skill checks
-    Narrative/                  template AST, document model, renderer, grammar/pronouns
-    Rulesets.Generic/           default d20-ish mechanics (behaviorally opt-out)
-    Tale/                       .tale + YAML compiler (Markdig, YamlDotNet), diagnostics
-    Runtime/                    IStorySession facade, command handling, frame production
+  Talewright.Core/              RPG engine: entities, stats, inventory, factions, events, state, RNG
+  Talewright.Rules/             predicates, evaluator, storylets, modifiers, triggers, skill checks
+  Talewright.Narrative/         template AST, document model, renderer, grammar/pronouns
+  Talewright.Rulesets.Generic/  default d20-ish attributes & skills (opt-out)
+  Talewright.Tale/              .tale + story.yaml compiler (Markdig, YamlDotNet), diagnostics
+  Talewright.Runtime/           IStorySession facade, command handling, frame production
   Talewright.Player/            Razor Class Library (UI)
   Talewright.Host.Desktop/      Photino.Blazor host
   Talewright.Host.Web/          Blazor WASM host
 tests/
-  Talewright.*.Tests/           xUnit per logical module + opt-in UI suites
+  Talewright.*.Tests/           xUnit per project + an end-to-end "play the sample" test
 samples/
   LostRelic/                    story.yaml + *.tale (NOT referenced by engine projects)
 ```
@@ -199,8 +194,7 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 - **M2 — Ship it:**
   - saves through `ISaveStore` (file on desktop, IndexedDB on web);
   - a `talewright` CLI (`validate`, `publish` producing itch-ready web and desktop zips);
-  - the C# story project path (Tier 1): templates and an MSBuild task giving build-time diagnostics;
-    the two NuGet packages are already wired for release through GitHub Actions;
+  - the C# story project path (Tier 1): NuGet packaging plus an MSBuild task giving build-time diagnostics;
   - richer hubs/storylets;
   - character creation.
 - **M3 — Ecosystem:**
@@ -213,7 +207,7 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
 
 ### Code-extension tiers (for reference)
 - **Tier 0 (M1):** `.tale` plus YAML only.
-- **Tier 1 (M2):** a C# story project installs `Talewright.Player` (bringing in `Talewright`), registers named predicates, stats, modifiers, grammar modifiers and rulesets, and builds its own desktop and web app. Headless/custom-frontend consumers can install only `Talewright`.
+- **Tier 1 (M2):** a C# story project references `Talewright.*` NuGet packages, registers named predicates, stats, modifiers, grammar modifiers and rulesets, and builds its own desktop and web app.
 - **Tier 2 (M3+):** plugins inside the generic player.
   - Desktop: AssemblyLoadContext (full trust, no sandbox).
   - Web: arbitrary DLLs are fragile under trimming, so **sandboxed script plugins (Jint/MoonSharp) are preferred**.

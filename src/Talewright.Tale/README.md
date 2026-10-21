@@ -1,10 +1,8 @@
 # Talewright.Tale — the story compiler
 
-This namespace is a module in the [Talewright engine](../README.md), not a separate package.
-
 Turns a story folder (`story.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
-diagnostics with file, line and column. This is the **only** module that parses text, and it runs once per load.
-The syntax itself is specified in [TALE-SYNTAX.md](../../../docs/TALE-SYNTAX.md).
+diagnostics with file, line and column. This is the **only** project that parses text, and it runs once per load.
+The syntax itself is specified in [TALE-SYNTAX.md](../../docs/TALE-SYNTAX.md).
 
 ```csharp
 var result = StoryCompiler.Compile(StorySource.FromDirectory("samples/LostRelic"));
@@ -50,7 +48,7 @@ var session = new StorySession(result.Story!);
 ## Diagnostic codes
 
 `TW1xxx` syntax, `TW2xxx` references and types, `TW3xxx` structure, `TW4xxx` story.yaml. The full table is in
-[TALE-SYNTAX.md §7](../../../docs/TALE-SYNTAX.md). To find where a code is raised: `grep -rn TW2002 src/`.
+[TALE-SYNTAX.md §7](../../docs/TALE-SYNTAX.md). To find where a code is raised: `grep -rn TW2002 src/`.
 
 ## Semantics worth knowing
 

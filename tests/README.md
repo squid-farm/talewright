@@ -16,8 +16,9 @@ unit, Chromium, Firefox, WebKit, and real Linux Photino jobs on Ubuntu 24.04.
 Each job uploads its reports/evidence even on failure. Both Build (including
 package verification) and Tests must pass before any publishing job.
 
-Test projects still follow logical module boundaries, but all headless references
-now target `src/Talewright/Talewright.csproj`. The engine package has no Blazor
+Test projects retain their original project references and suite boundaries.
+The `src/Talewright/Talewright.csproj` packaging shell bundles the six headless
+assemblies without moving their source or merging their projects. The engine package has no Blazor
 dependency. CI packs exactly `Talewright` and `Talewright.Player`, then restores
 and builds isolated engine-only and Razor consumers using a fresh package cache.
 This checks real package references, the Player's transitive engine dependency,

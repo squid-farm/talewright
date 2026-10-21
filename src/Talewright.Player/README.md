@@ -1,8 +1,9 @@
 # Talewright.Player — the shared Blazor UI
 
 A Razor Class Library containing the whole user interface. Both hosts render a single component,
-`<TalewrightApp />`, so desktop and web are identical. Its Talewright dependency is the consolidated
-`Talewright` engine package. It uses the Runtime namespace and the read-only `IGameStateView`,
+`<TalewrightApp />`, so desktop and web are identical. Its source dependency remains
+`Talewright.Runtime`; its NuGet dependency is the `Talewright` packaging shell.
+It uses the Runtime namespace and the read-only `IGameStateView`,
 not engine implementation internals.
 
 For C# customization, installing only `Talewright.Player` restores the engine automatically.

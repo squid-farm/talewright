@@ -2,9 +2,25 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>The headless Talewright engine: story compilation, rules, narrative rendering, and runtime.</Description>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeEngineAssemblies</TargetsForTfmSpecificBuildOutput>
+    <BuildProjectReferences Condition="'$(NoBuild)' == 'true'">false</BuildProjectReferences>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../Talewright.Core/Talewright.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../Talewright.Rules/Talewright.Rules.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../Talewright.Narrative/Talewright.Narrative.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../Talewright.Tale/Talewright.Tale.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../Talewright.Runtime/Talewright.Runtime.csproj" PrivateAssets="all" />
     <PackageReference Include="Markdig" Version="1.4.2" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
+  <Target Name="IncludeEngineAssemblies" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)"
+                            Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' And '%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).xml')"
+                            Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' And '%(ReferenceCopyLocalPaths.Extension)' == '.dll' And Exists('%(ReferenceCopyLocalPaths.RootDir)%(ReferenceCopyLocalPaths.Directory)%(ReferenceCopyLocalPaths.Filename).xml')" />
+    </ItemGroup>
+  </Target>
 </Project>

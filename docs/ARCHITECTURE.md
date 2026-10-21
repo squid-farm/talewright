@@ -1,6 +1,6 @@
 # Architecture
 
-This is the guided tour of the code: what each module does, how a click becomes text on screen, where the
+This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
 extension points are, and where to look when something breaks. [PLAN.md](PLAN.md) records _why_ (decisions,
 research, roadmap); this document records _what is actually built_. The [ADRs](adr/) hold the big decisions in
 long form, and [TALE-SYNTAX.md](TALE-SYNTAX.md) is the authoritative reference for the story language.
@@ -9,7 +9,7 @@ Contents:
 
 1. [The big picture](#1-the-big-picture)
 2. [Invariants (the rules the code must keep)](#2-invariants)
-3. [Module by module](#3-module-by-module)
+3. [Project by project](#3-project-by-project)
 4. [Life of a story: load → compile → play](#4-life-of-a-story)
 5. [The engine loop in detail](#5-the-engine-loop-in-detail)
 6. [Extension points](#6-extension-points)
@@ -21,54 +21,44 @@ Contents:
 
 ## 1. The big picture
 
+### NuGet distribution
+
+Project boundaries and the dependency graph below remain intact. The
+`src/Talewright/Talewright.csproj` shell references all six headless projects and
+packages their existing assemblies together as `Talewright`; it contains no engine
+implementation. `Talewright.Player` retains its direct Runtime project reference,
+and its published package depends on `Talewright`. Both packages share one version.
+The component projects are not separately published. Source paths, namespaces, and
+assembly identities are unchanged; packaging is independent of code organization.
+
+Ordinary story authors need no NuGet project dependencies. C# customizers normally
+install only `Talewright.Player`; headless/custom-UI consumers install `Talewright`.
+
 Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of _scenes_. Each
 scene has prose (a template), optional requirements, effects, skill checks, choices and diverts. Nothing about
 "which scene comes next" is hard-wired into the engine: scenes say where to go (`-> scene`, "rails"), or a hub scene
 offers every storylet whose requirements currently hold ("hubs"). The same mechanism will later drive
 open-world locations.
 
-The three tiers map onto namespaces/modules like this:
+The three tiers you asked for map onto projects like this:
 
-| Your tier             | Namespaces / modules                                                  | One-line job                                                                         |
+| Your tier             | Projects                                                              | One-line job                                                                         |
 | --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | **RPG engine**        | `Talewright.Core`, `Talewright.Rulesets.Generic`                      | Who exists, what they have, what has happened. Pure state + events.                  |
 | **Rules engine**      | `Talewright.Rules`                                                    | Evaluate conditions, apply effects, resolve checks, fire triggers, select storylets. |
 | **Template renderer** | `Talewright.Narrative`                                                | Turn a typed template AST + state into a presentation-agnostic document.             |
 | **Presentation**      | `Talewright.Player`, `Talewright.Host.Desktop`, `Talewright.Host.Web` | Blazor UI and the two native/web shells.                                             |
 
-Two more modules glue it together:
+Two more projects glue it together:
 
 - `Talewright.Tale` is the **compiler**: it turns `.tale` + `story.yaml` text into the typed objects the other
   layers use. It is the _only_ place that parses strings, and it runs once when a story loads.
 - `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
-  frame). It is the module that coordinates all the engine layers.
-
-### Packages and authoring audiences
-
-There are two library projects and NuGet packages:
-
-- `src/Talewright/Talewright.csproj` builds the headless `Talewright.dll`. Its
-  `Core/`, `Rules/`, `Narrative/`, `Rulesets.Generic/`, `Tale/`, and `Runtime/`
-  folders retain the existing namespaces but are not separate assemblies.
-- `Talewright.Player` is the optional Blazor RCL and depends on that engine.
-  Installing only `Talewright.Player` restores both packages.
-
-Ordinary story authors need no NuGet project dependencies. CLI and VS Code
-authoring tools remain roadmap work; the packages serve C# customizers, tooling,
-and alternative frontends. Both packages share one version/release train. No
-component-package family or umbrella package is published.
-
-Consolidation removes compile-time project boundaries between headless modules;
-the logical layering below remains a design rule. Core's code uses no third-party
-APIs, but the engine package as a whole depends on Markdig and YamlDotNet. Player
-is the meaningful optional dependency: headless consumers do not take Blazor.
-Generic mechanics are replaceable, but the compiler still uses its default
-factory/tier definitions, and Runtime consumes Tale's compiled story model.
+  frame). It is the only project that knows about all the others.
 
 ### Dependency graph
 
-Arrows show logical dependencies, not separate NuGet products. The six headless
-modules are in one engine assembly; the engine project never references the UI.
+Arrows mean "references". Nothing points upward; the engine never knows about the UI.
 
 ```
         Host.Desktop   Host.Web
@@ -133,10 +123,9 @@ These are load-bearing. Breaking one will break saves, replays, tests or the "de
 
 ---
 
-## 3. Module by module
+## 3. Project by project
 
-Each module also has its own `README.md` with a file-by-file guide under
-`src/Talewright/`; Player and the hosts have their own project READMEs.
+Each project also has its own `README.md` with a file-by-file guide. This section is the summary.
 
 ### 3.1 `Talewright.Core` — the RPG engine
 
@@ -336,7 +325,7 @@ samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Co
 
 ## 5. The engine loop in detail
 
-All of this is in `src/Talewright/Runtime/StorySession.cs` (the class remarks repeat it next to the code).
+All of this is in `src/Talewright.Runtime/StorySession.cs` (the class remarks repeat it next to the code).
 
 **Entering a scene** (`Enter`):
 
@@ -392,10 +381,8 @@ This is how the "dating sim doesn't want strength" requirement is met, and where
 | Different story source (database, HTTP)           | —                                                                                        | implement `IStoryLibrary` and register it in the host                      |
 | Different UI (console, Unity, MAUI)               | —                                                                                        | consume `IStorySession` + `RenderedDocument`; ignore `Talewright.Player`   |
 
-The C# column works through the two packages (or project references) and custom
-`CompilerOptions` (`Rulesets`, `Predicates`, `Modifiers`). A template project,
-CLI, and extension-loading support remain future work. These hooks do not imply
-that the stock Player exposes every custom option through its UI.
+The C# column already works if you reference the projects and pass a custom `CompilerOptions`
+(`Rulesets`, `Predicates`, `Modifiers`); what M2 adds is packaging (NuGet) and a template project.
 
 Things that are deliberately **not** extension points yet: the `.tale` syntax itself, the event set (adding an
 event means touching `GameState.Apply`), and save formats.
@@ -426,9 +413,7 @@ event means touching `GameState.Apply`), and save formats.
 
 ## 8. Testing
 
-Separate xUnit projects retain the engine's logical test boundaries under `tests/`
-(the generic ruleset is tested in `Talewright.Core.Tests`). All reference the
-consolidated engine:
+One xUnit test project per engine project, under `tests/` (the generic ruleset is tested in `Talewright.Core.Tests`):
 
 | Project                      | What it covers                                                                                                                                                                              |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
