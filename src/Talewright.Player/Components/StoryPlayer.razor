@@ -106,6 +106,9 @@
     [Parameter]
     public ulong? Seed { get; set; }
 
+    [Parameter]
+    public CharacterSelection? Character { get; set; }
+
     /// <summary>Raised when the player asks to go back to the library. The button is hidden if unset.</summary>
     [Parameter]
     public EventCallback OnExit { get; set; }
@@ -164,8 +167,9 @@
 
     private void Restart()
     {
+        var character = ReferenceEquals(_startedStory, Story) ? _session.Character : Character;
         _startedStory = Story;
-        _session = new StoryHistory(Story, Seed);
+        _session = new StoryHistory(Story, Seed, character);
         _generation++;
         _busy = false;
         _showSaves = false;

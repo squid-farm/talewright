@@ -10,7 +10,15 @@
     {
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
         <div hidden="@_showLibrary">
-            <StoryPlayer Story="_story" Visible="!_showLibrary" OnExit="ShowLibrary" SaveStore="Services.GetService<ISaveStore>()" />
+            @if (_story.Creation is not null && _character is null)
+            {
+                <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
+                <button type="button" class="tw-link" @onclick="ShowLibrary">Library</button>
+            }
+            else
+            {
+                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="ShowLibrary" SaveStore="Services.GetService<ISaveStore>()" />
+            }
         </div>
     }
 
@@ -87,6 +95,7 @@
 
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
+    private CharacterSelection? _character;
     private bool _showLibrary;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
@@ -142,6 +151,7 @@
         if (result.Success)
         {
             _story = result.Story;
+            _character = null;
             _showLibrary = false;
             _diagnostics = [];
             await OnTitleChanged.InvokeAsync(_story!.Title);
@@ -158,6 +168,8 @@
         _failedTitle = null;
         _diagnostics = [];
     }
+
+    private void CharacterCreated(CharacterSelection character) => _character = character;
 
     private async Task ShowLibrary()
     {

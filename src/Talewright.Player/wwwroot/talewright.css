@@ -95,3 +95,6 @@ button { font: inherit; color: inherit; }
 .tw-diagnostic.tw-error { border-color: var(--tw-error); }
 .tw-diagnostic.tw-warning { border-color: var(--tw-warning); }
 .tw-diagnostic-code { font-weight: bold; margin: 0 0.5rem; }
+.tw-creation form { display: grid; gap: 1rem; max-width: 32rem; }
+.tw-creation label { display: grid; gap: .25rem; }
+.tw-creation input, .tw-creation select { font: inherit; padding: .5rem; max-width: 100%; }

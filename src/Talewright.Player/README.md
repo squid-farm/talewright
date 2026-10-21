@@ -63,9 +63,20 @@ one below 52rem.
 
 ## Not here yet
 
-Character creation (M2), images (M4: Presentation),
+Images (M4: Presentation),
 settings (text size, theme picker; unscheduled). Core release verification takes precedence over new
 presentation features; see [the roadmap](../../docs/PLAN.md#core-production-readiness-gates-m2).
+
+## Character creation
+
+An opt-in manifest `creation` section opens the shared accessible creation form
+before play: names, allowed pronouns, presets and bounded ruleset stat choices.
+Invalid input shows an alert and cannot start a session. Fixed protagonists retain
+the existing direct-start behavior. Restart keeps the active character, including
+one restored from a save. Library reopening offers creation anew; loading a save
+then replaces that selection with the saved character.
+Custom hosts may pass `StoryPlayer.Character` with a validated selection.
+See [the manifest contract](../../docs/TALE-SYNTAX.md#optional-character-creation).
 
 ## Regression testing
 
