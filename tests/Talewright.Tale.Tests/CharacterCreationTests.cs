@@ -1,9 +1,35 @@
 using Talewright.Tale.Compilation;
+using Talewright.Core.Identity;
 
 namespace Talewright.Tale.Tests;
 
 public sealed class CharacterCreationTests
 {
+    [Theory]
+    [InlineData("16", 16)]
+    [InlineData("10", 8)]
+    public void Partial_preset_falls_back_to_authored_stat_before_legal_default(string strength, int expected)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.yaml"] = $$$"""
+                id: creation
+                title: Creation
+                start: a
+                characters:
+                  player: {first-name: Default, stats: {str: {{{strength}}}}}
+                creation:
+                  stats: {str: [8, 12, 16]}
+                  presets:
+                    healthy: {stats: {hp: 15}}
+                """,
+            ["main.tale"] = "=== a\n-> END",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        Assert.Equal(expected, story.Creation!.Default(story.World.Characters[EntityId.Player]).Stats["str"]);
+    }
+
     [Theory]
     [InlineData("name: maybe")]
     [InlineData("pronouns: [she, she]")]
