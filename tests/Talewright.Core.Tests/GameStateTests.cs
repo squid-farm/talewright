@@ -106,4 +106,13 @@ public class GameStateTests
         Assert.Equal(20, rolls.Distinct().Count());
         Assert.NotEqual(rolls.Take(20), Enumerable.Range(0, 20).Select(i => DeterministicDice.Roll(100, i, 20)));
     }
+
+    [Fact]
+    public void Dice_sequence_never_changes_between_versions()
+    {
+        // Golden values computed from the reference SplitMix64. If this fails, saved games would replay with
+        // different rolls: don't "fix" the expected values, fix the dice.
+        Assert.Equal([10, 7, 8, 17, 13, 18, 6, 12, 15, 9, 12, 7], Enumerable.Range(0, 12).Select(i => DeterministicDice.Roll(42, i, 20)));
+        Assert.Equal([1, 6, 2, 3, 1, 5, 4, 3, 5, 1, 3, 3], Enumerable.Range(0, 12).Select(i => DeterministicDice.Roll(0xDEADBEEF, i, 6)));
+    }
 }
