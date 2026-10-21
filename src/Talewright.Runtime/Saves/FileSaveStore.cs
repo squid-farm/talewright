@@ -18,7 +18,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
     private string SlotPath(string storyId, string slot)
     {
         SaveNames.Validate(storyId, slot);
-        var name = Convert.ToBase64String(Encoding.UTF8.GetBytes(slot)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var name = Convert.ToHexString(Encoding.UTF8.GetBytes(slot));
         return Path.Combine(StoryDirectory(storyId), name + ".json");
     }
 
@@ -38,11 +38,10 @@ public sealed class FileSaveStore(string root) : ISaveStore
         var slots = new List<string>();
         foreach (var path in paths)
         {
-            var name = Path.GetFileNameWithoutExtension(path).Replace('-', '+').Replace('_', '/');
-            name = name.PadRight((name.Length + 3) / 4 * 4, '=');
+            var name = Path.GetFileNameWithoutExtension(path);
             try
             {
-                var slot = new UTF8Encoding(false, true).GetString(Convert.FromBase64String(name));
+                var slot = new UTF8Encoding(false, true).GetString(Convert.FromHexString(name));
                 SaveNames.Validate(storyId, slot);
                 slots.Add(slot);
             }

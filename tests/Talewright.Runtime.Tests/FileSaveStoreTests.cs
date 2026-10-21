@@ -29,6 +29,21 @@ public sealed class FileSaveStoreTests : IDisposable
         Assert.Equal(new byte[] { 3 }, await Store.ReadAsync("story", "slot"));
     }
 
+    [Fact]
+    public async Task Slots_with_case_colliding_base64_names_remain_independent()
+    {
+        await Store.WriteAsync("story", "aaa", [1]);
+        await Store.WriteAsync("story", "aaG", [2]);
+        await Store.WriteAsync("story", "café", [3]);
+        var files = Directory.GetFiles(_root, "*.json", SearchOption.AllDirectories);
+        Assert.Equal(files.Length, files.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(["aaG", "aaa", "café"], await Store.ListAsync("story"));
+        await Store.WriteAsync("story", "aaG", [4], overwrite: true);
+        Assert.Equal(new byte[] { 1 }, await Store.ReadAsync("story", "aaa"));
+        Assert.Equal(new byte[] { 4 }, await Store.ReadAsync("story", "aaG"));
+        Assert.Equal(new byte[] { 3 }, await Store.ReadAsync("story", "café"));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
