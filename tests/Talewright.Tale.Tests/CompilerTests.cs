@@ -9,6 +9,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
+using System.IO.Compression;
 
 namespace Talewright.Tale.Tests;
 
@@ -426,7 +427,7 @@ public class CompilerTests
     public void Loads_stories_from_zip_with_a_top_level_folder()
     {
         using var stream = new MemoryStream();
-        using (var zip = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
             void Add(string path, string text)
             {
@@ -442,5 +443,57 @@ public class CompilerTests
         var source = StorySource.FromZip(stream);
         Assert.Equal(["chapters/one.tale", "story.yaml"], source.Files.Keys.Order());
         Assert.True(StoryCompiler.Compile(source).Success);
+    }
+
+    [Fact]
+    public void Rejects_a_compressible_story_file_over_the_expanded_file_limit()
+    {
+        var oversizedText = new string('x', 5 * 1024 * 1024 + 1);
+        using var stream = CreateZip([new("chapter.tale", oversizedText)]);
+
+        Assert.True(stream.Length < 100 * 1024);
+        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream));
+
+        Assert.Contains("chapter.tale", error.Message);
+        Assert.Contains("5 MiB", error.Message);
+    }
+
+    [Fact]
+    public void Rejects_story_files_that_exceed_the_total_expanded_size_limit()
+    {
+        var textAtFileLimit = new string('x', 5 * 1024 * 1024);
+        var files = Enumerable.Range(0, 11)
+            .Select(index => new KeyValuePair<string, string>($"chapter-{index}.tale", textAtFileLimit));
+        using var stream = CreateZip(files);
+
+        Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream));
+    }
+
+    [Fact]
+    public void Rejects_archives_with_too_many_story_files()
+    {
+        var files = Enumerable.Range(0, 1_001)
+            .Select(index => new KeyValuePair<string, string>($"chapter-{index}.tale", string.Empty));
+        using var stream = CreateZip(files);
+
+        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream));
+
+        Assert.Contains("1,000 story files", error.Message);
+    }
+
+    private static MemoryStream CreateZip(IEnumerable<KeyValuePair<string, string>> files)
+    {
+        var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (path, text) in files)
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(path).Open());
+                writer.Write(text);
+            }
+        }
+
+        stream.Position = 0;
+        return stream;
     }
 }
