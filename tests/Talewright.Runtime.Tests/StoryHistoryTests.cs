@@ -144,6 +144,84 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Legal_long_choice_keys_reach_the_exact_save_byte_limit()
+    {
+        var story = Compile(Yaml, "=== a\n~ var:visits += 1\n* [Again] -> a");
+        var emptySaveLength = new StoryHistory(story, 7).Save().Length;
+        var choices = Enumerable.Range(1, StoryHistory.MaxChoices)
+            .Select(count =>
+            {
+                var keyBytes = StoryHistory.MaxSaveBytes - emptySaveLength -
+                    (3 * count - 1) - (count.ToString().Length - 1);
+                return keyBytes > 0 && keyBytes % count == 0
+                    ? (Count: count, KeyLength: keyBytes / count)
+                    : (Count: 0, KeyLength: 0);
+            })
+            .First(candidate => candidate.Count != 0 && candidate.KeyLength is >= 1 and <= 512);
+
+        var key = new string('k', choices.KeyLength);
+        var scene = story.GetScene(story.Start);
+        var longKeyStory = new StoryDefinition
+        {
+            Id = story.Id,
+            Title = story.Title,
+            Version = story.Version,
+            ContentFingerprint = story.ContentFingerprint,
+            UndoEnabled = story.UndoEnabled,
+            Creation = story.Creation,
+            Start = story.Start,
+            Randomness = story.Randomness,
+            Seed = story.Seed,
+            World = story.World,
+            Triggers = story.Triggers,
+            Predicates = story.Predicates,
+            Scenes =
+            [
+                new SceneDefinition
+                {
+                    Id = scene.Id,
+                    Title = scene.Title,
+                    Requires = scene.Requires,
+                    Tags = scene.Tags,
+                    Priority = scene.Priority,
+                    Once = scene.Once,
+                    HubTag = scene.HubTag,
+                    Hub = scene.Hub,
+                    HubLimit = scene.HubLimit,
+                    EntryEffects = scene.EntryEffects,
+                    Body = scene.Body,
+                    EntryCheck = scene.EntryCheck,
+                    Choices =
+                    [
+                        new ChoiceDefinition
+                        {
+                            Key = key,
+                            Label = scene.Choices[0].Label,
+                            Divert = new DivertTarget(story.Start),
+                        },
+                    ],
+                    Diverts = scene.Diverts,
+                },
+            ],
+        };
+
+        var history = new StoryHistory(longKeyStory, 7);
+        for (var index = 0; index < choices.Count; index++)
+        {
+            history.Choose(key);
+        }
+
+        var exactLimitSave = history.Save();
+        Assert.Equal(StoryHistory.MaxSaveBytes, exactLimitSave.Length);
+        Assert.Equal(choices.Count, StoryHistory.Restore(longKeyStory, exactLimitSave).Cursor);
+
+        history.Choose(key);
+        Assert.Throws<InvalidOperationException>(() => history.Save());
+        Assert.Equal(choices.Count + 1, history.Cursor);
+        Assert.Equal(StoryHistory.MaxSaveBytes, exactLimitSave.Length);
+    }
+
+    [Fact]
     public void Choice_limit_accepts_exact_boundary_and_rejects_the_next_choice()
     {
         var history = new StoryHistory(Compile(Yaml + "\nvars: { visits: 0 }", "=== a\n* [Again] -> a"), 7);
