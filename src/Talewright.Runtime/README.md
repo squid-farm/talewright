@@ -128,6 +128,7 @@ independent synthetic session. Normal save bytes, rules and slots are untouched.
 The format rejects unknown members/commands/versions, duplicate JSON keys, null collections and
 invalid character/setup/command IDs. Limits: 2 MiB, 10,000 commands, 10,000 fields per value batch,
 512-character identifiers, JSON depth 32, 32-bit integer values and unsigned 64-bit seed.
+Stat values and inventory quantities must be present explicitly; missing numeric members are not zero.
 Character names retain the normal 80-character bounds. Export with pending redo replays it before
 writing evidence. Import reexecutes commands; it does not restore arbitrary mutable engine internals.
 

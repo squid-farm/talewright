@@ -102,6 +102,58 @@ public sealed class AuthorScenarioTests : IDisposable
     }
 
     [Fact]
+    public async Task Export_without_a_session_consumes_overwrite_confirmation()
+    {
+        var model = new WorkbenchModel(_story) { ConfirmOverwrite = true, ScenarioPath = _output };
+        model.Reload();
+        await model.ExportScenario();
+        Assert.Contains("Start a scene first", model.Error);
+        Assert.False(model.ConfirmOverwrite);
+        Assert.False(File.Exists(_output));
+    }
+
+    [Fact]
+    public async Task Oversized_export_consumes_consent_before_a_later_valid_export_can_replace_a_file()
+    {
+        var model = Start();
+        await model.ExportScenario();
+        Assert.Null(model.Error);
+        var original = await File.ReadAllBytesAsync(_output);
+        var ids = Enumerable.Range(0, 5000).Select(index => $"flag-{index:D4}-" + new string('x', 490)).ToArray();
+        var manifest = Path.Combine(_story, "story.yaml");
+        await File.WriteAllTextAsync(manifest, (await File.ReadAllTextAsync(manifest))
+            .Replace("flags: [ready]", $"flags: [{string.Join(", ", ids)}]"));
+        model.Reload();
+        Assert.Null(model.Error);
+        foreach (var flag in model.Flags)
+        {
+            flag.Enabled = true;
+            flag.Value = true;
+        }
+        model.Start();
+        Assert.Null(model.Error);
+        var session = model.Session;
+        model.ConfirmOverwrite = true;
+        await model.ExportScenario();
+        Assert.Contains("2 MiB", model.Error);
+        Assert.False(model.ConfirmOverwrite);
+        Assert.Same(session, model.Session);
+        Assert.Equal(original, await File.ReadAllBytesAsync(_output));
+        foreach (var flag in model.Flags)
+        {
+            flag.Enabled = false;
+        }
+        model.Start();
+        await model.ExportScenario();
+        Assert.NotNull(model.Error);
+        Assert.Equal(original, await File.ReadAllBytesAsync(_output));
+        model.ConfirmOverwrite = true;
+        await model.ExportScenario();
+        Assert.Null(model.Error);
+        Assert.NotEqual(original, await File.ReadAllBytesAsync(_output));
+    }
+
+    [Fact]
     public async Task Import_failure_preserves_every_active_surface_and_input_bytes()
     {
         var model = Start();
@@ -228,10 +280,111 @@ public sealed class AuthorScenarioTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(_output)!);
         foreach (var size in new[] { 0, AuthorScenario.MaxBytes + 1 })
         {
-            await using (var file = File.Create(_output)) { file.SetLength(size); }
+            await using (var file = File.Create(_output))
+            {
+                file.SetLength(size);
+            }
             await model.ImportScenario();
             Assert.Contains("2 MiB", model.Error);
             Assert.Same(session, model.Session);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Export_rejects_link_target_with_a_linked_ancestor(bool relativeTargets)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var nested = Path.Combine(_story, "nested");
+        Directory.CreateDirectory(nested);
+        var protectedFile = Path.Combine(nested, "test.twscenario");
+        var original = new byte[] { 1, 2, 3 };
+        await File.WriteAllBytesAsync(protectedFile, original);
+        var alias = Path.Combine(_root, "alias");
+        var bridge = Path.Combine(_root, "bridge");
+        Directory.CreateSymbolicLink(alias, relativeTargets ? "story" : _story);
+        Directory.CreateSymbolicLink(bridge, relativeTargets ? Path.Combine("alias", "nested") : Path.Combine(alias, "nested"));
+        var model = Start();
+        var session = model.Session;
+        model.ScenarioPath = Path.Combine(bridge, "test.twscenario");
+        model.ConfirmOverwrite = true;
+        await model.ExportScenario();
+        Assert.Contains("outside", model.Error);
+        Assert.Same(session, model.Session);
+        Assert.Equal(original, await File.ReadAllBytesAsync(protectedFile));
+        Assert.Single(Directory.GetFiles(nested));
+    }
+
+    [Fact]
+    public async Task Export_resolves_link_target_ancestors_for_allowed_destinations()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var allowed = Path.Combine(_root, "allowed");
+        Directory.CreateDirectory(Path.Combine(allowed, "nested"));
+        Directory.CreateSymbolicLink(Path.Combine(_root, "alias"), "allowed");
+        Directory.CreateSymbolicLink(Path.Combine(_root, "bridge"), Path.Combine("alias", "nested"));
+        var model = Start();
+        model.ScenarioPath = Path.Combine(_root, "bridge", "test.twscenario");
+        await model.ExportScenario();
+        Assert.Null(model.Error);
+        Assert.True(File.Exists(Path.Combine(allowed, "nested", "test.twscenario")));
+        await model.ImportScenario();
+        Assert.Null(model.Error);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Export_rejects_link_cycles_including_cycles_in_target_ancestors(bool ancestorCycle)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        Directory.CreateSymbolicLink(Path.Combine(_root, "first"), ancestorCycle ? Path.Combine("second", "nested") : "second");
+        Directory.CreateSymbolicLink(Path.Combine(_root, "second"), "first");
+        var model = Start();
+        model.ScenarioPath = Path.Combine(_root, "first", "test.twscenario");
+        await model.ExportScenario();
+        Assert.Contains("link cycle", model.Error);
+        Assert.False(Directory.Exists(Path.Combine(_root, "author")));
+    }
+
+    [Theory]
+    [InlineData(64)]
+    [InlineData(65)]
+    public async Task Export_bounds_link_resolution_at_64_hops(int count)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var allowed = Path.Combine(_root, "allowed");
+        Directory.CreateDirectory(allowed);
+        for (var index = count; index >= 1; index--)
+        {
+            Directory.CreateSymbolicLink(Path.Combine(_root, $"link{index}"),
+                index == count ? "allowed" : $"link{index + 1}");
+        }
+        var model = Start();
+        model.ScenarioPath = Path.Combine(_root, "link1", "test.twscenario");
+        await model.ExportScenario();
+        if (count == 64)
+        {
+            Assert.Null(model.Error);
+            Assert.True(File.Exists(Path.Combine(allowed, "test.twscenario")));
+        }
+        else
+        {
+            Assert.Contains("64-link", model.Error);
+            Assert.Empty(Directory.GetFiles(allowed));
         }
     }
 

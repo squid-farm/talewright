@@ -70,11 +70,11 @@ public sealed class WorkbenchModel(string root)
 
     public async Task ExportScenario() => await AttemptFile(async () =>
     {
+        var confirmed = ConfirmOverwrite;
+        ConfirmOverwrite = false;
         var session = Session ?? throw new InvalidOperationException("Start a scene first.");
         var bytes = AuthorScenario.Export(session, CompilerOptions.Default.CompatibilityId!);
         var path = ScenarioPath;
-        var confirmed = ConfirmOverwrite;
-        ConfirmOverwrite = false;
         await AuthorScenarioFiles.ExportAsync(path, bytes, Root, confirmed);
         ScenarioStatus = $"Synthetic scenario exported: {Path.GetFullPath(path)}. No source or player slot was written.";
     });
@@ -148,7 +148,10 @@ public sealed class WorkbenchModel(string root)
         try
         {
             await action();
-            if (!SourceRejected) { Error = null; }
+            if (!SourceRejected)
+            {
+                Error = null;
+            }
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
             or InvalidOperationException or NotSupportedException or KeyNotFoundException or ArithmeticException)

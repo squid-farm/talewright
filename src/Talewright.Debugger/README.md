@@ -26,7 +26,8 @@ How it's built:
   initialize from the retained selection on restart, via Player's optional `InitialSelection`.
 - **Tests.** The UI-independent model is covered by CLI tests; native interactions run through the Linux
   AT-SPI E2E harness, including export/import across two debugger processes.
-- **Scenario files.** `AuthorScenarioFiles` bounds reads, resolves parent links before excluding story
+- **Scenario files.** `AuthorScenarioFiles` bounds reads, resolves links and link-target ancestors
+  with a 64-link cycle/depth guard before excluding story
   and player-save locations, and uses confirmed, same-directory atomic replacements for `.twscenario`
   exports. Imports are candidates against accepted source; errors leave the active run and input files
   unchanged. See [replay format/API invariants](../Talewright.Runtime/README.md#portable-author-scenarios).

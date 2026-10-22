@@ -61,7 +61,10 @@ public static class AuthorScenario
             throw new InvalidDataException("Scenario belongs to a different story ID; cross-story adoption is unsupported.");
         }
         var differences = new List<string>();
-        if (!sameSource) { differences.Add("Story version/fingerprint differs; source adoption is not exact reproduction or migration."); }
+        if (!sameSource)
+        {
+            differences.Add("Story version/fingerprint differs; source adoption is not exact reproduction or migration.");
+        }
         var setup = data.Setup.ToSetup().Validate(story);
         var character = CharacterSelection.Validate(story, data.Character);
         story.GetScene(new(data.Target));
@@ -71,8 +74,14 @@ public static class AuthorScenario
             commands, commands.Length, captureDecisions);
         var current = data.Cursor == commands.Length ? end
             : AuthorSession.RestoreTimeline(story, new(data.Target), setup, data.Seed, character, commands, data.Cursor, captureDecisions);
-        if (Digest(current) != data.CurrentDigest) { differences.Add("Current state/event history, dice or presentation diverged."); }
-        if (Digest(end) != data.EndDigest) { differences.Add("Full timeline including redo diverged."); }
+        if (Digest(current) != data.CurrentDigest)
+        {
+            differences.Add("Current state/event history, dice or presentation diverged.");
+        }
+        if (Digest(end) != data.EndDigest)
+        {
+            differences.Add("Full timeline including redo diverged.");
+        }
         if (sameSource && differences.Count > 0)
         {
             throw new InvalidDataException("Scenario replay evidence does not match this source: " + string.Join(" ", differences));
@@ -94,7 +103,10 @@ public static class AuthorScenario
 
     private static ScenarioData Read(ReadOnlySpan<byte> bytes)
     {
-        if (bytes.Length is 0 or > MaxBytes) { throw new InvalidDataException("Scenario must be nonempty and at most 2 MiB."); }
+        if (bytes.Length is 0 or > MaxBytes)
+        {
+            throw new InvalidDataException("Scenario must be nonempty and at most 2 MiB.");
+        }
         try
         {
             RejectDuplicateMembers(bytes);
@@ -115,8 +127,14 @@ public static class AuthorScenario
         var objects = new Stack<HashSet<string>>();
         while (reader.Read())
         {
-            if (reader.TokenType == JsonTokenType.StartObject) { objects.Push(new(StringComparer.Ordinal)); }
-            else if (reader.TokenType == JsonTokenType.EndObject) { objects.Pop(); }
+            if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                objects.Push(new(StringComparer.Ordinal));
+            }
+            else if (reader.TokenType == JsonTokenType.EndObject)
+            {
+                objects.Pop();
+            }
             else if (reader.TokenType == JsonTokenType.PropertyName && !objects.Peek().Add(reader.GetString()!))
             {
                 throw new InvalidDataException("Scenario contains duplicate JSON members.");
@@ -135,21 +153,41 @@ public static class AuthorScenario
         {
             throw new InvalidDataException("Scenario identity, setup, commands or cursor are invalid.");
         }
-        Identifier(data.Identity.StoryId); Identifier(data.Identity.StoryVersion); Identifier(data.Identity.Extensions);
-        Identifier(data.Identity.Engine); Identifier(data.Identity.Fingerprint); Identifier(data.Target);
-        Identifier(data.CurrentDigest); Identifier(data.EndDigest);
+        Identifier(data.Identity.StoryId);
+        Identifier(data.Identity.StoryVersion);
+        Identifier(data.Identity.Extensions);
+        Identifier(data.Identity.Engine);
+        Identifier(data.Identity.Fingerprint);
+        Identifier(data.Target);
+        Identifier(data.CurrentDigest);
+        Identifier(data.EndDigest);
         data.Setup.Validate();
         foreach (var command in data.Commands)
         {
-            if (command is null) { throw new InvalidDataException("Null scenario command."); }
+            if (command is null)
+            {
+                throw new InvalidDataException("Null scenario command.");
+            }
             command.Validate();
         }
         if (data.Character is { } character)
         {
-            if (character.Stats is null || character.Stats.Count > MaxFields) { throw new InvalidDataException("Invalid scenario character stats."); }
-            foreach (var key in character.Stats.Keys) { Identifier(key); }
-            if (character.Preset is { } preset) { Identifier(preset); }
-            if (character.Pronouns is { } pronouns) { Identifier(pronouns); }
+            if (character.Stats is null || character.Stats.Count > MaxFields)
+            {
+                throw new InvalidDataException("Invalid scenario character stats.");
+            }
+            foreach (var key in character.Stats.Keys)
+            {
+                Identifier(key);
+            }
+            if (character.Preset is { } preset)
+            {
+                Identifier(preset);
+            }
+            if (character.Pronouns is { } pronouns)
+            {
+                Identifier(pronouns);
+            }
         }
     }
 
@@ -254,7 +292,10 @@ internal sealed class ScenarioOutput : MemoryStream
 
     private void CheckSize(int count)
     {
-        if (Length + count > AuthorScenario.MaxBytes) { throw new InvalidDataException("Author scenario exceeds 2 MiB."); }
+        if (Length + count > AuthorScenario.MaxBytes)
+        {
+            throw new InvalidDataException("Author scenario exceeds 2 MiB.");
+        }
     }
 }
 
@@ -280,8 +321,8 @@ internal sealed class ScenarioData
     public required string EndDigest { get; init; }
 }
 
-internal sealed record ScenarioStat(string Character, string Stat, int Value);
-internal sealed record ScenarioItem(string Character, string Item, int Quantity);
+internal sealed record ScenarioStat(string Character, string Stat, [property: JsonRequired] int Value);
+internal sealed record ScenarioItem(string Character, string Item, [property: JsonRequired] int Quantity);
 
 internal sealed class ScenarioValues
 {
@@ -307,16 +348,27 @@ internal sealed class ScenarioValues
         {
             throw new InvalidDataException("Scenario value batches must contain at most 10,000 fields and no null collections.");
         }
-        foreach (var id in Flags.Keys.Concat(Variables.Keys).Concat(Standings.Keys)) { AuthorScenario.Identifier(id); }
+        foreach (var id in Flags.Keys.Concat(Variables.Keys).Concat(Standings.Keys))
+        {
+            AuthorScenario.Identifier(id);
+        }
         foreach (var stat in Stats)
         {
-            if (stat is null) { throw new InvalidDataException("Null scenario stat."); }
-            AuthorScenario.Identifier(stat.Character); AuthorScenario.Identifier(stat.Stat);
+            if (stat is null)
+            {
+                throw new InvalidDataException("Null scenario stat.");
+            }
+            AuthorScenario.Identifier(stat.Character);
+            AuthorScenario.Identifier(stat.Stat);
         }
         foreach (var item in Inventory)
         {
-            if (item is null || item.Quantity < 0) { throw new InvalidDataException("Scenario inventory requires nonnegative integer quantities."); }
-            AuthorScenario.Identifier(item.Character); AuthorScenario.Identifier(item.Item);
+            if (item is null || item.Quantity < 0)
+            {
+                throw new InvalidDataException("Scenario inventory requires nonnegative integer quantities.");
+            }
+            AuthorScenario.Identifier(item.Character);
+            AuthorScenario.Identifier(item.Item);
         }
     }
 

@@ -21,13 +21,19 @@ public static class AuthorScenarioFiles
         }
         var bytes = new byte[(int)stream.Length];
         await stream.ReadExactlyAsync(bytes);
-        if (stream.ReadByte() != -1) { throw new InvalidDataException("Import changed while reading; retry."); }
+        if (stream.ReadByte() != -1)
+        {
+            throw new InvalidDataException("Import changed while reading; retry.");
+        }
         return bytes;
     }
 
     public static async Task ExportAsync(string path, byte[] bytes, string storyRoot, bool overwriteConfirmed)
     {
-        if (bytes.Length is 0 or > AuthorScenario.MaxBytes) { throw new InvalidDataException("Invalid scenario export size."); }
+        if (bytes.Length is 0 or > AuthorScenario.MaxBytes)
+        {
+            throw new InvalidDataException("Invalid scenario export size.");
+        }
         var target = Path.GetFullPath(path);
         if (!string.Equals(Path.GetExtension(target), AuthorScenario.FileExtension, StringComparison.OrdinalIgnoreCase))
         {
@@ -56,7 +62,10 @@ public static class AuthorScenarioFiles
         }
         finally
         {
-            if (File.Exists(temporary)) { File.Delete(temporary); }
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
         }
     }
 
@@ -67,17 +76,39 @@ public static class AuthorScenarioFiles
     private static string Resolve(string path)
     {
         var full = Path.GetFullPath(path);
-        var current = Path.GetPathRoot(full)!;
-        foreach (var part in full[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        for (var links = 0; ; links++)
         {
-            current = Path.Combine(current, part);
-            FileSystemInfo info = Directory.Exists(current) ? new DirectoryInfo(current) : new FileInfo(current);
-            if (info.LinkTarget is not null)
+            var current = Path.GetPathRoot(full)!;
+            var parts = full[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            var foundLink = false;
+            for (var index = 0; index < parts.Length; index++)
             {
-                current = info.ResolveLinkTarget(returnFinalTarget: true)?.FullName
+                current = Path.Combine(current, parts[index]);
+                FileSystemInfo info = Directory.Exists(current) ? new DirectoryInfo(current) : new FileInfo(current);
+                if (info.LinkTarget is null)
+                {
+                    continue;
+                }
+                if (links == 64)
+                {
+                    throw new IOException("Scenario path contains a link cycle or exceeds the 64-link resolution limit.");
+                }
+                var target = info.ResolveLinkTarget(returnFinalTarget: false)
                     ?? throw new IOException("Cannot resolve scenario path link.");
+                full = target.FullName;
+                for (var remaining = index + 1; remaining < parts.Length; remaining++)
+                {
+                    full = Path.Combine(full, parts[remaining]);
+                }
+                // Restart at the root: a link's target can itself have linked ancestors.
+                full = Path.GetFullPath(full);
+                foundLink = true;
+                break;
+            }
+            if (!foundLink)
+            {
+                return current;
             }
         }
-        return current;
     }
 }

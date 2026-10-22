@@ -85,7 +85,11 @@ public sealed class AuthorScenarioTests
         source.Choose("c0");
         source.Choose("continue");
         source.Jump(new("start"));
-        if (redo) { source.Back(); source.Back(); }
+        if (redo)
+        {
+            source.Back();
+            source.Back();
+        }
         var bytes = AuthorScenario.Export(source, Extensions);
         var imported = AuthorScenario.Import(Story(), bytes, Extensions);
         Assert.False(imported.Adopted);
@@ -97,7 +101,12 @@ public sealed class AuthorScenarioTests
         Assert.Equal(source.Commands.Select(command => command.GetType()), copy.Commands.Select(command => command.GetType()));
         Assert.Equal(source.Cursor, copy.Cursor);
         Assert.Equal(source.CanForward, copy.CanForward);
-        while (source.CanForward) { source.Forward(); copy.Forward(); Equal(source, copy); }
+        while (source.CanForward)
+        {
+            source.Forward();
+            copy.Forward();
+            Equal(source, copy);
+        }
         Assert.Single(copy.Events.OfType<DiceRolled>());
         Assert.Single(copy.Events.OfType<TriggerFired>());
         Assert.Equal(AuthorScenario.Export(source, Extensions), AuthorScenario.Export(copy, Extensions));
@@ -262,7 +271,10 @@ public sealed class AuthorScenarioTests
     {
         var data = Data();
         var flags = new JsonObject();
-        for (var index = 0; index < AuthorScenario.MaxFields; index++) { flags.Add($"flag{index}", true); }
+        for (var index = 0; index < AuthorScenario.MaxFields; index++)
+        {
+            flags.Add($"flag{index}", true);
+        }
         data["setup"] = JsonNode.Parse("""{"flags":{},"variables":{},"standings":{},"stats":[],"inventory":[]}""");
         data["setup"]!["flags"] = flags;
         Assert.Contains("Unknown setup flag", Assert.Throws<ArgumentException>(() =>
@@ -300,6 +312,32 @@ public sealed class AuthorScenarioTests
         var data = Data();
         data["setup"]!["variables"]!["count"] = JsonNode.Parse(value);
         Assert.Throws<InvalidDataException>(() => AuthorScenario.Import(Story(), Bytes(data), Extensions));
+    }
+
+    [Theory]
+    [InlineData(false, "stats", "value")]
+    [InlineData(false, "inventory", "quantity")]
+    [InlineData(true, "stats", "value")]
+    [InlineData(true, "inventory", "quantity")]
+    public void Missing_numeric_members_are_rejected_even_during_cross_source_adoption(bool edit, string collection, string member)
+    {
+        var data = Data();
+        data["identity"]!["fingerprint"] = "different-source";
+        var values = data["setup"]!;
+        if (edit)
+        {
+            values = values.DeepClone();
+            data["commands"] = new JsonArray(new JsonObject { ["kind"] = "edit", ["values"] = values });
+        }
+        var entry = values[collection]![0]!.AsObject();
+        Assert.True(entry.Remove(member));
+        var story = Story();
+        Assert.Throws<InvalidDataException>(() => AuthorScenario.Import(story, Bytes(data), Extensions, adoptDifferentSource: true));
+
+        entry[member] = 0;
+        var imported = AuthorScenario.Import(story, Bytes(data), Extensions, adoptDifferentSource: true);
+        Assert.True(imported.Adopted);
+        Assert.Equal(edit ? 1 : 0, imported.Session.Commands.Count);
     }
 
     [Fact]
