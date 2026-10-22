@@ -31,5 +31,5 @@ require idempotence. Ambiguous story repairs and general formatting are not part
 Generic Markdown linting/formatting cannot be applied wholesale because Tale has different structural
 semantics.
 
-These are planned capabilities, not implemented interfaces. See [PLAN.md](../PLAN.md#45-tale-compiler-talewrighttale)
+These are planned capabilities, not implemented interfaces. See [the plan](../plan.md#45-tale-compiler-talewrighttale)
 for scope, relative effort, dependencies, and acceptance checks.

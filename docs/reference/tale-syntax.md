@@ -1,0 +1,259 @@
+# Tale syntax reference
+
+A story is a **folder** containing one `story.yaml` and any number of `*.tale` files (subfolders allowed).
+`.tale` is a Markdown superset: prose is CommonMark inline Markdown, plus a small set of line-level directives.
+
+The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
+Every reference is validated, and mistakes are reported with `file:line:column` and an
+[error code](diagnostics.md) rather than surfacing during play.
+
+New to Talewright? Start with the [author guide](../guide/README.md). This page is the complete reference.
+
+---
+
+## 1. `story.yaml`
+
+```yaml
+id: lost-relic # kebab-case, unique
+title: The Lost Relic
+version: 0.1.0
+start: camp.arrival # first scene id
+randomness: checks-only # off | checks-only (default)
+seed: 1234 # optional; omitted = random per playthrough
+undo: true # default; false hides Back/Forward without disabling saves
+
+ruleset:
+  base: generic # generic | none
+  disable: [cha] # remove stats from the base ruleset
+  stats: # add stats
+    - id: courage
+      name: Courage
+      category: attribute # attribute | skill | resource | progression | custom
+      min: 0
+      max: 10
+      default: 0
+
+characters:
+  player: # the id "player" is required
+    first-name: Mara
+    last-name: Burns
+    pronouns: she # she | he | they | it, or a custom set (see below)
+    stats: { dex: 14, athletics: 2 }
+    inventory: [rope, torch] # or { torch: 3 }
+  guide:
+    first-name: Tomas
+    pronouns: he
+
+factions:
+  explorers-guild: { name: "Explorers' Guild", standing: 0 }
+
+items:
+  rope: { name: coil of rope }
+  relic: { name: Relic of Ysh, modifiers: { wis: 2 } } # held items modify stats
+
+flags: [door-open] # optional; flags/vars are also auto-declared when an effect sets them
+vars: { torches-lit: 0 }
+
+triggers:
+  - id: guild-turns
+    when: faction:explorers-guild <= hostile
+    do: set flag:guild-hostile
+    once: true
+```
+
+Custom pronoun set:
+
+```yaml
+pronouns:
+  {
+    subject: xe,
+    object: xem,
+    possessive: xyr,
+    possessive-pronoun: xyrs,
+    reflexive: xemself,
+    plural: false,
+  }
+```
+
+### Optional character creation
+
+Without `creation`, the authored protagonist starts unchanged. With it, the shared
+player requires a legal selection before play. The `player` declaration remains
+required and provides identity, inventory and other stat defaults.
+
+```yaml
+creation:
+  name: true
+  pronouns: [they, she, he]
+  stats:
+    str: [8, 12, 16]
+  presets:
+    explorer:
+      label: Explorer
+      stats: {str: 12, hp: 15}
+    scholar:
+      label: Scholar
+      stats: {str: 8, hp: 10}
+```
+
+All fields are optional. The first listed pronoun and preset are the defaults.
+
+| Field | Rules |
+|---|---|
+| `name: true` | Players may edit first and last names (trimmed, at most 80 characters each, first name required, no control characters). Fields start with the authored `player` names; **Use default name** restores them. |
+| `pronouns` | Distinct built-in keywords. Omit to keep an authored custom pronoun set. |
+| `stats` | Up to 32 stats, each with 1–100 distinct whole-number options within the ruleset's bounds. |
+| `presets` | Up to 16. Each sets starting stats within ruleset bounds; values for selectable stats must be listed options. |
+
+**Starting values.** For each selectable stat, the default is the preset's value if the preset sets one,
+otherwise the authored `player` value. If that isn't a listed option, or neither exists, the first option
+is used. An explicit `0` counts as a value. The player's own picks override the preset.
+
+**During play.** Creation happens before the first scene and is replayed identically by Back, Forward
+and loading. Saves keep the created character, and Restart keeps it too. Reopening the story from the
+library asks again; loading a save then switches to the saved character.
+
+Not included: point-buy, class designers or race systems.
+
+## 2. Scenes
+
+```tale
+=== temple.entrance
+@title The Sealed Door
+@requires player:dex >= 12 or player has rope
+@tags temple
+@priority 10
+@once
+
+Prose paragraph with **strong**, *emphasis* and `code`.
+{player:first-name#possessive} torch gutters as cold air spills out.
+
+> guide: Careful, {player:first-name}. Nobody has opened this in a thousand years.
+
+~ var:torches-lit += 1
+
+* [Read the glyphs] (requires: player:int >= 12) -> temple.glyphs
+* [Shove the door] { faction:explorers-guild -= 5 } -> temple.hall
+```
+
+| Element                                            | Meaning                                                                                        |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `=== id`                                           | Starts a scene. Ids are kebab-case segments separated by dots.                                 |
+| `@title text`                                      | Display title (used for hub choices).                                                          |
+| `@requires expr`                                   | Eligibility predicate (storylets / hubs).                                                      |
+| `@tags a, b`                                       | Tags for hubs.                                                                                 |
+| `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
+| `@once`                                            | Storylet is ineligible after it was visited once.                                              |
+| `@hub tag`                                         | At this scene, offer every eligible scene tagged `tag` as a choice.                            |
+| `@hub all(tag, tag)`                               | Offer storylets carrying every listed tag.                                                   |
+| `@hub any(tag, tag)`                               | Offer storylets carrying at least one listed tag.                                             |
+| `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
+| blank-line separated text                          | Paragraphs (inline Markdown).                                                                  |
+| `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
+| `![alt](media-id)`                                 | Image placeholder. Not displayed yet ([#35](https://github.com/squid-farm/talewright/issues/35)). |
+| `~ effect`                                         | Effect applied when the scene is entered (before rendering).                                   |
+| `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
+| `-> target`                                        | Scene divert. With no choices, the player sees a single **Continue**. `-> END` ends the story. |
+| `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
+
+Metadata lines are only recognized directly after the `===` header. Lines starting with `//` are comments.
+
+**Where a scene goes next.** A choice with its own `-> target` (or a skill check) goes there. A choice with
+_no_ target — e.g. `* [Take the torch] { give player torch }` — **falls through** to the scene's own
+`-> target` lines (like an ink "gather"), and so does a check outcome without `-> target`. A scene must have
+at least one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise it's a compile error.
+
+Hub tags must be distinct and nonempty. A scene may have only one `@hub` and one
+`@hub-limit`. The selector excludes the hub itself, applies requirements and
+`@once`, then sorts by descending priority and stable declaration order before
+limiting. Multiple matching tags never duplicate a choice. Explicit choices are
+not capped. A fallback `->` applies only when no explicit or generated choices
+are available. Reachability conservatively considers all tag matches, not just
+the current capped selection, because state changes may alter eligibility.
+
+**Conditional structure.** Choices, `~` effects and `->` diverts inside a block `{if}` only apply when the
+condition holds (a choice's own `requires` is combined with it using `and`). With several `->` lines, the
+first whose condition holds wins, so put conditional diverts before an unconditional fallback.
+
+**Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
+by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
+
+## 3. Substitutions
+
+`{reference#modifier#modifier…}`
+
+| Reference                                                                                   | Value                                     |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `player:first-name`, `player:last-name`, `player:name`                                      | Names (`name` = first + last)             |
+| `player:pronoun.subject` / `.object` / `.possessive` / `.possessive-pronoun` / `.reflexive` | Pronouns                                  |
+| `player:<stat>`                                                                             | Effective stat value (base + modifiers)   |
+| `faction:<id>`                                                                              | Player standing with the faction (number) |
+| `faction:<id>.tier`                                                                         | Standing tier name (`friendly`, …)        |
+| `faction:<id>.name`, `item:<id>`                                                            | Display names                             |
+| `var:<id>`, `flag:<id>`                                                                     | Story variables / flags                   |
+
+Any character id can replace `player`.
+
+| Modifier            | Effect                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `#possessive`       | Grammatically correct English possessive (Chicago style): `Mara's`, `Burns's`, `the guards'` |
+| `#capitalize`       | First letter upper case                                                                      |
+| `#upper` / `#lower` | Case                                                                                         |
+| `#a`                | Prefix with `a`/`an`                                                                         |
+
+## 4. Expressions
+
+```
+or / and / not            boolean logic
+== != < <= > >=           comparison
++ - * /                   integer arithmetic
+player has rope           inventory check (any character id)
+visited(temple.hall)      has the scene ever been entered
+true false 12 "text"      literals
+hostile … allied          reputation tier names (compare with faction:<id>)
+@CanPickLock              named predicate registered from C# (see C# extensions)
+```
+
+Types are checked at compile time (number, bool, text, tier).
+
+## 5. Effects
+
+Separated by `;` inside `{ }`, one per `~` line.
+
+```
+player:hp -= 3            stat arithmetic (= += -=), clamped to min/max
+faction:explorers-guild += 5
+var:torches-lit = 2
+set flag:door-open        / clear flag:door-open
+give player relic         / give player torch 2
+take player rope
+```
+
+## 6. Skill checks
+
+Attached to a choice (outcome lines indented below it):
+
+```tale
+* [Climb the collapsed wall] skill-check athletics dc 14
+  success: -> temple.upper
+  failure: { player:hp -= 2 } -> temple.fall
+```
+
+Or as a block that resolves when the scene is entered:
+
+```tale
+::: skill-check perception dc 12
+success: -> temple.hidden-door
+failure: -> temple.hall
+:::
+```
+
+Optional actor: `skill-check guide survival dc 10`. Resolution is defined by the ruleset
+(generic: `d20 + attribute modifier + skill rank ≥ DC`). Dice are seeded and recorded as events.
+With `randomness: off`, checks are deterministic (`10 + modifiers ≥ DC`).
+
+## 7. Diagnostics
+
+Every compiler message has a stable code (`TW1xxx` syntax, `TW2xxx` names and types, `TW3xxx` story
+structure, `TW4xxx` story.yaml) and a `file:line:column` location. See [error codes](diagnostics.md)
+for what each one means and how to fix it.

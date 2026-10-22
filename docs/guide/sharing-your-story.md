@@ -1,0 +1,67 @@
+# Sharing your story
+
+> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools).
+> Until ready-made downloads arrive, write `dotnet run --project src/Talewright.Cli --` instead of `talewright`.
+
+Every `publish` checks your story first and stops if there are errors.
+
+## Choose a format
+
+| You want to… | Publish | Players need |
+|---|---|---|
+| Send the story to someone who already has a Talewright player | A story file | The [web player](https://squid-farm.github.io/talewright/) or any Talewright player |
+| Put a playable game on the web or itch.io | A web game | A web browser |
+| Give players a downloadable app | A desktop game | Nothing on macOS. WebView2 on Windows (built into Windows 11 and up-to-date Windows 10). WebKitGTK 4.1 on Linux. |
+
+## A story file
+
+```bash
+talewright publish my-story --output my-story.zip
+```
+
+The zip contains only `story.yaml` and your `.tale` files, so private notes and other files in the folder
+are left out. Anyone can open it with **Open a story file** in the web player.
+
+## A web game
+
+```bash
+talewright publish my-story -a --target web --output my-game-web.zip
+```
+
+`-a` (short for `--all-in-one`) bundles the player with your story. The game opens straight into your
+story, with no library screen or samples.
+
+- **itch.io:** create a project, set *Kind of project* to **HTML**, upload the zip and tick
+  *This file will be played in the browser*.
+- **Your own site:** extract the zip anywhere that serves static files: GitHub Pages, Netlify, a
+  folder on your web server. It also works from a subfolder.
+
+## A desktop game
+
+```bash
+talewright publish my-story -a --target desktop --output my-game.zip
+```
+
+This makes one zip that runs on Windows, macOS and Linux (Intel and ARM). Players extract **the whole
+zip** and run:
+
+| System | Run |
+|---|---|
+| Windows | `start.cmd` |
+| macOS | `start.command` |
+| Linux | `start.sh` (or `sh start.sh`) |
+
+The universal zip is large because it includes everything for six platforms. To build for one
+platform only, add `--runtime` with one of `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64` or
+`linux-arm64`. Players then run `Talewright.Host.Desktop` (`.exe` on Windows).
+
+**Current limits:** desktop games aren't installers, aren't code-signed (Windows and macOS may warn
+players the first time) and aren't macOS `.app` bundles. So far only Linux x64 builds have been
+tested; Windows, macOS and ARM builds are unverified.
+
+## Republishing
+
+`publish` won't overwrite an existing file unless you add `--force`. If you publish an update, existing
+saves won't load in the new version (see [saves](playing-and-saving.md#updating-a-story-with-existing-saves)).
+
+All options and limits: [CLI reference: publish](../reference/cli.md#publish).

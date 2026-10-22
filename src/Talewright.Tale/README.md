@@ -2,7 +2,7 @@
 
 Turns a story folder (`story.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
 diagnostics with file, line and column. This is the **only** project that parses text, and it runs once per load.
-The syntax itself is specified in [TALE-SYNTAX.md](../../docs/TALE-SYNTAX.md).
+The syntax itself is specified in the [Tale syntax reference](../../docs/reference/tale-syntax.md).
 
 ```csharp
 var result = StoryCompiler.Compile(StorySource.FromDirectory("samples/LostRelic"));
@@ -54,7 +54,7 @@ are loaded; unrelated files are not published as story content.
 ## Diagnostic codes
 
 `TW1xxx` syntax, `TW2xxx` references and types, `TW3xxx` structure, `TW4xxx` story.yaml. The full table is in
-[TALE-SYNTAX.md §7](../../docs/TALE-SYNTAX.md). To find where a code is raised: `grep -rn TW2002 src/`.
+the [error code reference](../../docs/reference/diagnostics.md). To find where a code is raised: `grep -rn TW2002 src/`.
 
 ## Semantics worth knowing
 

@@ -25,7 +25,7 @@ while (!frame.IsEnded)
 
 ## The loop, briefly
 
-Full description in [ARCHITECTURE.md §5](../../docs/ARCHITECTURE.md#5-the-engine-loop-in-detail).
+Full description in [architecture §5](../../docs/developer/architecture.md#5-the-engine-loop-in-detail).
 
 - **Enter scene:** `SceneEntered` → entry effects → triggers + leveling → render body → notes → entry check
   (offer Continue) *or* choices (explicit + hub storylets) *or* first matching divert as Continue (`-> END` ends

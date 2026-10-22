@@ -30,22 +30,20 @@ Slot replacement is explicit and atomic; incompatible/corrupt loads leave the cu
 
 `talewright publish story-folder -a --target desktop --output game.zip` produces a self-contained
 ZIP with a single story baked in and no samples. An optional `--runtime win-x64` cross-publishes;
-see the [CLI reference](../Talewright.Cli/README.md#publishing) for targets and verification limits.
+see the [CLI reference](../../docs/reference/cli.md#publish) for targets and verification limits.
 `TalewrightIncludeSamples=false` disables development sample embedding in custom builds.
 
 ## Native regression tests
 
-`python3 tests/run_e2e.py linux --probe` verifies accessibility and the native chooser;
-`python3 tests/run_e2e.py linux` runs the shared story scenarios and desktop-specific file/startup tests.
-The same C#/xUnit project used for browser tests drives this actual Photino host through a thin AT-SPI
-command adapter in an isolated Xvfb/D-Bus session. All scenarios and assertions are authored in C#;
-Python only bridges native actions/observations. It needs additional distro accessibility packages and
-runs as an ordinary user. Linux development-machine coverage is the current target; Windows remains manual.
+```bash
+python3 tests/run_e2e.py linux --probe   # accessibility and native chooser check
+python3 tests/run_e2e.py linux           # shared story scenarios plus desktop file/startup tests
+```
 
-The Linux app **can be automated**: the suite above does so using the distro's AT-SPI dependencies.
-Playwright itself has no supported direct attachment to Photino's embedded WebKitGTK view.
-Another option is WebKitWebDriver, but that requires native-host automation hooks and a WebDriver client
-(such as Selenium); installing a dependency alone does not make this view controllable by Playwright.
-Windows WebView2 does support Playwright attachment through CDP; macOS WKWebView needs a separate native
-approach. See [testing guidance](../../tests/README.md) for prerequisites, evidence, coverage limits,
-and expansion options.
+The browser tests' C#/xUnit project drives this real Photino host through a thin AT-SPI adapter in an
+isolated Xvfb/D-Bus session. Scenarios and assertions are in C#; Python only bridges native actions.
+Linux is automated; Windows is manual for now.
+
+Playwright can't attach to Photino's WebKitGTK view. Windows WebView2 supports Playwright over CDP, and
+macOS WKWebView needs a separate native approach. See [testing guidance](../../tests/README.md) for
+prerequisites, coverage and expansion options.
