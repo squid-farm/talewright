@@ -25,6 +25,10 @@ public sealed class TriggerEngine
     private readonly Action<RuleDecision>? _observer;
     private readonly HashSet<string> _currentlyTrue = [];
 
+    /// <summary>Snapshot of rising-edge memory, without evaluating conditions again.</summary>
+    public IReadOnlyList<string> CaptureEdgeMemory() =>
+        Array.AsReadOnly(_currentlyTrue.Order(StringComparer.Ordinal).ToArray());
+
     public TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates, IGameStateView initialState)
         : this(triggers, predicates, initialState, observer: null)
     {

@@ -55,6 +55,8 @@
     public StoryDefinition Story { get; set; } = default!;
     [Parameter]
     public EventCallback<CharacterSelection> OnCreated { get; set; }
+    [Parameter]
+    public CharacterSelection? InitialSelection { get; set; }
 
     private string? _firstName;
     private string? _lastName;
@@ -65,7 +67,9 @@
 
     protected override void OnInitialized()
     {
-        var selection = Story.Creation!.Default(Story.World.Characters[EntityId.Player]);
+        var selection = InitialSelection is null
+            ? Story.Creation!.Default(Story.World.Characters[EntityId.Player])
+            : CharacterSelection.Validate(Story, InitialSelection)!;
         _firstName = selection.FirstName;
         _lastName = selection.LastName;
         _pronouns = selection.Pronouns;

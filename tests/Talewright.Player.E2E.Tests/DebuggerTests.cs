@@ -29,7 +29,6 @@ public sealed class DebuggerTests
                 * [Prepared] (requires: flag:ready) -> END
                 * [Wait] -> END
                 """)));
-            await driver.ClickAsync("Reload story");
             await WaitFor(driver, "Scene setup");
             await driver.FillAsync("Search scenes", "Chapter 1000");
             await WaitFor(driver, "Select scene1000 Chapter 1000");
@@ -51,8 +50,7 @@ public sealed class DebuggerTests
             await driver.ChooseAsync("Prepared");
             await WaitFor(driver, "Play again");
             await File.WriteAllTextAsync(tale, "=== scene1\n-> missing");
-            await driver.ClickAsync("Reload story");
-            snapshot = await WaitFor(driver, "Source not adopted");
+            snapshot = await WaitFor(driver, "Source not adopted", "Play again");
             Assert.Contains("Play again", snapshot.Content);
         }
         finally
@@ -61,13 +59,84 @@ public sealed class DebuggerTests
         }
     }
 
-    private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, string text)
+    [Fact]
+    public async Task Native_watch_reload_preserves_entry_state_and_gates_yaml_until_explicit_restart()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-watch-native-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-reload", Guid.NewGuid().ToString("N"));
+        const string yaml = "id: reload\ntitle: Native reload\nstart: start\nvars: {count: 0}\ncharacters:\n  player: {first-name: Tester}\ncreation:\n  name: true\n";
+        const string original = """
+                === start
+                * [Go] -> current
+                === current
+                Before reload. {player:first-name}.
+                ~ var:count += 1
+                * [Finish] -> END
+                """;
+        var tale = Path.Combine(root, "main.tale");
+        var manifest = Path.Combine(root, "story.yaml");
+        try
+        {
+            await File.WriteAllTextAsync(manifest, yaml);
+            await File.WriteAllTextAsync(tale, original);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.FillAsync("Seed", "42");
+            await driver.FillAsync("First name", "Alex");
+            await driver.ClickAsync("Start story");
+            await driver.ClickAsync("Start selected scene");
+            await driver.ChooseAsync("Go");
+            await WaitFor(driver, "Before reload.");
+            await File.WriteAllTextAsync(tale, "=== start\n-> missing");
+            var snapshot = await WaitFor(driver, "Story has compiler errors");
+            Assert.Contains("Before reload.", snapshot.Content);
+            var temp = Path.Combine(root, "editor.tmp");
+            var updated = original.Replace("Before reload.", "After reload.").Replace("count += 1", "count += 2");
+            await File.WriteAllTextAsync(temp, updated);
+            File.Move(temp, tale, overwrite: true);
+            snapshot = await WaitFor(driver, "After reload. Alex.");
+            Assert.Contains("Reload boundary: current", snapshot.Content);
+            Assert.Contains("Seed: 42", snapshot.Content);
+            await driver.ActivateAsync("Flags, variables, factions, visits and triggers");
+            snapshot = await WaitFor(driver, "var:count = 2");
+            Assert.Contains("current visits: 1", snapshot.Content);
+            await File.WriteAllTextAsync(manifest, yaml.Replace("Native reload", "Restarted title"));
+            snapshot = await WaitFor(driver, "Restart required.");
+            Assert.Contains("After reload.", snapshot.Content);
+            await File.WriteAllTextAsync(tale, updated.Replace("After reload.", "After YAML restart."));
+            snapshot = await WaitFor(driver, "Source compiled, but explicit Restart from source is required");
+            Assert.DoesNotContain("After YAML restart.", snapshot.Content);
+            await driver.ClickAsync("Restart from source");
+            await WaitFor(driver, "Restarted title");
+            await driver.ClickAsync("Start story");
+            await driver.ClickAsync("Start selected scene");
+            await driver.ChooseAsync("Go");
+            snapshot = await WaitFor(driver, "After YAML restart. Alex.");
+            Assert.Contains("Seed: 42", snapshot.Content);
+            await File.WriteAllTextAsync(tale, updated.Replace("[Go]", "[Changed positional meaning]")
+                .Replace("After reload.", "Incompatible progress."));
+            snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed");
+            Assert.Contains("After YAML restart.", snapshot.Content);
+            Assert.DoesNotContain("Incompatible progress.", snapshot.Content);
+            Assert.Equal(0, await driver.CloseWindowAsync());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+    private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, params string[] texts)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         while (true)
         {
             var snapshot = await driver.SnapshotAsync();
-            if (snapshot.Content.Contains(text, StringComparison.Ordinal))
+            if (texts.All(text => snapshot.Content.Contains(text, StringComparison.Ordinal)))
             {
                 return snapshot;
             }

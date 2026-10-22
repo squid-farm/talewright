@@ -1,11 +1,21 @@
 @inject WorkbenchModel Model
+@implements IAsyncDisposable
 
 <main class="author-workbench">
     <h1>Talewright Author Debugger</h1>
     <p>@Model.Root</p>
     <p>Local scene playtesting. No player saves are read or written.</p>
-    <p>Reload story explicitly discards the current playtest and setup only after compilation succeeds. No automatic reload.</p>
-    <button type="button" @onclick="Reload">Reload story</button>
+    <p>Saved Tale changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
+    <button type="button" @onclick="Rescan">Rescan / retry watcher</button>
+    <button type="button" @onclick="Restart">Restart from source</button>
+    @if (Model.RestartRequired)
+    {
+        <p role="status">Restart required. The last good compiled story/run is still displayed. Correct or disable incompatible setup before restarting.</p>
+    }
+    @if (Model.ReloadStatus is { } status)
+    {
+        <p role="status">@status</p>
+    }
     <DiagnosticList Diagnostics="Model.Diagnostics" />
     @if (Model.SourceRejected)
     {
@@ -32,7 +42,8 @@
             <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
             @if (story.Creation is not null)
             {
-                <CharacterCreator @key="story" Story="story" OnCreated="Model.SelectCharacter" />
+                <CharacterCreator @key="Model.CreationRevision" Story="story" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" />
+                <button type="button" @onclick="Model.ClearCharacter">Clear character selection</button>
                 <p role="status">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
             }
             <SetupFields Model="Model" />
@@ -71,8 +82,15 @@
 
 @code {
     private string _sceneSearch = "";
-    protected override void OnInitialized() => Model.Reload();
-    private void Reload() => Model.Reload();
+    private StoryReloadWatcher _watcher = null!;
+    protected override async Task OnInitializedAsync()
+    {
+        _watcher = new(Model, action => InvokeAsync(action), StateHasChanged);
+        await _watcher.RescanAsync(restart: true);
+    }
+    private Task Rescan() => _watcher.RescanAsync();
+    private Task Restart() => _watcher.RescanAsync(restart: true);
+    public ValueTask DisposeAsync() => _watcher.DisposeAsync();
     private void Start() => Model.Start();
     private void Choose(ChoiceView choice) => Model.Choose(choice.Key);
 }

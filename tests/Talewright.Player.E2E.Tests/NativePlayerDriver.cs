@@ -126,6 +126,7 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task ResizeAsync(int width, int height) => await CommandAsync("resize", new { width, height });
     public async Task FillAsync(string name, string value) => await CommandAsync("fill", new { name, value });
     public async Task ActivateAsync(string name) => await CommandAsync("activate", new { name });
+    public async Task<int> CloseWindowAsync() => (await CommandAsync("close-window")).GetInt32();
     public async Task<AccessibleNode> SnapshotAsync() =>
         (await CommandAsync("snapshot")).Deserialize<AccessibleNode>(Json)
         ?? throw new InvalidDataException("Missing accessibility snapshot.");

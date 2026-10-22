@@ -95,9 +95,44 @@ Replay requires the same unchanged compiled story and deterministic, side-effect
 extensions, just like ordinary choice replay. Session isolation cannot undo
 external effects performed by custom C# delegates. Rebuilding costs time
 proportional to the selected path; choices are bounded by `StoryHistory.MaxChoices`.
-No cross-source reload, live edits, portable scenarios or player-save compatibility
-bypass is implemented here. Source-aware reload must separately verify a new
-story's reconstruction boundary before adoption.
+Live edits, portable scenarios and player-save compatibility bypass are not
+implemented here.
+
+### Guarded author reload
+
+`var candidate = author.Reload(newStory)` returns an independent candidate; it
+never mutates `author`. Before entering the displayed scene, it verifies:
+
+- Compatible declarations, creation, rules and triggers, including Tale-inferred
+  flags/variables. Custom predicates/rules/modifiers require trusted rebuild/restart.
+- Structural equality of every previously consumed scene, not merely surviving
+  `c0` positional keys, plus the selected rendered label/key and generated hub
+  choice's target/title/eligibility metadata. Current target body edits remain
+  allowed. This deliberately rejects earlier prose changes too.
+- The same pre-entry event prefix, hence the same event-folded state, seed/RNG
+  position, pending transition notes and captured trigger-edge memory.
+
+Engine data is compared structurally (including polymorphic AST nodes and
+collections); collection order is conservatively significant. The new scene then
+enters **once**. Its effects/check results may change intentionally. Decisions are
+rebuilt; no stale trace/redo objects are adopted. Missing targets, divergent
+history, schema changes, no entry boundary or runtime/cascade failures throw,
+leaving the active run unchanged. `AuthorReloadException` distinguishes
+reconstruction incompatibility from a candidate runtime failure that can be
+repaired and retried. Fresh-jump recipes are replayed as such.
+
+`ValidateReloadSchema(oldStory, newStory)` exposes the declaration guard before a
+run exists. `AuthorSetup.Validate(story)` returns a copied/revalidated setup without
+scene entry. Hosts remain responsible for whole-source/YAML restart policy and
+serialized candidate adoption. None of this changes normal save fingerprints,
+restoration or migration policy. Future edited timelines must extend the replay
+recipe and guard explicitly; they cannot be inferred from event snapshots.
+
+Text modifiers in all compiled bodies/choice labels (including hidden/nested
+branches) must be engine-owned built-in instances before reconstruction starts.
+Names and delegate-wrapper types do not establish provenance; custom callbacks
+and same-name replacements require trusted rebuild/restart, without executing
+those callbacks during the reload attempt.
 
 ### State inspection and execution explanations
 

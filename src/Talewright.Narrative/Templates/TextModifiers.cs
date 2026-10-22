@@ -31,12 +31,28 @@ public sealed class TextModifierRegistry
 {
     private readonly Dictionary<string, ITextModifier> _modifiers = new(StringComparer.Ordinal);
 
-    public static TextModifierRegistry CreateDefault() => new TextModifierRegistry()
-        .Register(new DelegateTextModifier("possessive", (t, c) => c.Grammar.Possessive(t, c.IsPlural)))
-        .Register(new DelegateTextModifier("capitalize", (t, c) => c.Grammar.Capitalize(t)))
-        .Register(new DelegateTextModifier("upper", (t, _) => t.ToUpperInvariant()))
-        .Register(new DelegateTextModifier("lower", (t, _) => t.ToLowerInvariant()))
-        .Register(new DelegateTextModifier("a", (t, c) => c.Grammar.WithIndefiniteArticle(t)));
+    private static readonly ITextModifier[] BuiltIns =
+    [
+        new DelegateTextModifier("possessive", (t, c) => c.Grammar.Possessive(t, c.IsPlural)),
+        new DelegateTextModifier("capitalize", (t, c) => c.Grammar.Capitalize(t)),
+        new DelegateTextModifier("upper", (t, _) => t.ToUpperInvariant()),
+        new DelegateTextModifier("lower", (t, _) => t.ToLowerInvariant()),
+        new DelegateTextModifier("a", (t, c) => c.Grammar.WithIndefiniteArticle(t)),
+    ];
+
+    public static TextModifierRegistry CreateDefault()
+    {
+        var registry = new TextModifierRegistry();
+        foreach (var modifier in BuiltIns)
+        {
+            registry.Register(modifier);
+        }
+        return registry;
+    }
+
+    /// <summary>Checks engine-owned instance provenance, not the modifier's name or wrapper type.</summary>
+    public static bool IsBuiltIn(ITextModifier modifier) =>
+        BuiltIns.Any(builtIn => ReferenceEquals(builtIn, modifier));
 
     public TextModifierRegistry Register(ITextModifier modifier)
     {

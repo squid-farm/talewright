@@ -29,7 +29,14 @@ internal static class Program
                 Console.Error.WriteLine(e.ExceptionObject);
                 app.MainWindow.ShowMessage("Author Debugger error", e.ExceptionObject.ToString());
             };
-            app.Run();
+            try
+            {
+                app.Run();
+            }
+            finally
+            {
+                app.WindowManager.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
             return 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DllNotFoundException

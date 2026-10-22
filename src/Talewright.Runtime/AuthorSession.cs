@@ -15,9 +15,10 @@ public sealed class AuthorSession
 {
     private StorySession _session;
     private string[] _choices;
+    private readonly List<AuthorPlayedChoice> _playedChoices = [];
 
     private AuthorSession(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, string[] choices, bool captureDecisions)
+        CharacterSelection? character, string[] choices, bool captureDecisions, AuthorSceneCheckpoint? verify = null)
     {
         Story = story;
         StartScene = target;
@@ -26,11 +27,26 @@ public sealed class AuthorSession
         _choices = choices;
         CaptureDecisions = captureDecisions;
         var decisions = new List<RuleDecision>();
-        _session = new StorySession(story, seed, character, setup, captureDecisions ? decisions.Add : null);
+        var atBoundary = choices.Length == 0;
+        _session = new StorySession(story, seed, character, setup, captureDecisions ? decisions.Add : null,
+            verify is null ? null : (boundary, events) =>
+            {
+                if (atBoundary)
+                {
+                    verify.VerifyBoundary(boundary, events);
+                }
+            });
         _session.StartAt(target);
-        foreach (var choice in choices)
+        for (var i = 0; i < choices.Length; i++)
         {
-            _session.Choose(choice);
+            var scene = story.GetScene(_session.Current!.Scene!.Value);
+            var selected = _session.Current.Choices.FirstOrDefault(choice => choice.Key == choices[i])
+                ?? throw new AuthorReloadException($"previously consumed choice '{choices[i]}' is unavailable at '{scene.Id}'");
+            var played = AuthorPlayedChoice.Capture(story, scene, selected);
+            verify?.VerifyPlayedChoice(i, played);
+            _playedChoices.Add(played);
+            atBoundary = i == choices.Length - 1;
+            _session.Choose(choices[i]);
         }
         Events = Array.AsReadOnly(_session.Events.ToArray());
         State = new AuthorStateView(EventLog.Replay(story.World, seed, Events).State);
@@ -38,7 +54,7 @@ public sealed class AuthorSession
         if (_session.EntryBoundary is { } boundary)
         {
             Checkpoint = new AuthorSceneCheckpoint(story, target, setup, seed, character,
-                choices, boundary, Events, captureDecisions);
+                choices, boundary, Events, captureDecisions, _playedChoices.ToArray());
         }
     }
 
@@ -76,6 +92,26 @@ public sealed class AuthorSession
     /// <summary>Snapshots declared state and recorded decisions; never reevaluates branch predicates.</summary>
     public AuthorInspection Inspect() => new(Story, State, Events, Decisions, CaptureDecisions);
 
+    /// <summary>
+    /// Reconstructs a separate candidate, verifies schema, consumed scenes and the pre-entry boundary,
+    /// then enters the displayed scene once. Never changes this session or player save compatibility.
+    /// </summary>
+    public AuthorSession Reload(StoryDefinition candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        var checkpoint = Checkpoint ?? throw new AuthorReloadException("no current scene-entry boundary");
+        AuthorReloadComparison.Schema(Story, candidate);
+        candidate.GetScene(checkpoint.Scene);
+        var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
+            CharacterSelection.Validate(candidate, Character), _choices, CaptureDecisions, checkpoint);
+        AuthorReloadComparison.Require(result.Checkpoint?.Scene == checkpoint.Scene, "the replay no longer reaches the displayed scene");
+        return result;
+    }
+
+    /// <summary>Conservative declaration/rule compatibility check, also usable before a run starts.</summary>
+    public static void ValidateReloadSchema(StoryDefinition original, StoryDefinition candidate) =>
+        AuthorReloadComparison.Schema(original, candidate);
+
     /// <summary>Rebuilds a separate candidate; failed choices leave the active run unchanged.</summary>
     public void Choose(string key)
     {
@@ -111,5 +147,7 @@ public sealed class AuthorSession
         Checkpoint = candidate.Checkpoint;
         Decisions = candidate.Decisions;
         _choices = candidate._choices;
+        _playedChoices.Clear();
+        _playedChoices.AddRange(candidate._playedChoices);
     }
 }
