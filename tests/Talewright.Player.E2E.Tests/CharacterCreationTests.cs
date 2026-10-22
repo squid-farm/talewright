@@ -62,6 +62,37 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Observe(new(null, "Mara's"));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Host", "Browser")]
+    public async Task Default_name_button_has_readable_contrast_in_each_color_scheme(bool dark)
+    {
+        await Page.EmulateMediaAsync(new() { ColorScheme = dark ? ColorScheme.Dark : ColorScheme.Light });
+        await Upload(Fixture());
+
+        var button = Page.GetByRole(AriaRole.Button, new() { Name = "Use default name", Exact = true });
+        await Expect(button).ToBeVisibleAsync();
+        var contrast = await button.EvaluateAsync<double>("""
+            element => {
+                const channels = color => color.match(/\d+/g).map(Number).map(value => {
+                    value /= 255;
+                    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+                });
+                const luminance = color => {
+                    const [red, green, blue] = channels(color);
+                    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+                };
+                const style = getComputedStyle(element);
+                const text = luminance(style.color);
+                const background = luminance(style.backgroundColor);
+                return (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
+            }
+            """);
+
+        Assert.True(contrast >= 4.5, $"Button text contrast was {contrast:F2}:1 in {(dark ? "dark" : "light")} mode.");
+    }
+
     [Fact]
     [Trait("Host", "Browser")]
     public async Task Invalid_names_do_not_start_and_selected_identity_survives_reload()

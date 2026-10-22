@@ -6,7 +6,7 @@
         {
             <label>First name <input aria-label="First name" @bind="_firstName" maxlength="80" /></label>
             <label>Last name <input aria-label="Last name" @bind="_lastName" maxlength="80" /></label>
-            <button type="button" @onclick="UseDefaultName">Use default name</button>
+            <button type="button" class="tw-default-name" @onclick="UseDefaultName">Use default name</button>
         }
         @if (Story.Creation.Pronouns.Count > 0)
         {
