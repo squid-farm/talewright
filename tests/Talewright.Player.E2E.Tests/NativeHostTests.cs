@@ -19,6 +19,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     {
         await Driver.StartAsync();
         await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
         await AssertState(state =>
         {
             Assert.True(state.PassageVisible);
@@ -68,6 +69,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.StartAsync(path);
         await AssertState(state => Assert.Contains(expected, state.Library));
         await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
         await AssertState(state => Assert.True(state.PassageVisible));
     }
 
@@ -77,6 +79,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.StartAsync(Path.Combine(_fixtures, "does not exist.zip"));
         await AssertState(state => Assert.Contains("Couldn't open", state.Library));
         await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
         await AssertState(state => Assert.True(state.PassageVisible));
     }
 

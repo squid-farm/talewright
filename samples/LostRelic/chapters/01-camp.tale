@@ -9,7 +9,7 @@ The boat leaves {player:first-name} at the edge of the jungle with a pack, a {it
 three weeks of unanswered letters. The {faction:explorers-guild.name} has given {player:pronoun.object}
 one season to find the **Relic of Ysh** before they hand the expedition to someone more *reliable*.
 
-> guide: Ms {player:last-name}. You're later than your letter promised. I'm Tomas — the guild sent me.
+> guide: {player:first-name} {player:last-name}. You're later than your letter promised. I'm Tomas — the guild sent me.
 
 {player:last-name#possessive} reputation for punctuality is, {player:pronoun.subject} has to admit, deserved.
 
@@ -23,6 +23,8 @@ The camp hums with insects. Tomas sharpens a machete by the fire{if var:supplies
 you bought{/if}.
 
 * [Set out for the temple] -> trail.river
+* [Visit the expedition workshop] -> workshop.hub
+* [Try the field exercises] -> field.hub
 
 === camp.supplies
 @title Haggle for supplies

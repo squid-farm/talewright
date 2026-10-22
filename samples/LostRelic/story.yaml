@@ -4,13 +4,22 @@
 
 id: lost-relic
 title: The Lost Relic
-version: 0.1.0
+version: 0.2.0
 start: camp.arrival
 randomness: checks-only # dice are rolled only for skill-check directives
 # seed: 1234            # uncomment for the same rolls every playthrough
+undo: true
 
 ruleset:
   base: generic # d20-style attributes, skills, hp, xp and levels
+  disable: [performance] # no stage performances on this expedition
+  stats:
+    - id: courage
+      name: Courage
+      category: custom
+      min: 0
+      max: 10
+      default: 0
 
 characters:
   player:
@@ -29,8 +38,28 @@ characters:
   guide:
     first-name: Tomas
     last-name: Okafor
-    pronouns: he
+    pronouns:
+      subject: he
+      object: him
+      possessive: his
+      possessive-pronoun: his
+      reflexive: himself
+      plural: false
     stats: { survival: 4, wis: 14 }
+
+creation:
+  name: true
+  pronouns: [she, they, he]
+  stats:
+    str: [8, 12, 16]
+    courage: [3, 0, 6]
+  presets:
+    explorer:
+      label: Explorer
+      stats: {str: 12, athletics: 2, hp: 15}
+    scholar:
+      label: Scholar
+      stats: {str: 8, history: 5, hp: 10}
 
 factions:
   explorers-guild: { name: "Explorers' Guild", standing: 5 }
@@ -42,7 +71,9 @@ items:
   charm: { name: jade charm, modifiers: { wis: 2 } }
   idol: { name: obsidian idol }
   relic: { name: Relic of Ysh, modifiers: { cha: 2 } }
+  ration: { name: trail ration }
 
+flags: [packing-open]
 vars:
   supplies: 0
 
@@ -51,3 +82,11 @@ triggers:
     when: faction:explorers-guild <= unfriendly
     do: set flag:guild-wary
     once: true
+  - id: courage-earned
+    when: player:courage >= 6
+    do: set flag:steady
+    once: true
+  - id: watch-bell
+    when: flag:bell-ringing
+    do: var:bell-count += 1
+    once: false # fires again only after the condition becomes false, then true
