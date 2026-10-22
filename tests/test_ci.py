@@ -68,6 +68,10 @@ class PackageBoundaryTests(unittest.TestCase):
                 prefix = "tools/net10.0/any/"
                 for name in ["Talewright.Cli.dll", "Talewright.Cli.deps.json",
                              "Talewright.Cli.runtimeconfig.json",
+                             "Talewright.Debugger.dll",
+                             "debug-assets/index.html",
+                             "debug-assets/debugger.css",
+                             "debug-assets/_content/Talewright.Player/talewright.css",
                              "publish-assets/web/Talewright.Host.Web.csproj",
                              "publish-assets/desktop/Talewright.Host.Desktop.csproj",
                              "publish-assets/standalone/web/App.razor",
@@ -86,6 +90,9 @@ class PackageBoundaryTests(unittest.TestCase):
                                  'EntryPoint="Talewright.Cli.dll" Runner="dotnet" /></Commands></DotNetCliTool>')
                 for assembly in ENGINE_ASSEMBLIES | {"Talewright.Player"}:
                     package.writestr(prefix + assembly + ".dll", "")
+                for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
+                    extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
+                    package.writestr(prefix + f"runtimes/{rid}/native/Photino.Native.{extension}", "")
             else:
                 package.writestr(f"lib/net10.0/{identity}.dll", b"test placeholder")
             if identity == "Talewright":
@@ -158,6 +165,32 @@ class PackageBoundaryTests(unittest.TestCase):
                     package.writestr(name, content)
             with self.assertRaisesRegex(ValueError, "missing engine assembly asset"):
                 verify(directory, "1.2.3")
+
+    def test_missing_debugger_asset_fails(self):
+        prefix = "tools/net10.0/any/"
+        required = ["Talewright.Debugger.dll", "debug-assets/index.html",
+                    "debug-assets/debugger.css",
+                    "debug-assets/_content/Talewright.Player/talewright.css"]
+        for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
+            extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
+            required.append(f"runtimes/{rid}/native/Photino.Native.{extension}")
+        for missing in required:
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                self.write_package(directory, "Talewright")
+                self.write_package(directory, "Talewright.Player")
+                tool = self.write_package(directory, "Talewright.Cli")
+                with ZipFile(tool) as package:
+                    entries = {name: package.read(name) for name in package.namelist()
+                               if name != prefix + missing}
+                with ZipFile(tool, "w") as package:
+                    for name, content in entries.items():
+                        package.writestr(name, content)
+                with self.assertRaises(ValueError) as failure:
+                    verify(directory, "1.2.3")
+                self.assertIn("missing", str(failure.exception))
+                self.assertIn(missing if missing in required[:4] else missing.split("/")[1],
+                              str(failure.exception))
 
     def test_missing_tool_entry_point_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
