@@ -1,0 +1,930 @@
+{
+  "schemaVersion": 1,
+  "runId": "local-20261022-interrupted-894457f",
+  "runAttempt": 1,
+  "createdAt": "2026-10-22T05:31:34.970137+00:00",
+  "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+  "branch": "feature/57-real-file-performance-benchmarks",
+  "event": "local-manual",
+  "runKind": "partial-interrupted-local",
+  "status": "incomplete",
+  "jobResults": {
+    "coreBenchmarks": "interrupted after 45 of 60 cases",
+    "independentDimensions": "excluded; earlier run produced invalid NA values before metadata fix",
+    "boundaryBenchmarks": "success (14 cases)",
+    "browserPlayer": "not-run",
+    "linuxPhotino": "not-run",
+    "publication": "not-run"
+  },
+  "notes": [
+    "Core run was stopped at the user's request while the Typical-tier LoadFromDirectory case had started. It did not produce a final BenchmarkDotNet CSV.",
+    "Core means are parsed from completed BenchmarkDotNet case logs. Per-case p95 values are nearest-rank estimates from completed WorkloadResult samples; they are not the suite final report.",
+    "Independent-dimension measurements from the attempt before the metadata fix were invalid (NA) and are deliberately excluded.",
+    "Local measurements were collected on Linux Mint 22.3 with other system activity present; this is exploratory output, not a release baseline.",
+    "Browser, Photino, and CLI publication integration workloads were not run."
+  ],
+  "environment": {
+    "corpus": {
+      "Tier": "Gigantic",
+      "StoryFileCount": 1000,
+      "SceneCount": 50000,
+      "ChoiceCount": 55000,
+      "ExpandedBytes": 52428800,
+      "CompressedBytes": 856829,
+      "Seed": 57057,
+      "Sha256": "99272a7a8150e4df138267b9b952995f2657e4e1ec795f4e887528c3245a070a"
+    },
+    "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+    "workingTreeDirty": false,
+    "runtime": ".NET 10.0.13",
+    "benchmarkDotNet": "0.15.2.0",
+    "os": "Linux Mint 22.3",
+    "architecture": "X64",
+    "processorCount": 16,
+    "cpuModel": "AMD Ryzen 9 7940HS w/ Radeon 780M Graphics",
+    "physicalMemoryBytes": 29219717120,
+    "runtimeAvailableMemoryBytes": 29219717120,
+    "powerAndCacheSettings": "Local Linux Mint 22.3; background agents stopped; AC power and filesystem cache state not controlled",
+    "benchmarkWorkerPeakWorkingSetBytes": 1198350336,
+    "peakWorkingSetScope": "whole BenchmarkDotNet worker process; includes setup and harness"
+  },
+  "corpusMetadata": [
+    {
+      "corpus": {
+        "Tier": "Gigantic",
+        "StoryFileCount": 1000,
+        "SceneCount": 50000,
+        "ChoiceCount": 55000,
+        "ExpandedBytes": 52428800,
+        "CompressedBytes": 856829,
+        "Seed": 57057,
+        "Sha256": "99272a7a8150e4df138267b9b952995f2657e4e1ec795f4e887528c3245a070a"
+      },
+      "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+      "workingTreeDirty": false,
+      "runtime": ".NET 10.0.13",
+      "benchmarkDotNet": "0.15.2.0",
+      "os": "Linux Mint 22.3",
+      "architecture": "X64",
+      "processorCount": 16,
+      "cpuModel": "AMD Ryzen 9 7940HS w/ Radeon 780M Graphics",
+      "physicalMemoryBytes": 29219717120,
+      "runtimeAvailableMemoryBytes": 29219717120,
+      "powerAndCacheSettings": "Local Linux Mint 22.3; background agents stopped; AC power and filesystem cache state not controlled",
+      "benchmarkWorkerPeakWorkingSetBytes": 1198350336,
+      "peakWorkingSetScope": "whole BenchmarkDotNet worker process; includes setup and harness"
+    },
+    {
+      "corpus": {
+        "Tier": "Large",
+        "StoryFileCount": 500,
+        "SceneCount": 10000,
+        "ChoiceCount": 11000,
+        "ExpandedBytes": 26214400,
+        "CompressedBytes": 295827,
+        "Seed": 57057,
+        "Sha256": "c905381d836deacab4450d815ba58bbaa75f5fe9d977e2ee2915e6efff81092d"
+      },
+      "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+      "workingTreeDirty": false,
+      "runtime": ".NET 10.0.13",
+      "benchmarkDotNet": "0.15.2.0",
+      "os": "Linux Mint 22.3",
+      "architecture": "X64",
+      "processorCount": 16,
+      "cpuModel": "AMD Ryzen 9 7940HS w/ Radeon 780M Graphics",
+      "physicalMemoryBytes": 29219717120,
+      "runtimeAvailableMemoryBytes": 29219717120,
+      "powerAndCacheSettings": "Local Linux Mint 22.3; background agents stopped; AC power and filesystem cache state not controlled",
+      "benchmarkWorkerPeakWorkingSetBytes": 633253888,
+      "peakWorkingSetScope": "whole BenchmarkDotNet worker process; includes setup and harness"
+    },
+    {
+      "corpus": {
+        "Tier": "Medium",
+        "StoryFileCount": 100,
+        "SceneCount": 1000,
+        "ChoiceCount": 1100,
+        "ExpandedBytes": 5242880,
+        "CompressedBytes": 48637,
+        "Seed": 57057,
+        "Sha256": "e9bec3d1172c9ad3a5748ee0cabcd6b65a091e605a9f20640d45954e13d5c532"
+      },
+      "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+      "workingTreeDirty": false,
+      "runtime": ".NET 10.0.13",
+      "benchmarkDotNet": "0.15.2.0",
+      "os": "Linux Mint 22.3",
+      "architecture": "X64",
+      "processorCount": 16,
+      "cpuModel": "AMD Ryzen 9 7940HS w/ Radeon 780M Graphics",
+      "physicalMemoryBytes": 29219717120,
+      "runtimeAvailableMemoryBytes": 29219717120,
+      "powerAndCacheSettings": "Local Linux Mint 22.3; background agents stopped; AC power and filesystem cache state not controlled",
+      "benchmarkWorkerPeakWorkingSetBytes": 264216576,
+      "peakWorkingSetScope": "whole BenchmarkDotNet worker process; includes setup and harness"
+    },
+    {
+      "corpus": {
+        "Tier": "Typical",
+        "StoryFileCount": 10,
+        "SceneCount": 100,
+        "ChoiceCount": 110,
+        "ExpandedBytes": 524288,
+        "CompressedBytes": 4821,
+        "Seed": 57057,
+        "Sha256": "ba7afb5e0702a68fad230d110437631420e91d84f2352ef3db98869ac5bd7d68"
+      },
+      "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+      "workingTreeDirty": false,
+      "runtime": ".NET 10.0.13",
+      "benchmarkDotNet": "0.15.2.0",
+      "os": "Linux Mint 22.3",
+      "architecture": "X64",
+      "processorCount": 16,
+      "cpuModel": "AMD Ryzen 9 7940HS w/ Radeon 780M Graphics",
+      "physicalMemoryBytes": 29219717120,
+      "runtimeAvailableMemoryBytes": 29219717120,
+      "powerAndCacheSettings": "Local Linux Mint 22.3; background agents stopped; AC power and filesystem cache state not controlled",
+      "benchmarkWorkerPeakWorkingSetBytes": null,
+      "peakWorkingSetScope": "whole BenchmarkDotNet worker process; includes setup and harness"
+    }
+  ],
+  "completedCoreCases": [
+    {
+      "method": "LoadFromDirectory",
+      "tier": "Gigantic",
+      "mean": "68.901 ms",
+      "standardError": "0.715 ms (1.04%)",
+      "sampleCount": 27,
+      "standardDeviation": "3.716 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 76.6628,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadFromDirectory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "LoadAndCompileDirectory",
+      "tier": "Gigantic",
+      "mean": "1.367 s",
+      "standardError": "0.066 s (4.83%)",
+      "sampleCount": 29,
+      "standardDeviation": "0.355 s",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 2.1476,
+        "unit": "s"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadAndCompileDirectory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "LoadFromZip",
+      "tier": "Gigantic",
+      "mean": "285.220 ms",
+      "standardError": "12.388 ms (4.34%)",
+      "sampleCount": 30,
+      "standardDeviation": "67.853 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 350.0241,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadFromZip: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "LoadAndCompileZip",
+      "tier": "Gigantic",
+      "mean": "3.037 s",
+      "standardError": "0.150 s (4.94%)",
+      "sampleCount": 30,
+      "standardDeviation": "0.821 s",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 4.1695,
+        "unit": "s"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadAndCompileZip: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "CompileInMemory",
+      "tier": "Gigantic",
+      "mean": "1.233 s",
+      "standardError": "0.046 s (3.77%)",
+      "sampleCount": 25,
+      "standardDeviation": "0.232 s",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 1.4957,
+        "unit": "s"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.CompileInMemory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "StartupAndFirstFrame",
+      "tier": "Gigantic",
+      "mean": "14.957 ms",
+      "standardError": "0.012 ms (0.08%)",
+      "sampleCount": 23,
+      "standardDeviation": "0.056 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 15.0722,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.StartupAndFirstFrame: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "SerializeSaveAtHistoryDepth",
+      "tier": "Gigantic",
+      "mean": "148.389 us",
+      "standardError": "0.352 us (0.24%)",
+      "sampleCount": 26,
+      "standardDeviation": "1.795 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 151.9735,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.SerializeSaveAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "RestoreAtHistoryDepth",
+      "tier": "Gigantic",
+      "mean": "273.688 ms",
+      "standardError": "1.258 ms (0.46%)",
+      "sampleCount": 27,
+      "standardDeviation": "6.536 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 286.3628,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.RestoreAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "FileSaveWriteAndReadAtHistoryDepth",
+      "tier": "Gigantic",
+      "mean": "8.728 ms",
+      "standardError": "0.655 ms (7.50%)",
+      "sampleCount": 30,
+      "standardDeviation": "3.586 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 925.4446,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.FileSaveWriteAndReadAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "CliStoryOnlyPublish",
+      "tier": "Gigantic",
+      "mean": "1.653 s",
+      "standardError": "0.008 s (0.47%)",
+      "sampleCount": 29,
+      "standardDeviation": "0.042 s",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 1.7138,
+        "unit": "s"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.CliStoryOnlyPublish: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "GenerateAndCleanTypicalDiskCorpus",
+      "tier": "Gigantic",
+      "mean": "12.726 ms",
+      "standardError": "0.991 ms (7.79%)",
+      "sampleCount": 30,
+      "standardDeviation": "5.429 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 22.2351,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.GenerateAndCleanTypicalDiskCorpus: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "FirstProcessCliValidation",
+      "tier": "Gigantic",
+      "mean": "2.132 s",
+      "standardError": "0.048 s (2.27%)",
+      "sampleCount": 28,
+      "standardDeviation": "0.256 s",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 2.64,
+        "unit": "s"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.FirstProcessCliValidation: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "ChooseAtHistoryDepth",
+      "tier": "Gigantic",
+      "mean": "62.233 us",
+      "standardError": "6.701 us (10.77%)",
+      "sampleCount": 29,
+      "standardDeviation": "36.087 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 139.946,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.ChooseAtHistoryDepth: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "ChooseFromBoundedHub",
+      "tier": "Gigantic",
+      "mean": "90.650 us",
+      "standardError": "7.820 us (8.63%)",
+      "sampleCount": 26,
+      "standardDeviation": "39.875 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 192.709,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.ChooseFromBoundedHub: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "BackAndForwardAtHistoryDepth",
+      "tier": "Gigantic",
+      "mean": "162.109 ms",
+      "standardError": "0.796 ms (0.49%)",
+      "sampleCount": 24,
+      "standardDeviation": "3.901 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 166.9808,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.BackAndForwardAtHistoryDepth: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Gigantic]"
+    },
+    {
+      "method": "LoadFromDirectory",
+      "tier": "Large",
+      "mean": "39.023 ms",
+      "standardError": "0.196 ms (0.50%)",
+      "sampleCount": 27,
+      "standardDeviation": "1.020 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 40.2762,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadFromDirectory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "LoadAndCompileDirectory",
+      "tier": "Large",
+      "mean": "296.684 ms",
+      "standardError": "2.508 ms (0.85%)",
+      "sampleCount": 27,
+      "standardDeviation": "13.032 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 330.2416,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadAndCompileDirectory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "LoadFromZip",
+      "tier": "Large",
+      "mean": "80.805 ms",
+      "standardError": "1.837 ms (2.27%)",
+      "sampleCount": 30,
+      "standardDeviation": "10.061 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 98.2146,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadFromZip: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "LoadAndCompileZip",
+      "tier": "Large",
+      "mean": "322.180 ms",
+      "standardError": "3.126 ms (0.97%)",
+      "sampleCount": 26,
+      "standardDeviation": "15.940 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 352.7618,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadAndCompileZip: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "CompileInMemory",
+      "tier": "Large",
+      "mean": "239.433 ms",
+      "standardError": "0.874 ms (0.37%)",
+      "sampleCount": 28,
+      "standardDeviation": "4.626 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 246.1994,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.CompileInMemory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "StartupAndFirstFrame",
+      "tier": "Large",
+      "mean": "3.038 ms",
+      "standardError": "0.107 ms (3.52%)",
+      "sampleCount": 30,
+      "standardDeviation": "0.586 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 3.9821,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.StartupAndFirstFrame: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "SerializeSaveAtHistoryDepth",
+      "tier": "Large",
+      "mean": "62.381 us",
+      "standardError": "0.681 us (1.09%)",
+      "sampleCount": 30,
+      "standardDeviation": "3.728 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 67.9646,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.SerializeSaveAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "RestoreAtHistoryDepth",
+      "tier": "Large",
+      "mean": "83.383 ms",
+      "standardError": "0.864 ms (1.04%)",
+      "sampleCount": 25,
+      "standardDeviation": "4.319 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 92.0848,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.RestoreAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "FileSaveWriteAndReadAtHistoryDepth",
+      "tier": "Large",
+      "mean": "768.112 us",
+      "standardError": "14.918 us (1.94%)",
+      "sampleCount": 30,
+      "standardDeviation": "81.710 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 872.0973,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.FileSaveWriteAndReadAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "CliStoryOnlyPublish",
+      "tier": "Large",
+      "mean": "433.839 ms",
+      "standardError": "1.118 ms (0.26%)",
+      "sampleCount": 27,
+      "standardDeviation": "5.812 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 443.2675,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.CliStoryOnlyPublish: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "GenerateAndCleanTypicalDiskCorpus",
+      "tier": "Large",
+      "mean": "5.308 ms",
+      "standardError": "0.180 ms (3.38%)",
+      "sampleCount": 30,
+      "standardDeviation": "0.983 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 7.018,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.GenerateAndCleanTypicalDiskCorpus: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "FirstProcessCliValidation",
+      "tier": "Large",
+      "mean": "820.318 ms",
+      "standardError": "2.723 ms (0.33%)",
+      "sampleCount": 28,
+      "standardDeviation": "14.407 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 843.7533,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.FirstProcessCliValidation: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "ChooseAtHistoryDepth",
+      "tier": "Large",
+      "mean": "80.868 us",
+      "standardError": "7.640 us (9.45%)",
+      "sampleCount": 30,
+      "standardDeviation": "41.846 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 174.811,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.ChooseAtHistoryDepth: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "ChooseFromBoundedHub",
+      "tier": "Large",
+      "mean": "121.633 us",
+      "standardError": "3.873 us (3.18%)",
+      "sampleCount": 28,
+      "standardDeviation": "20.493 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 157.274,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.ChooseFromBoundedHub: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "BackAndForwardAtHistoryDepth",
+      "tier": "Large",
+      "mean": "68.039 ms",
+      "standardError": "0.629 ms (0.92%)",
+      "sampleCount": 27,
+      "standardDeviation": "3.267 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 73.0183,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.BackAndForwardAtHistoryDepth: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Large]"
+    },
+    {
+      "method": "LoadFromDirectory",
+      "tier": "Medium",
+      "mean": "10.133 ms",
+      "standardError": "0.058 ms (0.57%)",
+      "sampleCount": 30,
+      "standardDeviation": "0.316 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 10.7577,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadFromDirectory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "LoadAndCompileDirectory",
+      "tier": "Medium",
+      "mean": "38.433 ms",
+      "standardError": "0.233 ms (0.61%)",
+      "sampleCount": 30,
+      "standardDeviation": "1.278 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 40.1133,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadAndCompileDirectory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "LoadFromZip",
+      "tier": "Medium",
+      "mean": "20.722 ms",
+      "standardError": "0.618 ms (2.98%)",
+      "sampleCount": 30,
+      "standardDeviation": "3.385 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 24.3537,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadFromZip: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "LoadAndCompileZip",
+      "tier": "Medium",
+      "mean": "45.158 ms",
+      "standardError": "0.277 ms (0.61%)",
+      "sampleCount": 27,
+      "standardDeviation": "1.442 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 47.4552,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.LoadAndCompileZip: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "CompileInMemory",
+      "tier": "Medium",
+      "mean": "36.245 ms",
+      "standardError": "0.246 ms (0.68%)",
+      "sampleCount": 28,
+      "standardDeviation": "1.301 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 38.5652,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.CompileInMemory: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "StartupAndFirstFrame",
+      "tier": "Medium",
+      "mean": "110.230 us",
+      "standardError": "0.266 us (0.24%)",
+      "sampleCount": 27,
+      "standardDeviation": "1.382 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 112.5787,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.StartupAndFirstFrame: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "SerializeSaveAtHistoryDepth",
+      "tier": "Medium",
+      "mean": "12.359 us",
+      "standardError": "0.024 us (0.20%)",
+      "sampleCount": 23,
+      "standardDeviation": "0.116 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 12.5316,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.SerializeSaveAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "RestoreAtHistoryDepth",
+      "tier": "Medium",
+      "mean": "8.187 ms",
+      "standardError": "0.050 ms (0.61%)",
+      "sampleCount": 26,
+      "standardDeviation": "0.254 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 8.8725,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.RestoreAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "FileSaveWriteAndReadAtHistoryDepth",
+      "tier": "Medium",
+      "mean": "802.233 us",
+      "standardError": "18.393 us (2.29%)",
+      "sampleCount": 30,
+      "standardDeviation": "100.742 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 958.4835,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.FileSaveWriteAndReadAtHistoryDepth: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "CliStoryOnlyPublish",
+      "tier": "Medium",
+      "mean": "76.741 ms",
+      "standardError": "0.845 ms (1.10%)",
+      "sampleCount": 28,
+      "standardDeviation": "4.474 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 85.4656,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.CliStoryOnlyPublish: OutOfProcess(IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "GenerateAndCleanTypicalDiskCorpus",
+      "tier": "Medium",
+      "mean": "6.976 ms",
+      "standardError": "0.093 ms (1.33%)",
+      "sampleCount": 26,
+      "standardDeviation": "0.472 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 7.8638,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.GenerateAndCleanTypicalDiskCorpus: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "FirstProcessCliValidation",
+      "tier": "Medium",
+      "mean": "357.569 ms",
+      "standardError": "2.451 ms (0.69%)",
+      "sampleCount": 26,
+      "standardDeviation": "12.497 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 382.6389,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.FirstProcessCliValidation: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "ChooseAtHistoryDepth",
+      "tier": "Medium",
+      "mean": "826.093 us",
+      "standardError": "88.560 us (10.72%)",
+      "sampleCount": 30,
+      "standardDeviation": "485.064 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 841.371,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.ChooseAtHistoryDepth: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "ChooseFromBoundedHub",
+      "tier": "Medium",
+      "mean": "118.853 us",
+      "standardError": "4.144 us (3.49%)",
+      "sampleCount": 26,
+      "standardDeviation": "21.131 us",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 154.139,
+        "unit": "us"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.ChooseFromBoundedHub: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    },
+    {
+      "method": "BackAndForwardAtHistoryDepth",
+      "tier": "Medium",
+      "mean": "19.186 ms",
+      "standardError": "1.065 ms (5.55%)",
+      "sampleCount": 28,
+      "standardDeviation": "5.638 ms",
+      "p95FromCompletedWorkloadSamples": {
+        "value": 29.2189,
+        "unit": "ms"
+      },
+      "configuredWarmups": 5,
+      "configuredMeasuredIterations": 30,
+      "benchmarkName": "StoryBenchmarks.BackAndForwardAtHistoryDepth: OutOfProcess(InvocationCount=1, IterationCount=30, LaunchCount=1, UnrollFactor=1, WarmupCount=5) [TierName=Medium]"
+    }
+  ],
+  "completedBoundaryCases": [
+    {
+      "boundary": "count-exact",
+      "mean": "14,754.3 \u03bcs",
+      "p95": "18,391.7 \u03bcs",
+      "standardDeviation": "1,793.15 \u03bcs",
+      "allocated": "84282.49 KB"
+    },
+    {
+      "boundary": "count-over-one",
+      "mean": "17,877.4 \u03bcs",
+      "p95": "24,226.4 \u03bcs",
+      "standardDeviation": "3,969.28 \u03bcs",
+      "allocated": "84283.3 KB"
+    },
+    {
+      "boundary": "depth-exact",
+      "mean": "1,680.4 \u03bcs",
+      "p95": "2,007.7 \u03bcs",
+      "standardDeviation": "162.61 \u03bcs",
+      "allocated": "221.99 KB"
+    },
+    {
+      "boundary": "depth-over-one",
+      "mean": "1,540.0 \u03bcs",
+      "p95": "1,830.9 \u03bcs",
+      "standardDeviation": "182.23 \u03bcs",
+      "allocated": "138.56 KB"
+    },
+    {
+      "boundary": "file-exact",
+      "mean": "31,743.3 \u03bcs",
+      "p95": "33,507.8 \u03bcs",
+      "standardDeviation": "1,433.00 \u03bcs",
+      "allocated": "30870.19 KB"
+    },
+    {
+      "boundary": "file-over-one",
+      "mean": "10,153.8 \u03bcs",
+      "p95": "11,001.1 \u03bcs",
+      "standardDeviation": "725.33 \u03bcs",
+      "allocated": "10242.61 KB"
+    },
+    {
+      "boundary": "total-exact",
+      "mean": "301,276.5 \u03bcs",
+      "p95": "313,916.5 \u03bcs",
+      "standardDeviation": "8,841.14 \u03bcs",
+      "allocated": "307916.69 KB"
+    },
+    {
+      "boundary": "total-over-one",
+      "mean": "303,344.1 \u03bcs",
+      "p95": "407,974.6 \u03bcs",
+      "standardDeviation": "69,948.71 \u03bcs",
+      "allocated": "287373.35 KB"
+    },
+    {
+      "boundary": "zip-count-exact",
+      "mean": "22,399.9 \u03bcs",
+      "p95": "26,637.4 \u03bcs",
+      "standardDeviation": "2,315.19 \u03bcs",
+      "allocated": "84202.2 KB"
+    },
+    {
+      "boundary": "zip-count-over-one",
+      "mean": "427.4 \u03bcs",
+      "p95": "497.9 \u03bcs",
+      "standardDeviation": "39.73 \u03bcs",
+      "allocated": "649.47 KB"
+    },
+    {
+      "boundary": "zip-file-exact",
+      "mean": "26,846.2 \u03bcs",
+      "p95": "28,455.7 \u03bcs",
+      "standardDeviation": "1,010.98 \u03bcs",
+      "allocated": "30877.05 KB"
+    },
+    {
+      "boundary": "zip-file-over-one",
+      "mean": "12,491.3 \u03bcs",
+      "p95": "12,954.2 \u03bcs",
+      "standardDeviation": "283.71 \u03bcs",
+      "allocated": "10336.04 KB"
+    },
+    {
+      "boundary": "zip-total-exact",
+      "mean": "281,587.3 \u03bcs",
+      "p95": "306,532.3 \u03bcs",
+      "standardDeviation": "14,133.64 \u03bcs",
+      "allocated": "307928.1 KB"
+    },
+    {
+      "boundary": "zip-total-over-one",
+      "mean": "232,364.0 \u03bcs",
+      "p95": "244,314.8 \u03bcs",
+      "standardDeviation": "7,016.98 \u03bcs",
+      "allocated": "287380.78 KB"
+    }
+  ]
+}

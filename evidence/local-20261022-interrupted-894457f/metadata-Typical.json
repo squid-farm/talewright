@@ -1,0 +1,25 @@
+{
+  "corpus": {
+    "Tier": "Typical",
+    "StoryFileCount": 10,
+    "SceneCount": 100,
+    "ChoiceCount": 110,
+    "ExpandedBytes": 524288,
+    "CompressedBytes": 4821,
+    "Seed": 57057,
+    "Sha256": "ba7afb5e0702a68fad230d110437631420e91d84f2352ef3db98869ac5bd7d68"
+  },
+  "commit": "894457f9c6525c8ea5584066db16daf2bc0a9314",
+  "workingTreeDirty": false,
+  "runtime": ".NET 10.0.13",
+  "benchmarkDotNet": "0.15.2.0",
+  "os": "Linux Mint 22.3",
+  "architecture": "X64",
+  "processorCount": 16,
+  "cpuModel": "AMD Ryzen 9 7940HS w/ Radeon 780M Graphics",
+  "physicalMemoryBytes": 29219717120,
+  "runtimeAvailableMemoryBytes": 29219717120,
+  "powerAndCacheSettings": "Local Linux Mint 22.3; background agents stopped; AC power and filesystem cache state not controlled",
+  "benchmarkWorkerPeakWorkingSetBytes": null,
+  "peakWorkingSetScope": "whole BenchmarkDotNet worker process; includes setup and harness"
+}
