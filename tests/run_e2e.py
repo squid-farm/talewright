@@ -77,12 +77,15 @@ def main():
     if os.geteuid() == 0:
         parser.error("Run the native suite as an unprivileged user; do not disable the WebKit sandbox.")
     run(["dotnet", "build", "src/Talewright.Host.Desktop", "-c", "Release"])
+    run(["dotnet", "build", "src/Talewright.Debugger", "-c", "Release"])
     run(["dotnet", "build", PROJECT, "-c", "Release"])
     with tempfile.TemporaryDirectory(prefix="talewright-native-") as temporary:
         temporary = Path(temporary)
         environment = dict(os.environ, GTK_MODULES="gail:atk-bridge", GIO_USE_VFS="local",
                            GIO_USE_VOLUME_MONITOR="unix", TALEWRIGHT_TARGET="linux",
                            TALEWRIGHT_TEST_RESULTS=str(results),
+                           TALEWRIGHT_DEBUGGER_EXECUTABLE=os.environ.get("TALEWRIGHT_DEBUGGER_EXECUTABLE",
+                               str(ROOT / "src/Talewright.Debugger/bin/Release/net10.0/Talewright.Debugger.dll")),
                            TALEWRIGHT_DESKTOP_EXECUTABLE=os.environ.get("TALEWRIGHT_DESKTOP_EXECUTABLE",
                                str(ROOT / "src/Talewright.Host.Desktop/bin/Release/net10.0/Talewright.Host.Desktop.dll")))
         for variable, child in [("XDG_CONFIG_HOME", "config"), ("XDG_CACHE_HOME", "cache"),

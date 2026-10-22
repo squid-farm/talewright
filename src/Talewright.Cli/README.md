@@ -10,6 +10,7 @@ of the CLI framework; JSON output never contains its help or console formatting.
 
 ```bash
 talewright validate path/to/story
+talewright debug path/to/story
 talewright validate path/to/story --format json --warnings-as-errors
 talewright publish path/to/story --output story.zip
 talewright publish path/to/story -a --target web --output game-web.zip
@@ -45,6 +46,31 @@ Operational failures return exit 2 and include `success:false`, empty
 `diagnostics`, and `error:{"code":"TWCLI001","message":"..."}` for invocation
 errors or `TWCLI002` for input errors. A missing manifest in an otherwise readable
 directory is a compiler diagnostic, not an operational error.
+
+## Author debugging
+
+`debug <story-root>` launches a separate native Author Debugger window and waits
+for it to close. It requires a graphical desktop and the OS webview: WebKitGTK 4.1
+on Linux (`libwebkit2gtk-4.1-0`), WebView2 on Windows, or macOS WKWebView. There is
+no browser/server fallback. Linux x64 is runtime-tested; other native targets
+still need platform validation. Missing folders/assets/prerequisites and native
+launch failures return exit 2 with `TWCLI002`. Compiler errors appear in the
+window so the author can repair the source and explicitly reload.
+
+Search scenes by ID/title or enter an exact ID, optionally choose a seed and
+create the player character, then start the selected scene. Enable only the
+prerequisite overrides you need: flags, variables, character base stats and
+absolute item counts, or faction standings. Normal rules clamp stats and run
+entry effects/triggers. Inspect actual state, events and historical branch
+decisions; these are recorded evaluations, not predictions against current state.
+
+Every start is a fresh synthetic history: skipped scenes remain unvisited and
+reachability is not proven. Setup and pre-entry initialization events are shown
+separately. Player saves are neither read nor written. Reload is manual and
+discards setup/run only after successful compilation; rejected source leaves
+the previous compiled story and run visible. There is no watcher, live state
+editing, preserve-state jump, save editor, or portable scenario support yet.
+Debugger assets ship in the CLI tool, not Player packages or published games.
 
 ## Publishing
 

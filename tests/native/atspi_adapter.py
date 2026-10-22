@@ -191,6 +191,20 @@ def serve(args):
                     result = app.wait(app.snapshot, "read accessibility tree")
                 elif command == "click":
                     app.click(**arguments)
+                elif command == "activate":
+                    node = app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
+                    node.queryComponent().grabFocus()
+                    app.key("Space")
+                elif command == "fill":
+                    node = app.wait(lambda: app.find(name=arguments["name"]), "editable named field")
+                    node.queryComponent().grabFocus()
+                    app.key("Control_L", pyatspi.KEY_PRESS)
+                    try:
+                        app.key("a")
+                    finally:
+                        app.key("Control_L", pyatspi.KEY_RELEASE)
+                    pyatspi.Registry.generateKeyboardEvent(0, arguments["value"], pyatspi.KEY_STRING)
+                    app.key("Tab")
                 elif command == "upload":
                     app.upload(**arguments)
                 elif command == "key":
