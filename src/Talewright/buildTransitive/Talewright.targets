@@ -4,7 +4,7 @@
     <Error Condition="'$(TalewrightStoryRoot)' == ''" Code="TWBUILD002"
            Text="TalewrightStoryRoot is required when TalewrightStoryProject is set." />
     <MSBuild Projects="$(TalewrightStoryProject)" Targets="Restore;Build"
-             RemoveProperties="RuntimeIdentifier;SelfContained;PublishTrimmed;PublishAot"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishTrimmed;PublishAot;TalewrightStoryProject;TalewrightStoryRoot"
              Properties="Configuration=$(Configuration)">
       <Output TaskParameter="TargetOutputs" ItemName="_TalewrightStoryValidator" />
     </MSBuild>

@@ -25,7 +25,7 @@
 
   <!-- Bundled sample stories, embedded as stories/<Story>/<path> (see EmbeddedStoryLibrary). -->
   <ItemGroup Condition="'$(TalewrightIncludeSamples)' == 'true'">
-    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml" LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml" LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
 
 </Project>

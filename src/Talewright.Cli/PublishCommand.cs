@@ -48,6 +48,7 @@ public sealed class PublishSettings : CommandSettings
 
 public sealed class PublishCommand : Command<PublishSettings>
 {
+    private const string ComponentsVersion = "10.0.13";
     internal static readonly string[] DesktopRuntimes =
         ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"];
 
@@ -114,12 +115,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                     ? BuildUniversalDesktop(working, story, output, error)
                     : BuildHost(working, target, runtime, story, output, error);
                 File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(content, "ENGINE-LICENSE.txt"));
-                File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), target == "web"
-                    ? "Extract and serve this directory with a static HTTP(S) host, or upload the ZIP as an itch.io HTML5 game. No .NET runtime or backend server is required. Saves use this origin's IndexedDB."
-                    : (universalDesktop
-                        ? "Universal self-contained desktop package for Windows, Linux and macOS, x64 and ARM64. Extract the entire ZIP; start start.cmd on Windows, start.sh on Linux or start.command on macOS. Launchers select the matching platform directory. If executable permissions were lost during extraction, use sh start.sh on Linux/macOS."
-                        : $"Self-contained {runtime} desktop build. Start Talewright.Host.Desktop{(runtime is "win-x64" or "win-arm64" ? ".exe" : "")}.")
-                    + " The .NET runtime is included. Platform webview prerequisite: WebKitGTK 4.1 on Linux, WebView2 on Windows, built-in WKWebView on macOS. Linux x64 is automated here; other OS/CPU combinations require runtime verification. This ZIP is not a signed installer or macOS .app bundle.");
+                File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime));
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);
@@ -154,6 +150,24 @@ public sealed class PublishCommand : Command<PublishSettings>
     }
 
     private static string AssetsRoot => Path.Combine(Path.GetDirectoryName(typeof(PublishCommand).Assembly.Location)!, "publish-assets");
+
+    private static string DeploymentInstructions(string target, string? runtime)
+    {
+        if (target == "web")
+        {
+            return "Extract and serve this directory with a static HTTP(S) host, or upload the ZIP as an itch.io HTML5 game. No .NET runtime or backend server is required. Saves use this origin's IndexedDB.";
+        }
+
+        var launch = "Universal self-contained desktop package for Windows, Linux and macOS, x64 and ARM64. Extract the entire ZIP; start start.cmd on Windows, start.sh on Linux or start.command on macOS. Launchers select the matching platform directory. If executable permissions were lost during extraction, use sh start.sh on Linux/macOS.";
+        if (runtime is not null)
+        {
+            var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+            launch = $"Self-contained {runtime} desktop build. Start {executable}.";
+        }
+
+        return launch + " The .NET runtime is included. Platform webview prerequisite: WebKitGTK 4.1 on Linux, WebView2 on Windows, built-in WKWebView on macOS. Linux x64 is automated here; other OS/CPU combinations require runtime verification. This ZIP is not a signed installer or macOS .app bundle.";
+    }
 
     private static void WriteStory(StorySource source, string directory)
     {
@@ -208,27 +222,18 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
 
         references.Add(new XElement("PackageReference", new XAttribute("Include", "Microsoft.AspNetCore.Components.Web"),
-            new XAttribute("Version", "10.0.13")));
+            new XAttribute("Version", ComponentsVersion)));
         references.Add(new XElement("EmbeddedResource",
             new XAttribute("Include", Path.Combine(story, "**", "*.tale") + ";" + Path.Combine(story, "**", "*.yaml")),
-            new XAttribute("LogicalName", "stories/Published/%(RecursiveDir)%(Filename)%(Extension)")));
+            new XAttribute("LogicalName", "stories/Published/%(RecursiveDir)%(Filename)%(Extension)"),
+            new XAttribute("WithCulture", "false")));
         xml.Root!.Add(references);
         xml.Root.Add(new XElement("PropertyGroup", new XElement("TreatWarningsAsErrors", "true"),
             new XElement("LangVersion", "latest"), new XElement("JSModulesEnabled", "false")));
         xml.Save(project);
         CopyDirectory(Path.Combine(AssetsRoot, "player"), Path.Combine(host, "wwwroot", "_content", "Talewright.Player"));
 
-        var app = Path.Combine(host, "App.razor");
-        var appText = File.ReadAllText(app);
-        appText = target == "web"
-            ? appText.Replace("<TalewrightApp ", "<TalewrightApp AutoStartStoryId=\"Published\" ")
-            : appText.Replace("AutoStartStoryId=\"@Options.AutoStartStoryId\"", "AutoStartStoryId=\"0|Published\"");
-        File.WriteAllText(app, appText);
-        if (target == "web")
-        {
-            var index = Path.Combine(host, "wwwroot", "index.html");
-            File.WriteAllText(index, File.ReadAllText(index).Replace("<base href=\"/\" />", "<base href=\"./\" />"));
-        }
+        CopyDirectory(Path.Combine(AssetsRoot, "standalone", target), host, overwrite: true);
 
         var published = Path.Combine(working, "output");
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = host };
@@ -259,13 +264,13 @@ public sealed class PublishCommand : Command<PublishSettings>
         return target == "web" ? Path.Combine(published, "wwwroot") : published;
     }
 
-    private static void CopyDirectory(string source, string destination)
+    private static void CopyDirectory(string source, string destination, bool overwrite = false)
     {
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             var target = Path.Combine(destination, Path.GetRelativePath(source, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target);
+            File.Copy(file, target, overwrite);
         }
     }
 
