@@ -228,6 +228,22 @@ public sealed class AuthorReloadTests : IDisposable
     }
 
     [Fact]
+    public async Task Pending_status_dispatch_does_not_hold_the_watcher_gate()
+    {
+        var model = new WorkbenchModel(_root);
+        Task Dispatch(Action action)
+        {
+            var dispatched = Task.Run(action);
+            Assert.True(dispatched.Wait(TimeSpan.FromSeconds(5)), "UI dispatch was blocked by the watcher gate.");
+            return dispatched;
+        }
+        await using var watcher = new StoryReloadWatcher(model, Dispatch, () => { });
+        await watcher.RescanAsync(restart: true).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.NotNull(model.AcceptedSourceMap);
+        Assert.False(model.SourcePending);
+    }
+
+    [Fact]
     public async Task Late_compile_cannot_overwrite_newer_generation_and_play_during_compile_is_not_rolled_back()
     {
         var model = new WorkbenchModel(_root);
@@ -260,6 +276,11 @@ public sealed class AuthorReloadTests : IDisposable
         try
         {
             Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            await Dispatch(() =>
+            {
+                Assert.True(model.SourcePending);
+                Assert.DoesNotContain("Slow stale.", model.CurrentSource!.Text);
+            });
             await Dispatch(() => model.Choose("c0"));
             second = watcher.RescanAsync();
         }
@@ -271,6 +292,9 @@ public sealed class AuthorReloadTests : IDisposable
         Assert.Contains("Latest.", model.Session!.Current.Document.ToPlainText());
         Assert.Equal("current", model.Session.Current.Scene!.Value.Value);
         Assert.Equal(1, model.Session.State.GetVariable(new("count")));
+        Assert.False(model.SourcePending);
+        Assert.Contains("Latest.", model.CurrentSource!.Text);
+        Assert.DoesNotContain("Slow stale.", model.CurrentSource.Text);
     }
 
     [Fact]

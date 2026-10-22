@@ -1,0 +1,71 @@
+<section aria-label="Accepted Tale source">
+    <h3>Accepted Tale source</h3>
+    <p>Read-only accepted compilation snapshot, not newer disk text. Highlighting is scene provenance, not a statement-level instruction pointer.</p>
+    @if (Pending)
+    {
+        <p role="status">Disk changes pending compilation/adoption. Accepted source remains displayed.</p>
+    }
+    @if (Rejected || RestartRequired)
+    {
+        <p role="status">Disk source is stale or restart-required, not adopted. This view still shows accepted source.</p>
+    }
+    @if (Source is not { } source)
+    {
+        <p role="status">Source mapping unavailable for this passage (for example, a C#-defined scene or no scene). No source is guessed.</p>
+    }
+    else
+    {
+        <p>Accepted file: @source.Range.File. Scene @source.Scene source range: lines @source.Range.StartLine to @source.Range.EndLine (inclusive).</p>
+        <button type="button" @onclick="ShowScene">Go to current scene source</button>
+        <button type="button" disabled="@(_firstLine == 1)" @onclick="Previous">Previous source lines</button>
+        <button type="button" disabled="@(LastLine == _lines.Length)" @onclick="Next">Next source lines</button>
+        <div @key="_navigationRevision" class="source-window" tabindex="0" aria-label="Read-only accepted source lines">
+            <table class="source-lines">
+                <caption>Showing accepted lines @_firstLine to @LastLine of @_lines.Length</caption>
+                <thead><tr><th scope="col">Line</th><th scope="col">Tale source</th></tr></thead>
+                <tbody>
+                    @for (var line = _firstLine; line <= LastLine; line++)
+                    {
+                        <tr class="@(line >= source.Range.StartLine && line <= source.Range.EndLine ? "source-scene" : null)">
+                            <th scope="row">@line</th><td><code>@_lines[line - 1]</code></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public AcceptedSceneSource? Source { get; set; }
+    [Parameter] public bool Pending { get; set; }
+    [Parameter] public bool Rejected { get; set; }
+    [Parameter] public bool RestartRequired { get; set; }
+    private const int PageSize = 100;
+    private AcceptedSceneSource? _displayed;
+    private string[] _lines = [];
+    private int _firstLine = 1;
+    private long _navigationRevision;
+    private int LastLine => Math.Min(_firstLine + PageSize - 1, _lines.Length);
+
+    protected override void OnParametersSet()
+    {
+        if (Source == _displayed)
+        {
+            return;
+        }
+        _displayed = Source;
+        _lines = Source?.Text.ReplaceLineEndings("\n").Split('\n') ?? [];
+        ShowScene();
+    }
+
+    private void ShowScene() => Navigate(Math.Max(1, (Source?.Range.StartLine ?? 1) - 3));
+    private void Previous() => Navigate(Math.Max(1, _firstLine - PageSize));
+    private void Next() => Navigate(Math.Min(_lines.Length, _firstLine + PageSize));
+
+    private void Navigate(int firstLine)
+    {
+        _firstLine = firstLine;
+        ++_navigationRevision;
+    }
+}

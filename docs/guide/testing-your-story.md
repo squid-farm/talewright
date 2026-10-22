@@ -49,6 +49,24 @@ talewright debug my-story
 The **State inspection** panel shows the current stats, inventory, flags and variables, the events that
 led there, and **Branch explanations**: why each condition passed or failed.
 
+### See the source being tested
+
+**Accepted Tale source** shows the complete source file in read-only, 100-line windows with line
+numbers. It follows the current scene when you choose, jump, or use Back/Forward. Use
+**Previous source lines** / **Next source lines** to browse the file and **Go to current scene source**
+to return to the scene declaration. These controls reset the source viewport to the top of the
+requested window, even when returning to the window already selected.
+
+The marked range runs from the `===` declaration through the line before the next scene (or the end
+of that file), including intervening comments and blank lines. It describes the scene's source, **not**
+the statement currently executing. Line endings count consistently; a final newline leaves an empty
+last line.
+
+The text belongs to the accepted compilation running in the workbench, not a fresh disk read.
+Pending, rejected or restart-required disk changes are labeled; they cannot replace this view until
+adopted successfully. When no compiler mapping is available (for example, a C#-defined scene), the
+viewer explains that instead of guessing a file. Source viewing is debugger-only and cannot edit files.
+
 ### Change state without starting over
 
 Open **Live edit values**, enable the fields you want to change, and click **Apply live edit batch**.

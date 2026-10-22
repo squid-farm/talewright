@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Collections.ObjectModel;
 
 namespace Talewright.Tale.Compilation;
 
@@ -19,7 +20,8 @@ public sealed class StorySource
     /// <summary>Extension of narrative files.</summary>
     public const string TaleExtension = ".tale";
 
-    public StorySource(IReadOnlyDictionary<string, string> files) => Files = files;
+    public StorySource(IReadOnlyDictionary<string, string> files) =>
+        Files = new ReadOnlyDictionary<string, string>(files.ToDictionary(StringComparer.Ordinal));
 
     /// <summary>Relative path → file text.</summary>
     public IReadOnlyDictionary<string, string> Files { get; }

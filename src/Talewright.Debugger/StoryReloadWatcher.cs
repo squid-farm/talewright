@@ -151,8 +151,22 @@ public sealed class StoryReloadWatcher : IAsyncDisposable
 
     private async Task RunAsync(long generation, bool restart, bool debounce, CancellationTokenSource cancellation)
     {
+        // Queue holds the watcher gate; never enter the UI dispatcher synchronously under that lock.
+        await Task.Yield();
         try
         {
+            await _dispatch(() =>
+            {
+                lock (_gate)
+                {
+                    if (_disposed || generation != _generation)
+                    {
+                        return;
+                    }
+                    _model.SourceChanged();
+                    _changed();
+                }
+            });
             if (debounce)
             {
                 await Task.Delay(250, cancellation.Token);

@@ -140,7 +140,11 @@ public static class StoryCompiler
             Triggers = triggers,
             Predicates = options.Predicates,
         };
-        return new CompilationResult(story, diagnostics.Items);
+        return new CompilationResult(story, diagnostics.Items)
+        {
+            SourceMap = new StorySourceMap(source, parsed.ToDictionary(scene => scene.Definition.Id,
+                scene => new SceneSourceRange(scene.Location.File, scene.Location.Line, scene.EndLine))),
+        };
     }
 
     private static string? Fingerprint(StorySource source, string? compatibilityId)
