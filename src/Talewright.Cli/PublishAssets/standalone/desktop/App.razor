@@ -1,0 +1,8 @@
+<TalewrightApp AutoStartStoryId="0|Published" OnTitleChanged="UpdateTitle" />
+
+@code {
+    [Inject]
+    private DesktopOptions Options { get; set; } = default!;
+
+    private void UpdateTitle(string? title) => Options.SetTitle?.Invoke(title ?? "Talewright");
+}

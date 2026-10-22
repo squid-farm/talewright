@@ -27,5 +27,7 @@
              Link="publish-assets/player/Components/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../LICENSE" Link="publish-assets/ENGINE-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Update="PublishAssets/*" Link="publish-assets/launchers/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Remove="PublishAssets/standalone/**" />
+    <None Pack="false" Include="PublishAssets/standalone/**" Link="publish-assets/standalone/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

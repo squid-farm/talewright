@@ -216,7 +216,17 @@
             if (generation == _generation)
             {
                 _saveError = true;
-                _saveMessage = $"Couldn't complete save operation: {ex.Message}";
+                _saveMessage = ex switch
+                {
+                    FileNotFoundException or DirectoryNotFoundException =>
+                        "That saved game could not be found. Refresh the list and choose another save.",
+                    UnauthorizedAccessException =>
+                        "The player does not have permission to access saved games. Check your save-folder permissions or browser storage settings.",
+                    IOException =>
+                        "Saved games could not be read or written. Check that storage is available and has free space, then refresh the list and try again.",
+                    JSException => $"Couldn't complete save operation: {ex.Message.Split('\n')[0]}",
+                    _ => $"Couldn't complete save operation: {ex.Message}",
+                };
             }
         }
         finally

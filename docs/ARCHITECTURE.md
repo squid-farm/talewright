@@ -294,6 +294,10 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
 
 Both hosts embed `samples/**/*.tale|yaml` as resources named `stories/<Story>/<path>` (see the `EmbeddedResource`
 item in each `.csproj`). That avoids any HTTP fetching or manifest files for the bundled stories.
+Story resources disable MSBuild culture inference so names such as `chapter.fr.tale`
+stay in the main assembly. The CLI builds standalone hosts using explicit Razor/HTML
+templates (including a relative web base path); project changes use `XDocument` and
+`XElement` serialization, not hand-built XML or replacements inside component source.
 
 ---
 

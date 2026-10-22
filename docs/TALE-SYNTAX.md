@@ -95,7 +95,10 @@ creation:
 ```
 
 All fields are optional. `name: true` allows first/last names (trimmed, no control
-characters, at most 80 characters each, nonempty first name). Pronoun choices are
+characters, at most 80 characters each, nonempty first name). Names are
+prefilled from `characters.player.first-name` and `last-name`; the **Use default name**
+button restores those authored names without resetting other creation choices.
+Pronoun choices are
 distinct built-in keywords; omit them to preserve an authored custom pronoun set.
 Stat choices must exist in the final ruleset and be distinct integers within its
 bounds: up to 32 selectable stats, each with 1–100 values. Up to 16 presets may set

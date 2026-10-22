@@ -76,6 +76,9 @@ def verify(directory, version):
                                   "tools/net10.0/any/Talewright.Cli.runtimeconfig.json",
                                   "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
                                   "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
+                                  "tools/net10.0/any/publish-assets/standalone/web/App.razor",
+                                  "tools/net10.0/any/publish-assets/standalone/web/wwwroot/index.html",
+                                  "tools/net10.0/any/publish-assets/standalone/desktop/App.razor",
                                   "tools/net10.0/any/publish-assets/player/talewright.css",
                                   "tools/net10.0/any/publish-assets/player/Components/StoryPlayer.razor.js",
                                   "tools/net10.0/any/publish-assets/player/Saves/IndexedDbSaveStore.js",
@@ -169,6 +172,16 @@ using System.Collections.Generic;
 using Talewright.Tale.Compilation;
 using Talewright.Runtime;
 
+if (args.Length == 1)
+{
+    var assembly = System.Reflection.Assembly.LoadFile(System.IO.Path.GetFullPath(args[0]));
+    using var stream = assembly.GetManifestResourceStream("stories/Published/chapter.fr.tale")
+        ?? throw new Exception("Culture-like chapter is missing from the main host assembly.");
+    using var reader = new System.IO.StreamReader(stream);
+    if (!reader.ReadToEnd().Contains("Culture-like chapter"))
+        throw new Exception("Culture-like chapter resource has incorrect content.");
+    return;
+}
 if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
     throw new Exception("Original Narrative assembly identity was not preserved.");
 var source = new StorySource(new Dictionary<string, string>
@@ -211,7 +224,8 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         story.mkdir()
         (story / "story.yaml").write_text(
             "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
-        (story / "main.tale").write_text("=== a\nHello.\n-> END\n")
+        (story / "main.tale").write_text("=== a\nHello.\n-> translated\n")
+        (story / "chapter.fr.tale").write_text("=== translated\nCulture-like chapter.\n-> END\n")
         result = subprocess.run([str(tool_path / "talewright"), "validate", str(story), "--format", "json"],
                                 cwd=root, env=environment, check=True, capture_output=True, text=True)
         if json.loads(result.stdout) != {"schemaVersion": 1, "success": True, "diagnostics": []}:
@@ -220,7 +234,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "--output", str(archive)],
                        cwd=root, env=environment, check=True)
         with ZipFile(archive) as published:
-            if set(published.namelist()) != {"story.yaml", "main.tale"}:
+            if set(published.namelist()) != {"story.yaml", "main.tale", "chapter.fr.tale"}:
                 raise ValueError("Installed CLI did not produce a story-only archive")
         web = root / "web.zip"
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
@@ -233,20 +247,32 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
                         "--target", "desktop", "--output", str(desktop)], cwd=root, env=environment, check=True)
         verify_desktop_archive(desktop)
+        with ZipFile(desktop) as published:
+            host = root / "PublishedHost.dll"
+            host.write_bytes(published.read("linux-x64/Talewright.Host.Desktop.dll"))
+        subprocess.run(["dotnet", "run", "--project", str(root / "EngineConsumer"), "-c", "Release",
+                        "--no-build", "--", str(host)], cwd=root, env=environment, check=True)
         example = root / "CSharpStory"
         shutil.copytree(Path(__file__).resolve().parents[2] / "examples/CSharpStory", example,
                         ignore=shutil.ignore_patterns("bin", "obj"))
         for host in ["Web", "Desktop"]:
             subprocess.run(["dotnet", "build", str(example / host), "-c", "Release",
                             f"-p:TalewrightVersion={version}"], cwd=root, env=environment, check=True)
+        validation_properties = [
+            f"-p:TalewrightStoryProject={example / 'Validator/Validator.csproj'}",
+            f"-p:TalewrightStoryRoot={example / 'Story/Content'}",
+        ]
+        subprocess.run(["dotnet", "build", str(example / "Web"), "-c", "Release",
+                        f"-p:TalewrightVersion={version}", *validation_properties],
+                       cwd=root, env=environment, check=True, timeout=120)
         shell = example / "Desktop/bin/Release/net10.0/wwwroot/index.html"
         if not shell.is_file() or shell.read_bytes() != (example / "Desktop/wwwroot/index.html").read_bytes():
             raise ValueError("Desktop example did not copy its shell page into the executable output")
         tale = example / "Story/Content/main.tale"
         tale.write_text("=== beginning\n-> missing\n")
         invalid = subprocess.run(["dotnet", "build", str(example / "Web"), "-c", "Release",
-                                  f"-p:TalewrightVersion={version}"],
-                                 cwd=root, env=environment, capture_output=True, text=True)
+                                  f"-p:TalewrightVersion={version}", *validation_properties],
+                                 cwd=root, env=environment, capture_output=True, text=True, timeout=120)
         if invalid.returncode == 0 or "main.tale(2," not in invalid.stdout or "error TW2002:" not in invalid.stdout:
             raise ValueError(f"Invalid C# story did not fail with source diagnostics:\n{invalid.stdout}\n{invalid.stderr}")
         print("Both library consumers and installed CLI passed", flush=True)

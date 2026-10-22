@@ -95,15 +95,15 @@ public class StoryHistoryTests
     }
 
     [Theory]
-    [InlineData("formatVersion", "99", "Unsupported")]
+    [InlineData("formatVersion", "99", "unsupported")]
     [InlineData("storyId", "\"other\"", "different story")]
     [InlineData("storyVersion", "\"other\"", "incompatible")]
     [InlineData("contentFingerprint", "\"changed\"", "incompatible")]
-    [InlineData("cursor", "-1", "bounds")]
-    [InlineData("cursor", "3", "bounds")]
-    [InlineData("choices", "null", "bounds")]
-    [InlineData("choices", "[null]", "bounds")]
-    [InlineData("choices", "[\"missing\"]", "not available")]
+    [InlineData("cursor", "-1", "history is damaged")]
+    [InlineData("cursor", "3", "history is damaged")]
+    [InlineData("choices", "null", "history is damaged")]
+    [InlineData("choices", "[null]", "history is damaged")]
+    [InlineData("choices", "[\"missing\"]", "cannot continue")]
     public void Invalid_saves_preserve_active_session(string field, string value, string message)
     {
         var history = new StoryHistory(Compile(), 7);
@@ -153,10 +153,13 @@ public class StoryHistoryTests
         }
 
         Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
+        Assert.Equal(StoryHistory.MaxChoices + 1, history.Transcript.Count);
         var saved = history.Save();
         Assert.Throws<InvalidOperationException>(() => history.Choose("c0"));
         Assert.Equal(saved, history.Save());
-        Assert.Equal(StoryHistory.MaxChoices, StoryHistory.Restore(history.Story, saved).Cursor);
+        var restored = StoryHistory.Restore(history.Story, saved);
+        Assert.Equal(StoryHistory.MaxChoices, restored.Cursor);
+        Assert.Equal(StoryHistory.MaxChoices + 1, restored.Transcript.Count);
     }
 
     [Fact]

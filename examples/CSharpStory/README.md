@@ -17,6 +17,10 @@ player; the Validator executable uses the same factory at build time. Package-pr
 `TalewrightStoryProject` against `TalewrightStoryRoot` before host compilation.
 Invalid Tale emits `file(line,column): error TWxxxx: message` and fails the build.
 Design-time IDE builds do not launch validation.
+The opt-in properties may also be supplied globally with `-p:`; the nested
+validator build strips them to avoid recursively invoking itself. Embedded story
+resources set `WithCulture="false"` so filenames such as `chapter.fr.tale` remain
+in the story assembly rather than being moved to a satellite assembly.
 
 The explicit compatibility ID must change when extension behavior changes.
 Predicates/modifiers must remain deterministic for replay and saves. Arbitrary

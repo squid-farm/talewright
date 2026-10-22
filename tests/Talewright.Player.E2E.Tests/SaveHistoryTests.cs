@@ -123,6 +123,28 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Observe(new(null, "Mara's"));
     }
 
+    [Theory]
+    [Trait("Host", "Browser")]
+    [InlineData("QuotaExceededError", "not enough browser storage")]
+    [InlineData("SecurityError", "storage is blocked")]
+    public async Task Browser_storage_failures_give_actionable_advice_and_preserve_play(string errorName, string expected)
+    {
+        await Upload(Fixture());
+        await Page.EvaluateAsync("""
+            name => Object.defineProperty(globalThis, 'indexedDB', {
+                configurable: true,
+                value: { open() { throw new DOMException('Internal storage detail', name); } }
+            })
+            """, errorName);
+        await Driver.ClickAsync("Saved games");
+        var alert = Page.GetByRole(AriaRole.Alert);
+        await Expect(alert).ToContainTextAsync(expected);
+        await Expect(alert).Not.ToContainTextAsync("Internal storage detail");
+        await Expect(alert).Not.ToContainTextAsync("IndexedDbSaveStore.js:");
+        await Choose("Walk onward");
+        await Observe(new(null, "Second passage text."));
+    }
+
     [Fact]
     [Trait("Host", "Browser")]
     public async Task Choice_limit_is_visible_and_keeps_save_back_and_restart_usable()
@@ -147,16 +169,21 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
             """, new { storyId = story.Id, json = saved.ToJsonString() });
         await Driver.ClickAsync("Saved games");
         await Driver.ClickAsync("Load Limit");
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("choice limit");
+        // This includes rendering 10,001 passages, not just replaying their choices.
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("choice limit", new() { Timeout = 30_000 });
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices + 1);
         await Expect(Choices).ToBeDisabledAsync();
         await Driver.ClickAsync("Save game");
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'My save'");
         await Driver.ClickAsync("Back");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices);
         await Expect(Choices).ToBeEnabledAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Driver.ClickAsync("Forward");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices + 1);
         await Expect(Choices).ToBeDisabledAsync();
         await Driver.ClickAsync("Restart");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
         await Expect(Choices).ToBeEnabledAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Choose("Again");

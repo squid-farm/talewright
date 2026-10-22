@@ -66,7 +66,7 @@ public sealed record CharacterSelection
             ? !Name(selection.FirstName, true) || !Name(selection.LastName, false)
             : selection.FirstName is not null || selection.LastName is not null)
         {
-            throw new ArgumentException("Names must be trimmed, contain no control characters and have at most 80 characters; a first name is required.");
+            throw new ArgumentException("A first name is required. Use at most 80 characters per name, without leading or trailing spaces, line breaks or special control characters.");
         }
 
         if (creation.Pronouns.Count == 0 ? selection.Pronouns is not null
