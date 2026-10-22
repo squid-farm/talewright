@@ -99,6 +99,65 @@ No cross-source reload, live edits, portable scenarios or player-save compatibil
 bypass is implemented here. Source-aware reload must separately verify a new
 story's reconstruction boundary before adoption.
 
+### State inspection and execution explanations
+
+Enable decision recording explicitly; ordinary player and author sessions do not
+record by default:
+
+```csharp
+var author = AuthorSession.Create(story, new SceneId("finale"),
+    captureDecisions: true, seed: 42, character: selection);
+var inspection = author.Inspect();
+var guide = inspection.FindCharacters("guide").FirstOrDefault();
+var hidden = inspection.FindDecisions(kind: DecisionKind.Choice)
+    .Where(d => d.Outcome == DecisionOutcome.Excluded);
+```
+
+`Inspect()` returns a stable read-only snapshot of all declared characters
+(identity, base/effective stats, inventory), factions/tiers, flags including
+false values, variables including zero, all scene visit counts, fired-trigger
+history, seed/roll count and events. Its typed lists support normal LINQ
+filtering; character and decision searches use ordinal case-insensitive matching.
+Inspecting/searching does not reevaluate branch predicates. Effective stats use
+the ruleset's normal getters; custom modifiers must remain side-effect-free.
+
+`DecisionsCaptured` distinguishes unavailable recording from an empty trace.
+Each `RuleDecision` records its kind, subject (scene/choice/trigger ID or local
+entry/divert index), scene, outcome/reason and event offsets. Applied effects
+and resolved checks occupy `[EventStart, EventEnd)` in the **same snapshot's**
+`Events`; pure decisions have equal offsets. Trigger passes, hub priority/rank
+and limits are included where relevant. Never present a historical condition
+result as a fresh evaluation against later state. A fresh jump replaces the
+timeline; old inspection objects remain unchanged.
+
+The expression tree retains the evaluator's actual operand/results, including
+effective stat values. A null expression result means **not evaluated**, not
+false. Short-circuit branches, later diverts and choices suppressed by an entry
+check are explicitly skipped without executing their predicates. Named C#
+predicates are opaque: their name and actual result are available, not invented
+internals. No extra calls are made for explanations.
+
+Hub explanations distinguish tag/self/once exclusion, false requirements,
+duplicate IDs, stable priority ordering and hub-limit exclusion. Requirements
+are evaluated before ranking/limiting, as in normal selection. Explicit diverts
+still bypass storylet eligibility; observing them does not introduce new gates.
+Entry conditions, choice requirements, fallback diverts, check difficulty/results
+and outcome effects, trigger priming/edges/cascade effects are observed at their
+actual engine boundaries. This is not a trace of every prose substitution or
+effect arithmetic operation, nor an exact source navigator; source mapping is
+separate shared-analysis work.
+
+Recording follows successful author candidate replay: `Choose`, `JumpFresh`
+and checkpoint `Reenter` preserve the recording setting, with no duplicated
+append-only traces from earlier rebuild attempts. Failed candidates leave the
+previous decisions/state intact and throw their error. This is opt-in in-memory
+diagnostic data, not persisted in player saves or scenario files.
+
+Custom hosts can pass an `Action<RuleDecision>` through the five-argument
+`StorySession` constructor. Callbacks are synchronous, must not mutate/reenter
+the engine, and their exceptions propagate. The normal constructor and
+`IStorySession` contract remain unchanged.
+
 ## History and saves
 
 `StoryHistory` starts a session and owns its transcript and choice history. `Choose`, `Back`, and `Forward`

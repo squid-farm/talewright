@@ -87,6 +87,24 @@ public sealed class CharacterCreationTests
     }
 
     [Fact]
+    public void Validated_stats_use_declared_ids_even_with_a_case_insensitive_caller_dictionary()
+    {
+        var story = Story();
+        var selection = story.Creation!.Default(story.World.Characters[EntityId.Player]) with
+        {
+            Stats = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["STR"] = 16 },
+        };
+
+        var validated = CharacterSelection.Validate(story, selection)!;
+        Assert.Equal(["str"], validated.Stats.Keys);
+        Assert.Throws<KeyNotFoundException>(() => validated.Stats["STR"]);
+
+        var session = new StorySession(story, 42, character: selection);
+        Assert.Equal(16, session.State.GetBaseStat(EntityId.Player, new StatId("str")));
+        Assert.Equal(16, new StoryHistory(story, 42, selection).State.GetBaseStat(EntityId.Player, new StatId("str")));
+    }
+
+    [Fact]
     public void Predefined_stories_keep_old_save_shape_compatibility_and_reject_creation_input()
     {
         var story = Story("");
