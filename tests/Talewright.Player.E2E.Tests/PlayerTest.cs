@@ -107,9 +107,10 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         });
     }
 
-    protected async Task AssertState(Action<PlayerObservation> assertion)
+    protected async Task AssertState(Action<PlayerObservation> assertion, TimeSpan? timeout = null)
     {
         var timer = Stopwatch.StartNew();
+        var maximumWait = timeout ?? TimeSpan.FromSeconds(15);
         while (true)
         {
             var state = await Driver.ObserveAsync();
@@ -118,7 +119,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
                 assertion(state);
                 return;
             }
-            catch (Xunit.Sdk.XunitException) when (timer.Elapsed < TimeSpan.FromSeconds(15))
+            catch (Xunit.Sdk.XunitException) when (timer.Elapsed < maximumWait)
             {
                 await Task.Delay(100);
             }

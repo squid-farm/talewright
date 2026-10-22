@@ -47,6 +47,101 @@ These bounded source workloads
 do not currently justify a second compiled-bundle format, serializer or compatibility
 surface (#26); revisit with real complex stories and constrained-device profiling.
 
+### Real-file BenchmarkDotNet suite
+
+Issue #57 adds a separate, out-of-process BenchmarkDotNet suite. The dependency-free
+seven-sample `Talewright.Benchmarks` runner above remains the fast correctness/budget
+check; it is not presented as BenchmarkDotNet evidence.
+
+The deterministic corpus generator counts `story.yaml` within the file total and
+creates exact expanded-byte totals. The four named tiers are 10 / 100 / 500 / 1,000
+files, 100 / 1,000 / 10,000 / 50,000 scenes, 0.5 / 5 / 25 / 50 MiB, and
+100 / 1,000 / 5,000 / 10,000 choice-history depth. Scene IDs and references are
+unique/valid; generated story content includes substitutions, effects, conditions,
+tags, priorities and bounded hub selection. Only the generator is stored in git.
+It records the seed, counts, byte totals, archive size and a SHA-256 content
+checksum. Repeated comment padding makes the primary ZIPs highly compressible;
+a separate deterministic low-compressibility case exercises a larger upload.
+
+```bash
+# Generate every tier, compile each from disk and ZIP, then play/save/restore its history.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- --verify-corpora
+
+# Full core suite, with five warmups and thirty measured iterations per case.
+TALEWRIGHT_BENCHMARK_OUTPUT="$PWD/artifacts/performance/metadata" \
+  dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*StoryBenchmarks*' --artifacts artifacts/performance/core
+
+# Focused independent file-count, byte-volume, scene-count and history-depth cases.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks*' --artifacts artifacts/performance/dimensions
+
+# Exact and one-over directory/ZIP file-size, aggregate-byte, file-count and depth checks.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*BoundaryInputBenchmarks*' --artifacts artifacts/performance/boundaries
+
+# Generate a corpus outside the BenchmarkDotNet lifecycle, for integration workloads.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --generate-corpus Gigantic artifacts/performance/gigantic-story
+
+# Full web, single-RID and universal desktop publication (45-minute bound each).
+python3 tests/performance/run_publication.py \
+  --story artifacts/performance/gigantic-story \
+  --cli src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll \
+  --output artifacts/performance/publication
+
+# Run one method or tier by matching its BenchmarkDotNet name/parameter.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*LoadAndCompileDirectory*Large*' --artifacts artifacts/performance/large
+```
+
+The default job uses one out-of-process launch, five warmups and thirty measured
+iterations so the reported p95 has more than a handful of samples. The reports
+include BenchmarkDotNet full JSON and CSV, GitHub-flavored Markdown,
+P95/mean/dispersion, GC counts and managed allocations. A metadata JSON sidecar
+records the commit and dirty-worktree flag, corpus seed/checksum/dimensions,
+BenchmarkDotNet and .NET runtime versions, OS, CPU, architecture, physical and
+runtime-available memory, and the configured power/cache note. The recorded worker
+peak working set is process-wide (including setup/harness), not per-operation or
+retained memory. Set `TALEWRIGHT_BENCHMARK_POWER_CACHE` to describe local power/cache
+conditions; GitHub-hosted runner cache and power settings are not controlled.
+
+The suite also measures a fresh CLI process validating the corpus, warmed runtime
+startup/first frame, directory and ZIP loading, compilation, choices, serialization,
+real `FileSaveStore` write/read, restore, Back/Forward and story-only CLI publication.
+The warmed hub-choice case separately measures selection from the generated bounded
+hub, which offers at most 20 storylets. `BoundaryInputBenchmarks` times exact and
+immediately-over directory and ZIP file-size, expanded-size and file-count limits,
+plus directory nesting depth. The runtime suite also verifies a valid save
+at exactly 2 MiB with legal 512-character choice keys; the first additional choice
+crosses the byte cap. Existing compiler/runtime/CLI/player tests provide matching
+ZIP, UTF-16/BOM, upload, save-store, 10,000-choice and failed-publication safety
+checks. Those hard correctness/limit assertions remain separate from noisy
+performance comparisons.
+
+The full browser and native integration workloads are opt-in because they compile
+the 50 MiB / 50,000-scene tier. The manual/scheduled `Real-file performance`
+workflow runs them separately from ordinary per-PR browser and Linux UI tests:
+
+```bash
+python3 tests/run_e2e.py web --filter 'FullyQualifiedName~RealCorpusBrowserPerformanceTests'
+python3 tests/run_e2e.py linux --filter 'FullyQualifiedName~RealCorpusNativePerformanceTests'
+```
+
+Browser integration records archive upload through first playable passage, a choice,
+IndexedDB write/restore, browser identity and main-thread long tasks. The Linux
+Photino case records fresh application open through first playable passage and a
+choice. These are single end-to-end observations, not percentiles. The scheduled
+workflow separately times real CLI web, single-RID desktop and universal desktop
+publication. Each publication is individually bounded at 45 minutes and gets a
+JSON result row (`succeeded`, `failed`, `timed_out`, or `runner_failed`), captured
+stdout/stderr, exit code, output size, elapsed time and `/usr/bin/time` peak RSS
+when available. Later workloads still run after an earlier failure or timeout.
+The internal `dotnet publish`/SDK work is process-level integration time, not
+engine compilation time. No performance budgets are inferred from one
+machine or made a noisy per-PR gate; establish and compare target-specific budgets
+after collecting stable baselines.
+
 ## One test-authoring surface
 
 All player E2E cases and assertions live in **C#/xUnit** in `Talewright.Player.E2E.Tests`.

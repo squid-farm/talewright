@@ -1,0 +1,111 @@
+name: Real-file performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks-and-publication:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      TALEWRIGHT_BENCHMARK_OUTPUT: ${{ github.workspace }}/artifacts/performance/metadata
+      TALEWRIGHT_BENCHMARK_POWER_CACHE: GitHub-hosted ubuntu-24.04; power governor and filesystem cache are not controlled
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Prepare owned artifact paths
+        run: mkdir -p artifacts/performance
+      - name: Build BenchmarkDotNet and CLI entry points
+        run: dotnet build tests/Talewright.BenchmarkDotNet -c Release
+      - name: Verify every deterministic corpus and full history
+        run: dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build -- --verify-corpora
+      - name: Run core BenchmarkDotNet suite
+        run: >
+          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          --filter '*StoryBenchmarks*' --artifacts artifacts/performance/core
+      - name: Run independent dimension BenchmarkDotNet suite
+        run: >
+          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          --filter '*IndependentDimensionBenchmarks*' --artifacts artifacts/performance/dimensions
+      - name: Run exact and over-limit BenchmarkDotNet suite
+        run: >
+          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          --filter '*BoundaryInputBenchmarks*' --artifacts artifacts/performance/boundaries
+      - name: Generate the gigantic real-file corpus
+        run: >
+          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          --generate-corpus Gigantic artifacts/performance/gigantic-story
+          > artifacts/performance/gigantic-corpus.json
+      - name: Measure full publication workloads with bounded timeouts
+        run: >
+          python3 tests/performance/run_publication.py
+          --story artifacts/performance/gigantic-story
+          --cli src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll
+          --output artifacts/performance/publication
+          --timeout-seconds 2700
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-file-benchmarks
+          path: artifacts/performance
+          if-no-files-found: error
+          retention-days: 30
+
+  browser-player:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install browser and system dependencies
+        run: python3 tests/run_e2e.py install-browsers --browser ${{ matrix.browser }}
+      - name: Run real-file browser measurements
+        run: >
+          python3 tests/run_e2e.py web --browser ${{ matrix.browser }}
+          --filter 'FullyQualifiedName~RealCorpusBrowserPerformanceTests'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-file-player-${{ matrix.browser }}
+          path: artifacts/test-results
+          if-no-files-found: error
+          retention-days: 30
+
+  linux-photino:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install native GUI prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify4 libgtk-3-0t64 \
+            xvfb xauth dbus-x11 at-spi2-core libatk-adaptor python3-pyatspi python3-gi \
+            gir1.2-gtk-3.0 xfwm4 wmctrl
+      - name: Run real-file Linux Photino measurements
+        run: >
+          python3 tests/run_e2e.py linux
+          --filter 'FullyQualifiedName~RealCorpusNativePerformanceTests'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-file-player-linux-photino
+          path: artifacts/test-results
+          if-no-files-found: error
+          retention-days: 30
