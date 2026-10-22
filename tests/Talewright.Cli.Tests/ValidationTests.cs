@@ -142,16 +142,27 @@ public sealed class ValidationTests : IDisposable
         Assert.Empty(error.ToString());
     }
 
-    [Fact]
-    public void Framework_parse_errors_keep_machine_readable_failure_contract()
+    [Theory]
+    [InlineData("--format", "json", "--bogus")]
+    [InlineData("--bogus", "--format=json")]
+    public void Framework_parse_errors_keep_machine_readable_failure_contract(params string[] options)
     {
-        var result = Run("--format", "json", "--bogus");
+        var result = Run(options);
         Assert.Equal(2, result.Code);
         Assert.Empty(result.Error);
         using var json = JsonDocument.Parse(result.Output);
         Assert.False(json.RootElement.GetProperty("success").GetBoolean());
         Assert.Equal("TWCLI001", json.RootElement.GetProperty("error").GetProperty("code").GetString());
         Assert.Contains("bogus", json.RootElement.GetProperty("error").GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public void Format_after_option_terminator_does_not_enable_json()
+    {
+        var result = Run("--", "--format=json");
+        Assert.Equal(0, result.Code);
+        Assert.Contains("Validation succeeded.", result.Output);
+        Assert.Empty(result.Error);
     }
 
     [Fact]
