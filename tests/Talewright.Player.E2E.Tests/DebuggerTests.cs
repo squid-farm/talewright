@@ -120,7 +120,7 @@ public sealed class DebuggerTests
             Assert.Contains("Seed: 42", snapshot.Content);
             await File.WriteAllTextAsync(tale, updated.Replace("[Go]", "[Changed positional meaning]")
                 .Replace("After reload.", "Incompatible progress."));
-            snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed");
+            snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "After YAML restart. Alex.");
             Assert.Contains("After YAML restart.", snapshot.Content);
             Assert.DoesNotContain("Incompatible progress.", snapshot.Content);
             Assert.Equal(0, await driver.CloseWindowAsync());
@@ -197,6 +197,61 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "Reloaded target count 19.", "Verified command prefix retained");
             Assert.Contains("Position 2 / 2.", snapshot.Content);
             Assert.Contains("eligibility bypassed", snapshot.Content);
+            Assert.Equal(0, await driver.CloseWindowAsync());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Native_source_view_follows_ranges_and_keeps_accepted_text_when_disk_reload_is_rejected()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-source-native-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-source", Guid.NewGuid().ToString("N"));
+        const string first = "// FIRST FILE SOURCE\n=== first\n* [Go] -> late";
+        var late = "=== other\n* [Wait] -> other\n"
+            + string.Join("\n", Enumerable.Range(1, 205).Select(i => $"// padding {i}"))
+            + "\n=== late\n// OLD ACCEPTED SOURCE\n* [Return] -> first\n";
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"),
+                "id: source-native\ntitle: Native Source\nstart: first\ncharacters:\n  player: {first-name: Tester}\n");
+            var firstPath = Path.Combine(root, "first.tale");
+            var latePath = Path.Combine(root, "late.tale");
+            await File.WriteAllTextAsync(firstPath, first);
+            await File.WriteAllTextAsync(latePath, late);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            await WaitFor(driver, "Accepted file: first.tale", "lines 2 to 3 (inclusive)", "// FIRST FILE SOURCE");
+            await driver.ChooseAsync("Go");
+            await WaitFor(driver, "Accepted file: late.tale", "lines 208 to 211 (inclusive)", "// OLD ACCEPTED SOURCE");
+            await driver.ClickAsync("Previous source lines");
+            var snapshot = await WaitFor(driver, "Showing accepted lines 105 to 204 of 211");
+            Assert.DoesNotContain("// OLD ACCEPTED SOURCE", snapshot.Content);
+            await driver.ClickAsync("Go to current scene source");
+            await WaitFor(driver, "Showing accepted lines 205 to 211 of 211", "// OLD ACCEPTED SOURCE");
+            await driver.ClickAsync("Back command");
+            await WaitFor(driver, "Accepted file: first.tale", "// FIRST FILE SOURCE");
+            await driver.ClickAsync("Forward command");
+            await WaitFor(driver, "Accepted file: late.tale", "// OLD ACCEPTED SOURCE");
+
+            await File.WriteAllTextAsync(latePath, "// inserted line\n" + late.Replace("OLD ACCEPTED SOURCE", "NEW ACCEPTED SOURCE"));
+            await WaitFor(driver, "lines 209 to 212 (inclusive)", "// NEW ACCEPTED SOURCE", "Verified command prefix retained");
+            await File.WriteAllTextAsync(latePath, "=== late\n// INVALID DISK SOURCE\n-> missing");
+            snapshot = await WaitFor(driver, "Story has compiler errors", "// NEW ACCEPTED SOURCE", "not adopted");
+            Assert.DoesNotContain("// INVALID DISK SOURCE", snapshot.Content);
+            await File.WriteAllTextAsync(firstPath, first.Replace("[Go]", "[Changed meaning]"));
+            await File.WriteAllTextAsync(latePath, late.Replace("OLD ACCEPTED SOURCE", "REJECTED DISK SOURCE"));
+            snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "// NEW ACCEPTED SOURCE");
+            Assert.DoesNotContain("// REJECTED DISK SOURCE", snapshot.Content);
             Assert.Equal(0, await driver.CloseWindowAsync());
         }
         finally

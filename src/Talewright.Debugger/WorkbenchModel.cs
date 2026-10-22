@@ -26,6 +26,8 @@ public sealed class SetupFlag(FlagId id)
     public bool Value { get; set; }
 }
 
+public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text);
+
 /// <summary>UI-independent orchestration; every replacement is prepared before adoption.</summary>
 public sealed class WorkbenchModel(string root)
 {
@@ -35,6 +37,20 @@ public sealed class WorkbenchModel(string root)
     public IReadOnlyList<Diagnostic> Diagnostics { get; private set; } = [];
     public string? Error { get; private set; }
     public bool SourceRejected { get; private set; }
+    public bool SourcePending { get; private set; }
+    public StorySourceMap? AcceptedSourceMap { get; private set; }
+    public AcceptedSceneSource? CurrentSource
+    {
+        get
+        {
+            if (Session?.Current.Scene is not { } scene || AcceptedSourceMap is not { } map
+                || !map.Scenes.TryGetValue(scene, out var range))
+            {
+                return null;
+            }
+            return new(scene, range, map.Source.Files[range.File]);
+        }
+    }
     public bool RestartRequired { get; private set; }
     public string? ReloadStatus { get; private set; }
     public int CreationRevision { get; private set; }
@@ -50,6 +66,8 @@ public sealed class WorkbenchModel(string root)
 
     public void Reload() => ApplySource(SourceCompilation.Load(Root), restart: true);
 
+    public void SourceChanged() => SourcePending = true;
+
     public void RequireRestart()
     {
         RestartRequired = true;
@@ -59,6 +77,7 @@ public sealed class WorkbenchModel(string root)
 
     public void WatchFailed(string message)
     {
+        SourcePending = false;
         RequireRestart();
         SourceRejected = true;
         Error = $"Source watcher failed: {message}. Select Rescan / retry watcher. The last good run is unchanged.";
@@ -78,6 +97,10 @@ public sealed class WorkbenchModel(string root)
         }
         try
         {
+            if (!Publish(() => SourcePending = false))
+            {
+                return false;
+            }
             if (yamlChanged || (_acceptedSource is not null && candidate.Source is { } source
                 && Manifest(source) != Manifest(_acceptedSource)))
             {
@@ -136,6 +159,7 @@ public sealed class WorkbenchModel(string root)
                     Session = session;
                     Inspection = inspection;
                     _acceptedSource = candidate.Source;
+                    AcceptedSourceMap = compiled.SourceMap;
                     SourceRejected = false;
                     Error = null;
                     ReloadStatus = session is null ? "Tale source adopted. Ready for scene setup."
@@ -218,6 +242,7 @@ public sealed class WorkbenchModel(string root)
                 SourceRejected = false;
                 RestartRequired = false;
                 _acceptedSource = candidate.Source;
+                AcceptedSourceMap = compiled.SourceMap;
                 Error = null;
                 ReloadStatus = "Source restarted. Compatible setup retained and revalidated; select Start selected scene for a fresh run.";
             });

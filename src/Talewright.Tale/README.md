@@ -34,6 +34,20 @@ are loaded; unrelated files are not published as story content.
 4. **Validate.** `StoryValidator` checks the whole story (start scene, dead ends, fall-through, hubs, reachability).
 5. **Assemble.** If there were no errors, build the `StoryDefinition`. Warnings never block compilation.
 
+## Accepted source provenance
+
+Successful `CompilationResult.SourceMap` pairs the immutable input `StorySource` snapshot with a
+`SceneId` to `SceneSourceRange` map from the existing parser. Ranges use inclusive 1-based whole lines:
+declaration through the line before the next declaration, or EOF. Inter-scene comments/blank lines
+belong to the preceding scene; a terminal newline creates an empty final line. Line counting uses
+`String.ReplaceLineEndings`, matching parsing and the debugger display.
+
+Errors produce no accepted map. Manually constructed results/C# story models may also have no map;
+consumers must report absent provenance, not infer it from IDs or reparse source independently.
+The map stays outside `StoryDefinition` and does not affect fingerprints, runtime execution or saves.
+This is a narrow reusable scene-provenance seam, not the partial-symbol/overlay analysis API in #29
+and not a statement-level execution map.
+
 ## Files
 
 | File | Contents |

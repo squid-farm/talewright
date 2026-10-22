@@ -45,6 +45,9 @@ public sealed class CompilerOptions
 /// <summary>The outcome of compiling a story: the model (if there were no errors) and every diagnostic.</summary>
 public sealed record CompilationResult(StoryDefinition? Story, IReadOnlyList<Diagnostic> Diagnostics)
 {
+    /// <summary>Accepted Tale provenance, absent on errors or for manually constructed/C# models.</summary>
+    public StorySourceMap? SourceMap { get; init; }
+
     /// <summary>True when a story was produced (warnings are allowed).</summary>
     public bool Success => Story is not null;
 

@@ -10,3 +10,9 @@
 .author-workbench th, .author-workbench td { padding: .3rem .7rem; text-align: left; }
 .setup-row { display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 55rem; }
 .author-workbench code { overflow-wrap: anywhere; }
+.source-window { max-height: 30rem; overflow: auto; }
+.source-lines { width: 100%; }
+.source-lines td code { white-space: pre; overflow-wrap: normal; }
+.source-lines th[scope="row"] { color: var(--tw-muted); user-select: none; }
+.source-lines .source-scene { background: var(--tw-panel); }
+.source-lines .source-scene th[scope="row"] { color: var(--tw-accent); border-left: 3px solid var(--tw-accent); }

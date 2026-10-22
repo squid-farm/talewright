@@ -125,6 +125,8 @@
                 <p role="alert">This synthetic run reached the @StoryHistory.MaxChoices-command limit. Start a fresh scene playtest to continue.</p>
             }
             <StoryChoices Current="session.Current" OnChoose="Choose" OnRestart="Start" Busy="@(atLimit && !session.Current.IsEnded)" />
+            <SourceView Source="Model.CurrentSource" Pending="Model.SourcePending"
+                        Rejected="Model.SourceRejected" RestartRequired="Model.RestartRequired" />
             <InspectionPanel Inspection="inspection" />
         </section>
     }

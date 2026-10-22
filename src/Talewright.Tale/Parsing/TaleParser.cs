@@ -10,7 +10,10 @@ using Talewright.Tale.Model;
 namespace Talewright.Tale.Parsing;
 
 /// <summary>A compiled scene plus where it was declared (for validator diagnostics).</summary>
-internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Location);
+internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Location)
+{
+    public required int EndLine { get; init; }
+}
 
 /// <summary>
 /// Line-oriented parser for <c>.tale</c> files. Each line is classified by its first characters (<c>===</c>,
@@ -122,7 +125,7 @@ internal sealed partial class TaleParser
             CloseFrame();
         }
 
-        _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location));
+        _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location) { EndLine = _index });
         _scene = null;
     }
 
