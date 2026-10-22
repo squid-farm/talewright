@@ -1,0 +1,78 @@
+@inject WorkbenchModel Model
+
+<main class="author-workbench">
+    <h1>Talewright Author Debugger</h1>
+    <p>@Model.Root</p>
+    <p>Local scene playtesting. No player saves are read or written.</p>
+    <p>Reload story explicitly discards the current playtest and setup only after compilation succeeds. No automatic reload.</p>
+    <button type="button" @onclick="Reload">Reload story</button>
+    <DiagnosticList Diagnostics="Model.Diagnostics" />
+    @if (Model.SourceRejected)
+    {
+        <p role="status">Source not adopted. Displayed story and playtest, if any, use the last successful compilation.</p>
+    }
+    @if (Model.Error is not null)
+    {
+        <p role="alert" class="tw-error">@Model.Error</p>
+    }
+    @if (Model.Story is { } story)
+    {
+        <h2>@story.Title</h2>
+        <section aria-label="Scene setup">
+            <h2>Scene setup</h2>
+            <label>Search scenes <input aria-label="Search scenes" @bind="_sceneSearch" @bind:event="oninput" /></label>
+            <p>@Model.FindScenes(_sceneSearch).Count() matching scenes. Showing up to 50; narrow the search or enter an exact ID.</p>
+            <ul aria-label="Matching scenes">
+                @foreach (var scene in Model.FindScenes(_sceneSearch).Take(50))
+                {
+                    <li><button type="button" @onclick="() => Model.Target = scene.Id.Value">Select @scene.Id @scene.Title</button></li>
+                }
+            </ul>
+            <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
+            <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
+            @if (story.Creation is not null)
+            {
+                <CharacterCreator @key="story" Story="story" OnCreated="Model.SelectCharacter" />
+                <p role="status">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
+            }
+            <SetupFields Model="Model" />
+            <button type="button" @onclick="Start">Start selected scene</button>
+        </section>
+    }
+    @if (Model.Session is { } session && Model.Inspection is { } inspection)
+    {
+        <section aria-label="Synthetic playtest">
+            <h2>Synthetic playtest</h2>
+            <p role="status">Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: @inspection.Seed. Rolls: @inspection.RollCount.</p>
+            <details>
+                <summary>Initialization before target entry</summary>
+                <p>Setup applies before trigger priming. Base stats may be clamped; inspect actual initialization events below. Scene entry effects are separate.</p>
+                <ul>
+                    @foreach (var item in session.Events.TakeWhile(e => e is not Talewright.Core.Events.SceneEntered))
+                    {
+                        <li>@item</li>
+                    }
+                </ul>
+            </details>
+            <section aria-label="Current passage" tabindex="0">
+                <h3>@session.Current.Scene @session.Current.Title</h3>
+                <DocumentView Document="session.Current.Document" />
+            </section>
+            @{ var atLimit = session.Events.OfType<Talewright.Core.Events.ChoiceMade>().Count() >= StoryHistory.MaxChoices; }
+            @if (atLimit && !session.Current.IsEnded)
+            {
+                <p role="alert">This synthetic run reached the @StoryHistory.MaxChoices-choice limit. Start a fresh scene playtest to continue.</p>
+            }
+            <StoryChoices Current="session.Current" OnChoose="Choose" OnRestart="Start" Busy="@(atLimit && !session.Current.IsEnded)" />
+            <InspectionPanel Inspection="inspection" />
+        </section>
+    }
+</main>
+
+@code {
+    private string _sceneSearch = "";
+    protected override void OnInitialized() => Model.Reload();
+    private void Reload() => Model.Reload();
+    private void Start() => Model.Start();
+    private void Choose(ChoiceView choice) => Model.Choose(choice.Key);
+}

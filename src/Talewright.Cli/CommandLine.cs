@@ -35,6 +35,9 @@ public static class CommandLine
             config.AddCommand<PublishCommand>("publish")
                 .WithDescription("Publish a validated story archive or complete deployable game.")
                 .WithData(writers);
+            config.AddCommand<DebugCommand>("debug")
+                .WithDescription("Open the local native author workbench for a story folder.")
+                .WithData(writers);
         });
         try
         {

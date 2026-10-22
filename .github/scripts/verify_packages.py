@@ -7,6 +7,7 @@ import os
 import shutil
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
@@ -74,6 +75,10 @@ def verify(directory, version):
                                   "tools/net10.0/any/Talewright.Cli.dll",
                                   "tools/net10.0/any/Talewright.Cli.deps.json",
                                   "tools/net10.0/any/Talewright.Cli.runtimeconfig.json",
+                                  "tools/net10.0/any/Talewright.Debugger.dll",
+                                  "tools/net10.0/any/debug-assets/index.html",
+                                  "tools/net10.0/any/debug-assets/debugger.css",
+                                  "tools/net10.0/any/debug-assets/_content/Talewright.Player/talewright.css",
                                   "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
                                   "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
                                   "tools/net10.0/any/publish-assets/standalone/web/App.razor",
@@ -100,7 +105,13 @@ def verify(directory, version):
                 for assembly in ENGINE_ASSEMBLIES | {"Talewright.Player"}:
                     if f"tools/net10.0/any/{assembly}.dll" not in names:
                         raise ValueError(f"{path}: missing CLI compiler assembly {assembly}")
+                for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
+                    extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
+                    if f"tools/net10.0/any/runtimes/{rid}/native/Photino.Native.{extension}" not in names:
+                        raise ValueError(f"{path}: missing debugger native dependency for {rid}")
             elif identity == "Talewright.Player":
+                if any("Debugger" in name or "debug-assets/" in name for name in names):
+                    raise ValueError(f"{path}: Player includes author-only tooling")
                 if dependencies.get("Talewright") != version:
                     raise ValueError(f"{path}: Player must depend on engine version {version}")
                 for required in ["staticwebassets/talewright.css",
@@ -226,6 +237,14 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
             "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
         (story / "main.tale").write_text("=== a\nHello.\n-> translated\n")
         (story / "chapter.fr.tale").write_text("=== translated\nCulture-like chapter.\n-> END\n")
+        subprocess.run([str(tool_path / "talewright"), "debug", "--help"],
+                       cwd=root, env=environment, check=True, capture_output=True)
+        if sys.platform.startswith("linux"):
+            headless = dict(environment, DISPLAY="")
+            result = subprocess.run([str(tool_path / "talewright"), "debug", str(story)],
+                                    cwd=root, env=headless, capture_output=True, text=True)
+            if result.returncode != 2 or "TWCLI002" not in result.stderr or "DISPLAY" not in result.stderr:
+                raise ValueError("Installed debugger did not reject headless Linux with an actionable error")
         result = subprocess.run([str(tool_path / "talewright"), "validate", str(story), "--format", "json"],
                                 cwd=root, env=environment, check=True, capture_output=True, text=True)
         if json.loads(result.stdout) != {"schemaVersion": 1, "success": True, "diagnostics": []}:
@@ -240,6 +259,8 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
                         "--target", "web", "--output", str(web)], cwd=root, env=environment, check=True)
         with ZipFile(web) as published:
+            if any("Debugger" in name or "debug-assets/" in name for name in published.namelist()):
+                raise ValueError("Published game includes author-only tooling")
             if "index.html" not in published.namelist() or not any(
                     name.startswith("_framework/") for name in published.namelist()):
                 raise ValueError("Installed CLI did not publish a complete standalone web site")
