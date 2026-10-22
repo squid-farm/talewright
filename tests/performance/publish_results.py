@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import xml.etree.ElementTree as ET
 
 
@@ -47,6 +48,7 @@ def integration_rows(root):
         for result in document.iter():
             if result.tag.rsplit("}", 1)[-1] != "UnitTestResult":
                 continue
+            measured = False
             for output in result.iter():
                 if output.tag.rsplit("}", 1)[-1] != "StdOut" or not output.text:
                     continue
@@ -59,24 +61,45 @@ def integration_rows(root):
                     except json.JSONDecodeError:
                         continue
                     if isinstance(measurement, dict) and measurement.get("measurement"):
+                        measured = True
                         rows.append({
                             **measurement,
                             "report": path.name,
                             "testOutcome": result.get("outcome", "Unknown"),
+                            "testName": result.get("testName", ""),
                         })
+            name = result.get("testName", "")
+            outcome = result.get("outcome", "Unknown")
+            if not measured and "RealCorpus" in name and outcome != "Passed":
+                tier = re.search(r'tierName:\s*"([^"]+)"', name)
+                error = "\n".join(
+                    element.text for element in result.iter()
+                    if element.tag.rsplit("}", 1)[-1] == "Message" and element.text
+                )
+                rows.append({
+                    "report": path.name,
+                    "testName": name,
+                    "testOutcome": outcome,
+                    "host": "Linux Photino" if "Native" in name else "browser",
+                    "browser": path.stem if "Native" not in name else "",
+                    "Metadata": {"Tier": tier.group(1) if tier else (
+                        "Low-compressibility" if "Low_compressibility" in name else "unknown"
+                    )},
+                    "error": error or "No error message was recorded in the test result.",
+                })
     return rows
 
 
 def collect(input_dir):
     metadata = [read_json(path) for path in sorted(input_dir.rglob("metadata-*.json"))]
-    publication_summaries = [
-        read_json(path) for path in sorted(input_dir.rglob("publication-summary.json"))
-    ]
-    publications = [
-        result
-        for summary in publication_summaries
-        for result in summary.get("results", [])
-    ]
+    publications = []
+    summaries = sorted(input_dir.rglob("publication-summary.json"))
+    for path in summaries:
+        publications.extend(read_json(path).get("results", []))
+    summary_directories = {path.parent for path in summaries}
+    for path in sorted(input_dir.rglob("publication-*.json")):
+        if path.name != "publication-summary.json" and path.parent not in summary_directories:
+            publications.append(read_json(path))
     return {
         "schemaVersion": 1,
         "runId": os.environ.get("GITHUB_RUN_ID", "local"),
@@ -168,6 +191,16 @@ def markdown_for_run(run):
                 f"{row.get('indexedDbHistoryRestoreMs', '')} |"
             )
         lines.append("")
+    failures = [row for row in run["integrations"] if row.get("error")]
+    if failures:
+        lines.extend(["### Player failures without measurements", ""])
+        for row in failures:
+            lines.extend([
+                f"- **{row['testOutcome']}**: {row['testName']}",
+                "",
+                "    " + row["error"].replace("\n", "\n    "),
+                "",
+            ])
     if run["publications"]:
         lines.extend([
             "## Full publication workloads",

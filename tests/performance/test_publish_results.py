@@ -6,10 +6,59 @@ import sys
 import tempfile
 import unittest
 
-from publish_results import benchmark_rows, collect, markdown_for_run, update_history
+from publish_results import benchmark_rows, collect, integration_rows, markdown_for_run, update_history
 
 
 class PublishResultsTests(unittest.TestCase):
+    def test_failed_real_corpus_cases_survive_without_measurement_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "firefox.trx").write_text(
+                """<TestRun><Results>
+<UnitTestResult testName='RealCorpusBrowserPerformanceTests.Load(tierName: "Gigantic")' outcome="Failed">
+<Output><ErrorInfo><Message>Restore timed out.</Message></ErrorInfo></Output>
+</UnitTestResult>
+<UnitTestResult testName="UnrelatedTest" outcome="Failed" />
+<UnitTestResult testName="RealCorpusBrowserPerformanceTests.Passed" outcome="Passed" />
+</Results></TestRun>""", encoding="utf-8"
+            )
+            (root / "linux.trx").write_text(
+                """<TestRun><Results>
+<UnitTestResult testName='RealCorpusNativePerformanceTests.Open(tierName: "Large")' outcome="Failed" />
+</Results></TestRun>""", encoding="utf-8"
+            )
+            rows = integration_rows(root)
+            self.assertEqual(2, len(rows))
+            self.assertEqual("firefox", rows[0]["browser"])
+            self.assertEqual("Gigantic", rows[0]["Metadata"]["Tier"])
+            self.assertEqual("Restore timed out.", rows[0]["error"])
+            self.assertEqual("Linux Photino", rows[1]["host"])
+            run = collect(root)
+            report = markdown_for_run(run)
+            self.assertIn("Restore timed out.", report)
+            self.assertIn("Gigantic", report)
+            self.assertIn("Failed", report)
+
+    def test_publication_partial_files_are_used_only_without_directory_summary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            complete = root / "complete"
+            partial = root / "partial"
+            complete.mkdir()
+            partial.mkdir()
+            (complete / "publication-summary.json").write_text(
+                json.dumps({"results": [{"name": "web", "status": "succeeded"}]})
+            )
+            (complete / "publication-web.json").write_text(
+                json.dumps({"name": "web", "status": "succeeded"})
+            )
+            (partial / "publication-linux-x64.json").write_text(
+                json.dumps({"name": "linux-x64", "status": "failed"})
+            )
+            results = collect(root)["publications"]
+            self.assertEqual(["web", "linux-x64"], [row["name"] for row in results])
+            self.assertEqual("failed", results[1]["status"])
+
     def test_preserves_actual_benchmark_parameter_columns(self):
         for column, value in (
             ("TierName", "Gigantic"),

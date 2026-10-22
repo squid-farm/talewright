@@ -14,6 +14,8 @@ public class StoryBenchmarks
 {
     private PerformanceCorpus _corpus = null!;
     private StoryDefinition _story = null!;
+    private StoryDefinition _hubEntryStory = null!;
+    private string[] _expectedHubChoices = [];
     private StorySource _directorySource = null!;
     private StorySource _zipSource = null!;
     private StoryHistory _history = null!;
@@ -46,11 +48,17 @@ public class StoryBenchmarks
 
         _history = BuildHistory(tier.HistoryDepth);
         _choiceKey = _history.Current.Choices[0].Key;
-        _hubHistory = new StoryHistory(_story, (ulong)_corpus.Metadata.Seed);
-        if (_hubHistory.Current.Choices.Count <= 1)
-        {
-            throw new InvalidOperationException("The bounded hub corpus did not generate storylet choices.");
-        }
+        var hubFiles = _directorySource.Files.ToDictionary(pair => pair.Key, pair => pair.Value);
+        hubFiles[StorySource.ManifestFileName] = hubFiles[StorySource.ManifestFileName]
+            .Replace("start: scene.0", $"start: scene.{tier.SceneCount - 1}", StringComparison.Ordinal);
+        _hubEntryStory = Compile(new StorySource(hubFiles));
+        _expectedHubChoices = _story.Scenes
+            .Where(scene => scene.Id.Value != "scene.0")
+            .OrderByDescending(scene => scene.Priority)
+            .Take(20)
+            .Select(scene => StorySession.StoryletKeyPrefix + scene.Id.Value)
+            .ToArray();
+        PrepareHubChoice();
 
         _save = _history.Save();
         _saveRoot = prefix + "-saves";
@@ -149,9 +157,14 @@ public class StoryBenchmarks
     public int ChooseFromBoundedHub()
     {
         _hubHistory.Choose(_hubHistory.Current.Choices[0].Key);
-        if (_hubHistory.Cursor != 1)
+        var generated = _hubHistory.Current.Choices
+            .Where(choice => choice.Key.StartsWith(StorySession.StoryletKeyPrefix, StringComparison.Ordinal))
+            .Select(choice => choice.Key)
+            .ToArray();
+        if (_hubHistory.Cursor != 1 || _hubHistory.Current.Scene?.Value != "scene.0" ||
+            !generated.SequenceEqual(_expectedHubChoices))
         {
-            throw new InvalidOperationException("The hub choice did not advance the story.");
+            throw new InvalidOperationException("The timed transition did not enter the hub and generate its expected storylet choices.");
         }
 
         return _hubHistory.Cursor;
@@ -159,7 +172,7 @@ public class StoryBenchmarks
 
     [IterationSetup(Target = nameof(ChooseFromBoundedHub))]
     public void PrepareHubChoice() =>
-        _hubHistory = new StoryHistory(_story, (ulong)_corpus.Metadata.Seed);
+        _hubHistory = new StoryHistory(_hubEntryStory, (ulong)_corpus.Metadata.Seed);
 
     [IterationSetup(Target = nameof(ChooseAtHistoryDepth))]
     public void PrepareChoice()

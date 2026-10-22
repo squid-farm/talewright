@@ -27,7 +27,15 @@ else
         .WithIterationCount(30)
         .WithUnrollFactor(1));
     config.AddColumn(StatisticColumn.P95);
-    BenchmarkSwitcher.FromAssembly(typeof(StoryBenchmarks).Assembly).Run(args, config);
+    var summaries = BenchmarkSwitcher.FromAssembly(typeof(StoryBenchmarks).Assembly).Run(args, config).ToArray();
+    if (summaries.Length == 0 || summaries.Any(summary =>
+        summary.HasCriticalValidationErrors ||
+        summary.Reports.Length == 0 ||
+        summary.Reports.Any(report => !report.Success || report.ResultStatistics is null)))
+    {
+        Console.Error.WriteLine("Benchmark run failed validation or did not produce successful measurements for every case.");
+        Environment.ExitCode = 1;
+    }
 }
 
 static void GenerateCorpus(string[] arguments)

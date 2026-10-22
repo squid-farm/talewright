@@ -158,6 +158,21 @@ tests. Browser evidence captures the viewport rather than the full document;
 long histories can exceed browser screenshot size limits. This does not change
 the player's transcript presentation (tracked separately in #23 and #70).
 
+Benchmark setup/build/worker failures produce a nonzero runner exit code.
+The bounded-hub case times entering the hub, including generated storylet
+selection, rather than choosing from an already populated hub frame. Player
+choice timings wait for changed passage content, and restore timings wait for
+the loaded-slot confirmation and expected transcript depth. Failed real-corpus
+tests remain in published reports even when they emit no measurement JSON.
+Publication results completed before interruption are retained from individual
+workload files when no aggregate summary exists.
+
+Results recorded before these operation-completion fixes do not validate
+hub-selection, browser choice, or IndexedDB restore latency: the old hub case
+left the hub, and the old player assertions could match unchanged content.
+Retain those historical artifacts as evidence, but do not use those particular
+timings as baselines for the corrected workloads.
+
 The weekly schedule runs on the repository's default branch. To measure a
 different branch such as M2 on demand, open **Actions → Real-file performance
 → Run workflow** and select that branch; the run report records the selected

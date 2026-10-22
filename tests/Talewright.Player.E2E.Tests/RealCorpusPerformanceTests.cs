@@ -60,7 +60,7 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
 
         var choiceTimer = Stopwatch.StartNew();
         await Driver.ChooseAsync("Next");
-        await AssertState(state => Assert.Contains("Passage for Tester;", state.Passage), TimeSpan.FromMinutes(3));
+        await AssertState(state => Assert.Contains("Passage for Tester; visit 3.", state.Passage), TimeSpan.FromMinutes(3));
         choiceTimer.Stop();
 
         const string slot = "Real corpus benchmark";
@@ -78,7 +78,10 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
         await Driver.ClickAsync("Saved games");
         var restoreTimer = Stopwatch.StartNew();
         await Driver.ClickAsync("Load " + slot);
-        await AssertState(state => Assert.Contains("Passage for Tester;", state.Passage), TimeSpan.FromMinutes(3));
+        await Microsoft.Playwright.Assertions.Expect(Page.GetByRole(AriaRole.Status))
+            .ToHaveTextAsync($"Loaded '{slot}'.", new() { Timeout = 180_000 });
+        await Microsoft.Playwright.Assertions.Expect(Page.Locator(".tw-frame"))
+            .ToHaveCountAsync(tier.HistoryDepth + 1, new() { Timeout = 180_000 });
         restoreTimer.Stop();
 
         var longTasks = await Page.EvaluateAsync<double[]>("() => window.__talewrightLongTasks ?? []");
@@ -130,7 +133,7 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
         await UploadBytes(tier.Name + ".zip", archive);
         await AssertState(state => Assert.Contains("Passage for Tester;", state.Passage), TimeSpan.FromMinutes(3));
         await Driver.ChooseAsync("Next");
-        await AssertState(state => Assert.Contains("Passage for Tester;", state.Passage), TimeSpan.FromMinutes(3));
+        await AssertState(state => Assert.Contains("Passage for Tester; visit 3.", state.Passage), TimeSpan.FromMinutes(3));
         _output.WriteLine(JsonSerializer.Serialize(new
         {
             host = "browser",
@@ -194,7 +197,7 @@ public sealed class RealCorpusNativePerformanceTests : PlayerTest
         var choiceTimer = Stopwatch.StartNew();
         await Driver.ChooseAsync("Next");
         await AssertState(
-            state => Assert.Contains("Passage for Tester;", state.Passage),
+            state => Assert.Contains("Passage for Tester; visit 3.", state.Passage),
             TimeSpan.FromMinutes(3));
         choiceTimer.Stop();
 
