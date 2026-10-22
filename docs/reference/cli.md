@@ -1,146 +1,156 @@
-# Talewright CLI
+# CLI reference
 
-Requires the .NET 10 SDK. Run from source with
-`dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`.
-The project packs as a .NET tool with command name `talewright`.
-Spectre.Console.Cli supplies typed command/option parsing, strict unknown-option
-rejection and generated help (`--help`, `validate --help`, `publish --help`).
-The validation JSON schema, diagnostics and exit codes below remain independent
-of the CLI framework; JSON output never contains its help or console formatting.
+The `talewright` command checks, debugs and publishes stories. See
+[Getting started](../guide/getting-started.md#install-the-desktop-tools-optional) to install it. From a
+source checkout, use `dotnet run --project src/Talewright.Cli --` in place of `talewright`.
+
+| Command | Does |
+|---|---|
+| `talewright validate <story>` | Checks a story folder for errors and warnings. |
+| `talewright debug <story>` | Opens the Author Debugger. |
+| `talewright publish <story>` | Builds a story zip, web game or desktop game. |
+
+`talewright --help` and `talewright <command> --help` list every option. Unknown options are rejected.
+
+## validate
 
 ```bash
 talewright validate path/to/story
-talewright debug path/to/story
 talewright validate path/to/story --format json --warnings-as-errors
-talewright publish path/to/story --output story.zip
-talewright publish path/to/story -a --target web --output game-web.zip
-talewright publish path/to/story --all-in-one --target desktop --output game-desktop.zip
-talewright publish path/to/story -a --target desktop --runtime win-x64 --output game-windows.zip
 ```
 
-Validation uses the same compiler as the player. It checks a directory containing
-`story.yaml` and `.tale` files. Static validation does **not** prove every possible
-playthrough succeeds. Warnings succeed unless `--warnings-as-errors` is supplied.
+Runs the same compiler as the players on a folder containing `story.yaml` and `.tale` files. Validation
+proves the story is well formed; it doesn't play every possible path.
 
-## Output contract
+| Option | Effect |
+|---|---|
+| `--warnings-as-errors` | Fail if there are any warnings. Warnings pass by default. |
+| `--format json` | Machine-readable output (below). |
 
-- Exit **0**: accepted validation (or help).
-- Exit **1**: compiler errors, or warnings rejected by the selected policy.
-- Exit **2**: invalid invocation or input/I/O failure.
+### Output contract
 
-Human output uses the compiler's `file:line:column: severity CODE: message`
-diagnostics and a final status. Operational errors go to stderr.
+| Exit code | Meaning |
+|---|---|
+| 0 | Story accepted (or help shown). |
+| 1 | Compiler errors, or warnings when `--warnings-as-errors` is set. |
+| 2 | Invalid command, or the input couldn't be read. |
 
-`--format json` writes one JSON object to stdout, with no progress messages:
+Human output prints `file:line:column: severity CODE: message` per diagnostic, then a final status.
+Operational errors go to stderr.
+
+`--format json` writes exactly one JSON object to stdout, with no progress or help text:
 
 ```json
 {"schemaVersion":1,"success":true,"diagnostics":[]}
 ```
 
-Every diagnostic has `code`, `severity` (`error` or `warning`), `message`, `file`
-(story-relative path), `line`, and `column`. Source positions are one-based;
-zero denotes an unspecified position. Compiler severities are not rewritten by
-warnings-as-errors.
+- Each diagnostic has `code`, `severity` (`error` or `warning`), `message`, `file` (relative to the story),
+  `line` and `column`. Positions are one-based; `0` means unspecified. `--warnings-as-errors` doesn't
+  change reported severities.
+- Operational failures (exit 2) return `success: false`, empty `diagnostics` and
+  `error: {"code": "TWCLI001" | "TWCLI002", "message": "..."}`: `TWCLI001` for invocation errors,
+  `TWCLI002` for input errors.
+- A readable folder with no `story.yaml` is a compiler diagnostic (`TW4002`), not an operational error.
 
-Operational failures return exit 2 and include `success:false`, empty
-`diagnostics`, and `error:{"code":"TWCLI001","message":"..."}` for invocation
-errors or `TWCLI002` for input errors. A missing manifest in an otherwise readable
-directory is a compiler diagnostic, not an operational error.
+## debug
 
-## Author debugging
+```bash
+talewright debug path/to/story
+```
 
-`debug <story-root>` launches a separate native Author Debugger window and waits
-for it to close. It requires a graphical desktop and the OS webview: WebKitGTK 4.1
-on Linux (`libwebkit2gtk-4.1-0`), WebView2 on Windows, or macOS WKWebView. There is
-no browser/server fallback. Linux x64 is runtime-tested; other native targets
-still need platform validation. Missing folders/assets/prerequisites and native
-launch failures return exit 2 with `TWCLI002`. Compiler errors appear in the
-window so the author can repair and save the source without closing the workbench.
+Opens the native Author Debugger and waits for it to close. For a walkthrough, see
+[Testing your story](../guide/testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
 
-Search scenes by ID/title or enter an exact ID, optionally choose a seed and
-create the player character, then start the selected scene. Enable only the
-prerequisite overrides you need: flags, variables, character base stats and
-absolute item counts, or faction standings. Normal rules clamp stats and run
-entry effects/triggers. Inspect actual state, events and historical branch
-decisions; these are recorded evaluations, not predictions against current state.
+**Requirements.** A graphical desktop and the OS webview: WebKitGTK 4.1 on Linux
+(`libwebkit2gtk-4.1-0`), WebView2 on Windows, WKWebView on macOS. There's no browser fallback. Linux x64
+is runtime-tested; other platforms need validation. Missing folders, assets or prerequisites, and native
+launch failures, exit 2 with `TWCLI002`. Compiler errors appear in the window so you can fix and save
+without closing it.
 
-Every start is a fresh synthetic history: skipped scenes remain unvisited and
-reachability is not proven. Setup and pre-entry initialization events are shown
-separately. Player saves are neither read nor written.
+**Starting a scene.** Search by id or title (or type an exact id), optionally choose a seed and create
+the character, enable only the overrides you need (flags, variables, base stats, absolute item counts,
+faction standing), then start. Normal rules still apply: stats are clamped and entry effects and
+triggers run. Each start is a fresh synthetic history, so skipped scenes are unvisited and reachability
+isn't proven. Setup and pre-entry initialization events are listed separately. Player saves are never
+read or written.
 
-Saved Tale changes are debounced and compiled as a complete bounded source set.
-Automatic adoption reconstructs and verifies the displayed scene's pre-entry
-boundary: declarations/rules, previously consumed scenes and choice meaning,
-events (and therefore state/RNG position), pending notes and trigger-edge memory.
-The current scene enters once from that boundary, not from its already-entered
-state. Current entry effects/check outcomes may intentionally change. The passage
-is replaced and historical explanations are rebuilt, with a visible reload marker.
-The workbench still displays only the current passage, not a fabricated transcript.
+**Inspection.** Shows actual state, events and historical branch decisions. Explanations record how
+conditions evaluated at the time, not predictions against the current state.
 
-This guard is deliberately conservative: any structural change to a previously
-consumed scene (even its prose), changed Tale auto-declarations, missing targets
-or a run that ended without a new scene boundary require fresh restart/setup.
-Errors preserve the good run and visibly mark stale source.
+**Reloading `.tale` changes.** Saves are debounced and compiled as one complete source set. Automatic
+reload rebuilds the state just before the current scene was entered (declarations, rules, earlier
+scenes and choice meanings, events, RNG position, pending notes, trigger memory), then enters the current
+scene once from there. Its entry effects and check outcomes may legitimately change. The passage is
+replaced, explanations are rebuilt, and a reload marker is shown. Only the current passage is displayed,
+not a reconstructed transcript.
 
-**Any YAML change requires explicit Restart from source**, including comment-only
-changes. Later Tale saves cannot bypass that latch. Restart compiles the latest
-full source, retains/revalidates enabled setup, seed, target and character, then
-discards the run only on success. Changed/removed IDs are reported, never silently
-dropped: correct/disable overrides or clear character selection, restart, then
-start a fresh scene. `Rescan / retry watcher` retries compilation and rearms a
-failed/overflowed watcher without bypassing guards. Closing releases the watcher
-and pending work. A watcher error also requires restart: missed events cannot
-prove YAML stayed unchanged. Custom C# extensions require trusted explicit rebuild/restart;
-they are not discovered or hot-reloaded.
+The guard is deliberately conservative. Restart is required after:
 
-There is no live state editing, preserve-state jump, save editor, or portable scenario support yet.
-Debugger assets ship in the CLI tool, not Player packages or published games.
+- any structural change to a scene already passed through, even its prose;
+- changed Tale auto-declarations, missing targets, or a run that ended without reaching a new scene;
+- **any `story.yaml` change**, even comments (later Tale saves can't bypass this);
+- a file-watcher error, since missed events can't prove `story.yaml` didn't change.
 
-## Publishing
+Errors keep the last good run and mark the source as stale.
 
-`publish` validates before creating an output artifact. By default it ZIPs only
-`story.yaml` and `.tale` files, retaining their relative layout; private notes,
-engine binaries and unrelated files are not included.
+**Restart from source** compiles the latest source and revalidates the setup, seed, target and character,
+discarding the run only on success. Changed or removed ids are reported, never silently dropped: fix or
+disable the overrides (or clear the character), then restart. **Rescan / retry watcher** retries
+compilation and rearms a failed watcher without bypassing these guards. Closing the window releases
+the watcher and pending work.
 
-`-a` / `--all-in-one` includes the player and engine, automatically opening exactly
-the chosen story with no bundled samples. `--target web` (default) creates a full
-static site with root `index.html` and relative URLs: extract onto a static HTTP(S)
-host, or upload the ZIP as an itch.io HTML5 game. No backend or .NET installation
-is needed on the player's machine.
+**Not yet supported:** live state editing, jumping while preserving state, save editing and portable
+scenarios ([#63](https://github.com/squid-farm/talewright/issues/63),
+[#64](https://github.com/squid-farm/talewright/issues/64)). C# extensions aren't hot-reloaded; rebuild and
+restart. Debugger assets ship in the CLI tool, not in Player packages or published games.
 
-`--target desktop` creates **one universal self-contained ZIP**, including .NET
-for Windows, Linux and macOS on x64 and ARM64. Extract the entire archive, then
-run `start.cmd` on Windows, `start.sh` on Linux or `start.command` on macOS.
-The launchers select the matching platform directory. If extraction dropped
-executable permissions, use `sh start.sh` on Linux/macOS.
+## publish
 
-For a smaller, single-platform ZIP, `--runtime` explicitly selects `linux-x64`,
-`linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. Photino supplies the
-native binaries, so ordinary publishing can cross-target from the current SDK.
-Linux x64 is runtime-verified here. Windows builds can be tested separately;
-macOS/ARM64 builds are unverified, not implicitly supported by Linux test results.
-Desktop ZIPs are not installers, signed applications or macOS `.app` bundles.
-The OS webview is still required: Linux WebKitGTK 4.1, Windows WebView2, or built-in
-macOS WKWebView. In a single-runtime archive, run `Talewright.Host.Desktop`
-(`.exe` on Windows) after extracting.
+```bash
+talewright publish path/to/story --output story.zip
+talewright publish path/to/story -a --target web --output game-web.zip
+talewright publish path/to/story -a --target desktop --output game-desktop.zip
+talewright publish path/to/story -a --target desktop --runtime win-x64 --output game-windows.zip
+```
 
-Publishing requires a .NET 10 SDK and package restore access on the **author's**
-machine. Installed tools include their publishing templates, binaries, UI assets
-and engine license; no source checkout is needed. The generated host uses
-precompiled Player binaries and copies their JS modules as static assets, rather
-than trying to associate them with Razor components in the generated host.
+Validates first, then builds. For a walkthrough, see [Sharing your story](../guide/sharing-your-story.md).
 
-Existing output requires explicit `--force`. Compiler/build errors return 1;
-invalid invocation, input, output or missing-tool failures return 2. Failed builds
-leave an existing final archive unchanged and do not create a partial final ZIP.
-Publishing uses human-readable diagnostics; `--format json` belongs to `validate`.
-`--a` is invalid, not an alias.
+| Option | Effect |
+|---|---|
+| `-o`, `--output <file>` | Output zip. |
+| `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds just `story.yaml` and `.tale` files in their folder layout. `--a` is not accepted. |
+| `--target web` | Default. A static site with a root `index.html` and relative URLs. |
+| `--target desktop` | A self-contained desktop app. |
+| `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
+| `--force` | Overwrite an existing output file. |
 
-Inputs are bounded to 1,000 story files, 5 MiB each and 50 MiB total text.
-Staged UTF-8 files are rechecked against the same limits before either archive
-or standalone publication, since BOM-detected UTF-16 input can expand on rewrite.
-Folder depth is limited to 64 and symbolic links inside a story are rejected.
-Outputs are bounded to 20,000 files and 512 MiB before compression (1 GiB for the
-six-runtime universal desktop ZIP). Later media
-support will extend the story payload deliberately; arbitrary adjacent files are
-not automatically bundled.
+**Web output** runs on any static HTTP(S) host, including beneath a subpath, and can be uploaded to
+itch.io as an HTML5 game. Players need no backend or .NET.
+
+**Desktop output** is one universal zip with self-contained .NET for Windows, Linux and macOS on x64 and
+ARM64. Extract everything, then run `start.cmd` (Windows), `start.sh` (Linux) or `start.command` (macOS);
+the launcher picks the right platform. If extraction dropped execute permissions, use `sh start.sh`. A
+single-runtime zip is smaller; run `Talewright.Host.Desktop` (`.exe` on Windows). Photino supplies the
+native binaries, so any platform can be built from any machine. Linux x64 is runtime-verified; Windows,
+macOS and ARM64 builds are unverified. Players need the OS webview (WebKitGTK 4.1, WebView2 or
+WKWebView). Output isn't an installer, signed, notarized or a macOS `.app` bundle.
+
+**Author requirements.** A .NET 10 SDK and package restore access. Installed tools carry their
+templates, binaries, UI assets and the engine license, so no source checkout is needed. The generated
+host uses precompiled Player binaries and copies their JS modules as static assets.
+
+**Failures.** Compiler or build errors exit 1. Invalid invocation, input, output or missing tools exit 2.
+A failed build leaves any existing output unchanged and never writes a partial zip. `publish` prints
+human-readable diagnostics only (`--format json` is for `validate`).
+
+**Limits.**
+
+| Input | Limit |
+|---|---|
+| Story files | 1,000 files, 5 MiB each, 50 MiB total, folder depth 64 |
+| Symbolic links inside the story | Rejected |
+| Output (before compression) | 20,000 files and 512 MiB (1 GiB for the universal desktop zip) |
+
+Files are rechecked after UTF-8 staging, because UTF-16 input can grow when rewritten. Only
+`story.yaml` and `.tale` files are included. Media support will extend this deliberately; other files
+are never bundled automatically.

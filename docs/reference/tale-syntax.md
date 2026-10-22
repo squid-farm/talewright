@@ -1,11 +1,13 @@
-# `.tale` Syntax — v0
+# Tale syntax reference
 
 A story is a **folder** containing one `story.yaml` and any number of `*.tale` files (subfolders allowed).
 `.tale` is a Markdown superset: prose is CommonMark inline Markdown, plus a small set of line-level directives.
 
-Everything is compiled **once** (at load time for no-code stories, at build time for C# story projects in M2)
-into a typed model. All references are validated against the story schema; mistakes are reported as
-diagnostics with `file:line:column`, never as runtime surprises.
+The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
+Every reference is validated, and mistakes are reported with `file:line:column` and an
+[error code](diagnostics.md) rather than surfacing during play.
+
+New to Talewright? Start with the [author guide](../guide/README.md). This page is the complete reference.
 
 ---
 
@@ -94,27 +96,24 @@ creation:
       stats: {str: 8, hp: 10}
 ```
 
-All fields are optional. `name: true` allows first/last names (trimmed, no control
-characters, at most 80 characters each, nonempty first name). Names are
-prefilled from `characters.player.first-name` and `last-name`; the **Use default name**
-button restores those authored names without resetting other creation choices.
-Pronoun choices are
-distinct built-in keywords; omit them to preserve an authored custom pronoun set.
-Stat choices must exist in the final ruleset and be distinct integers within its
-bounds: up to 32 selectable stats, each with 1–100 values. Up to 16 presets may set
-starting stats, also within ruleset bounds; selectable preset stats must be legal
-options. The first preset/pronoun is the default. For each selectable stat, its
-preset value (or authored protagonist value) is used if legal, otherwise the first
-listed option is the default. If neither supplies a value, the first listed option
-is used; an explicitly authored zero is distinct from an omitted stat.
-Player selections override preset stats.
+All fields are optional. The first listed pronoun and preset are the defaults.
 
-Initialization events precede scene entry and are replayed identically on undo,
-redo and load. Saves retain the created character. Restart retains that identity
-and selection; reopening a story from the library offers creation again. To load
-an existing save after reopening, complete creation and use **Saved games**; the
-saved character replaces the temporary selection. This is not point-buy, a class
-designer or a race system.
+| Field | Rules |
+|---|---|
+| `name: true` | Players may edit first and last names (trimmed, at most 80 characters each, first name required, no control characters). Fields start with the authored `player` names; **Use default name** restores them. |
+| `pronouns` | Distinct built-in keywords. Omit to keep an authored custom pronoun set. |
+| `stats` | Up to 32 stats, each with 1–100 distinct whole-number options within the ruleset's bounds. |
+| `presets` | Up to 16. Each sets starting stats within ruleset bounds; values for selectable stats must be listed options. |
+
+**Starting values.** For each selectable stat, the default is the preset's value if the preset sets one,
+otherwise the authored `player` value. If that isn't a listed option, or neither exists, the first option
+is used. An explicit `0` counts as a value. The player's own picks override the preset.
+
+**During play.** Creation happens before the first scene and is replayed identically by Back, Forward
+and loading. Saves keep the created character, and Restart keeps it too. Reopening the story from the
+library asks again; loading a save then switches to the saved character.
+
+Not included: point-buy, class designers or race systems.
 
 ## 2. Scenes
 
@@ -151,7 +150,7 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (inline Markdown).                                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
-| `![alt](media-id)`                                 | Media placeholder (ignored by the M1 player; reserved for images).                             |
+| `![alt](media-id)`                                 | Image placeholder. Not displayed yet ([#35](https://github.com/squid-farm/talewright/issues/35)). |
 | `~ effect`                                         | Effect applied when the scene is entered (before rendering).                                   |
 | `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
 | `-> target`                                        | Scene divert. With no choices, the player sees a single **Continue**. `-> END` ends the story. |
@@ -212,7 +211,7 @@ player has rope           inventory check (any character id)
 visited(temple.hall)      has the scene ever been entered
 true false 12 "text"      literals
 hostile … allied          reputation tier names (compare with faction:<id>)
-@CanPickLock              named predicate registered from C# (Tier 1, M2)
+@CanPickLock              named predicate registered from C# (see C# extensions)
 ```
 
 Types are checked at compile time (number, bool, text, tier).
@@ -255,11 +254,6 @@ With `randomness: off`, checks are deterministic (`10 + modifiers ≥ DC`).
 
 ## 7. Diagnostics
 
-Every compiler message has a stable code and a `file:line:column` location.
-
-| Range    | Area                 | Examples                                                                                                                                                                                                                                                                                                                    |
-| -------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TW1xxx` | Syntax               | `TW1005` unbalanced `{if}`/`{else}`/`{/if}`, `TW1009` missing `success:`/`failure:`, `TW1011` malformed choice                                                                                                                                                                                                              |
-| `TW2xxx` | References and types | `TW2001` unknown character/stat/item/faction, `TW2002` unknown scene, `TW2003` type mismatch, `TW2004` flag/var never set, `TW2005` unknown `@predicate`, `TW2006` unknown `#modifier`                                                                                                                                      |
-| `TW3xxx` | Story structure      | `TW3002` dead-end scene, `TW3003` fall-through with nowhere to fall, `TW3005` skill check without a check rule, `TW3007` missing start scene, `TW3010` duplicate scene; warnings `TW3008` empty hub, `TW3009` unreachable scene (only reported once there are no errors, so one broken divert doesn't bury you in warnings) |
-| `TW4xxx` | story.yaml           | `TW4001` invalid YAML, `TW4002` missing required key, `TW4003` bad value, `TW4004` unknown ruleset, `TW4005` unknown stat/item; warning `TW4006` unknown key; `TW4007` duplicate trigger id                                                                                                                                 |
+Every compiler message has a stable code (`TW1xxx` syntax, `TW2xxx` names and types, `TW3xxx` story
+structure, `TW4xxx` story.yaml) and a `file:line:column` location. See [error codes](diagnostics.md)
+for what each one means and how to fix it.
