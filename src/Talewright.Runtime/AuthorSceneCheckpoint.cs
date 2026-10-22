@@ -19,15 +19,18 @@ public sealed class AuthorSceneCheckpoint
     private readonly AuthorSetup _setup;
     private readonly CharacterSelection? _character;
     private readonly string[] _choices;
+    private readonly bool _captureDecisions;
 
     internal AuthorSceneCheckpoint(StoryDefinition story, SceneId start, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, string[] choices, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events)
+        CharacterSelection? character, string[] choices, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
+        bool captureDecisions)
     {
         _story = story;
         _start = start;
         _setup = setup;
         _character = character;
         _choices = choices;
+        _captureDecisions = captureDecisions;
         Scene = boundary.Scene;
         Seed = seed;
         Events = Array.AsReadOnly(events.Take(boundary.EventCount).ToArray());
@@ -45,7 +48,7 @@ public sealed class AuthorSceneCheckpoint
     /// Rebuilds the captured run and enters this scene once, returning an independent candidate.
     /// Requires the same unchanged story and deterministic extensions; this is not cross-source reload.
     /// </summary>
-    public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _choices);
+    public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _choices, _captureDecisions);
 }
 
 internal sealed class AuthorStateView(GameState state) : IGameStateView
