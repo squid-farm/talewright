@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using Spectre.Console.Cli.Help;
+using Spectre.Console.Rendering;
 using Talewright.Tale.Compilation;
 
 namespace Talewright.Cli;
@@ -9,6 +11,12 @@ namespace Talewright.Cli;
 public static class CommandLine
 {
     public static int Run(string[] args, TextWriter output, TextWriter error)
+        => Run(args, output, error, new CliInput(Console.In, Console.IsInputRedirected,
+            Console.IsOutputRedirected || !ReferenceEquals(output, Console.Out),
+            Console.IsErrorRedirected || !ReferenceEquals(error, Console.Error)));
+
+    internal static int Run(string[] args, TextWriter output, TextWriter error, CliInput input,
+        PublishCommand.Operations? publication = null)
     {
         if (args.Length == 0)
         {
@@ -22,13 +30,14 @@ public static class CommandLine
             config.CaseSensitivity(CaseSensitivity.All);
             config.UseStrictParsing();
             config.PropagateExceptions();
+            config.SetHelpProvider(new CliHelpProvider(config.Settings));
             config.ConfigureConsole(AnsiConsole.Create(new AnsiConsoleSettings
             {
                 Out = new AnsiConsoleOutput(output),
                 Ansi = AnsiSupport.No,
                 ColorSystem = ColorSystemSupport.NoColors,
             }));
-            var writers = new CommandWriters(output, error);
+            var writers = new CommandWriters(output, error, input, publication ?? PublishCommand.Operations.Default);
             config.AddCommand<ValidateCommand>("validate")
                 .WithDescription("Validate a story folder with stable human or JSON diagnostics.")
                 .WithData(writers);
@@ -89,9 +98,36 @@ public static class CommandLine
         output.WriteLine(JsonSerializer.Serialize(result, CliJsonContext.Default.ValidationOutput));
 }
 
-internal sealed record CommandWriters(TextWriter Output, TextWriter Error);
+internal sealed record CliInput(TextReader Reader, bool IsInputRedirected, bool IsOutputRedirected,
+    bool IsErrorRedirected = false)
+{
+    public bool IsInteractive => !IsInputRedirected && !IsOutputRedirected && !IsErrorRedirected;
+}
 
-public sealed class ValidationSettings : CommandSettings
+internal sealed record CommandWriters(TextWriter Output, TextWriter Error, CliInput Input,
+    PublishCommand.Operations Publication);
+
+public abstract class CliSettings : CommandSettings
+{
+    internal const string NonInteractiveDescription = "Never prompt; does not imply --force or change validation/output.";
+
+    [CommandOption("--non-interactive")]
+    [System.ComponentModel.Description(NonInteractiveDescription)]
+    public bool NonInteractive { get; set; }
+}
+
+internal sealed class CliHelpProvider(ICommandAppSettings settings) : HelpProvider(settings)
+{
+    public override IEnumerable<IRenderable> GetFooter(ICommandModel model, ICommandInfo? command)
+    {
+        if (command is null)
+        {
+            yield return new Text($"\nAll commands accept --non-interactive after the command name.\n{CliSettings.NonInteractiveDescription}\n");
+        }
+    }
+}
+
+public sealed class ValidationSettings : CliSettings
 {
     [CommandArgument(0, "<story-root>")]
     public string Root { get; set; } = "";
@@ -146,7 +182,7 @@ public sealed class ValidateCommand : Command<ValidationSettings>
 
 internal sealed record InvocationFailure(string Message, TextWriter Output, TextWriter Error);
 
-public sealed class InvocationFailureSettings : CommandSettings
+public sealed class InvocationFailureSettings : CliSettings
 {
     [CommandArgument(0, "[arguments]")]
     public string[] Arguments { get; set; } = [];

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Xml.Linq;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -8,7 +9,7 @@ using Talewright.Tale.Compilation;
 
 namespace Talewright.Cli;
 
-public sealed class PublishSettings : CommandSettings
+public sealed class PublishSettings : CliSettings
 {
     [CommandArgument(0, "<story-root>")]
     public string Root { get; set; } = "";
@@ -55,11 +56,19 @@ public sealed class PublishCommand : Command<PublishSettings>
     public override int Execute(CommandContext context, PublishSettings settings, CancellationToken cancellationToken)
     {
         var writers = (CommandWriters)context.Data!;
-        return Run(settings, writers.Output, writers.Error);
+        return Run(settings, writers);
     }
 
-    private static int Run(PublishSettings settings, TextWriter output, TextWriter error)
+    internal sealed record Operations(
+        Func<string, string, string?, string, TextWriter, TextWriter, string> BuildHost,
+        Action<string, string, bool> CreateZip)
     {
+        internal static Operations Default { get; } = new(PublishCommand.BuildHost, PublishCommand.CreateZip);
+    }
+
+    private static int Run(PublishSettings settings, CommandWriters writers)
+    {
+        var (output, error, input, publication) = writers;
         var root = settings.Root;
         var destination = settings.Destination!;
         var runtime = settings.Runtime;
@@ -69,13 +78,33 @@ public sealed class PublishCommand : Command<PublishSettings>
         var universalDesktop = allInOne && target == "desktop" && runtime is null;
 
         string final;
+        DestinationState? approved = null;
         StorySource source;
         try
         {
             final = Path.GetFullPath(destination);
+            if (Directory.Exists(final))
+            {
+                throw new IOException($"Output '{final}' is a directory. Choose a different --output ZIP path.");
+            }
             if (File.Exists(final) && !force)
             {
-                throw new IOException($"Output '{final}' exists. Use --force to replace it explicitly.");
+                if (settings.NonInteractive || !input.IsInteractive)
+                {
+                    throw new IOException($"Output '{final}' exists. Choose a new --output path or use --force to replace it explicitly.");
+                }
+
+                approved = DestinationState.Capture(final);
+                error.WriteLine($"Output '{final}' already exists.");
+                error.Write("Replace it? [y/N] ");
+                error.Flush();
+                var answer = input.Reader.ReadLine()?.Trim();
+                if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
+                {
+                    error.WriteLine("Publication cancelled. No archive was published.");
+                    return 2;
+                }
             }
 
             source = StorySource.FromDirectory(root);
@@ -112,16 +141,21 @@ public sealed class PublishCommand : Command<PublishSettings>
             if (allInOne)
             {
                 content = universalDesktop
-                    ? BuildUniversalDesktop(working, story, output, error)
-                    : BuildHost(working, target, runtime, story, output, error);
+                    ? BuildUniversalDesktop(working, story, output, error, publication)
+                    : publication.BuildHost(working, target, runtime, story, output, error);
                 File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(content, "ENGINE-LICENSE.txt"));
                 File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime));
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);
             temporaryZip = Path.Combine(Path.GetDirectoryName(final)!, $".talewright-{Guid.NewGuid():N}.zip.tmp");
-            CreateZip(content, temporaryZip, universalDesktop);
-            File.Move(temporaryZip, final, force);
+            publication.CreateZip(content, temporaryZip, universalDesktop);
+            if (approved is not null && approved != DestinationState.Capture(final))
+            {
+                throw new IOException($"Output '{final}' changed after approval. No archive was published. Retry to approve the current file, choose a new --output path, or use --force.");
+            }
+            // The check and move are separate operations, not a filesystem compare-and-swap.
+            File.Move(temporaryZip, final, force || approved is not null);
             output.WriteLine($"Published {(allInOne ? target : "story")} archive: {final}");
             return 0;
         }
@@ -146,6 +180,32 @@ public sealed class PublishCommand : Command<PublishSettings>
             {
                 Directory.Delete(working, recursive: true);
             }
+        }
+    }
+
+    private sealed record DestinationState(long Length, DateTime LastWriteTimeUtc, DateTime CreationTimeUtc,
+        string? LinkTarget, string Hash)
+    {
+        internal static DestinationState Capture(string path)
+        {
+            var before = new FileInfo(path);
+            if (!before.Exists)
+            {
+                throw new IOException($"Output '{path}' disappeared while publishing. No archive was published; retry or choose a new --output path.");
+            }
+            var length = before.Length;
+            var modified = before.LastWriteTimeUtc;
+            var created = before.CreationTimeUtc;
+            var link = before.LinkTarget;
+            using var stream = File.OpenRead(path);
+            var hash = Convert.ToHexString(SHA256.HashData(stream));
+            var after = new FileInfo(path);
+            if (!after.Exists || after.Length != length || after.LastWriteTimeUtc != modified ||
+                after.CreationTimeUtc != created || after.LinkTarget != link)
+            {
+                throw new IOException($"Output '{path}' changed while checking it. No archive was published; retry or use --force.");
+            }
+            return new(length, modified, created, link, hash);
         }
     }
 
@@ -184,14 +244,15 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private static string BuildUniversalDesktop(string working, string story, TextWriter output, TextWriter error)
+    private static string BuildUniversalDesktop(string working, string story, TextWriter output, TextWriter error,
+        Operations publication)
     {
         var bundle = Path.Combine(working, "bundle");
         Directory.CreateDirectory(bundle);
         foreach (var runtime in DesktopRuntimes)
         {
             output.WriteLine($"Building desktop runtime: {runtime}");
-            var built = BuildHost(Path.Combine(working, runtime), "desktop", runtime, story, output, error);
+            var built = publication.BuildHost(Path.Combine(working, runtime), "desktop", runtime, story, output, error);
             Directory.Move(built, Path.Combine(bundle, runtime));
         }
 
@@ -301,5 +362,5 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private sealed class PublishBuildException(string message) : Exception(message);
+    internal sealed class PublishBuildException(string message) : Exception(message);
 }

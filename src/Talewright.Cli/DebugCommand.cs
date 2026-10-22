@@ -5,7 +5,7 @@ using Spectre.Console.Cli;
 
 namespace Talewright.Cli;
 
-public sealed class DebugSettings : CommandSettings
+public sealed class DebugSettings : CliSettings
 {
     [CommandArgument(0, "<story-root>")]
     public string Root { get; set; } = "";

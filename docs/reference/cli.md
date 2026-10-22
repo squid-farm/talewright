@@ -12,6 +12,21 @@ ready-made downloads arrive, use `dotnet run --project src/Talewright.Cli --` in
 
 `talewright --help` and `talewright <command> --help` list every option. Unknown options are rejected.
 
+## Options shared by all commands
+
+Put `--non-interactive` after the command name:
+
+```bash
+talewright validate path/to/story --non-interactive --format json
+talewright publish path/to/story --output story.zip --non-interactive --force
+```
+
+`--non-interactive` guarantees that the CLI never asks a question, even if a script runner provides a
+terminal. It does **not** imply `--force`, skip validation, or change diagnostics, logging or JSON.
+There is no `--ci` alias. `validate` and `debug` do not ask CLI questions today; they accept the option
+for the same contract. `debug` still opens its graphical workbench; this option does not change
+confirmation dialogs inside that window.
+
 ## validate
 
 ```bash
@@ -94,7 +109,40 @@ Validates first, then builds. For a walkthrough, see [Sharing your story](../gui
 | `--target web` | Default. A static site with a root `index.html` and relative URLs. |
 | `--target desktop` | A self-contained desktop app. |
 | `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
-| `--force` | Overwrite an existing output file. |
+| `--force` | Authorize replacement without asking, independently of `--non-interactive`. |
+
+### Replacing an existing archive
+
+For a new output path, publication never asks a question. For an existing file, an interactive
+terminal shows the full destination path and asks `Replace it? [y/N]` **before** compiling or building.
+Type `y` or `yes` to replace it. No, Enter, end-of-input or any other answer cancels publication,
+leaves the existing file alone, and exits 2. The question is written to stderr, not stdout.
+
+With `--non-interactive`, redirected stdin, stdout **or** stderr, there is no question and no
+confirmation input is read. An existing destination fails with guidance to choose another `--output`
+path or add `--force`. Piping `yes` into publish is not approval.
+
+For an intentional scripted update:
+
+```bash
+talewright publish path/to/story --output story.zip --non-interactive --force
+```
+
+`--force` also works on its own in an interactive terminal without asking. It never bypasses story
+validation or build errors.
+
+**Overlapping publications.** Without force, a file that appears while publishing is not overwritten.
+For an approved existing file, publish compares its content fingerprint, size, timestamps and link
+target again just before replacement. If it has observably changed or disappeared, publish fails
+instead of using the earlier approval. Retry to approve the current file, choose a new path, or
+explicitly use `--force`. Force permits replacement even if the destination appears or changes.
+
+The completed ZIP is staged beside the destination and moved into place; the original is not deleted
+first. The check and replacement are separate operations, **not** a filesystem transaction or a
+lock against other programs. A change in that final gap, or a replacement indistinguishable by the
+checked content and metadata, may not be detected. Do not run concurrent publishers against the same
+path when that distinction matters. No universal atomicity or crash-durability guarantee is made
+across operating systems and filesystems.
 
 **Web output** runs on any static HTTP(S) host, including beneath a subpath, and can be uploaded to
 itch.io as an HTML5 game. Players need no backend or .NET.
