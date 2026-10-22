@@ -142,6 +142,21 @@ engine compilation time. No performance budgets are inferred from one
 machine or made a noisy per-PR gate; establish and compare target-specific budgets
 after collecting stable baselines.
 
+Every workflow run also publishes a Markdown summary in the Actions run and
+stores compact, structured measurements in the `performance-results` branch.
+Its `index.md` provides the cross-run overview; `reports/` contains a readable
+report and `runs/` contains one JSON record per run attempt, including
+BenchmarkDotNet means/p95/allocations, browser/Photino observations,
+publication timings, corpus/runtime metadata, and workflow job outcomes. Raw
+artifacts remain available from each Actions run for 30 days; the compact trend
+records persist on the branch.
+
+The weekly schedule runs on the repository's default branch. To measure a
+different branch such as M2 on demand, open **Actions → Real-file performance
+→ Run workflow** and select that branch; the run report records the selected
+branch and commit. Keep branch, runtime, and workload comparable when
+interpreting changes, since hosted runner hardware and load can vary.
+
 ## One test-authoring surface
 
 All player E2E cases and assertions live in **C#/xUnit** in `Talewright.Player.E2E.Tests`.

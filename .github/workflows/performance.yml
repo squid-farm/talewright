@@ -1,4 +1,5 @@
 name: Real-file performance
+run-name: Real-file performance on ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -107,5 +108,63 @@ jobs:
         with:
           name: real-file-player-linux-photino
           path: artifacts/test-results
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-results:
+    if: always()
+    needs:
+      - benchmarks-and-publication
+      - browser-player
+      - linux-photino
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: real-file-performance-history
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: real-file-*
+          path: artifacts/performance-input
+      - name: Prepare durable history branch
+        env:
+          HISTORY_PATH: ${{ runner.temp }}/performance-history
+        run: |
+          if git ls-remote --exit-code origin refs/heads/performance-results >/dev/null; then
+            git fetch --no-tags origin refs/heads/performance-results
+            git worktree add --detach "$HISTORY_PATH" FETCH_HEAD
+          else
+            git worktree add --detach "$HISTORY_PATH" "$GITHUB_SHA"
+            git -C "$HISTORY_PATH" switch --orphan "performance-history-$GITHUB_RUN_ID"
+          fi
+      - name: Generate run report and update trend history
+        env:
+          HISTORY_PATH: ${{ runner.temp }}/performance-history
+          REPORT_PATH: ${{ runner.temp }}/performance-report
+          PERF_BENCHMARKS_RESULT: ${{ needs.benchmarks-and-publication.result }}
+          PERF_BROWSER_RESULT: ${{ needs.browser-player.result }}
+          PERF_PHOTINO_RESULT: ${{ needs.linux-photino.result }}
+        run: |
+          python3 tests/performance/publish_results.py \
+            --input artifacts/performance-input \
+            --output "$REPORT_PATH" \
+            --history "$HISTORY_PATH"
+          cat "$REPORT_PATH/summary.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish run summary and durable trend history
+        env:
+          HISTORY_PATH: ${{ runner.temp }}/performance-history
+        run: |
+          git -C "$HISTORY_PATH" config user.name github-actions[bot]
+          git -C "$HISTORY_PATH" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C "$HISTORY_PATH" add index.md reports runs
+          git -C "$HISTORY_PATH" commit -m "Record performance run $GITHUB_RUN_ID"
+          git -C "$HISTORY_PATH" push origin HEAD:refs/heads/performance-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: real-file-performance-summary
+          path: ${{ runner.temp }}/performance-report
           if-no-files-found: error
           retention-days: 30
