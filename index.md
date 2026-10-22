@@ -1,9 +1,8 @@
 # Real-file performance history
 
-Exploratory history. Partial/interrupted local results are not directly comparable to complete scheduled-run baselines. Review each report and runner metadata.
+Each row links to a run's workflow summary; machine-readable measurements are in `runs/`. Compare like-for-like workloads and review runner metadata before interpreting small changes.
 
-| Date (UTC) | Commit | Status | Core cases | Boundary cases | Report | Data |
-|---|---|---|---:|---:|---|---|
-| 2026-10-22 | `894457f9c652` | interrupted; partial, non-baseline | 45/60 | 14/14 | [report](reports/local-20261022-interrupted-894457f.md) | [JSON](runs/local-20261022-interrupted-894457f.json) |
-
-Raw evidence for this partial run is retained under `evidence/local-20261022-interrupted-894457f/`.
+| Date (UTC) | Commit | Benchmarks | Player observations | Publications | Jobs | Run |
+|---|---|---:|---:|---:|---|---|
+| 2026-10-22 | `894457f9c652` | 106 | 15 | 3 | success/failure (7 passed, 8 screenshot teardown failures)/not-run | local-20261022T054931Z · [report](reports/local-20261022T054931Z-1.md) · [JSON](runs/local-20261022T054931Z-1.json) |
+| 2026-10-22 | `894457f9c652` | 59 | 0 | 0 | /not-run/not-run | local-20261022-interrupted-894457f · [report](reports/local-20261022-interrupted-894457f.md) · [JSON](runs/local-20261022-interrupted-894457f.json) |

@@ -1,0 +1,41 @@
+[
+  {
+    "name": "web",
+    "status": "succeeded",
+    "startedAt": "2026-10-22T06:41:35.557611+00:00",
+    "completedAt": "2026-10-22T06:42:11.673108+00:00",
+    "elapsedSeconds": 36.116,
+    "timeoutSeconds": 2700,
+    "exitCode": 0,
+    "peakWorkingSetKiB": 454016,
+    "artifactPath": "/home/joelwilkins/source/rpg-engine-benchmarking-57/artifacts/performance/manual-20261022T054931Z/publication/publish-web.zip",
+    "artifactBytes": 12345934,
+    "timingOutput": "/home/joelwilkins/source/rpg-engine-benchmarking-57/artifacts/performance/manual-20261022T054931Z/publication/publication-web.time.txt"
+  },
+  {
+    "name": "linux-x64",
+    "status": "succeeded",
+    "startedAt": "2026-10-22T06:42:11.673632+00:00",
+    "completedAt": "2026-10-22T06:42:18.097307+00:00",
+    "elapsedSeconds": 6.424,
+    "timeoutSeconds": 2700,
+    "exitCode": 0,
+    "peakWorkingSetKiB": 445792,
+    "artifactPath": "/home/joelwilkins/source/rpg-engine-benchmarking-57/artifacts/performance/manual-20261022T054931Z/publication/publish-linux-x64.zip",
+    "artifactBytes": 38276304,
+    "timingOutput": "/home/joelwilkins/source/rpg-engine-benchmarking-57/artifacts/performance/manual-20261022T054931Z/publication/publication-linux-x64.time.txt"
+  },
+  {
+    "name": "universal-desktop",
+    "status": "succeeded",
+    "startedAt": "2026-10-22T06:42:18.097816+00:00",
+    "completedAt": "2026-10-22T06:42:46.731588+00:00",
+    "elapsedSeconds": 28.634,
+    "timeoutSeconds": 2700,
+    "exitCode": 0,
+    "peakWorkingSetKiB": 456644,
+    "artifactPath": "/home/joelwilkins/source/rpg-engine-benchmarking-57/artifacts/performance/manual-20261022T054931Z/publication/publish-universal-desktop.zip",
+    "artifactBytes": 222052628,
+    "timingOutput": "/home/joelwilkins/source/rpg-engine-benchmarking-57/artifacts/performance/manual-20261022T054931Z/publication/publication-universal-desktop.time.txt"
+  }
+]
