@@ -47,7 +47,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
             }
             catch (Exception ex) when (ex is FormatException or ArgumentException)
             {
-                throw new InvalidDataException($"Invalid save filename '{Path.GetFileName(path)}'.", ex);
+                throw new InvalidDataException("A saved game has an unrecognized filename. Move it out of your save folder and refresh the list.", ex);
             }
         }
 
@@ -59,7 +59,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
         await using var stream = new FileStream(SlotPath(storyId, slot), FileMode.Open, FileAccess.Read, FileShare.Read);
         if (stream.Length is 0 or > StoryHistory.MaxSaveBytes)
         {
-            throw new InvalidDataException("Save data must contain 1 byte to 2 MiB.");
+            throw new InvalidDataException("This saved game is empty or too large to load (maximum 2 MiB). Choose another save.");
         }
 
         var data = new byte[(int)stream.Length];

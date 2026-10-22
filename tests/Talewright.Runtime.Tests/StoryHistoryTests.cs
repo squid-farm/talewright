@@ -95,15 +95,15 @@ public class StoryHistoryTests
     }
 
     [Theory]
-    [InlineData("formatVersion", "99", "Unsupported")]
+    [InlineData("formatVersion", "99", "unsupported")]
     [InlineData("storyId", "\"other\"", "different story")]
     [InlineData("storyVersion", "\"other\"", "incompatible")]
     [InlineData("contentFingerprint", "\"changed\"", "incompatible")]
-    [InlineData("cursor", "-1", "bounds")]
-    [InlineData("cursor", "3", "bounds")]
-    [InlineData("choices", "null", "bounds")]
-    [InlineData("choices", "[null]", "bounds")]
-    [InlineData("choices", "[\"missing\"]", "not available")]
+    [InlineData("cursor", "-1", "history is damaged")]
+    [InlineData("cursor", "3", "history is damaged")]
+    [InlineData("choices", "null", "history is damaged")]
+    [InlineData("choices", "[null]", "history is damaged")]
+    [InlineData("choices", "[\"missing\"]", "cannot continue")]
     public void Invalid_saves_preserve_active_session(string field, string value, string message)
     {
         var history = new StoryHistory(Compile(), 7);

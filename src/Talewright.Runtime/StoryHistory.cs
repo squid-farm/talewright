@@ -87,12 +87,12 @@ public sealed class StoryHistory
     {
         if (string.IsNullOrEmpty(Story.ContentFingerprint))
         {
-            throw new InvalidOperationException("Saving requires a compiled story and an explicit extension compatibility identity.");
+            throw new InvalidOperationException("Saving is unavailable for this story. Ask the author to enable save compatibility for their custom extensions.");
         }
 
         if (_choices.Any(c => c.Length > 512))
         {
-            throw new InvalidOperationException("A saved choice key may contain at most 512 characters.");
+            throw new InvalidOperationException("This story contains a choice identifier that is too long to save. Contact the story author.");
         }
 
         var data = JsonSerializer.SerializeToUtf8Bytes(new SavedHistory
@@ -108,7 +108,7 @@ public sealed class StoryHistory
         }, SaveJsonContext.Default.SavedHistory);
         if (data.Length > MaxSaveBytes)
         {
-            throw new InvalidOperationException("The save exceeds the 2 MiB size limit.");
+            throw new InvalidOperationException("This playthrough is too large to save (maximum 2 MiB). You can continue playing, but this save could not be created.");
         }
 
         return data;
@@ -118,36 +118,36 @@ public sealed class StoryHistory
     {
         if (data.Length > MaxSaveBytes)
         {
-            throw new InvalidDataException("The save exceeds the 2 MiB size limit.");
+            throw new InvalidDataException("This saved game is too large to load (maximum 2 MiB). Choose another save.");
         }
 
         SavedHistory save;
         try
         {
             save = JsonSerializer.Deserialize(data, SaveJsonContext.Default.SavedHistory)
-                ?? throw new InvalidDataException("The save is empty.");
+                ?? throw new InvalidDataException("This saved game is empty. Choose another save or start a new game.");
         }
         catch (JsonException ex)
         {
-            throw new InvalidDataException($"The save is malformed: {ex.Message}", ex);
+            throw new InvalidDataException("This saved game is malformed or damaged. Choose another save or start a new game.", ex);
         }
 
         if (save.FormatVersion != FormatVersion)
         {
-            throw new InvalidDataException($"Unsupported save format {save.FormatVersion}; expected {FormatVersion}.");
+            throw new InvalidDataException("This saved game uses an unsupported format. Open it with the player version that created it.");
         }
 
         if (string.IsNullOrEmpty(story.ContentFingerprint) ||
             save.StoryId != story.Id || save.StoryVersion != story.Version ||
             save.ContentFingerprint != story.ContentFingerprint)
         {
-            throw new InvalidDataException("This save belongs to a different story or an incompatible story/extension version.");
+            throw new InvalidDataException("This save belongs to a different story or an incompatible story/extension version. Open it with the story and player version that created it.");
         }
 
         if (save.Choices is null || save.Choices.Length > MaxChoices || save.Cursor < 0 || save.Cursor > save.Choices.Length ||
             save.Choices.Any(c => string.IsNullOrEmpty(c) || c.Length > 512))
         {
-            throw new InvalidDataException("The save has invalid choice history or cursor bounds.");
+            throw new InvalidDataException("This saved game's history is damaged or exceeds the supported length. Choose another save.");
         }
 
         // Validate redo choices too, not just the visible prefix.
@@ -177,7 +177,7 @@ public sealed class StoryHistory
             var choice = session.Current!.Choices.FirstOrDefault(c => c.Key == key);
             if (choice is null)
             {
-                throw new InvalidDataException($"Saved choice {frames.Count} ('{key}') is not available.");
+                throw new InvalidDataException($"This saved game cannot continue at choice {frames.Count}. It may be damaged or belong to a different story version.");
             }
 
             frames[^1] = frames[^1] with { Chosen = choice.Label };
