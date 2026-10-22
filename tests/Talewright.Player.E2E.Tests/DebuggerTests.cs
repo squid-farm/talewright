@@ -317,6 +317,115 @@ public sealed class DebuggerTests
         }
     }
 
+    [Fact]
+    public async Task Native_portable_scenario_replays_in_another_process_after_setup_reload_edit_and_dice()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-scenario-native-" + Guid.NewGuid().ToString("N"));
+        var story = Path.Combine(root, "story");
+        Directory.CreateDirectory(story);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-scenarios", Guid.NewGuid().ToString("N"));
+        var scenario = Path.Combine(root, "portable.twscenario");
+        var secondExport = Path.Combine(root, "second.twscenario");
+        var tale = Path.Combine(story, "main.tale");
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(story, "story.yaml"), """
+                id: native-portable
+                title: Portable Native
+                start: scene1
+                flags: [ready]
+                vars: {count: 0}
+                characters:
+                  player: {first-name: Tester}
+                creation:
+                  name: true
+                """);
+            var source = string.Join("\n", Enumerable.Range(1, 1000).Select(i => $$"""
+                === scene{{i}}
+                @title Chapter {{i}}
+                Before scene{{i}}. Count {var:count}. {player:first-name}.
+                * [Prepared] (requires: flag:ready) -> check
+                * [Wait] -> END
+                """)) + """
+
+                === check
+                Check passage.
+                ::: skill-check athletics dc 10
+                success: -> finish
+                failure: -> finish
+                :::
+                === finish
+                * [Return] -> scene1
+                """;
+            await File.WriteAllTextAsync(tale, source);
+            await using (var driver = new NativePlayerDriver(artifacts, executable))
+            {
+                await driver.StartAsync(story);
+                await WaitFor(driver, "Scene setup");
+                await driver.FillAsync("Search scenes", "Chapter 1000");
+                await WaitFor(driver, "Select scene1000 Chapter 1000");
+                await driver.ClickAsync("Select scene1000 Chapter 1000");
+                await driver.FillAsync("Seed", "42");
+                await driver.FillAsync("First name", "Robin");
+                await driver.ClickAsync("Start story");
+                await driver.ActivateAsync("Prerequisite overrides");
+                await driver.ActivateAsync("Override flag:ready");
+                await driver.ActivateAsync("Value flag:ready");
+                await driver.ActivateAsync("Override var:count");
+                await driver.FillAsync("Value var:count", "7");
+                await driver.ClickAsync("Start selected scene");
+                await WaitFor(driver, "Before scene1000. Count 7. Robin.");
+                await driver.FillAsync("Filter decisions", "c0");
+                await WaitFor(driver, "ConditionTrue", "Offered");
+                source = source.Replace("Before scene1000.", "After scene1000.");
+                await File.WriteAllTextAsync(tale, source);
+                await WaitFor(driver, "After scene1000. Count 7. Robin.", "Reload boundary: scene1000");
+                await driver.ActivateAsync("Live edit values");
+                await driver.ActivateAsync("Edit var:count");
+                await driver.FillAsync("Edit value var:count", "19");
+                await driver.ClickAsync("Apply live edit batch");
+                await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 1 / 1.");
+                await driver.ChooseAsync("Prepared");
+                await WaitFor(driver, "Check passage.", "Rolls: 1", "Position 2 / 2.");
+                await driver.ClickAsync("Jump retaining state");
+                await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 3 / 3.", "Rolls: 1");
+                await driver.ClickAsync("Back command");
+                await WaitFor(driver, "Check passage.", "Position 2 / 3.", "Rolls: 1");
+                await driver.FillAsync("Scenario file path", scenario);
+                await driver.ClickAsync("Export synthetic scenario");
+                await WaitFor(driver, "Synthetic scenario exported:");
+                await driver.ClickAsync("Export synthetic scenario");
+                await WaitFor(driver, "Scenario operation failed:");
+                Assert.Equal(0, await driver.CloseWindowAsync());
+            }
+            var bytes = await File.ReadAllBytesAsync(scenario);
+            await using (var driver = new NativePlayerDriver(artifacts + "-reopened", executable))
+            {
+                await driver.StartAsync(story);
+                await WaitFor(driver, "Scene setup");
+                await driver.FillAsync("Scenario file path", scenario);
+                await driver.ClickAsync("Import exact scenario");
+                await WaitFor(driver, "Exact synthetic scenario imported", "Check passage.", "Position 2 / 3.", "Rolls: 1", "Seed: 42");
+                await driver.FillAsync("Scenario file path", secondExport);
+                await driver.ClickAsync("Export synthetic scenario");
+                await WaitFor(driver, "Synthetic scenario exported:");
+                Assert.Equal(bytes, await File.ReadAllBytesAsync(secondExport));
+                await driver.ClickAsync("Forward command");
+                await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 3 / 3.", "Rolls: 1");
+                Assert.Equal(0, await driver.CloseWindowAsync());
+            }
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(scenario));
+            Assert.Equal(source, await File.ReadAllTextAsync(tale));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, params string[] texts)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));

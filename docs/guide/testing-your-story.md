@@ -120,10 +120,55 @@ and click **Rescan / retry watcher**, or deliberately start a fresh scene.
 
 ### Good to know
 
-- The debugger never reads or changes player save files.
+- The debugger never writes player saves. It reads one only when you explicitly fork it (below).
 - Starting at a scene skips everything before it, so earlier scenes count as **unvisited**, and there's
   no arbitrary visit-count override. If a scene checks `visited(...)`, start at the earlier scene and
   play forward or use **Jump retaining state** to keep the visits you have accumulated.
 - It needs a desktop environment (on Linux, WebKitGTK 4.1).
+
+### Share and restore a debugging scenario
+
+**Portable author scenarios** exports a synthetic `.twscenario` replay recipe: accepted story
+ID/version/fingerprint, extension and engine/tool compatibility, character, seed, starting scene,
+prerequisite overrides, choices, live edits, jumps and the timeline cursor (including redo).
+It does **not** export arbitrary state, events, source code or extensions. Share the matching story
+source separately and use the same tool version.
+
+1. Set **Scenario file path** to an absolute path outside your story and player-save folders.
+   The initial suggestion is in your local application's `Talewright/author-scenarios` directory,
+   separate from `Talewright/saves`.
+2. Click **Export synthetic scenario**. Existing files are not replaced unless you enable
+   **Confirm replacement of existing scenario file on next export**. Confirmation is consumed by
+   the next export attempt. Successful writes use a temporary file and atomic replacement.
+3. In another debugger process, open the matching story, enter that path, and click
+   **Import exact scenario**. You do not need to recreate the character or start a scene first.
+   The entire timeline, including redo, must replay successfully before the active run is replaced.
+   Back/Forward and accepted-source viewing then work normally.
+
+Exact import rejects mismatched source or compatibility, malformed files and changed replay evidence.
+It uses the **accepted compilation**, even when newer disk edits are pending/rejected.
+If source intentionally changed, **Adopt scenario to accepted source** is a separate, explicit
+operation. It revalidates every declared ID and command, reports identity and current/full-timeline
+state/event/dice/presentation differences, and creates a new synthetic run. This is **not a migration
+guarantee**: positional choice keys may now mean something else. Review all differences and export
+under a new path to preserve the original. Story ID, engine/tool and extension compatibility must
+still match; adoption cannot load arbitrary extensions or bypass those requirements.
+
+For an existing game, put its ordinary save's path in **Player save file path (read only)** and click
+**Fork compatible player save**. This first uses the normal save compatibility and restore policy,
+then copies its character, seed, choices and cursor into an independent author timeline. Your original
+save is never modified; subsequent author exports must use `.twscenario`, not a player slot.
+This accepts files, not browser IndexedDB slots; it does not add a browser-save download UI.
+
+Imports are bounded to 2 MiB, 10,000 commands, 10,000 fields per setup/edit batch and 512 characters per
+ID/key/compatibility identity. Numbers must be signed 32-bit integers (seed: unsigned 64-bit); character
+options and all IDs must be legal for the accepted story. Unknown versions, fields, commands, duplicate
+JSON members and invalid redo are rejected explicitly. Failed imports preserve the active run and
+input file. These recipes are editable diagnostic data, **not authenticated proof of normal play**.
+
+New to the debugger? Follow the [hands-on debugger test plan](debugger-test-plan.md), including a
+small copyable story, expected values, rollback checks and save isolation.
+Performance evidence and its limitations are recorded in the [performance notes](../developer/performance.md);
+scenario replay has no new responsiveness guarantee.
 
 Full details: [CLI reference: debug](../reference/cli.md#debug).
