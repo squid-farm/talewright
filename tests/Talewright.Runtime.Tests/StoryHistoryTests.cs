@@ -153,10 +153,13 @@ public class StoryHistoryTests
         }
 
         Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
+        Assert.Equal(StoryHistory.MaxChoices + 1, history.Transcript.Count);
         var saved = history.Save();
         Assert.Throws<InvalidOperationException>(() => history.Choose("c0"));
         Assert.Equal(saved, history.Save());
-        Assert.Equal(StoryHistory.MaxChoices, StoryHistory.Restore(history.Story, saved).Cursor);
+        var restored = StoryHistory.Restore(history.Story, saved);
+        Assert.Equal(StoryHistory.MaxChoices, restored.Cursor);
+        Assert.Equal(StoryHistory.MaxChoices + 1, restored.Transcript.Count);
     }
 
     [Fact]

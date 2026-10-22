@@ -171,15 +171,19 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Load Limit");
         // This includes rendering 10,001 passages, not just replaying their choices.
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("choice limit", new() { Timeout = 30_000 });
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices + 1);
         await Expect(Choices).ToBeDisabledAsync();
         await Driver.ClickAsync("Save game");
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'My save'");
         await Driver.ClickAsync("Back");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices);
         await Expect(Choices).ToBeEnabledAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Driver.ClickAsync("Forward");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices + 1);
         await Expect(Choices).ToBeDisabledAsync();
         await Driver.ClickAsync("Restart");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
         await Expect(Choices).ToBeEnabledAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Choose("Again");
