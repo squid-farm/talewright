@@ -1,8 +1,8 @@
 # CLI reference
 
 The `talewright` command checks, debugs and publishes stories. See
-[Getting started](../guide/getting-started.md#install-the-desktop-tools-optional) to install it. From a
-source checkout, use `dotnet run --project src/Talewright.Cli --` in place of `talewright`.
+[Getting started](../guide/getting-started.md#install-the-desktop-tools) to install it. Until
+ready-made downloads arrive, use `dotnet run --project src/Talewright.Cli --` in place of `talewright`.
 
 | Command | Does |
 |---|---|

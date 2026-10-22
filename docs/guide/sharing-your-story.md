@@ -1,7 +1,7 @@
 # Sharing your story
 
-> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools-optional).
-> With a source checkout, write `dotnet run --project src/Talewright.Cli --` instead of `talewright`.
+> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools).
+> Until ready-made downloads arrive, write `dotnet run --project src/Talewright.Cli --` instead of `talewright`.
 
 Every `publish` checks your story first and stops if there are errors.
 

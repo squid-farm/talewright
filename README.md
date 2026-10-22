@@ -41,33 +41,35 @@ cast in one `story.yaml`. No programming required.
 Open the **[web player](https://squid-farm.github.io/talewright/)** and pick *The Lost Relic*. Nothing
 to install.
 
+## Install the desktop tools
+
+The web player is enough to start. For serious writing, install the desktop tools: the `talewright`
+command checks your story in seconds and publishes finished games, and the **Author Debugger** jumps
+to any scene with any game state.
+
+1. Install the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+2. Download [Talewright as a zip](https://github.com/squid-farm/talewright/archive/refs/heads/main.zip),
+   extract it, and open a terminal in the extracted folder.
+3. Check that it works: `dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`
+
+The docs write commands as `talewright ...`. Until downloads are ready, read that as
+`dotnet run --project src/Talewright.Cli -- ...`, run from the extracted folder.
+
+Ready-made downloads are planned ([#33](https://github.com/squid-farm/talewright/issues/33)).
+[Getting started](docs/guide/getting-started.md#install-the-desktop-tools) has the details, including
+Linux notes and Git instructions.
+
 ## Write your first story
 
 1. Create a folder with a `story.yaml` (title, start scene, characters) and a `story.tale` (your scenes).
    You can also copy the [sample story](samples/LostRelic) and edit it.
-2. Zip the folder.
-3. In the [web player](https://squid-farm.github.io/talewright/), choose **Open a story file** and select
-   your zip.
-4. Play it. If something's wrong, Talewright lists each problem with its file and line.
-5. Fix, re-zip, and reload.
+2. Check it: `talewright validate my-story` lists every problem with its file and line.
+3. Play it in the desktop player, which opens the folder directly. Or zip the folder and choose
+   **Open a story file** in the [web player](https://squid-farm.github.io/talewright/).
+4. Fix, check again, and replay.
 
 The **[first story tutorial](docs/guide/first-story.md)** walks through this with a complete example.
 Keep the **[Tale syntax reference](docs/reference/tale-syntax.md)** handy while you write.
-
-## Install the desktop tools
-
-The web player covers writing and playing. To check stories from the command line, test individual
-scenes in the Author Debugger, or publish a finished game, you currently need the free
-[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and a copy of this repository:
-
-```bash
-git clone https://github.com/squid-farm/talewright.git
-cd talewright
-dotnet run --project src/Talewright.Cli -- validate path/to/your-story
-```
-
-Ready-made downloads are planned ([#33](https://github.com/squid-farm/talewright/issues/33)).
-See [Getting started](docs/guide/getting-started.md) for the desktop player and Linux notes.
 
 ## Share your story
 
@@ -77,7 +79,6 @@ talewright publish my-story -a --target web --output game-web.zip   # static web
 talewright publish my-story -a --target desktop --output game.zip   # Windows, macOS and Linux app
 ```
 
-Running from a source checkout? Use `dotnet run --project src/Talewright.Cli --` in place of `talewright`.
 Players don't need .NET. See [Sharing your story](docs/guide/sharing-your-story.md).
 
 ## Documentation

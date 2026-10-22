@@ -22,17 +22,20 @@ scenes haven't already been visited. `validate` warns (`TW3008`) when no scene h
 ## My old save won't load
 
 Saves only load into the exact story version they were made with, so any edit to the story stops older
-saves from loading. See [saves](playing-and-saving.md#updating-a-story-with-existing-saves).
+saves from loading. See [saves](playing-and-saving.md#updating-a-story-with-existing-saves). Carrying
+saves over to a new version is planned ([#39](https://github.com/squid-farm/talewright/issues/39)).
 
 ## My saves disappeared (web)
 
 Web saves live in your browser for that site. Clearing browsing data, private windows and switching
-browsers or devices all lose them. Use the desktop player if you need saves to stick around.
+browsers or devices all lose them. Use the desktop player if you need saves to stick around. Exporting
+saves to a file for backup is planned ([#84](https://github.com/squid-farm/talewright/issues/84)).
 
 ## The desktop player or debugger won't start on Linux
 
 Install WebKitGTK 4.1: `sudo apt install libwebkit2gtk-4.1-0` (Debian, Ubuntu, Mint) or your
-distribution's equivalent. You also need a graphical desktop session.
+distribution's equivalent. You also need a graphical desktop session. Players of published Linux games
+need it too; removing that step is being explored ([#85](https://github.com/squid-farm/talewright/issues/85)).
 
 ## A published desktop game won't start
 

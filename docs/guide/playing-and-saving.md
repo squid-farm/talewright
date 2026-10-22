@@ -37,7 +37,8 @@ The web player, the desktop player and published games all share the same screen
 | Desktop (Linux) | `~/.local/share/Talewright/saves` |
 
 There's no autosave yet ([#54](https://github.com/squid-farm/talewright/issues/54)), so save before
-closing the player.
+closing the player. Web saves can't be backed up yet either; exporting saves to a file is planned
+([#84](https://github.com/squid-farm/talewright/issues/84)).
 
 ## Updating a story with existing saves
 

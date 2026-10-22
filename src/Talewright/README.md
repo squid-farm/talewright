@@ -18,7 +18,8 @@ No Blazor or Photino dependencies.
 - **Which package:** `Talewright` for headless tooling or a custom frontend; `Talewright.Player` for the
   supplied Blazor UI (it brings this package in). Story authors need neither.
 - **Build-time validation:** the package includes an opt-in MSBuild target. Set `TalewrightStoryProject`
-  to a validator executable and `TalewrightStoryRoot` to the story folder, and call
+  to the validator console app's project file (`.csproj`, not its compiled executable; the target
+  restores and builds it) and `TalewrightStoryRoot` to the story folder, and call
   `StoryProjectValidator.Validate` with the same `CompilerOptions` factory as your hosts. Invalid Tale
   fails the build with source-positioned diagnostics. See the
   [C# story example](../../examples/CSharpStory/README.md).

@@ -11,8 +11,9 @@ browser with nothing to install.
 - Use **Open a story file** to play your own story from a `.zip` file. [Your first story](first-story.md)
   shows how to make one.
 
-The web player is all you need to write and play stories. Your files stay on your computer: the player
-reads the zip inside your browser and doesn't upload it anywhere.
+Your files stay on your computer: the player reads the zip inside your browser and doesn't upload it
+anywhere. The web player is enough to write and play stories, but once you're writing regularly, the
+[desktop tools](#install-the-desktop-tools) make it much quicker to check and test them.
 
 ## What you need to write stories
 
@@ -25,27 +26,30 @@ my-story/
 └── story.tale      # your scenes (use as many .tale files and subfolders as you like)
 ```
 
-> **Tip:** In VS Code, the YAML extension helps with `story.yaml`. Dedicated `.tale` highlighting and
-> completion are on the way ([#31](https://github.com/squid-farm/talewright/issues/31)).
+> **Tip:** In VS Code, install Red Hat's
+> [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) to catch
+> YAML formatting mistakes in `story.yaml` as you type. Dedicated `.tale` highlighting and completion
+> are on the way ([#31](https://github.com/squid-farm/talewright/issues/31)).
 
-## Install the desktop tools (optional)
+## Install the desktop tools
 
-The desktop tools add a desktop player, the `talewright` command (check stories, publish games) and
-the **Author Debugger** (jump to any scene with any game state). They currently run from the source code;
-ready-made downloads are planned ([#33](https://github.com/squid-farm/talewright/issues/33)).
+Recommended for anyone writing more than a short story. The desktop tools add:
+
+- the `talewright` command, which checks your story for mistakes and publishes finished games;
+- the **Author Debugger**, which jumps to any scene with any game state;
+- a desktop player that opens story folders directly, without zipping.
+
+For now they run from Talewright's source code. Versioned downloads
+([#86](https://github.com/squid-farm/talewright/issues/86)) and ready-made apps
+([#33](https://github.com/squid-farm/talewright/issues/33)) are planned.
 
 1. Install the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
-2. Install [Git](https://git-scm.com/downloads), then open a terminal and download Talewright:
-
-   ```bash
-   git clone https://github.com/squid-farm/talewright.git
-   cd talewright
-   ```
-
+2. Download [Talewright as a zip](https://github.com/squid-farm/talewright/archive/refs/heads/main.zip)
+   and extract it somewhere handy. Open a terminal in the extracted `talewright-main` folder.
 3. **Linux only:** install WebKitGTK, e.g. `sudo apt install libwebkit2gtk-4.1-0`. Windows and macOS
    already include what's needed.
 
-Run these from the `talewright` folder:
+Run these from the Talewright folder:
 
 | To… | Run |
 |---|---|
@@ -55,10 +59,14 @@ Run these from the `talewright` folder:
 | Open the Author Debugger | `dotnet run --project src/Talewright.Cli -- debug path/to/my-story` |
 | Publish a game | `dotnet run --project src/Talewright.Cli -- publish path/to/my-story ...` |
 
-The first run takes a minute while .NET builds everything; later runs are quick.
+The first run takes a minute while .NET builds everything; later runs are quick. To update, download
+the zip again.
 
-> **Shorter commands:** the rest of the docs write `talewright validate ...`. With a source checkout,
-> read that as `dotnet run --project src/Talewright.Cli -- validate ...`.
+> **Using Git?** `git clone https://github.com/squid-farm/talewright.git` instead, and `git pull` to
+> update.
+
+> **Shorter commands:** the rest of the docs write `talewright validate ...`. Until ready-made
+> downloads arrive, read that as `dotnet run --project src/Talewright.Cli -- validate ...`.
 
 The desktop player can open story **folders** directly, so you don't need to zip anything while writing.
 It also lists the built-in samples.

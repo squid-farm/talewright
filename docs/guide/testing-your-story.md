@@ -3,8 +3,8 @@
 Talewright checks your whole story every time it loads, so most mistakes show up before anyone plays.
 There are three ways to test, from quickest to most thorough.
 
-> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools-optional).
-> With a source checkout, write `dotnet run --project src/Talewright.Cli --` instead of `talewright`.
+> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools).
+> Until ready-made downloads arrive, write `dotnet run --project src/Talewright.Cli --` instead of `talewright`.
 
 ## 1. Open it in a player
 
@@ -52,16 +52,20 @@ led there, and **Branch explanations**: why each condition passed or failed.
 ### Editing while you test
 
 Leave the debugger open while you write. When you save a `.tale` file, it recompiles and reloads the
-current scene. If the change can't be applied safely (for example, you edited a scene the player
-already passed through), it asks you to restart instead.
+scene you're on, keeping the state you'd built up to reach it. You stay where you are.
 
-**Changes to `story.yaml` always need a restart.** Click **Restart from source**: it keeps your scene,
-seed, overrides and character, and reports any that no longer exist.
+Some changes can't be applied safely in place, for example editing a scene the player already passed
+through. Any change to `story.yaml` also needs a restart. In those cases the debugger asks you to click
+**Restart from source**. You don't have to set anything up again: it keeps your selected scene, seed,
+overrides and character, and tells you about any that no longer exist in the story so you can fix them.
 
 ### Good to know
 
 - The debugger never reads or changes player save files.
-- Starting at a scene skips everything before it, so earlier scenes count as unvisited.
+- Starting at a scene skips everything before it, so earlier scenes count as **unvisited**, and there's
+  no override for that yet. If a scene checks `visited(...)`, start the debugger at the earlier scene
+  and play forward from there. Jumping ahead while keeping visit history is planned
+  ([#63](https://github.com/squid-farm/talewright/issues/63)).
 - It needs a desktop environment (on Linux, WebKitGTK 4.1).
 
 Full details: [CLI reference: debug](../reference/cli.md#debug).

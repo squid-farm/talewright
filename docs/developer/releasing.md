@@ -20,7 +20,11 @@ only after both pass:
 2. Let the publishing jobs use their scoped Pages/OIDC and `packages: write` permissions. No PAT secret
    is needed. After the first publication, check package visibility and repository/Actions access;
    publishing doesn't set those for you.
-3. Branch protection should require **Build** (it orchestrates the tests).
+3. Branch protection should require each check individually: `build`, `tests / unit`,
+   `tests / browser (chromium)`, `tests / browser (firefox)`, `tests / browser (webkit)` and
+   `tests / linux-desktop`. In the **Build** workflow, `build` and `tests` run independently (only
+   publishing waits for both), and no check named `Build` is reported, so requiring the workflow
+   name, or `build` alone, would let PRs merge with failing tests.
 
 ## Cutting a release
 

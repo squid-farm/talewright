@@ -1,8 +1,9 @@
 # Your first story
 
 In this tutorial you'll build *The Night Ferry*: a three-scene story with dialogue, an item, a skill
-check and text that changes depending on what the player did. It takes about fifteen minutes and only
-needs a text editor and the [web player](https://squid-farm.github.io/talewright/).
+check and text that changes depending on what the player did. It takes about fifteen minutes. You
+need a text editor and the [desktop tools](getting-started.md#install-the-desktop-tools); if you don't
+have those yet, the [web player](https://squid-farm.github.io/talewright/) works too.
 
 ## 1. Create the story folder
 
@@ -61,34 +62,36 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 - Lines starting with `*` are **choices**: the label goes in `[brackets]`, and `->` names the scene to go
   to next. `-> END` ends the story.
 
-## 3. Play it and fix your first error
+## 3. Check it and fix your first error
 
-Zip the `night-ferry` folder:
+Before you play, have Talewright check the story. It finds mistakes in seconds, so it's worth making a
+habit of it. The same tool also runs the [Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger),
+which lets you jump straight to any scene.
 
-- **Windows:** right-click the folder → **Send to** → **Compressed (zipped) folder**.
-- **macOS:** right-click the folder → **Compress**.
-- **Linux:** right-click → **Compress**, or run `zip -r night-ferry.zip night-ferry`.
+Open a terminal in the Talewright folder and run this, replacing `path/to/night-ferry` with
+wherever you made the folder:
 
-Open the [web player](https://squid-farm.github.io/talewright/), choose **Open a story file** and pick
-`night-ferry.zip`.
-
-The story won't open yet, because the choice points at a `crossing` scene that doesn't exist.
-Talewright lists every problem with the file, line and column, so you can go straight to it:
-
-```text
-story.tale:8:34 TW2002 Unknown scene 'crossing'.
-story.tale:1:1  TW3003 Scene 'dock' has a choice or check outcome without '-> target', ...
+```bash
+talewright validate path/to/night-ferry
 ```
 
-`TW2002` is the real problem. `TW3003` is a knock-on effect of the same mistake and disappears once
-you fix it. When you see several errors, fix the first one and try again.
+> Need the tool? [Install the desktop tools](getting-started.md#install-the-desktop-tools) first; it
+> takes a few minutes. Until ready-made downloads arrive, type `dotnet run --project src/Talewright.Cli --`
+> in place of `talewright`. Not ready for that yet? [Use the web player](#no-desktop-tools-use-the-web-player)
+> instead.
 
-Here's what the error list looks like in the player:
+The check fails, because the choice points at a `crossing` scene that doesn't exist. Talewright lists
+every problem with its file, line and column, so you can go straight to it:
 
-![The web player listing story errors](../images/errors.png)
+```text
+story.tale:8:34: error TW2002: Unknown scene 'crossing'.
+story.tale:1:1: error TW3003: Scene 'dock' has a choice or check outcome without '-> target', ...
+Validation failed.
+```
 
-> The screenshot shows two other common mistakes: an item that was never declared in `story.yaml`,
-> and a misspelled stat. Each error code is explained in the [error code reference](../reference/diagnostics.md).
+`TW2002` is the real problem. `TW3003` is a domino effect of the same mistake and disappears once you
+fix it. When you see several errors, fix the first one and check again. Every code is explained in the
+[error code reference](../reference/diagnostics.md).
 
 Add the missing scene to the end of `story.tale`:
 
@@ -104,7 +107,34 @@ The boat slides into the dark.
 A `->` line on its own moves on to that scene. When a scene has no choices, the player gets a
 **Continue** button, or **The End** when it leads to `END`.
 
-Re-zip the folder, go back to the library and open it again. You can now play from start to finish.
+Check again, and this time you'll see `Validation succeeded.` Now play it. The desktop player opens the
+folder directly, with no zipping:
+
+```bash
+dotnet run --project src/Talewright.Host.Desktop -- path/to/night-ferry
+```
+
+You can play from start to finish. After each change, choose **Library** and open the story again; it
+reads your files fresh each time.
+
+### No desktop tools? Use the web player
+
+Zip the `night-ferry` folder:
+
+- **Windows:** right-click the folder → **Send to** → **Compressed (zipped) folder**.
+- **macOS:** right-click the folder → **Compress**.
+- **Linux:** right-click → **Compress**, or run `zip -r night-ferry.zip night-ferry`.
+
+Open the [web player](https://squid-farm.github.io/talewright/), choose **Open a story file** and pick
+`night-ferry.zip`. The player runs the same checks, so the story won't open while there are errors.
+Instead, you'll see the same list of problems:
+
+![The web player listing story errors](../images/errors.png)
+
+> This screenshot shows two other common mistakes: an item that was never declared in `story.yaml`,
+> and a misspelled stat.
+
+After each change, re-zip the folder, go back to the library and open it again.
 
 ## 4. Make choices matter
 
@@ -145,7 +175,7 @@ The boat slides into the dark.
 
 `{if ...}` shows text only when its condition is true. `{else}` is optional.
 
-Zip, open and play both routes. The character sheet on the right updates as Ada spends her coin, and
+Check the story again, then play both routes. The character sheet on the right updates as Ada spends her coin, and
 skill check results appear in the story as they happen.
 
 ![The Night Ferry running in the web player](../images/first-story.png)

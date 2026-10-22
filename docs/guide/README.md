@@ -2,7 +2,7 @@
 
 Everything you need to write, test and share a Talewright story. No programming required.
 
-1. **[Getting started](getting-started.md):** play a story in your browser, and install the desktop tools if you want them.
+1. **[Getting started](getting-started.md):** play a story in your browser, then install the desktop tools for checking and testing.
 2. **[Your first story](first-story.md):** build a small, complete story step by step.
 3. **[Writing stories](writing-stories.md):** characters, stats, items, factions, skill checks, hubs and conditional text.
 4. **[Playing and saving](playing-and-saving.md):** what your players see and can do.

@@ -89,8 +89,19 @@ factions:
   explorers-guild: { name: "Explorers' Guild", standing: 5 }
 ```
 
-Standing is a number. Its tier name (`hostile`, `unfriendly`, `neutral`, `friendly`, `allied`) is what
-players see and what you'll usually compare against:
+Standing is a number. Its tier name is what players see and what you'll usually compare against:
+
+| Tier | Standing |
+|---|---|
+| `hostile` | −31 or lower |
+| `unfriendly` | −30 to −10 |
+| `neutral` | −9 to 9 |
+| `friendly` | 10 to 49 |
+| `allied` | 50 or higher |
+
+Standing has no upper or lower limit; these tiers just label the ranges. They come from the built-in
+ruleset and can't be changed in `story.yaml` yet. A developer can change them with a
+[custom C# ruleset](../developer/csharp-extensions.md).
 
 ```tale
 * [Shove the door] { faction:explorers-guild -= 10 } -> hall
