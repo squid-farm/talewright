@@ -83,7 +83,7 @@ triggers:
     do: set flag:guild-wary
     once: true
   - id: courage-earned
-    when: player:courage >= 6
+    when: player:courage >= 10
     do: set flag:steady
     once: true
   - id: watch-bell
