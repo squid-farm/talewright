@@ -20,10 +20,12 @@ public sealed class AuthorSceneCheckpoint
     private readonly CharacterSelection? _character;
     private readonly string[] _choices;
     private readonly bool _captureDecisions;
+    private readonly IReadOnlyList<string> _triggerEdges;
+    private readonly SceneDefinition[] _playedScenes;
 
     internal AuthorSceneCheckpoint(StoryDefinition story, SceneId start, AuthorSetup setup, ulong seed,
         CharacterSelection? character, string[] choices, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
-        bool captureDecisions)
+        bool captureDecisions, SceneDefinition[] playedScenes)
     {
         _story = story;
         _start = start;
@@ -31,6 +33,8 @@ public sealed class AuthorSceneCheckpoint
         _character = character;
         _choices = choices;
         _captureDecisions = captureDecisions;
+        _triggerEdges = boundary.TriggerEdges;
+        _playedScenes = playedScenes;
         Scene = boundary.Scene;
         Seed = seed;
         Events = Array.AsReadOnly(events.Take(boundary.EventCount).ToArray());
@@ -49,6 +53,21 @@ public sealed class AuthorSceneCheckpoint
     /// Requires the same unchanged story and deterministic extensions; this is not cross-source reload.
     /// </summary>
     public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _choices, _captureDecisions);
+
+    internal void VerifyPlayedScene(int index, SceneDefinition scene) =>
+        AuthorReloadComparison.Require(index < _playedScenes.Length
+            && AuthorReloadComparison.Equal(_playedScenes[index], scene),
+            $"previously consumed scene/choice meaning changed at '{scene.Id}'");
+
+    internal void VerifyBoundary(SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events)
+    {
+        AuthorReloadComparison.Require(boundary.Scene == Scene && boundary.EventCount == Events.Count
+            && AuthorReloadComparison.Equal(Events, events), "pre-entry history/state or RNG position diverged");
+        AuthorReloadComparison.Require(AuthorReloadComparison.Equal(_triggerEdges, boundary.TriggerEdges),
+            "pre-entry trigger-edge memory diverged");
+        AuthorReloadComparison.Require(AuthorReloadComparison.Equal(PendingNotes, boundary.Pending),
+            "pre-entry pending consequences diverged");
+    }
 }
 
 internal sealed class AuthorStateView(GameState state) : IGameStateView

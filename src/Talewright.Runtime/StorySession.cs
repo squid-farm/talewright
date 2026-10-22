@@ -50,6 +50,7 @@ public sealed class StorySession : IStorySession
     private readonly TemplateRenderer _renderer;
     private readonly bool _captureEntry;
     private readonly Action<RuleDecision>? _observer;
+    private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
     private readonly Dictionary<string, Action<List<RenderedBlock>>> _actions = new(StringComparer.Ordinal);
 
     /// <summary>Creates a session. <paramref name="seed"/> defaults to the story's seed, else a random one.</summary>
@@ -65,13 +66,14 @@ public sealed class StorySession : IStorySession
     }
 
     internal StorySession(StoryDefinition story, ulong seed, CharacterSelection? character, AuthorSetup setup,
-        Action<RuleDecision>? observer = null)
-        : this(story, seed, grammar: null, character, setup, observer)
+        Action<RuleDecision>? observer = null, Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
+        : this(story, seed, grammar: null, character, setup, observer, beforeEntry)
     {
     }
 
     private StorySession(StoryDefinition story, ulong? seed, IGrammar? grammar, CharacterSelection? character,
-        AuthorSetup? setup, Action<RuleDecision>? observer)
+        AuthorSetup? setup, Action<RuleDecision>? observer,
+        Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
     {
         character = CharacterSelection.Validate(story, character);
         Story = story;
@@ -103,6 +105,7 @@ public sealed class StorySession : IStorySession
         setup?.Apply(_log);
         _captureEntry = setup is not null;
         _observer = observer;
+        _beforeEntry = beforeEntry;
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count);
         _renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
     }
@@ -174,7 +177,9 @@ public sealed class StorySession : IStorySession
         var mark = _log.Events.Count;
         if (_captureEntry)
         {
-            EntryBoundary = new SceneEntryBoundary(scene.Id, mark, Array.AsReadOnly(pending.ToArray()));
+            EntryBoundary = new SceneEntryBoundary(scene.Id, mark, Array.AsReadOnly(pending.ToArray()),
+                _triggers.CaptureEdgeMemory());
+            _beforeEntry?.Invoke(EntryBoundary, _log.Events);
         }
         _log.Append(new SceneEntered(scene.Id));
         for (var i = 0; i < scene.EntryEffects.Count; i++)
@@ -465,4 +470,5 @@ public sealed class StorySession : IStorySession
     }
 }
 
-internal sealed record SceneEntryBoundary(SceneId Scene, int EventCount, IReadOnlyList<RenderedBlock> Pending);
+internal sealed record SceneEntryBoundary(SceneId Scene, int EventCount, IReadOnlyList<RenderedBlock> Pending,
+    IReadOnlyList<string> TriggerEdges);

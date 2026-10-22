@@ -95,6 +95,14 @@ class Desktop:
             raise RuntimeError(f"No hardware keycode for {key}")
         pyatspi.Registry.generateKeyboardEvent(entries[0].keycode, None, event)
 
+    def window_id(self):
+        windows = subprocess.check_output(["wmctrl", "-lp"], text=True).splitlines()
+        window = next((line.split()[0] for line in windows
+                       if len(line.split()) >= 3 and line.split()[2] == str(self.process.pid)), None)
+        if window is None:
+            raise RuntimeError("No window belongs to the Photino process")
+        return window
+
     def upload(self, path):
         Path(path).resolve(strict=True)
         self.click(name="Story archive", role="push button")
@@ -210,13 +218,11 @@ def serve(args):
                 elif command == "key":
                     app.key(**arguments)
                 elif command == "resize":
-                    windows = subprocess.check_output(["wmctrl", "-lp"], text=True).splitlines()
-                    window = next((line.split()[0] for line in windows
-                                   if len(line.split()) >= 3 and line.split()[2] == str(app.process.pid)), None)
-                    if window is None:
-                        raise RuntimeError("No window belongs to the Photino process")
-                    subprocess.run(["wmctrl", "-ir", window, "-e",
+                    subprocess.run(["wmctrl", "-ir", app.window_id(), "-e",
                                     f"0,-1,-1,{arguments['width']},{arguments['height']}"], check=True)
+                elif command == "close-window":
+                    subprocess.run(["wmctrl", "-ic", app.window_id()], check=True)
+                    result = app.process.wait(timeout=20)
                 elif command == "close":
                     try:
                         app.close()

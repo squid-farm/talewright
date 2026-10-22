@@ -95,6 +95,7 @@ public sealed class DebuggerTests : IDisposable
         Assert.Same(original, model.Session);
         Assert.NotEmpty(model.Diagnostics);
         File.WriteAllText(Path.Combine(_root, "main.tale"), "=== scene1\nRecovered.\n-> END");
+        model.Target = "scene1";
         model.Reload();
         Assert.Null(model.Session);
         Assert.False(model.SourceRejected);

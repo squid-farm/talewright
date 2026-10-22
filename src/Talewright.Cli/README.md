@@ -55,7 +55,7 @@ on Linux (`libwebkit2gtk-4.1-0`), WebView2 on Windows, or macOS WKWebView. There
 no browser/server fallback. Linux x64 is runtime-tested; other native targets
 still need platform validation. Missing folders/assets/prerequisites and native
 launch failures return exit 2 with `TWCLI002`. Compiler errors appear in the
-window so the author can repair the source and explicitly reload.
+window so the author can repair and save the source without closing the workbench.
 
 Search scenes by ID/title or enter an exact ID, optionally choose a seed and
 create the player character, then start the selected scene. Enable only the
@@ -66,10 +66,34 @@ decisions; these are recorded evaluations, not predictions against current state
 
 Every start is a fresh synthetic history: skipped scenes remain unvisited and
 reachability is not proven. Setup and pre-entry initialization events are shown
-separately. Player saves are neither read nor written. Reload is manual and
-discards setup/run only after successful compilation; rejected source leaves
-the previous compiled story and run visible. There is no watcher, live state
-editing, preserve-state jump, save editor, or portable scenario support yet.
+separately. Player saves are neither read nor written.
+
+Saved Tale changes are debounced and compiled as a complete bounded source set.
+Automatic adoption reconstructs and verifies the displayed scene's pre-entry
+boundary: declarations/rules, previously consumed scenes and choice meaning,
+events (and therefore state/RNG position), pending notes and trigger-edge memory.
+The current scene enters once from that boundary, not from its already-entered
+state. Current entry effects/check outcomes may intentionally change. The passage
+is replaced and historical explanations are rebuilt, with a visible reload marker.
+The workbench still displays only the current passage, not a fabricated transcript.
+
+This guard is deliberately conservative: any structural change to a previously
+consumed scene (even its prose), changed Tale auto-declarations, missing targets
+or a run that ended without a new scene boundary require fresh restart/setup.
+Errors preserve the good run and visibly mark stale source.
+
+**Any YAML change requires explicit Restart from source**, including comment-only
+changes. Later Tale saves cannot bypass that latch. Restart compiles the latest
+full source, retains/revalidates enabled setup, seed, target and character, then
+discards the run only on success. Changed/removed IDs are reported, never silently
+dropped: correct/disable overrides or clear character selection, restart, then
+start a fresh scene. `Rescan / retry watcher` retries compilation and rearms a
+failed/overflowed watcher without bypassing guards. Closing releases the watcher
+and pending work. A watcher error also requires restart: missed events cannot
+prove YAML stayed unchanged. Custom C# extensions require trusted explicit rebuild/restart;
+they are not discovered or hot-reloaded.
+
+There is no live state editing, preserve-state jump, save editor, or portable scenario support yet.
 Debugger assets ship in the CLI tool, not Player packages or published games.
 
 ## Publishing

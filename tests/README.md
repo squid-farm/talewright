@@ -484,11 +484,18 @@ References: [Playwright .NET runners](https://playwright.dev/dotnet/docs/test-ru
 
 `dotnet test tests/Talewright.Cli.Tests -c Release` covers CLI argument handling,
 scene search over 1,000 scenes, all prerequisite types, character creation,
-validation and failed-reload preservation.
+validation and failed-reload preservation. Reload tests also cover explicit YAML
+gating, invalidated setup IDs, stale generations, concurrent play/compile,
+atomic-save/rename/delete/burst patterns, watcher retry and shutdown.
+Runtime author-reload tests verify pre-entry visits/effects/RNG/trigger parity,
+changed current-entry behavior, schema/choice-meaning rejection and failed
+candidate cascades without touching the good run.
 
 `python3 tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
 builds and exercises the actual native workbench: repair/reload, late-scene
-search, setup, seed, choices and recorded explanations. It uses the same isolated
+search, setup, seed, choices, recorded explanations, watched Tale adoption,
+YAML restart gating, incompatible-history preservation and graceful window close.
+It uses the same isolated
 Xvfb/D-Bus/AT-SPI infrastructure as the player; assertions remain in C#.
 Set `TALEWRIGHT_DEBUGGER_EXECUTABLE` to an installed tool's
 `Talewright.Debugger.dll` to check packaged assets outside the checkout.

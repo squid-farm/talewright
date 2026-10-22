@@ -17,8 +17,10 @@ public sealed record AuthorSetup
     public IReadOnlyList<AuthorStatValue> Stats { get; init; } = [];
     public IReadOnlyList<AuthorItemValue> Inventory { get; init; } = [];
 
-    internal AuthorSetup Validate(StoryDefinition story)
+    /// <summary>Revalidates against declared IDs and returns a copied setup without entering a scene.</summary>
+    public AuthorSetup Validate(StoryDefinition story)
     {
+        ArgumentNullException.ThrowIfNull(story);
         ArgumentNullException.ThrowIfNull(Flags);
         ArgumentNullException.ThrowIfNull(Variables);
         ArgumentNullException.ThrowIfNull(Standings);
