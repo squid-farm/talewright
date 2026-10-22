@@ -1,5 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Model;
@@ -175,6 +176,110 @@ public sealed class AuthorReloadTests
         var story = Compile(options: new() { Predicates = registry });
         var session = AuthorSession.Create(story, new("current"), seed: 42);
         Assert.Contains("trusted rebuild", Assert.Throws<AuthorReloadException>(() => session.Reload(story)).Message);
+    }
+
+    [Theory]
+    [InlineData("custom", false)]
+    [InlineData("upper", false)]
+    [InlineData("custom", true)]
+    [InlineData("upper", true)]
+    public void Custom_text_modifiers_are_rejected_before_replaying_callbacks(string name, bool replaceCallback)
+    {
+        var originalCalls = 0;
+        var replacementCalls = 0;
+        var modifiers = TextModifierRegistry.CreateDefault().Register(new DelegateTextModifier(name, (text, _) =>
+        {
+            originalCalls++;
+            return text;
+        }));
+        var tale = Tale.Replace("~ set flag:ready", $"~ set flag:ready\n{{player:first-name#{name}}}");
+        var story = Compile(tale, options: new() { Modifiers = modifiers });
+        var session = AuthorSession.Create(story, new("start"), seed: 42);
+        session.Choose("c0");
+        var callsBeforeReload = originalCalls;
+        Assert.True(callsBeforeReload > 0);
+        if (replaceCallback)
+        {
+            modifiers = TextModifierRegistry.CreateDefault().Register(new DelegateTextModifier(name, (text, _) =>
+            {
+                replacementCalls++;
+                return text;
+            }));
+        }
+        var candidate = Compile(tale.Replace("Old passage.", "Updated."), options: new() { Modifiers = modifiers });
+        var events = session.Events;
+        var ex = Assert.Throws<AuthorReloadException>(() => session.Reload(candidate));
+        Assert.Contains("custom text modifiers", ex.Message);
+        Assert.Equal(callsBeforeReload, originalCalls);
+        Assert.Equal(0, replacementCalls);
+        Assert.Same(events, session.Events);
+    }
+
+    [Theory]
+    [InlineData("{if flag:ready}**{player:first-name#custom}**{/if}")]
+    [InlineData("* [Hidden {player:first-name#custom}] (requires: flag:ready) -> END")]
+    [InlineData("> player: {player:first-name#custom}")]
+    public void Candidate_only_custom_modifiers_are_rejected_even_in_unexecuted_templates(string content)
+    {
+        var calls = 0;
+        var modifiers = TextModifierRegistry.CreateDefault().Register(new DelegateTextModifier("custom", (text, _) =>
+        {
+            calls++;
+            return text;
+        }));
+        const string tale = "=== start\n* [Next] -> current\n=== current\nOriginal.\n* [Finish] -> END";
+        var session = AuthorSession.Create(Compile(tale), new("start"), seed: 42);
+        var candidate = Compile(tale.Replace("Original.", content), options: new() { Modifiers = modifiers });
+        Assert.Throws<AuthorReloadException>(() => session.Reload(candidate));
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public void Engine_owned_builtin_modifiers_from_separate_registries_remain_reloadable()
+    {
+        var tale = Tale.Replace("~ set flag:ready", "~ set flag:ready\n{player:first-name#upper}");
+        var session = AuthorSession.Create(Compile(tale), new("start"), seed: 42);
+        session.Choose("c0");
+        var candidate = session.Reload(Compile(tale.Replace("Old passage.", "Updated {player:first-name#lower}.")));
+        Assert.Contains("Updated tester.", candidate.Current.Document.ToPlainText());
+        Assert.Equivalent(session.Events, candidate.Events, strict: true);
+    }
+
+    [Theory]
+    [InlineData("title")]
+    [InlineData("priority")]
+    [InlineData("requires")]
+    [InlineData("unavailable")]
+    [InlineData("once")]
+    public void Selected_hub_choice_semantics_are_verified_before_replaying_its_key(string change)
+    {
+        const string tale = """
+            === start
+            @hub camp
+            Choose.
+            === current
+            @tags camp
+            @title Selected title
+            Old passage.
+            * [Finish] -> END
+            """;
+        var session = AuthorSession.Create(Compile(tale), new("start"), seed: 42);
+        session.Choose("storylet:current");
+        var candidateTale = change switch
+        {
+            "title" => tale.Replace("Selected title", "Different title"),
+            "priority" => tale.Replace("@tags camp", "@tags camp\n@priority 1"),
+            "requires" => tale.Replace("@tags camp", "@tags camp\n@requires not flag:ready"),
+            "unavailable" => tale.Replace("@tags camp", "@tags camp\n@requires flag:ready"),
+            _ => tale.Replace("@tags camp", "@tags camp\n@once"),
+        };
+        var events = session.Events;
+        Assert.Contains("previously consumed", Assert.Throws<AuthorReloadException>(
+            () => session.Reload(Compile(candidateTale))).Message);
+        Assert.Same(events, session.Events);
+        var updated = session.Reload(Compile(tale.Replace("Old passage.", "Updated body.")));
+        Assert.Contains("Updated body.", updated.Current.Document.ToPlainText());
+        Assert.Equivalent(events, updated.Events, strict: true);
     }
 
     [Fact]

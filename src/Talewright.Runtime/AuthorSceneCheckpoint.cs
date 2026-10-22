@@ -21,11 +21,11 @@ public sealed class AuthorSceneCheckpoint
     private readonly string[] _choices;
     private readonly bool _captureDecisions;
     private readonly IReadOnlyList<string> _triggerEdges;
-    private readonly SceneDefinition[] _playedScenes;
+    private readonly AuthorPlayedChoice[] _playedChoices;
 
     internal AuthorSceneCheckpoint(StoryDefinition story, SceneId start, AuthorSetup setup, ulong seed,
         CharacterSelection? character, string[] choices, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
-        bool captureDecisions, SceneDefinition[] playedScenes)
+        bool captureDecisions, AuthorPlayedChoice[] playedChoices)
     {
         _story = story;
         _start = start;
@@ -34,7 +34,7 @@ public sealed class AuthorSceneCheckpoint
         _choices = choices;
         _captureDecisions = captureDecisions;
         _triggerEdges = boundary.TriggerEdges;
-        _playedScenes = playedScenes;
+        _playedChoices = playedChoices;
         Scene = boundary.Scene;
         Seed = seed;
         Events = Array.AsReadOnly(events.Take(boundary.EventCount).ToArray());
@@ -54,10 +54,13 @@ public sealed class AuthorSceneCheckpoint
     /// </summary>
     public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _choices, _captureDecisions);
 
-    internal void VerifyPlayedScene(int index, SceneDefinition scene) =>
-        AuthorReloadComparison.Require(index < _playedScenes.Length
-            && AuthorReloadComparison.Equal(_playedScenes[index], scene),
-            $"previously consumed scene/choice meaning changed at '{scene.Id}'");
+    internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice) =>
+        AuthorReloadComparison.Require(index < _playedChoices.Length
+            && AuthorReloadComparison.Equal(_playedChoices[index].Scene, choice.Scene)
+            && AuthorReloadComparison.Equal(_playedChoices[index].Choice.Label, choice.Choice.Label)
+            && _playedChoices[index].Choice.Key == choice.Choice.Key
+            && AuthorReloadComparison.Equal(_playedChoices[index].Storylet, choice.Storylet),
+            $"previously consumed scene/choice meaning changed at '{choice.Scene.Id}'");
 
     internal void VerifyBoundary(SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events)
     {
@@ -69,6 +72,23 @@ public sealed class AuthorSceneCheckpoint
             "pre-entry pending consequences diverged");
     }
 }
+
+internal sealed record AuthorPlayedChoice(SceneDefinition Scene, ChoiceView Choice, AuthorStoryletChoice? Storylet)
+{
+    public static AuthorPlayedChoice Capture(StoryDefinition story, SceneDefinition scene, ChoiceView choice)
+    {
+        AuthorStoryletChoice? selected = null;
+        if (choice.Key.StartsWith(StorySession.StoryletKeyPrefix, StringComparison.Ordinal))
+        {
+            var target = story.GetScene(new(choice.Key[StorySession.StoryletKeyPrefix.Length..]));
+            selected = new(target.Id, target.Title, target.Requires, target.Tags.ToArray(), target.Priority, target.Once);
+        }
+        return new(scene, choice, selected);
+    }
+}
+
+internal sealed record AuthorStoryletChoice(SceneId Id, string? Title, Talewright.Rules.Expressions.Expr? Requires,
+    IReadOnlyList<string> Tags, int Priority, bool Once);
 
 internal sealed class AuthorStateView(GameState state) : IGameStateView
 {

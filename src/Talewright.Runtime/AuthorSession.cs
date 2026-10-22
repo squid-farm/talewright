@@ -15,7 +15,7 @@ public sealed class AuthorSession
 {
     private StorySession _session;
     private string[] _choices;
-    private readonly List<SceneDefinition> _playedScenes = [];
+    private readonly List<AuthorPlayedChoice> _playedChoices = [];
 
     private AuthorSession(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
         CharacterSelection? character, string[] choices, bool captureDecisions, AuthorSceneCheckpoint? verify = null)
@@ -40,8 +40,11 @@ public sealed class AuthorSession
         for (var i = 0; i < choices.Length; i++)
         {
             var scene = story.GetScene(_session.Current!.Scene!.Value);
-            verify?.VerifyPlayedScene(i, scene);
-            _playedScenes.Add(scene);
+            var selected = _session.Current.Choices.FirstOrDefault(choice => choice.Key == choices[i])
+                ?? throw new AuthorReloadException($"previously consumed choice '{choices[i]}' is unavailable at '{scene.Id}'");
+            var played = AuthorPlayedChoice.Capture(story, scene, selected);
+            verify?.VerifyPlayedChoice(i, played);
+            _playedChoices.Add(played);
             atBoundary = i == choices.Length - 1;
             _session.Choose(choices[i]);
         }
@@ -51,7 +54,7 @@ public sealed class AuthorSession
         if (_session.EntryBoundary is { } boundary)
         {
             Checkpoint = new AuthorSceneCheckpoint(story, target, setup, seed, character,
-                choices, boundary, Events, captureDecisions, _playedScenes.ToArray());
+                choices, boundary, Events, captureDecisions, _playedChoices.ToArray());
         }
     }
 
@@ -144,7 +147,7 @@ public sealed class AuthorSession
         Checkpoint = candidate.Checkpoint;
         Decisions = candidate.Decisions;
         _choices = candidate._choices;
-        _playedScenes.Clear();
-        _playedScenes.AddRange(candidate._playedScenes);
+        _playedChoices.Clear();
+        _playedChoices.AddRange(candidate._playedChoices);
     }
 }

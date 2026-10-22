@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Rulesets.Generic;
 using Talewright.Tale.Model;
@@ -29,6 +30,9 @@ internal static class AuthorReloadComparison
                 && (rules.SkillCheckRule is null or D20SkillCheckRule)
                 && (rules.LevelingRule is null or ExperienceLevelingRule)
                 && rules.Modifiers.Count == 0, "custom extensions require trusted rebuild/restart");
+            Require(story.Scenes.All(scene => BuiltInBlocks(scene.Body)
+                && scene.Choices.All(choice => BuiltInInlines(choice.Label))),
+                "custom text modifiers require trusted rebuild/restart");
         }
         Require(original.Id == candidate.Id && original.Version == candidate.Version
             && original.Start == candidate.Start && original.Randomness == candidate.Randomness
@@ -38,6 +42,23 @@ internal static class AuthorReloadComparison
             "world declarations, creation, triggers or rules changed (including Tale auto-declarations)");
     }
 
+    private static bool BuiltInBlocks(IEnumerable<TemplateBlock> blocks) => blocks.All(block => block switch
+    {
+        ParagraphTemplate paragraph => BuiltInInlines(paragraph.Inlines),
+        SpeechTemplate speech => BuiltInInlines(speech.Inlines),
+        ConditionalBlockTemplate conditional => BuiltInBlocks(conditional.Then) && BuiltInBlocks(conditional.Else),
+        _ => false,
+    });
+
+    private static bool BuiltInInlines(IEnumerable<TemplateInline> inlines) => inlines.All(inline => inline switch
+    {
+        SubstitutionTemplate substitution => substitution.Modifiers.All(TextModifierRegistry.IsBuiltIn),
+        StyledTemplate styled => BuiltInInlines(styled.Children),
+        ConditionalInlineTemplate conditional => BuiltInInlines(conditional.Then) && BuiltInInlines(conditional.Else),
+        TextTemplate or LineBreakTemplate or MediaTemplate => true,
+        _ => false,
+    });
+
     // Conservative structural equality for immutable engine data, including polymorphic expression,
     // effect and template nodes. Collection order is significant; unknown extension types fail closed.
     public static bool Equal(object? left, object? right)
@@ -45,6 +66,11 @@ internal static class AuthorReloadComparison
         if (left is null || right is null)
         {
             return left is null && right is null;
+        }
+        if (left is ITextModifier || right is ITextModifier)
+        {
+            return left is ITextModifier modifier && TextModifierRegistry.IsBuiltIn(modifier)
+                && ReferenceEquals(left, right);
         }
         var type = left.GetType();
         if (type.IsPrimitive || type.IsEnum || left is string or decimal)
@@ -80,6 +106,7 @@ internal static class AuthorReloadComparison
         if (assembly != typeof(WorldDefinition).Assembly && assembly != typeof(RenderedBlock).Assembly
             && assembly != typeof(Expr).Assembly && assembly != typeof(StoryDefinition).Assembly
             && assembly != typeof(GenericRuleset).Assembly
+            && type != typeof(AuthorStoryletChoice)
             && !(type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)))
         {
             return false;
