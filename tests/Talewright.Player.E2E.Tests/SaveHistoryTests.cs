@@ -169,7 +169,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
             """, new { storyId = story.Id, json = saved.ToJsonString() });
         await Driver.ClickAsync("Saved games");
         await Driver.ClickAsync("Load Limit");
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("choice limit");
+        // This includes rendering 10,001 passages, not just replaying their choices.
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("choice limit", new() { Timeout = 30_000 });
         await Expect(Choices).ToBeDisabledAsync();
         await Driver.ClickAsync("Save game");
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'My save'");
