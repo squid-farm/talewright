@@ -151,6 +151,13 @@ publication timings, corpus/runtime metadata, and workflow job outcomes. Raw
 artifacts remain available from each Actions run for 30 days; the compact trend
 records persist on the branch.
 
+Published workload labels preserve the CSV's `TierName`, `CorpusCase`, and
+`Boundary` parameters. Player observations also retain the test outcome, so
+measurements emitted before a later test failure are not presented as passing
+tests. Browser evidence captures the viewport rather than the full document;
+long histories can exceed browser screenshot size limits. This does not change
+the player's transcript presentation (tracked separately in #23 and #70).
+
 The weekly schedule runs on the repository's default branch. To measure a
 different branch such as M2 on demand, open **Actions → Real-file performance
 → Run workflow** and select that branch; the run report records the selected

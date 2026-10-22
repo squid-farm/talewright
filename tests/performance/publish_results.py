@@ -24,7 +24,11 @@ def benchmark_rows(root):
                 rows.append({
                     "report": path.name,
                     "method": row.get("Method"),
-                    "parameters": row.get("Params", ""),
+                    "parameters": "; ".join(
+                        f"{name}={row[name]}"
+                        for name in ("TierName", "CorpusCase", "Boundary", "Params")
+                        if row.get(name)
+                    ),
                     "job": row.get("Job", ""),
                     "mean": row.get("Mean", ""),
                     "p95": row.get("P95", ""),
@@ -40,19 +44,26 @@ def integration_rows(root):
             document = ET.parse(path)
         except ET.ParseError as error:
             raise ValueError(f"Could not parse test report {path}: {error}") from error
-        for output in document.iter():
-            if output.tag.rsplit("}", 1)[-1] != "StdOut" or not output.text:
+        for result in document.iter():
+            if result.tag.rsplit("}", 1)[-1] != "UnitTestResult":
                 continue
-            for line in output.text.splitlines():
-                candidate = line.strip()
-                if not candidate.startswith("{"):
+            for output in result.iter():
+                if output.tag.rsplit("}", 1)[-1] != "StdOut" or not output.text:
                     continue
-                try:
-                    measurement = json.loads(candidate)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(measurement, dict) and measurement.get("measurement"):
-                    rows.append({"report": path.name, **measurement})
+                for line in output.text.splitlines():
+                    candidate = line.strip()
+                    if not candidate.startswith("{"):
+                        continue
+                    try:
+                        measurement = json.loads(candidate)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(measurement, dict) and measurement.get("measurement"):
+                        rows.append({
+                            **measurement,
+                            "report": path.name,
+                            "testOutcome": result.get("outcome", "Unknown"),
+                        })
     return rows
 
 
@@ -98,7 +109,8 @@ def markdown_for_run(run):
         f"- **Commit:** `{run['commit'] or 'unknown'}`",
         f"- **Branch:** `{run['branch'] or 'unknown'}`",
         f"- **Event:** {run['event'] or 'local'}",
-        f"- **Run:** [{run['workflowRunUrl']}]({run['workflowRunUrl']})",
+        f"- **Run:** [{run['workflowRunUrl']}]({run['workflowRunUrl']})"
+        if run["workflowRunUrl"] else "- **Run:** local execution",
         f"- **Benchmark cases:** {len(run['benchmarks'])}",
         f"- **Player integration observations:** {len(run['integrations'])}",
         f"- **Publication workloads:** {len(run['publications'])}",
@@ -107,6 +119,8 @@ def markdown_for_run(run):
         f"Photino `{run['jobResults']['linuxPhotino']}`",
         "",
     ]
+    if run.get("notes"):
+        lines.extend([*run["notes"], ""])
     if run["metadata"]:
         lines.extend([
             "## Runner and corpus metadata",
@@ -140,14 +154,15 @@ def markdown_for_run(run):
         lines.extend([
             "## Player integration observations",
             "",
-            "| Host | Browser | Corpus | Load/play (ms) | Choice (ms) | Save (ms) | Restore (ms) |",
-            "|---|---|---|---:|---:|---:|---:|",
+            "| Host | Browser | Corpus | Test outcome | Load/play (ms) | Choice (ms) | Save (ms) | Restore (ms) |",
+            "|---|---|---|---|---:|---:|---:|---:|",
         ])
         for row in run["integrations"]:
             corpus = row.get("Metadata", row.get("metadata", {}))
             corpus_name = corpus.get("Tier", corpus.get("tier", ""))
             lines.append(
                 f"| {row.get('host', '')} | {row.get('browser', '')} | {corpus_name} | "
+                f"{row.get('testOutcome', 'Unknown')} | "
                 f"{row.get('uploadCompileFirstPlayableMs', row.get('coldApplicationOpenAndFirstPlayableMs', ''))} | "
                 f"{row.get('choiceLatencyMs', '')} | {row.get('indexedDbSaveMs', '')} | "
                 f"{row.get('indexedDbHistoryRestoreMs', '')} |"
@@ -194,16 +209,24 @@ def update_history(history_dir, run, report):
         "|---|---|---:|---:|---:|---|---|",
     ]
     for entry in reversed(runs):
+        filename = f"{entry.get('runId', '')}-{entry.get('runAttempt', 1)}"
+        if not (runs_dir / f"{filename}.json").is_file():
+            filename = entry.get("runId", "")
+        run_link = (
+            f"[{entry.get('runId', '')}]({entry['workflowRunUrl']})"
+            if entry.get("workflowRunUrl") else entry.get("runId", "")
+        )
         lines.append(
             f"| {entry.get('createdAt', '')[:10]} | "
-            f"`{entry.get('commit', '')[:12]}` | {len(entry.get('benchmarks', []))} | "
+            f"`{entry.get('commit', '')[:12]}` | "
+            f"{len(entry.get('benchmarks', [])) + len(entry.get('completedCoreCases', [])) + len(entry.get('completedBoundaryCases', []))} | "
             f"{len(entry.get('integrations', []))} | {len(entry.get('publications', []))} | "
             f"{entry.get('jobResults', {}).get('benchmarksAndPublication', '')}/"
             f"{entry.get('jobResults', {}).get('browserPlayer', '')}/"
             f"{entry.get('jobResults', {}).get('linuxPhotino', '')} | "
-            f"[{entry.get('runId', '')}]({entry.get('workflowRunUrl', '')}) · "
-            f"[report](reports/{entry.get('runId', '')}-{entry.get('runAttempt', 1)}.md) · "
-            f"[JSON](runs/{entry.get('runId', '')}-{entry.get('runAttempt', 1)}.json) |"
+            f"{run_link} · "
+            f"[report](reports/{filename}.md) · "
+            f"[JSON](runs/{filename}.json) |"
         )
     (history_dir / "index.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return run_path

@@ -142,7 +142,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         {
             if (Page is not null && !Page.IsClosed)
             {
-                await Page.ScreenshotAsync(new() { Path = Path.Combine(_artifacts, "page.png"), FullPage = true });
+                await Page.ScreenshotAsync(new() { Path = Path.Combine(_artifacts, "page.png"), FullPage = false });
                 await File.WriteAllTextAsync(Path.Combine(_artifacts, "page.html"), await Page.ContentAsync());
                 if (await Page.Locator("#blazor-error-ui").IsVisibleAsync())
                 {

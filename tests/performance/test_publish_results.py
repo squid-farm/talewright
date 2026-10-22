@@ -6,10 +6,26 @@ import sys
 import tempfile
 import unittest
 
-from publish_results import collect, markdown_for_run, update_history
+from publish_results import benchmark_rows, collect, markdown_for_run, update_history
 
 
 class PublishResultsTests(unittest.TestCase):
+    def test_preserves_actual_benchmark_parameter_columns(self):
+        for column, value in (
+            ("TierName", "Gigantic"),
+            ("CorpusCase", "history-10000"),
+            ("Boundary", "zip-total-exact"),
+            ("Params", "Large"),
+        ):
+            with self.subTest(column=column), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / "case-report.csv").write_text(
+                    f"Method,{column},Job,Mean,P95,Allocated\n"
+                    f"Read,{value},OutOfProcess,1 ms,2 ms,10 KB\n",
+                    encoding="utf-8",
+                )
+                self.assertEqual(f"{column}={value}", benchmark_rows(root)[0]["parameters"])
+
     def test_command_line_writes_a_summary_and_history_record(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -64,7 +80,7 @@ class PublishResultsTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (inputs / "browser" / "browser.trx").write_text(
-                """<TestRun><Results><UnitTestResult><Output><StdOut>
+                """<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results><UnitTestResult outcome="Failed"><Output><StdOut>
 {"host":"browser","browser":"chromium","measurement":"single integration observation; not a percentile","uploadCompileFirstPlayableMs":42,"Metadata":{"Tier":"Large"}}
 </StdOut></Output></UnitTestResult></Results></TestRun>""",
                 encoding="utf-8",
@@ -103,10 +119,12 @@ class PublishResultsTests(unittest.TestCase):
             self.assertEqual(1, len(run["benchmarks"]))
             self.assertEqual("120 ms", run["benchmarks"][0]["p95"])
             self.assertEqual(1, len(run["integrations"]))
+            self.assertEqual("Failed", run["integrations"][0]["testOutcome"])
             self.assertEqual(1, len(run["publications"]))
             report = markdown_for_run(run)
             self.assertIn("LoadAndCompileDirectory", report)
             self.assertIn("chromium", report)
+            self.assertIn("Failed", report)
             self.assertIn("succeeded", report)
 
             history = root / "history"
@@ -116,6 +134,22 @@ class PublishResultsTests(unittest.TestCase):
             self.assertIn("abc123", index)
             self.assertIn("[42]", index)
             self.assertTrue((history / "reports" / "42-2.md").is_file())
+
+            legacy = {
+                "runId": "local-interrupted",
+                "runAttempt": 1,
+                "createdAt": "2026-01-01T00:00:00Z",
+                "completedCoreCases": [{}] * 45,
+                "completedBoundaryCases": [{}] * 14,
+            }
+            (history / "runs" / "local-interrupted.json").write_text(
+                json.dumps(legacy), encoding="utf-8"
+            )
+            update_history(history, run, report)
+            index = (history / "index.md").read_text(encoding="utf-8")
+            self.assertIn("| 59 |", index)
+            self.assertIn("(reports/local-interrupted.md)", index)
+            self.assertIn("(runs/local-interrupted.json)", index)
 
 
 if __name__ == "__main__":
