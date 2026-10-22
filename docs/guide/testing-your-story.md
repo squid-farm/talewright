@@ -54,7 +54,8 @@ led there, and **Branch explanations**: why each condition passed or failed.
 **Accepted Tale source** shows the complete source file in read-only, 100-line windows with line
 numbers. It follows the current scene when you choose, jump, or use Back/Forward. Use
 **Previous source lines** / **Next source lines** to browse the file and **Go to current scene source**
-to return to the scene declaration.
+to return to the scene declaration. These controls reset the source viewport to the top of the
+requested window, even when returning to the window already selected.
 
 The marked range runs from the `===` declaration through the line before the next scene (or the end
 of that file), including intervening comments and blank lines. It describes the scene's source, **not**

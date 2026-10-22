@@ -19,7 +19,7 @@
         <button type="button" @onclick="ShowScene">Go to current scene source</button>
         <button type="button" disabled="@(_firstLine == 1)" @onclick="Previous">Previous source lines</button>
         <button type="button" disabled="@(LastLine == _lines.Length)" @onclick="Next">Next source lines</button>
-        <div class="source-window" tabindex="0" aria-label="Read-only accepted source lines">
+        <div @key="_navigationRevision" class="source-window" tabindex="0" aria-label="Read-only accepted source lines">
             <table class="source-lines">
                 <caption>Showing accepted lines @_firstLine to @LastLine of @_lines.Length</caption>
                 <thead><tr><th scope="col">Line</th><th scope="col">Tale source</th></tr></thead>
@@ -45,6 +45,7 @@
     private AcceptedSceneSource? _displayed;
     private string[] _lines = [];
     private int _firstLine = 1;
+    private long _navigationRevision;
     private int LastLine => Math.Min(_firstLine + PageSize - 1, _lines.Length);
 
     protected override void OnParametersSet()
@@ -58,7 +59,13 @@
         ShowScene();
     }
 
-    private void ShowScene() => _firstLine = Math.Max(1, (Source?.Range.StartLine ?? 1) - 3);
-    private void Previous() => _firstLine = Math.Max(1, _firstLine - PageSize);
-    private void Next() => _firstLine = Math.Min(_lines.Length, _firstLine + PageSize);
+    private void ShowScene() => Navigate(Math.Max(1, (Source?.Range.StartLine ?? 1) - 3));
+    private void Previous() => Navigate(Math.Max(1, _firstLine - PageSize));
+    private void Next() => Navigate(Math.Min(_lines.Length, _firstLine + PageSize));
+
+    private void Navigate(int firstLine)
+    {
+        _firstLine = firstLine;
+        ++_navigationRevision;
+    }
 }

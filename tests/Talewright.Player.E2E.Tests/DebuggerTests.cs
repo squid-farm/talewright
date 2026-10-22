@@ -260,6 +260,63 @@ public sealed class DebuggerTests
         }
     }
 
+    [Fact]
+    public async Task Native_return_to_same_source_window_resets_its_scrolled_viewport()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-source-scroll-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-source-scroll", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"),
+                "id: scroll\ntitle: Source Scroll\nstart: first\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), "=== first\n"
+                + string.Join("\n", Enumerable.Range(1, 150).Select(i => $"// source line {i}"))
+                + "\n* [Stay] -> first");
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            await WaitFor(driver, "Showing accepted lines 1 to 100 of 152");
+            await driver.ActivateAsync("Read-only accepted source lines");
+            await driver.PressAsync("End");
+            await WaitForDeclaration(scrolledOut: true);
+            await driver.ClickAsync("Go to current scene source");
+            await WaitForDeclaration(scrolledOut: false);
+            await driver.ClickAsync("Next source lines");
+            await WaitFor(driver, "Showing accepted lines 101 to 152 of 152");
+            await driver.ClickAsync("Previous source lines");
+            await WaitForDeclaration(scrolledOut: false);
+            Assert.Equal(0, await driver.CloseWindowAsync());
+
+            async Task WaitForDeclaration(bool scrolledOut)
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                while (true)
+                {
+                    var snapshot = await driver.SnapshotAsync();
+                    var viewport = snapshot.Descendants().First(node => node.Name == "Read-only accepted source lines");
+                    var declaration = viewport.Descendants().First(node => node.Text == "=== first" || node.Name == "=== first");
+                    var aboveViewport = declaration.Bounds.Y < viewport.Bounds.Y;
+                    var withinViewport = declaration.Bounds.Y >= viewport.Bounds.Y
+                        && declaration.Bounds.Y + declaration.Bounds.Height <= viewport.Bounds.Y + viewport.Bounds.Height;
+                    if (scrolledOut ? aboveViewport : withinViewport)
+                    {
+                        return;
+                    }
+                    await Task.Delay(100, timeout.Token);
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, params string[] texts)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
