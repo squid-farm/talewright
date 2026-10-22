@@ -14,7 +14,7 @@ public sealed record AccessibleNode(
         string.Join(" ", Descendants().SelectMany(node => new[] { node.Name, node.Text })), @"\s+", " ").Trim();
 }
 
-public sealed class NativePlayerDriver(string artifacts) : IPlayerDriver
+public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null) : IPlayerDriver
 {
     private Process? _adapter;
     private Task<string>? _stderr;
@@ -31,7 +31,7 @@ public sealed class NativePlayerDriver(string artifacts) : IPlayerDriver
 
         try
         {
-            var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DESKTOP_EXECUTABLE")
+            var executable = executableOverride ?? Environment.GetEnvironmentVariable("TALEWRIGHT_DESKTOP_EXECUTABLE")
                 ?? throw new InvalidOperationException("Set TALEWRIGHT_DESKTOP_EXECUTABLE or use tests/run_e2e.py linux.");
             var helper = Path.Combine(AppContext.BaseDirectory, "native", "atspi_adapter.py");
             Directory.CreateDirectory(_temporary);
@@ -124,6 +124,11 @@ public sealed class NativePlayerDriver(string artifacts) : IPlayerDriver
         await CommandAsync("click", new { pattern = @"^\d+\.\s*" + Regex.Escape(label) + "$", role = "push button", within = "Story choices" });
     public async Task PressAsync(string key) => await CommandAsync("key", new { key });
     public async Task ResizeAsync(int width, int height) => await CommandAsync("resize", new { width, height });
+    public async Task FillAsync(string name, string value) => await CommandAsync("fill", new { name, value });
+    public async Task ActivateAsync(string name) => await CommandAsync("activate", new { name });
+    public async Task<AccessibleNode> SnapshotAsync() =>
+        (await CommandAsync("snapshot")).Deserialize<AccessibleNode>(Json)
+        ?? throw new InvalidDataException("Missing accessibility snapshot.");
 
     public async Task<PlayerObservation> ObserveAsync()
     {
@@ -169,7 +174,7 @@ public sealed class NativePlayerDriver(string artifacts) : IPlayerDriver
                     await _adapter.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15));
                 }
 
-                if (_adapter.ExitCode != 0)
+                if (_adapter.ExitCode != 0 && !_protocolFailed)
                 {
                     throw new InvalidOperationException($"AT-SPI adapter exited with {_adapter.ExitCode}.");
                 }

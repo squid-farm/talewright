@@ -480,3 +480,17 @@ References: [Playwright .NET runners](https://playwright.dev/dotnet/docs/test-ru
 [WebKit versions](https://playwright.dev/docs/browsers#webkit),
 [WebKitGTK automation context](https://webkitgtk.org/reference/webkit2gtk/stable/method.WebContext.set_automation_allowed.html),
 [automation-controlled views](https://webkitgtk.org/reference/webkit2gtk/stable/property.WebView.is-controlled-by-automation.html).
+# Author Debugger checks
+
+`dotnet test tests/Talewright.Cli.Tests -c Release` covers CLI argument handling,
+scene search over 1,000 scenes, all prerequisite types, character creation,
+validation and failed-reload preservation.
+
+`python3 tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
+builds and exercises the actual native workbench: repair/reload, late-scene
+search, setup, seed, choices and recorded explanations. It uses the same isolated
+Xvfb/D-Bus/AT-SPI infrastructure as the player; assertions remain in C#.
+Set `TALEWRIGHT_DEBUGGER_EXECUTABLE` to an installed tool's
+`Talewright.Debugger.dll` to check packaged assets outside the checkout.
+Package verification checks debugger/native assets, headless launch errors and
+exclusion from Player packages and published games.

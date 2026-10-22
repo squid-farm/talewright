@@ -6,8 +6,8 @@ from an authorized feed (or a local package directory); no reflection discovery.
 ```sh
 dotnet build Web -p:TalewrightVersion=0.1.0-preview.1
 dotnet build Desktop -p:TalewrightVersion=0.1.0-preview.1
-dotnet run --project Web
-dotnet run --project Desktop
+dotnet run --project Web -p:TalewrightVersion=0.1.0-preview.1
+dotnet run --project Desktop -p:TalewrightVersion=0.1.0-preview.1
 ```
 
 The Story library owns one `StoryExtensions.Create()` factory registering a
@@ -16,6 +16,8 @@ player; the Validator executable uses the same factory at build time. Package-pr
 `buildTransitive/Talewright.targets` runs the project configured by
 `TalewrightStoryProject` against `TalewrightStoryRoot` before host compilation.
 Invalid Tale emits `file(line,column): error TWxxxx: message` and fails the build.
+The Web project includes the private WebAssembly development-server package for
+`dotnet run`; deploy its `dotnet publish` output with a static web server.
 Design-time IDE builds do not launch validation.
 The opt-in properties may also be supplied globally with `-p:`; the nested
 validator build strips them to avoid recursively invoking itself. Embedded story

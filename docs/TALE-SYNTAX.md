@@ -105,7 +105,9 @@ bounds: up to 32 selectable stats, each with 1–100 values. Up to 16 presets ma
 starting stats, also within ruleset bounds; selectable preset stats must be legal
 options. The first preset/pronoun is the default. For each selectable stat, its
 preset value (or authored protagonist value) is used if legal, otherwise the first
-listed option is the default. Player selections override preset stats.
+listed option is the default. If neither supplies a value, the first listed option
+is used; an explicitly authored zero is distinct from an omitted stat.
+Player selections override preset stats.
 
 Initialization events precede scene entry and are replayed identically on undo,
 redo and load. Saves retain the created character. Restart retains that identity

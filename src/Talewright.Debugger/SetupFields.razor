@@ -1,0 +1,30 @@
+<details>
+    <summary>Prerequisite overrides</summary>
+    <p>Enable only the values to override. Other fields retain world/created-character defaults. Quantities are absolute, zero removes an item. Base stats use ruleset clamping.</p>
+    <label>Filter setup fields <input aria-label="Filter setup fields" @bind="_filter" @bind:event="oninput" /></label>
+    <fieldset>
+        <legend>Flags</legend>
+        @foreach (var flag in Model.Flags.Where(f => $"flag:{f.Id}".Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+        {
+            <div class="setup-row">
+                <label><input type="checkbox" aria-label="@($"Override flag:{flag.Id}")" @bind="flag.Enabled" /> Override flag:@flag.Id</label>
+                <label><input type="checkbox" aria-label="@($"Value flag:{flag.Id}")" @bind="flag.Value" /> Value</label>
+            </div>
+        }
+    </fieldset>
+    <fieldset>
+        <legend>Variables, standings, base stats and inventory</legend>
+        @foreach (var field in Model.Numbers.Where(f => f.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+        {
+            <div class="setup-row">
+                <label><input type="checkbox" aria-label="@($"Override {field.Label}")" @bind="field.Enabled" /> @field.Label</label>
+                <label>Value <input aria-label="@($"Value {field.Label}")" inputmode="numeric" @bind="field.Value" /></label>
+            </div>
+        }
+    </fieldset>
+</details>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = default!;
+    private string _filter = "";
+}
