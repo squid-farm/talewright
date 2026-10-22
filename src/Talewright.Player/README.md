@@ -8,7 +8,7 @@ not engine implementation internals.
 
 For C# customization, installing only `Talewright.Player` restores the engine automatically.
 This is a Razor UI library, not an executable host. Ordinary story authors need neither package.
-See [registry setup](../../README.md#c-customization-packages).
+See [registry setup](../../docs/developer/csharp-extensions.md).
 
 ## Components (`Components/`)
 
@@ -70,9 +70,9 @@ one below 52rem.
 
 ## Not here yet
 
-Images (M4: Presentation),
-settings (text size, theme picker; unscheduled). Core release verification takes precedence over new
-presentation features; see [the roadmap](../../docs/PLAN.md#core-production-readiness-gates-m2).
+- Images ([#35](https://github.com/squid-farm/talewright/issues/35)).
+- Reader settings such as text size and a theme picker (unscheduled).
+- Story and host theming beyond CSS variables ([#13](https://github.com/squid-farm/talewright/issues/13)).
 
 ## Character creation
 
@@ -83,7 +83,7 @@ the existing direct-start behavior. Restart keeps the active character, includin
 one restored from a save. Library reopening offers creation anew; loading a save
 then replaces that selection with the saved character.
 Custom hosts may pass `StoryPlayer.Character` with a validated selection.
-See [the manifest contract](../../docs/TALE-SYNTAX.md#optional-character-creation).
+See [the manifest contract](../../docs/reference/tale-syntax.md#optional-character-creation).
 
 ## Regression testing
 

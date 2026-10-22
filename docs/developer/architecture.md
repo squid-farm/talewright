@@ -1,9 +1,9 @@
 # Architecture
 
 This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
-extension points are, and where to look when something breaks. [PLAN.md](PLAN.md) records _why_ (decisions,
+extension points are, and where to look when something breaks. [the plan](plan.md) records _why_ (decisions,
 research, roadmap); this document records _what is actually built_. The [ADRs](adr/) hold the big decisions in
-long form, and [TALE-SYNTAX.md](TALE-SYNTAX.md) is the authoritative reference for the story language.
+long form, and the [Tale syntax reference](../reference/tale-syntax.md) is the authoritative reference for the story language.
 
 Contents:
 
@@ -246,7 +246,7 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   World, Scenes, Triggers, Predicates), `SceneDefinition`, `ChoiceDefinition`, `CheckBranch`/`CheckOutcome`,
   `ConditionalEffect`, `ConditionalDivert`, `DivertTarget` (`End` is a target too).
 - **`Diagnostics/Diagnostic.cs`**: `Diagnostic(Severity, Code, Message, SourceLocation(File, Line, Column))`.
-  Codes are documented in TALE-SYNTAX.md §7.
+  Codes are documented in the [diagnostics reference](../reference/diagnostics.md).
 
 ### 3.6 `Talewright.Runtime` — the orchestrator
 
@@ -414,10 +414,10 @@ event means touching `GameState.Apply`), and save formats.
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
-| What can `story.yaml` contain?             | `StoryYamlReader` and TALE-SYNTAX.md §2                                                                       |
-| How is a `.tale` line classified?          | `TaleParser` (line kinds), TALE-SYNTAX.md                                                                     |
+| What can `story.yaml` contain?             | `StoryYamlReader` and the [Tale syntax reference](../reference/tale-syntax.md#1-storyyaml)                                                                       |
+| How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Tale syntax reference](../reference/tale-syntax.md)                                                                     |
 | How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
-| What does error TWxxxx mean?               | TALE-SYNTAX.md §7 and `grep -rn TWxxxx src/`                                                                  |
+| What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx src/`                                                                  |
 | Where do "Gained: X" lines come from?      | `EventNarrator.Describe`                                                                                      |
 | Where is the HTML?                         | `Talewright.Player/Components/*.razor`                                                                        |
 | Where are the styles?                      | `Talewright.Player/wwwroot/talewright.css`                                                                    |
@@ -445,7 +445,7 @@ The player has one C#/xUnit authoring surface with shared assertions behind brow
 Playwright handles browsers; Python is only a thin AT-SPI command adapter for actual Linux Photino,
 not a second test suite. Both reuse C#-defined story fixtures from `tests/Talewright.TestStories`; generated ZIPs and folders are not
 checked in or shipped. Sample-specific routes are deliberately not the detailed UI test contract.
-See [testing guidance](../tests/README.md) for the per-host coverage matrix, native prerequisites, commands,
+See [testing guidance](../../tests/README.md) for the per-host coverage matrix, native prerequisites, commands,
 failure evidence, and the distinction between Playwright WebKit and system webviews.
 
 Run fast engine tests with `dotnet test` from the repo root. Player UI suites are explicit:
@@ -465,7 +465,7 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
   storylets by state, and movement is an event. Locations will be another kind of storylet source.
 - **One language.** `EnglishGrammar` only; the `IGrammar` seam is there.
 - **Event log growth.** No snapshots yet; histories are bounded to 10,000 choices. Generated load/replay
-  workloads have explicit Release budgets; see [testing](../tests/README.md). Real complex stories and
+  workloads have explicit Release budgets; see [testing](../../tests/README.md). Real complex stories and
   constrained devices may need further profiling before snapshots or a precompiled bundle format.
 - **Development hosts embed samples.** `publish -a` instead includes only the selected story.
 - **Desktop platform matrix.** Universal packages contain six self-contained OS/CPU builds. Linux x64

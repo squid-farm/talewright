@@ -3,7 +3,7 @@
 The heart of Talewright: who exists, what they have, and what has happened. It knows nothing about text,
 templates, rules syntax or UI, and has **no package dependencies**.
 
-See [ARCHITECTURE.md §3.1](../../docs/ARCHITECTURE.md#31-talewrightcore--the-rpg-engine) for how it fits in.
+See [architecture §3.1](../../docs/developer/architecture.md#31-talewrightcore--the-rpg-engine) for how it fits in.
 
 ## Key ideas
 

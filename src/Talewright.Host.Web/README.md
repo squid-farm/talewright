@@ -13,7 +13,7 @@ dotnet run --project src/Talewright.Host.Web          # dev server, prints the U
 
 For a standalone game with exactly one story and relative URLs:
 `talewright publish story-folder -a --target web --output game.zip`.
-See the [CLI reference](../Talewright.Cli/README.md#publishing). Development hosts retain samples by
+See the [CLI reference](../../docs/reference/cli.md#publish). Development hosts retain samples by
 default; `TalewrightIncludeSamples=false` disables them in custom builds.
 
 ```bash
@@ -25,28 +25,21 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 - **Subfolder hosting** (GitHub Pages `/<repo>/`, itch.io): change `<base href="/" />` in `wwwroot/index.html`
   to the folder, with a trailing slash. There is no router, so no rewrite/404 tricks are needed.
 - Hosts that don't serve pre-compressed `.br`/`.gz` files still work (the uncompressed files are there too).
-  itch.io specifics are an M2 item.
 
 ### GitHub Pages
 
-After Build and all test jobs pass on a `main` push, Publish Samples publishes this
-host with every bundled sample. Select **GitHub Actions** as the repository's Pages
-source and permit `main` in the `github-pages` environment.
+Every `main` push that passes Build publishes this host, with all bundled samples, to
+[GitHub Pages](https://squid-farm.github.io/talewright/). The workflow reads the base path from Pages,
+applies it before publishing, smoke-tests the result at that path and uploads only `wwwroot`. See
+[releasing and CI](../../docs/developer/releasing.md) for repository settings.
 
-The workflow obtains the base path from `actions/configure-pages`, applies it
-before publishing (including generated/compressed output), and restores the source
-shell afterward. Local root hosting is unchanged. It smoke-tests the actual publish
-at that path before uploading only `wwwroot` to Pages. No branch full of generated
-site files or 404 rewrite is needed.
-
-To reproduce a repository-subpath publish locally:
+Reproduce a subpath publish locally, then serve it under `/talewright/`:
 
 ```bash
 python3 .github/scripts/publish_samples.py --base-path /talewright --output artifacts/pages
 ```
 
-Serve that output under `/talewright/`, not `/`. See the [deployment-path test](../../tests/README.md#ci-and-deployment-checks)
-for the suite-owned subpath server.
+The [deployment-path test](../../tests/README.md#ci-and-deployment-checks) covers this in CI.
 
 ## Files
 

@@ -7,7 +7,7 @@
 This is the living roadmap, not the live task board. Track requirements, status, blockers, and implementation
 in [GitHub Issues](https://github.com/squid-farm/talewright/issues) and the
 [Development Project](https://github.com/orgs/squid-farm/projects/1). Section 7 preserves completed M0/M1
-history; new work belongs in GitHub. See [the migration index](ISSUES.md) for legacy IDs and coordination.
+history; new work belongs in GitHub. See [issue tracking](issues.md) for legacy IDs and coordination.
 
 Distribution now uses two packages without changing the project layout:
 `Talewright` is a packaging shell containing the six existing headless assemblies;
@@ -212,7 +212,7 @@ still refresh Tale analysis and compiler diagnostics for `story.yaml`.
 **C# extensions:** the implemented project integration shares an explicit options factory between the
 validator and both hosts; an opt-in transitive MSBuild target executes the author's validator.
 The data-only CLI does not discover or execute arbitrary C# extensions. See
-[the package-based example](../examples/CSharpStory/README.md). Future editor analysis must agree
+[the package-based example](../../examples/CSharpStory/README.md). Future editor analysis must agree
 on these registrations through explicit integration or exported metadata, without silently treating
 custom symbols as built-ins or executing arbitrary project code during editing.
 
@@ -262,7 +262,7 @@ samples/
 
 ## 5. `.tale` syntax v0
 
-The authoritative spec is [TALE-SYNTAX.md](TALE-SYNTAX.md). Summary:
+The authoritative spec is the [Tale syntax reference](../reference/tale-syntax.md). Summary:
 - A story is a folder: `story.yaml` (schema, characters, factions, items, triggers) + `*.tale` files.
 - A `.tale` file holds many scenes (`=== scene.id` + `@title/@requires/@tags/@priority/@once/@hub` metadata).
 - Prose is inline Markdown with `{player:first-name#possessive}` substitutions and `{if}/{else}/{/if}` conditionals.
@@ -289,7 +289,7 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
   `publish` defaults to story-only; `-a --target web|desktop` includes the complete player.
   Desktop defaults to one archive of six self-contained native builds and selecting launchers, not
   one portable binary. Creation is opt-in author-bounded names/pronouns/presets/stat choices, not
-  an unrestricted point-buy system. See [performance and artifact checks](../tests/README.md) for
+  an unrestricted point-buy system. See [performance and artifact checks](../../tests/README.md) for
   measured budgets; source compilation remains the format until precompiled bundles show a real benefit.
 - **M3 — Author stories comfortably:** ([GitHub milestone](https://github.com/squid-farm/talewright/milestone/4)) shared analysis, editor-neutral LSP, VS Code support, and a bounded initial lint rule set. Deliver independently usable slices:
   1. Tale syntax highlighting, language configuration, and snippets (independent of LSP; [#31](https://github.com/squid-farm/talewright/issues/31)).
@@ -325,7 +325,7 @@ M4's concrete deliverables are tracked in [FR-027 / #35](https://github.com/squi
 These are planned release criteria, not claims that the current engine is production-ready. Existing M2
 features remain in scope, but reliability work takes precedence over additional features.
 
-- **Correctness:** resolve known S1/S2 bugs in [ISSUES.md](ISSUES.md) and explicitly triage remaining
+- **Correctness:** resolve known S1/S2 bugs in [issue tracking](issues.md) and explicitly triage remaining
   release risks. Cover the existing M2-deferred arithmetic overflow and commented-out auto-declaration
   bugs ([#6](https://github.com/squid-farm/talewright/issues/6)/[#8](https://github.com/squid-farm/talewright/issues/8)) with fixes and regression tests before release.
 - **Save safety:** round-trip saves on desktop and web; preserve deterministic state/choices on reload;
@@ -347,7 +347,7 @@ Track the readiness and save-compatibility work in [FR-025 / #33](https://github
 
 The migration is complete: [GitHub Issues](https://github.com/squid-farm/talewright/issues) holds the live
 backlog, preserving FR/BUG identifiers. [Milestones](https://github.com/squid-farm/talewright/milestones)
-are release targets; [epics](ISSUES.md#epics) group work across milestones without promoting exploratory
+are release targets; [epics](issues.md#epics) group work across milestones without promoting exploratory
 ideas to approved tasks. Each milestone feature has a dedicated issue with prerequisites, implementation
 slices, decisions, and acceptance checks. Split slices into linked child issues when taking up the work;
 use native blockers, not numeric milestone order, for actual dependencies. Update live requirements in
@@ -405,7 +405,7 @@ GitHub instead of recreating a local board.
 
 ## 9. M1 outcome (what was actually built)
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) for the code tour. Summary of where reality differs from, or sharpens,
+Read [architecture](architecture.md) for the code tour. Summary of where reality differs from, or sharpens,
 the plan above:
 
 - **Solution file** is `Talewright.slnx` (the new XML format), not `.sln`.
@@ -418,7 +418,7 @@ the plan above:
   object. Same guarantees, nothing to serialise.
 - **Fall-through diverts:** a choice or check outcome without `-> target` continues at the scene's first matching
   `->`, evaluated *after* its effects. This was not in the original syntax draft; it removes a lot of repetition.
-  Documented in TALE-SYNTAX.md.
+  Documented in the [Tale syntax reference](../reference/tale-syntax.md).
 - **Built-in rulesets:** `generic` and `none` (no stats or checks; tiers only).
 - **Bundled stories** are embedded resources in each host (`stories/<Story>/<path>`), read through
   `IStoryLibrary`. No HTTP manifest. Desktop also takes folders/zips on the command line; both hosts accept a zip

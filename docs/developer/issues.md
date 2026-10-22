@@ -7,7 +7,7 @@ This document is a stable migration index, not a snapshot of current issue state
 
 - [Development Project](https://github.com/orgs/squid-farm/projects/1): backlog, current work, bugs, milestone planning, and epics.
 - [Milestones](https://github.com/squid-farm/talewright/milestones): M0-M9 release targets.
-- [Roadmap](PLAN.md): architecture, sequencing, and release criteria; issue links carry live execution details.
+- [Roadmap](plan.md): architecture, sequencing, and release criteria; issue links carry live execution details.
 
 ## Working with issues (humans and bots)
 

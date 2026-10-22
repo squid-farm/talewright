@@ -1,13 +1,12 @@
-# Samples
+# Sample stories
 
-Example stories. They are **not** part of the engine: engine code never references them. The two hosts embed
-everything under `samples/` as built-in stories. Integration smoke tests compile the sample and open it
-from the bundled library; detailed player tests use stable, programmatically defined test stories instead.
+Complete stories to play, read and copy. The desktop player and the
+[web player](https://squid-farm.github.io/talewright/) both include them.
 
 ## The Lost Relic (`LostRelic/`)
 
-A short treasure hunt (19 scenes in 3 chapter files, three endings) written to exercise every M1
-feature. Mara Burns, a treasure hunter, and her guide Tomas Okafor look for the Relic of Ysh while the
+A short treasure hunt (19 scenes in 3 chapter files, three endings) that uses almost every feature.
+Mara Burns, a treasure hunter, and her guide Tomas Okafor look for the Relic of Ysh while the
 Explorers' Guild watches.
 
 | Feature | Where |
@@ -21,18 +20,18 @@ Explorers' Guild watches.
 | Inline and block `{if}` conditional prose, XP and level-up | throughout all three chapters |
 | Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
 
-Play it: `dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic`.
+**Play it** in the [web player](https://squid-farm.github.io/talewright/), or from a source checkout:
+`dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic`.
 
-## Writing your own
+## Use a sample as a starting point
 
-Copy `LostRelic/`, edit `story.yaml` and the `.tale` files (see [TALE-SYNTAX.md](../docs/TALE-SYNTAX.md)), then
-open the folder with the desktop app or zip it and use "Open a story file" on the web. Compile errors are listed
-with file and line.
+Copy `LostRelic/`, change `id` and `title` in `story.yaml`, and start editing. The
+[first story tutorial](../docs/guide/first-story.md) explains the basics, and the
+[Tale syntax reference](../docs/reference/tale-syntax.md) covers everything else.
 
-## Published samples
+## For contributors
 
-The [GitHub Pages player](https://squid-farm.github.io/talewright/) includes every
-bundled story. It is deployed after Build and all test jobs pass on a `main` push;
-the workflow verifies published assets, sample opening, and a choice at the Pages
-base path. Sample story contents are embedded in the hosts, never in either NuGet
-package. See [repository setup](../README.md#github-actions-and-releases).
+Samples aren't part of the engine: engine code never references them, and they aren't included in NuGet
+packages. The desktop and web hosts embed everything under `samples/` as built-in stories, and
+[GitHub Pages](../docs/developer/releasing.md) republishes them on every `main` push. Integration smoke
+tests open the sample; detailed player tests use their own stories defined in C#.
