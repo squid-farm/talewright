@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Core.State;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
 
 namespace Talewright.Rules.Storylets;
@@ -52,8 +53,18 @@ public sealed class StoryletTags
 public static class StoryletSelector
 {
     public static bool IsEligible(IStorylet storylet, EvaluationContext context) =>
-        !(storylet.Once && context.State.VisitCount(storylet.Id) > 0)
-        && (storylet.Requires is null || ExpressionEvaluator.IsTrue(storylet.Requires, context));
+        EligibilityExclusion(storylet, context, capture: false, out _) is null;
+
+    private static DecisionReason? EligibilityExclusion(IStorylet storylet, EvaluationContext context,
+        bool capture, out ExpressionTrace? trace)
+    {
+        trace = null;
+        if (storylet.Once && context.State.VisitCount(storylet.Id) > 0)
+        {
+            return DecisionReason.AlreadyVisited;
+        }
+        return RuleObservation.Test(storylet.Requires, context, capture, out trace) ? null : DecisionReason.ConditionFalse;
+    }
 
     /// <summary>
     /// Eligible storylets carrying <paramref name="tag"/>, ordered by descending priority then declaration order.
@@ -64,6 +75,10 @@ public static class StoryletSelector
     /// <summary>Filters before stable ordering and limiting; excludes the hub itself and duplicate scene ids.</summary>
     public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, StoryletTags tags,
         EvaluationContext context, SceneId? exclude = null, int? limit = null)
+        where T : IStorylet => SelectEligible(storylets, tags, context, exclude, limit, observer: null);
+
+    public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, StoryletTags tags,
+        EvaluationContext context, SceneId? exclude, int? limit, Action<RuleDecision>? observer, int? eventIndex = null)
         where T : IStorylet
     {
         if (limit is <= 0)
@@ -71,14 +86,51 @@ public static class StoryletSelector
             throw new ArgumentOutOfRangeException(nameof(limit), "A storylet limit must be positive.");
         }
 
-        return storylets
-            .Select((s, index) => (s, index))
-            .Where(x => x.s.Id != exclude && tags.Matches(x.s.Tags) && IsEligible(x.s, context))
-            .OrderByDescending(x => x.s.Priority)
-            .ThenBy(x => x.index)
-            .Select(x => x.s)
-            .DistinctBy(s => s.Id)
-            .Take(limit ?? int.MaxValue)
-            .ToArray();
+        var eligible = new List<(T Storylet, int Index, ExpressionTrace? Trace)>();
+        var index = 0;
+        foreach (var storylet in storylets)
+        {
+            DecisionReason? excluded = storylet.Id == exclude ? DecisionReason.SelfExcluded
+                : !tags.Matches(storylet.Tags) ? DecisionReason.TagMismatch : null;
+            ExpressionTrace? trace = null;
+            if (excluded is null)
+            {
+                excluded = EligibilityExclusion(storylet, context, observer is not null, out trace);
+            }
+            if (excluded is { } reason)
+            {
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Excluded, reason, trace ?? (storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null),
+                    eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
+            }
+            else
+            {
+                eligible.Add((storylet, index, trace));
+            }
+            index++;
+        }
+
+        var selected = new List<T>();
+        var seen = new HashSet<SceneId>();
+        var rank = 0;
+        foreach (var (storylet, _, trace) in eligible.OrderByDescending(x => x.Storylet.Priority).ThenBy(x => x.Index))
+        {
+            var duplicate = !seen.Add(storylet.Id);
+            if (!duplicate)
+            {
+                rank++;
+            }
+            var reason = duplicate ? DecisionReason.Duplicate
+                : limit is { } cap && selected.Count >= cap ? DecisionReason.HubLimit : DecisionReason.PriorityOrder;
+            var included = reason == DecisionReason.PriorityOrder;
+            if (included)
+            {
+                selected.Add(storylet);
+            }
+            observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                included ? DecisionOutcome.Selected : DecisionOutcome.Excluded, reason, trace, eventIndex, eventIndex,
+                Priority: storylet.Priority, Rank: duplicate ? null : rank, Limit: limit));
+        }
+        return selected.AsReadOnly();
     }
 }

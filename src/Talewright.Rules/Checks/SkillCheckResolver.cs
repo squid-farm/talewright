@@ -3,6 +3,7 @@ using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
 
 namespace Talewright.Rules.Checks;
@@ -27,7 +28,12 @@ public sealed record SkillCheck(EntityId Actor, StatId Skill, Expr Difficulty);
 public static class SkillCheckResolver
 {
     public static SkillCheckResult Resolve(SkillCheck check, EventLog log, RandomnessMode randomness, NamedPredicateRegistry predicates)
+        => Resolve(check, log, randomness, predicates, observer: null);
+
+    public static SkillCheckResult Resolve(SkillCheck check, EventLog log, RandomnessMode randomness,
+        NamedPredicateRegistry predicates, Action<RuleDecision>? observer)
     {
+        var start = log.Events.Count;
         var state = log.State;
         var rule = state.Ruleset.SkillCheckRule
             ?? throw new InvalidOperationException($"Ruleset '{state.Ruleset.Id}' has no skill check rule.");
@@ -39,9 +45,13 @@ public static class SkillCheckResolver
             log.Append(new DiceRolled(rule.DieSides, roll.Value));
         }
 
-        var difficulty = ExpressionEvaluator.EvaluateNumber(check.Difficulty, new EvaluationContext(log.State, predicates));
+        var context = new EvaluationContext(log.State, predicates);
+        var difficulty = RuleObservation.Evaluate(check.Difficulty, context, observer is not null, out var trace).Number;
         var result = rule.Resolve(log.State, new SkillCheckRequest(check.Actor, check.Skill, difficulty, roll));
         log.Append(new SkillCheckResolved(check.Actor, check.Skill, difficulty, result.Roll, result.Modifier, result.Total, result.Success));
+        observer?.Invoke(new RuleDecision(DecisionKind.Check, $"{check.Actor}:{check.Skill}", state.CurrentScene,
+            result.Success ? DecisionOutcome.Passed : DecisionOutcome.Failed,
+            result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, trace, start, log.Events.Count));
         return result;
     }
 }
