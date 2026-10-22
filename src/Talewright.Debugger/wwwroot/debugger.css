@@ -2,6 +2,7 @@
 .author-workbench section { margin: 1rem 0; border: 1px solid var(--tw-muted); padding: 1rem; }
 .author-workbench label { display: inline-block; margin: .4rem; }
 .author-workbench button, .author-workbench input, .author-workbench select { font: inherit; padding: .35rem; }
+.author-workbench button:not(.tw-choice) { color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); }
 .author-workbench details { margin: .6rem 0; padding: .4rem; border: 1px solid var(--tw-muted); }
 .author-workbench summary { cursor: pointer; }
 .author-workbench :focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }
