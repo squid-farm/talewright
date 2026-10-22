@@ -6,6 +6,38 @@ namespace Talewright.Tale.Tests;
 public sealed class CharacterCreationTests
 {
     [Theory]
+    [InlineData("", "", 20)]
+    [InlineData("", "stats: {hp: 0}", 0)]
+    [InlineData("stats: {hp: 0}", "", 0)]
+    [InlineData("stats: {hp: 20}", "stats: {hp: 0}", 0)]
+    [InlineData("stats: {hp: 7}", "", 20)]
+    public void Missing_stats_use_first_option_but_explicit_zero_is_preserved(string player, string preset, int expected)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.yaml"] = $$"""
+                id: creation
+                title: Creation
+                start: a
+                characters:
+                  player:
+                    first-name: Default
+                    {{player}}
+                creation:
+                  stats: {hp: [20, 0]}
+                  presets:
+                    healthy:
+                      label: Healthy
+                      {{preset}}
+                """,
+            ["main.tale"] = "=== a\n-> END",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        Assert.Equal(expected, story.Creation!.Default(story.World.Characters[EntityId.Player]).Stats["hp"]);
+    }
+
+    [Theory]
     [InlineData("16", 16)]
     [InlineData("10", 8)]
     public void Partial_preset_falls_back_to_authored_stat_before_legal_default(string strength, int expected)

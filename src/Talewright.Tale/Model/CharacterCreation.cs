@@ -26,8 +26,15 @@ public sealed class CharacterCreation
             Preset = preset?.Id,
             Stats = Stats.ToDictionary(kv => kv.Key.Value, kv =>
             {
-                var value = preset is not null && preset.Stats.TryGetValue(kv.Key, out var presetValue)
-                    ? presetValue : player.Stats.GetValueOrDefault(kv.Key);
+                var value = kv.Value[0];
+                if (preset is not null && preset.Stats.TryGetValue(kv.Key, out var presetValue))
+                {
+                    value = presetValue;
+                }
+                else if (player.Stats.TryGetValue(kv.Key, out var playerValue))
+                {
+                    value = playerValue;
+                }
                 return kv.Value.Contains(value) ? value : kv.Value[0];
             }),
         };
