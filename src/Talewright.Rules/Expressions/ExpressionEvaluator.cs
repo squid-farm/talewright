@@ -25,6 +25,8 @@ public readonly record struct Value(ExprType Type, int Number, bool Bool, string
 /// <summary>Everything an expression may read.</summary>
 public sealed record EvaluationContext(IGameStateView State, NamedPredicateRegistry Predicates)
 {
+    public Action<ExpressionTrace>? Trace { get; init; }
+
     public static EvaluationContext For(IGameStateView state) => new(state, NamedPredicateRegistry.Empty);
 }
 
@@ -36,6 +38,19 @@ public static class ExpressionEvaluator
     public static int EvaluateNumber(Expr expr, EvaluationContext context) => Evaluate(expr, context).Number;
 
     public static Value Evaluate(Expr expr, EvaluationContext context)
+    {
+        if (context.Trace is not { } observe)
+        {
+            return EvaluateCore(expr, context);
+        }
+
+        var children = new List<ExpressionTrace>();
+        var value = EvaluateCore(expr, context with { Trace = children.Add });
+        observe(new ExpressionTrace(expr, value, children.AsReadOnly()));
+        return value;
+    }
+
+    private static Value EvaluateCore(Expr expr, EvaluationContext context)
     {
         var state = context.State;
         return expr switch
@@ -59,7 +74,7 @@ public static class ExpressionEvaluator
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
             UnaryExpr { Op: UnaryOp.Not } e => Value.Of(!Evaluate(e.Operand, context).Bool),
-            UnaryExpr { Op: UnaryOp.Negate } e => Value.Of(-Evaluate(e.Operand, context).Number),
+            UnaryExpr { Op: UnaryOp.Negate } e => Value.Of(Arithmetic.Saturate(-(long)Evaluate(e.Operand, context).Number)),
             BinaryExpr e => Binary(e, context),
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };
@@ -70,22 +85,32 @@ public static class ExpressionEvaluator
         // Short-circuit boolean operators.
         if (e.Op == BinaryOp.And)
         {
-            return Value.Of(Evaluate(e.Left, context).Bool && Evaluate(e.Right, context).Bool);
+            if (!Evaluate(e.Left, context).Bool)
+            {
+                context.Trace?.Invoke(ExpressionTrace.NotEvaluated(e.Right));
+                return Value.Of(false);
+            }
+            return Value.Of(Evaluate(e.Right, context).Bool);
         }
 
         if (e.Op == BinaryOp.Or)
         {
-            return Value.Of(Evaluate(e.Left, context).Bool || Evaluate(e.Right, context).Bool);
+            if (Evaluate(e.Left, context).Bool)
+            {
+                context.Trace?.Invoke(ExpressionTrace.NotEvaluated(e.Right));
+                return Value.Of(true);
+            }
+            return Value.Of(Evaluate(e.Right, context).Bool);
         }
 
         var left = Evaluate(e.Left, context);
         var right = Evaluate(e.Right, context);
         return e.Op switch
         {
-            BinaryOp.Add => Value.Of(left.Number + right.Number),
-            BinaryOp.Subtract => Value.Of(left.Number - right.Number),
-            BinaryOp.Multiply => Value.Of(left.Number * right.Number),
-            BinaryOp.Divide => Value.Of(right.Number == 0 ? 0 : left.Number / right.Number),
+            BinaryOp.Add => Value.Of(Arithmetic.Saturate((long)left.Number + right.Number)),
+            BinaryOp.Subtract => Value.Of(Arithmetic.Saturate((long)left.Number - right.Number)),
+            BinaryOp.Multiply => Value.Of(Arithmetic.Saturate((long)left.Number * right.Number)),
+            BinaryOp.Divide => Value.Of(right.Number == 0 ? 0 : Arithmetic.Saturate((long)left.Number / right.Number)),
             BinaryOp.Equal => Value.Of(Compare(left, right, context) == 0),
             BinaryOp.NotEqual => Value.Of(Compare(left, right, context) != 0),
             BinaryOp.Less => Value.Of(Compare(left, right, context) < 0),

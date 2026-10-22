@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.World;
 
 namespace Talewright.Core.Events;
 
@@ -8,6 +9,9 @@ namespace Talewright.Core.Events;
 /// never intentions, so replaying a log always reproduces the same state.
 /// </summary>
 public abstract record GameEvent;
+
+/// <summary>Created protagonist identity, applied before any scene or trigger is evaluated.</summary>
+public sealed record CharacterIdentityChanged(EntityId Character, string FirstName, string LastName, Pronouns Pronouns) : GameEvent;
 
 /// <summary>A character's base stat was set to a new (already clamped) value.</summary>
 public sealed record StatChanged(EntityId Character, StatId Stat, int OldValue, int NewValue) : GameEvent;

@@ -13,6 +13,9 @@ dotnet run --project src/Talewright.Host.Desktop -- ~/stories/a ~/b.zip   # seve
 ```
 
 Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's equivalent).
+Manual saves use per-user local application data under `Talewright/saves` (normally
+`$XDG_DATA_HOME/Talewright/saves`, or `~/.local/share/Talewright/saves` on Linux).
+Slot replacement is explicit and atomic; incompatible/corrupt loads leave the current playthrough intact.
 
 ## Files
 
@@ -25,8 +28,10 @@ Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's 
 
 ## Packaging
 
-Not done in M1. `dotnet publish -c Release -r <rid> --self-contained` produces a runnable folder; M2's
-`talewright publish` will produce itch-ready zips with a single story baked in.
+`talewright publish story-folder -a --target desktop --output game.zip` produces a self-contained
+ZIP with a single story baked in and no samples. An optional `--runtime win-x64` cross-publishes;
+see the [CLI reference](../Talewright.Cli/README.md#publishing) for targets and verification limits.
+`TalewrightIncludeSamples=false` disables development sample embedding in custom builds.
 
 ## Native regression tests
 

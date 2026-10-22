@@ -17,6 +17,9 @@ public sealed class StoryDefinition
     public required string Id { get; init; }
     public required string Title { get; init; }
     public required string Version { get; init; }
+    public string? ContentFingerprint { get; init; }
+    public bool UndoEnabled { get; init; } = true;
+    public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
 
@@ -82,6 +85,10 @@ public sealed class SceneDefinition : IStorylet
 
     /// <summary>When set, every eligible scene tagged with this is offered as a choice here.</summary>
     public string? HubTag { get; init; }
+
+    public StoryletTags? Hub { get; init; }
+    public int? HubLimit { get; init; }
+    public StoryletTags? HubSelection => Hub ?? (string.IsNullOrEmpty(HubTag) ? null : new StoryletTags([HubTag]));
 
     public IReadOnlyList<ConditionalEffect> EntryEffects { get; init; } = [];
     public IReadOnlyList<TemplateBlock> Body { get; init; } = [];

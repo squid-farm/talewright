@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Check the two release packages and optionally build isolated package consumers."""
+"""Check release libraries/tool and optionally run isolated package consumers."""
 
 import argparse
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
@@ -13,9 +15,41 @@ from zipfile import ZipFile
 
 from package_version import version_from_tag
 
-PACKAGE_IDS = {"Talewright", "Talewright.Player"}
+PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli"}
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Rules", "Narrative", "Rulesets.Generic", "Tale", "Runtime")}
+
+
+def verify_desktop_archive(path):
+    with ZipFile(path) as archive:
+        names = set(archive.namelist())
+        required = {"start.sh", "start.cmd", "start.command", "ENGINE-LICENSE.txt", "DEPLOYMENT.txt"}
+        for os_name, native, runtime in [("linux", "Photino.Native.so", "libcoreclr.so"),
+                                        ("win", "Photino.Native.dll", "coreclr.dll"),
+                                        ("osx", "Photino.Native.dylib", "libcoreclr.dylib")]:
+            for cpu in ["x64", "arm64"]:
+                rid = f"{os_name}-{cpu}"
+                executable = "Talewright.Host.Desktop" + (".exe" if os_name == "win" else "")
+                required.update(f"{rid}/{name}" for name in [
+                    executable, native, runtime, "Talewright.Host.Desktop.dll",
+                    "wwwroot/index.html", "wwwroot/_content/Talewright.Player/talewright.css",
+                    "wwwroot/_content/Talewright.Player/Components/StoryPlayer.razor.js",
+                    "wwwroot/_content/Talewright.Player/Saves/IndexedDbSaveStore.js"])
+                if os_name == "win":
+                    required.add(f"{rid}/WebView2Loader.dll")
+                config = json.loads(archive.read(f"{rid}/Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
+                frameworks = config.get("includedFrameworks", [])
+                if "framework" in config or "frameworks" in config or not any(
+                        framework["name"] == "Microsoft.NETCore.App" for framework in frameworks):
+                    raise ValueError(f"{rid}: desktop output requires an installed .NET runtime")
+        if not required <= names:
+            raise ValueError(f"Universal desktop archive is missing {sorted(required - names)}")
+        for name in ["start.sh", "start.command", *(
+                f"{os_name}-{cpu}/Talewright.Host.Desktop" for os_name in ["linux", "osx"]
+                for cpu in ["x64", "arm64"])]:
+            if not (archive.getinfo(name).external_attr >> 16) & 0o111:
+                raise ValueError(f"Missing executable permissions: {name}")
+    print("Verified six self-contained desktop builds and launchers", flush=True)
 
 
 def verify(directory, version):
@@ -35,20 +69,60 @@ def verify(directory, version):
                 raise ValueError(f"{path}: unexpected or duplicate package {identity}")
             if metadata.findtext("{*}version") != version:
                 raise ValueError(f"{path}: package version does not match {version}")
-            for required in ["README.md", f"lib/net10.0/{identity}.dll"]:
+            required_files = ["README.md", f"lib/net10.0/{identity}.dll"]
+            if identity == "Talewright.Cli":
+                required_files = ["README.md", "tools/net10.0/any/DotnetToolSettings.xml",
+                                  "tools/net10.0/any/Talewright.Cli.dll",
+                                  "tools/net10.0/any/Talewright.Cli.deps.json",
+                                  "tools/net10.0/any/Talewright.Cli.runtimeconfig.json",
+                                  "tools/net10.0/any/Talewright.Debugger.dll",
+                                  "tools/net10.0/any/debug-assets/index.html",
+                                  "tools/net10.0/any/debug-assets/debugger.css",
+                                  "tools/net10.0/any/debug-assets/_content/Talewright.Player/talewright.css",
+                                  "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
+                                  "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
+                                  "tools/net10.0/any/publish-assets/standalone/web/App.razor",
+                                  "tools/net10.0/any/publish-assets/standalone/web/wwwroot/index.html",
+                                  "tools/net10.0/any/publish-assets/standalone/desktop/App.razor",
+                                  "tools/net10.0/any/publish-assets/player/talewright.css",
+                                  "tools/net10.0/any/publish-assets/player/Components/StoryPlayer.razor.js",
+                                  "tools/net10.0/any/publish-assets/player/Saves/IndexedDbSaveStore.js",
+                                  "tools/net10.0/any/publish-assets/launchers/start.sh",
+                                  "tools/net10.0/any/publish-assets/launchers/start.command",
+                                  "tools/net10.0/any/publish-assets/launchers/start.cmd",
+                                  "tools/net10.0/any/publish-assets/ENGINE-LICENSE.txt"]
+            for required in required_files:
                 if required not in names:
                     raise ValueError(f"{path}: missing {required}")
             dependencies = {item.attrib["id"]: item.attrib["version"]
                             for item in metadata.findall(".//{*}dependency")}
-            if identity == "Talewright.Player":
+            if identity == "Talewright.Cli":
+                settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
+                command = settings.find("Commands/Command")
+                if command is None or command.attrib != {
+                        "Name": "talewright", "EntryPoint": "Talewright.Cli.dll", "Runner": "dotnet"}:
+                    raise ValueError(f"{path}: invalid talewright tool command")
+                for assembly in ENGINE_ASSEMBLIES | {"Talewright.Player"}:
+                    if f"tools/net10.0/any/{assembly}.dll" not in names:
+                        raise ValueError(f"{path}: missing CLI compiler assembly {assembly}")
+                for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
+                    extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
+                    if f"tools/net10.0/any/runtimes/{rid}/native/Photino.Native.{extension}" not in names:
+                        raise ValueError(f"{path}: missing debugger native dependency for {rid}")
+            elif identity == "Talewright.Player":
+                if any("Debugger" in name or "debug-assets/" in name for name in names):
+                    raise ValueError(f"{path}: Player includes author-only tooling")
                 if dependencies.get("Talewright") != version:
                     raise ValueError(f"{path}: Player must depend on engine version {version}")
                 for required in ["staticwebassets/talewright.css",
                                  "staticwebassets/Components/StoryPlayer.razor.js",
+                                 "staticwebassets/Saves/IndexedDbSaveStore.js",
                                  "buildTransitive/Talewright.Player.props"]:
                     if required not in names:
                         raise ValueError(f"{path}: missing Razor asset {required}")
             else:
+                if "buildTransitive/Talewright.targets" not in names:
+                    raise ValueError(f"{path}: missing story validation build target")
                 if any(name.startswith(("Talewright.", "Microsoft.AspNetCore."))
                        for name in dependencies):
                     raise ValueError(f"{path}: headless engine has a UI/component dependency")
@@ -60,7 +134,7 @@ def verify(directory, version):
             found[identity] = path
     if found.keys() != PACKAGE_IDS:
         raise ValueError(f"Expected exactly {sorted(PACKAGE_IDS)}; found {sorted(found)}")
-    print(f"Verified both packages at {version}", flush=True)
+    print(f"Verified two libraries and CLI tool at {version}", flush=True)
 
 
 def smoke(directory, version):
@@ -76,7 +150,7 @@ def smoke(directory, version):
   </packageSources>
   <packageSourceMapping>
     <clear />
-    <packageSource key="local"><package pattern="Talewright" /><package pattern="Talewright.Player" /></packageSource>
+    <packageSource key="local"><package pattern="Talewright" /><package pattern="Talewright.Player" /><package pattern="Talewright.Cli" /></packageSource>
     <packageSource key="nuget.org"><package pattern="*" /></packageSource>
   </packageSourceMapping>
 </configuration>
@@ -109,6 +183,16 @@ using System.Collections.Generic;
 using Talewright.Tale.Compilation;
 using Talewright.Runtime;
 
+if (args.Length == 1)
+{
+    var assembly = System.Reflection.Assembly.LoadFile(System.IO.Path.GetFullPath(args[0]));
+    using var stream = assembly.GetManifestResourceStream("stories/Published/chapter.fr.tale")
+        ?? throw new Exception("Culture-like chapter is missing from the main host assembly.");
+    using var reader = new System.IO.StreamReader(stream);
+    if (!reader.ReadToEnd().Contains("Culture-like chapter"))
+        throw new Exception("Culture-like chapter resource has incorrect content.");
+    return;
+}
 if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
     throw new Exception("Original Narrative assembly identity was not preserved.");
 var source = new StorySource(new Dictionary<string, string>
@@ -141,9 +225,78 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                 manifest = json.loads((project / "obj/Release/net10.0/staticwebassets.build.json").read_text())
                 paths = {asset["RelativePath"] for asset in manifest["Assets"]
                          if asset["BasePath"] == "_content/Talewright.Player"}
-                if not {"talewright.css", "Components/StoryPlayer.razor.js"} <= paths:
+                if not {"talewright.css", "Components/StoryPlayer.razor.js", "Saves/IndexedDbSaveStore.js"} <= paths:
                     raise ValueError("Player consumer is missing transitive Razor static assets")
-        print("Both isolated package consumers built successfully", flush=True)
+        tool_path = root / "tools"
+        subprocess.run(["dotnet", "tool", "install", "Talewright.Cli", "--version", version,
+                        "--tool-path", str(tool_path), "--configfile", str(config)],
+                       cwd=root, env=environment, check=True)
+        story = root / "tool-story"
+        story.mkdir()
+        (story / "story.yaml").write_text(
+            "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
+        (story / "main.tale").write_text("=== a\nHello.\n-> translated\n")
+        (story / "chapter.fr.tale").write_text("=== translated\nCulture-like chapter.\n-> END\n")
+        subprocess.run([str(tool_path / "talewright"), "debug", "--help"],
+                       cwd=root, env=environment, check=True, capture_output=True)
+        if sys.platform.startswith("linux"):
+            headless = dict(environment, DISPLAY="")
+            result = subprocess.run([str(tool_path / "talewright"), "debug", str(story)],
+                                    cwd=root, env=headless, capture_output=True, text=True)
+            if result.returncode != 2 or "TWCLI002" not in result.stderr or "DISPLAY" not in result.stderr:
+                raise ValueError("Installed debugger did not reject headless Linux with an actionable error")
+        result = subprocess.run([str(tool_path / "talewright"), "validate", str(story), "--format", "json"],
+                                cwd=root, env=environment, check=True, capture_output=True, text=True)
+        if json.loads(result.stdout) != {"schemaVersion": 1, "success": True, "diagnostics": []}:
+            raise ValueError("Installed CLI did not validate an isolated story")
+        archive = root / "story.zip"
+        subprocess.run([str(tool_path / "talewright"), "publish", str(story), "--output", str(archive)],
+                       cwd=root, env=environment, check=True)
+        with ZipFile(archive) as published:
+            if set(published.namelist()) != {"story.yaml", "main.tale", "chapter.fr.tale"}:
+                raise ValueError("Installed CLI did not produce a story-only archive")
+        web = root / "web.zip"
+        subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
+                        "--target", "web", "--output", str(web)], cwd=root, env=environment, check=True)
+        with ZipFile(web) as published:
+            if any("Debugger" in name or "debug-assets/" in name for name in published.namelist()):
+                raise ValueError("Published game includes author-only tooling")
+            if "index.html" not in published.namelist() or not any(
+                    name.startswith("_framework/") for name in published.namelist()):
+                raise ValueError("Installed CLI did not publish a complete standalone web site")
+        desktop = root / "desktop.zip"
+        subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
+                        "--target", "desktop", "--output", str(desktop)], cwd=root, env=environment, check=True)
+        verify_desktop_archive(desktop)
+        with ZipFile(desktop) as published:
+            host = root / "PublishedHost.dll"
+            host.write_bytes(published.read("linux-x64/Talewright.Host.Desktop.dll"))
+        subprocess.run(["dotnet", "run", "--project", str(root / "EngineConsumer"), "-c", "Release",
+                        "--no-build", "--", str(host)], cwd=root, env=environment, check=True)
+        example = root / "CSharpStory"
+        shutil.copytree(Path(__file__).resolve().parents[2] / "examples/CSharpStory", example,
+                        ignore=shutil.ignore_patterns("bin", "obj"))
+        for host in ["Web", "Desktop"]:
+            subprocess.run(["dotnet", "build", str(example / host), "-c", "Release",
+                            f"-p:TalewrightVersion={version}"], cwd=root, env=environment, check=True)
+        validation_properties = [
+            f"-p:TalewrightStoryProject={example / 'Validator/Validator.csproj'}",
+            f"-p:TalewrightStoryRoot={example / 'Story/Content'}",
+        ]
+        subprocess.run(["dotnet", "build", str(example / "Web"), "-c", "Release",
+                        f"-p:TalewrightVersion={version}", *validation_properties],
+                       cwd=root, env=environment, check=True, timeout=120)
+        shell = example / "Desktop/bin/Release/net10.0/wwwroot/index.html"
+        if not shell.is_file() or shell.read_bytes() != (example / "Desktop/wwwroot/index.html").read_bytes():
+            raise ValueError("Desktop example did not copy its shell page into the executable output")
+        tale = example / "Story/Content/main.tale"
+        tale.write_text("=== beginning\n-> missing\n")
+        invalid = subprocess.run(["dotnet", "build", str(example / "Web"), "-c", "Release",
+                                  f"-p:TalewrightVersion={version}", *validation_properties],
+                                 cwd=root, env=environment, capture_output=True, text=True, timeout=120)
+        if invalid.returncode == 0 or "main.tale(2," not in invalid.stdout or "error TW2002:" not in invalid.stdout:
+            raise ValueError(f"Invalid C# story did not fail with source diagnostics:\n{invalid.stdout}\n{invalid.stderr}")
+        print("Both library consumers and installed CLI passed", flush=True)
 
 
 def main():

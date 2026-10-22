@@ -22,7 +22,8 @@ public sealed record PlayerObservation(
     bool PassageFocused,
     bool PassageInWindow,
     bool SheetStacked,
-    double WindowWidth);
+    double WindowWidth,
+    string WindowTitle);
 
 public interface IPlayerDriver : IAsyncDisposable
 {
@@ -93,7 +94,8 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
                     passageBounds.bottom <= innerHeight,
                 SheetStacked: sheetBounds !== null && transcriptBounds !== null &&
                     sheetBounds.top >= transcriptBounds.bottom - 1,
-                WindowWidth: innerWidth
+                WindowWidth: innerWidth,
+                WindowTitle: document.title
             };
         }
         """);

@@ -1,0 +1,71 @@
+<section aria-label="State inspection">
+    <h2>State inspection</h2>
+    <label>Filter inspection <input aria-label="Filter inspection" @bind="_filter" @bind:event="oninput" /></label>
+    @foreach (var character in Inspection.FindCharacters(_filter))
+    {
+        <details>
+            <summary>@character.Id: @character.FirstName @character.LastName</summary>
+            <p>Pronouns: @character.Pronouns</p>
+            <table><caption>Base and effective stats</caption><thead><tr><th>Stat</th><th>Base</th><th>Effective</th></tr></thead>
+                <tbody>@foreach (var stat in character.Stats)
+                {
+                    <tr><th>@stat.Id @stat.Name</th><td>@stat.BaseValue</td><td>@stat.EffectiveValue</td></tr>
+                }</tbody>
+            </table>
+            <ul>@foreach (var item in character.Inventory) { <li>@item.Id @item.Name: @item.Quantity</li> }</ul>
+        </details>
+    }
+    <details>
+        <summary>Flags, variables, factions, visits and triggers</summary>
+        <ul>
+            @foreach (var flag in Inspection.Flags.Where(v => Match($"flag:{v.Key}"))) { <li>flag:@flag.Key = @flag.Value</li> }
+            @foreach (var variable in Inspection.Variables.Where(v => Match($"var:{v.Key}"))) { <li>var:@variable.Key = @variable.Value</li> }
+            @foreach (var faction in Inspection.Factions.Where(v => Match(v.Id.Value))) { <li>faction:@faction.Id = @faction.Standing (@faction.Tier)</li> }
+            @foreach (var scene in Inspection.Scenes.Where(v => Match(v.Id.Value)).Take(100)) { <li>@scene.Id visits: @scene.Visits</li> }
+            @foreach (var trigger in Inspection.Triggers.Where(v => Match(v.Id))) { <li>@trigger.Id fired: @trigger.HasFired</li> }
+        </ul>
+        <p>Showing at most 100 scene visit rows. Narrow the inspection filter to find other scenes.</p>
+    </details>
+    <details>
+        <summary>Events</summary>
+        <p>Zero-based event offsets; showing the most recent 200 matching events.</p>
+        <ul>@foreach (var entry in Inspection.Events.Select((item, index) => (item, index)).Where(e => Match(e.item.ToString())).TakeLast(200))
+        {
+            <li>@entry.index: @entry.item</li>
+        }</ul>
+    </details>
+</section>
+<section aria-label="Branch explanations">
+    <h2>Branch explanations</h2>
+    <p>Historical results at recorded event offsets, not reevaluations of current state. Null results are not evaluated. Exact source locations are unavailable in this release.</p>
+    <label>Filter decisions <input aria-label="Filter decisions" @bind="_decisionFilter" @bind:event="oninput" /></label>
+    <label>Decision kind <select aria-label="Decision kind" @bind="_kind">
+        <option value="">All</option>
+        @foreach (var kind in Enum.GetValues<DecisionKind>()) { <option value="@kind">@kind</option> }
+    </select></label>
+    @if (!Inspection.DecisionsCaptured)
+    {
+        <p>Decision recording unavailable for this run.</p>
+    }
+    <p>Showing the most recent 100 matching decisions. Filter by subject or scene ID.</p>
+    @foreach (var decision in Inspection.FindDecisions(_decisionFilter, Enum.TryParse<DecisionKind>(_kind, out var kind) ? kind : null).TakeLast(100))
+    {
+        <details>
+            <summary>@decision.Kind @decision.Scene @decision.Subject: @decision.Outcome (@decision.Reason)</summary>
+            <p>Events [@decision.EventStart, @decision.EventEnd). Pass: @decision.Pass. Priority: @decision.Priority. Rank: @decision.Rank. Limit: @decision.Limit.</p>
+            @if (decision.Expression is { } expression) { <ul><ExpressionView Trace="expression" /></ul> }
+            @if (decision.EventStart is { } start && decision.EventEnd is { } end && end > start)
+            {
+                <ul>@foreach (var item in Inspection.Events.Skip(start).Take(end - start)) { <li>@item</li> }</ul>
+            }
+        </details>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AuthorInspection Inspection { get; set; } = default!;
+    private string _filter = "";
+    private string _decisionFilter = "";
+    private string _kind = "";
+    private bool Match(string text) => text.Contains(_filter, StringComparison.OrdinalIgnoreCase);
+}

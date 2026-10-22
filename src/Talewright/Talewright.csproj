@@ -6,6 +6,7 @@
     <BuildProjectReferences Condition="'$(NoBuild)' == 'true'">false</BuildProjectReferences>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="buildTransitive/Talewright.targets" Pack="true" PackagePath="buildTransitive/" />
     <ProjectReference Include="../Talewright.Core/Talewright.Core.csproj" PrivateAssets="all" />
     <ProjectReference Include="../Talewright.Rules/Talewright.Rules.csproj" PrivateAssets="all" />
     <ProjectReference Include="../Talewright.Narrative/Talewright.Narrative.csproj" PrivateAssets="all" />

@@ -1,0 +1,111 @@
+<section class="tw-creation" aria-label="Character creation">
+    <h1>@Story.Title</h1>
+    <h2>Create your character</h2>
+    <form @onsubmit="Start" @onsubmit:preventDefault>
+        @if (Story.Creation!.EditName)
+        {
+            <label>First name <input aria-label="First name" @bind="_firstName" maxlength="80" /></label>
+            <label>Last name <input aria-label="Last name" @bind="_lastName" maxlength="80" /></label>
+            <button type="button" @onclick="UseDefaultName">Use default name</button>
+        }
+        @if (Story.Creation.Pronouns.Count > 0)
+        {
+            <label>Pronouns
+                <select aria-label="Pronouns" @bind="_pronouns">
+                    @foreach (var pronoun in Story.Creation.Pronouns)
+                    {
+                        <option value="@pronoun">@pronoun</option>
+                    }
+                </select>
+            </label>
+        }
+        @if (Story.Creation.Presets.Count > 0)
+        {
+            <label>Character preset
+                <select aria-label="Character preset" value="@_preset" @onchange="PresetChanged">
+                    @foreach (var preset in Story.Creation.Presets)
+                    {
+                        <option value="@preset.Id">@preset.Label</option>
+                    }
+                </select>
+            </label>
+        }
+        @foreach (var (stat, values) in Story.Creation.Stats)
+        {
+            var label = Story.World.Ruleset.StatsById[stat].Name;
+            <label>@label
+                <select aria-label="@label" @bind="_stats[stat.Value]">
+                    @foreach (var value in values)
+                    {
+                        <option value="@value">@value</option>
+                    }
+                </select>
+            </label>
+        }
+        @if (_error is not null)
+        {
+            <p class="tw-error" role="alert">@_error</p>
+        }
+        <button type="submit" class="tw-choice">Start story</button>
+    </form>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public StoryDefinition Story { get; set; } = default!;
+    [Parameter]
+    public EventCallback<CharacterSelection> OnCreated { get; set; }
+
+    private string? _firstName;
+    private string? _lastName;
+    private string? _pronouns;
+    private string? _preset;
+    private Dictionary<string, int> _stats = [];
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        var selection = Story.Creation!.Default(Story.World.Characters[EntityId.Player]);
+        _firstName = selection.FirstName;
+        _lastName = selection.LastName;
+        _pronouns = selection.Pronouns;
+        _preset = selection.Preset;
+        _stats = new Dictionary<string, int>(selection.Stats);
+    }
+
+    private void PresetChanged(ChangeEventArgs args)
+    {
+        _preset = args.Value?.ToString();
+        var selection = Story.Creation!.Default(Story.World.Characters[EntityId.Player], _preset);
+        _stats = new Dictionary<string, int>(selection.Stats);
+    }
+
+    private void UseDefaultName()
+    {
+        var player = Story.World.Characters[EntityId.Player];
+        _firstName = player.FirstName;
+        _lastName = player.LastName;
+        _error = null;
+    }
+
+    private async Task Start()
+    {
+        CharacterSelection? selection;
+        try
+        {
+            selection = CharacterSelection.Validate(Story, new CharacterSelection
+            {
+                FirstName = _firstName, LastName = _lastName, Pronouns = _pronouns,
+                Preset = _preset, Stats = _stats,
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            _error = ex.Message;
+            return;
+        }
+
+        _error = null;
+        await OnCreated.InvokeAsync(selection!);
+    }
+}

@@ -9,6 +9,176 @@ dotnet test
 The root solution includes compiler, runtime, rules, narrative, and core tests. It does **not** discover UI
 tests or require downloaded browsers. `Talewright.E2E.slnx` is a separate, opt-in solution in this directory.
 
+### Reproducible performance budgets
+
+```bash
+DOTNET_TieredCompilation=0 dotnet run --project tests/Talewright.Benchmarks -c Release
+python3 tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
+```
+
+The dependency-free console workload generates 100/1,000/10,000-scene stories
+with substitutions, effects and choices. It measures in-memory validation/compilation,
+ZIP load+compile, startup, save serialization, full restore and Back+Forward at
+100/1,000/10,000 choices (the save format's upper limit). Restore verifies cursor
+and event counts. Each operation warms once, then reports median, nearest-rank
+p95 (the maximum of seven samples), current-thread managed allocations and its
+budget. It exits nonzero on any p95 over budget. First compile includes compiler
+JIT cost; later sizes share a warmed process. Timings are not cold OS/process
+startup measurements, peak memory or guarantees for arbitrary author code.
+Run without other build/test work for comparable results.
+
+Budgets deliberately allow slower CI/author machines: compile 100/1,000 scenes
+500 ms and 10,000 scenes 2.5 s; ZIP load+compile 750 ms / 3 s; startup 250 ms;
+save 500 ms; restore and Back+Forward 2 s. Browser tests independently enforce
+upload+WASM compile+first playable render within 5 s (1,000 scenes) and 15 s
+(10,000 scenes), then actually activate the next choice. They include ZIP
+generation/transport, not engine compilation alone. They run with the ordinary
+three-browser suite against trimmed Release output.
+
+M2 local baseline (.NET 10.0.13, Linux Mint 22.3 x64, tiered compilation disabled):
+10,000-scene compile median 138 ms/p95 145 ms, ZIP load+compile 135/149 ms;
+10,000-choice restore 106/115 ms, Back+Forward 112/172 ms; save 0.23/0.24 ms.
+Managed allocations were about 118 MiB for compile and 81 MiB for restore,
+not retained/peak memory. Under concurrent build load, compile p95 rose to 878 ms,
+illustrating why runtime configuration and machine load matter. Browser
+1,000/10,000-scene upload+compile+playable-render measurements were
+416/1,444 ms (Chromium), 572/1,856 ms (Firefox), 505/1,335 ms (WebKit).
+These bounded source workloads
+do not currently justify a second compiled-bundle format, serializer or compatibility
+surface (#26); revisit with real complex stories and constrained-device profiling.
+
+### Real-file BenchmarkDotNet suite
+
+Issue #57 adds a separate, out-of-process BenchmarkDotNet suite. The dependency-free
+seven-sample `Talewright.Benchmarks` runner above remains the fast correctness/budget
+check; it is not presented as BenchmarkDotNet evidence.
+
+The deterministic corpus generator counts `story.yaml` within the file total and
+creates exact expanded-byte totals. The four named tiers are 10 / 100 / 500 / 1,000
+files, 100 / 1,000 / 10,000 / 50,000 scenes, 0.5 / 5 / 25 / 50 MiB, and
+100 / 1,000 / 5,000 / 10,000 choice-history depth. Scene IDs and references are
+unique/valid; generated story content includes substitutions, effects, conditions,
+tags, priorities and bounded hub selection. Only the generator is stored in git.
+It records the seed, counts, byte totals, archive size and a SHA-256 content
+checksum. Repeated comment padding makes the primary ZIPs highly compressible;
+a separate deterministic low-compressibility case exercises a larger upload.
+
+```bash
+# Generate every tier, compile each from disk and ZIP, then play/save/restore its history.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- --verify-corpora
+
+# Full core suite, with five warmups and thirty measured iterations per case.
+TALEWRIGHT_BENCHMARK_OUTPUT="$PWD/artifacts/performance/metadata" \
+  dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*StoryBenchmarks*' --artifacts artifacts/performance/core
+
+# Focused independent file-count, byte-volume, scene-count and history-depth cases.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks*' --artifacts artifacts/performance/dimensions
+
+# Exact and one-over directory/ZIP file-size, aggregate-byte, file-count and depth checks.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*BoundaryInputBenchmarks*' --artifacts artifacts/performance/boundaries
+
+# Generate a corpus outside the BenchmarkDotNet lifecycle, for integration workloads.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --generate-corpus Gigantic artifacts/performance/gigantic-story
+
+# Full web, single-RID and universal desktop publication (45-minute bound each).
+python3 tests/performance/run_publication.py \
+  --story artifacts/performance/gigantic-story \
+  --cli src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll \
+  --output artifacts/performance/publication
+
+# Run one method or tier by matching its BenchmarkDotNet name/parameter.
+dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*LoadAndCompileDirectory*Large*' --artifacts artifacts/performance/large
+```
+
+The default job uses one out-of-process launch, five warmups and thirty measured
+iterations so the reported p95 has more than a handful of samples. The reports
+include BenchmarkDotNet full JSON and CSV, GitHub-flavored Markdown,
+P95/mean/dispersion, GC counts and managed allocations. A metadata JSON sidecar
+records the commit and dirty-worktree flag, corpus seed/checksum/dimensions,
+BenchmarkDotNet and .NET runtime versions, OS, CPU, architecture, physical and
+runtime-available memory, and the configured power/cache note. The recorded worker
+peak working set is process-wide (including setup/harness), not per-operation or
+retained memory. Set `TALEWRIGHT_BENCHMARK_POWER_CACHE` to describe local power/cache
+conditions; GitHub-hosted runner cache and power settings are not controlled.
+
+The suite also measures a fresh CLI process validating the corpus, warmed runtime
+startup/first frame, directory and ZIP loading, compilation, choices, serialization,
+real `FileSaveStore` write/read, restore, Back/Forward and story-only CLI publication.
+The warmed hub-choice case separately measures selection from the generated bounded
+hub, which offers at most 20 storylets. `BoundaryInputBenchmarks` times exact and
+immediately-over directory and ZIP file-size, expanded-size and file-count limits,
+plus directory nesting depth. The runtime suite also verifies a valid save
+at exactly 2 MiB with legal 512-character choice keys; the first additional choice
+crosses the byte cap. Existing compiler/runtime/CLI/player tests provide matching
+ZIP, UTF-16/BOM, upload, save-store, 10,000-choice and failed-publication safety
+checks. Those hard correctness/limit assertions remain separate from noisy
+performance comparisons.
+
+The full browser and native integration workloads are opt-in because they compile
+the 50 MiB / 50,000-scene tier. The manual/scheduled `Real-file performance`
+workflow runs them separately from ordinary per-PR browser and Linux UI tests:
+
+```bash
+python3 tests/run_e2e.py web --filter 'FullyQualifiedName~RealCorpusBrowserPerformanceTests'
+python3 tests/run_e2e.py linux --filter 'FullyQualifiedName~RealCorpusNativePerformanceTests'
+```
+
+Browser integration records archive upload through first playable passage, a choice,
+IndexedDB write/restore, browser identity and main-thread long tasks. The Linux
+Photino case records fresh application open through first playable passage and a
+choice. These are single end-to-end observations, not percentiles. The scheduled
+workflow separately times real CLI web, single-RID desktop and universal desktop
+publication. Each publication is individually bounded at 45 minutes and gets a
+JSON result row (`succeeded`, `failed`, `timed_out`, or `runner_failed`), captured
+stdout/stderr, exit code, output size, elapsed time and `/usr/bin/time` peak RSS
+when available. Later workloads still run after an earlier failure or timeout.
+The internal `dotnet publish`/SDK work is process-level integration time, not
+engine compilation time. No performance budgets are inferred from one
+machine or made a noisy per-PR gate; establish and compare target-specific budgets
+after collecting stable baselines.
+
+Every workflow run also publishes a Markdown summary in the Actions run and
+stores compact, structured measurements in the `performance-results` branch.
+Its `index.md` provides the cross-run overview; `reports/` contains a readable
+report and `runs/` contains one JSON record per run attempt, including
+BenchmarkDotNet means/p95/allocations, browser/Photino observations,
+publication timings, corpus/runtime metadata, and workflow job outcomes. Raw
+artifacts remain available from each Actions run for 30 days; the compact trend
+records persist on the branch.
+
+Published workload labels preserve the CSV's `TierName`, `CorpusCase`, and
+`Boundary` parameters. Player observations also retain the test outcome, so
+measurements emitted before a later test failure are not presented as passing
+tests. Browser evidence captures the viewport rather than the full document;
+long histories can exceed browser screenshot size limits. This does not change
+the player's transcript presentation (tracked separately in #23 and #70).
+
+Benchmark setup/build/worker failures produce a nonzero runner exit code.
+The bounded-hub case times entering the hub, including generated storylet
+selection, rather than choosing from an already populated hub frame. Player
+choice timings wait for changed passage content, and restore timings wait for
+the loaded-slot confirmation and expected transcript depth. Failed real-corpus
+tests remain in published reports even when they emit no measurement JSON.
+Publication results completed before interruption are retained from individual
+workload files when no aggregate summary exists.
+
+Results recorded before these operation-completion fixes do not validate
+hub-selection, browser choice, or IndexedDB restore latency: the old hub case
+left the hub, and the old player assertions could match unchanged content.
+Retain those historical artifacts as evidence, but do not use those particular
+timings as baselines for the corrected workloads.
+
+The weekly schedule runs on the repository's default branch. To measure a
+different branch such as M2 on demand, open **Actions → Real-file performance
+→ Run workflow** and select that branch; the run report records the selected
+branch and commit. Keep branch, runtime, and workload comparable when
+interpreting changes, since hosted runner hardware and load can vary.
+
 ## One test-authoring surface
 
 All player E2E cases and assertions live in **C#/xUnit** in `Talewright.Player.E2E.Tests`.
@@ -34,20 +204,29 @@ package verification) and Tests must pass before any publishing job.
 Test projects retain their original project references and suite boundaries.
 The `src/Talewright/Talewright.csproj` packaging shell bundles the six headless
 assemblies without moving their source or merging their projects. The engine package has no Blazor
-dependency. CI packs exactly `Talewright` and `Talewright.Player`, then restores
+dependency. CI packs the `Talewright` and `Talewright.Player` libraries and the `Talewright.Cli` tool, then restores
 and builds isolated engine-only and Razor consumers using a fresh package cache.
 This checks real package references, the Player's transitive engine dependency,
-and its CSS/JavaScript assets, not just project-reference builds.
+and its CSS/JavaScript assets, not just project-reference builds. CI also packs and installs
+the separate `Talewright.Cli` tool, running JSON validation and story/standalone
+publication outside the checkout.
+The same isolated package check builds the C# authoring example's web and desktop
+hosts, then injects invalid Tale into its temporary copy and requires the build
+to fail with the exact file/line and stable compiler code.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_ci.py' -v
 dotnet build Talewright.slnx -c Release -p:Version=0.1.0-preview.1
-dotnet pack Talewright.slnx -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack src/Talewright -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack src/Talewright.Player -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack src/Talewright.Cli -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
 python3 .github/scripts/verify_packages.py artifacts/packages 0.1.0-preview.1 --smoke
 ```
 
 Use a fresh output directory when changing package versions: verification rejects
 unexpected/duplicate packages instead of accidentally publishing stale files.
+Pack the three projects sequentially: solution-wide packing can evaluate the
+CLI's publish graph concurrently with RCL packing and omit static assets.
 
 Pages publishing also checks the real static output under the configured base
 path. To reproduce a project-subpath deployment after installing Chromium:
@@ -96,6 +275,66 @@ TALEWRIGHT_WEB_ROOT="$PWD/artifacts/web/wwwroot" BROWSER=webkit \
 ```
 
 Use the helper for the normal path; direct invocation requires the matching browser binaries to be installed.
+
+### Standalone publisher artifacts
+
+CI also publishes a selected story with no development samples and tests the
+extracted ZIP. Standalone cases are explicitly skipped in normal development-host
+runs; opt in with `TALEWRIGHT_STANDALONE=1` and `Artifact=Standalone`.
+These checks verify auto-start, title, play, save/load across a host restart,
+history, and (in browsers) a one-story library, real styling, JS and network errors.
+
+```bash
+dotnet run --project src/Talewright.Cli -c Release -- \
+  publish samples/LostRelic -a --target web --output artifacts/game-web.zip
+unzip artifacts/game-web.zip -d artifacts/game-web
+TALEWRIGHT_STANDALONE=1 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/game-web" \
+  TALEWRIGHT_WEB_BASE_PATH=/games/published BROWSER=chromium \
+  dotnet test tests/Talewright.Player.E2E.Tests -c Release --filter Artifact=Standalone
+
+dotnet run --project src/Talewright.Cli -c Release -- \
+  publish samples/LostRelic -a --target desktop --output artifacts/game-desktop.zip
+unzip artifacts/game-desktop.zip -d artifacts/game-desktop
+TALEWRIGHT_STANDALONE=1 TALEWRIGHT_DESKTOP_EXECUTABLE="$PWD/artifacts/game-desktop/start.sh" \
+  python3 tests/run_e2e.py linux --filter Artifact=Standalone
+```
+
+The second command publishes all six OS/CPU builds; the native test launches the
+universal ZIP's actual launcher and selected self-contained Linux binary.
+`--runtime linux-x64` instead creates a flat single-runtime archive; point
+`TALEWRIGHT_DESKTOP_EXECUTABLE` at its `Talewright.Host.Desktop` binary.
+`TALEWRIGHT_PUBLISHED_TITLE` overrides the expected title for another story.
+For a story with opt-in character creation, set `TALEWRIGHT_STANDALONE_CREATION=1`;
+the same extracted-artifact test must complete creation before initial play and
+after process/browser restart. Its initial passage must contain
+`TALEWRIGHT_PUBLISHED_CHARACTER` (default `Tester`), proving identity substitution
+survives trimming. All normal title, choices, save/restore, Back and library
+assertions remain enabled.
+Windows/macOS/ARM64 build verification is not a substitute for runtime testing.
+
+### M2 verified matrix and remaining release checks
+
+Local final gates on Linux x64 (.NET 10.0.13):
+
+| Surface | Evidence |
+|---|---|
+| Headless Release | Build with no warnings; 248 tests passed across six projects |
+| Player in browsers | 64 passed each in Chromium, Firefox and Playwright WebKit; standalone case intentionally skipped in ordinary runs |
+| Native Linux player | 52 passed against the actual Photino window; separate native preflight passed |
+| Extracted standalone web ZIPs | Lost Relic and a creation-enabled story passed in all three browsers beneath `/games/final`; real styles/modules, title, choices, save/reload/Back, one-story library, no JS/network errors |
+| Extracted standalone desktop ZIPs | Universal launcher's Linux x64 selection and a creation-enabled single-RID binary passed play/save/process-restart/load/Back |
+| Desktop payloads | Linux/Windows/macOS x64+ARM64 self-contained builds, Photino libraries, .NET payload, executable modes and launchers verified |
+| Installed packages | Three `0.1.0-m2.7` local packages passed fresh-cache consumers, installed CLI validate/story/web/universal publication, C# web/desktop builds and intentional invalid-Tale build failure |
+| CI scripts | 12 Python contract tests passed; actual GitHub Actions run still requires pushing/review |
+
+This matrix is local evidence, not an assertion that a release has been published.
+Playwright WebKit is not macOS WKWebView. Windows, macOS and ARM64 native
+execution remain unverified; signing, notarization, installers and macOS `.app`
+bundles are not supplied. Before distributing a target platform, extract the ZIP
+on that machine, run its launcher and verify title/play, manual save, process
+restart/load, Back/Forward and library. Windows requires WebView2, Linux
+WebKitGTK; macOS uses its system webview. A build-only payload check cannot replace
+this execution matrix.
 
 Each case records a screenshot, DOM, trace, and browser-error list under
 `artifacts/test-results/<browser>/<case-id>/`. The xUnit output associates the case with that directory.
@@ -241,3 +480,17 @@ References: [Playwright .NET runners](https://playwright.dev/dotnet/docs/test-ru
 [WebKit versions](https://playwright.dev/docs/browsers#webkit),
 [WebKitGTK automation context](https://webkitgtk.org/reference/webkit2gtk/stable/method.WebContext.set_automation_allowed.html),
 [automation-controlled views](https://webkitgtk.org/reference/webkit2gtk/stable/property.WebView.is-controlled-by-automation.html).
+# Author Debugger checks
+
+`dotnet test tests/Talewright.Cli.Tests -c Release` covers CLI argument handling,
+scene search over 1,000 scenes, all prerequisite types, character creation,
+validation and failed-reload preservation.
+
+`python3 tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
+builds and exercises the actual native workbench: repair/reload, late-scene
+search, setup, seed, choices and recorded explanations. It uses the same isolated
+Xvfb/D-Bus/AT-SPI infrastructure as the player; assertions remain in C#.
+Set `TALEWRIGHT_DEBUGGER_EXECUTABLE` to an installed tool's
+`Talewright.Debugger.dll` to check packaged assets outside the checkout.
+Package verification checks debugger/native assets, headless launch errors and
+exclusion from Player packages and published games.

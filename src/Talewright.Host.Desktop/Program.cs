@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor;
 using Talewright.Player.Library;
+using Talewright.Runtime.Saves;
 
 namespace Talewright.Host.Desktop;
 
@@ -22,10 +23,13 @@ internal static class Program
             new FileSystemStoryLibrary(paths)));
 
         // Composite ids are "<library index>|<id>"; the file-system library is index 1 and uses full paths.
-        builder.Services.AddSingleton(new DesktopOptions(paths.Count > 0 ? $"1|{Path.GetFullPath(paths[0])}" : null));
+        var options = new DesktopOptions(paths.Count > 0 ? $"1|{Path.GetFullPath(paths[0])}" : null);
+        builder.Services.AddSingleton(options);
+        builder.Services.AddSingleton<ISaveStore>(new FileSaveStore(FileSaveStore.DefaultRoot));
         builder.RootComponents.Add<App>("app");
 
         var app = builder.Build();
+        options.SetTitle = title => app.MainWindow.SetTitle(title);
         app.MainWindow
             .SetTitle("Talewright")
             .SetSize(1200, 850)
@@ -40,5 +44,9 @@ internal static class Program
 }
 
 /// <summary>Command-line options passed into the Blazor component tree.</summary>
-/// <param name="AutoStartStoryId">Library id of the story to open on launch, if any.</param>
-internal sealed record DesktopOptions(string? AutoStartStoryId);
+/// <param name="autoStartStoryId">Library id of the story to open on launch, if any.</param>
+internal sealed class DesktopOptions(string? autoStartStoryId)
+{
+    public string? AutoStartStoryId { get; } = autoStartStoryId;
+    public Action<string>? SetTitle { get; set; }
+}

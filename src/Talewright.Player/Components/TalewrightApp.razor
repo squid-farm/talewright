@@ -1,13 +1,24 @@
 @* The whole player: pick a story from the library (or upload a .zip), compile it, then play it.
    Hosts render just this component; everything else is shared between desktop and web. *@
 @inject IStoryLibrary Library
+@inject IServiceProvider Services
+@using Microsoft.Extensions.DependencyInjection
+@using Talewright.Runtime.Saves
 
 <div class="tw-app">
     @if (_story is not null)
     {
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
         <div hidden="@_showLibrary">
-            <StoryPlayer Story="_story" Visible="!_showLibrary" OnExit="ShowLibrary" />
+            @if (_story.Creation is not null && _character is null)
+            {
+                <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
+                <button type="button" class="tw-link" @onclick="ShowLibrary">Library</button>
+            }
+            else
+            {
+                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="ShowLibrary" SaveStore="Services.GetService<ISaveStore>()" />
+            }
         </div>
     }
 
@@ -75,8 +86,16 @@
     [Parameter]
     public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
 
+    [Parameter]
+    public EventCallback<string?> OnTitleChanged { get; set; }
+
+    /// <summary>Explicit extensions shared with the author's build-time compiler.</summary>
+    [Parameter]
+    public CompilerOptions Options { get; set; } = CompilerOptions.Default;
+
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
+    private CharacterSelection? _character;
     private bool _showLibrary;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
@@ -96,7 +115,7 @@
         Reset();
         try
         {
-            Compile(await Library.LoadAsync(entry.Id), entry.Title);
+            await CompileAsync(await Library.LoadAsync(entry.Id), entry.Title);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException)
         {
@@ -117,7 +136,7 @@
             }
 
             buffer.Position = 0;
-            Compile(StorySource.FromZip(buffer), e.File.Name);
+            await CompileAsync(StorySource.FromZip(buffer), e.File.Name);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
@@ -125,15 +144,17 @@
         }
     }
 
-    private void Compile(StorySource source, string title)
+    private async Task CompileAsync(StorySource source, string title)
     {
-        var result = StoryCompiler.Compile(source);
+        var result = StoryCompiler.Compile(source, Options);
         _diagnostics = result.Diagnostics;
         if (result.Success)
         {
             _story = result.Story;
+            _character = null;
             _showLibrary = false;
             _diagnostics = [];
+            await OnTitleChanged.InvokeAsync(_story!.Title);
         }
         else
         {
@@ -148,15 +169,19 @@
         _diagnostics = [];
     }
 
-    private void ShowLibrary()
+    private void CharacterCreated(CharacterSelection character) => _character = character;
+
+    private async Task ShowLibrary()
     {
         Reset();
         _showLibrary = true;
+        await OnTitleChanged.InvokeAsync(null);
     }
 
-    private void ResumeStory()
+    private async Task ResumeStory()
     {
         Reset();
         _showLibrary = false;
+        await OnTitleChanged.InvokeAsync(_story!.Title);
     }
 }

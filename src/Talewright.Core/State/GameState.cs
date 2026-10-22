@@ -72,6 +72,12 @@ public sealed class GameState : IGameStateView
     {
         switch (gameEvent)
         {
+            case CharacterIdentityChanged e:
+                Character(e.Character).Definition = GetCharacterDefinition(e.Character) with
+                {
+                    FirstName = e.FirstName, LastName = e.LastName, Pronouns = e.Pronouns,
+                };
+                break;
             case StatChanged e:
                 Character(e.Character).Stats[e.Stat] = e.NewValue;
                 break;
@@ -138,7 +144,8 @@ public sealed class GameState : IGameStateView
     public bool HasCharacter(EntityId id) => _characters.ContainsKey(id);
 
     public CharacterDefinition GetCharacterDefinition(EntityId id) =>
-        World.Characters.TryGetValue(id, out var def) ? def : throw new KeyNotFoundException($"Unknown character '{id}'.");
+        Character(id).Definition ?? (World.Characters.TryGetValue(id, out var def)
+            ? def : throw new KeyNotFoundException($"Unknown character '{id}'."));
 
     public int GetBaseStat(EntityId character, StatId stat) =>
         Character(character).Stats.TryGetValue(stat, out var value) ? value : 0;
@@ -182,6 +189,7 @@ public sealed class GameState : IGameStateView
 
     private sealed class CharacterState
     {
+        public CharacterDefinition? Definition { get; set; }
         public Dictionary<StatId, int> Stats { get; } = [];
         public Dictionary<ItemId, int> Inventory { get; } = [];
     }

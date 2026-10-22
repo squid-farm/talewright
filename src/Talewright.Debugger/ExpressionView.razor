@@ -1,0 +1,21 @@
+<li>
+    <code>@Trace.Expression</code>:
+    <strong>@(Trace.Result?.ToString() ?? "Not evaluated")</strong>
+    @if (Trace.IsOpaque)
+    {
+        <span> (opaque C# predicate; internals unavailable)</span>
+    }
+    @if (Trace.Children.Count > 0)
+    {
+        <ul>
+            @foreach (var child in Trace.Children)
+            {
+                <ExpressionView Trace="child" />
+            }
+        </ul>
+    }
+</li>
+
+@code {
+    [Parameter, EditorRequired] public ExpressionTrace Trace { get; set; } = default!;
+}

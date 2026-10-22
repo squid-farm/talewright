@@ -1,3 +1,9 @@
 @* Web root: just the shared player. No router - the app has a single screen, which also keeps static
    hosting (GitHub Pages, any file server, a subfolder) free of URL-rewrite configuration. *@
-<TalewrightApp />
+<PageTitle>@_title</PageTitle>
+<TalewrightApp OnTitleChanged="UpdateTitle" />
+
+@code {
+    private string _title = "Talewright";
+    private void UpdateTitle(string? title) => _title = title ?? "Talewright";
+}

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Rules.Expressions;
@@ -6,6 +5,9 @@ using Talewright.Rules.Triggers;
 using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
 using Talewright.Tale.Parsing;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Talewright.Tale.Compilation;
 
@@ -16,24 +18,15 @@ namespace Talewright.Tale.Compilation;
 /// Pipeline:
 /// <list type="number">
 /// <item>Read story.yaml into a <see cref="WorldDefinition"/> (ruleset, characters, items, factions…).</item>
-/// <item>Pre-scan every <c>.tale</c> file for scene ids and for flags/variables that some effect assigns,
+/// <item>Discover scene ids and effect assignment targets using the Tale parser and expression lexer,
 /// so forward references and auto-declared flags/variables resolve.</item>
 /// <item>Parse each <c>.tale</c> file (expressions are type-checked and resolved as they are parsed).</item>
 /// <item>Parse triggers, then run the whole-story <see cref="StoryValidator"/>.</item>
 /// </list>
 /// Any error means no story is produced; all diagnostics are returned either way.
 /// </remarks>
-public static partial class StoryCompiler
+public static class StoryCompiler
 {
-    [GeneratedRegex(@"^[ \t]*===[ \t]*(\S+)", RegexOptions.Multiline)]
-    private static partial Regex SceneHeader();
-
-    [GeneratedRegex(@"\b(?:set|clear)\s+flag:([A-Za-z0-9_]+(?:[.\-][A-Za-z0-9_]+)*)")]
-    private static partial Regex FlagAssignment();
-
-    [GeneratedRegex(@"\bvar:([A-Za-z0-9_]+(?:[.\-][A-Za-z0-9_]+)*)\s*(?:=(?!=)|\+=|-=)")]
-    private static partial Regex VariableAssignment();
-
     /// <summary>Compiles <paramref name="source"/>.</summary>
     public static CompilationResult Compile(StorySource source, CompilerOptions? options = null)
     {
@@ -58,14 +51,43 @@ public static partial class StoryCompiler
             diagnostics.Error("TW3001", "The story has no .tale files.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
         }
 
-        var scenes = PreScanScenes(taleFiles, diagnostics);
-        var world = WithAutoDeclarations(manifest.World, taleFiles.Select(f => f.Value).Concat(manifest.EffectText));
+        var scenes = new Dictionary<SceneId, SourceLocation>();
+        var flags = manifest.World.Flags.ToHashSet();
+        var variables = manifest.World.Variables.ToDictionary();
+        void DiscoverEffects(string text) => ExpressionParser.CollectDeclarations(text, flags, variables);
+        var discoverySymbols = new StorySymbols
+        {
+            World = manifest.World,
+            Flags = flags,
+            Variables = variables.Keys.ToHashSet(),
+            Scenes = new HashSet<SceneId>(),
+            Predicates = options.Predicates,
+            Modifiers = options.Modifiers,
+        };
+        foreach (var (path, text) in taleFiles)
+        {
+            TaleParser.Discover(path, text, discoverySymbols, DiscoverEffects, (id, location) =>
+            {
+                if (!scenes.TryAdd(id, location))
+                {
+                    diagnostics.Error("TW3010", $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
+                }
+            });
+        }
+
+        foreach (var text in manifest.EffectText)
+        {
+            DiscoverEffects(text);
+        }
+
+        var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
+            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables);
         var symbols = new StorySymbols
         {
             World = world,
             Flags = world.Flags,
             Variables = world.Variables.Keys.ToHashSet(),
-            Scenes = scenes,
+            Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,
         };
@@ -76,7 +98,7 @@ public static partial class StoryCompiler
         {
             foreach (var scene in TaleParser.Parse(path, text, symbols, diagnostics))
             {
-                // Duplicates were reported by the pre-scan; keep the first so the rest still validates.
+                // Discovery reported duplicates; keep the first so the rest still validates.
                 if (seen.Add(scene.Definition.Id))
                 {
                     parsed.Add(scene);
@@ -107,6 +129,9 @@ public static partial class StoryCompiler
             Id = manifest.Id,
             Title = manifest.Title,
             Version = manifest.Version,
+            ContentFingerprint = Fingerprint(source, options.CompatibilityId),
+            UndoEnabled = manifest.UndoEnabled,
+            Creation = manifest.Creation,
             Start = new SceneId(manifest.Start),
             Randomness = manifest.Randomness,
             Seed = manifest.Seed,
@@ -118,47 +143,32 @@ public static partial class StoryCompiler
         return new CompilationResult(story, diagnostics.Items);
     }
 
-    private static HashSet<SceneId> PreScanScenes(List<KeyValuePair<string, string>> files, DiagnosticBag diagnostics)
+    private static string? Fingerprint(StorySource source, string? compatibilityId)
     {
-        var scenes = new Dictionary<SceneId, SourceLocation>();
-        foreach (var (path, text) in files)
+        if (string.IsNullOrWhiteSpace(compatibilityId))
         {
-            foreach (Match match in SceneHeader().Matches(text))
-            {
-                var id = new SceneId(match.Groups[1].Value);
-                var line = text.AsSpan(0, match.Index).Count('\n') + 1;
-                var location = new SourceLocation(path, line, 1);
-                if (!scenes.TryAdd(id, location))
-                {
-                    diagnostics.Error("TW3010", $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
-                }
-            }
+            return null;
         }
 
-        return scenes.Keys.ToHashSet();
-    }
-
-    /// <summary>
-    /// Flags and variables don't have to be declared in story.yaml: assigning one anywhere declares it (flags start
-    /// false, variables 0). Reading one that is never assigned or declared is still an error.
-    /// </summary>
-    private static WorldDefinition WithAutoDeclarations(WorldDefinition world, IEnumerable<string> texts)
-    {
-        var flags = world.Flags.ToHashSet();
-        var vars = world.Variables.ToDictionary();
-        foreach (var text in texts)
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        void Append(string text)
         {
-            foreach (Match match in FlagAssignment().Matches(text))
-            {
-                flags.Add(new FlagId(match.Groups[1].Value));
-            }
-
-            foreach (Match match in VariableAssignment().Matches(text))
-            {
-                vars.TryAdd(new VarId(match.Groups[1].Value), 0);
-            }
+            var bytes = Encoding.UTF8.GetBytes(text);
+            Span<byte> length = stackalloc byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+            hash.AppendData(length);
+            hash.AppendData(bytes);
         }
 
-        return new WorldDefinition(world.Ruleset, world.Characters.Values, world.Items.Values, world.Factions.Values, flags, vars);
+        Append("talewright-replay-v1");
+        Append(compatibilityId);
+        foreach (var (path, text) in source.Files.OrderBy(f => f.Key, StringComparer.Ordinal))
+        {
+            Append(path);
+            Append(text);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
+
 }

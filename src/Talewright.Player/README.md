@@ -15,7 +15,11 @@ See [registry setup](../../README.md#c-customization-packages).
 | Component | Job |
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `MaxUploadBytes` (20 MB). |
-| `StoryPlayer` | One playthrough. Creates a `StorySession`, keeps a transcript (past frames dimmed, chosen label echoed as "→ …"), numbered choice buttons, Restart, back to Library, "The End". Its collocated JS module scrolls to and focuses the newest frame, respecting reduced motion. Parameters: `Story`, `Seed`, `OnExit`, `Visible`. |
+| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
+| `PlayerToolbar` | Title and navigation/save/restart/library buttons; enabled states and actions come from the parent. |
+| `SavedGamesPanel` | Slot-name input, slot list and explicit overwrite confirmation; all persistence and state live in the parent. |
+| `StoryPassage` | One history frame's title, document and chosen-label echo. |
+| `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`. `RenderedMedia` renders nothing yet. |
 | `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
@@ -32,6 +36,29 @@ See [registry setup](../../README.md#c-customization-packages).
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
+Pass `TalewrightApp.Options` for custom `CompilerOptions`; its default preserves
+built-in behavior. Use one explicit options factory for the player and build-time
+validation, as in the [C# example](../../examples/CSharpStory/README.md).
+`TalewrightApp.OnTitleChanged` reports the loaded/resumed story title or null on library return.
+The web host uses `PageTitle`; the desktop host updates its native window title.
+
+## Saves and history
+
+Register `ISaveStore` for the host: `FileSaveStore` on desktop or the scoped
+`IndexedDbSaveStore` from `Talewright.Player.Saves` on web. `TalewrightApp` supplies it to `StoryPlayer`;
+custom consumers without a store still play normally but have no save controls.
+Use **Saved games** to list slots, save a checkpoint or load one. Saving to an existing name requires
+**Confirm overwrite**. Load failures preserve the current playthrough and show an alert. Operations
+disable conflicting controls while in flight. Browser saves live only in that origin's IndexedDB:
+clearing browser/site data removes them; no server account or cloud sync exists.
+
+Back/Forward restores state, choices and transcript together. Choosing after Back discards redo.
+At 10,000 choices, an explanatory alert replaces silent failure and disables further
+choices. Save, Back/Forward (when allowed by the story), Restart and Library remain
+usable. Going Back below the cap re-enables choices; returning Forward restores the notice.
+Authors can disable these controls with `undo: false`. Restart starts a fresh playthrough but does not
+delete manual saves. Autosave is a [separate follow-up](https://github.com/squid-farm/talewright/issues/54).
+See the [runtime compatibility policy](../Talewright.Runtime/README.md#history-and-saves).
 
 ## Styling (`wwwroot/talewright.css`)
 
@@ -43,9 +70,20 @@ one below 52rem.
 
 ## Not here yet
 
-Saves/loading with compatibility safeguards (M2), character creation (M2), images (M4: Presentation),
+Images (M4: Presentation),
 settings (text size, theme picker; unscheduled). Core release verification takes precedence over new
 presentation features; see [the roadmap](../../docs/PLAN.md#core-production-readiness-gates-m2).
+
+## Character creation
+
+An opt-in manifest `creation` section opens the shared accessible creation form
+before play: names, allowed pronouns, presets and bounded ruleset stat choices.
+Invalid input shows an alert and cannot start a session. Fixed protagonists retain
+the existing direct-start behavior. Restart keeps the active character, including
+one restored from a save. Library reopening offers creation anew; loading a save
+then replaces that selection with the saved character.
+Custom hosts may pass `StoryPlayer.Character` with a validated selection.
+See [the manifest contract](../../docs/TALE-SYNTAX.md#optional-character-creation).
 
 ## Regression testing
 

@@ -44,6 +44,40 @@ internal sealed class ExpressionParser
 
     private sealed class ParseException : Exception;
 
+    internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables)
+    {
+        var tokens = Lexer.Tokenize(text);
+        for (var start = 0; start < tokens.Count - 1;)
+        {
+            var end = start;
+            while (tokens[end].Kind is not (TokenKind.Semicolon or TokenKind.End))
+            {
+                end++;
+            }
+
+            var statement = tokens.GetRange(start, end - start).ToArray();
+            if (statement is [
+                { Kind: TokenKind.Identifier, Text: "set" or "clear" },
+                { Kind: TokenKind.Identifier, Text: "flag" },
+                { Kind: TokenKind.Colon },
+                { Kind: TokenKind.Identifier } flag])
+            {
+                flags.Add(new FlagId(flag.Text));
+            }
+            else if (statement is [
+                { Kind: TokenKind.Identifier, Text: "var" },
+                { Kind: TokenKind.Colon },
+                { Kind: TokenKind.Identifier } variable,
+                { Kind: TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign },
+                .. var amount] && amount.Length > 0)
+            {
+                variables.TryAdd(new VarId(variable.Text), 0);
+            }
+
+            start = end + 1;
+        }
+    }
+
     /// <summary>Parses a boolean condition. Returns null (with diagnostics) on error.</summary>
     public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
         ParseTyped(text, location, symbols, diagnostics, ExprType.Bool);

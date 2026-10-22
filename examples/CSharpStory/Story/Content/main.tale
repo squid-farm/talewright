@@ -1,0 +1,7 @@
+=== beginning
+{player:first-name#greeting}.
+* [Continue] (requires: @Ready) -> ending
+
+=== ending
+Your explicitly registered extensions work.
+-> END

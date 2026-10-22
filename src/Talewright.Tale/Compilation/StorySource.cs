@@ -9,9 +9,9 @@ namespace Talewright.Tale.Compilation;
 /// </summary>
 public sealed class StorySource
 {
-    private const int MaxZipStoryFiles = 1_000;
-    private const long MaxZipStoryFileBytes = 5L * 1024 * 1024;
-    private const long MaxZipExpandedBytes = 50L * 1024 * 1024;
+    private const int MaxStoryFiles = 1_000;
+    private const long MaxStoryFileBytes = 5L * 1024 * 1024;
+    private const long MaxExpandedBytes = 50L * 1024 * 1024;
 
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
     public const string ManifestFileName = "story.yaml";
@@ -28,15 +28,42 @@ public sealed class StorySource
     public IEnumerable<KeyValuePair<string, string>> TaleFiles =>
         Files.Where(f => f.Key.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.Key, StringComparer.Ordinal);
 
-    /// <summary>Loads every <c>story.yaml</c>/<c>*.tale</c> file under <paramref name="directory"/>.</summary>
+    /// <summary>Loads story files with the same count/size bounds as ZIP loading. Symbolic links are rejected.</summary>
     public static StorySource FromDirectory(string directory)
     {
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+        long totalBytes = 0;
+        var pending = new Stack<(string Path, int Depth)>();
+        pending.Push((directory, 0));
+        while (pending.TryPop(out var current))
         {
-            if (IsStoryFile(path))
+            foreach (var path in Directory.EnumerateFileSystemEntries(current.Path))
             {
-                files[Path.GetRelativePath(directory, path).Replace('\\', '/')] = File.ReadAllText(path);
+                var attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new InvalidDataException($"Story folders cannot contain symbolic links: '{path}'.");
+                }
+
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    if (current.Depth >= 64)
+                    {
+                        throw new InvalidDataException("Story folders may be nested at most 64 levels deep.");
+                    }
+
+                    pending.Push((path, current.Depth + 1));
+                }
+                else if (IsStoryFile(path))
+                {
+                    if (files.Count >= MaxStoryFiles)
+                    {
+                        throw new InvalidDataException("A story may contain at most 1,000 story files.");
+                    }
+
+                    using var input = File.OpenRead(path);
+                    files[Path.GetRelativePath(directory, path).Replace('\\', '/')] = ReadText(input, path, ref totalBytes);
+                }
             }
         }
 
@@ -61,9 +88,9 @@ public sealed class StorySource
         var storyEntries = entries
             .Where(entry => entry.FullName.Replace('\\', '/').StartsWith(root, StringComparison.Ordinal))
             .ToList();
-        if (storyEntries.Count > MaxZipStoryFiles)
+        if (storyEntries.Count > MaxStoryFiles)
         {
-            throw new InvalidDataException($"A story archive may contain at most {MaxZipStoryFiles:N0} story files.");
+            throw new InvalidDataException($"A story archive may contain at most {MaxStoryFiles:N0} story files.");
         }
 
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -72,33 +99,36 @@ public sealed class StorySource
         {
             var path = entry.FullName.Replace('\\', '/');
             using var input = entry.Open();
-            using var content = new MemoryStream();
-            var buffer = new byte[81920];
-            long entryBytes = 0;
-            int bytesRead;
-            while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
-            {
-                if (entryBytes + bytesRead > MaxZipStoryFileBytes)
-                {
-                    throw new InvalidDataException($"Story file '{path}' exceeds the 5 MiB expanded-size limit.");
-                }
-
-                if (totalBytes + bytesRead > MaxZipExpandedBytes)
-                {
-                    throw new InvalidDataException("The story archive exceeds the 50 MiB total expanded-text limit.");
-                }
-
-                content.Write(buffer, 0, bytesRead);
-                entryBytes += bytesRead;
-                totalBytes += bytesRead;
-            }
-
-            content.Position = 0;
-            using var reader = new StreamReader(content);
-            files[path[root.Length..]] = reader.ReadToEnd();
+            files[path[root.Length..]] = ReadText(input, path, ref totalBytes);
         }
 
         return new StorySource(files);
+    }
+
+    private static string ReadText(Stream input, string path, ref long totalBytes)
+    {
+        using var content = new MemoryStream();
+        var buffer = new byte[81920];
+        int bytesRead;
+        while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            if (content.Length + bytesRead > MaxStoryFileBytes)
+            {
+                throw new InvalidDataException($"Story file '{path}' exceeds the 5 MiB expanded-size limit.");
+            }
+
+            if (totalBytes + bytesRead > MaxExpandedBytes)
+            {
+                throw new InvalidDataException("The story exceeds the 50 MiB total expanded-text limit.");
+            }
+
+            content.Write(buffer, 0, bytesRead);
+            totalBytes += bytesRead;
+        }
+
+        content.Position = 0;
+        using var reader = new StreamReader(content);
+        return reader.ReadToEnd();
     }
 
     /// <summary>

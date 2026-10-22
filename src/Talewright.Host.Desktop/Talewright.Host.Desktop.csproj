@@ -6,6 +6,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <TalewrightIncludeSamples Condition="'$(TalewrightIncludeSamples)' == ''">true</TalewrightIncludeSamples>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Talewright.Player\Talewright.Player.csproj" />
+    <ProjectReference Include="..\Talewright.Runtime\Talewright.Runtime.csproj" />
   </ItemGroup>
 
   <!-- Photino serves wwwroot from the output folder. -->
@@ -22,9 +24,8 @@
   </ItemGroup>
 
   <!-- Bundled sample stories, embedded as stories/<Story>/<path> (see EmbeddedStoryLibrary). -->
-  <ItemGroup>
-    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml"
-                      LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" />
+  <ItemGroup Condition="'$(TalewrightIncludeSamples)' == 'true'">
+    <EmbeddedResource Include="..\..\samples\**\*.tale;..\..\samples\**\*.yaml" LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
 
 </Project>

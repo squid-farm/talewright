@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Talewright" Version="$(TalewrightVersion)" />
+    <EmbeddedResource Include="Content/**/*.yaml;Content/**/*.tale" LogicalName="stories/Custom/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
+  </ItemGroup>
+</Project>

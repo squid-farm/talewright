@@ -1,0 +1,7 @@
+<PageTitle>@_title</PageTitle>
+<TalewrightApp AutoStartStoryId="Published" OnTitleChanged="UpdateTitle" />
+
+@code {
+    private string _title = "Talewright";
+    private void UpdateTitle(string? title) => _title = title ?? "Talewright";
+}

@@ -5,6 +5,7 @@ using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
+using Talewright.Tale.Model;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
@@ -23,6 +24,8 @@ internal sealed class StoryManifest
     public SourceLocation StartLocation { get; set; }
     public RandomnessMode Randomness { get; set; } = RandomnessMode.ChecksOnly;
     public ulong? Seed { get; set; }
+    public bool UndoEnabled { get; set; } = true;
+    public CharacterCreation? Creation { get; set; }
     public required WorldDefinition World { get; init; }
     public List<RawTrigger> Triggers { get; } = [];
 
@@ -71,7 +74,7 @@ internal sealed class StoryYamlReader
             return null;
         }
 
-        CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
+        CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "undo", "creation", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
 
         var ruleset = ReadRuleset(Get(root, "ruleset"));
         var items = ReadItems(Get(root, "items"), ruleset);
@@ -107,8 +110,125 @@ internal sealed class StoryYamlReader
                 : Error<ulong?>(seed, "TW4003", "seed must be a non-negative whole number.", null);
         }
 
+        if (Get(root, "undo") is { } undo)
+        {
+            manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
+                ? enabled
+                : Error(undo, "TW4003", "undo must be true or false.", true);
+        }
+
         ReadTriggers(Get(root, "triggers"), manifest.Triggers);
+        manifest.Creation = ReadCreation(Get(root, "creation"), ruleset);
         return manifest;
+    }
+
+    private CharacterCreation? ReadCreation(YamlNode? node, Ruleset ruleset)
+    {
+        if (node is null || Mapping(node, "creation") is not { } map)
+        {
+            return null;
+        }
+
+        CheckKeys(map, "name", "pronouns", "presets", "stats");
+        var editName = false;
+        if (Get(map, "name") is { } name && !bool.TryParse(Scalar(name), out editName))
+        {
+            Error(name, "TW4003", "creation.name must be true or false.", 0);
+        }
+
+        var pronouns = new List<string>();
+        if (Get(map, "pronouns") is { } pronounNode)
+        {
+            foreach (var value in Sequence(pronounNode, "creation.pronouns"))
+            {
+                var keyword = Scalar(value) ?? "";
+                if (keyword is not ("she" or "he" or "they" or "it") || pronouns.Contains(keyword))
+                {
+                    Error(value, "TW4003", "creation.pronouns must contain distinct built-in keywords: she, he, they, it.", 0);
+                }
+                else
+                {
+                    pronouns.Add(keyword);
+                }
+            }
+        }
+
+        var stats = new Dictionary<StatId, IReadOnlyList<int>>();
+        if (Get(map, "stats") is { } statNode && Mapping(statNode, "creation.stats") is { } statMap)
+        {
+            foreach (var (key, value) in statMap.Children)
+            {
+                var id = new StatId(Scalar(key) ?? "");
+                if (!ruleset.StatsById.TryGetValue(id, out var definition))
+                {
+                    Error(key, "TW4005", $"Unknown creation stat '{id}'.", 0);
+                    continue;
+                }
+
+                var values = new List<int>();
+                foreach (var option in Sequence(value, "creation stat values"))
+                {
+                    if (Int(option) is { } number && definition.Clamp(number) == number && !values.Contains(number))
+                    {
+                        values.Add(number);
+                    }
+                    else
+                    {
+                        Error(option, "TW4003", $"Creation values for '{id}' must be distinct integers within ruleset bounds.", 0);
+                    }
+                }
+
+                if (values.Count is < 1 or > 100)
+                {
+                    Error(value, "TW4003", "Each creation stat needs 1 to 100 legal values.", 0);
+                }
+
+                stats[id] = values.AsReadOnly();
+            }
+        }
+
+        if (stats.Count > 32)
+        {
+            Error(map, "TW4003", "Character creation supports at most 32 selectable stats.", 0);
+        }
+
+        var presets = new List<CharacterPreset>();
+        if (Get(map, "presets") is { } presetNode && Mapping(presetNode, "creation.presets") is { } presetMap)
+        {
+            foreach (var (key, value) in presetMap.Children)
+            {
+                if (Mapping(value, "creation preset") is not { } preset)
+                {
+                    continue;
+                }
+
+                CheckKeys(preset, "label", "stats");
+                var id = Scalar(key) ?? "";
+                if (string.IsNullOrWhiteSpace(id) || id.Length > 80)
+                {
+                    Error(key, "TW4003", "Preset ids must contain 1 to 80 characters.", 0);
+                }
+
+                var presetStats = ReadStatMap(Get(preset, "stats"), ruleset);
+                foreach (var (stat, number) in presetStats)
+                {
+                    if (ruleset.StatsById[stat].Clamp(number) != number ||
+                        stats.TryGetValue(stat, out var choices) && !choices.Contains(number))
+                    {
+                        Error(value, "TW4003", $"Preset stat '{stat}' must respect ruleset bounds and its selectable values.", 0);
+                    }
+                }
+
+                presets.Add(new CharacterPreset(id, Scalar(Get(preset, "label")) ?? id, presetStats));
+            }
+
+            if (presets.Count > 16)
+            {
+                Error(presetNode, "TW4003", "Character creation supports at most 16 presets.", 0);
+            }
+        }
+
+        return new CharacterCreation { EditName = editName, Pronouns = pronouns.AsReadOnly(), Stats = stats, Presets = presets.AsReadOnly() };
     }
 
     private Ruleset ReadRuleset(YamlNode? node)

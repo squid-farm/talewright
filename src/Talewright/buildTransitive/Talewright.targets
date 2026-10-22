@@ -1,0 +1,14 @@
+<Project>
+  <Target Name="ValidateTalewrightStory" BeforeTargets="CoreCompile"
+          Condition="'$(TalewrightStoryProject)' != '' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(TalewrightStoryRoot)' == ''" Code="TWBUILD002"
+           Text="TalewrightStoryRoot is required when TalewrightStoryProject is set." />
+    <MSBuild Projects="$(TalewrightStoryProject)" Targets="Restore;Build"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishTrimmed;PublishAot;TalewrightStoryProject;TalewrightStoryRoot"
+             Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_TalewrightStoryValidator" />
+    </MSBuild>
+    <Exec Command="dotnet &quot;%(_TalewrightStoryValidator.Identity)&quot; &quot;$(TalewrightStoryRoot)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>

@@ -2,10 +2,12 @@ using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Narrative.Grammar;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
@@ -46,15 +48,62 @@ public sealed class StorySession : IStorySession
     private readonly EventLog _log;
     private readonly TriggerEngine _triggers;
     private readonly TemplateRenderer _renderer;
+    private readonly bool _captureEntry;
+    private readonly Action<RuleDecision>? _observer;
     private readonly Dictionary<string, Action<List<RenderedBlock>>> _actions = new(StringComparer.Ordinal);
 
     /// <summary>Creates a session. <paramref name="seed"/> defaults to the story's seed, else a random one.</summary>
-    public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null)
+    public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null, CharacterSelection? character = null)
+        : this(story, seed, grammar, character, setup: null, observer: null)
     {
+    }
+
+    public StorySession(StoryDefinition story, ulong? seed, IGrammar? grammar,
+        CharacterSelection? character, Action<RuleDecision>? observer)
+        : this(story, seed, grammar, character, setup: null, observer)
+    {
+    }
+
+    internal StorySession(StoryDefinition story, ulong seed, CharacterSelection? character, AuthorSetup setup,
+        Action<RuleDecision>? observer = null)
+        : this(story, seed, grammar: null, character, setup, observer)
+    {
+    }
+
+    private StorySession(StoryDefinition story, ulong? seed, IGrammar? grammar, CharacterSelection? character,
+        AuthorSetup? setup, Action<RuleDecision>? observer)
+    {
+        character = CharacterSelection.Validate(story, character);
         Story = story;
         Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);
-        _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State);
+        if (character is not null)
+        {
+            var player = story.World.Characters[EntityId.Player];
+            _log.Append(new CharacterIdentityChanged(EntityId.Player,
+                character.FirstName ?? player.FirstName, character.LastName ?? player.LastName,
+                character.Pronouns is null ? player.Pronouns : Pronouns.FromKeyword(character.Pronouns)!));
+            var stats = new Dictionary<StatId, int>();
+            if (story.Creation!.Presets.FirstOrDefault(p => p.Id == character.Preset) is { } preset)
+            {
+                foreach (var (stat, value) in preset.Stats)
+                {
+                    stats[stat] = value;
+                }
+            }
+            foreach (var (stat, value) in character.Stats)
+            {
+                stats[new StatId(stat)] = value;
+            }
+            foreach (var (stat, value) in stats.OrderBy(kv => kv.Key.Value, StringComparer.Ordinal))
+            {
+                _log.Append(new StatChanged(EntityId.Player, stat, _log.State.GetBaseStat(EntityId.Player, stat), value));
+            }
+        }
+        setup?.Apply(_log);
+        _captureEntry = setup is not null;
+        _observer = observer;
+        _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count);
         _renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
     }
 
@@ -77,13 +126,16 @@ public sealed class StorySession : IStorySession
 
     /// <inheritdoc/>
     public StoryFrame Start()
+        => StartAt(Story.Start);
+
+    internal StoryFrame StartAt(SceneId scene)
     {
         if (Current is not null)
         {
             throw new InvalidOperationException("The session has already started.");
         }
 
-        return Enter(new DivertTarget(Story.Start), []);
+        return Enter(new DivertTarget(scene), []);
     }
 
     /// <inheritdoc/>
@@ -101,27 +153,44 @@ public sealed class StorySession : IStorySession
         }
 
         var notes = new List<RenderedBlock>();
+        EntryBoundary = null;
         action(notes);
         return Current;
     }
 
     // ---- scene entry -----------------------------------------------------------------------------------------------
 
+    internal SceneEntryBoundary? EntryBoundary { get; private set; }
+
     private StoryFrame Enter(DivertTarget target, List<RenderedBlock> pending)
     {
         if (target.IsEnd)
         {
+            EntryBoundary = null;
             return EndStory(pending, scene: null);
         }
 
         var scene = Story.GetScene(target.Scene!.Value);
         var mark = _log.Events.Count;
-        _log.Append(new SceneEntered(scene.Id));
-        foreach (var entry in scene.EntryEffects)
+        if (_captureEntry)
         {
-            if (entry.Condition is null || ExpressionEvaluator.IsTrue(entry.Condition, Context))
+            EntryBoundary = new SceneEntryBoundary(scene.Id, mark, Array.AsReadOnly(pending.ToArray()));
+        }
+        _log.Append(new SceneEntered(scene.Id));
+        for (var i = 0; i < scene.EntryEffects.Count; i++)
+        {
+            var entry = scene.EntryEffects[i];
+            var start = _log.Events.Count;
+            var applies = Test(entry.Condition, out var trace);
+            if (applies)
             {
                 EffectExecutor.Execute(entry.Effect, _log, Story.Predicates);
+            }
+            if (_observer is not null)
+            {
+                Observe(DecisionKind.EntryEffect, $"entry:{i}", applies ? DecisionOutcome.Applied : DecisionOutcome.Excluded,
+                    entry.Condition is null ? DecisionReason.Unconditional
+                        : applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, start);
             }
         }
 
@@ -133,6 +202,7 @@ public sealed class StorySession : IStorySession
         DivertTarget? next;
         if (scene.EntryCheck is { } check)
         {
+            SkipChoices(scene);
             var checkMark = _log.Events.Count;
             next = ResolveCheck(check, scene);
             blocks.AddRange(NotesSince(checkMark));
@@ -142,6 +212,7 @@ public sealed class StorySession : IStorySession
             var choices = OfferChoices(scene);
             if (choices.Count > 0)
             {
+                SkipDiverts(scene, DecisionReason.ChoicesAvailable);
                 return Present(scene, blocks, choices);
             }
 
@@ -163,22 +234,22 @@ public sealed class StorySession : IStorySession
         var offered = new List<(ChoiceView, Action<List<RenderedBlock>>)>();
         foreach (var choice in scene.Choices)
         {
-            if (choice.Requires is null || ExpressionEvaluator.IsTrue(choice.Requires, Context))
+            var applies = Test(choice.Requires, out var trace);
+            Observe(DecisionKind.Choice, choice.Key, applies ? DecisionOutcome.Offered : DecisionOutcome.Excluded,
+                choice.Requires is null ? DecisionReason.Unconditional
+                    : applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, _log.Events.Count);
+            if (applies)
             {
                 var view = new ChoiceView(choice.Key, _renderer.RenderInlines(choice.Label, _log.State));
                 offered.Add((view, notes => MakeChoice(scene, choice, notes)));
             }
         }
 
-        if (!string.IsNullOrEmpty(scene.HubTag))
+        if (scene.HubSelection is { } hub)
         {
-            foreach (var storylet in StoryletSelector.SelectEligible(Story.Scenes, scene.HubTag, Context))
+            foreach (var storylet in StoryletSelector.SelectEligible(Story.Scenes, hub, Context, scene.Id,
+                scene.HubLimit, _observer, _log.Events.Count))
             {
-                if (storylet.Id == scene.Id)
-                {
-                    continue;
-                }
-
                 var label = new RenderedInline[] { new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None) };
                 var key = StoryletKeyPrefix + storylet.Id.Value;
                 offered.Add((new ChoiceView(key, label), notes =>
@@ -218,6 +289,10 @@ public sealed class StorySession : IStorySession
         }
         else
         {
+            if (choice.Divert is not null)
+            {
+                SkipDiverts(scene, DecisionReason.ExplicitTarget);
+            }
             target = choice.Divert ?? FirstMatchingDivert(scene);
         }
 
@@ -235,10 +310,20 @@ public sealed class StorySession : IStorySession
     /// <summary>Resolves a check and applies its outcome; returns where to go next (null = stuck).</summary>
     private DivertTarget? ResolveCheck(CheckBranch check, SceneDefinition scene)
     {
-        var result = SkillCheckResolver.Resolve(check.Check, _log, Story.Randomness, Story.Predicates);
+        var result = SkillCheckResolver.Resolve(check.Check, _log, Story.Randomness, Story.Predicates, _observer);
         var outcome = result.Success ? check.Success : check.Failure;
+        var start = _log.Events.Count;
         EffectExecutor.ExecuteAll(outcome.Effects, _log, Story.Predicates);
         AfterChanges();
+        if (_observer is not null)
+        {
+            Observe(DecisionKind.CheckOutcome, $"{check.Check.Actor}:{check.Check.Skill}",
+                DecisionOutcome.Applied, result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, start);
+        }
+        if (outcome.Divert is not null)
+        {
+            SkipDiverts(scene, DecisionReason.ExplicitTarget);
+        }
         return outcome.Divert ?? FirstMatchingDivert(scene);
     }
 
@@ -278,8 +363,79 @@ public sealed class StorySession : IStorySession
         return changes;
     }
 
-    private DivertTarget? FirstMatchingDivert(SceneDefinition scene) =>
-        scene.Diverts.FirstOrDefault(d => d.Condition is null || ExpressionEvaluator.IsTrue(d.Condition, Context))?.Target;
+    private DivertTarget? FirstMatchingDivert(SceneDefinition scene)
+    {
+        DivertTarget? selected = null;
+        for (var i = 0; i < scene.Diverts.Count; i++)
+        {
+            var divert = scene.Diverts[i];
+            if (selected is not null)
+            {
+                ObserveSkipped(DecisionKind.Divert, $"divert:{i}->{divert.Target}", divert.Condition, DecisionReason.EarlierDivert);
+                continue;
+            }
+            var applies = Test(divert.Condition, out var trace);
+            if (_observer is not null)
+            {
+                Observe(DecisionKind.Divert, $"divert:{i}->{divert.Target}",
+                    applies ? DecisionOutcome.Selected : DecisionOutcome.Excluded,
+                    divert.Condition is null ? DecisionReason.Unconditional
+                        : applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, _log.Events.Count);
+            }
+            if (applies)
+            {
+                selected = divert.Target;
+                if (_observer is null)
+                {
+                    break;
+                }
+            }
+        }
+        return selected;
+    }
+
+    private bool Test(Expr? expression, out ExpressionTrace? trace)
+        => RuleObservation.Test(expression, Context, _observer is not null, out trace);
+
+    private void Observe(DecisionKind kind, string subject, DecisionOutcome outcome, DecisionReason reason,
+        ExpressionTrace? trace, int start) => _observer?.Invoke(new RuleDecision(kind, subject, State.CurrentScene,
+            outcome, reason, trace, start, _log.Events.Count));
+
+    private void ObserveSkipped(DecisionKind kind, string subject, Expr? expression, DecisionReason reason)
+        => _observer?.Invoke(new RuleDecision(kind, subject, State.CurrentScene, DecisionOutcome.NotEvaluated,
+            reason, expression is null ? null : ExpressionTrace.NotEvaluated(expression), _log.Events.Count, _log.Events.Count));
+
+    private void SkipDiverts(SceneDefinition scene, DecisionReason reason)
+    {
+        if (_observer is null)
+        {
+            return;
+        }
+        for (var i = 0; i < scene.Diverts.Count; i++)
+        {
+            var divert = scene.Diverts[i];
+            ObserveSkipped(DecisionKind.Divert, $"divert:{i}->{divert.Target}", divert.Condition, reason);
+        }
+    }
+
+    private void SkipChoices(SceneDefinition scene)
+    {
+        if (_observer is null)
+        {
+            return;
+        }
+        foreach (var choice in scene.Choices)
+        {
+            ObserveSkipped(DecisionKind.Choice, choice.Key, choice.Requires, DecisionReason.EntryCheck);
+        }
+        if (scene.HubSelection is not null)
+        {
+            foreach (var storylet in Story.Scenes)
+            {
+                ObserveSkipped(DecisionKind.Storylet, storylet.Id.Value, storylet.Requires, DecisionReason.EntryCheck);
+            }
+        }
+    }
 
     private IEnumerable<RenderedBlock> NotesSince(int mark) =>
         EventNarrator.Describe(_log.Events.Skip(mark).ToList(), _log.State);
@@ -308,3 +464,5 @@ public sealed class StorySession : IStorySession
         return Current;
     }
 }
+
+internal sealed record SceneEntryBoundary(SceneId Scene, int EventCount, IReadOnlyList<RenderedBlock> Pending);

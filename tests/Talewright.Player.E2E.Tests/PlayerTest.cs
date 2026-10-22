@@ -20,6 +20,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
     protected virtual bool AutoStartDesktop => true;
+    protected virtual bool StartsInLibrary => true;
 
     public async Task InitializeAsync()
     {
@@ -64,8 +65,11 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
             }
         };
         await Page.GotoAsync(host.BaseUrl);
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
+        if (StartsInLibrary)
+        {
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
+        }
     }
 
     protected async Task Upload(StoryFixture fixture, string prefix = "") =>
@@ -103,9 +107,10 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         });
     }
 
-    protected async Task AssertState(Action<PlayerObservation> assertion)
+    protected async Task AssertState(Action<PlayerObservation> assertion, TimeSpan? timeout = null)
     {
         var timer = Stopwatch.StartNew();
+        var maximumWait = timeout ?? TimeSpan.FromSeconds(15);
         while (true)
         {
             var state = await Driver.ObserveAsync();
@@ -114,7 +119,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
                 assertion(state);
                 return;
             }
-            catch (Xunit.Sdk.XunitException) when (timer.Elapsed < TimeSpan.FromSeconds(15))
+            catch (Xunit.Sdk.XunitException) when (timer.Elapsed < maximumWait)
             {
                 await Task.Delay(100);
             }
@@ -137,7 +142,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         {
             if (Page is not null && !Page.IsClosed)
             {
-                await Page.ScreenshotAsync(new() { Path = Path.Combine(_artifacts, "page.png"), FullPage = true });
+                await Page.ScreenshotAsync(new() { Path = Path.Combine(_artifacts, "page.png"), FullPage = false });
                 await File.WriteAllTextAsync(Path.Combine(_artifacts, "page.html"), await Page.ContentAsync());
                 if (await Page.Locator("#blazor-error-ui").IsVisibleAsync())
                 {

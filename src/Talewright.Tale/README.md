@@ -15,13 +15,19 @@ if (!result.Success)
 var session = new StorySession(result.Story!);
 ```
 
+Folder and ZIP loaders both accept at most 1,000 story files, 5 MiB per file and
+50 MiB total expanded text. Folder traversal rejects symbolic links inside the
+story and paths deeper than 64 directories. Only `story.yaml` and `.tale` files
+are loaded; unrelated files are not published as story content.
+
 ## Pipeline (`StoryCompiler.Compile`)
 
 1. **Manifest.** `StoryYamlReader` reads `story.yaml` (YamlDotNet node model, so error positions are exact and
    nothing depends on reflection). Builds the ruleset (`base` → factory from `CompilerOptions.Rulesets`, then
    `disable`, then `stats`), characters, items, factions, flags, vars and triggers.
-2. **Pre-scan.** Regexes over every `.tale` collect scene ids (`=== id`) and auto-declared flags/vars
-   (`set flag:x`, `var:x += 1`), so scenes can reference things declared later or in other files.
+2. **Discover.** The Tale parser collects scene ids and actual effect blocks; the expression lexer collects
+   assignment targets from those blocks and manifest effects. Comments, prose and choice labels do not
+   declare flags/vars. Forward references across files remain supported.
 3. **Parse.** `TaleParser` walks each file line by line (files in path order). Prose goes through `InlineParser`;
    conditions, substitutions and effects through `ExpressionParser`. Choices/effects/diverts inside `{if}` blocks
    get the condition ANDed in.

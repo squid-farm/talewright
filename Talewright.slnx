@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Talewright/Talewright.csproj" />
+    <Project Path="src/Talewright.Cli/Talewright.Cli.csproj" />
     <Project Path="src/Talewright.Core/Talewright.Core.csproj" />
+    <Project Path="src/Talewright.Debugger/Talewright.Debugger.csproj" />
     <Project Path="src/Talewright.Host.Desktop/Talewright.Host.Desktop.csproj" />
     <Project Path="src/Talewright.Host.Web/Talewright.Host.Web.csproj" />
     <Project Path="src/Talewright.Narrative/Talewright.Narrative.csproj" />
@@ -12,6 +14,8 @@
     <Project Path="src/Talewright.Tale/Talewright.Tale.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Talewright.Benchmarks/Talewright.Benchmarks.csproj" />
+    <Project Path="tests/Talewright.Cli.Tests/Talewright.Cli.Tests.csproj" />
     <Project Path="tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />
     <Project Path="tests/Talewright.Narrative.Tests/Talewright.Narrative.Tests.csproj" />
     <Project Path="tests/Talewright.Rules.Tests/Talewright.Rules.Tests.csproj" />

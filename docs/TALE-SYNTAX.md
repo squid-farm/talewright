@@ -18,6 +18,7 @@ version: 0.1.0
 start: camp.arrival # first scene id
 randomness: checks-only # off | checks-only (default)
 seed: 1234 # optional; omitted = random per playthrough
+undo: true # default; false hides Back/Forward without disabling saves
 
 ruleset:
   base: generic # generic | none
@@ -72,6 +73,49 @@ pronouns:
   }
 ```
 
+### Optional character creation
+
+Without `creation`, the authored protagonist starts unchanged. With it, the shared
+player requires a legal selection before play. The `player` declaration remains
+required and provides identity, inventory and other stat defaults.
+
+```yaml
+creation:
+  name: true
+  pronouns: [they, she, he]
+  stats:
+    str: [8, 12, 16]
+  presets:
+    explorer:
+      label: Explorer
+      stats: {str: 12, hp: 15}
+    scholar:
+      label: Scholar
+      stats: {str: 8, hp: 10}
+```
+
+All fields are optional. `name: true` allows first/last names (trimmed, no control
+characters, at most 80 characters each, nonempty first name). Names are
+prefilled from `characters.player.first-name` and `last-name`; the **Use default name**
+button restores those authored names without resetting other creation choices.
+Pronoun choices are
+distinct built-in keywords; omit them to preserve an authored custom pronoun set.
+Stat choices must exist in the final ruleset and be distinct integers within its
+bounds: up to 32 selectable stats, each with 1–100 values. Up to 16 presets may set
+starting stats, also within ruleset bounds; selectable preset stats must be legal
+options. The first preset/pronoun is the default. For each selectable stat, its
+preset value (or authored protagonist value) is used if legal, otherwise the first
+listed option is the default. If neither supplies a value, the first listed option
+is used; an explicitly authored zero is distinct from an omitted stat.
+Player selections override preset stats.
+
+Initialization events precede scene entry and are replayed identically on undo,
+redo and load. Saves retain the created character. Restart retains that identity
+and selection; reopening a story from the library offers creation again. To load
+an existing save after reopening, complete creation and use **Saved games**; the
+saved character replaces the temporary selection. This is not point-buy, a class
+designer or a race system.
+
 ## 2. Scenes
 
 ```tale
@@ -102,6 +146,9 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
 | `@once`                                            | Storylet is ineligible after it was visited once.                                              |
 | `@hub tag`                                         | At this scene, offer every eligible scene tagged `tag` as a choice.                            |
+| `@hub all(tag, tag)`                               | Offer storylets carrying every listed tag.                                                   |
+| `@hub any(tag, tag)`                               | Offer storylets carrying at least one listed tag.                                             |
+| `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (inline Markdown).                                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `![alt](media-id)`                                 | Media placeholder (ignored by the M1 player; reserved for images).                             |
@@ -116,6 +163,14 @@ Metadata lines are only recognized directly after the `===` header. Lines starti
 _no_ target — e.g. `* [Take the torch] { give player torch }` — **falls through** to the scene's own
 `-> target` lines (like an ink "gather"), and so does a check outcome without `-> target`. A scene must have
 at least one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise it's a compile error.
+
+Hub tags must be distinct and nonempty. A scene may have only one `@hub` and one
+`@hub-limit`. The selector excludes the hub itself, applies requirements and
+`@once`, then sorts by descending priority and stable declaration order before
+limiting. Multiple matching tags never duplicate a choice. Explicit choices are
+not capped. A fallback `->` applies only when no explicit or generated choices
+are available. Reachability conservatively considers all tag matches, not just
+the current capped selection, because state changes may alter eligibility.
 
 **Conditional structure.** Choices, `~` effects and `->` diverts inside a block `{if}` only apply when the
 condition holds (a choice's own `requires` is combined with it using `and`). With several `->` lines, the

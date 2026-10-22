@@ -25,15 +25,50 @@ stats, factions and items. No code is needed. Programmers can extend the engine 
 
 **Milestone 1 (vertical slice) is complete:** the engine, the `.tale` compiler, the shared Blazor player, and the
 desktop and web hosts all work, and the sample story *The Lost Relic* is playable end to end on both.
-Core reliability and release verification come first in M2, alongside saves with compatibility safeguards,
-a CLI with `validate` and `publish`, and character creation.
+**M2 implementation** adds manual named saves with conservative compatibility checks, deterministic
+Back/Forward history, `validate` and story-only/complete-game `publish`, explicit C# project
+integration, all/any bounded hubs, and opt-in character creation. Save migration, autosave and
+editor tooling are not included. Release readiness is tracked separately in
+[#33](https://github.com/squid-farm/talewright/issues/33); local implementation is not a registry release.
 M3 adds `lint` and editor-neutral language-server support with a thin VS Code extension for Tale highlighting,
 snippets, live validation, completion, and hover help, delivered in independently usable slices.
 Later milestones preserve the feature backlog: **M4** image/media support, **M5** world simulation,
 **M6** combat, **M7** runtime plugins, **M8** save migration, and **M9** safe `lint --fix` (lowest priority).
 Dependencies, not milestone numbers alone, determine when independent work can start; none blocks M2/M3.
-These commands and editor tools are planned, not available yet; they will share the compiler's analysis
-rather than duplicate it. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
+CLI `validate` and `publish` are available; editor tools remain planned. They share the compiler rather
+than duplicate its analysis. See [docs/PLAN.md](docs/PLAN.md) for scope and dependencies.
+
+## Performance snapshot
+
+The initial Release benchmark compiles **10,000 generated scenes** with substitutions,
+effects and choices, and restores **10,000-choice histories**:
+
+| Operation | Median | Observed p95 |
+|---|---:|---:|
+| Compile 10,000 scenes | 138 ms | 145 ms |
+| Load in-memory story ZIP + compile | 135 ms | 149 ms |
+| Restore 10,000 choices | 106 ms | 115 ms |
+| Back + Forward at 10,000 choices | 112 ms | 172 ms |
+| Serialize a 10,000-choice save | 0.23 ms | 0.24 ms |
+
+Published, trimmed WebAssembly player tests also loaded a generated 10,000-scene
+story and reached its first playable passage in **1.44 s in Chromium, 1.86 s in
+Firefox and 1.33 s in Playwright WebKit** (one integration measurement per browser,
+including archive generation/upload, compilation and rendering; not p95 values).
+
+These are recorded local measurements on **Linux Mint 22.3 x64 / .NET 10.0.13**,
+not universal performance guarantees. The .NET table uses warmed execution with
+tiered compilation disabled, seven samples per operation, and nearest-rank p95
+(the largest sample). The synthetic story has one Tale file of about 1.24 MB;
+these numbers do **not** measure cold process/disk startup, complex real-world
+stories or maximum file/byte limits. Compile and restore allocated approximately
+118 MiB and 81 MiB respectively; those are managed allocations, not peak memory.
+Compilation p95 reached 878 ms during a separate run under concurrent build load.
+
+See [methodology, reproduction commands and recorded results](tests/README.md#reproducible-performance-budgets).
+The broader **10 / 100 / 500 / 1,000 real-file BenchmarkDotNet suite** remains
+tracked in [#57](https://github.com/squid-farm/talewright/issues/57); it has not yet
+produced results.
 
 ## Work tracking
 
@@ -54,6 +89,7 @@ assignee and branch/worktree comment. See [the migration index and workflow](doc
 | `src/Talewright.Rulesets.Generic` | Default d20 ruleset |
 | `src/Talewright.Tale` | Story compiler and diagnostics |
 | `src/Talewright.Runtime` | Story sessions and frames |
+| `src/Talewright.Cli` | `talewright validate` and story-only/standalone `publish` tool |
 | `src/Talewright.Player` | Blazor UI (Razor Class Library) |
 | `src/Talewright.Host.Desktop` / `.Host.Web` | Photino desktop host / Blazor WASM host |
 | `samples/LostRelic` | Sample story (not part of the engine) |
@@ -85,8 +121,16 @@ No C# project or NuGet dependency is needed to write a story. Copy a story from
 [samples](samples/README.md), edit its `.tale` files and `story.yaml`, and open the
 folder in the desktop player or upload its ZIP in the web player. The published
 [sample player](https://squid-farm.github.io/talewright/) includes all bundled samples.
-The CLI and VS Code authoring extension are roadmap work, not prerequisites or
-commands implemented by this change.
+Validate from source with `dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`.
+See the [CLI reference](src/Talewright.Cli/README.md) for JSON output and exit policy.
+Use `talewright publish story-folder --output story.zip` for a portable story archive, or add
+`-a --target web|desktop` for a complete deployable game. The VS Code authoring extension remains roadmap work.
+Web output is a static site that also works beneath a subpath. Desktop output defaults to one ZIP
+with self-contained Windows/Linux/macOS x64 and ARM64 builds plus launchers that select the right one;
+players do not need .NET, but do need their OS webview. `--runtime` selects a smaller single-platform ZIP.
+This is not a universal native executable or a signed/notarized installer.
+For custom C# registrations and build-time Tale errors, see the package-based
+[C# story example](examples/CSharpStory/README.md).
 
 ## C# customization packages
 
@@ -100,6 +144,7 @@ Packages are for C# extensions and custom applications, not ordinary story autho
 Install **only `Talewright.Player`** for the usual C# customization experience.
 Install `Talewright` alone for tooling or a replacement frontend. Both packages
 share one release version. Hosts, sample stories, and test helpers are not packages.
+`Talewright.Cli` is a separate .NET tool package, not a library dependency.
 The Player package is a UI library, not a runnable desktop/web application; a
 custom application still supplies its host and story library.
 
@@ -129,7 +174,7 @@ project reference for compilation and depends on the shell package for distribut
 ## GitHub Actions and releases
 
 The Build workflow runs on PRs targeting `main`, pushes to `main`, version-tag
-pushes, and manual requests. It builds Release and verifies the two packages with
+pushes, and manual requests. It builds Release and verifies both libraries and the CLI tool with
 clean, isolated consumers. Its reusable Tests workflow runs unit tests, Chromium,
 Firefox, WebKit, and actual Linux Photino tests. Both must pass before publishing:
 

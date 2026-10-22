@@ -40,8 +40,9 @@ class Desktop:
         self.output = output
         output.mkdir(parents=True, exist_ok=True)
         self.log = (output / "app.log").open("w")
+        command = ["dotnet", str(executable)] if executable.suffix == ".dll" else [str(executable)]
         self.process = subprocess.Popen(
-            ["dotnet", str(executable), *paths], cwd=executable.parent,
+            [*command, *paths], cwd=executable.parent,
             stdout=self.log, stderr=subprocess.STDOUT,
         )
 
@@ -190,12 +191,31 @@ def serve(args):
                     result = app.wait(app.snapshot, "read accessibility tree")
                 elif command == "click":
                     app.click(**arguments)
+                elif command == "activate":
+                    node = app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
+                    node.queryComponent().grabFocus()
+                    app.key("Space")
+                elif command == "fill":
+                    node = app.wait(lambda: app.find(name=arguments["name"]), "editable named field")
+                    node.queryComponent().grabFocus()
+                    app.key("Control_L", pyatspi.KEY_PRESS)
+                    try:
+                        app.key("a")
+                    finally:
+                        app.key("Control_L", pyatspi.KEY_RELEASE)
+                    pyatspi.Registry.generateKeyboardEvent(0, arguments["value"], pyatspi.KEY_STRING)
+                    app.key("Tab")
                 elif command == "upload":
                     app.upload(**arguments)
                 elif command == "key":
                     app.key(**arguments)
                 elif command == "resize":
-                    subprocess.run(["wmctrl", "-r", "Talewright", "-e",
+                    windows = subprocess.check_output(["wmctrl", "-lp"], text=True).splitlines()
+                    window = next((line.split()[0] for line in windows
+                                   if len(line.split()) >= 3 and line.split()[2] == str(app.process.pid)), None)
+                    if window is None:
+                        raise RuntimeError("No window belongs to the Photino process")
+                    subprocess.run(["wmctrl", "-ir", window, "-e",
                                     f"0,-1,-1,{arguments['width']},{arguments['height']}"], check=True)
                 elif command == "close":
                     try:
