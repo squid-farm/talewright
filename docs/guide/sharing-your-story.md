@@ -61,7 +61,38 @@ tested; Windows, macOS and ARM builds are unverified.
 
 ## Republishing
 
-`publish` won't overwrite an existing file unless you add `--force`. If you publish an update, existing
-saves won't load in the new version (see [saves](playing-and-saving.md#updating-a-story-with-existing-saves)).
+Run the same command again:
+
+```bash
+talewright publish my-story --output my-story.zip
+```
+
+In an interactive terminal, publish shows the full existing file path and asks `Replace it? [y/N]`
+before doing the build. Type `y` or `yes` to replace it. Press Enter or answer `n` to keep the old file
+and cancel (exit 2). End-of-input also cancels. A failed build or ZIP write keeps the old file.
+
+For a script that must never ask questions:
+
+```bash
+talewright publish my-story --output my-story.zip --non-interactive
+```
+
+This succeeds for a new path but stops if the ZIP already exists. If you intentionally want a script
+to replace it, add `--force`:
+
+```bash
+talewright publish my-story --output my-story.zip --non-interactive --force
+```
+
+`--force` means "replace without asking"; `--non-interactive` only means "never ask." Neither skips
+validation. Redirecting input or output also prevents questions, so those commands need `--force`
+to replace an existing file.
+
+Avoid publishing two builds to the same path at once. Without force, publish stops if another file
+appears or an approved file observably changes during the build. This is a safety check, not a lock
+against every possible filesystem race; see the [replacement policy](../reference/cli.md#replacing-an-existing-archive).
+
+If you publish an update, existing saves won't load in the new version
+(see [saves](playing-and-saving.md#updating-a-story-with-existing-saves)).
 
 All options and limits: [CLI reference: publish](../reference/cli.md#publish).

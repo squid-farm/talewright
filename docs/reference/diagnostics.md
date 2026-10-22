@@ -74,4 +74,4 @@ the story. See the [CLI reference](cli.md#output-contract).
 | Code | Meaning |
 |---|---|
 | TWCLI001 | Invalid command or options. |
-| TWCLI002 | The story folder couldn't be read, or a required file, tool or desktop component is missing. |
+| TWCLI002 | An input/output operation failed, an existing publish destination needs `--force` in noninteractive use, the destination changed during publication, or a required file, tool or desktop component is missing. |

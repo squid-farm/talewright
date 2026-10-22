@@ -118,6 +118,7 @@ public sealed class ValidationTests : IDisposable
         start.ArgumentList.Add(_root);
         start.ArgumentList.Add("--format");
         start.ArgumentList.Add("json");
+        start.ArgumentList.Add("--non-interactive");
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
@@ -132,6 +133,10 @@ public sealed class ValidationTests : IDisposable
     [InlineData("--help", "", "validate")]
     [InlineData("validate", "--help", "--warnings-as-errors")]
     [InlineData("publish", "--help", "--all-in-one")]
+    [InlineData("--help", "", "--non-interactive")]
+    [InlineData("validate", "--help", "--non-interactive")]
+    [InlineData("publish", "--help", "--non-interactive")]
+    [InlineData("debug", "--help", "--non-interactive")]
     public void Framework_help_describes_commands_and_options(string first, string second, string expected)
     {
         using var output = new StringWriter();
@@ -172,6 +177,96 @@ public sealed class ValidationTests : IDisposable
         Assert.Equal(0, result.Code);
         Assert.Equal("""{"schemaVersion":1,"success":true,"diagnostics":[]}""", result.Output.Trim());
         Assert.Empty(result.Error);
+    }
+
+    [Theory]
+    [InlineData("--non-interactive", "--format", "json")]
+    [InlineData("--format=json", "--non-interactive")]
+    [InlineData("--non-interactive", "--bogus", "--format=json")]
+    [InlineData("--bogus", "--format=json", "--non-interactive")]
+    public void Noninteractive_validation_preserves_exact_json_and_parse_errors(params string[] options)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = CommandLine.Run(["validate", _root, .. options], output, error,
+            new CliInput(new UnreadableInput(), false, false));
+        using var json = JsonDocument.Parse(output.ToString());
+        var invalid = options.Contains("--bogus");
+        Assert.Equal(invalid ? 2 : 0, code);
+        Assert.Equal(!invalid, json.RootElement.GetProperty("success").GetBoolean());
+        if (invalid)
+        {
+            Assert.Equal("TWCLI001", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        }
+        else
+        {
+            Assert.Equal("""{"schemaVersion":1,"success":true,"diagnostics":[]}""", output.ToString().Trim());
+        }
+        Assert.Empty(error.ToString());
+    }
+
+    [Fact]
+    public void Noninteractive_does_not_change_compiler_diagnostics_or_warnings_policy()
+    {
+        File.AppendAllText(Path.Combine(_root, "main.tale"), "\n=== unused\n-> END");
+        Assert.Equal(Run("--format=json"), Run("--format=json", "--non-interactive"));
+        Assert.Equal(Run("--warnings-as-errors", "--format=json"),
+            Run("--non-interactive", "--warnings-as-errors", "--format=json"));
+        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== a\n-> missing");
+        Assert.Equal(Run("--format=json"), Run("--format=json", "--non-interactive"));
+        Assert.Equal(Run(), Run("--non-interactive"));
+        Directory.Delete(_root, recursive: true);
+        Assert.Equal(Run("--format=json"), Run("--format=json", "--non-interactive"));
+        Directory.CreateDirectory(_root);
+    }
+
+    [Fact]
+    public void Debug_accepts_shared_option_without_changing_launch_validation()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        Assert.Equal(2, CommandLine.Run(["debug", Path.Combine(_root, "missing"), "--non-interactive"],
+            output, error, new CliInput(new UnreadableInput(), false, false)));
+        Assert.Contains("TWCLI002", error.ToString());
+        Assert.Contains("does not exist", error.ToString());
+        Assert.Empty(output.ToString());
+    }
+
+    [Theory]
+    [InlineData("--non-interactiv")]
+    [InlineData("--Non-Interactive")]
+    [InlineData("--non-interactive", "--bogus")]
+    [InlineData("--non-interactive", "--force")]
+    public void Shared_option_preserves_strict_parsing(params string[] options)
+    {
+        var result = Run(options);
+        Assert.Equal(2, result.Code);
+        Assert.Contains("TWCLI001", result.Error);
+        Assert.Empty(result.Output);
+    }
+
+    [Fact]
+    public void Shared_option_after_terminator_is_not_reinterpreted()
+    {
+        Assert.Equal(Run("--", "--non-interactive"), Run("--", "--format=json"));
+    }
+
+    private sealed class UnreadableInput : TextReader
+    {
+        public override string? ReadLine() => throw new InvalidOperationException("Validation/debug must not read input.");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Shared_contract_does_not_change_missing_or_unknown_command_errors(bool unknown)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        Assert.Equal(2, CommandLine.Run(unknown ? ["unknown", "--non-interactive"] : [], output, error,
+            new CliInput(new UnreadableInput(), false, false)));
+        Assert.Empty(output.ToString());
+        Assert.Contains("TWCLI001", error.ToString());
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
