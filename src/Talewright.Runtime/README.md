@@ -99,11 +99,15 @@ Portable scenarios and player-save compatibility bypass are not implemented here
 
 ### Live editing and author navigation
 
+For controls and author-facing behavior, see the [live-editing walkthrough](../../docs/guide/testing-your-story.md#change-state-without-starting-over).
+The API contract is:
+
 `Edit(AuthorSetup)` applies an absolute-value batch to the **current** state, using the same
 declared-ID validation and event-producing domain setters as setup. Unlike initial setup,
 it runs normal triggers/leveling against existing rising-edge memory after the complete batch.
-All characters' base stats and inventory are editable. Effective stats, visits, fired triggers
-and RNG remain read-only. `Results` records before/actual-after values and all consequence events.
+`Results` records before/actual-after values and all consequence events, with kind-prefixed
+field keys (`flag:`, `var:`, `faction:`, `stat:`, `inventory:`) to distinguish character IDs
+from other editable fields.
 
 Presentation refresh renders current text and reevaluates choice/storylet eligibility and
 ordinary diverts without entering the scene, duplicating visits/effects or rolling dice.
@@ -111,9 +115,8 @@ For an entry check, the already resolved continuation is retained even if edited
 produce a different outcome now. Its original notes and incoming transition notes remain visible.
 An edit leaving no live continuation is explicitly rejected; use fresh-world setup instead.
 
-`Jump(target)` bypasses eligibility and enters normally once, retaining state, visits, fired
-triggers and RNG. It is not proof of normal reachability. Ended-session edits/jumps are
-unsupported: use `Back()` to return to a live passage or `JumpFresh` for a fresh world.
+`Jump(target)` uses normal scene entry on the existing session, unlike `JumpFresh`.
+The runtime rejects ended-session edits/jumps rather than clearing `IsEnded`.
 
 `Commands` is a typed author-only sequence of `AuthorChoice`, `AuthorEdit` and `AuthorJump`;
 validated setup/character/seed/start remain its origin. `Cursor`, `Back()` and `Forward()`

@@ -66,6 +66,36 @@ public sealed class AuthorTimelineTests
 
     private static AuthorSetup Flag(bool value) => new() { Flags = new Dictionary<FlagId, bool> { [new("ready")] = value } };
 
+    [Theory]
+    [InlineData("flag", "flag:str")]
+    [InlineData("var", "var:str")]
+    [InlineData("faction", "faction:str")]
+    public void Mixed_field_batches_use_distinct_kind_keys_for_character_stats(string character, string field)
+    {
+        var yaml = Yaml.Replace("flags: [ready, fired]", "flags: [ready, fired, str]")
+            .Replace("vars: {count: 0}", "vars: {count: 0, str: 0}")
+            .Replace("guide: {first-name: Guide, stats: {str: 11}}", $"{character}: {{first-name: Guide, stats: {{str: 11}}}}")
+            .Replace("guild: {name: Guild}", "str: {name: Guild}");
+        var session = Start(Compile(yaml: yaml));
+        session.Edit(new()
+        {
+            Flags = new Dictionary<FlagId, bool> { [new("str")] = true },
+            Variables = new Dictionary<VarId, int> { [new("str")] = 7 },
+            Standings = new Dictionary<FactionId, int> { [new("str")] = -5 },
+            Stats = [new(new(character), new("str"), 15)],
+        });
+        var changes = Assert.Single(session.Results).Changes;
+        Assert.Equal(4, changes.Select(change => change.Field).Distinct().Count());
+        Assert.Contains(changes, change => change.Field == field);
+        Assert.Contains(changes, change => change.Field == $"stat:{character}:str"
+            && change.Before == "11" && change.After == "15");
+        Assert.Equal(15, session.State.GetBaseStat(new(character), new("str")));
+        var events = session.Events;
+        session.Back();
+        session.Forward();
+        Assert.Equal(events, session.Events);
+    }
+
     [Fact]
     public void Batch_edits_every_declared_kind_across_characters_then_refreshes_without_entry()
     {

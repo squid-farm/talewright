@@ -67,56 +67,14 @@ is runtime-tested; other platforms need validation. Missing folders, assets or p
 launch failures, exit 2 with `TWCLI002`. Compiler errors appear in the window so you can fix and save
 without closing it.
 
-**Starting a scene.** Search by id or title (or type an exact id), optionally choose a seed and create
-the character, enable only the overrides you need (flags, variables, base stats, absolute item counts,
-faction standing), then start. Normal rules still apply: stats are clamped and entry effects and
-triggers run. Each start is a fresh synthetic history, so skipped scenes are unvisited and reachability
-isn't proven. Setup and pre-entry initialization events are listed separately. Player saves are never
-read or written.
+**Workbench behavior.** See the testing guide for [scene setup and inspection](../guide/testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger),
+[live edits, jumps and navigation](../guide/testing-your-story.md#change-state-without-starting-over),
+and [source reload/restart](../guide/testing-your-story.md#editing-while-you-test).
+For API and reconstruction invariants, see the [runtime documentation](../../src/Talewright.Runtime/README.md#live-editing-and-author-navigation).
 
-**Inspection.** Shows actual state, events and historical branch decisions. Explanations record how
-conditions evaluated at the time, not predictions against the current state.
-
-**Live edits and jumps.** Validated absolute-value edit batches change declared flags, variables,
-faction standing, all characters' base stats and inventory, then run normal triggers and leveling.
-Text/choices refresh without entry effects, visits or entry-check rerolls; resolved entry-check
-continuations stay fixed. Command history shows before/actual-after values and cascading events.
-Preserve-state jumps bypass eligibility and enter once with accumulated state/history/RNG.
-Ended runs require Back or a fresh-world start; edits with no live continuation are rejected explicitly.
-
-**Author timeline.** Back/Forward cover choices, edits and jumps regardless of player undo policy.
-Successful new commands discard redo. Commands use separate candidates; failures leave the active
-run and timeline unchanged. This timeline is not a player save and cannot overwrite player slots.
-
-**Reloading `.tale` changes.** Saves are debounced and compiled as one complete source set. Automatic
-reload rebuilds the state just before the current scene was entered (declarations, rules, earlier
-scenes and choice meanings, events, RNG position, pending notes, trigger memory), then enters the current
-scene once from there. Its entry effects and check outcomes may legitimately change. The passage is
-replaced, explanations are rebuilt, and a reload marker is shown. Only the current passage is displayed,
-not a reconstructed transcript.
-
-Applied edit/jump commands are replayed and retained. Pending redo postpones automatic reload without
-discarding anything: move Forward to the end and Rescan, or explicitly start a fresh scene.
-
-The guard is deliberately conservative. Restart is required after:
-
-- any structural change to a scene already passed through, even its prose;
-- changed Tale auto-declarations, missing targets, or a run that ended without reaching a new scene;
-- **any `story.yaml` change**, even comments (later Tale saves can't bypass this);
-- a file-watcher error, since missed events can't prove `story.yaml` didn't change.
-
-Errors keep the last good run and mark the source as stale.
-
-**Restart from source** compiles the latest source and revalidates the setup, seed, target and character,
-discarding the run only on success. Changed or removed ids are reported, never silently dropped: fix or
-disable the overrides (or clear the character), then restart. **Rescan / retry watcher** retries
-compilation and rearms a failed watcher without bypassing these guards. Closing the window releases
-the watcher and pending work.
-
-**Not yet supported:** live state editing, jumping while preserving state, save editing and portable
-scenarios ([#63](https://github.com/squid-farm/talewright/issues/63),
-[#64](https://github.com/squid-farm/talewright/issues/64)). C# extensions aren't hot-reloaded; rebuild and
-restart. Debugger assets ship in the CLI tool, not in Player packages or published games.
+**Distribution.** Debugger assets ship in the CLI tool, not in Player packages or published games.
+Save editing and portable scenarios are not supported yet
+([#64](https://github.com/squid-farm/talewright/issues/64)).
 
 ## publish
 

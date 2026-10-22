@@ -130,11 +130,11 @@ public sealed record AuthorSetup
         }
         foreach (var value in Stats)
         {
-            yield return new($"{value.Character}:{value.Stat}", state.GetBaseStat(value.Character, value.Stat).ToString(CultureInfo.InvariantCulture));
+            yield return new($"stat:{value.Character}:{value.Stat}", state.GetBaseStat(value.Character, value.Stat).ToString(CultureInfo.InvariantCulture));
         }
         foreach (var value in Inventory)
         {
-            yield return new($"{value.Character} inventory:{value.Item}", state.GetItemCount(value.Character, value.Item).ToString(CultureInfo.InvariantCulture));
+            yield return new($"inventory:{value.Character}:{value.Item}", state.GetItemCount(value.Character, value.Item).ToString(CultureInfo.InvariantCulture));
         }
     }
 }

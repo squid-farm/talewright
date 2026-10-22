@@ -79,9 +79,22 @@ Leave the debugger open while you write. When you save a `.tale` file, it recomp
 scene you're on, keeping the state you'd built up to reach it. You stay where you are.
 
 Some changes can't be applied safely in place, for example editing a scene the player already passed
-through. Any change to `story.yaml` also needs a restart. In those cases the debugger asks you to click
+through, changing Tale-inferred flags/variables, removing a target, or reloading a run that ended
+without entering a new scene. Any change to `story.yaml`, even a comment, also needs a restart.
+A file-watcher failure requires a restart because source changes may have been missed.
+In those cases the debugger asks you to click
 **Restart from source**. You don't have to set anything up again: it keeps your selected scene, seed,
 overrides and character, and tells you about any that no longer exist in the story so you can fix them.
+Correct or disable invalid overrides (or clear the character), then restart. The current run is only
+discarded after the new source and retained setup validate successfully.
+
+Failed compilations and runtime errors keep the last good run visible and mark the source as stale.
+**Rescan / retry watcher** retries compilation and rearms a failed watcher without bypassing restart
+requirements. C# extensions are not hot-reloaded; rebuild and restart them.
+
+Reload reconstructs the state before the current scene entry and enters once, so changes to its entry
+effects or checks may deliberately change their results. It replaces the current passage and rebuilds
+branch explanations, not a transcript of earlier passages.
 
 Applied edit and jump commands are kept during compatible reloads. If you have pending redo after
 going Back, automatic reload pauses rather than silently dropping commands. Go Forward to the end

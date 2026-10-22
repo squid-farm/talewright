@@ -30,46 +30,31 @@ public sealed class AuthorSession
         CaptureDecisions = captureDecisions;
         var decisions = new List<RuleDecision>();
         var results = new List<AuthorCommandResult>();
-        var lastEntryCommand = Array.FindLastIndex(commands.Take(cursor).ToArray(),
+        var appliedCommands = commands.Take(cursor).ToArray();
+        var lastEntryCommand = Array.FindLastIndex(appliedCommands,
             command => command is AuthorChoice or AuthorJump);
-        var atBoundary = lastEntryCommand < 0;
-        _session = new StorySession(story, seed, character, setup, captureDecisions ? decisions.Add : null,
-            verify is null ? null : (boundary, events) =>
-            {
-                if (atBoundary)
-                {
-                    verify.VerifyBoundary(boundary, events);
-                }
-            });
-        _session.StartAt(target);
-        for (var i = 0; i < cursor; i++)
+        var verifyNextEntry = lastEntryCommand < 0;
+
+        void VerifyEntry(SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events)
         {
-            var scene = story.GetScene(_session.Current!.Scene!.Value);
-            var command = commands[i];
-            var eventStart = _session.Events.Count;
-            var before = command is AuthorEdit editCommand ? editCommand.Values.ReadValues(_session.State).ToDictionary() : [];
+            if (verifyNextEntry)
+            {
+                verify?.VerifyBoundary(boundary, events);
+            }
+        }
+
+        _session = new StorySession(story, seed, character, setup,
+            captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry);
+        _session.StartAt(target);
+        for (var i = 0; i < appliedCommands.Length; i++)
+        {
+            var command = appliedCommands[i];
             if (i <= lastEntryCommand)
             {
-                var selected = command is AuthorChoice choice
-                    ? _session.Current.Choices.FirstOrDefault(view => view.Key == choice.Key)
-                        ?? throw new AuthorReloadException($"previously consumed choice '{choice.Key}' is unavailable at '{scene.Id}'")
-                    : new ChoiceView(command is AuthorJump jump ? $"author-jump:{jump.Target}" : "author-edit", []);
-                var played = AuthorPlayedChoice.Capture(story, scene, selected);
-                verify?.VerifyPlayedChoice(i, played);
-                _playedChoices.Add(played);
+                VerifyConsumedCommand(i, command, verify);
             }
-            atBoundary = i == lastEntryCommand;
-            switch (command)
-            {
-                case AuthorChoice choice: _session.Choose(choice.Key); break;
-                case AuthorEdit edit: _session.EditAuthorState(edit.Values.Validate(story)); break;
-                case AuthorJump jump: _session.JumpAuthor(jump.Target); break;
-                default: throw new NotSupportedException($"Unknown author command '{command.GetType().Name}'.");
-            }
-            var changes = command is AuthorEdit edited
-                ? edited.Values.ReadValues(_session.State).Select(value => new AuthorValueChange(value.Key, before[value.Key], value.Value)).ToArray()
-                : [];
-            results.Add(new(eventStart, Array.AsReadOnly(_session.Events.Skip(eventStart).ToArray()), Array.AsReadOnly(changes)));
+            verifyNextEntry = i == lastEntryCommand;
+            results.Add(ReplayCommand(command));
         }
         _results = results.AsReadOnly();
         Events = Array.AsReadOnly(_session.Events.ToArray());
@@ -78,8 +63,65 @@ public sealed class AuthorSession
         if (_session.EntryBoundary is { } boundary)
         {
             Checkpoint = new AuthorSceneCheckpoint(story, target, setup, seed, character,
-                commands.Take(cursor).ToArray(), boundary, Events, captureDecisions, _playedChoices.ToArray());
+                appliedCommands, boundary, Events, captureDecisions, _playedChoices.ToArray());
         }
+    }
+
+    private void VerifyConsumedCommand(int index, AuthorCommand command, AuthorSceneCheckpoint? checkpoint)
+    {
+        var scene = Story.GetScene(Current.Scene!.Value);
+        ChoiceView selected;
+        switch (command)
+        {
+            case AuthorChoice choice:
+                selected = Current.Choices.FirstOrDefault(view => view.Key == choice.Key)
+                    ?? throw new AuthorReloadException($"previously consumed choice '{choice.Key}' is unavailable at '{scene.Id}'");
+                break;
+            case AuthorJump jump:
+                selected = new ChoiceView($"author-jump:{jump.Target}", []);
+                break;
+            case AuthorEdit:
+                selected = new ChoiceView("author-edit", []);
+                break;
+            default:
+                throw new NotSupportedException($"Unknown author command '{command.GetType().Name}'.");
+        }
+        var played = AuthorPlayedChoice.Capture(Story, scene, selected);
+        checkpoint?.VerifyPlayedChoice(index, played);
+        _playedChoices.Add(played);
+    }
+
+    private AuthorCommandResult ReplayCommand(AuthorCommand command)
+    {
+        var eventStart = _session.Events.Count;
+        IReadOnlyList<AuthorValueChange> changes = [];
+        switch (command)
+        {
+            case AuthorChoice choice:
+                _session.Choose(choice.Key);
+                break;
+            case AuthorEdit edit:
+                changes = ReplayEdit(edit);
+                break;
+            case AuthorJump jump:
+                _session.JumpAuthor(jump.Target);
+                break;
+            default:
+                throw new NotSupportedException($"Unknown author command '{command.GetType().Name}'.");
+        }
+        var events = Array.AsReadOnly(_session.Events.Skip(eventStart).ToArray());
+        return new AuthorCommandResult(eventStart, events, changes);
+    }
+
+    private IReadOnlyList<AuthorValueChange> ReplayEdit(AuthorEdit edit)
+    {
+        var values = edit.Values.Validate(Story);
+        var before = values.ReadValues(_session.State).ToDictionary();
+        _session.EditAuthorState(values);
+        var changes = values.ReadValues(_session.State)
+            .Select(value => new AuthorValueChange(value.Key, before[value.Key], value.Value))
+            .ToArray();
+        return Array.AsReadOnly(changes);
     }
 
     public StoryDefinition Story { get; }
