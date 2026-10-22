@@ -47,10 +47,21 @@ public sealed class StorySession : IStorySession
     private readonly EventLog _log;
     private readonly TriggerEngine _triggers;
     private readonly TemplateRenderer _renderer;
+    private readonly bool _captureEntry;
     private readonly Dictionary<string, Action<List<RenderedBlock>>> _actions = new(StringComparer.Ordinal);
 
     /// <summary>Creates a session. <paramref name="seed"/> defaults to the story's seed, else a random one.</summary>
     public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null, CharacterSelection? character = null)
+        : this(story, seed, grammar, character, setup: null)
+    {
+    }
+
+    internal StorySession(StoryDefinition story, ulong seed, CharacterSelection? character, AuthorSetup setup)
+        : this(story, seed, grammar: null, character, setup)
+    {
+    }
+
+    private StorySession(StoryDefinition story, ulong? seed, IGrammar? grammar, CharacterSelection? character, AuthorSetup? setup)
     {
         character = CharacterSelection.Validate(story, character);
         Story = story;
@@ -79,6 +90,8 @@ public sealed class StorySession : IStorySession
                 _log.Append(new StatChanged(EntityId.Player, stat, _log.State.GetBaseStat(EntityId.Player, stat), value));
             }
         }
+        setup?.Apply(_log);
+        _captureEntry = setup is not null;
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State);
         _renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
     }
@@ -102,13 +115,16 @@ public sealed class StorySession : IStorySession
 
     /// <inheritdoc/>
     public StoryFrame Start()
+        => StartAt(Story.Start);
+
+    internal StoryFrame StartAt(SceneId scene)
     {
         if (Current is not null)
         {
             throw new InvalidOperationException("The session has already started.");
         }
 
-        return Enter(new DivertTarget(Story.Start), []);
+        return Enter(new DivertTarget(scene), []);
     }
 
     /// <inheritdoc/>
@@ -126,21 +142,29 @@ public sealed class StorySession : IStorySession
         }
 
         var notes = new List<RenderedBlock>();
+        EntryBoundary = null;
         action(notes);
         return Current;
     }
 
     // ---- scene entry -----------------------------------------------------------------------------------------------
 
+    internal SceneEntryBoundary? EntryBoundary { get; private set; }
+
     private StoryFrame Enter(DivertTarget target, List<RenderedBlock> pending)
     {
         if (target.IsEnd)
         {
+            EntryBoundary = null;
             return EndStory(pending, scene: null);
         }
 
         var scene = Story.GetScene(target.Scene!.Value);
         var mark = _log.Events.Count;
+        if (_captureEntry)
+        {
+            EntryBoundary = new SceneEntryBoundary(scene.Id, mark, Array.AsReadOnly(pending.ToArray()));
+        }
         _log.Append(new SceneEntered(scene.Id));
         foreach (var entry in scene.EntryEffects)
         {
@@ -328,3 +352,5 @@ public sealed class StorySession : IStorySession
         return Current;
     }
 }
+
+internal sealed record SceneEntryBoundary(SceneId Scene, int EventCount, IReadOnlyList<RenderedBlock> Pending);
