@@ -60,6 +60,8 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
           TALEWRIGHT_STANDALONE: '1'
+          TALEWRIGHT_STANDALONE_CREATION: '1'
+          TALEWRIGHT_PUBLISHED_CHARACTER: Mara
           TALEWRIGHT_WEB_ROOT: ${{ github.workspace }}/artifacts/standalone-web
           TALEWRIGHT_WEB_BASE_PATH: /games/published
         run: |
@@ -94,6 +96,8 @@ jobs:
       - name: Verify self-contained standalone desktop executable
         env:
           TALEWRIGHT_STANDALONE: '1'
+          TALEWRIGHT_STANDALONE_CREATION: '1'
+          TALEWRIGHT_PUBLISHED_CHARACTER: Mara
           TALEWRIGHT_DESKTOP_EXECUTABLE: ${{ github.workspace }}/artifacts/standalone-linux/start.sh
         run: |
           cp artifacts/test-results/linux.trx artifacts/test-results/linux-regression.trx
