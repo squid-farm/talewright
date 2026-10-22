@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Rules.Storylets;
 using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
 using Talewright.Tale.Parsing;
@@ -26,7 +27,18 @@ internal static class StoryValidator
             diagnostics.Error("TW3007", $"Start scene '{manifest.Start}' does not exist.", manifest.StartLocation);
         }
 
-        var definitions = scenes.Select(s => s.Definition).ToArray();
+        var byTag = new Dictionary<string, HashSet<SceneId>>(StringComparer.Ordinal);
+        foreach (var (scene, _) in scenes)
+        {
+            foreach (var tag in scene.Tags)
+            {
+                if (!byTag.TryGetValue(tag, out var ids))
+                {
+                    byTag[tag] = ids = [];
+                }
+                ids.Add(scene.Id);
+            }
+        }
 
         foreach (var (scene, location) in scenes)
         {
@@ -35,7 +47,7 @@ internal static class StoryValidator
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
             }
-            if (scene.HubSelection is { } hub && !definitions.Any(s => s.Id != scene.Id && hub.Matches(s.Tags)))
+            if (scene.HubSelection is { } hub && !ResolveTags(hub, byTag).Any(id => id != scene.Id))
             {
                 diagnostics.Warning("TW3008", $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
             }
@@ -52,7 +64,7 @@ internal static class StoryValidator
         var queue = new Queue<SceneId>([start]);
         while (queue.Count > 0)
         {
-            foreach (var next in Successors(byId[queue.Dequeue()].Definition, definitions))
+            foreach (var next in Successors(byId[queue.Dequeue()].Definition, byTag))
             {
                 if (byId.ContainsKey(next) && reached.Add(next))
                 {
@@ -94,7 +106,40 @@ internal static class StoryValidator
         }
     }
 
-    private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyList<SceneDefinition> scenes)
+    private static IEnumerable<SceneId> ResolveTags(StoryletTags query, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
+    {
+        var sets = query.Tags.Select(tag => byTag.GetValueOrDefault(tag)).ToArray();
+        if (query.MatchAll && sets.Any(set => set is null))
+        {
+            return [];
+        }
+
+        var candidates = sets.OfType<HashSet<SceneId>>().OrderBy(set => set.Count).ToArray();
+        if (candidates.Length == 0)
+        {
+            return [];
+        }
+        if (candidates.Length == 1)
+        {
+            return candidates[0];
+        }
+
+        var result = new HashSet<SceneId>(candidates[0]);
+        foreach (var set in candidates.Skip(1))
+        {
+            if (query.MatchAll)
+            {
+                result.IntersectWith(set);
+            }
+            else
+            {
+                result.UnionWith(set);
+            }
+        }
+        return result;
+    }
+
+    private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
     {
         IEnumerable<DivertTarget?> targets = scene.Diverts.Select(d => d.Target)
             .Concat(scene.Choices.Select(c => c.Divert))
@@ -110,9 +155,12 @@ internal static class StoryValidator
 
         if (scene.HubSelection is { } hub)
         {
-            foreach (var candidate in scenes.Where(s => s.Id != scene.Id && hub.Matches(s.Tags)))
+            foreach (var candidate in ResolveTags(hub, byTag))
             {
-                yield return candidate.Id;
+                if (candidate != scene.Id)
+                {
+                    yield return candidate;
+                }
             }
         }
     }
