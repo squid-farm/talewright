@@ -30,6 +30,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     public async Task Bundled_sample_opens_without_a_sample_specific_route()
     {
         await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
         await AssertState(state =>
         {
             Assert.True(state.PassageVisible);
@@ -39,10 +40,56 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Bundled_sample_workshop_and_field_exercises_save_and_replay()
+    {
+        await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
+        await Choose("Continue");
+        await Choose("Visit the expedition workshop");
+        await AssertState(state => Assert.Equal(["Pack a trail lunch", "Balance the expedition ledger"], state.Choices));
+        await Choose("Pack a trail lunch");
+        await Choose("Eat one ration");
+        await Observe(new(null, "one ration left"));
+        await Choose("Continue");
+        await Choose("Balance the expedition ledger");
+        await Observe(new(null, "10"));
+        await Choose("Agree on ten crates");
+        await Choose("Sign the expedition register");
+        await Observe(new(null, "MARA BURNS"));
+        await Choose("Continue");
+        await Choose("Continue");
+        await Choose("Try the field exercises");
+        await Choose("Stand your ground");
+        await Observe(new(null, "never above its authored maximum of ten"));
+        await Driver.ClickAsync("Saved games");
+        await Driver.ClickAsync("Save game");
+        await Choose("Thank Tomas for the lesson");
+        await Driver.ClickAsync("Load My save");
+        await Observe(new(null, "never above its authored maximum of ten"));
+        await Driver.ClickAsync("Back");
+        await AssertState(state => Assert.Equal(["Stand your ground"], state.Choices));
+        await Driver.ClickAsync("Forward");
+        await Choose("Thank Tomas for the lesson");
+        await Choose("Follow the signal");
+        await Choose("Continue");
+        await Observe(new(null, "Both exercises are complete"));
+        await Choose("Continue");
+        await Choose("Test the watch bell");
+        await Choose("Ring the bell");
+        await Choose("Silence the bell");
+        await Choose("Ring the bell");
+        await Observe(new(null, "The watch bell has sounded 2 times."));
+        await Choose("Finish the watch drill");
+        await Choose("Continue");
+        await AssertState(state => Assert.Contains("Set out for the temple", state.Choices));
+    }
+
+    [Fact]
     [Trait("Host", "Browser")]
     public async Task Bundled_sample_assets_work_when_served_at_the_selected_base_path()
     {
         await Page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true }).ClickAsync();
         await Expect(Latest).ToBeVisibleAsync();
         Assert.NotEmpty(await Latest.InnerTextAsync());
         await Expect(Sheet).ToBeVisibleAsync();
