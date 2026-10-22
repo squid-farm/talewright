@@ -44,7 +44,13 @@ internal static class BenchmarkMetadataWriter
             return configured;
         }
 
-        return ReadGitOutput("rev-parse", "HEAD");
+        var commit = ReadGitOutput("rev-parse", "HEAD");
+        if (string.IsNullOrWhiteSpace(commit))
+        {
+            throw new InvalidOperationException("Git returned an empty commit for the benchmark metadata.");
+        }
+
+        return commit;
     }
 
     private static string ReadGitOutput(params string[] arguments)
@@ -59,7 +65,7 @@ internal static class BenchmarkMetadataWriter
         var commit = process.StandardOutput.ReadToEnd().Trim();
         var error = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        if (process.ExitCode != 0 || string.IsNullOrEmpty(commit))
+        if (process.ExitCode != 0)
         {
             throw new InvalidOperationException($"Could not read Git metadata: {error}");
         }
