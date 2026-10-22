@@ -77,12 +77,26 @@ read or written.
 **Inspection.** Shows actual state, events and historical branch decisions. Explanations record how
 conditions evaluated at the time, not predictions against the current state.
 
+**Live edits and jumps.** Validated absolute-value edit batches change declared flags, variables,
+faction standing, all characters' base stats and inventory, then run normal triggers and leveling.
+Text/choices refresh without entry effects, visits or entry-check rerolls; resolved entry-check
+continuations stay fixed. Command history shows before/actual-after values and cascading events.
+Preserve-state jumps bypass eligibility and enter once with accumulated state/history/RNG.
+Ended runs require Back or a fresh-world start; edits with no live continuation are rejected explicitly.
+
+**Author timeline.** Back/Forward cover choices, edits and jumps regardless of player undo policy.
+Successful new commands discard redo. Commands use separate candidates; failures leave the active
+run and timeline unchanged. This timeline is not a player save and cannot overwrite player slots.
+
 **Reloading `.tale` changes.** Saves are debounced and compiled as one complete source set. Automatic
 reload rebuilds the state just before the current scene was entered (declarations, rules, earlier
 scenes and choice meanings, events, RNG position, pending notes, trigger memory), then enters the current
 scene once from there. Its entry effects and check outcomes may legitimately change. The passage is
 replaced, explanations are rebuilt, and a reload marker is shown. Only the current passage is displayed,
 not a reconstructed transcript.
+
+Applied edit/jump commands are replayed and retained. Pending redo postpones automatic reload without
+discarding anything: move Forward to the end and Rescan, or explicitly start a fresh scene.
 
 The guard is deliberately conservative. Restart is required after:
 

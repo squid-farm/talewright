@@ -14,20 +14,25 @@ namespace Talewright.Runtime;
 public sealed class AuthorSession
 {
     private StorySession _session;
-    private string[] _choices;
+    private AuthorCommand[] _commands;
     private readonly List<AuthorPlayedChoice> _playedChoices = [];
+    private IReadOnlyList<AuthorCommandResult> _results = [];
 
     private AuthorSession(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, string[] choices, bool captureDecisions, AuthorSceneCheckpoint? verify = null)
+        CharacterSelection? character, AuthorCommand[] commands, int cursor, bool captureDecisions, AuthorSceneCheckpoint? verify = null)
     {
         Story = story;
         StartScene = target;
         Setup = setup;
         Character = character;
-        _choices = choices;
+        _commands = commands;
+        Cursor = cursor;
         CaptureDecisions = captureDecisions;
         var decisions = new List<RuleDecision>();
-        var atBoundary = choices.Length == 0;
+        var results = new List<AuthorCommandResult>();
+        var lastEntryCommand = Array.FindLastIndex(commands.Take(cursor).ToArray(),
+            command => command is AuthorChoice or AuthorJump);
+        var atBoundary = lastEntryCommand < 0;
         _session = new StorySession(story, seed, character, setup, captureDecisions ? decisions.Add : null,
             verify is null ? null : (boundary, events) =>
             {
@@ -37,24 +42,43 @@ public sealed class AuthorSession
                 }
             });
         _session.StartAt(target);
-        for (var i = 0; i < choices.Length; i++)
+        for (var i = 0; i < cursor; i++)
         {
             var scene = story.GetScene(_session.Current!.Scene!.Value);
-            var selected = _session.Current.Choices.FirstOrDefault(choice => choice.Key == choices[i])
-                ?? throw new AuthorReloadException($"previously consumed choice '{choices[i]}' is unavailable at '{scene.Id}'");
-            var played = AuthorPlayedChoice.Capture(story, scene, selected);
-            verify?.VerifyPlayedChoice(i, played);
-            _playedChoices.Add(played);
-            atBoundary = i == choices.Length - 1;
-            _session.Choose(choices[i]);
+            var command = commands[i];
+            var eventStart = _session.Events.Count;
+            var before = command is AuthorEdit editCommand ? editCommand.Values.ReadValues(_session.State).ToDictionary() : [];
+            if (i <= lastEntryCommand)
+            {
+                var selected = command is AuthorChoice choice
+                    ? _session.Current.Choices.FirstOrDefault(view => view.Key == choice.Key)
+                        ?? throw new AuthorReloadException($"previously consumed choice '{choice.Key}' is unavailable at '{scene.Id}'")
+                    : new ChoiceView(command is AuthorJump jump ? $"author-jump:{jump.Target}" : "author-edit", []);
+                var played = AuthorPlayedChoice.Capture(story, scene, selected);
+                verify?.VerifyPlayedChoice(i, played);
+                _playedChoices.Add(played);
+            }
+            atBoundary = i == lastEntryCommand;
+            switch (command)
+            {
+                case AuthorChoice choice: _session.Choose(choice.Key); break;
+                case AuthorEdit edit: _session.EditAuthorState(edit.Values.Validate(story)); break;
+                case AuthorJump jump: _session.JumpAuthor(jump.Target); break;
+                default: throw new NotSupportedException($"Unknown author command '{command.GetType().Name}'.");
+            }
+            var changes = command is AuthorEdit edited
+                ? edited.Values.ReadValues(_session.State).Select(value => new AuthorValueChange(value.Key, before[value.Key], value.Value)).ToArray()
+                : [];
+            results.Add(new(eventStart, Array.AsReadOnly(_session.Events.Skip(eventStart).ToArray()), Array.AsReadOnly(changes)));
         }
+        _results = results.AsReadOnly();
         Events = Array.AsReadOnly(_session.Events.ToArray());
         State = new AuthorStateView(EventLog.Replay(story.World, seed, Events).State);
         Decisions = decisions.AsReadOnly();
         if (_session.EntryBoundary is { } boundary)
         {
             Checkpoint = new AuthorSceneCheckpoint(story, target, setup, seed, character,
-                choices, boundary, Events, captureDecisions, _playedChoices.ToArray());
+                commands.Take(cursor).ToArray(), boundary, Events, captureDecisions, _playedChoices.ToArray());
         }
     }
 
@@ -65,6 +89,12 @@ public sealed class AuthorSession
     public CharacterSelection? Character { get; private set; }
     public bool IsSynthetic => true;
     public bool CaptureDecisions { get; }
+    public IReadOnlyList<AuthorCommand> Commands => Array.AsReadOnly(_commands);
+    public int Cursor { get; private set; }
+    public bool CanBack => Cursor > 0;
+    public bool CanForward => Cursor < _commands.Length;
+    /// <summary>Applied command deltas, including all trigger/leveling consequences; redo commands have no result yet.</summary>
+    public IReadOnlyList<AuthorCommandResult> Results => _results;
     /// <summary>Historical decisions at their event offsets; empty when observation was not enabled.</summary>
     public IReadOnlyList<RuleDecision> Decisions { get; private set; }
     public ulong Seed => _session.Seed;
@@ -86,7 +116,7 @@ public sealed class AuthorSession
         var selection = CharacterSelection.Validate(story, character);
         var validated = (setup ?? new AuthorSetup()).Validate(story);
         return new AuthorSession(story, target, validated,
-            seed ?? story.Seed ?? DeterministicDice.NewSeed(), selection, [], captureDecisions);
+            seed ?? story.Seed ?? DeterministicDice.NewSeed(), selection, [], 0, captureDecisions);
     }
 
     /// <summary>Snapshots declared state and recorded decisions; never reevaluates branch predicates.</summary>
@@ -99,11 +129,15 @@ public sealed class AuthorSession
     public AuthorSession Reload(StoryDefinition candidate)
     {
         ArgumentNullException.ThrowIfNull(candidate);
+        if (CanForward)
+        {
+            throw new InvalidOperationException("Automatic reload postponed: the author timeline has redo commands. Move Forward to its end and Rescan, or explicitly start a fresh scene. No commands were dropped.");
+        }
         var checkpoint = Checkpoint ?? throw new AuthorReloadException("no current scene-entry boundary");
         AuthorReloadComparison.Schema(Story, candidate);
         candidate.GetScene(checkpoint.Scene);
         var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
-            CharacterSelection.Validate(candidate, Character), _choices, CaptureDecisions, checkpoint);
+            CharacterSelection.Validate(candidate, Character), _commands, Cursor, CaptureDecisions, checkpoint);
         AuthorReloadComparison.Require(result.Checkpoint?.Scene == checkpoint.Scene, "the replay no longer reaches the displayed scene");
         return result;
     }
@@ -115,16 +149,50 @@ public sealed class AuthorSession
     /// <summary>Rebuilds a separate candidate; failed choices leave the active run unchanged.</summary>
     public void Choose(string key)
     {
-        if (_choices.Length >= StoryHistory.MaxChoices)
-        {
-            throw new InvalidOperationException($"An author playthrough supports at most {StoryHistory.MaxChoices:N0} choices.");
-        }
         if (!Current.Choices.Any(c => c.Key == key))
         {
             throw new InvalidOperationException($"'{key}' is not an available choice.");
         }
-        var candidate = Replay(Story, StartScene, Setup, Seed, Character, [.. _choices, key], CaptureDecisions);
-        Adopt(candidate);
+        Append(new AuthorChoice(key));
+    }
+
+    /// <summary>Applies a validated absolute-value batch, then triggers/leveling and safe presentation refresh.</summary>
+    public void Edit(AuthorSetup values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        Append(new AuthorEdit(values.Validate(Story)));
+    }
+
+    /// <summary>Bypasses target eligibility, preserving state, trigger memory and the RNG cursor.</summary>
+    public void Jump(SceneId target)
+    {
+        Story.GetScene(target);
+        Append(new AuthorJump(target));
+    }
+
+    public void Back()
+    {
+        if (!CanBack) { throw new InvalidOperationException("No earlier author command."); }
+        MoveTo(Cursor - 1);
+    }
+
+    public void Forward()
+    {
+        if (!CanForward) { throw new InvalidOperationException("No redo author command."); }
+        MoveTo(Cursor + 1);
+    }
+
+    private void MoveTo(int cursor) => Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character,
+        _commands, cursor, CaptureDecisions));
+
+    private void Append(AuthorCommand command)
+    {
+        if (Cursor >= StoryHistory.MaxChoices)
+        {
+            throw new InvalidOperationException($"An author timeline supports at most {StoryHistory.MaxChoices:N0} commands.");
+        }
+        AuthorCommand[] commands = [.. _commands.Take(Cursor), command];
+        Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character, commands, commands.Length, CaptureDecisions));
     }
 
     /// <summary>Starts a fresh synthetic candidate, not a preserve-current-state jump.</summary>
@@ -133,8 +201,8 @@ public sealed class AuthorSession
         => Adopt(Create(Story, target, CaptureDecisions, setup, seed, character));
 
     internal static AuthorSession Replay(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, string[] choices, bool captureDecisions = false)
-        => new(story, target, setup, seed, character, choices, captureDecisions);
+        CharacterSelection? character, AuthorCommand[] commands, bool captureDecisions = false)
+        => new(story, target, setup, seed, character, commands, commands.Length, captureDecisions);
 
     private void Adopt(AuthorSession candidate)
     {
@@ -146,7 +214,9 @@ public sealed class AuthorSession
         Events = candidate.Events;
         Checkpoint = candidate.Checkpoint;
         Decisions = candidate.Decisions;
-        _choices = candidate._choices;
+        _commands = candidate._commands;
+        Cursor = candidate.Cursor;
+        _results = candidate._results;
         _playedChoices.Clear();
         _playedChoices.AddRange(candidate._playedChoices);
     }

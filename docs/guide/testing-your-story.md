@@ -49,6 +49,30 @@ talewright debug my-story
 The **State inspection** panel shows the current stats, inventory, flags and variables, the events that
 led there, and **Branch explanations**: why each condition passed or failed.
 
+### Change state without starting over
+
+Open **Live edit values**, enable the fields you want to change, and click **Apply live edit batch**.
+You can change declared flags, integer variables, faction standing, and every character's base stats
+and inventory. Quantities are absolute; zero removes an item. Stats use normal bounds.
+The whole batch is applied together, then normal triggers and leveling run. Text and choices refresh
+without repeating entry effects, visits or entry-check dice. An already resolved entry check keeps
+its original continuation; edits do not change that historical outcome.
+
+**Command history and consequences** shows before/actual-after values (including clamping), trigger
+firings and all other resulting events. Fields reset to actual values after success. Invalid edits
+leave the run and your draft unchanged. If an edit would leave no live continuation, use fresh-world
+prerequisite overrides instead.
+
+To move elsewhere without losing accumulated state, set **Target scene ID** and click **Jump retaining
+state**. This bypasses scene eligibility and enters the target once, keeping visits, trigger history
+and dice position. **Start selected scene** instead discards progress and creates a fresh world using
+prerequisite overrides.
+
+Use **Back command** and **Forward command** across choices, edit batches and jumps. A successful new
+command after Back discards redo. This author-only navigation works even when the story disables
+player undo. Ended runs cannot be edited or jumped retaining state: go Back or start a fresh scene.
+None of these operations prove that the resulting state is reachable through ordinary play.
+
 ### Editing while you test
 
 Leave the debugger open while you write. When you save a `.tale` file, it recompiles and reloads the
@@ -59,13 +83,16 @@ through. Any change to `story.yaml` also needs a restart. In those cases the deb
 **Restart from source**. You don't have to set anything up again: it keeps your selected scene, seed,
 overrides and character, and tells you about any that no longer exist in the story so you can fix them.
 
+Applied edit and jump commands are kept during compatible reloads. If you have pending redo after
+going Back, automatic reload pauses rather than silently dropping commands. Go Forward to the end
+and click **Rescan / retry watcher**, or deliberately start a fresh scene.
+
 ### Good to know
 
 - The debugger never reads or changes player save files.
 - Starting at a scene skips everything before it, so earlier scenes count as **unvisited**, and there's
-  no override for that yet. If a scene checks `visited(...)`, start the debugger at the earlier scene
-  and play forward from there. Jumping ahead while keeping visit history is planned
-  ([#63](https://github.com/squid-farm/talewright/issues/63)).
+  no arbitrary visit-count override. If a scene checks `visited(...)`, start at the earlier scene and
+  play forward or use **Jump retaining state** to keep the visits you have accumulated.
 - It needs a desktop environment (on Linux, WebKitGTK 4.1).
 
 Full details: [CLI reference: debug](../reference/cli.md#debug).

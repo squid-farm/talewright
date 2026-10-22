@@ -13,7 +13,11 @@ require platform testing.
 
 How it's built:
 
-- **Session.** `AuthorSession` provides fresh-state scene jumps and recorded inspection. The workbench
+- **Session.** `AuthorSession` provides fresh-state starts, validated live edit batches, preserve-state
+  jumps and a typed author command timeline with atomic Back/Forward/branching. Live refresh never
+  repeats entry effects or rerolls entry checks; an already resolved continuation is retained.
+  Ended runs require Back or a fresh-world start. Before/actual-after values and cascades appear in
+  command history. Navigation is available regardless of ordinary player undo policy. The workbench
   reuses Player rendering and creation components, has its own `debug-assets` root, and never touches
   player save storage.
 - **Reload.** `StoryReloadWatcher` watches saved changes, creates, deletes and renames, debounces editor
@@ -21,6 +25,8 @@ How it's built:
   discard superseded results, including at commit after runtime reconstruction. Play and swaps share the
   Blazor dispatcher. YAML changes latch an explicit restart; failed compiles or reconstruction keep the
   last good run. Rescan retries and rearms the watcher. Disposal cancels pending work.
+  Applied edits/jumps remain in the replay recipe. Pending redo postpones reload without dropping
+  commands: move Forward to the end and Rescan, or explicitly start a fresh run.
 - **Restart from source** revalidates the retained setup, character and seed before discarding the run.
   Invalidated ids stay visible for correction. Creation forms keep their draft across Tale reloads and
   initialize from the retained selection on restart, via Player's optional `InitialSelection`.

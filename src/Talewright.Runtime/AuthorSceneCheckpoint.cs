@@ -18,20 +18,20 @@ public sealed class AuthorSceneCheckpoint
     private readonly SceneId _start;
     private readonly AuthorSetup _setup;
     private readonly CharacterSelection? _character;
-    private readonly string[] _choices;
+    private readonly AuthorCommand[] _commands;
     private readonly bool _captureDecisions;
     private readonly IReadOnlyList<string> _triggerEdges;
     private readonly AuthorPlayedChoice[] _playedChoices;
 
     internal AuthorSceneCheckpoint(StoryDefinition story, SceneId start, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, string[] choices, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
+        CharacterSelection? character, AuthorCommand[] commands, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
         bool captureDecisions, AuthorPlayedChoice[] playedChoices)
     {
         _story = story;
         _start = start;
         _setup = setup;
         _character = character;
-        _choices = choices;
+        _commands = commands;
         _captureDecisions = captureDecisions;
         _triggerEdges = boundary.TriggerEdges;
         _playedChoices = playedChoices;
@@ -52,7 +52,7 @@ public sealed class AuthorSceneCheckpoint
     /// Rebuilds the captured run and enters this scene once, returning an independent candidate.
     /// Requires the same unchanged story and deterministic extensions; this is not cross-source reload.
     /// </summary>
-    public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _choices, _captureDecisions);
+    public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _commands, _captureDecisions);
 
     internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice) =>
         AuthorReloadComparison.Require(index < _playedChoices.Length
