@@ -6,7 +6,7 @@ namespace Talewright.BenchmarkDotNet;
 
 [MemoryDiagnoser]
 [JsonExporterAttribute.Full]
-public sealed class BoundaryInputBenchmarks
+public class BoundaryInputBenchmarks
 {
     private const int MaxFileBytes = 5 * 1024 * 1024;
     private const long MaxExpandedBytes = 50L * 1024 * 1024;

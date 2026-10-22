@@ -54,6 +54,7 @@ internal static class BenchmarkMetadataWriter
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
+            WorkingDirectory = FindRepositoryRoot(),
         }) ?? throw new InvalidOperationException("Could not start git to record the benchmark commit.");
         var commit = process.StandardOutput.ReadToEnd().Trim();
         var error = process.StandardError.ReadToEnd();
@@ -65,6 +66,36 @@ internal static class BenchmarkMetadataWriter
 
         return commit;
     }
+
+    private static string FindRepositoryRoot()
+    {
+        var configured = Environment.GetEnvironmentVariable("GITHUB_WORKSPACE")
+            ?? Environment.GetEnvironmentVariable("TALEWRIGHT_BENCHMARK_REPOSITORY");
+        if (!string.IsNullOrWhiteSpace(configured) && IsRepositoryRoot(configured))
+        {
+            return configured;
+        }
+
+        foreach (var start in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            var directory = new DirectoryInfo(start);
+            while (directory is not null)
+            {
+                if (IsRepositoryRoot(directory.FullName))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Could not locate the repository root; set GITHUB_WORKSPACE or TALEWRIGHT_BENCHMARK_REPOSITORY.");
+    }
+
+    private static bool IsRepositoryRoot(string path) =>
+        Directory.Exists(Path.Combine(path, ".git")) || File.Exists(Path.Combine(path, ".git"));
 
     private static long? ReadPhysicalMemoryBytes()
     {
