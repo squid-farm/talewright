@@ -45,6 +45,8 @@ public sealed class WorkbenchModel(string root)
     public string Seed { get; set; } = "";
     public IReadOnlyList<SetupNumber> Numbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
+    public IReadOnlyList<SetupNumber> EditNumbers { get; private set; } = [];
+    public IReadOnlyList<SetupFlag> EditFlags { get; private set; } = [];
 
     public void Reload() => ApplySource(SourceCompilation.Load(Root), restart: true);
 
@@ -137,7 +139,8 @@ public sealed class WorkbenchModel(string root)
                     SourceRejected = false;
                     Error = null;
                     ReloadStatus = session is null ? "Tale source adopted. Ready for scene setup."
-                        : $"Reload boundary: {session.Current.Scene}. Verified prefix retained; current passage replaced, decisions rebuilt. No redo history.";
+                        : $"Reload boundary: {session.Current.Scene}. Verified command prefix retained; current passage replaced, decisions rebuilt.";
+                    RefreshEdits();
                 });
             }
             var numbers = new List<SetupNumber>();
@@ -211,6 +214,7 @@ public sealed class WorkbenchModel(string root)
                 ++CreationRevision;
                 Session = null;
                 Inspection = null;
+                RefreshEdits();
                 SourceRejected = false;
                 RestartRequired = false;
                 _acceptedSource = candidate.Source;
@@ -285,6 +289,7 @@ public sealed class WorkbenchModel(string root)
             var inspection = candidate.Inspect();
             Session = candidate;
             Inspection = inspection;
+            RefreshEdits();
         });
     }
 
@@ -329,12 +334,39 @@ public sealed class WorkbenchModel(string root)
         };
     }
 
-    public void Choose(string key) => Attempt(() =>
+    public void Choose(string key) => RunCommand(session => session.Choose(key));
+    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags)));
+    public void JumpPreservingState() => RunCommand(session => session.Jump(new SceneId(Target)));
+    public void Back() => RunCommand(session => session.Back());
+    public void Forward() => RunCommand(session => session.Forward());
+
+    private void RunCommand(Action<AuthorSession> command) => Attempt(() =>
     {
         var session = Session ?? throw new InvalidOperationException("Start a scene first.");
-        session.Choose(key);
+        command(session);
         Inspection = session.Inspect();
+        RefreshEdits();
     });
+
+    private void RefreshEdits()
+    {
+        if (Session is not { } session)
+        {
+            EditNumbers = [];
+            EditFlags = [];
+            return;
+        }
+        var state = session.State;
+        EditNumbers = Numbers.Select(field => new SetupNumber(field.Kind, field.Id, field.Label, field.Kind switch
+        {
+            SetupNumberKind.Variable => state.GetVariable(new(field.Id)),
+            SetupNumberKind.Standing => state.GetStanding(new(field.Id)),
+            SetupNumberKind.Stat => state.GetBaseStat(new(field.Character!), new(field.Id)),
+            SetupNumberKind.Inventory => state.GetItemCount(new(field.Character!), new(field.Id)),
+            _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
+        }, field.Character)).ToArray();
+        EditFlags = Flags.Select(flag => new SetupFlag(flag.Id) { Value = state.GetFlag(flag.Id) }).ToArray();
+    }
 
     private void Attempt(Action action)
     {

@@ -99,7 +99,7 @@ public sealed class DebuggerTests
             var updated = original.Replace("Before reload.", "After reload.").Replace("count += 1", "count += 2");
             await File.WriteAllTextAsync(temp, updated);
             File.Move(temp, tale, overwrite: true);
-            snapshot = await WaitFor(driver, "After reload. Alex.");
+            snapshot = await WaitFor(driver, "After reload. Alex.", "Reload boundary: current", "Seed: 42");
             Assert.Contains("Reload boundary: current", snapshot.Content);
             Assert.Contains("Seed: 42", snapshot.Content);
             await driver.ActivateAsync("Flags, variables, factions, visits and triggers");
@@ -130,6 +130,81 @@ public sealed class DebuggerTests
             Directory.Delete(root, recursive: true);
         }
     }
+    [Fact]
+    public async Task Native_live_edits_jumps_navigation_and_reload_keep_a_synthetic_timeline()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-edit-native-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-edits", Guid.NewGuid().ToString("N"));
+        const string tale = """
+            === start
+            ~ var:count += 1
+            Live count {var:count}.
+            * [Prepared] (requires: flag:ready) -> target
+            * [Wait] -> start
+            === target
+            @requires not flag:ready
+            ~ var:count += 2
+            Target count {var:count}.
+            * [Return] -> start
+            """;
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"), """
+                id: live-native
+                title: Native live edits
+                start: start
+                flags: [ready]
+                vars: {count: 0}
+                characters:
+                  player: {first-name: Tester}
+                triggers:
+                  - id: reward
+                    when: flag:ready
+                    do: var:count += 10
+                    once: false
+                """);
+            var path = Path.Combine(root, "main.tale");
+            await File.WriteAllTextAsync(path, tale);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.FillAsync("Seed", "42");
+            await driver.ClickAsync("Start selected scene");
+            await WaitFor(driver, "Live count 1.");
+            await driver.ActivateAsync("Live edit values");
+            await driver.ActivateAsync("Edit flag:ready");
+            await driver.ActivateAsync("Edit value flag:ready");
+            await driver.ActivateAsync("Edit var:count");
+            await driver.FillAsync("Edit value var:count", "7");
+            await driver.ClickAsync("Apply live edit batch");
+            var snapshot = await WaitFor(driver, "Live count 17.", "Position 1 / 1.");
+            Assert.Contains("Prepared", snapshot.Content);
+            await driver.ActivateAsync("Command history and consequences");
+            snapshot = await WaitFor(driver, "var:count: 1 to 17", "TriggerFired");
+            Assert.Contains("reward", snapshot.Content);
+            await driver.FillAsync("Target scene ID", "target");
+            await driver.ClickAsync("Jump retaining state");
+            await WaitFor(driver, "Target count 19.", "Position 2 / 2.");
+            await driver.ClickAsync("Back command");
+            await WaitFor(driver, "Live count 17.", "Position 1 / 2.");
+            await driver.ClickAsync("Forward command");
+            await WaitFor(driver, "Target count 19.", "Position 2 / 2.");
+            await File.WriteAllTextAsync(path, tale.Replace("Target count", "Reloaded target count"));
+            snapshot = await WaitFor(driver, "Reloaded target count 19.", "Verified command prefix retained");
+            Assert.Contains("Position 2 / 2.", snapshot.Content);
+            Assert.Contains("eligibility bypassed", snapshot.Content);
+            Assert.Equal(0, await driver.CloseWindowAsync());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, params string[] texts)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));

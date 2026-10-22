@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Tale.Model;
@@ -110,6 +111,30 @@ public sealed record AuthorSetup
         foreach (var (id, value) in Variables.OrderBy(v => v.Key.Value, StringComparer.Ordinal))
         {
             log.AppendRange(StateChanges.SetVariable(log.State, id, value));
+        }
+    }
+
+    internal IEnumerable<KeyValuePair<string, string>> ReadValues(IGameStateView state)
+    {
+        foreach (var id in Flags.Keys)
+        {
+            yield return new($"flag:{id}", state.GetFlag(id).ToString());
+        }
+        foreach (var id in Variables.Keys)
+        {
+            yield return new($"var:{id}", state.GetVariable(id).ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var id in Standings.Keys)
+        {
+            yield return new($"faction:{id}", state.GetStanding(id).ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var value in Stats)
+        {
+            yield return new($"stat:{value.Character}:{value.Stat}", state.GetBaseStat(value.Character, value.Stat).ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var value in Inventory)
+        {
+            yield return new($"inventory:{value.Character}:{value.Item}", state.GetItemCount(value.Character, value.Item).ToString(CultureInfo.InvariantCulture));
         }
     }
 }

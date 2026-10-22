@@ -1,5 +1,7 @@
 using Talewright.Debugger;
 using Talewright.Core.Identity;
+using Talewright.Narrative.Rendering;
+using Talewright.Tale.Compilation;
 
 namespace Talewright.Cli.Tests;
 
@@ -64,6 +66,93 @@ public sealed class DebuggerTests : IDisposable
         Assert.True(model.Inspection!.DecisionsCaptured);
         model.Choose("c0");
         Assert.True(model.Session.Current.IsEnded);
+    }
+
+    [Fact]
+    public void Live_fields_apply_atomically_navigate_jump_and_retain_commands_across_reload()
+    {
+        var path = Path.Combine(_root, "main.tale");
+        const string tale = """
+            === scene1
+            Count {var:count}.
+            * [Prepared] (requires: flag:ready) -> target
+            * [Wait] -> scene1
+            === target
+            ~ var:count += 1
+            Target {var:count}.
+            * [Return] -> scene1
+            """;
+        File.WriteAllText(path, tale);
+        var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        Assert.Equal("0", model.EditNumbers.Single(field => field.Label == "var:count").Value);
+        var flag = Assert.Single(model.EditFlags);
+        flag.Enabled = flag.Value = true;
+        var field = model.EditNumbers.Single(field => field.Label == "var:count");
+        field.Enabled = true;
+        field.Value = "7";
+        model.ApplyEdits();
+        Assert.Null(model.Error);
+        Assert.Equal(7, model.Session!.State.GetVariable(new("count")));
+        Assert.Contains("Count 7.", model.Session.Current.Document.ToPlainText());
+        Assert.Equal(2, model.Session.Current.Choices.Count);
+        Assert.All(model.EditNumbers, field => Assert.False(field.Enabled));
+        Assert.False(Assert.Single(model.EditFlags).Enabled);
+        Assert.True(Assert.Single(model.EditFlags).Value);
+        model.Target = "target";
+        model.JumpPreservingState();
+        Assert.Equal(8, model.Session.State.GetVariable(new("count")));
+        var events = model.Session.Events;
+        model.Back();
+        Assert.Equal(7, model.Session.State.GetVariable(new("count")));
+        Assert.Equal("7", model.EditNumbers.Single(field => field.Label == "var:count").Value);
+        File.WriteAllText(path, tale.Replace("Target {var:count}.", "Revised {var:count}."));
+        Assert.False(model.ApplySource(SourceCompilation.Load(_root)));
+        Assert.Contains("redo commands", model.Error);
+        Assert.False(model.RestartRequired);
+        model.Forward();
+        Assert.True(model.ApplySource(SourceCompilation.Load(_root)));
+        Assert.Null(model.Error);
+        Assert.Equal(events, model.Session!.Events);
+        Assert.Equal(2, model.Session.Commands.Count);
+        Assert.Contains("Revised 8.", model.Session.Current.Document.ToPlainText());
+        Assert.Equal("8", model.EditNumbers.Single(field => field.Label == "var:count").Value);
+        model.Reload();
+        Assert.Null(model.Session);
+        Assert.Empty(model.EditNumbers);
+    }
+
+    [Fact]
+    public void Failed_live_inputs_keep_draft_and_active_timeline_while_fresh_start_is_distinct()
+    {
+        var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        var session = model.Session!;
+        var frame = session.Current;
+        var field = model.EditNumbers.Single(value => value.Label == "var:count");
+        field.Enabled = true;
+        field.Value = "not an integer";
+        model.ApplyEdits();
+        Assert.Contains("32-bit integer", model.Error);
+        Assert.Same(frame, session.Current);
+        Assert.Empty(session.Commands);
+        Assert.True(field.Enabled);
+        Assert.Equal("not an integer", field.Value);
+        field.Value = "7";
+        model.ApplyEdits();
+        Assert.Null(model.Error);
+        model.Target = "missing";
+        model.JumpPreservingState();
+        Assert.Contains("missing", model.Error);
+        Assert.Single(session.Commands);
+        model.Target = "scene1000";
+        model.Start();
+        Assert.Null(model.Error);
+        Assert.Empty(model.Session!.Commands);
+        Assert.Equal(0, model.Session.State.GetVariable(new("count")));
+        Assert.Equal(0, model.Session.State.VisitCount(new("scene1")));
     }
 
     [Fact]

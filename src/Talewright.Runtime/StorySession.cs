@@ -52,6 +52,9 @@ public sealed class StorySession : IStorySession
     private readonly Action<RuleDecision>? _observer;
     private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
     private readonly Dictionary<string, Action<List<RenderedBlock>>> _actions = new(StringComparer.Ordinal);
+    private IReadOnlyList<RenderedBlock> _pendingNotes = [];
+    private readonly List<RenderedBlock> _entryNotes = [];
+    private DivertTarget? _entryCheckTarget;
 
     /// <summary>Creates a session. <paramref name="seed"/> defaults to the story's seed, else a random one.</summary>
     public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null, CharacterSelection? character = null)
@@ -141,6 +144,55 @@ public sealed class StorySession : IStorySession
         return Enter(new DivertTarget(scene), []);
     }
 
+    internal void EditAuthorState(AuthorSetup values)
+    {
+        RequireAuthorBoundary();
+        var mark = _log.Events.Count;
+        values.Apply(_log);
+        AfterChanges();
+        _entryNotes.AddRange(NotesSince(mark));
+        var scene = Story.GetScene(Current!.Scene!.Value);
+        var blocks = new List<RenderedBlock>(_pendingNotes);
+        blocks.AddRange(_renderer.Render(scene.Body, _log.State).Blocks);
+        blocks.AddRange(_entryNotes);
+        if (scene.EntryCheck is not null)
+        {
+            // Its effects and roll already happened on entry. Keep the resolved continuation.
+            SkipChoices(scene);
+            Present(scene, blocks, ContinueTo(_entryCheckTarget
+                ?? throw new InvalidOperationException("The entry-check continuation is unavailable. Start a fresh scene.")));
+            return;
+        }
+        var choices = OfferChoices(scene);
+        if (choices.Count > 0)
+        {
+            SkipDiverts(scene, DecisionReason.ChoicesAvailable);
+            Present(scene, blocks, choices);
+            return;
+        }
+        var next = FirstMatchingDivert(scene);
+        if (next is null || next.IsEnd)
+        {
+            throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
+        }
+        Present(scene, blocks, ContinueTo(next));
+    }
+
+    internal void JumpAuthor(SceneId target)
+    {
+        RequireAuthorBoundary();
+        Story.GetScene(target);
+        Enter(new DivertTarget(target), []);
+    }
+
+    private void RequireAuthorBoundary()
+    {
+        if (!_captureEntry || Current is null || Current.IsEnded || Current.Scene is null)
+        {
+            throw new InvalidOperationException("Live edits and preserve-state jumps require an active passage. For an ended run, use a fresh-world scene start.");
+        }
+    }
+
     /// <inheritdoc/>
     public StoryFrame Choose(string key)
     {
@@ -200,9 +252,15 @@ public sealed class StorySession : IStorySession
         }
 
         AfterChanges();
+        if (_captureEntry)
+        {
+            _pendingNotes = pending.ToArray();
+            _entryNotes.Clear();
+            _entryCheckTarget = null;
+        }
         var blocks = new List<RenderedBlock>(pending);
         blocks.AddRange(_renderer.Render(scene.Body, _log.State).Blocks);
-        blocks.AddRange(NotesSince(mark));
+        AppendEntryNotes(blocks, mark);
 
         DivertTarget? next;
         if (scene.EntryCheck is { } check)
@@ -210,7 +268,11 @@ public sealed class StorySession : IStorySession
             SkipChoices(scene);
             var checkMark = _log.Events.Count;
             next = ResolveCheck(check, scene);
-            blocks.AddRange(NotesSince(checkMark));
+            if (_captureEntry)
+            {
+                _entryCheckTarget = next;
+            }
+            AppendEntryNotes(blocks, checkMark);
         }
         else
         {
@@ -444,6 +506,21 @@ public sealed class StorySession : IStorySession
 
     private IEnumerable<RenderedBlock> NotesSince(int mark) =>
         EventNarrator.Describe(_log.Events.Skip(mark).ToList(), _log.State);
+
+    private void AppendEntryNotes(List<RenderedBlock> blocks, int mark)
+    {
+        var notes = NotesSince(mark);
+        if (_captureEntry)
+        {
+            var captured = notes.ToArray();
+            _entryNotes.AddRange(captured);
+            blocks.AddRange(captured);
+        }
+        else
+        {
+            blocks.AddRange(notes);
+        }
+    }
 
     private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, List<(ChoiceView View, Action<List<RenderedBlock>> Action)> choices)
     {
