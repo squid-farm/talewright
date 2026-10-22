@@ -6,6 +6,7 @@
         {
             <label>First name <input aria-label="First name" @bind="_firstName" maxlength="80" /></label>
             <label>Last name <input aria-label="Last name" @bind="_lastName" maxlength="80" /></label>
+            <button type="button" @onclick="UseDefaultName">Use default name</button>
         }
         @if (Story.Creation.Pronouns.Count > 0)
         {
@@ -77,6 +78,14 @@
         _preset = args.Value?.ToString();
         var selection = Story.Creation!.Default(Story.World.Characters[EntityId.Player], _preset);
         _stats = new Dictionary<string, int>(selection.Stats);
+    }
+
+    private void UseDefaultName()
+    {
+        var player = Story.World.Characters[EntityId.Player];
+        _firstName = player.FirstName;
+        _lastName = player.LastName;
+        _error = null;
     }
 
     private async Task Start()

@@ -45,13 +45,32 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Default_name_can_be_restored_without_resetting_other_choices()
+    {
+        await Upload(Fixture());
+        await Expect(Page.GetByLabel("First name", new() { Exact = true })).ToHaveValueAsync("Mara");
+        await Page.GetByLabel("First name", new() { Exact = true }).FillAsync("Robin");
+        await Page.GetByLabel("Last name", new() { Exact = true }).FillAsync("Vale");
+        await Page.GetByLabel("Pronouns", new() { Exact = true }).SelectOptionAsync("she");
+        await Page.GetByLabel("Character preset").SelectOptionAsync("scholar");
+        await Driver.ClickAsync("Use default name");
+        await Expect(Page.GetByLabel("First name", new() { Exact = true })).ToHaveValueAsync("Mara");
+        await Expect(Page.GetByLabel("Last name", new() { Exact = true })).ToHaveValueAsync("Burns");
+        await Expect(Page.GetByLabel("Pronouns", new() { Exact = true })).ToHaveValueAsync("she");
+        await Expect(Page.GetByLabel("Character preset")).ToHaveValueAsync("scholar");
+        await Driver.ClickAsync("Start story");
+        await Observe(new(null, "Mara's"));
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Invalid_names_do_not_start_and_selected_identity_survives_reload()
     {
         var fixture = Fixture();
         await Upload(fixture);
         await Page.GetByLabel("First name", new() { Exact = true }).FillAsync("");
         await Driver.ClickAsync("Start story");
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("first name is required");
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("A first name is required");
         await Expect(Page.GetByRole(AriaRole.Region, new() { Name = "Current passage" })).ToHaveCountAsync(0);
         await Page.GetByLabel("First name", new() { Exact = true }).FillAsync("Robin");
         await Page.GetByLabel("Last name", new() { Exact = true }).FillAsync("Vale");
