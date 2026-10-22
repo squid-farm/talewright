@@ -86,6 +86,11 @@ public sealed record CharacterSelection
             throw new ArgumentException("Select a legal value for every configurable stat.");
         }
 
-        return selection with { Stats = new ReadOnlyDictionary<string, int>(new Dictionary<string, int>(selection.Stats)) };
+        // Rebuild from declared ids: a caller's comparer may match "STR" for "str".
+        return selection with
+        {
+            Stats = new ReadOnlyDictionary<string, int>(
+                creation.Stats.Keys.ToDictionary(id => id.Value, id => selection.Stats[id.Value])),
+        };
     }
 }
