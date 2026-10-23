@@ -2,6 +2,9 @@
   "name": "talewright-editor",
   "implicitDependencies": ["talewright-docs", "Story", "Talewright.Tale", "Talewright.Tale.Tests", "Talewright.LanguageServer", "talewright-snippets"],
   "tags": ["type:tooling", "area:editor"],
+  "namedInputs": {
+    "default": ["sharedGlobals", "{projectRoot}/**/*", "editorWorkflow"]
+  },
   "targets": {
     "compiler-contract": {
       "executor": "nx:run-commands",
