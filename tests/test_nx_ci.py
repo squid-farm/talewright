@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -106,10 +107,55 @@ class CiRoutingTests(unittest.TestCase):
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),
             ("tooling/vscode-talewright/snippets/tale.json", {"editor"}),
             ("docs/guide/first-story.md", {"checks", "editor"}),
+            ("docs/developer/architecture.md", {"checks"}),
+            ("docs/reference/diagnostics.md", {"checks"}),
         ]:
             with self.subTest(changed=changed):
                 plan = make_plan(affected_graph(changed))
                 self.assertEqual(expected, {group for group, tasks in plan.items() if tasks})
+
+    def test_documented_manifests_select_only_schema_verification(self):
+        schema_test = ROOT / "tooling/vscode-talewright/tests/story-schema.test.mjs"
+        consumed = set(re.findall(r"'(docs/[^']+\.md)'", schema_test.read_text()))
+        editor = json.loads((ROOT / "tooling/vscode-talewright/project.json").read_text())
+        self.assertEqual(
+            {f"{{workspaceRoot}}/{path}" for path in consumed},
+            set(editor["namedInputs"]["documentedManifests"]),
+        )
+        for changed in consumed:
+            with self.subTest(changed=changed):
+                graph = affected_graph(changed)
+                plan = make_plan(graph)
+                self.assertEqual(
+                    [{"project": "talewright-docs", "target": "check"}], plan["checks"],
+                )
+                self.assertEqual({
+                    ("talewright-editor", "test"),
+                    ("talewright-editor", "compiler-contract"),
+                }, {(task["project"], task["target"]) for task in plan["editor"]})
+                for group in ("build", "unit", "browser", "linux-desktop"):
+                    self.assertEqual([], plan[group])
+                self.assertIn(
+                    "Talewright.Tale.Tests:build:release", graph["tasks"]["tasks"],
+                )
+
+    def test_general_docs_do_not_hide_mixed_source_verification(self):
+        for source in (
+            "tooling/vscode-talewright/extension.cjs",
+            "engine/src/Talewright.Tale/Parsing/StoryYamlReader.cs",
+            "player/src/Talewright.Player/Components/PlayerToolbar.razor",
+        ):
+            with self.subTest(source=source):
+                expected = {
+                    group: {(task["project"], task["target"]) for task in tasks}
+                    for group, tasks in make_plan(affected_graph(source)).items()
+                }
+                expected["checks"].add(("talewright-docs", "check"))
+                actual = make_plan(affected_graph(source, "docs/developer/architecture.md"))
+                self.assertEqual(expected, {
+                    group: {(task["project"], task["target"]) for task in tasks}
+                    for group, tasks in actual.items()
+                })
 
     def test_fallback_and_full_verification_include_every_environment(self):
         fallback = make_plan(affected_graph("new-product/feature.cs"))
