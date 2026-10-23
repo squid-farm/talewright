@@ -56,8 +56,12 @@ advertised. Unsupported requests return JSON-RPC method-not-found.
 
 The nearest on-disk `story.yaml` identifies each story. An unsaved `story.yaml`
 can establish its own root; otherwise a containing initialized workspace folder
-is the fallback. Multiple story roots are analyzed independently. File URIs only
-are supported. Open overlays win over disk, and close reloads disk. Versions must
+is the fallback. Multiple story roots are analyzed independently.
+An opened manifest always establishes its own directory as the root, including an
+unsaved nested manifest. Existing Tale overlays and diagnostic ownership move
+from ancestor workspaces to the new story; ancestor refreshes exclude that story.
+Closing a document discards its overlay even if the subsequent disk reload fails.
+Only file URIs are supported. Open overlays win over disk, and close reloads disk. Versions must
 increase. Whole-story analysis is debounced by 150 ms and superseded snapshots
 cannot publish. Diagnostics for fixed or deleted files are explicitly cleared.
 Disk changes re-read the bounded shared story source loader; no project code is

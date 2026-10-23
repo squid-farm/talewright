@@ -212,6 +212,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var text = document.GetProperty("text").GetString()!;
         story.Workspace.Open(Relative(story.Root, path), version, text);
         _documents.Add(path, new(story.Root, version, text));
+        if (Path.GetFileName(path) == StorySource.ManifestFileName) ReconcileStory(story);
         Schedule(story);
     }
 
@@ -238,10 +239,11 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         if (!IsStoryFile(path)) return;
         if (!_documents.TryGetValue(path, out var document)) throw new InvalidOperationException($"Document is not open: {path}");
         var story = _stories[document.Root];
-        // Disk may have changed without a watcher event while the overlay was open.
-        story = Reload(story);
         story.Workspace.Close(Relative(story.Root, path));
         _documents.Remove(path);
+        // Closing must discard the overlay even when reloading disk fails.
+        // Disk may have changed without a watcher event while the overlay was open.
+        story = Reload(story);
         Schedule(story);
     }
 
@@ -257,9 +259,9 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
 
     private Story GetStory(string path)
     {
-        var root = StoryWorkspace.FindStoryRoot(path)
-            ?? _stories.Keys.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
-            ?? (Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null)
+        var root = (Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null)
+            ?? _stories.Keys.Append(StoryWorkspace.FindStoryRoot(path))
+                .OfType<string>().Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
             ?? _folders.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
             ?? throw new ArgumentException($"No story.yaml or workspace root found for {path}.");
         if (_stories.TryGetValue(root, out var existing)) return existing;
@@ -268,9 +270,36 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         return story;
     }
 
+    private void ReconcileStory(Story story)
+    {
+        foreach (var ancestor in _stories.Values.Where(candidate => !ReferenceEquals(candidate, story) &&
+                     IsWithin(candidate.Root, story.Root)).ToArray())
+        {
+            foreach (var (path, document) in _documents.Where(pair =>
+                         PathComparer.Equals(pair.Value.Root, ancestor.Root) && IsWithin(story.Root, pair.Key)).ToArray())
+            {
+                ancestor.Workspace.Close(Relative(ancestor.Root, path));
+                story.Workspace.Open(Relative(story.Root, path), document.Version, document.Text);
+                _documents[path] = document with { Root = story.Root };
+            }
+            foreach (var path in ancestor.Published.Where(path => IsWithin(story.Root, path)).ToArray())
+            {
+                ancestor.Published.Remove(path);
+                story.Published.Add(path);
+            }
+            Reload(ancestor);
+            Schedule(ancestor);
+        }
+    }
+
     private Story LoadStory(string root)
     {
         var source = StorySource.FromDirectory(root);
+        var children = _stories.Keys.Where(candidate => !PathComparer.Equals(candidate, root) && IsWithin(root, candidate)).ToArray();
+        if (children.Length != 0)
+            source = new StorySource(source.Files.Where(file =>
+                !children.Any(child => IsWithin(child, Path.GetFullPath(file.Key, root))))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
         if (_metadataPath is not null)
         {
             try

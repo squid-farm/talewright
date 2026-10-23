@@ -94,6 +94,76 @@ public sealed class ServerTests
     }
 
     [Fact]
+    public async Task Close_discards_overlay_and_registration_even_when_disk_reload_fails()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale", Invalid, 1);
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
+        File.WriteAllText(client.PathOf("oversized.tale"), new string('x', 5 * 1024 * 1024 + 1));
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("start.tale") } });
+        var error = await client.Next(message => message.TryGetProperty("method", out var method) &&
+            method.GetString() == "window/showMessage");
+        Assert.Contains("5 MiB", error.GetProperty("params").GetProperty("message").GetString());
+        File.Delete(client.PathOf("oversized.tale"));
+        await client.Watch("oversized.tale", 3);
+        Assert.Empty(await client.Diagnostics("start.tale", null));
+        await client.Open("start.tale", Valid, 1);
+        Assert.Empty(await client.Diagnostics("start.tale", 1));
+        await client.Change("start.tale", Invalid, 2);
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 2));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Unsaved_nested_manifest_rehomes_existing_tale_overlays_and_diagnostics(bool parentManifest)
+    {
+        await using var client = new Client();
+        if (!parentManifest) File.Delete(client.PathOf("story.yaml"));
+        Directory.CreateDirectory(client.PathOf("child"));
+        const string childValid = "=== child\nHello.\n-> END\n";
+        const string childInvalid = "=== child\n* [Go] -> absent\n";
+        File.WriteAllText(client.PathOf("child/main.tale"), childValid);
+        await client.Initialize();
+        await client.Open("child/main.tale", childInvalid, 1);
+        var previous = await client.Diagnostics("child/main.tale", 1);
+        if (parentManifest) Assert.NotEmpty(previous);
+        await client.Open("child/story.yaml", Manifest.Replace("start: start", "start: child"), 1);
+        Assert.Contains(await client.Diagnostics("child/main.tale", 1),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
+        await client.Change("child/main.tale", childValid, 2);
+        Assert.Empty(await client.Diagnostics("child/main.tale", 2));
+        // An ancestor reload must neither reclaim the overlay nor republish its diagnostics.
+        await client.Watch("start.tale", 2);
+        await client.Open("start.tale", Valid, 1);
+        await client.Diagnostics("start.tale", 1);
+        Assert.DoesNotContain(client.PendingDiagnostics, message =>
+            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("child/main.tale") &&
+            message.GetProperty("params").GetProperty("diagnostics").GetArrayLength() != 0);
+        await client.Change("child/main.tale", childInvalid, 3);
+        Assert.Contains(await client.Diagnostics("child/main.tale", 3),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
+        await client.Change("child/main.tale", childValid, 4);
+        Assert.Empty(await client.Diagnostics("child/main.tale", 4));
+        Assert.False(File.Exists(client.PathOf("child/story.yaml")));
+        Assert.Equal(childValid, File.ReadAllText(client.PathOf("child/main.tale")));
+    }
+
+    [Fact]
+    public async Task Opening_unsaved_nested_manifest_before_tale_uses_its_own_directory()
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("child"));
+        await client.Initialize();
+        await client.Open("child/story.yaml", Manifest.Replace("start: start", "start: child"), 1);
+        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", 1));
+        await client.Open("child/main.tale", "=== child\nHello.\n-> END\n", 1);
+        Assert.Empty(await client.Diagnostics("child/story.yaml", 1));
+        Assert.Empty(await client.Diagnostics("child/main.tale", 1));
+    }
+
+    [Fact]
     public async Task Cross_file_add_change_delete_and_diagnostic_clearing()
     {
         await using var client = new Client();
