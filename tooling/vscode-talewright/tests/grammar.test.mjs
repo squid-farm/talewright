@@ -9,7 +9,11 @@ import { vscodePath } from './vscode-path.mjs';
 const wasm = await readFile(new URL('../node_modules/vscode-oniguruma/release/onig.wasm', import.meta.url));
 await oniguruma.loadWASM(wasm.buffer.slice(wasm.byteOffset, wasm.byteOffset + wasm.byteLength));
 const executable = await vscodePath();
-const markdownPath = path.join(path.dirname(executable), 'resources/app/extensions/markdown-basics/syntaxes/markdown.tmLanguage.json');
+// macOS keeps app resources beside Contents/MacOS rather than beside the executable.
+const appRoot = process.platform === 'darwin'
+  ? path.join(path.dirname(executable), '..', 'Resources', 'app')
+  : path.join(path.dirname(executable), 'resources', 'app');
+const markdownPath = path.join(appRoot, 'extensions/markdown-basics/syntaxes/markdown.tmLanguage.json');
 const registry = new textmate.Registry({
   onigLib: Promise.resolve({
     createOnigScanner: patterns => new oniguruma.OnigScanner(patterns),
@@ -69,6 +73,15 @@ test('Tale syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['![torch](torch.png)', 'torch.png', 'meta.image.inline.markdown'],
     ['[label](https://example.org)', 'label', 'meta.link.inline.markdown'],
     ['Literal \\{player:first-name\\}', '\\{', 'constant.character.escape.tale'],
+    ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'and', 'keyword.operator.word.tale'],
+    ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
+    ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'END', 'entity.name.section.target.tale'],
+    ['* [Go] (requires: (visited(a) or visited(b)) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
+    ['{if visited(start) and player:hp > 0}Yes{/if}', 'hp', 'variable.other.member.tale'],
+    ['__snake__case__ after', 'case', 'markup.bold.markdown'],
+    ['_snake_case_words_ after', 'case_words', 'markup.italic.markdown'],
+    ['**bold**text', 'bold', 'markup.bold.markdown'],
+    ['*it*text', 'it', 'markup.italic.markdown'],
   ]) hasScope(line, text, scope);
 });
 
@@ -85,12 +98,21 @@ test('ordinary prose, Markdown, comments and escaped braces are not Tale command
   assert.ok(!tokens('Literal \\{player:first-name\\}').tokens.some(token => token.scopes.includes('meta.template.tale')));
   assert.ok(!tokens('A -> sign in prose').tokens.some(token => token.scopes.includes('keyword.control.divert.tale')));
   assert.ok(!tokens('snake_case_words').tokens.some(token => token.scopes.includes('markup.italic.markdown')));
+  for (const [line, text] of [['__snake__case__ after', 'after'], ['_snake_case_words_ after', 'after']]) {
+    const offset = line.indexOf(text);
+    const token = tokens(line).tokens.find(token => token.startIndex <= offset && token.endIndex > offset);
+    assert.ok(!token.scopes.some(scope => scope.startsWith('markup.')), `${line}: ${text} should close formatting`);
+  }
+  const requires = '* [Continue] (requires: visited(start) and player:hp > 0) -> END';
+  const close = requires.indexOf(') ->');
+  const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);
+  assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
 });
 
 test('unterminated edits recover before the next scene', () => {
   for (const line of [
     '{player:first-name', '{if var:count == "unfinished', '* [unfinished',
-    '* [choice] (requires: player:dex >', '**unfinished', '_unfinished',
+    '* [choice] (requires: player:dex >', '* [choice] (requires: visited(start', '**unfinished', '_unfinished', '__unfinished',
     '> guide: {player:first-name', '::: skill-check', '~ var:count = "unfinished',
     '`unfinished code', '![unfinished](image', '[unfinished](link',
   ]) {

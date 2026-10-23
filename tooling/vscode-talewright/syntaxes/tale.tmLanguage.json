@@ -134,6 +134,13 @@
         }
       ]
     },
+    "paren": {
+      "begin": "\\(",
+      "beginCaptures": {"0": {"name": "punctuation.section.parens.begin.tale"}},
+      "end": "\\)|(?=$)",
+      "endCaptures": {"0": {"name": "punctuation.section.parens.end.tale"}},
+      "patterns": [{"include": "#expression"}]
+    },
     "expression": {
       "patterns": [
         {
@@ -147,6 +154,7 @@
         {"match": "\\b(?:true|false|hostile|unfriendly|neutral|friendly|allied)\\b", "name": "constant.language.tale"},
         {"match": "\\b(?:and|or|not|has|set|clear|give|take|dc)\\b", "name": "keyword.operator.word.tale"},
         {"match": "\\bvisited(?=\\s*\\()", "name": "support.function.tale"},
+        {"include": "#paren"},
         {
           "match": "\\b([A-Za-z0-9_.-]+)(:)([A-Za-z0-9_.-]+)",
           "captures": {
@@ -163,14 +171,26 @@
       "patterns": [
         {"include": "#template"},
         {
-          "begin": "(\\*\\*|(?<!\\w)__)(?=\\S)",
-          "end": "(?<=\\S)\\1|(?=$)",
+          "begin": "\\*\\*(?=\\S)",
+          "end": "(?<=\\S)\\*\\*|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(\\*|(?<!\\w)_)(?=\\S)",
-          "end": "(?<=\\S)\\1|(?=$)",
+          "begin": "(?<!\\w)__(?=\\S)",
+          "end": "(?<=\\S)__(?!\\w)|(?=$)",
+          "name": "markup.bold.markdown",
+          "patterns": [{"include": "#inline"}]
+        },
+        {
+          "begin": "\\*(?=\\S)",
+          "end": "(?<=\\S)\\*|(?=$)",
+          "name": "markup.italic.markdown",
+          "patterns": [{"include": "#inline"}]
+        },
+        {
+          "begin": "(?<!\\w)_(?=\\S)",
+          "end": "(?<=\\S)_(?!\\w)|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
