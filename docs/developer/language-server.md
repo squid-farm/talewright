@@ -48,12 +48,13 @@ diagnostics are separately identified by source `talewright`.
 ## Client contract and workspace behavior
 
 The server supports initialize/initialized, shutdown/exit, full-text
-didOpen/didChange/didClose, didSave, textDocument/completion, and workspace/didChangeWatchedFiles. Positions
+didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover,
+and workspace/didChangeWatchedFiles. Positions
 are UTF-16 and zero-based. Compiler point locations become zero-width ranges,
 clamped to the current file; codes, messages, and error/warning severities remain
 the compiler's. Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
-returns a complete list with explicit `textEdit` replacement ranges. Hover,
-signature help, inlay hints, rename, formatting, and autofixes are not advertised.
+returns a complete list with explicit `textEdit` replacement ranges. Hover returns
+source-aware help; signature help, inlay hints, rename, formatting, and autofixes are not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
 ### Semantic completion
@@ -99,6 +100,60 @@ values. Required missing or invalid project metadata returns an explicit
 completion-unavailable JSON-RPC error (`-32001`), in addition to its diagnostic,
 rather than misleading built-in suggestions. Completion requires an open document
 and a valid UTF-16 position; malformed/out-of-bounds requests return `-32602`.
+
+### Source-aware hover
+
+`textDocument/hover` uses the same current whole-story snapshot as completion.
+The shared authoring provider resolves parser-recognized references and
+declarations for scenes, characters, stats, items, factions, flags, variables,
+rulesets, registered predicates, and modifiers. Results include the symbol kind
+and type, a declaration location and authored source line when available, or
+explicit registration/ruleset provenance when there is no authored declaration.
+Scene metadata directives, conditional text, scene/choice/divert/speech/effect
+markers, and expression keywords/operators supply authoring help too.
+
+Canonical `story.talewright.yaml` keys use descriptions from the same schema
+bundled in the VSIX, embedded as a resource in `Talewright.Authoring`. There is no
+second schema or editor-specific semantic parser. Parsed YAML key paths and
+decoded scalar mappings preserve authored UTF-16 ranges, including quoted and
+escaped identifiers. Red Hat YAML can independently show structural help.
+
+Hover ranges are half-open token ranges and may span physical lines (unlike
+completion's primary edit). Unknown or partial identifiers and ordinary prose,
+comments, and expression string literals return `null`, not invented symbol
+documentation. Already-recognized tokens in incomplete expressions still work;
+syntactically broken YAML has no fabricated schema locations. Registered
+predicates/modifiers expose their names and types, not undocumented signatures
+or runtime results. Source context is authored text, never a current gameplay
+value or evaluated registration.
+
+Clients advertising Markdown receive formatted help with authored names, paths,
+and source lines isolated in code spans; no authored text is promoted into links,
+HTML, or commands. Other clients receive plaintext. Required missing/invalid
+metadata returns `-32001` explicitly, just like completion. An open document and
+valid UTF-16 request position are required (`-32602` otherwise). Hover does not
+save files, build projects, load assemblies, or execute game code.
+
+#### Beginner hover check
+
+1. Install/configure the server as above and open a trusted story folder.
+2. Add `=== destination` in another Tale file and type `-> destination` in the
+   first file. Hover the target (or use VS Code **Show Hover**, **Ctrl+K Ctrl+I**).
+   Expect **Scene**, its type, and the other file's declaration location/source.
+3. Without saving, rename the declaration and update the reference. Hover should
+   immediately reflect the unsaved name/location. An unknown target has no
+   semantic hover. Closing the buffer restores the latest disk context.
+4. Hover `hp` in `{player:hp}`, `requires` in a scene header's
+   `@requires player:hp > 0`, and `capitalize` in `{player:first-name#capitalize}`.
+   Check symbol/type or syntax help, not evaluated values.
+5. Hover `start` in `story.talewright.yaml` for its schema description; hover its
+   scene value for declaration context. Quoted values keep quotes outside the
+   identifier range.
+6. With explicitly exported custom metadata configured, hover a registered
+   predicate/modifier. Remove/corrupt the file and confirm an unavailable error
+   instead of fallback documentation.
+7. Neovim and other clients use the same `textDocument/hover` request. The
+   headless smoke below verifies hover without the VS Code extension.
 
 ### Story ownership
 
@@ -177,8 +232,8 @@ remains absent. For cross-file disk changes, configure the client to forward
 `workspace/didChangeWatchedFiles` as described above.
 
 The reproducible headless client smoke exercises initialization, compiler
-diagnostics, an unsaved fix, clearing, shared completion with exact replacement
-ranges, and clean shutdown:
+diagnostics, an unsaved fix, clearing, shared completion and hover with exact
+source ranges, and clean shutdown:
 
 ```sh
 TALEWRIGHT_LSP_DLL="$PWD/tooling/language-server/src/Talewright.LanguageServer/bin/Release/net10.0/Talewright.LanguageServer.dll" \
@@ -205,6 +260,11 @@ contexts, incomplete input, UTF-16/CRLF and escaped YAML ranges, versioned
 overlays, cross-file additions/changes/deletions, and metadata failure/recovery.
 The installed-VSIX smoke preserves the existing syntax/snippet/schema checks
 and exercises unsaved Tale and canonical manifest completion alongside diagnostics.
+Hover tests cover all symbol categories, syntax/schema descriptions, exact
+UTF-16/CRLF/escaped YAML ranges, unknown and incomplete input, current overlays,
+cross-file changes/deletions, Markdown/plaintext negotiation, and metadata
+failure/recovery. The installed VSIX displays Markdown symbol/declaration help
+for unsaved references, and Neovim requests the same hover directly.
 
 ### Beginner manual check
 
@@ -233,5 +293,6 @@ and an installed local NuGet tool; the installed VSIX in an isolated VS Code
 1.100.3 profile; and the headless Neovim 0.11.5 smoke above. Both editors received
 compiler diagnostics and cleared them after an unsaved fix; completion was also
 verified in both editors, including unsaved Tale token replacement and canonical
-manifest values in the installed VSIX. This is local test
+manifest values in the installed VSIX. Source-aware hover with declaration context
+and exact ranges was also verified in both editors. This is local test
 evidence, not a claim that the package has already been released.

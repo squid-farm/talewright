@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../../../../engine/src/Talewright.Tale/Talewright.Tale.csproj" />
+    <EmbeddedResource Include="../../../vscode-talewright/schemas/story.schema.json" LogicalName="Talewright.Authoring.story.schema.json" />
   </ItemGroup>
 </Project>

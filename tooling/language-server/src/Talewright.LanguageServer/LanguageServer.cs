@@ -19,6 +19,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private bool _shutdown;
     private string? _metadataPath;
     private bool _requiresMetadata;
+    private bool _hoverMarkdown;
     private static StringComparer PathComparer => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
     private sealed record Document(string Root, int Version, string Text);
     private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error);
@@ -139,6 +140,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     capabilities = new
                     {
                         positionEncoding = "utf-16",
+                        hoverProvider = true,
                         completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
@@ -169,7 +171,11 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     break;
                 case "textDocument/completion":
                     if (!hasId) throw new ArgumentException("completion requires a request id.");
-                    await CompleteAsync(id, parameters, cancellationToken);
+                    await SemanticAsync(id, parameters, false, cancellationToken);
+                    break;
+                case "textDocument/hover":
+                    if (!hasId) throw new ArgumentException("hover requires a request id.");
+                    await SemanticAsync(id, parameters, true, cancellationToken);
                     break;
                 case "textDocument/didChange":
                     Change(parameters);
@@ -200,6 +206,13 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
 
     private void Configure(JsonElement parameters)
     {
+        if (parameters.TryGetProperty("capabilities", out var capabilities) &&
+            capabilities.TryGetProperty("textDocument", out var textDocument) &&
+            textDocument.TryGetProperty("hover", out var hover) &&
+            hover.TryGetProperty("contentFormat", out var formats) && formats.ValueKind == JsonValueKind.Array)
+            _hoverMarkdown = formats.EnumerateArray()
+                .Select(format => format.ValueKind == JsonValueKind.String ? format.GetString() : null)
+                .FirstOrDefault(format => format is "markdown" or "plaintext") == "markdown";
         if (parameters.TryGetProperty("workspaceFolders", out var folders) && folders.ValueKind == JsonValueKind.Array)
             foreach (var folder in folders.EnumerateArray()) _folders.Add(PathFromUri(folder.GetProperty("uri").GetString()!));
         else if (parameters.TryGetProperty("rootUri", out var root) && root.ValueKind == JsonValueKind.String)
@@ -227,36 +240,52 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         Schedule(story);
     }
 
-    private async Task CompleteAsync(JsonElement id, JsonElement parameters, CancellationToken cancellationToken)
+    private async Task SemanticAsync(JsonElement id, JsonElement parameters, bool hover, CancellationToken cancellationToken)
     {
+        var feature = hover ? "Hover" : "Completion";
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!_documents.TryGetValue(path, out var document))
-            throw new ArgumentException("Completion requires an open story document.");
+            throw new ArgumentException($"{feature} requires an open story document.");
         var point = parameters.GetProperty("position");
         if (!point.GetProperty("line").TryGetInt32(out var line) || !point.GetProperty("character").TryGetInt32(out var character))
-            throw new ArgumentException("Completion positions must be 32-bit integers.");
+            throw new ArgumentException($"{feature} positions must be 32-bit integers.");
         var lines = document.Text.ReplaceLineEndings("\n").Split('\n');
         if (line < 0 || line >= lines.Length || character < 0 || character > lines[line].Length)
-            throw new ArgumentException("Completion position is outside the current document.");
+            throw new ArgumentException($"{feature} position is outside the current document.");
         var story = _stories[document.Root];
         if (story.MetadataError is { } error)
         {
-            await ErrorAsync(id, -32001, $"Semantic completion unavailable: {error.Message}", cancellationToken);
+            await ErrorAsync(id, -32001, $"{feature} unavailable: {error.Message}", cancellationToken);
             return;
         }
         var analysis = story.Workspace.Current;
         if (analysis is null)
         {
             var update = await story.Workspace.AnalyzeAsync(TimeSpan.Zero, cancellationToken);
-            if (!update.Published) throw new InvalidOperationException("Completion snapshot was superseded; request again.");
+            if (!update.Published) throw new InvalidOperationException($"{feature} snapshot was superseded; request again.");
             analysis = update.Analysis;
         }
         if (analysis.Diagnostics.FirstOrDefault(diagnostic => diagnostic.Code is "TW5001" or "TW5002") is { } unavailable)
         {
-            await ErrorAsync(id, -32001, $"Semantic completion unavailable: {unavailable.Message}", cancellationToken);
+            await ErrorAsync(id, -32001, $"{feature} unavailable: {unavailable.Message}", cancellationToken);
             return;
         }
-        var items = StoryCompletion.Complete(analysis, new(Relative(story.Root, path), line + 1, character + 1));
+        var position = new SourceLocation(Relative(story.Root, path), line + 1, character + 1);
+        if (hover)
+        {
+            var result = StoryHover.Get(analysis, position);
+            await ReplyAsync(id, result is null ? null : new
+            {
+                contents = new { kind = _hoverMarkdown ? "markdown" : "plaintext", value = _hoverMarkdown ? result.Markdown : result.PlainText },
+                range = new
+                {
+                    start = new { line = result.Range.Start.Line - 1, character = result.Range.Start.Column - 1 },
+                    end = new { line = result.Range.End.Line - 1, character = result.Range.End.Column - 1 }
+                }
+            }, cancellationToken);
+            return;
+        }
+        var items = StoryCompletion.Complete(analysis, position);
         await ReplyAsync(id, new
         {
             isIncomplete = false,

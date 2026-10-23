@@ -52,9 +52,20 @@ local ok, failure = pcall(function()
     end
   end
   assert(found, "Unsaved buffer did not offer the start scene")
+  assert(client.server_capabilities.hoverProvider, "Server did not advertise hover")
+  vim.api.nvim_buf_set_lines(buffer, 0, -1, false, { "=== start", "-> start" })
+  response = client:request_sync("textDocument/hover", {
+    textDocument = { uri = vim.uri_from_bufnr(buffer) },
+    position = { line = 1, character = 5 },
+  }, 10000, buffer)
+  assert(response and response.result, "Shared hover request failed")
+  assert(response.result.contents.value:match("Scene") and response.result.contents.value:match("Declared at"),
+    "Hover omitted symbol kind or declaration context")
+  assert(response.result.range.start.character == 3 and response.result.range["end"].character == 8,
+    "Hover did not return the exact source range")
   vim.lsp.stop_client(id)
   assert(vim.wait(5000, function() return vim.lsp.get_client_by_id(id) == nil end, 50), "Server did not shut down")
-  print("Neovim LSP smoke passed: compiler diagnostics, unsaved fixes, clearing, semantic completion, shutdown.")
+  print("Neovim LSP smoke passed: diagnostics, unsaved fixes, completion, source-aware hover, shutdown.")
 end)
 vim.fn.delete(root .. "/start.tale")
 vim.fn.delete(root .. "/story.talewright.yaml")

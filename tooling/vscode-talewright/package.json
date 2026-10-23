@@ -1,7 +1,7 @@
 {
   "name": "talewright",
   "displayName": "Talewright",
-  "description": "Tale highlighting, snippets, story.talewright.yaml schema, shared semantic completion, and live compiler diagnostics.",
+  "description": "Tale highlighting, snippets, story.talewright.yaml schema, shared completion/hover, and live compiler diagnostics.",
   "version": "0.1.0",
   "publisher": "squid-farm",
   "license": "MPL-2.0",
@@ -31,7 +31,7 @@
     "configuration": {
       "title": "Talewright",
       "properties": {
-        "talewright.languageServer.enabled": { "type": "boolean", "default": true, "description": "Enable shared live diagnostics and semantic completion. Reload the window after changing settings." },
+        "talewright.languageServer.enabled": { "type": "boolean", "default": true, "description": "Enable shared live diagnostics, completion, and hover. Reload the window after changing settings." },
         "talewright.languageServer.command": { "type": "string", "default": "talewright-lsp", "description": "Installed language-server executable. Never installed or built automatically." },
         "talewright.languageServer.args": { "type": "array", "items": { "type": "string" }, "default": ["--stdio"], "description": "Server arguments; for a local build use dotnet with the server DLL followed by --stdio." },
         "talewright.languageServer.metadataPath": { "type": "string", "default": "", "description": "Explicit data-only authoring metadata file, absolute or relative to each story root." },

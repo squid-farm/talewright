@@ -1,7 +1,7 @@
 # Tale for VS Code
 
 Highlight Talewright `.tale` stories, insert common story structures, and provide
-schema support, shared semantic completion, and live compiler diagnostics without
+schema support, shared semantic completion/hover, and live compiler diagnostics without
 running your story.
 
 ## Install
@@ -122,7 +122,7 @@ non-whitespace character and be no longer than 80 characters.
 
 ## Not included
 
-- Hover, signature help, inlay hints, rename, lint, formatting, or runtime debugging.
+- Signature help, inlay hints, rename, lint, formatting, or runtime debugging.
 - Implicit project builds/assembly execution, gameplay, network service, or telemetry.
 
 The language server uses only shared compiler/authoring analysis. Custom C#
@@ -139,6 +139,15 @@ its own word/snippet suggestions. YAML must be parseable, and required custom
 metadata must be available. See the
 [capabilities and manual walkthrough](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#semantic-completion)
 for supported slots, exact replacement behavior, and limitations.
+
+Hover a known reference or declaration for its kind/type and authored declaration
+context. Scene directives and expressions also show syntax help; manifest keys use
+the bundled schema's descriptions. Unsaved edits are included. Unknown/partial
+symbols and ordinary prose return no semantic hover, and required missing custom
+metadata is reported explicitly. Authored text is displayed as code, not active
+Markdown links or HTML. No runtime values or C# signatures are invented. See the
+[hover walkthrough](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#source-aware-hover)
+for a beginner-friendly check in VS Code and other LSP clients.
 
 Keep using `talewright validate <story-folder>` for correctness checks. See the
 [Tale reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/tale-syntax.md)

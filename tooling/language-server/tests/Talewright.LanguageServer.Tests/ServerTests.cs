@@ -23,7 +23,7 @@ public sealed partial class ServerTests
         var initialized = await client.Initialize();
         Assert.Equal("utf-16", initialized.GetProperty("result").GetProperty("capabilities").GetProperty("positionEncoding").GetString());
         Assert.Equal(1, initialized.GetProperty("result").GetProperty("capabilities").GetProperty("textDocumentSync").GetProperty("change").GetInt32());
-        var unknown = await client.Request("textDocument/hover", new { });
+        var unknown = await client.Request("textDocument/signatureHelp", new { });
         Assert.Equal(-32601, unknown.GetProperty("error").GetProperty("code").GetInt32());
         var shutdown = await client.Request("shutdown", new { });
         Assert.Equal(JsonValueKind.Null, shutdown.GetProperty("result").ValueKind);

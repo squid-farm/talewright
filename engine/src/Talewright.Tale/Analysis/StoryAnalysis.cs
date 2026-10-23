@@ -29,6 +29,7 @@ public sealed class StoryAnalysis
         Symbols = original.Symbols;
         Expressions = original.Expressions;
         CompletionSites = original.CompletionSites;
+        Tokens = original.Tokens;
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
@@ -37,6 +38,7 @@ public sealed class StoryAnalysis
         Symbols = Array.AsReadOnly(collector.Symbols.Distinct().ToArray());
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
         CompletionSites = Array.AsReadOnly(collector.CompletionSites.ToArray());
+        Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
@@ -45,6 +47,7 @@ public sealed class StoryAnalysis
     public IReadOnlyList<ExpressionContext> Expressions { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
     public IReadOnlyList<CompletionSite> CompletionSites { get; }
+    public IReadOnlyList<AuthoringToken> Tokens { get; }
 
     /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
     public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
@@ -71,6 +74,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSite> CompletionSites { get; } = [];
+    internal List<AuthoringToken> Tokens { get; } = [];
 
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
@@ -169,6 +173,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             completionText += line[(range.End.Column - 1)..end];
         }
         CompletionSites.AddRange(ExpressionCompletion.Sites(completionText, kind, Map, Symbols));
+        foreach (var token in Lexer.Tokenize(text))
+            if (token.Kind is not (TokenKind.End or TokenKind.String or TokenKind.Error or TokenKind.NamedPredicate))
+                Tokens.Add(new(token.Text, Map(token.Offset, token.Text.Length)));
         if (kind == ExpressionContextKind.Effects)
         {
             ExpressionParser.CollectDeclarations(text, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
@@ -263,6 +270,26 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
 
     internal void Manifest(YamlMappingNode root)
     {
+        void Properties(YamlNode node, string[] path, HashSet<YamlNode> ancestors)
+        {
+            if (!ancestors.Add(node)) return;
+            if (node is YamlMappingNode mapping)
+            {
+                foreach (var (key, value) in mapping.Children)
+                {
+                    if (key is not YamlScalarNode { Value: { } name } scalar) continue;
+                    var next = path.Append(name).ToArray();
+                    Scalar(scalar);
+                    var location = new SourceLocation(StorySource.ManifestFileName, (int)key.Start.Line, (int)key.Start.Column);
+                    Tokens.Add(new(name, _scalars[location].Range(0, name.Length), next));
+                    Properties(value, next, ancestors);
+                }
+            }
+            else if (node is YamlSequenceNode sequence)
+                foreach (var child in sequence.Children) Properties(child, path.Append("[]").ToArray(), ancestors);
+            ancestors.Remove(node);
+        }
+        Properties(root, [], []);
         void Walk(YamlNode node, string[] path)
         {
             if (node is YamlMappingNode map)
@@ -294,8 +321,12 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             map.Children.TryGetValue(new YamlScalarNode(name), out var value) ? value : null;
         void Add(YamlNode key, AuthoringSymbolKind kind, string type)
         {
-            if (key is YamlScalarNode { Value: { Length: > 0 } name })
-                Symbols.Add(new(name, kind, type, At(key)));
+            if (key is YamlScalarNode { Value: { Length: > 0 } name } scalar)
+            {
+                Scalar(scalar);
+                var location = At(key).Start;
+                Symbols.Add(new(name, kind, type, _scalars[location].Range(0, name.Length)));
+            }
         }
         if (Get(root, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
         {

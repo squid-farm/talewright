@@ -81,6 +81,7 @@ internal sealed partial class TaleParser
 
             if (trimmed.StartsWith("===", StringComparison.Ordinal))
             {
+                _symbols.Analysis?.Tokens.Add(new("===", AnalysisCollector.Range(At(indent), "===")));
                 FinishScene();
                 StartScene(trimmed[3..].Trim(), At(indent));
                 continue;
@@ -156,19 +157,23 @@ internal sealed partial class TaleParser
         switch (line)
         {
             case ['>', ..]:
+                _symbols.Analysis?.Tokens.Add(new(">", AnalysisCollector.Range(At(indent), ">")));
                 FlushParagraph();
                 ParseSpeech(line, indent);
                 return;
             case ['~', ..]:
+                _symbols.Analysis?.Tokens.Add(new("~", AnalysisCollector.Range(At(indent), "~")));
                 FlushParagraph();
                 ParseEntryEffects(line[1..], indent + 1);
                 return;
             case ['*', ' ' or '\t' or '[', ..]:
+                _symbols.Analysis?.Tokens.Add(new("*choice", AnalysisCollector.Range(At(indent), "*")));
                 // "* [label]" is a choice; "*text*" is emphasis.
                 FlushParagraph();
                 ParseChoice(line, indent);
                 return;
             case ['-', '>', ..]:
+                _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(indent), "->")));
                 FlushParagraph();
                 var target = ParseDivertTarget(line[2..], indent + 2);
                 if (target is not null)
@@ -178,6 +183,7 @@ internal sealed partial class TaleParser
 
                 return;
             case [':', ':', ':', ..]:
+                _symbols.Analysis?.Tokens.Add(new("::: skill-check", AnalysisCollector.Range(At(indent), ":::")));
                 FlushParagraph();
                 ParseBlockCheck(line, indent);
                 return;
@@ -313,6 +319,9 @@ internal sealed partial class TaleParser
     private void ParseBlockDirective(string directive, int indent, string line)
     {
         var scene = _scene!;
+        var keyword = directive.StartsWith("if ", StringComparison.Ordinal) ? "if" : directive;
+        var keywordStart = line.IndexOf(keyword, StringComparison.Ordinal);
+        _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(indent + keywordStart), keyword)));
         if (directive == "else")
         {
             if (scene.Frames.Count == 0 || scene.Frames.Peek().InElse)
@@ -523,6 +532,7 @@ internal sealed partial class TaleParser
             }
             else if (remaining.StartsWith("->", StringComparison.Ordinal))
             {
+                _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(column), "->")));
                 divert = ParseDivertTarget(rest[(pos + 2)..], column + 2);
                 pos = rest.Length;
             }
@@ -592,10 +602,14 @@ internal sealed partial class TaleParser
     /// <summary>Parses <c>[actor] skill dc expr</c>.</summary>
     private SkillCheck? ParseCheckSpec(string text, int column)
     {
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var dc = Array.IndexOf(words, "dc");
         if (_symbols.Analysis is { } analysis)
         {
+            analysis.Tokens.Add(new("skill-check",
+                AnalysisCollector.Range(At(column - "skill-check".Length), "skill-check")));
             var offset = 0;
-            var references = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).TakeWhile(word => word != "dc").Take(2).ToArray();
+            var references = words.TakeWhile(word => word != "dc").Take(2).ToArray();
             if (references.Length == 0)
             {
                 analysis.Reference("", At(column), AuthoringSymbolKind.Character);
@@ -605,11 +619,18 @@ internal sealed partial class TaleParser
             {
                 var word = references[index];
                 offset = text.IndexOf(word, offset, StringComparison.Ordinal);
-                analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Stat);
-                if (index == 0) analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Character);
+                if (dc == 1)
+                    analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Stat);
+                else if (dc == 2)
+                    analysis.Reference(word, At(column + offset), index == 0 ? AuthoringSymbolKind.Character : AuthoringSymbolKind.Stat);
+                else
+                {
+                    analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Stat);
+                    if (index == 0) analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Character);
+                }
                 offset += word.Length;
             }
-            if (references.Length == 1 && column + offset < _lines[_index].Length &&
+            if (dc < 0 && references.Length == 1 && column + offset < _lines[_index].Length &&
                 char.IsWhiteSpace(_lines[_index][column + offset]) &&
                 _symbols.World.Characters.ContainsKey(new EntityId(references[0])))
                 analysis.Reference("", At(column + offset + 1), AuthoringSymbolKind.Stat);
@@ -625,8 +646,6 @@ internal sealed partial class TaleParser
             return null;
         }
 
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var dc = Array.IndexOf(words, "dc");
         if (dc is < 1 or > 2 || dc == words.Length - 1)
         {
             _diagnostics.Error("TW1013", "Skill checks look like 'skill-check [actor] skill dc 12'.", At(column));
@@ -736,6 +755,7 @@ internal sealed partial class TaleParser
                 return null;
             }
 
+            _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(column + pos), "->")));
             divert = ParseDivertTarget(text[(pos + 2)..], column + pos + 2);
         }
 
