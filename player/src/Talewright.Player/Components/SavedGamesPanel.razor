@@ -47,6 +47,10 @@
                     <li data-save-kind="@(entry.IsQuick ? "quick" : "named")"
                         aria-label="@($"{(entry.IsQuick ? "Checkpoint" : "Named save")}: {entry.DisplayName}")">
                         <strong>@entry.DisplayName</strong>
+                        @if (!entry.IsQuick && entry.DisplayName == SaveEntry.DisplayNameFor(SaveEntry.QuickSlot))
+                        {
+                            <span class="tw-save-kind">Named save</span>
+                        }
                         @if (entry.Summary is { } summary)
                         {
                             <span>@summary.SceneTitle</span>

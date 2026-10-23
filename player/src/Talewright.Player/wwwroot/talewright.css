@@ -87,6 +87,7 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-save-list { display: grid; gap: .75rem; list-style: none; margin: .5rem 0 0; padding: 0; }
 .tw-save-list li { display: grid; grid-template-columns: minmax(0, 1fr); gap: .25rem; padding: .75rem; border: 1px solid var(--tw-border); border-radius: 6px; background: var(--tw-bg); overflow-wrap: anywhere; }
 .tw-save-list li strong { font-size: 1.05rem; }
+.tw-save-kind { justify-self: start; padding: .1rem .4rem; border: 1px solid var(--tw-border); border-radius: 999px; color: var(--tw-muted); font-size: .8rem; }
 .tw-saves input { box-sizing: border-box; max-width: 100%; color: var(--tw-fg); background: var(--tw-bg); border: 1px solid var(--tw-border); font: inherit; }
 .tw-saves button { min-width: 0; overflow-wrap: anywhere; margin: 0.25rem; padding: 0.25rem 0.5rem; color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 4px; cursor: pointer; }
 .tw-columns { display: grid; grid-template-columns: minmax(0, 1fr) 16rem; gap: 2rem; align-items: start; }

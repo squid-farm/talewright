@@ -80,22 +80,22 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     public async Task Saves_are_localized_sorted_newest_first_and_visually_grouped()
     {
         await Upload(Fixture());
-        await Driver.ClickAsync("Saves");
-        await FillSaveName("Earlier named save");
-        await Driver.ClickAsync("Save game");
-        await Driver.ClickAsync("Close saves");
-        await Task.Delay(TimeSpan.FromSeconds(1.1));
-        await Choose("Walk onward");
         await Driver.ClickAsync("Quick Save");
+        await Task.Delay(TimeSpan.FromSeconds(1.1));
         await Driver.ClickAsync("Saves");
+        await FillSaveName("Quick Save checkpoint");
+        await Driver.ClickAsync("Save game");
+        await AssertDialogText(text => Assert.Contains("Saved 'Quick Save checkpoint'.", text));
 
         var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true });
         var entries = dialog.Locator(".tw-save-list > li");
         await Expect(entries).ToHaveCountAsync(2);
-        await Expect(entries.Nth(0)).ToHaveAttributeAsync("data-save-kind", "quick");
-        await Expect(entries.Nth(1)).ToHaveAttributeAsync("data-save-kind", "named");
+        await Expect(entries.Nth(0)).ToHaveAttributeAsync("data-save-kind", "named");
+        await Expect(entries.Nth(1)).ToHaveAttributeAsync("data-save-kind", "quick");
+        await Expect(entries.Nth(0).Locator(".tw-save-kind")).ToHaveTextAsync("Named save");
+        await Expect(entries.Nth(1).Locator(".tw-save-kind")).ToHaveCountAsync(0);
         var text = await dialog.InnerTextAsync();
-        Assert.DoesNotContain("Named save", text);
+        Assert.Contains("Named save", text);
         Assert.DoesNotContain("One replaceable checkpoint for this story", text);
 
         var form = dialog.Locator(".tw-save-form");
