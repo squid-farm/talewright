@@ -300,6 +300,8 @@ public class StoryHistoryTests
         Assert.Throws<InvalidOperationException>(() => history.Save());
         Assert.Equal(choices.Count + 1, history.Cursor);
         Assert.Equal(StoryHistory.MaxSaveBytes, exactLimitSave.Length);
+        Assert.False(history.TryProgressKey(out var progress));
+        Assert.Null(progress);
     }
 
     [Fact]

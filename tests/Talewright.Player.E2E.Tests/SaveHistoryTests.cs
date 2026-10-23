@@ -220,6 +220,44 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Indexeddb_record_corruption_keeps_catalog_available_for_other_slots()
+    {
+        var fixture = Fixture();
+        await Upload(fixture);
+        await Driver.ClickAsync("Saves");
+        await FillSaveName("Healthy");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+        await Page.EvaluateAsync("""
+            async storyId => {
+                const db = await new Promise((resolve, reject) => {
+                    const request = indexedDB.open("talewright-saves", 1);
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => resolve(request.result);
+                });
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction("saves", "readwrite");
+                    tx.onerror = () => reject(tx.error);
+                    tx.objectStore("saves").put({ storyId, slot: "Broken", data: "not-bytes" });
+                    tx.oncomplete = () => resolve();
+                });
+                db.close();
+            }
+            """, fixture.Yaml.Split('\n')[0]["id: ".Length..]);
+
+        await Driver.ClickAsync("Saves");
+        await AssertDialogText(text =>
+        {
+            Assert.Contains("Healthy", text);
+            Assert.Contains("Broken", text);
+            Assert.Contains("invalid or oversized data", text);
+        });
+        await Driver.ClickAsync("Load Healthy");
+        await Observe(new(null, "First passage"));
+    }
+
+    [Fact]
     [Trait("Host", "Linux")]
     public async Task Native_failed_replacement_preserves_old_payload_and_load_guard()
     {

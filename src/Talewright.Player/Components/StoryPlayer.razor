@@ -199,7 +199,8 @@
             return;
         }
         _slots = slots;
-        if (!_slots.Any(entry => entry.ProgressKey == _session.ProgressKey))
+        var currentProgress = _session.TryProgressKey(out var progressKey) ? progressKey : null;
+        if (currentProgress is null || !_slots.Any(entry => entry.ProgressKey == currentProgress))
         {
             _pendingLoad = slot;
             return;

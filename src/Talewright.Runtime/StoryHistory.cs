@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Talewright.Core.Events;
@@ -124,6 +125,20 @@ public sealed class StoryHistory
     }
 
     public string ProgressKey => Convert.ToHexString(SHA256.HashData(Save()));
+
+    public bool TryProgressKey([NotNullWhen(true)] out string? progressKey)
+    {
+        try
+        {
+            progressKey = ProgressKey;
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            progressKey = null;
+            return false;
+        }
+    }
 
     public SaveSummary CaptureSummary(DateTimeOffset savedAt)
     {
