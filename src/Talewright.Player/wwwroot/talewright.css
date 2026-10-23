@@ -52,7 +52,8 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-empty { color: var(--tw-muted); font-style: italic; }
 
 /* Player layout */
-.tw-bar { position: sticky; top: 0; z-index: 10; display: flex; gap: 1rem; align-items: center; justify-content: space-between; background: var(--tw-bg); border-bottom: 1px solid var(--tw-border); margin-bottom: 1rem; }
+.tw-bar { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem 1rem; align-items: center; background: var(--tw-bg); border-bottom: 1px solid var(--tw-border); margin-bottom: 1rem; }
+.tw-toolbar-feedback { grid-column: 1 / -1; min-width: 0; margin: 0 0 .5rem; overflow-wrap: anywhere; font-family: var(--tw-ui-font); font-size: .85rem; }
 .tw-bar h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.5rem; margin: 0.5rem 0; }
 .tw-bar-actions { display: flex; gap: .25rem; flex-shrink: 0; }
 .tw-bar-actions > .tw-link, .tw-overflow > .tw-link { min-width: 44px; min-height: 44px; padding: .25rem .5rem; }
@@ -64,10 +65,15 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-confirm-actions { display: flex; gap: 1rem; }
 @media (max-width: 52rem) {
     .tw-bar h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-    .tw-bar { justify-content: flex-start; }
+    .tw-bar { grid-template-columns: minmax(0, 1fr); }
     .tw-bar-actions { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
     .tw-bar-actions > .tw-link, .tw-overflow > .tw-link { font-size: .8rem; padding: .25rem; }
     .tw-bar-actions > .tw-quick-save { max-width: 3.5rem; }
+}
+@media (min-width: 360px) and (max-width: 52rem) {
+    .tw-bar-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); width: 100%; }
+    .tw-bar-actions > .tw-link, .tw-overflow > .tw-link { width: 100%; }
+    .tw-bar-actions > .tw-quick-save { max-width: none; }
 }
 .tw-link { background: none; border: none; cursor: pointer; color: var(--tw-accent); font-family: var(--tw-ui-font); font-size: 0.9rem; padding: 0; }
 .tw-link:hover { text-decoration: underline; }

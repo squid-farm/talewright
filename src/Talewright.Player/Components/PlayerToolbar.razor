@@ -26,6 +26,11 @@
             </div>
         </div>
     </div>
+    @if (Message is not null)
+    {
+        <p class="tw-toolbar-feedback @(Error ? "tw-error" : "tw-save-status")"
+           role="@(Error ? "alert" : "status")">@Message</p>
+    }
 </header>
 
 <dialog class="tw-confirm" aria-label="Restart story?" @ref="_confirmation">
@@ -44,6 +49,8 @@
     [Parameter] public bool CanBack { get; set; }
     [Parameter] public bool CanForward { get; set; }
     [Parameter] public bool CanSave { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public bool Error { get; set; }
     [Parameter] public EventCallback OnBack { get; set; }
     [Parameter] public EventCallback OnForward { get; set; }
     [Parameter] public EventCallback OnSavedGames { get; set; }

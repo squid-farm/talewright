@@ -16,6 +16,129 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         Yaml = TestStories.DefaultYaml.Replace("id: player-test", $"id: quick-{Guid.NewGuid():N}"),
     };
 
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1100)]
+    public async Task Quick_save_feedback_stays_visible_while_scrolled_without_moving_the_reader(int width)
+    {
+        var fixture = TestStories.Long with { Yaml = Fixture().Yaml };
+        await Upload(fixture);
+        await AssertState(state => Assert.True(state.PassageFocused));
+        await Driver.ResizeAsync(width, 900);
+        if (PlayerTarget.IsDesktop)
+            await Driver.PressAsync("End");
+        else
+            await Page.EvaluateAsync("() => window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})");
+        var timer = Stopwatch.StartNew();
+        while (await PassageTop() >= 0)
+        {
+            Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "The reader scrolled down the transcript.");
+            await Task.Delay(100);
+        }
+        var before = await PassageTop();
+        await ClickVisibleQuickSave();
+        await AssertText(text => Assert.Contains("Quick Save checkpoint saved.", text));
+        await AssertFeedbackVisible("Quick Save checkpoint saved.");
+        var after = await PassageTop();
+        Assert.InRange(Math.Abs(after - before), 0, 160); // Only the feedback row may change layout.
+        Assert.True(after < -100, "Saving must not return the reader to the start.");
+
+        string? path = null;
+        string? backup = null;
+        if (PlayerTarget.IsDesktop)
+        {
+            var storyId = fixture.Yaml.Split('\n')[0]["id: ".Length..];
+            var bytes = await new FileSaveStore(FileSaveStore.DefaultRoot).ReadQuickAsync(storyId);
+            path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "quick.json", SearchOption.AllDirectories)
+                .Single(file => File.ReadAllBytes(file).SequenceEqual(bytes));
+            backup = path + ".test-backup";
+            File.Move(path, backup);
+            Directory.CreateDirectory(path);
+        }
+        else
+        {
+            await Page.EvaluateAsync("""
+                () => {
+                    window.originalTransaction = IDBDatabase.prototype.transaction;
+                    IDBDatabase.prototype.transaction = function(...args) {
+                        if (args[1] === 'readwrite') throw new DOMException('test failure', 'QuotaExceededError');
+                        return window.originalTransaction.apply(this, args);
+                    };
+                }
+                """);
+        }
+        try
+        {
+            var beforeFailure = await PassageTop();
+            await ClickVisibleQuickSave();
+            await AssertText(text => Assert.Contains(PlayerTarget.IsDesktop
+                ? "Saved games could not be read or written" : "not enough browser storage", text));
+            await AssertFeedbackVisible(PlayerTarget.IsDesktop
+                ? "Saved games could not be read or written" : "not enough browser storage");
+            Assert.InRange(Math.Abs(await PassageTop() - beforeFailure), 0, 160);
+            Assert.True(await PassageTop() < -100);
+        }
+        finally
+        {
+            if (path is not null && backup is not null)
+            {
+                Directory.Delete(path);
+                File.Move(backup, path);
+            }
+            else
+            {
+                await Page.EvaluateAsync("() => IDBDatabase.prototype.transaction = window.originalTransaction");
+            }
+        }
+        await Driver.ClickAsync("Saves");
+        await ClickLoad("quick");
+        await Observe(new(null, "Long beginning"));
+    }
+
+    private async Task<double> PassageTop() => Driver is NativePlayerDriver native
+        ? (await native.SnapshotAsync()).Descendants().First(node => node.Name == "Current passage").Bounds.Y
+        : (await Latest.BoundingBoxAsync())!.Y;
+
+    private async Task ClickVisibleQuickSave()
+    {
+        if (PlayerTarget.IsDesktop)
+        {
+            await Driver.ClickAsync("Quick Save");
+        }
+        else
+        {
+            var button = Page.GetByRole(AriaRole.Button, new() { Name = "Quick Save", Exact = true });
+            await Expect(button).ToBeInViewportAsync(new() { Ratio = 1 });
+            var bounds = (await button.BoundingBoxAsync())!;
+            // Click where the reader would, without Locator.Click's automatic scrollIntoView.
+            await Page.Mouse.ClickAsync(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
+        }
+    }
+
+    private async Task AssertFeedbackVisible(string text)
+    {
+        if (Driver is NativePlayerDriver native)
+        {
+            var snapshot = await native.SnapshotAsync();
+            var window = snapshot.Descendants().First(node => node.Role == "frame").Bounds;
+            var feedback = snapshot.Descendants().First(node =>
+                node.Text.Contains(text, StringComparison.Ordinal) && node.Children.Length == 0).Bounds;
+            Assert.True(feedback.Y >= window.Y && feedback.Y + feedback.Height <= window.Y + window.Height);
+        }
+        else
+        {
+            var feedback = Page.Locator(".tw-toolbar-feedback");
+            await Expect(feedback).ToContainTextAsync(text);
+            await Expect(feedback).ToBeInViewportAsync(new() { Ratio = 1 });
+            await Expect(Page.Locator(".tw-bar")).ToBeInViewportAsync(new() { Ratio = 1 });
+            await Expect(Page.Locator(".tw-bar")).ToHaveCSSAsync("position", "sticky");
+            await Page.WaitForFunctionAsync("""
+                () => Math.abs(parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop)
+                    - document.querySelector('.tw-bar').getBoundingClientRect().height - 18) < .01
+                """);
+        }
+    }
+
     [Fact]
     public async Task Quick_save_replaces_only_checkpoint_and_restores_redo_after_host_restart()
     {

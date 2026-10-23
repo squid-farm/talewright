@@ -26,7 +26,9 @@ The web player, the desktop player and published games all share the same screen
 | **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |
 | **More actions → Library** | Return to the list of stories (not shown in published games). |
 
-The toolbar stays visible while you scroll. The Saves dialog refreshes automatically when opened.
+The toolbar stays visible while you scroll. Quick Save confirmations and storage errors appear
+in the toolbar without returning you to the start of the passage.
+The Saves dialog refreshes automatically when opened.
 Each new save shows its name, scene title, real-world save time (UTC) and character name.
 Older saves show **Details unavailable** instead of an invented timestamp.
 The **Quick Save checkpoint** appears separately from entries marked **Named save** in the same list,

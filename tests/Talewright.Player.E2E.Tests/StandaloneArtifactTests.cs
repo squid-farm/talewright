@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Playwright;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -52,7 +53,12 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         await Driver.ClickAsync("Quick Save");
         if (Driver is NativePlayerDriver native)
         {
-            Assert.Contains("Quick Save checkpoint saved.", (await native.SnapshotAsync()).Content);
+            var timer = Stopwatch.StartNew();
+            while (!(await native.SnapshotAsync()).Content.Contains("Quick Save checkpoint saved.", StringComparison.Ordinal))
+            {
+                Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "Quick Save completed before restarting the process.");
+                await Task.Delay(100);
+            }
         }
         else
         {

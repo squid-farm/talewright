@@ -6,6 +6,7 @@
 <div class="tw-player">
     <PlayerToolbar Title="@Story.Title" Busy="_busy" UndoEnabled="Story.UndoEnabled"
                    CanBack="_session.CanBack" CanForward="_session.CanForward" CanSave="@(SaveStore is not null)"
+                   Message="@(_showSaves ? null : _saveMessage)" Error="_saveError"
                    OnBack="Back" OnForward="Forward" OnQuickSave="QuickSaveAsync" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit" />
 
     @if (SaveStore is not null)
@@ -15,11 +16,6 @@
                          OnSave="SaveAsync" OnRetry="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
                          OnLoad="RequestLoadAsync" OnConfirmLoad="ConfirmLoadAsync" OnCancelLoad="CloseSaves" OnClose="CloseSaves" />
     }
-    @if (_saveMessage is not null && !_showSaves)
-    {
-        <p class="@(_saveError ? "tw-error" : "tw-save-status")" role="@(_saveError ? "alert" : "status")">@_saveMessage</p>
-    }
-
     <div class="tw-columns">
         <main class="tw-transcript" aria-label="Story transcript" aria-live="polite">
             @for (var i = 0; i < _transcript.Count; i++)
