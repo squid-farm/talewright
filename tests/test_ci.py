@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from zipfile import ZipFile, ZipInfo
 
 SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
@@ -248,6 +249,52 @@ class DesktopArchiveTests(unittest.TestCase):
                     self.write_archive(path, **change)
                     with self.assertRaisesRegex(ValueError, error):
                         verify_desktop_archive(path)
+
+
+class UiTestImageContracts(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_image_metadata_matches_repository_version_pins(self):
+        metadata = json.loads((self.ROOT / ".github/docker/ui-tests/image.json").read_text())
+        e2e = ET.parse(self.ROOT / "tests/Talewright.Player.E2E.Tests/Talewright.Player.E2E.Tests.csproj")
+        playwright = [package.attrib["Version"] for package in e2e.findall(".//PackageReference")
+                      if package.attrib["Include"] == "Microsoft.Playwright"]
+        self.assertEqual(playwright, [metadata["playwright"]])
+        global_json = json.loads((self.ROOT / "global.json").read_text())
+        self.assertEqual(global_json["sdk"]["version"], metadata["sdk_request"])
+        self.assertRegex(metadata["reference"], r"^ghcr\.io/squid-farm/talewright-ui-tests:pw\d+\.\d+\.\d+-r\d+$")
+        self.assertEqual(metadata["node_major"], 22)
+
+    def test_ui_workflows_use_prebuilt_image_and_skip_runtime_installs(self):
+        for workflow in ["tests.yml", "performance.yml"]:
+            with self.subTest(workflow=workflow):
+                content = (self.ROOT / ".github/workflows" / workflow).read_text()
+                self.assertEqual(content.count(
+                    "image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1"), 2)
+                self.assertNotIn("${{ env.UI_TEST_IMAGE }}", content)
+                self.assertIn("python3 .github/docker/ui-tests/verify.py", content)
+                self.assertNotIn("tests/run_e2e.py install-browsers", content)
+                self.assertNotIn("apt-get install -y", content)
+
+    def test_publish_workflow_is_trusted_path_only(self):
+        content = (self.ROOT / ".github/workflows/publish-ui-test-image.yml").read_text()
+        self.assertIn("workflow_dispatch:", content)
+        self.assertIn("branches: [main]", content)
+        self.assertNotIn("pull_request_target", content)
+        self.assertIn("packages: write", content)
+
+    def test_container_jobs_preserve_nx_routing_and_selection(self):
+        content = (self.ROOT / ".github/workflows/tests.yml").read_text()
+        for job, following in (("browser", "linux-desktop"), ("linux-desktop", "editor")):
+            with self.subTest(job=job):
+                section = content.split(f"\n  {job}:\n", 1)[1].split(f"\n  {following}:\n", 1)[0]
+                self.assertIn("needs: plan", section)
+                self.assertIn("if: fromJSON(needs.plan.outputs.selected)", section)
+                self.assertIn(f"python3 .github/scripts/nx_ci.py run {job}", section)
+                self.assertIn("name: nx-ci-plan", section)
+                self.assertIn("path: artifacts/ci", section)
+                self.assertNotIn("actions/setup-node", section)
+                self.assertNotIn("actions/setup-dotnet", section)
 
 
 if __name__ == "__main__":

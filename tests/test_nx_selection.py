@@ -107,7 +107,10 @@ class NxSelectionTests(unittest.TestCase):
         )
 
     def test_shared_and_unclassified_changes_are_conservative(self):
-        for changed in ("Directory.Build.props", ".github/workflows/build.yml", "src/Talewright.NewModule/Feature.cs"):
+        for changed in (
+                "Directory.Build.props", ".github/workflows/build.yml",
+                ".github/docker/ui-tests/Dockerfile", ".github/workflows/tests.yml",
+                "src/Talewright.NewModule/Feature.cs"):
             with self.subTest(changed=changed):
                 graph = affected_graph(changed)
                 selected = self.assert_selected(

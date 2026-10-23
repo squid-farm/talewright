@@ -79,6 +79,9 @@ jobs:
     if: fromJSON(needs.plan.outputs.selected).browser
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    container:
+      image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
+      options: --user 1001:1001 --init --shm-size=1g
     strategy:
       fail-fast: false
       matrix:
@@ -87,17 +90,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
+      - name: Verify prebuilt UI test environment
+        run: python3 .github/docker/ui-tests/verify.py
       - uses: actions/download-artifact@v4
         with:
           name: nx-ci-plan
           path: artifacts/ci
-      - run: python3 tests/run_e2e.py install-browsers --browser ${{ matrix.browser }}
       - run: python3 .github/scripts/nx_ci.py run browser --browser ${{ matrix.browser }}
       - uses: actions/upload-artifact@v4
         if: always()
@@ -111,26 +109,19 @@ jobs:
     if: fromJSON(needs.plan.outputs.selected)['linux-desktop']
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    container:
+      image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
+      options: --user 1001:1001 --init --shm-size=1g
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
+      - name: Verify prebuilt UI test environment
+        run: python3 .github/docker/ui-tests/verify.py
       - uses: actions/download-artifact@v4
         with:
           name: nx-ci-plan
           path: artifacts/ci
-      - name: Install native GUI prerequisites
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify4 libgtk-3-0t64 \
-            xvfb xauth dbus-x11 at-spi2-core libatk-adaptor python3-pyatspi python3-gi \
-            gir1.2-gtk-3.0 xfwm4 wmctrl
       - run: python3 .github/scripts/nx_ci.py run linux-desktop
       - uses: actions/upload-artifact@v4
         if: always()

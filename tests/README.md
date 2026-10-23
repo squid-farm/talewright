@@ -270,6 +270,11 @@ python3 tests/run_e2e.py web --browser firefox
 python3 tests/run_e2e.py web --browser chromium --filter FullyQualifiedName~StoryLoadingTests
 ```
 
+GitHub Actions browser and Linux native UI jobs use a prebuilt versioned GHCR image
+(`ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1`) instead of reinstalling browser/native dependencies
+every run. Those jobs call `.github/docker/ui-tests/verify.py` before test execution to enforce
+Playwright/.NET compatibility with the checked-out repository pins and to require non-root execution.
+
 The helper uses a temporary publish directory and removes it after the run. The .NET suite owns its Kestrel
 static server and browser contexts, waits for readiness, and disposes them without touching other servers.
 There are no application test switches and no fake web host.

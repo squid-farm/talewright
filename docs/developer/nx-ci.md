@@ -82,6 +82,12 @@ unselected jobs. Failures, cancellations, missing results, unexpected execution/
 errors fail closed. Browser matrix fail-fast remains disabled, so every browser produces evidence.
 NuGet/sample publication additionally requires the aggregate.
 
+Browser and Linux desktop jobs use the [prebuilt UI environment](ui-test-image.md) instead of
+installing SDK/browser/native dependencies per job. They keep the same selection manifest and
+`nx_ci.py run` entry points, including the native probe prerequisite and published-artifact targets.
+Node 22/npm come from the image; non-root execution requires writable checkout, `.nx/installation`,
+npm home, and NuGet home directories. Image files under `.github/` remain shared selection inputs.
+
 The repository ruleset was inspected during implementation: its required-status-check list was empty.
 This change preserves `build`, `unit`, `browser`, `linux-desktop`, and editor `syntax` job IDs, but editor
 now runs as a reusable job inside Tests, so its displayed check context changes. After a first PR run
