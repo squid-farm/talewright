@@ -11,7 +11,7 @@
         }
         @if (CanSave)
         {
-            <button type="button" class="tw-link" disabled="@Busy" @onclick="OnSavedGames">Saved games</button>
+            <button type="button" class="tw-link tw-saves-trigger" disabled="@Busy" @onclick="OnSavedGames">Saves</button>
         }
         <div class="tw-overflow">
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"

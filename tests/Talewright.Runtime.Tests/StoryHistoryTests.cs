@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using Talewright.Core.Identity;
+using Talewright.Runtime.Saves;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Model;
 
@@ -40,6 +41,86 @@ public class StoryHistoryTests
         }), options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
+    }
+
+    [Fact]
+    public void Atomic_summary_preserves_replay_and_legacy_saves_have_no_invented_details()
+    {
+        var history = new StoryHistory(Compile(), 42);
+        history.Choose("c0");
+        history.Back();
+        var time = new DateTimeOffset(2026, 10, 23, 9, 12, 30, TimeSpan.Zero);
+        var summary = history.CaptureSummary(time);
+        var bytes = history.Save(summary);
+        var entry = StoryHistory.DescribeSave("Named save", bytes);
+
+        Assert.Equal("Named save", entry.Slot);
+        Assert.Equal("a", summary.SceneTitle);
+        Assert.Equal("Tester", summary.CharacterName);
+        Assert.Equal(time, entry.Summary!.SavedAt);
+        Assert.Equal(summary, entry.Summary);
+        Assert.Null(entry.Warning);
+        Assert.Equal(history.ProgressKey, entry.ProgressKey);
+        AssertEquivalent(history, StoryHistory.Restore(history.Story, bytes));
+        var legacy = StoryHistory.DescribeSave("Legacy", history.Save());
+        Assert.Null(legacy.Summary);
+        Assert.Equal(entry.ProgressKey, legacy.ProgressKey);
+        Assert.DoesNotContain("summary", Encoding.UTF8.GetString(history.Save()));
+    }
+
+    [Theory]
+    [InlineData("\"damaged\"")]
+    [InlineData("{\"sceneTitle\":\"a\",\"savedAt\":\"not-a-date\"}")]
+    [InlineData("{\"savedAt\":\"2026-10-23T00:00:00Z\"}")]
+    public void Unreadable_summary_does_not_prevent_loading_replay(string metadata)
+    {
+        var history = new StoryHistory(Compile(), 7);
+        var json = JsonNode.Parse(history.Save())!;
+        json["summary"] = JsonNode.Parse(metadata);
+        var bytes = Encoding.UTF8.GetBytes(json.ToJsonString());
+        var entry = StoryHistory.DescribeSave("Damaged details", bytes);
+        Assert.Null(entry.Summary);
+        Assert.Contains("unreadable", entry.Warning);
+        Assert.Equal(history.ProgressKey, entry.ProgressKey);
+        AssertEquivalent(history, StoryHistory.Restore(history.Story, bytes));
+    }
+
+    [Fact]
+    public void Catalog_reads_metadata_without_replaying_and_keeps_damaged_slots_visible()
+    {
+        var history = new StoryHistory(Compile(), 7);
+        var json = JsonNode.Parse(history.Save(history.CaptureSummary(DateTimeOffset.UtcNow)))!;
+        json["choices"] = new JsonArray("no-such-choice");
+        json["cursor"] = 1;
+        var bytes = Encoding.UTF8.GetBytes(json.ToJsonString());
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes));
+        Assert.NotNull(StoryHistory.DescribeSave("Invalid replay", bytes).Summary);
+        var damaged = StoryHistory.DescribeSave("Broken", "{broken"u8);
+        Assert.Equal("Broken", damaged.Slot);
+        Assert.Null(damaged.ProgressKey);
+        Assert.NotNull(damaged.Warning);
+    }
+
+    [Fact]
+    public void Progress_identity_includes_seed_cursor_and_entire_redo_branch_but_not_save_time()
+    {
+        var story = Compile();
+        var history = new StoryHistory(story, 7);
+        var start = history.ProgressKey;
+        Assert.NotEqual(start, new StoryHistory(story, 8).ProgressKey);
+        history.Choose("c0");
+        var advanced = history.ProgressKey;
+        Assert.NotEqual(start, advanced);
+        history.Back();
+        Assert.NotEqual(start, history.ProgressKey); // Retained redo is progress too.
+        history.Forward();
+        Assert.Equal(advanced, history.ProgressKey);
+        history.Back();
+        history.Choose("c1");
+        Assert.NotEqual(advanced, history.ProgressKey);
+        var first = StoryHistory.DescribeSave("one", history.Save(history.CaptureSummary(DateTimeOffset.UtcNow)));
+        var later = StoryHistory.DescribeSave("two", history.Save(history.CaptureSummary(DateTimeOffset.UtcNow.AddDays(1))));
+        Assert.Equal(first.ProgressKey, later.ProgressKey);
     }
 
     [Fact]
@@ -219,6 +300,8 @@ public class StoryHistoryTests
         Assert.Throws<InvalidOperationException>(() => history.Save());
         Assert.Equal(choices.Count + 1, history.Cursor);
         Assert.Equal(StoryHistory.MaxSaveBytes, exactLimitSave.Length);
+        Assert.False(history.TryProgressKey(out var progress));
+        Assert.Null(progress);
     }
 
     [Fact]

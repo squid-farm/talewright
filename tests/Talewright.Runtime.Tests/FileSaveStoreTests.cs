@@ -8,6 +8,27 @@ public sealed class FileSaveStoreTests : IDisposable
     private FileSaveStore Store => new(_root);
 
     [Fact]
+    public async Task Catalog_keeps_corrupt_and_oversized_slots_visible_with_explicit_warnings()
+    {
+        await Store.WriteAsync("story", "Malformed", "{broken"u8.ToArray());
+        await Store.WriteAsync("story", "Oversized", [1]);
+        var path = Directory.GetFiles(_root, "*.json", SearchOption.AllDirectories)
+            .Single(file => File.ReadAllBytes(file).SequenceEqual(new byte[] { 1 }));
+        await using (var stream = File.OpenWrite(path))
+        {
+            stream.SetLength(StoryHistory.MaxSaveBytes + 1);
+        }
+        var entries = await Store.ListEntriesAsync("story");
+        Assert.Equal(["Malformed", "Oversized"], entries.Select(entry => entry.Slot));
+        Assert.All(entries, entry =>
+        {
+            Assert.Null(entry.Summary);
+            Assert.Null(entry.ProgressKey);
+            Assert.NotNull(entry.Warning);
+        });
+    }
+
+    [Fact]
     public async Task Round_trip_isolated_slots_and_stories()
     {
         Assert.Empty(await Store.ListAsync("story"));

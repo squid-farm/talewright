@@ -270,6 +270,15 @@ The v1 format includes story ID/version, SHA-256 source/extension fingerprint, s
 It also has an optional `character` selection for opt-in creation stories. Older
 fixed-protagonist v1 saves without it remain readable; creation stories require a
 valid selection. Schema/source changes still invalidate mismatched fingerprints.
+`Save(CaptureSummary(DateTimeOffset.UtcNow))` embeds optional scene/title, capture time and
+effective character-name metadata in the same atomic payload. `Save()` without metadata keeps
+its original representation. Updated players accept older saves without a summary; earlier
+players reject the new field, so new summary-bearing saves require an updated player.
+Malformed summary values do not prevent otherwise-valid replay restoration.
+`SaveCatalog.ListEntriesAsync` parses bounded payloads without replay, returning missing/unreadable
+details explicitly. `StoryHistory.ProgressKey` and each entry's matching key hash the canonical
+full replay payload excluding summary metadata. The player checks those keys against actual
+persisted slots before replacing a session; timestamps do not influence load protection.
 The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
 unsupported formats and incompatible stories fail explicitly. No migration is attempted.
 

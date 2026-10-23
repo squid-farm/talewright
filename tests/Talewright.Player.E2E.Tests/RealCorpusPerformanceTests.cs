@@ -75,9 +75,10 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
             """,
             new { storyId = story.Id, slot, json = System.Text.Encoding.UTF8.GetString(save) });
         saveTimer.Stop();
-        await Driver.ClickAsync("Saved games");
+        await Driver.ClickAsync("Saves");
         var restoreTimer = Stopwatch.StartNew();
         await Driver.ClickAsync("Load " + slot);
+        await Driver.ClickAsync("Load save");
         await Microsoft.Playwright.Assertions.Expect(Page.GetByRole(AriaRole.Status))
             .ToHaveTextAsync($"Loaded '{slot}'.", new() { Timeout = 180_000 });
         await Microsoft.Playwright.Assertions.Expect(Page.Locator(".tw-frame"))

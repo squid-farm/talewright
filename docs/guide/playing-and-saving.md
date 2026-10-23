@@ -21,11 +21,19 @@ The web player, the desktop player and published games all share the same screen
 | Button | What it does |
 |---|---|
 | **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `undo: false`. |
-| **Saved games** | Save to a named slot, or load one. Saving over an existing slot asks you to confirm. |
-| **Restart** | Start again from the beginning. Your saves are kept. |
-| **Library** | Return to the list of stories. |
+| **Saves** | Open the Saves dialog to create or load a named save. Saving over an existing slot asks you to confirm. |
+| **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |
+| **More actions → Library** | Return to the list of stories (not shown in published games). |
 
-![The Saved games panel](../images/saved-games.png)
+The toolbar stays visible while you scroll. The Saves dialog refreshes automatically when opened.
+Each new save shows its name, scene title, real-world save time (UTC) and character name.
+Older saves show **Details unavailable** instead of an invented timestamp.
+
+Loading asks **Load save** or **Keep playing** only if your current progress is not safely saved.
+This includes undo/redo history and your character, not just the visible passage.
+Cancel keeps your current game; a failed load also leaves it untouched.
+Use **Close saves** or Escape to return to play. If storage fails, check the displayed advice and
+use **Retry save list**; a failed save does not count as saved progress.
 
 ## Where saves are kept
 
@@ -46,6 +54,9 @@ Saves are tied to the exact story files they were made with. **Any change to the
 typo, means older saves won't load.** Talewright checks before loading, shows a message and leaves the
 current game untouched. Bear this in mind before releasing an update to players. Migrating old saves to
 new story versions is planned ([#39](https://github.com/squid-farm/talewright/issues/39)).
+
+Updated players can load older saves without summary details. Saves created with the new details
+need an updated player; earlier players do not recognize the additional metadata.
 
 ## Character creation
 
