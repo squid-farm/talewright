@@ -12,17 +12,17 @@ host and Author Debugger also need WebKitGTK 4.1 (`sudo apt install libwebkit2gt
 dotnet build
 dotnet test                                                       # fast .NET suite, no browsers
 
-dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic   # desktop player
-dotnet run --project src/Talewright.Host.Web                            # web player dev server
-dotnet run --project src/Talewright.Cli -- validate samples/LostRelic   # CLI
+dotnet run --project apps/desktop -- samples/LostRelic   # desktop player
+dotnet run --project apps/web                            # web player dev server
+dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostRelic   # CLI
 ```
 
 ## Player UI tests (opt-in)
 
 ```bash
-python3 tests/run_e2e.py install-browsers
-python3 tests/run_e2e.py web       # Chromium, Firefox, WebKit against the Release-published web host
-python3 tests/run_e2e.py linux     # real Photino window through AT-SPI
+python3 player/tests/run_e2e.py install-browsers
+python3 player/tests/run_e2e.py web       # Chromium, Firefox, WebKit against the Release-published web host
+python3 player/tests/run_e2e.py linux     # real Photino window through AT-SPI
 ```
 
 Tests use small stories defined in C#, not the samples. See [tests/README.md](tests/README.md) for
@@ -32,20 +32,29 @@ prerequisites, targeted runs, performance budgets and other platforms.
 
 | Path | What |
 |---|---|
-| `src/Talewright.Core` | State, events, ruleset contracts, deterministic randomness |
-| `src/Talewright.Rules` | Conditions, effects, checks, triggers, storylets |
-| `src/Talewright.Narrative` | Templates, grammar, presentation-independent documents |
-| `src/Talewright.Rulesets.Generic` | Default d20 ruleset |
-| `src/Talewright.Tale` | `.tale` / `story.yaml` compiler and diagnostics |
-| `src/Talewright.Runtime` | Story sessions, history, saves, author sessions |
-| `src/Talewright` | Packaging shell: ships the six projects above as one NuGet package |
-| `src/Talewright.Player` | Shared Blazor UI (Razor Class Library) |
-| `src/Talewright.Host.Desktop` / `.Host.Web` | Photino desktop host / Blazor WebAssembly host |
-| `src/Talewright.Cli` / `.Debugger` | `talewright` tool and the native Author Debugger |
+| `engine/src/Talewright.Core` | State, events, ruleset contracts, deterministic randomness |
+| `engine/src/Talewright.Rules` | Conditions, effects, checks, triggers, storylets |
+| `engine/src/Talewright.Narrative` | Templates, grammar, presentation-independent documents |
+| `engine/src/Talewright.Rulesets.Generic` | Default d20 ruleset |
+| `engine/src/Talewright.Tale` | `.tale` / `story.yaml` compiler and diagnostics |
+| `engine/src/Talewright.Runtime` | Story sessions, history, saves, author sessions |
+| `packaging/Talewright` | Packaging shell: ships the six projects above as one NuGet package |
+| `player/src/Talewright.Player` | Shared Blazor UI (Razor Class Library) |
+| `apps/desktop` / `apps/web` | Photino desktop host / Blazor WebAssembly host |
+| `tooling/authoring/` | Editor-neutral workspace and project metadata infrastructure |
+| `tooling/cli/` / `tooling/debugger/` | `talewright` tool and the native Author Debugger |
+| `tooling/vscode-talewright/` | VS Code extension, syntax, snippets, and manifest schema |
+| `engine/tests/`, `player/tests/`, `tooling/*/tests/` | Tests colocated with the area they exercise; shared story fixtures live in `engine/tests/Talewright.TestStories` |
+| `benchmarks/` | Engine budgets, BenchmarkDotNet workloads, and publication measurements |
+| `tests/` | Repository-wide CI and Nx contract tests; not product test suites |
 | `samples/` | Example stories (never referenced by engine code) |
 | `examples/CSharpStory` | Package-based C# extension example |
 
-Each project has a short README describing its files and extension points.
+The root solution groups projects by the same responsibilities. Project names,
+namespaces, assembly identities, and published package IDs are independent of
+these source paths. Directory placement communicates ownership; project references
+and package checks enforce what actually ships. Engine code does not depend on
+tooling. Shared build settings and Nx orchestration remain at the repository root.
 
 ## Picking up work
 

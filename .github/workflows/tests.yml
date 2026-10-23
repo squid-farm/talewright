@@ -71,7 +71,10 @@ jobs:
         if: always()
         with:
           name: unit-results
-          path: tests/*/artifacts/unit
+          path: |
+            engine/tests/*/artifacts/unit
+            player/tests/*/artifacts/unit
+            tooling/*/tests/*/artifacts/unit
           if-no-files-found: error
 
   browser:
@@ -80,6 +83,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     container:
+      # r2 updates checkout paths only; keep the published r1 environment until r2 is published.
       image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
       options: --user 1001:1001 --init --shm-size=1g
     strategy:

@@ -24,31 +24,31 @@ jobs:
       - name: Prepare owned artifact paths
         run: mkdir -p artifacts/performance
       - name: Build BenchmarkDotNet and CLI entry points
-        run: dotnet build tests/Talewright.BenchmarkDotNet -c Release
+        run: dotnet build benchmarks/Talewright.BenchmarkDotNet -c Release
       - name: Verify every deterministic corpus and full history
-        run: dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build -- --verify-corpora
+        run: dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build -- --verify-corpora
       - name: Run core BenchmarkDotNet suite
         run: >
-          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --
           --filter '*StoryBenchmarks*' --artifacts artifacts/performance/core
       - name: Run independent dimension BenchmarkDotNet suite
         run: >
-          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --
           --filter '*IndependentDimensionBenchmarks*' --artifacts artifacts/performance/dimensions
       - name: Run exact and over-limit BenchmarkDotNet suite
         run: >
-          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --
           --filter '*BoundaryInputBenchmarks*' --artifacts artifacts/performance/boundaries
       - name: Generate the gigantic real-file corpus
         run: >
-          dotnet run --project tests/Talewright.BenchmarkDotNet -c Release --no-build --
+          dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --
           --generate-corpus Gigantic artifacts/performance/gigantic-story
           > artifacts/performance/gigantic-corpus.json
       - name: Measure full publication workloads with bounded timeouts
         run: >
-          python3 tests/performance/run_publication.py
+          python3 benchmarks/performance/run_publication.py
           --story artifacts/performance/gigantic-story
-          --cli src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll
+          --cli tooling/cli/src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll
           --output artifacts/performance/publication
           --timeout-seconds 2700
       - uses: actions/upload-artifact@v4
@@ -75,7 +75,7 @@ jobs:
         run: python3 .github/docker/ui-tests/verify.py
       - name: Run real-file browser measurements
         run: >
-          python3 tests/run_e2e.py web --browser ${{ matrix.browser }}
+          python3 player/tests/run_e2e.py web --browser ${{ matrix.browser }}
           --filter 'FullyQualifiedName~RealCorpusBrowserPerformanceTests'
       - uses: actions/upload-artifact@v4
         if: always()
@@ -97,7 +97,7 @@ jobs:
         run: python3 .github/docker/ui-tests/verify.py
       - name: Run real-file Linux Photino measurements
         run: >
-          python3 tests/run_e2e.py linux
+          python3 player/tests/run_e2e.py linux
           --filter 'FullyQualifiedName~RealCorpusNativePerformanceTests'
       - uses: actions/upload-artifact@v4
         if: always()
@@ -144,7 +144,7 @@ jobs:
           PERF_BROWSER_RESULT: ${{ needs.browser-player.result }}
           PERF_PHOTINO_RESULT: ${{ needs.linux-photino.result }}
         run: |
-          python3 tests/performance/publish_results.py \
+          python3 benchmarks/performance/publish_results.py \
             --input artifacts/performance-input \
             --output "$REPORT_PATH" \
             --history "$HISTORY_PATH"

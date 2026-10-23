@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.2" />
+    <ProjectReference Include="../../tooling/cli/src/Talewright.Cli/Talewright.Cli.csproj" />
+    <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
+    <ProjectReference Include="../../engine/src/Talewright.Tale/Talewright.Tale.csproj" />
+    <ProjectReference Include="../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
+  </ItemGroup>
+</Project>

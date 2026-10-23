@@ -1,7 +1,7 @@
 # Sharing your story
 
 > These commands need the [desktop tools](getting-started.md#install-the-desktop-tools).
-> Until ready-made downloads arrive, write `dotnet run --project src/Talewright.Cli --` instead of `talewright`.
+> Until ready-made downloads arrive, write `dotnet run --project tooling/cli/src/Talewright.Cli --` instead of `talewright`.
 
 Every `publish` checks your story first and stops if there are errors.
 
@@ -55,7 +55,7 @@ zip** and run:
 Like a web game, the published app stays in your story and does not expose Library
 navigation. The general-purpose desktop player still has a library by default;
 its optional `--no-library story-folder-or-zip` launch mode is described in the
-[desktop host guide](../../src/Talewright.Host.Desktop/README.md#run).
+[desktop host guide](../../apps/desktop/README.md#run).
 
 The universal zip is large because it includes everything for six platforms. To build for one
 platform only, add `--runtime` with one of `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64` or

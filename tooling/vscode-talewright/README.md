@@ -69,7 +69,7 @@ the top of `story.yaml`:
 ```
 
 Or point `$schema` to a local copy of
-[`schemas/story.schema.json`](./schemas/story.schema.json). SchemaStore discovery
+[`schemas/story.schema.json`](schemas/story.schema.json). SchemaStore discovery
 is tracked separately and is not required for either option.
 
 ### Schema distribution and compatibility
@@ -123,7 +123,7 @@ From this directory:
 ```bash
 npm ci
 npm test
-dotnet test ../../tests/Talewright.Tale.Tests -c Release
+dotnet test ../../engine/tests/Talewright.Tale.Tests -c Release
 npm run package
 npm run test:package
 npm run test:editor

@@ -29,7 +29,7 @@ jobs:
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: python3 .github/scripts/publish_samples.py --base-path "$BASE_PATH" --output artifacts/pages
-      - run: python3 tests/run_e2e.py install-browsers --browser chromium
+      - run: python3 player/tests/run_e2e.py install-browsers --browser chromium
       - name: Smoke-test the deployment path
         env:
           BROWSER: chromium
@@ -37,7 +37,7 @@ jobs:
           TALEWRIGHT_WEB_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           TALEWRIGHT_TEST_RESULTS: ${{ github.workspace }}/artifacts/test-results/pages
         run: |
-          dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build \
+          dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --no-build \
             --filter FullyQualifiedName~Bundled_sample_assets_work_when_served_at_the_selected_base_path \
             --logger 'trx;LogFileName=pages.trx' --results-directory artifacts/test-results/pages
           python3 - <<'PY'

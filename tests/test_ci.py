@@ -57,6 +57,45 @@ class PagesPathTests(unittest.TestCase):
                 normalize_base_path(value)
 
 
+class RepositoryLayoutTests(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_both_hosts_embed_all_bundled_story_files(self):
+        expected = {
+            path.resolve()
+            for extension in ("*.tale", "*.yaml")
+            for path in (self.ROOT / "samples").rglob(extension)
+        }
+        self.assertTrue(expected)
+        for host in ("web", "desktop"):
+            with self.subTest(host=host):
+                directory = self.ROOT / "apps" / host
+                project = ET.parse(next(directory.glob("*.csproj")))
+                actual = {
+                    path.resolve()
+                    for resource in project.findall(".//EmbeddedResource")
+                    for pattern in resource.attrib["Include"].replace("\\", "/").split(";")
+                    for path in directory.glob(pattern)
+                }
+                self.assertEqual(expected, actual)
+
+    def test_cli_copies_both_source_hosts_into_publish_templates(self):
+        directory = self.ROOT / "tooling/cli/src/Talewright.Cli"
+        project = ET.parse(directory / "Talewright.Cli.csproj")
+        for host, assembly in (("web", "Talewright.Host.Web"), ("desktop", "Talewright.Host.Desktop")):
+            with self.subTest(host=host):
+                templates = {
+                    path.name
+                    for item in project.findall(".//None")
+                    if item.attrib.get("Link", "").startswith(f"publish-assets/{host}/")
+                    for pattern in item.attrib.get("Include", "").split(";")
+                    if pattern
+                    for path in directory.glob(pattern.replace("\\", "/"))
+                    if path.is_file()
+                }
+                self.assertTrue({f"{assembly}.csproj", "App.razor", "Program.cs"} <= templates)
+
+
 class PackageBoundaryTests(unittest.TestCase):
     def write_package(self, directory, identity, version="1.2.3", dependency="1.2.3"):
         path = directory / f"{identity}.{version}.nupkg"
@@ -280,7 +319,7 @@ class UiTestImageContracts(unittest.TestCase):
 
     def test_image_metadata_matches_repository_version_pins(self):
         metadata = json.loads((self.ROOT / ".github/docker/ui-tests/image.json").read_text())
-        e2e = ET.parse(self.ROOT / "tests/Talewright.Player.E2E.Tests/Talewright.Player.E2E.Tests.csproj")
+        e2e = ET.parse(self.ROOT / "player/tests/Talewright.Player.E2E.Tests/Talewright.Player.E2E.Tests.csproj")
         playwright = [package.attrib["Version"] for package in e2e.findall(".//PackageReference")
                       if package.attrib["Include"] == "Microsoft.Playwright"]
         self.assertEqual(playwright, [metadata["playwright"]])
@@ -297,7 +336,7 @@ class UiTestImageContracts(unittest.TestCase):
                     "image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1"), 2)
                 self.assertNotIn("${{ env.UI_TEST_IMAGE }}", content)
                 self.assertIn("python3 .github/docker/ui-tests/verify.py", content)
-                self.assertNotIn("tests/run_e2e.py install-browsers", content)
+                self.assertNotIn("player/tests/run_e2e.py install-browsers", content)
                 self.assertNotIn("apt-get install -y", content)
 
     def test_publish_workflow_is_trusted_path_only(self):

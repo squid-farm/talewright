@@ -9,7 +9,8 @@ compilation. It does not add editor state to `StoryDefinition` or change
 management and project metadata integration. It references the compiler, never the
 reverse, and is not included in the shipped `Talewright` or `Talewright.Player`
 packages. Tool hosts reference its project explicitly; it is not a separately
-published NuGet package. Only the parser-backed analysis API remains in the
+published NuGet package. Its source and tests live in `tooling/authoring`, alongside
+the other development tools. Only the parser-backed analysis API remains in the
 compiler, so tools reuse parsing and semantic checks without shipping workspace
 or project-metadata infrastructure with games.
 

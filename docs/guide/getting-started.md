@@ -54,11 +54,11 @@ Run these from the Talewright folder:
 
 | To… | Run |
 |---|---|
-| Open the desktop player | `dotnet run --project src/Talewright.Host.Desktop` |
-| Open a story in the desktop player | `dotnet run --project src/Talewright.Host.Desktop -- path/to/my-story` |
-| Check a story for mistakes | `dotnet run --project src/Talewright.Cli -- validate path/to/my-story` |
-| Open the Author Debugger | `dotnet run --project src/Talewright.Cli -- debug path/to/my-story` |
-| Publish a game | `dotnet run --project src/Talewright.Cli -- publish path/to/my-story ...` |
+| Open the desktop player | `dotnet run --project apps/desktop` |
+| Open a story in the desktop player | `dotnet run --project apps/desktop -- path/to/my-story` |
+| Check a story for mistakes | `dotnet run --project tooling/cli/src/Talewright.Cli -- validate path/to/my-story` |
+| Open the Author Debugger | `dotnet run --project tooling/cli/src/Talewright.Cli -- debug path/to/my-story` |
+| Publish a game | `dotnet run --project tooling/cli/src/Talewright.Cli -- publish path/to/my-story ...` |
 
 The first run takes a minute while .NET builds everything; later runs are quick. To update, download
 the zip again.
@@ -67,7 +67,7 @@ the zip again.
 > update.
 
 > **Shorter commands:** the rest of the docs write `talewright validate ...`. Until ready-made
-> downloads arrive, read that as `dotnet run --project src/Talewright.Cli -- validate ...`.
+> downloads arrive, read that as `dotnet run --project tooling/cli/src/Talewright.Cli -- validate ...`.
 
 The desktop player can open story **folders** directly, so you don't need to zip anything while writing.
 It also lists the built-in samples.

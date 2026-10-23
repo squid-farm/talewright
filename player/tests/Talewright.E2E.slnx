@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/player/tests/">
+    <Project Path="Talewright.Player.E2E.Tests/Talewright.Player.E2E.Tests.csproj" />
+  </Folder>
+  <Folder Name="/engine/tests/">
+    <Project Path="../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
+  </Folder>
+</Solution>

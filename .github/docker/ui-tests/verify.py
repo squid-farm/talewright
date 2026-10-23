@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 
 def verify_versions(root, metadata):
-    project = ET.parse(root / "tests/Talewright.Player.E2E.Tests/Talewright.Player.E2E.Tests.csproj")
+    project = ET.parse(root / "player/tests/Talewright.Player.E2E.Tests/Talewright.Player.E2E.Tests.csproj")
     packages = [package.attrib["Version"] for package in project.findall(".//PackageReference")
                 if package.attrib["Include"] == "Microsoft.Playwright"]
     if packages != [metadata["playwright"]]:

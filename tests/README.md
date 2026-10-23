@@ -1,5 +1,10 @@
 # Testing the engine and player
 
+This is the repository-wide verification guide. Product suites live alongside
+their areas in `engine/tests`, `player/tests`, and `tooling/*/tests`; root `tests`
+contains Python CI/Nx contracts. Performance workloads and report tools live in
+`benchmarks`.
+
 ## Fast .NET tests
 
 ```bash
@@ -10,7 +15,9 @@ For an explicit Release invocation, use `dotnet test Talewright.slnx -c Release`
 the output reports actual test counts.
 
 The root solution includes compiler, runtime, rules, narrative, and core tests. It does **not** discover UI
-tests or require downloaded browsers. `Talewright.E2E.slnx` is a separate, opt-in solution in this directory.
+tests or require downloaded browsers.
+[Talewright.E2E.slnx](../player/tests/Talewright.E2E.slnx) is a separate,
+opt-in solution under `player/tests`.
 
 Save coverage includes metadata/legacy compatibility and canonical replay identity in the runtime
 suite, plus modal focus/escape, narrow light/dark layout, summaries, redo-aware discard protection,
@@ -23,8 +30,8 @@ and native I/O failures. Sticky-toolbar tests check Quick Save during actual scr
 ### Reproducible performance budgets
 
 ```bash
-DOTNET_TieredCompilation=0 dotnet run --project tests/Talewright.Benchmarks -c Release
-python3 tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release
+python3 player/tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
 ```
 
 The dependency-free console workload generates 100/1,000/10,000-scene stories
@@ -76,33 +83,33 @@ a separate deterministic low-compressibility case exercises a larger upload.
 
 ```bash
 # Generate every tier, compile each from disk and ZIP, then play/save/restore its history.
-dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- --verify-corpora
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- --verify-corpora
 
 # Full core suite, with five warmups and thirty measured iterations per case.
 TALEWRIGHT_BENCHMARK_OUTPUT="$PWD/artifacts/performance/metadata" \
-  dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+  dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --filter '*StoryBenchmarks*' --artifacts artifacts/performance/core
 
 # Focused independent file-count, byte-volume, scene-count and history-depth cases.
-dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --filter '*IndependentDimensionBenchmarks*' --artifacts artifacts/performance/dimensions
 
 # Exact and one-over directory/ZIP file-size, aggregate-byte, file-count and depth checks.
-dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --filter '*BoundaryInputBenchmarks*' --artifacts artifacts/performance/boundaries
 
 # Generate a corpus outside the BenchmarkDotNet lifecycle, for integration workloads.
-dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --generate-corpus Gigantic artifacts/performance/gigantic-story
 
 # Full web, single-RID and universal desktop publication (45-minute bound each).
-python3 tests/performance/run_publication.py \
+python3 benchmarks/performance/run_publication.py \
   --story artifacts/performance/gigantic-story \
-  --cli src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll \
+  --cli tooling/cli/src/Talewright.Cli/bin/Release/net10.0/Talewright.Cli.dll \
   --output artifacts/performance/publication
 
 # Run one method or tier by matching its BenchmarkDotNet name/parameter.
-dotnet run --project tests/Talewright.BenchmarkDotNet -c Release -- \
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --filter '*LoadAndCompileDirectory*Large*' --artifacts artifacts/performance/large
 ```
 
@@ -135,8 +142,8 @@ the 50 MiB / 50,000-scene tier. The manual/scheduled `Real-file performance`
 workflow runs them separately from ordinary per-PR browser and Linux UI tests:
 
 ```bash
-python3 tests/run_e2e.py web --filter 'FullyQualifiedName~RealCorpusBrowserPerformanceTests'
-python3 tests/run_e2e.py linux --filter 'FullyQualifiedName~RealCorpusNativePerformanceTests'
+python3 player/tests/run_e2e.py web --filter 'FullyQualifiedName~RealCorpusBrowserPerformanceTests'
+python3 player/tests/run_e2e.py linux --filter 'FullyQualifiedName~RealCorpusNativePerformanceTests'
 ```
 
 Browser integration records archive upload through first playable passage, a choice,
@@ -213,7 +220,7 @@ Each job uploads its reports/evidence even on failure. Both Build (including
 package verification) and Tests must pass before any publishing job.
 
 Test projects retain their original project references and suite boundaries.
-The `src/Talewright/Talewright.csproj` packaging shell bundles the six headless
+The `packaging/Talewright/Talewright.csproj` packaging shell bundles the six headless
 assemblies without moving their source or merging their projects. The engine package has no Blazor
 dependency. CI packs the `Talewright` and `Talewright.Player` libraries and the `Talewright.Cli` tool, then restores
 and builds isolated engine-only and Razor consumers using a fresh package cache.
@@ -228,9 +235,9 @@ to fail with the exact file/line and stable compiler code.
 ```bash
 python3 -m unittest discover -s tests -p 'test_ci.py' -v
 dotnet build Talewright.slnx -c Release -p:Version=0.1.0-preview.1
-dotnet pack src/Talewright -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
-dotnet pack src/Talewright.Player -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
-dotnet pack src/Talewright.Cli -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack packaging/Talewright -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack player/src/Talewright.Player -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
+dotnet pack tooling/cli/src/Talewright.Cli -c Release --no-build -p:Version=0.1.0-preview.1 -o artifacts/packages
 python3 .github/scripts/verify_packages.py artifacts/packages 0.1.0-preview.1 --smoke
 ```
 
@@ -243,11 +250,11 @@ Pages publishing also checks the real static output under the configured base
 path. To reproduce a project-subpath deployment after installing Chromium:
 
 ```bash
-python3 tests/run_e2e.py install-browsers --browser chromium
+python3 player/tests/run_e2e.py install-browsers --browser chromium
 python3 .github/scripts/publish_samples.py --base-path /talewright --output artifacts/pages
 BROWSER=chromium TALEWRIGHT_WEB_ROOT="$PWD/artifacts/pages/wwwroot" \
   TALEWRIGHT_WEB_BASE_PATH=/talewright TALEWRIGHT_TEST_RESULTS="$PWD/artifacts/test-results/pages" \
-  dotnet test tests/Talewright.Player.E2E.Tests -c Release --no-build \
+  dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --no-build \
   --filter FullyQualifiedName~Bundled_sample_assets_work_when_served_at_the_selected_base_path
 ```
 
@@ -263,14 +270,14 @@ Requires the .NET 10 SDK and Python 3. No Node/npm project or PowerShell install
 ```bash
 # Once, and again when the pinned Microsoft.Playwright package changes.
 # --with-deps may require sudo to install browser system libraries.
-python3 tests/run_e2e.py install-browsers
+python3 player/tests/run_e2e.py install-browsers
 
 # Publishes the real web host in Release, serves it on an owned loopback port,
 # and runs the same functional cases in Chromium, Firefox, and WebKit.
-python3 tests/run_e2e.py web
+python3 player/tests/run_e2e.py web
 
-python3 tests/run_e2e.py web --browser firefox
-python3 tests/run_e2e.py web --browser chromium --filter FullyQualifiedName~StoryLoadingTests
+python3 player/tests/run_e2e.py web --browser firefox
+python3 player/tests/run_e2e.py web --browser chromium --filter FullyQualifiedName~StoryLoadingTests
 ```
 
 GitHub Actions browser and Linux native UI jobs use a prebuilt versioned GHCR image
@@ -285,9 +292,9 @@ There are no application test switches and no fake web host.
 To run directly against an existing published output:
 
 ```bash
-dotnet publish src/Talewright.Host.Web -c Release -o artifacts/web
+dotnet publish apps/web -c Release -o artifacts/web
 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/web/wwwroot" BROWSER=webkit \
-  dotnet test tests/Talewright.Player.E2E.Tests --filter 'Host!=Linux'
+  dotnet test player/tests/Talewright.Player.E2E.Tests --filter 'Host!=Linux'
 ```
 
 Use the helper for the normal path; direct invocation requires the matching browser binaries to be installed.
@@ -312,18 +319,18 @@ history, Restart, absence of Library/upload controls during creation and play,
 and (in browsers) real styling, JS and network errors.
 
 ```bash
-dotnet run --project src/Talewright.Cli -c Release -- \
+dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- \
   publish samples/LostRelic -a --target web --output artifacts/game-web.zip
 unzip artifacts/game-web.zip -d artifacts/game-web
 TALEWRIGHT_STANDALONE=1 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/game-web" \
   TALEWRIGHT_WEB_BASE_PATH=/games/published BROWSER=chromium \
-  dotnet test tests/Talewright.Player.E2E.Tests -c Release --filter Artifact=Standalone
+  dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --filter Artifact=Standalone
 
-dotnet run --project src/Talewright.Cli -c Release -- \
+dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- \
   publish samples/LostRelic -a --target desktop --output artifacts/game-desktop.zip
 unzip artifacts/game-desktop.zip -d artifacts/game-desktop
 TALEWRIGHT_STANDALONE=1 TALEWRIGHT_DESKTOP_EXECUTABLE="$PWD/artifacts/game-desktop/start.sh" \
-  python3 tests/run_e2e.py linux --filter Artifact=Standalone
+  python3 player/tests/run_e2e.py linux --filter Artifact=Standalone
 ```
 
 The second command publishes all six OS/CPU builds; the native test launches the
@@ -390,10 +397,10 @@ sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify4 libgtk-3-0t64 \
   xvfb xauth dbus-x11 at-spi2-core libatk-adaptor python3-pyatspi python3-gi gir1.2-gtk-3.0 xfwm4 wmctrl
 
 # Run as your ordinary user, not root.
-python3 tests/run_e2e.py linux --probe
-python3 tests/run_e2e.py linux
-python3 tests/run_e2e.py linux --filter FullyQualifiedName~PlayerBehaviorTests
-python3 tests/run_e2e.py linux --filter 'FullyQualifiedName~Explicit_story_scenario'
+python3 player/tests/run_e2e.py linux --probe
+python3 player/tests/run_e2e.py linux
+python3 player/tests/run_e2e.py linux --filter FullyQualifiedName~PlayerBehaviorTests
+python3 player/tests/run_e2e.py linux --filter 'FullyQualifiedName~Explicit_story_scenario'
 ```
 
 The runner builds the production desktop host and the same C# test project, and starts
@@ -449,7 +456,7 @@ this into a general testing DSL or introducing Python tests.
 To inspect generated files deliberately:
 
 ```bash
-dotnet run --project tests/Talewright.TestStories -- /tmp/my-talewright-test-stories
+dotnet run --project engine/tests/Talewright.TestStories -- /tmp/my-talewright-test-stories
 ```
 
 That command leaves the requested directory for inspection; the normal E2E helpers create and clean their
@@ -509,7 +516,7 @@ References: [Playwright .NET runners](https://playwright.dev/dotnet/docs/test-ru
 [automation-controlled views](https://webkitgtk.org/reference/webkit2gtk/stable/property.WebView.is-controlled-by-automation.html).
 # Author Debugger checks
 
-`dotnet test tests/Talewright.Cli.Tests -c Release` covers CLI argument handling,
+`dotnet test tooling/cli/tests/Talewright.Cli.Tests -c Release` covers CLI argument handling,
 scene search over 1,000 scenes, all prerequisite types, character creation,
 validation and failed-reload preservation. Reload tests also cover explicit YAML
 gating, invalidated setup IDs, stale generations, concurrent play/compile,
@@ -522,7 +529,7 @@ explicit cross-source adoption, normal-save forks, typed values and byte/field/c
 File/model checks verify one-shot overwrite confirmation, atomic replacement, rejected imports,
 source-map retention, protected export paths (including parent symlinks), and unchanged input saves.
 
-`python3 tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
+`python3 player/tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
 builds and exercises the actual native workbench: repair/reload, late-scene
 search, setup, seed, choices, recorded explanations, watched Tale adoption,
 YAML restart gating, incompatible-history preservation and graceful window close.

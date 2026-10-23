@@ -110,7 +110,7 @@ test('schema validates complete and contextual documented manifest examples', as
 });
 
 test('schema rejects unknown keys at every closed reader mapping', async () => {
-  const source = await read('src/Talewright.Tale/Parsing/StoryYamlReader.cs');
+  const source = await read('engine/src/Talewright.Tale/Parsing/StoryYamlReader.cs');
   const readerSets = [...source.matchAll(/CheckKeys\(\w+,\s*((?:"[^"]+"\s*,?\s*)+)\);/g)]
     .map(match => [...match[1].matchAll(/"([^"]+)"/g)].map(key => key[1]).sort());
   assert.ok(readerSets.length > 0, 'reader CheckKeys lists should be discoverable');

@@ -10,7 +10,7 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [C# extensions and packages](csharp-extensions.md) | Which NuGet package to use, registry setup, extension examples |
 | [Shared authoring analysis](authoring-analysis.md) | Partial symbols, source ranges, unsaved workspaces, and explicit project metadata |
 | [Plan and roadmap](plan.md) | Decisions, milestones and their dependencies |
-| [Decision records](adr/) | The big design decisions in long form |
+| [Decision records](adr) | The big design decisions in long form |
 | [Issue tracking](issues.md) | Full claim/status workflow for people and agents |
 | [Releasing and CI](releasing.md) | Workflows, GitHub Pages, version tags, package publication |
 | [UI test container image](ui-test-image.md) | Build/publish process and CI image rollout for browser/Linux player tests |
@@ -18,4 +18,6 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [Performance](performance.md) | Recorded benchmark results and how they were measured |
 | [Testing](../../tests/README.md) | Unit, browser, desktop and performance test suites |
 
-Each project under `src/` also has a short README covering its files and extension points.
+Projects are grouped into engine, player, apps, tooling, packaging, and benchmarks.
+See the [repository layout](../../CONTRIBUTING.md#repository-layout) and each
+area's project READMEs for files and extension points.

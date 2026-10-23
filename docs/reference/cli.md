@@ -2,7 +2,7 @@
 
 The `talewright` command checks, debugs and publishes stories. See
 [Getting started](../guide/getting-started.md#install-the-desktop-tools) to install it. Until
-ready-made downloads arrive, use `dotnet run --project src/Talewright.Cli --` in place of `talewright`.
+ready-made downloads arrive, use `dotnet run --project tooling/cli/src/Talewright.Cli --` in place of `talewright`.
 
 | Command | Does |
 |---|---|
@@ -85,7 +85,7 @@ without closing it.
 **Workbench behavior.** See the testing guide for [scene setup and inspection](../guide/testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger),
 [live edits, jumps and navigation](../guide/testing-your-story.md#change-state-without-starting-over),
 and [source reload/restart](../guide/testing-your-story.md#editing-while-you-test).
-For API and reconstruction invariants, see the [runtime documentation](../../src/Talewright.Runtime/README.md#live-editing-and-author-navigation).
+For API and reconstruction invariants, see the [runtime documentation](../../engine/src/Talewright.Runtime/README.md#live-editing-and-author-navigation).
 
 **Distribution.** Debugger assets ship in the CLI tool, not in Player packages or published games.
 See the testing guide for [portable scenarios and read-only player-save forks](../guide/testing-your-story.md#share-and-restore-a-debugging-scenario)

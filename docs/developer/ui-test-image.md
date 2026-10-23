@@ -3,12 +3,12 @@
 The browser and Linux Photino UI workflows run in a prebuilt public image:
 
 - `ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1`
-- Definition: [.github/docker/ui-tests/](../../.github/docker/ui-tests/)
+- Definition: [.github/docker/ui-tests/](../../.github/docker/ui-tests)
 
 The image includes:
 
 - Playwright .NET browsers and their Linux dependencies (Chromium, Firefox, WebKit)
-- Native Linux UI dependencies used by `tests/run_e2e.py linux` (WebKitGTK, AT-SPI, Xvfb, D-Bus, Xfwm4)
+- Native Linux UI dependencies used by `player/tests/run_e2e.py linux` (WebKitGTK, AT-SPI, Xvfb, D-Bus, Xfwm4)
 - Node 22/npm for Nx orchestration compatibility
 - Python 3 with `python3-gi` and `python3-pyatspi`
 
@@ -47,6 +47,12 @@ Suggested rollout:
 3. Copy the published immutable digest from the workflow summary.
 4. Update consuming workflow references.
 5. Verify browser and native jobs on a PR.
+
+The repository layout migration updates the image's verifier to read the player
+test project under `player/tests`, so its candidate definition uses `pw1.63.0-r2`.
+Runtime dependencies are unchanged. Consumer workflows intentionally stay on
+the already-published `r1` image and run the verifier from the checkout; they
+must not point at `r2` until the publisher has validated and published it.
 
 Do not publish PR code, do not use mutable `latest`, and do not replace an existing version tag with different content.
 

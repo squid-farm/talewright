@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../../engine/src/Talewright.Tale/Talewright.Tale.csproj" />
+  </ItemGroup>
+</Project>

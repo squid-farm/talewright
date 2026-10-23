@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../Talewright.Core/Talewright.Core.csproj" />
+    <ProjectReference Include="../Talewright.Rules/Talewright.Rules.csproj" />
+    <ProjectReference Include="../Talewright.Narrative/Talewright.Narrative.csproj" />
+    <ProjectReference Include="../Talewright.Tale/Talewright.Tale.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

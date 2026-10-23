@@ -8,17 +8,36 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from test_nx_selection import affected_graph
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
-from nx_ci import GROUPS, TARGETS, make_plan, nx, verify_results
+from nx_ci import GROUPS, TARGETS, make_plan, nx, verify_results, verify_unit_reports
+
+
+class UnitReportTests(unittest.TestCase):
+    def test_reports_are_collected_from_each_area_not_the_old_root_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for area in ("engine/tests/Engine.Tests", "player/tests/Player.Tests",
+                         "tooling/authoring/tests/Authoring.Tests", "tooling/cli/tests/Cli.Tests"):
+                report = root / area / "artifacts/unit/test.trx"
+                report.parent.mkdir(parents=True)
+                report.write_text('<TestRun><Counters executed="1" failed="0" /></TestRun>')
+            legacy = root / "tests/Old.Tests/artifacts/unit/old.trx"
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text("not a current report")
+            with patch("nx_ci.ROOT", root):
+                verify_unit_reports(4)
+                with self.assertRaisesRegex(ValueError, "Expected 5 unit reports"):
+                    verify_unit_reports(5)
 
 
 class CiRoutingTests(unittest.TestCase):
     def test_real_inferred_leaf_has_nonempty_compilation_plan(self):
-        plan = make_plan(affected_graph("tests/Talewright.BenchmarkDotNet/Program.cs"))
+        plan = make_plan(affected_graph("benchmarks/Talewright.BenchmarkDotNet/Program.cs"))
         self.assertIn(
             {"project": "Talewright.BenchmarkDotNet", "target": "build:release"},
             plan["checks"],
