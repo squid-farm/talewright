@@ -1,8 +1,11 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Talewright.Core.Events;
+using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
+using Talewright.Runtime.Saves;
 using Talewright.Tale.Model;
 
 namespace Talewright.Runtime;
@@ -88,7 +91,7 @@ public sealed class StoryHistory
         Cursor = cursor;
     }
 
-    public byte[] Save()
+    public byte[] Save(SaveSummary? summary = null)
     {
         if (string.IsNullOrEmpty(Story.ContentFingerprint))
         {
@@ -110,6 +113,7 @@ public sealed class StoryHistory
             Choices = _choices.ToArray(),
             Cursor = Cursor,
             Character = Character,
+            Summary = summary is null ? null : JsonSerializer.SerializeToElement(summary, SaveJsonContext.Default.SaveSummary),
         }, SaveJsonContext.Default.SavedHistory);
         if (data.Length > MaxSaveBytes)
         {
@@ -117,6 +121,58 @@ public sealed class StoryHistory
         }
 
         return data;
+    }
+
+    public string ProgressKey => Convert.ToHexString(SHA256.HashData(Save()));
+
+    public SaveSummary CaptureSummary(DateTimeOffset savedAt)
+    {
+        var player = State.GetCharacterDefinition(EntityId.Player);
+        var title = string.IsNullOrWhiteSpace(Current.Title)
+            ? Current.Scene?.Value ?? (Current.IsEnded ? "The end" : "Untitled scene")
+            : Current.Title;
+        return new(title,
+            savedAt, player.FullName);
+    }
+
+    /// <summary>Reads display metadata and replay identity without replaying a saved history.</summary>
+    public static SaveEntry DescribeSave(string slot, ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length is 0 or > MaxSaveBytes)
+        {
+            return new(slot, null, null, "Saved game is empty or exceeds 2 MiB.");
+        }
+        try
+        {
+            var save = JsonSerializer.Deserialize(bytes, SaveJsonContext.Default.SavedHistory)
+                ?? throw new JsonException("Empty saved game.");
+            SaveSummary? summary = null;
+            string? warning = null;
+            if (save.Summary is { } metadata && metadata.ValueKind != JsonValueKind.Null)
+            {
+                try
+                {
+                    summary = metadata.Deserialize(SaveJsonContext.Default.SaveSummary);
+                    if (summary is null || string.IsNullOrWhiteSpace(summary.SceneTitle) || summary.SavedAt == default)
+                    {
+                        summary = null;
+                        warning = "Save details are unreadable.";
+                    }
+                }
+                catch (JsonException)
+                {
+                    warning = "Save details are unreadable.";
+                }
+            }
+            save.Summary = null;
+            var key = Convert.ToHexString(SHA256.HashData(
+                JsonSerializer.SerializeToUtf8Bytes(save, SaveJsonContext.Default.SavedHistory)));
+            return new(slot, summary, key, warning);
+        }
+        catch (JsonException)
+        {
+            return new(slot, null, null, "Saved game is malformed; loading will show the error.");
+        }
     }
 
     public static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data)
@@ -203,9 +259,12 @@ internal sealed class SavedHistory
     public required string[] Choices { get; init; }
     public required int Cursor { get; init; }
     public CharacterSelection? Character { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Summary { get; set; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(SavedHistory))]
+[JsonSerializable(typeof(SaveSummary))]
 internal partial class SaveJsonContext : JsonSerializerContext;

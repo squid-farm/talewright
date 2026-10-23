@@ -47,15 +47,14 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Shift+Tab");
         await Page.Keyboard.PressAsync("Shift+Tab");
-        var saves = Page.GetByRole(AriaRole.Button, new() { Name = "Saved games", Exact = true });
+        var saves = Page.GetByRole(AriaRole.Button, new() { Name = "Saves", Exact = true });
         await Expect(saves).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save game", Exact = true })).ToBeEnabledAsync();
-        await Expect(saves).ToBeEnabledAsync();
         Assert.False(await Page.Locator(".tw-overflow-actions").EvaluateAsync<bool>(
             "menu => menu.contains(document.activeElement)"), "Save refresh must not pull focus into the disclosure.");
-        await saves.FocusAsync();
-        await Page.Keyboard.PressAsync("Enter");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Close saves", Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Escape");
         await Expect(saves).ToBeFocusedAsync();
     }
 
@@ -221,7 +220,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         {
             var nodes = (await native.SnapshotAsync()).Descendants().ToArray();
             var window = nodes.First(node => node.Role == "frame").Bounds;
-            foreach (var name in new[] { "Back", "Forward", "Saved games", "More actions" })
+            foreach (var name in new[] { "Back", "Forward", "Saves", "More actions" })
             {
                 var bounds = nodes.First(node => node.Role == "push button" && node.Name == name).Bounds;
                 Assert.True(bounds.Y >= window.Y && bounds.Y + bounds.Height <= window.Y + window.Height, $"{name} remains visible.");
@@ -230,7 +229,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         }
         else
         {
-            foreach (var name in new[] { "Back", "Forward", "Saved games", "More actions" })
+            foreach (var name in new[] { "Back", "Forward", "Saves", "More actions" })
             {
                 await Expect(Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true })).ToBeInViewportAsync();
             }
