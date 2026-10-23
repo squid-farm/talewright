@@ -7,10 +7,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 
-from test_nx_selection import affected_graph
+from test_nx_selection import NO_IMPACT_FILES, affected_graph
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
@@ -36,6 +37,11 @@ class UnitReportTests(unittest.TestCase):
 
 
 class CiRoutingTests(unittest.TestCase):
+    def test_no_impact_plan_has_no_selected_groups(self):
+        self.assertEqual(
+            {group: [] for group in GROUPS}, make_plan(affected_graph(*NO_IMPACT_FILES)),
+        )
+
     def test_real_inferred_leaf_has_nonempty_compilation_plan(self):
         plan = make_plan(affected_graph("benchmarks/Talewright.BenchmarkDotNet/Program.cs"))
         self.assertIn(
@@ -114,6 +120,83 @@ class AggregateTests(unittest.TestCase):
         ]:
             with self.subTest(needs=needs), self.assertRaises(ValueError):
                 verify_results(needs, expected)
+
+
+class WorkflowAggregateTests(unittest.TestCase):
+    """Execute the workflows' actual aggregate steps, including their selection guards."""
+
+    def workflow(self, name):
+        return (ROOT / ".github/workflows" / name).read_text()
+
+    def aggregate(self, workflow, needs, selected):
+        content = self.workflow(workflow)
+        verification = content.split("\n  verification:\n", 1)[1].split("\n  publish-", 1)[0]
+        self.assertIn("    if: always()\n", verification)
+        run = verification.split("        run: |\n", 1)[1]
+        return subprocess.run(
+            ["bash", "-e", "-c", textwrap.dedent(run)],
+            cwd=ROOT, text=True, capture_output=True,
+            env=dict(os.environ, NEEDS=json.dumps(needs), SELECTED=json.dumps(selected)),
+        )
+
+    def test_no_op_reusable_workflow_and_required_gate_pass(self):
+        selected = {group: False for group in GROUPS}
+        tests = {"plan": {"result": "success"}, **{
+            group: {"result": "skipped"} for group in GROUPS if group != "build"
+        }}
+        result = self.aggregate("tests.yml", tests, selected)
+        self.assertEqual(0, result.returncode, result.stderr)
+        result = self.aggregate("build.yml", {
+            "select": {"result": "success"}, "build": {"result": "skipped"},
+            "tests": {"result": "success"},
+        }, selected)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_planning_failure_or_cancellation_cannot_pass(self):
+        for workflow, planner in (("build.yml", "select"), ("tests.yml", "plan")):
+            for status in ("failure", "cancelled", "skipped"):
+                with self.subTest(workflow=workflow, status=status):
+                    result = self.aggregate(workflow, {planner: {"result": status}}, {})
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertIn("failed, was skipped, or was cancelled", result.stderr)
+
+    def test_selected_job_failures_and_unexpected_skips_cannot_pass(self):
+        selected = {group: True for group in GROUPS}
+        for workflow, planner, jobs in (
+            ("build.yml", "select", ("build", "tests")),
+            ("tests.yml", "plan", tuple(group for group in GROUPS if group != "build")),
+        ):
+            for job in jobs:
+                for status in ("failure", "cancelled", "skipped"):
+                    with self.subTest(workflow=workflow, job=job, status=status):
+                        needs = {name: {"result": "success"} for name in (planner, *jobs)}
+                        needs[job]["result"] = status
+                        result = self.aggregate(workflow, needs, selected)
+                        self.assertNotEqual(0, result.returncode)
+                        self.assertIn(f"{job}: expected success, got {status}", result.stderr)
+
+    def test_workflow_wiring_keeps_no_op_and_failed_runs_reportable(self):
+        build = self.workflow("build.yml")
+        trigger = build.split("\npermissions:", 1)[0]
+        self.assertNotRegex(trigger, r"\bpaths(?:-ignore)?:")
+        self.assertIn('if [[ "$EVENT" == pull_request ]]; then', build)
+        self.assertIn('select --base "$BASE" --head "$HEAD"', build)
+        self.assertIn("select --full", build)
+        tests = build.split("\n  tests:\n", 1)[1].split("\n  verification:\n", 1)[0]
+        self.assertIn("needs: select", tests)
+        self.assertNotIn("if:", tests)
+        self.assertIn("uses: ./.github/workflows/tests.yml", tests)
+        self.assertIn("selected: ${{ needs.select.outputs.selected }}", tests)
+        self.assertIn("name: CI verification", build)
+        self.assertIn("needs: [select, build, tests]", build)
+        reusable = self.workflow("tests.yml")
+        self.assertIn("needs: [plan, unit, browser, linux-desktop, editor, checks]", reusable)
+        for group in GROUPS:
+            if group == "build":
+                continue
+            job = reusable.split(f"\n  {group}:\n", 1)[1].split("\n\n", 1)[0]
+            self.assertIn("needs: plan", job)
+            self.assertIn("if: fromJSON(needs.plan.outputs.selected)", job)
 
 
 class NxExecutionTests(unittest.TestCase):

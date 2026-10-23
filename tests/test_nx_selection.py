@@ -23,6 +23,23 @@ TARGETS = [
     "budget",
     "build:release",
 ]
+NO_IMPACT_FILES = (
+    ".vscode/tasks.json",
+    ".github/skills/backlog-refinement/SKILL.md",
+    ".github/agents/reviewer.agent.md",
+    ".github/prompts/review.prompt.md",
+    ".github/instructions/style.instructions.md",
+    ".github/copilot-instructions.md",
+    "AGENTS.md",
+    "README.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "CODEOWNERS",
+    ".github/CODEOWNERS",
+    ".gitignore",
+    "samples/README.md",
+    "examples/CSharpStory/README.md",
+)
 
 
 def affected_graph(*files):
@@ -51,6 +68,30 @@ class NxSelectionTests(unittest.TestCase):
         selected = set(graph["tasks"]["tasks"])
         self.assertTrue(set(tasks).issubset(selected), f"Missing {set(tasks) - selected}")
         return selected
+
+    def test_no_impact_changes_select_no_tasks(self):
+        for changed in NO_IMPACT_FILES:
+            with self.subTest(changed=changed):
+                self.assertEqual({}, affected_graph(changed)["tasks"]["tasks"])
+
+    def test_agent_and_vscode_changes_together_select_no_tasks(self):
+        graph = affected_graph(
+            ".github/skills/backlog-refinement/SKILL.md", ".vscode/tasks.json",
+        )
+        self.assertEqual({}, graph["tasks"]["tasks"])
+
+    def test_no_impact_changes_do_not_hide_product_changes(self):
+        for changed in (
+            "engine/src/Talewright.Core/Events/GameEvents.cs",
+            "tooling/vscode-talewright/package.json",
+            "docs/reference/tale-syntax.md",
+            "src/Talewright.NewModule/Feature.cs",
+        ):
+            with self.subTest(changed=changed):
+                expected = affected_graph(changed)["tasks"]["tasks"]
+                self.assertTrue(expected)
+                actual = affected_graph(*NO_IMPACT_FILES, changed)["tasks"]["tasks"]
+                self.assertEqual(expected, actual)
 
     def test_highlighting_changes_select_editor_checks_only(self):
         graph = affected_graph("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json")
@@ -133,7 +174,8 @@ class NxSelectionTests(unittest.TestCase):
 
     def test_shared_and_unclassified_changes_are_conservative(self):
         for changed in (
-                "Directory.Build.props", ".github/workflows/build.yml",
+                "Directory.Build.props", "global.json", "nx.json", ".nxignore",
+                ".github/workflows/build.yml", ".github/scripts/nx_ci.py",
                 ".github/docker/ui-tests/Dockerfile", ".github/workflows/tests.yml",
                 "src/Talewright.NewModule/Feature.cs"):
             with self.subTest(changed=changed):

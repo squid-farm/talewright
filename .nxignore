@@ -1,0 +1,18 @@
+# Tooling preferences and agent guidance do not affect product verification.
+/.vscode/
+/.github/skills/
+/.github/agents/
+/.github/prompts/
+/.github/instructions/
+/.github/copilot-instructions.md
+/AGENTS.md
+
+# Only these repository-level documents are no-impact, not product documentation.
+/README.md
+/CONTRIBUTING.md
+/LICENSE
+/CODEOWNERS
+/.github/CODEOWNERS
+/.gitignore
+/samples/README.md
+/examples/CSharpStory/README.md
