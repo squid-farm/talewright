@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using BenchmarkDotNet.Attributes;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
@@ -49,14 +51,8 @@ public class StoryBenchmarks
 
         _history = BuildHistory(tier.HistoryDepth);
         _choiceKey = _history.Current.Choices[0].Key;
-        var redoPrefix = BuildHistory(tier.HistoryDepth);
         var redoCursor = tier.HistoryDepth / 2;
-        while (redoPrefix.Cursor > redoCursor)
-        {
-            redoPrefix.Back();
-        }
-
-        _redoPrefixSave = redoPrefix.Save();
+        _redoPrefixSave = CreateSaveAtCursor(_history.Save(), redoCursor);
         var hubFiles = _directorySource.Files.ToDictionary(pair => pair.Key, pair => pair.Value);
         hubFiles[StorySource.ManifestFileName] = hubFiles[StorySource.ManifestFileName]
             .Replace("start: scene.0", $"start: scene.{tier.SceneCount - 1}", StringComparison.Ordinal);
@@ -295,6 +291,14 @@ public class StoryBenchmarks
         }
 
         return history;
+    }
+
+    private static byte[] CreateSaveAtCursor(byte[] saveBytes, int cursor)
+    {
+        var save = JsonNode.Parse(saveBytes)?.AsObject()
+            ?? throw new InvalidOperationException("Could not parse the benchmark save.");
+        save["cursor"] = cursor;
+        return JsonSerializer.SerializeToUtf8Bytes(save);
     }
 
     private static StoryDefinition Compile(StorySource source)
