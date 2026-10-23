@@ -1,4 +1,7 @@
-<header class="tw-bar">
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<header class="tw-bar" aria-label="Player toolbar" @ref="_bar">
     <h1>@Title</h1>
     <div class="tw-bar-actions">
         @if (UndoEnabled)
@@ -10,13 +13,28 @@
         {
             <button type="button" class="tw-link" disabled="@Busy" @onclick="OnSavedGames">Saved games</button>
         }
-        <button type="button" class="tw-link" disabled="@Busy" @onclick="OnRestart">Restart</button>
-        @if (OnExit.HasDelegate)
-        {
-            <button type="button" class="tw-link" disabled="@Busy" @onclick="OnExit">Library</button>
-        }
+        <div class="tw-overflow">
+            <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
+                    disabled="@Busy" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
+            <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
+                <button type="button" class="tw-link" disabled="@Busy" @onclick="ConfirmRestart">Restart</button>
+                @if (OnExit.HasDelegate)
+                {
+                    <button type="button" class="tw-link" disabled="@Busy" @onclick="Exit">Library</button>
+                }
+            </div>
+        </div>
     </div>
 </header>
+
+<dialog class="tw-confirm" aria-label="Restart story?" @ref="_confirmation">
+    <h2>Restart story?</h2>
+    <p>This discards your current playthrough. Saved games are kept.</p>
+    <div class="tw-confirm-actions">
+        <button type="button" class="tw-choice" @onclick="CancelRestart" autofocus>Keep playing</button>
+        <button type="button" class="tw-choice" @onclick="Restart">Restart story</button>
+    </div>
+</dialog>
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";
@@ -30,4 +48,53 @@
     [Parameter] public EventCallback OnSavedGames { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
     [Parameter] public EventCallback OnExit { get; set; }
+
+    private ElementReference _bar, _toggle, _menu, _confirmation;
+    private IJSObjectReference? _module;
+    private bool _menuOpen;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/PlayerToolbar.razor.js");
+            await _module.InvokeVoidAsync("initialize", _bar, _toggle, _menu, _confirmation);
+        }
+        if (_menuOpen)
+        {
+            await _module!.InvokeVoidAsync("focusMenu", _menu);
+        }
+    }
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private async Task ConfirmRestart()
+    {
+        _menuOpen = false;
+        await _module!.InvokeVoidAsync("openConfirmation", _confirmation);
+    }
+
+    private async Task CancelRestart() =>
+        await _module!.InvokeVoidAsync("closeConfirmation", _confirmation, _toggle);
+
+    private async Task Restart()
+    {
+        await CancelRestart();
+        await OnRestart.InvokeAsync();
+    }
+
+    private async Task Exit()
+    {
+        _menuOpen = false;
+        await OnExit.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("dispose", _bar);
+            await _module.DisposeAsync();
+        }
+    }
 }

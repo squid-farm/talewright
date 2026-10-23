@@ -278,6 +278,13 @@ Use the helper for the normal path; direct invocation requires the matching brow
 
 ### Standalone publisher artifacts
 
+`ToolbarTests` measures real passage movement while scrolling down and up, then
+checks that the primary controls remain in the browser/native window at narrow
+and wide widths. Browser coverage also checks focused-choice/passage clearance,
+light/dark backgrounds, history boundaries, disclosure keyboard behavior, modal
+Restart confirmation, cancellation, and focus restoration. Restart and Library
+are reached through **More actions**; Restart requires confirmation.
+
 CI also publishes a selected story with no development samples and tests the
 extracted ZIP. Standalone cases are explicitly skipped in normal development-host
 runs; opt in with `TALEWRIGHT_STANDALONE=1` and `Artifact=Standalone`.

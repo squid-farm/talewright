@@ -16,7 +16,7 @@ See [registry setup](../../docs/developer/csharp-extensions.md).
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
-| `PlayerToolbar` | Title and navigation/save/restart/library buttons; enabled states and actions come from the parent. |
+| `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Restart/Library, and modal Restart confirmation. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
 | `SavedGamesPanel` | Slot-name input, slot list and explicit overwrite confirmation; all persistence and state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
 | `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |

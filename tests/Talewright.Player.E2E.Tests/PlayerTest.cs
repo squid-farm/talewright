@@ -81,10 +81,29 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected async Task Choose(string label) =>
         await Driver.ChooseAsync(label);
 
-    protected async Task Library() => await Driver.ClickAsync("Library");
+    protected async Task Library()
+    {
+        if ((await Driver.ObserveAsync()).PassageVisible)
+        {
+            await Driver.ClickAsync("More actions");
+        }
+        await Driver.ClickAsync("Library");
+    }
+
+    protected async Task Restart()
+    {
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Restart");
+        await Driver.ClickAsync("Restart story");
+    }
 
     protected async Task AssertLibraryUnavailable(bool duringCreation = false)
     {
+        var playing = (await Driver.ObserveAsync()).PassageVisible;
+        if (playing)
+        {
+            await Driver.ClickAsync("More actions");
+        }
         if (Driver is NativePlayerDriver native)
         {
             var timer = Stopwatch.StartNew();
@@ -113,6 +132,10 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
             await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Library", Exact = true })).ToHaveCountAsync(0);
             await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
             await Expect(Page.Locator(".tw-library")).ToHaveCountAsync(0);
+        }
+        if (playing)
+        {
+            await Driver.PressAsync("Escape");
         }
     }
 
