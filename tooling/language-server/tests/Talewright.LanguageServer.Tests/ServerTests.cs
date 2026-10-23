@@ -164,6 +164,68 @@ public sealed class ServerTests
     }
 
     [Fact]
+    public async Task Opening_tale_discovers_disk_child_and_transfers_diagnostic_ownership()
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("child"));
+        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        const string childValid = "=== child\nHello.\n-> END\n";
+        File.WriteAllText(client.PathOf("child/main.tale"), "=== child\n* [Go] -> absent\n");
+        await client.Initialize();
+        await client.Open("start.tale", Invalid, 1);
+        Assert.NotEmpty(await client.Diagnostics("child/main.tale", null));
+        await client.Diagnostics("start.tale", 1);
+        await client.Open("child/main.tale", childValid, 1);
+        Assert.Empty(await client.Diagnostics("child/main.tale", 1));
+        await client.Diagnostics("start.tale", 1);
+        await client.Change("start.tale", Valid, 2);
+        await client.Diagnostics("start.tale", 2);
+        Assert.DoesNotContain(client.PendingDiagnostics, message =>
+            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("child/main.tale"));
+        await client.Change("child/main.tale", "=== child\n* [Go] -> absent\n", 2);
+        Assert.NotEmpty(await client.Diagnostics("child/main.tale", 2));
+        await client.Watch("start.tale", 2);
+        await client.Diagnostics("start.tale", 2);
+        Assert.DoesNotContain(client.PendingDiagnostics, message =>
+            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("child/main.tale"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Discarding_unsaved_child_manifest_retires_root_and_rehomes_overlays(bool parentManifest)
+    {
+        await using var client = new Client();
+        if (!parentManifest) File.Delete(client.PathOf("story.yaml"));
+        Directory.CreateDirectory(client.PathOf("child"));
+        File.WriteAllText(client.PathOf("child/main.tale"), "=== child\nHello.\n-> END\n");
+        await client.Initialize();
+        await client.Open("start.tale", Valid, 1);
+        await client.Diagnostics("start.tale", 1);
+        await client.Open("child/story.yaml", Manifest.Replace("start: start", "start: absent"), 1);
+        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", 1));
+        await client.Open("child/main.tale", "=== child\n* [Go] -> absent\n", 1);
+        Assert.NotEmpty(await client.Diagnostics("child/main.tale", 1));
+        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", 1));
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("child/story.yaml") } });
+        Assert.Empty(await client.Diagnostics("child/story.yaml", null));
+        await client.Diagnostics("start.tale", 1);
+        await client.Diagnostics("child/main.tale", 1); // Retirement clears the old publication.
+        await client.Diagnostics("child/main.tale", 1); // Ancestor reanalysis owns the overlay.
+        await client.Change("child/main.tale", "=== child\nHello.\n-> END\n", 2);
+        var diagnostics = await client.Diagnostics("child/main.tale", 2);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("child/main.tale") } });
+        await client.Request("unknown", new { });
+        await client.Open("child/main.tale", "=== child\nHello.\n-> END\n", 1);
+        await client.Diagnostics("child/main.tale", 1);
+        await client.Diagnostics("start.tale", 1);
+        Assert.DoesNotContain(client.PendingDiagnostics, message =>
+            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("child/story.yaml") &&
+            message.GetProperty("params").GetProperty("diagnostics").GetArrayLength() != 0);
+    }
+
+    [Fact]
     public async Task Cross_file_add_change_delete_and_diagnostic_clearing()
     {
         await using var client = new Client();

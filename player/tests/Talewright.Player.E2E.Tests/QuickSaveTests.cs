@@ -345,6 +345,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         Assert.True(await dialog.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"));
         Assert.Equal(dark ? "rgb(38, 35, 31)" : "rgb(240, 235, 224)",
             await dialog.EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Close saves", Exact = true })).ToBeEnabledAsync();
         await Page.Keyboard.PressAsync("Escape");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Saves", Exact = true })).ToBeFocusedAsync();
     }

@@ -60,6 +60,10 @@ is the fallback. Multiple story roots are analyzed independently.
 An opened manifest always establishes its own directory as the root, including an
 unsaved nested manifest. Existing Tale overlays and diagnostic ownership move
 from ancestor workspaces to the new story; ancestor refreshes exclude that story.
+Discovering an on-disk child manifest through a Tale open performs the same
+ownership transfer. Discarding an unsaved nested manifest retires its temporary
+root and returns its Tale overlays to the containing story/workspace, clearing
+obsolete child diagnostics.
 Closing a document discards its overlay even if the subsequent disk reload fails.
 Only file URIs are supported. Open overlays win over disk, and close reloads disk. Versions must
 increase. Whole-story analysis is debounced by 150 ms and superseded snapshots

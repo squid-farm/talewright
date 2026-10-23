@@ -164,7 +164,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     Change(parameters);
                     break;
                 case "textDocument/didClose":
-                    Close(parameters);
+                    await CloseAsync(parameters, cancellationToken);
                     break;
                 case "textDocument/didSave":
                     Refresh(PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!));
@@ -212,7 +212,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var text = document.GetProperty("text").GetString()!;
         story.Workspace.Open(Relative(story.Root, path), version, text);
         _documents.Add(path, new(story.Root, version, text));
-        if (Path.GetFileName(path) == StorySource.ManifestFileName) ReconcileStory(story);
+        ReconcileStory(story);
         Schedule(story);
     }
 
@@ -233,7 +233,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         Schedule(story);
     }
 
-    private void Close(JsonElement parameters)
+    private async Task CloseAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!IsStoryFile(path)) return;
@@ -241,10 +241,48 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var story = _stories[document.Root];
         story.Workspace.Close(Relative(story.Root, path));
         _documents.Remove(path);
+        if (Path.GetFileName(path) == StorySource.ManifestFileName && !File.Exists(path) &&
+            _stories.Keys.Concat(_folders).Any(root => !PathComparer.Equals(root, story.Root) && IsWithin(root, story.Root)))
+        {
+            await RetireStoryAsync(story, cancellationToken);
+            return;
+        }
         // Closing must discard the overlay even when reloading disk fails.
         // Disk may have changed without a watcher event while the overlay was open.
         story = Reload(story);
         Schedule(story);
+    }
+
+    private async Task RetireStoryAsync(Story story, CancellationToken cancellationToken)
+    {
+        story.Generation++;
+        story.Pending?.Cancel();
+        story.Pending?.Dispose();
+        _stories.Remove(story.Root);
+        var affected = new HashSet<string>(PathComparer);
+        foreach (var (path, document) in _documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).ToArray())
+        {
+            var destination = GetStory(path);
+            destination.Workspace.Open(Relative(destination.Root, path), document.Version, document.Text);
+            _documents[path] = document with { Root = destination.Root };
+            affected.Add(destination.Root);
+        }
+        foreach (var path in story.Published)
+        {
+            await NotifyAsync("textDocument/publishDiagnostics", new
+            {
+                uri = UriFromPath(path),
+                version = _documents.TryGetValue(path, out var document) ? (int?)document.Version : null,
+                diagnostics = Array.Empty<object>()
+            }, cancellationToken);
+        }
+        foreach (var root in _stories.Keys.Where(root => IsWithin(root, story.Root)).ToArray())
+            affected.Add(root);
+        foreach (var root in affected)
+        {
+            Reload(_stories[root]);
+            Schedule(_stories[root]);
+        }
     }
 
     private void Refresh(params string[] paths)
