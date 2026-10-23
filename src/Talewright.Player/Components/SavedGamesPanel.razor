@@ -16,7 +16,7 @@
     @if (PendingLoad is not null)
     {
         <section aria-label="Confirm load">
-            <h3>Load “@PendingLoad”?</h3>
+            <h3>Load “@SaveEntry.DisplayNameFor(PendingLoad)”?</h3>
             <p>This will discard unsaved progress.</p>
             <button type="button" class="tw-choice" disabled="@Busy" @onclick="OnCancelLoad">Keep playing</button>
             <button type="button" class="tw-choice" disabled="@Busy" @onclick="OnConfirmLoad">Load save</button>
@@ -42,8 +42,10 @@
         <ul class="tw-save-list" aria-label="Saved games">
             @foreach (var entry in Slots)
             {
-                <li>
-                    <strong>@entry.Slot</strong>
+                <li data-save-kind="@(entry.IsQuick ? "quick" : "named")"
+                    aria-label="@($"{(entry.IsQuick ? "Checkpoint" : "Named save")}: {entry.DisplayName}")">
+                    <strong>@entry.DisplayName</strong>
+                    <span>@(entry.IsQuick ? "One replaceable checkpoint for this story" : "Named save")</span>
                     @if (entry.Summary is { } summary)
                     {
                         <span>@summary.SceneTitle</span>
@@ -61,7 +63,7 @@
                     {
                         <span class="tw-error">@entry.Warning</span>
                     }
-                    <button type="button" disabled="@Busy" @onclick="() => OnLoad.InvokeAsync(entry.Slot)">Load @entry.Slot</button>
+                    <button type="button" disabled="@Busy" @onclick="() => OnLoad.InvokeAsync(entry.Slot)">Load @entry.DisplayName</button>
                 </li>
             }
         </ul>

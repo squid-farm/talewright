@@ -212,6 +212,8 @@ def serve(args):
                     finally:
                         app.key("Control_L", pyatspi.KEY_RELEASE)
                     pyatspi.Registry.generateKeyboardEvent(0, arguments["value"], pyatspi.KEY_STRING)
+                    app.wait(lambda: node.queryText().getText(0, -1) == arguments["value"],
+                             "finish typing the named field")
                     app.key("Tab")
                 elif command == "upload":
                     app.upload(**arguments)

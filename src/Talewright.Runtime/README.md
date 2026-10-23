@@ -294,6 +294,17 @@ and hashed story directories. Replacements use a flushed same-directory temporar
 file and atomic rename. Failed reads/writes throw explicit errors; the store never interprets or migrates
 the save payload. Names are limited to 64 UTF-8 bytes, without control characters or surrounding spaces.
 
+`ISaveStore.ReadQuickAsync(storyId)` / `WriteQuickAsync(storyId, data)` address one separate checkpoint,
+with atomic unconditional replacement. Missing reads throw `FileNotFoundException`; invalid data and
+storage failures remain explicit. Custom save-store implementations must supply these methods.
+Named `ListAsync` omits the checkpoint. `SaveCatalog.ListEntriesAsync` combines both kinds into one
+list using `SaveEntry.IsQuick` and `DisplayName`, and reads metadata without replay.
+Desktop storage uses `quick.json` beside hexadecimal named-slot filenames (so names such as
+`quick` or `Quick Save checkpoint` cannot collide). IndexedDB uses the reserved `\0quick` key,
+which contains a control character and cannot pass named-save validation.
+The replay format is identical for both kinds; neither storage key nor display name establishes
+story compatibility. Failed replacements preserve the existing checkpoint.
+
 ## Character initialization
 
 For stories with `StoryDefinition.Creation`, supply a validated `CharacterSelection`

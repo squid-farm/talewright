@@ -5,4 +5,6 @@ public interface ISaveStore
     Task<IReadOnlyList<string>> ListAsync(string storyId);
     Task<byte[]> ReadAsync(string storyId, string slot);
     Task WriteAsync(string storyId, string slot, byte[] data, bool overwrite = false);
+    Task<byte[]> ReadQuickAsync(string storyId);
+    Task WriteQuickAsync(string storyId, byte[] data);
 }

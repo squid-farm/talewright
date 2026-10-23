@@ -14,7 +14,7 @@
                 <select aria-label="Pronouns" @bind="_pronouns">
                     @foreach (var pronoun in Story.Creation.Pronouns)
                     {
-                        <option value="@pronoun">@pronoun</option>
+                        <option value="@pronoun">@PronounLabel(pronoun)</option>
                     }
                 </select>
             </label>
@@ -64,6 +64,14 @@
     private string? _preset;
     private Dictionary<string, int> _stats = [];
     private string? _error;
+
+    private static string PronounLabel(string keyword)
+    {
+        var pronouns = Pronouns.FromKeyword(keyword)
+            ?? throw new InvalidOperationException($"Unknown creation pronoun keyword '{keyword}'.");
+        var forms = new[] { pronouns.Subject, pronouns.Object, pronouns.Reflexive };
+        return string.Join("/", forms.Where((form, index) => index == 0 || form != forms[index - 1]));
+    }
 
     protected override void OnInitialized()
     {

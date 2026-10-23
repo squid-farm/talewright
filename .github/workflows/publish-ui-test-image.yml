@@ -1,0 +1,107 @@
+name: Publish UI test image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Versioned image tag (example: pw1.63.0-r1)'
+        required: true
+        default: pw1.63.0-r1
+  push:
+    branches: [main]
+    paths:
+      - '.github/docker/ui-tests/**'
+      - '.github/workflows/publish-ui-test-image.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      reference: ${{ steps.metadata.outputs.reference }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate versioned image reference
+        id: metadata
+        env:
+          IMAGE_TAG: ${{ inputs.image-tag }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          reference = json.loads(Path(".github/docker/ui-tests/image.json").read_text())["reference"]
+          if not re.fullmatch(r"ghcr\.io/squid-farm/talewright-ui-tests:pw\d+\.\d+\.\d+-r\d+", reference):
+              raise SystemExit(f"Invalid image reference: {reference}")
+          if os.environ["IMAGE_TAG"] and reference.rsplit(":", 1)[1] != os.environ["IMAGE_TAG"]:
+              raise SystemExit("Requested tag must match image.json; update image metadata for a new revision")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"reference={reference}\n")
+          PY
+      - name: Build candidate image
+        run: docker build -t talewright-ui-tests:candidate .github/docker/ui-tests
+      - name: Verify browser and native prerequisites in the candidate
+        run: |
+          docker run --rm --init --shm-size=1g \
+            --user 1001:1001 \
+            -e HOME=/tmp/talewright-ui-home \
+            -v "$PWD":/workspace \
+            talewright-ui-tests:candidate \
+            bash -e -c 'mkdir -p "$HOME"; python3 /opt/talewright-ui/verify.py; python3 tests/run_e2e.py web --filter FullyQualifiedName~StoryLoadingTests; python3 tests/run_e2e.py linux --probe'
+      - name: Save validated candidate
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        run: docker save talewright-ui-tests:candidate | gzip > "${{ runner.temp }}/ui-test-image.tar.gz"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        with:
+          name: ui-test-image-candidate
+          path: ${{ runner.temp }}/ui-test-image.tar.gz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: publish-ui-test-image
+      cancel-in-progress: false
+    env:
+      IMAGE_REFERENCE: ${{ needs.validate.outputs.reference }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-test-image-candidate
+          path: ${{ runner.temp }}/ui-test-image
+      - name: Load validated candidate
+        run: docker load -i "${{ runner.temp }}/ui-test-image/ui-test-image.tar.gz"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish versioned image
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          reference = os.environ["IMAGE_REFERENCE"]
+          result = subprocess.run(["docker", "manifest", "inspect", reference], capture_output=True, text=True)
+          if result.returncode == 0:
+              raise SystemExit(f"Refusing to overwrite {reference}; choose a new revision")
+          if not any(message in result.stderr.lower() for message in ("manifest unknown", "no such manifest")):
+              raise SystemExit(f"Cannot establish that {reference} is unused: {result.stderr}")
+          PY
+          docker tag talewright-ui-tests:candidate "$IMAGE_REFERENCE"
+          docker push "$IMAGE_REFERENCE"
+      - name: Show immutable digest for workflow updates
+        run: |
+          digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE_REFERENCE")"
+          echo "Published: ${digest}"
+          echo "Published: ${digest}" >> "$GITHUB_STEP_SUMMARY"

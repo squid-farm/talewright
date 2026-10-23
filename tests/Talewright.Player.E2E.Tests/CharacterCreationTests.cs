@@ -23,6 +23,48 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
             """,
     };
 
+    [Theory]
+    [InlineData("she", "she/her/herself", "she/her/herself")]
+    [InlineData("he", "he/him/himself", "he/him/himself")]
+    [InlineData("they", "they/them/themselves", "they/them/themselves")]
+    [InlineData("it", "it/itself", "it/it/itself")]
+    public async Task Full_pronoun_labels_keep_keyword_values_and_survive_save_load(
+        string keyword, string label, string storyForms)
+    {
+        var fixture = Fixture();
+        fixture = fixture with
+        {
+            Tale = TestStories.Linear.Tale.Replace("Mara's",
+                "{player:pronoun.subject}/{player:pronoun.object}/{player:pronoun.reflexive}"),
+            Yaml = fixture.Yaml.Replace("pronouns: [they, she]", $"pronouns: [{keyword}, " +
+                string.Join(", ", new[] { "she", "he", "they", "it" }.Where(value => value != keyword)) + "]"),
+        };
+        await Upload(fixture);
+        if (PlayerTarget.IsDesktop)
+        {
+            await AssertState(state => Assert.Contains(label, state.Library));
+        }
+        else
+        {
+            var picker = Page.GetByRole(AriaRole.Combobox, new() { Name = "Pronouns", Exact = true });
+            await Expect(picker.Locator("option")).ToHaveCountAsync(4);
+            await Expect(picker.Locator($"option[value='{keyword}']")).ToHaveTextAsync(label);
+            await picker.SelectOptionAsync(new SelectOptionValue { Label = label });
+            await Expect(picker).ToHaveValueAsync(keyword);
+        }
+        await Driver.ClickAsync("Start story");
+        await Observe(new(null, storyForms));
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Load My save");
+        await Observe(new(null, storyForms));
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await Observe(new(null, storyForms));
+    }
+
     [Fact]
     public async Task Default_creation_plays_saves_replays_and_restarts_on_both_hosts()
     {
@@ -42,6 +84,32 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Observe(new(null, "Second passage text."));
         await Driver.ClickAsync("Back");
         await Observe(new(null, "Mara's"));
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Quick_checkpoint_keeps_created_identity_and_summarizes_effective_name()
+    {
+        var fixture = Fixture();
+        await Upload(fixture);
+        await Page.GetByLabel("First name", new() { Exact = true }).FillAsync("Robin");
+        await Page.GetByLabel("Last name", new() { Exact = true }).FillAsync("Vale");
+        await Driver.ClickAsync("Start story");
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Quick Save");
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Quick Save checkpoint saved.");
+        await Driver.ClickAsync("Saves");
+        await Expect(Page.Locator("[data-save-kind=quick]")).ToContainTextAsync("Robin Vale");
+        await Page.ReloadAsync();
+        await Upload(fixture);
+        await Driver.ClickAsync("Start story");
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load Quick Save checkpoint");
+        await Driver.ClickAsync("Load save");
+        await Observe(new(null, "Second passage text."));
+        await AssertState(state => Assert.Contains("Robin Vale", state.Sheet));
+        await Driver.ClickAsync("Back");
+        await Observe(new(null, "Robin's"));
     }
 
     [Fact]

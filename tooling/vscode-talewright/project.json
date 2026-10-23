@@ -1,0 +1,42 @@
+{
+  "name": "talewright-editor",
+  "implicitDependencies": ["talewright-docs", "Story", "Talewright.Tale", "Talewright.Tale.Tests", "talewright-snippets"],
+  "tags": ["type:tooling", "area:editor"],
+  "targets": {
+    "compiler-contract": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [{"projects": ["Talewright.Tale.Tests"], "target": "build:release"}],
+      "options": {
+        "command": "dotnet test tests/Talewright.Tale.Tests -c Release --no-build --no-restore --filter FullyQualifiedName~EditorManifestSchemaTests"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "cache": false,
+      "options": {
+        "command": "npm test",
+        "args": [],
+        "cwd": "tooling/vscode-talewright"
+      }
+    },
+    "package-check": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "npm run package && npm run test:package",
+        "cwd": "tooling/vscode-talewright"
+      }
+    },
+    "editor-smoke": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["package-check"],
+      "cache": false,
+      "options": {
+        "command": "xvfb-run -a npm run test:editor",
+        "cwd": "tooling/vscode-talewright"
+      }
+    }
+  }
+}

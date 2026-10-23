@@ -1,0 +1,13 @@
+{
+  "name": "talewright-docs",
+  "tags": ["type:documentation"],
+  "targets": {
+    "check": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "python3 -m unittest discover -s docs -p test_docs.py -v"
+      }
+    }
+  }
+}

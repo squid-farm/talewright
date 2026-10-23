@@ -21,19 +21,27 @@ The web player, the desktop player and published games all share the same screen
 | Button | What it does |
 |---|---|
 | **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `undo: false`. |
+| **Quick Save** | Write or replace this story's one quick checkpoint, without an overwrite prompt. Named saves are never replaced by this action. |
 | **Saves** | Open the Saves dialog to create or load a named save. Saving over an existing slot asks you to confirm. |
 | **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |
 | **More actions → Library** | Return to the list of stories (not shown in published games). |
 
-The toolbar stays visible while you scroll. The Saves dialog refreshes automatically when opened.
+The toolbar stays visible while you scroll. Quick Save confirmations and storage errors appear
+in the toolbar without returning you to the start of the passage.
+The Saves dialog refreshes automatically when opened.
 Each new save shows its name, scene title, real-world save time (UTC) and character name.
 Older saves show **Details unavailable** instead of an invented timestamp.
+The **Quick Save checkpoint** appears separately from entries marked **Named save** in the same list,
+with the same scene, time and character details. Each story has its own checkpoint. Saving again
+replaces only that checkpoint; use named saves to keep multiple points in the story.
 
 Loading asks **Load save** or **Keep playing** only if your current progress is not safely saved.
 This includes undo/redo history and your character, not just the visible passage.
 Cancel keeps your current game; a failed load also leaves it untouched.
 Use **Close saves** or Escape to return to play. If storage fails, check the displayed advice and
 use **Retry save list**; a failed save does not count as saved progress.
+If Quick Save fails, the previous checkpoint is kept: follow the storage advice and try
+**Quick Save** again. Restarting or reopening the player keeps both quick and named saves.
 
 ## Where saves are kept
 
@@ -61,7 +69,9 @@ need an updated player; earlier players do not recognize the additional metadata
 ## Character creation
 
 If the story has a [`creation`](writing-stories.md#character-creation) section, players first choose
-their name, pronouns, preset and starting stats. **Use default name** restores the author's name.
+their name, pronouns, preset and starting stats. Pronoun choices show the full forms:
+**she/her/herself**, **he/him/himself**, **they/them/themselves**, or **it/itself**,
+depending on which sets the author offers. **Use default name** restores the author's name.
 Restart keeps the created character. Loading a save switches to the character in that save.
 
 ## Very long playthroughs

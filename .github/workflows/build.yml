@@ -7,6 +7,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '37 4 * * 1'
 
 permissions:
   contents: read
@@ -16,13 +18,54 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  select:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      selected: ${{ steps.select.outputs.selected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Select verification from the Nx task graph
+        id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "$EVENT" == pull_request ]]; then
+            python3 .github/scripts/nx_ci.py select --base "$BASE" --head "$HEAD"
+          else
+            python3 .github/scripts/nx_ci.py select --full
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nx-ci-plan
+          path: artifacts/ci/plan.json
+          if-no-files-found: error
+
   build:
+    needs: select
+    if: fromJSON(needs.select.outputs.selected).build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -36,20 +79,14 @@ jobs:
             version=$(python3 .github/scripts/package_version.py --ci "$GITHUB_RUN_NUMBER")
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - run: python3 -m unittest discover -s tests -p 'test_ci.py' -v
-      - run: dotnet restore Talewright.slnx
-      - name: Build Release
+      - uses: actions/download-artifact@v4
+        with:
+          name: nx-ci-plan
+          path: artifacts/ci
+      - name: Build, pack and verify selected clean consumers
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: dotnet build Talewright.slnx -c Release --no-restore -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
-      - name: Pack and verify clean consumers
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          dotnet pack src/Talewright -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
-          dotnet pack src/Talewright.Player -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
-          dotnet pack src/Talewright.Cli -c Release --no-build -p:Version="$VERSION" -o artifacts/packages
-          python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION" --smoke
+        run: python3 .github/scripts/nx_ci.py run build
       - uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
@@ -57,10 +94,39 @@ jobs:
           if-no-files-found: error
 
   tests:
+    needs: select
     uses: ./.github/workflows/tests.yml
+    with:
+      selected: ${{ needs.select.outputs.selected }}
+
+  verification:
+    name: CI verification
+    if: always()
+    needs: [select, build, tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require successful selection and every selected job
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          SELECTED: ${{ needs.select.outputs.selected }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, ".github/scripts")
+          from nx_ci import verify_results
+          results = json.loads(os.environ["NEEDS"])
+          if results["select"]["result"] != "success":
+              raise SystemExit("Nx selection failed, was skipped, or was cancelled")
+          selected = json.loads(os.environ["SELECTED"])
+          verify_results(results, {"select": True, "build": selected["build"], "tests": True})
+          PY
 
   publish-samples:
-    needs: [build, tests]
+    needs: [build, tests, verification]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -69,7 +135,7 @@ jobs:
     uses: ./.github/workflows/publish-samples.yml
 
   publish-nuget:
-    needs: [build, tests]
+    needs: [build, tests, verification]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read

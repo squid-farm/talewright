@@ -8,6 +8,72 @@ public sealed class FileSaveStoreTests : IDisposable
     private FileSaveStore Store => new(_root);
 
     [Fact]
+    public async Task Quick_checkpoint_is_single_story_scoped_and_cannot_alias_named_slots()
+    {
+        await Assert.ThrowsAsync<FileNotFoundException>(() => Store.ReadQuickAsync("story"));
+        await Store.WriteAsync("story", "Quick Save checkpoint", [1]);
+        await Store.WriteAsync("story", "quick", [2]);
+        await Store.WriteQuickAsync("story", [3]);
+        await Store.WriteQuickAsync("other", [4]);
+        await Store.WriteQuickAsync("story", [5]);
+        Assert.Equal(new byte[] { 5 }, await Store.ReadQuickAsync("story"));
+        Assert.Equal(new byte[] { 4 }, await Store.ReadQuickAsync("other"));
+        Assert.Equal(new byte[] { 1 }, await Store.ReadAsync("story", "Quick Save checkpoint"));
+        Assert.Equal(new byte[] { 2 }, await Store.ReadAsync("story", "quick"));
+        Assert.Equal(["Quick Save checkpoint", "quick"], await Store.ListAsync("story"));
+        await Assert.ThrowsAsync<ArgumentException>(() => Store.WriteAsync("story", SaveEntry.QuickSlot, [6], overwrite: true));
+        await Assert.ThrowsAsync<ArgumentException>(() => Store.ReadAsync("story", SaveEntry.QuickSlot));
+        Assert.Equal(new byte[] { 5 }, await Store.ReadQuickAsync("story"));
+        Assert.Equal(2, Directory.EnumerateFiles(_root, "quick.json", SearchOption.AllDirectories).Count());
+    }
+
+    [Fact]
+    public async Task Failed_quick_replacement_preserves_payload_and_cleans_temporary_files()
+    {
+        await Store.WriteQuickAsync("story", [1]);
+        await Assert.ThrowsAsync<InvalidDataException>(() => Store.WriteQuickAsync("story", []));
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            Store.WriteQuickAsync("story", new byte[StoryHistory.MaxSaveBytes + 1]));
+        Assert.Equal(new byte[] { 1 }, await Store.ReadQuickAsync("story"));
+        var target = Directory.GetFiles(_root, "quick.json", SearchOption.AllDirectories).Single();
+        var backup = target + ".backup";
+        File.Move(target, backup);
+        Directory.CreateDirectory(target);
+        try
+        {
+            await Assert.ThrowsAnyAsync<IOException>(() => Store.WriteQuickAsync("story", [2]));
+            Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            Directory.Delete(target);
+            File.Move(backup, target);
+        }
+        Assert.Equal(new byte[] { 1 }, await Store.ReadQuickAsync("story"));
+    }
+
+    [Fact]
+    public async Task Catalog_lists_quick_metadata_once_and_preserves_damaged_checkpoint()
+    {
+        var json = """
+            {"formatVersion":1,"storyId":"story","storyVersion":"1","contentFingerprint":"fingerprint",
+             "seed":7,"choices":[],"cursor":0,"character":null,
+             "summary":{"sceneTitle":"A scene","savedAt":"2026-10-23T00:00:00Z","characterName":"Mara"}}
+            """;
+        await Store.WriteQuickAsync("story", System.Text.Encoding.UTF8.GetBytes(json));
+        var entry = Assert.Single(await Store.ListEntriesAsync("story"));
+        Assert.True(entry.IsQuick);
+        Assert.Equal("Quick Save checkpoint", entry.DisplayName);
+        Assert.Equal("A scene", entry.Summary!.SceneTitle);
+        Assert.Equal("Mara", entry.Summary.CharacterName);
+        await Store.WriteQuickAsync("story", "{broken"u8.ToArray());
+        var damaged = Assert.Single(await Store.ListEntriesAsync("story"));
+        Assert.True(damaged.IsQuick);
+        Assert.NotNull(damaged.Warning);
+        Assert.Null(damaged.ProgressKey);
+    }
+
+    [Fact]
     public async Task Catalog_keeps_corrupt_and_oversized_slots_visible_with_explicit_warnings()
     {
         await Store.WriteAsync("story", "Malformed", "{broken"u8.ToArray());
