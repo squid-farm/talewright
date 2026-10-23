@@ -1,5 +1,5 @@
 @* Desktop root: the shared player, auto-opening a story passed on the command line. *@
-<TalewrightApp AutoStartStoryId="@Options.AutoStartStoryId" OnTitleChanged="UpdateTitle" />
+<TalewrightApp AutoStartStoryId="@Options.AutoStartStoryId" LibraryEnabled="@Options.LibraryEnabled" OnTitleChanged="UpdateTitle" />
 
 @code {
     [Inject]

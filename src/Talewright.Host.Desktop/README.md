@@ -10,7 +10,14 @@ on macOS, WebKitGTK on Linux). There is no browser, no local web server and no o
 dotnet run --project src/Talewright.Host.Desktop                          # library with the bundled samples
 dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic     # also opens this story immediately
 dotnet run --project src/Talewright.Host.Desktop -- ~/stories/a ~/b.zip   # several folders/zips in the library
+dotnet run --project src/Talewright.Host.Desktop -- --no-library ~/b.zip # one story, no Library navigation
 ```
+
+Library remains available by default, even when a story opens automatically.
+`--no-library` requires exactly one folder or ZIP; it hides Library during creation
+and play. Startup errors show diagnostics and a retry action for that same story.
+Use `--` before a path beginning with `-`; unknown options and invalid combinations
+exit with code 2 before opening a window. `--help` prints usage.
 
 Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's equivalent).
 Manual saves use per-user local application data under `Talewright/saves` (normally
@@ -21,15 +28,18 @@ Slot replacement is explicit and atomic; incompatible/corrupt loads leave the cu
 
 | File | Contents |
 |---|---|
-| `Program.cs` | Builds the Photino app: registers `CompositeStoryLibrary(EmbeddedStoryLibrary, FileSystemStoryLibrary(args))`, passes the first path as `DesktopOptions.AutoStartStoryId`, sets the window title/size, shows unhandled exceptions in a message box. Arguments starting with `-` are ignored as story paths. |
-| `App.razor` | Root component: `<TalewrightApp AutoStartStoryId=… />`. |
+| `Program.cs` | Builds the Photino app, registers embedded/file libraries, passes startup selection and library policy, and sets the window title/size. |
+| `DesktopLaunchOptions.cs` | Parses story paths, `--no-library`, `--help`, and `--`. |
+| `App.razor` | Root component: passes `AutoStartStoryId` and `LibraryEnabled` to the shared player. |
 | `wwwroot/index.html` | Shell page: `<app>` mount point, Player stylesheet, `_framework/blazor.webview.js`. Copied to the output folder. |
 | `Talewright.Host.Desktop.csproj` | Razor SDK; embeds `samples/**/*.tale` and `*.yaml` as `stories/<Story>/<path>` resources. |
 
 ## Packaging
 
 `talewright publish story-folder -a --target desktop --output game.zip` produces a self-contained
-ZIP with a single story baked in and no samples. An optional `--runtime win-x64` cross-publishes;
+ZIP with a single story baked in, no samples, and no Library navigation during creation or play.
+This policy is built into published hosts, not inferred from auto-start or a launcher flag.
+An optional `--runtime win-x64` cross-publishes;
 see the [CLI reference](../../docs/reference/cli.md#publish) for targets and verification limits.
 `TalewrightIncludeSamples=false` disables development sample embedding in custom builds.
 

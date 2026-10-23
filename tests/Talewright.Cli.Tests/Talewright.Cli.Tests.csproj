@@ -6,4 +6,7 @@
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Talewright.Cli/Talewright.Cli.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Talewright.Host.Desktop/DesktopLaunchOptions.cs" Link="DesktopLaunchOptions.cs" />
+  </ItemGroup>
 </Project>

@@ -54,6 +54,38 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Explicit_no_library_flag_hides_navigation_during_creation_and_play()
+    {
+        var fixture = TestStories.Linear with
+        {
+            Yaml = TestStories.DefaultYaml + "\ncreation:\n  name: true\n",
+        };
+        var path = await WriteArchive("creation.zip", fixture.Zip());
+        await Driver.StartAsync("--no-library", path);
+        await AssertLibraryUnavailable(duringCreation: true);
+        await Driver.ClickAsync("Start story");
+        await Observe(new(null, "First passage"));
+        await AssertLibraryUnavailable();
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Restart");
+        await Observe(new(null, "First passage"));
+        await AssertLibraryUnavailable();
+    }
+
+    [Fact]
+    public async Task No_library_startup_error_can_retry_the_same_story()
+    {
+        var path = await WriteArchive("repair.zip", TestArchives.Invalid("zip"));
+        await Driver.StartAsync("--no-library", path);
+        await AssertState(state => Assert.Contains("Couldn't open", state.Library));
+        await AssertLibraryUnavailable();
+        await File.WriteAllBytesAsync(path, TestStories.Linear.Zip());
+        await Driver.ClickAsync("Retry opening story");
+        await Observe(new(null, "First passage"));
+        await AssertLibraryUnavailable();
+    }
+
+    [Fact]
     public async Task Unicode_and_spaces_in_cli_path_are_supported()
     {
         var path = await WriteArchive("histoire caf\u00e9.zip", TestStories.Linear.Zip());
