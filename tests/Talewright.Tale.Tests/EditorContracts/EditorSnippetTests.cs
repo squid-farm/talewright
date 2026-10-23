@@ -6,6 +6,7 @@ namespace Talewright.Tale.Tests;
 
 public class EditorSnippetTests
 {
+    [Trait("Category", "EditorContract")]
     [Fact]
     public void Every_editor_snippet_compiles_in_an_explicit_story_context()
     {

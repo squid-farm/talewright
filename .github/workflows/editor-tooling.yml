@@ -1,22 +1,7 @@
 name: Editor tooling
 
 on:
-  pull_request:
-    paths:
-      - 'tooling/vscode-talewright/**'
-      - 'tests/Talewright.Tale.Tests/**'
-      - 'src/Talewright.Tale/**'
-      - 'samples/**'
-      - '.github/workflows/editor-tooling.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'tooling/vscode-talewright/**'
-      - 'tests/Talewright.Tale.Tests/**'
-      - 'src/Talewright.Tale/**'
-      - 'samples/**'
-      - '.github/workflows/editor-tooling.yml'
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -25,11 +10,10 @@ jobs:
   syntax:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: tooling/vscode-talewright
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -38,12 +22,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - run: npm ci
-      - run: npm test
-      - run: dotnet test ../../tests/Talewright.Tale.Tests -c Release
-      - run: npm run package && npm run test:package
-      - run: xvfb-run -a npm run test:editor
+      - uses: actions/download-artifact@v4
+        with:
+          name: nx-ci-plan
+          path: artifacts/ci
+      - run: npm ci --prefix tooling/vscode-talewright
+      - run: python3 .github/scripts/nx_ci.py run editor
       - uses: actions/upload-artifact@v4
+        if: hashFiles('tooling/vscode-talewright/artifacts/talewright.vsix') != ''
         with:
           name: talewright-vscode
           path: tooling/vscode-talewright/artifacts/talewright.vsix

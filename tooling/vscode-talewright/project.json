@@ -1,0 +1,33 @@
+{
+  "name": "talewright-editor",
+  "tags": ["type:tooling", "area:editor"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "cache": false,
+      "options": {
+        "command": "npm test",
+        "args": [],
+        "cwd": "tooling/vscode-talewright"
+      }
+    },
+    "package-check": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "npm run package && npm run test:package",
+        "cwd": "tooling/vscode-talewright"
+      }
+    },
+    "editor-smoke": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["package-check"],
+      "cache": false,
+      "options": {
+        "command": "xvfb-run -a npm run test:editor",
+        "cwd": "tooling/vscode-talewright"
+      }
+    }
+  }
+}
