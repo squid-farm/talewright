@@ -72,6 +72,28 @@ Or point `$schema` to a local copy of
 [`schemas/story.schema.json`](./schemas/story.schema.json). SchemaStore discovery
 is tracked separately and is not required for either option.
 
+### Schema distribution and compatibility
+
+The canonical schema is maintained in this repository and bundled in the VSIX.
+Its public `main` URL above is the rolling schema for the current manifest format.
+SchemaStore registration uses that same URL and the exact filename `story.yaml`;
+it does not maintain a second copy of the schema. Submission alone does not mean
+automatic discovery is available: SchemaStore must accept and publish the entry,
+and an editor may need to refresh its catalog.
+
+Keep changes at this URL backward-compatible with supported manifests. A future
+breaking manifest change must retain the old schema at an immutable release/tag
+URL and document migration and version selection before changing the rolling
+schema. To pin validation today, replace `main` in the modeline URL with the
+commit or release tag matching your Talewright version, or use a local copy.
+The VSIX always uses its bundled schema, independent of catalog/network access.
+
+After SchemaStore accepts the submission, verify discovery in another
+SchemaStore-capable YAML editor with no Talewright extension or schema modeline:
+open `story.yaml`, request root-key completion, introduce an unknown key, and
+remove it to check diagnostics clear. Until that verification is recorded, use
+the explicit modeline or local-file fallback rather than assume auto-discovery.
+
 The schema reflects structural key/type rules and editor-friendly canonical YAML
 forms. The compiler remains authoritative for story-specific references, custom
 ruleset registration, integer bounds and Tale expressions. YAML tooling can also
