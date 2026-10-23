@@ -56,6 +56,12 @@ Two more projects glue it together:
 - `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
   frame). It is the only project that knows about all the others.
 
+`Talewright.Authoring` is a development-tool library above the compiler. It owns
+unsaved workspaces, analysis scheduling, and explicit project metadata integration.
+The compiler exposes parser-backed partial analysis without depending on this
+library. Authoring is excluded from the shipped engine and player packages; see
+[shared authoring analysis](authoring-analysis.md).
+
 ### Dependency graph
 
 Arrows mean "references". Nothing points upward; the engine never knows about the UI.

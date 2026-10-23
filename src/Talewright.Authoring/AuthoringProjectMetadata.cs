@@ -6,8 +6,9 @@ using Talewright.Core.State;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Tale.Compilation;
+using Talewright.Tale.Analysis;
 
-namespace Talewright.Tale.Analysis;
+namespace Talewright.Authoring;
 
 public sealed record AuthoringStat(string Id, string Name, StatCategory Category, int Min, int Max, int Default,
     string? GoverningAttribute);
@@ -28,6 +29,9 @@ public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predic
         RespectNullableAnnotations = true,
         RespectRequiredConstructorParameters = true,
     };
+
+    /// <summary>Analyzes a source snapshot using these data-only registrations.</summary>
+    public StoryAnalysis Analyze(StorySource source) => StoryAnalyzer.Analyze(source, CreateOptions());
 
     /// <summary>Explicit host opt-in; ruleset factories run only during this export, never while loading metadata.</summary>
     public static AuthoringProjectMetadata Export(CompilerOptions options) => new(1,

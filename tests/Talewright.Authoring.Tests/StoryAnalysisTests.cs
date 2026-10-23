@@ -4,8 +4,9 @@ using Talewright.Rules.Expressions;
 using Talewright.Tale.Analysis;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
+using Talewright.Authoring;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Authoring.Tests;
 
 public class StoryAnalysisTests
 {
@@ -19,6 +20,20 @@ public class StoryAnalysisTests
 
     private static StorySource Source(string tale = "=== first\n-> END", string yaml = Manifest) => new(
         new Dictionary<string, string> { ["story.yaml"] = yaml, ["main.tale"] = tale });
+
+    [Fact]
+    public void Host_diagnostics_do_not_mutate_the_compiler_snapshot()
+    {
+        var analysis = StoryAnalyzer.Analyze(Source());
+        var diagnostic = new Diagnostic(DiagnosticSeverity.Error, "HOST001", "Host error.",
+            new SourceLocation("story.yaml", 1, 1));
+        var extended = analysis.WithDiagnostic(diagnostic);
+        Assert.DoesNotContain(diagnostic, analysis.Diagnostics);
+        Assert.Contains(diagnostic, extended.Diagnostics);
+        Assert.Same(analysis.Source, extended.Source);
+        Assert.Same(analysis.Symbols, extended.Symbols);
+        Assert.Same(analysis.Expressions, extended.Expressions);
+    }
 
     [Fact]
     public void Valid_analysis_matches_compilation_and_preserves_source_ranges()
@@ -199,7 +214,7 @@ public class StoryAnalysisTests
         var metadata = AuthoringProjectMetadata.FromJson(AuthoringProjectMetadata.Export(options).ToJson());
         var source = Source("=== first\n@requires @Ready\n{player:first-name#greeting}\n-> END",
             Manifest + "\nruleset: {base: project}");
-        var analysis = StoryAnalyzer.AnalyzeWithMetadata(source, metadata);
+        var analysis = metadata.Analyze(source);
         Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics, analysis.Diagnostics);
         Assert.Empty(analysis.Diagnostics);
         Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Predicate && symbol.Name == "Ready");
@@ -221,9 +236,9 @@ public class StoryAnalysisTests
             :::
             """);
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics,
-            StoryAnalyzer.AnalyzeWithMetadata(source, metadata).Diagnostics);
+            metadata.Analyze(source).Diagnostics);
         Assert.Equal(StoryAnalyzer.Analyze(source).Symbols,
-            StoryAnalyzer.AnalyzeWithMetadata(source, metadata).Symbols);
+            metadata.Analyze(source).Symbols);
     }
 
     [Fact]
@@ -239,7 +254,7 @@ public class StoryAnalysisTests
         var metadata = AuthoringProjectMetadata.FromJson(AuthoringProjectMetadata.Export(options).ToJson());
         var source = Source(yaml: Manifest + "\nruleset: {base: alias}\nitems: {charm: {modifiers: {unknown: 1}}}");
         Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics,
-            StoryAnalyzer.AnalyzeWithMetadata(source, metadata).Diagnostics);
+            metadata.Analyze(source).Diagnostics);
     }
 
     [Fact]

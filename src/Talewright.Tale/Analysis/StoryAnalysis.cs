@@ -23,7 +23,7 @@ public sealed record ExpressionContext(ExpressionContextKind Kind, string Text, 
 /// <summary>Immutable, source-aware authoring data, separate from the runtime story model.</summary>
 public sealed class StoryAnalysis
 {
-    internal StoryAnalysis(StoryAnalysis original, Diagnostic additional)
+    private StoryAnalysis(StoryAnalysis original, Diagnostic additional)
     {
         Source = original.Source;
         Symbols = original.Symbols;
@@ -42,13 +42,13 @@ public sealed class StoryAnalysis
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
     public IReadOnlyList<ExpressionContext> Expressions { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
+
+    /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
+    public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
 }
 
 public static class StoryAnalyzer
 {
-    /// <summary>Analyzes explicitly exported registration data without loading or executing project code.</summary>
-    public static StoryAnalysis AnalyzeWithMetadata(StorySource source, AuthoringProjectMetadata metadata) =>
-        Analyze(source, metadata.CreateOptions());
     /// <summary>Reuses compiler parsing/checks, retaining authoring data even when no runtime story can be built.</summary>
     public static StoryAnalysis Analyze(StorySource source, CompilerOptions? options = null)
     {

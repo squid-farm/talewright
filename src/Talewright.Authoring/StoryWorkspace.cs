@@ -1,7 +1,8 @@
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
+using Talewright.Tale.Analysis;
 
-namespace Talewright.Tale.Analysis;
+namespace Talewright.Authoring;
 
 public sealed record AnalysisUpdate(long Revision, StoryAnalysis Analysis, bool Published);
 
@@ -115,7 +116,7 @@ public sealed class StoryWorkspace
         var analysis = await Task.Run(() => StoryAnalyzer.Analyze(snapshot, _options), cancellationToken).ConfigureAwait(false);
         if (_missingMetadata)
         {
-            analysis = new StoryAnalysis(analysis, new Diagnostic(DiagnosticSeverity.Error, "TW5001",
+            analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5001",
                 "Project authoring metadata is missing. Explicitly supply the project's CompilerOptions or exported authoring metadata; editing never loads project assemblies.",
                 new SourceLocation(StorySource.ManifestFileName, 1, 1)));
         }

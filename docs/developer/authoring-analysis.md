@@ -1,9 +1,17 @@
 # Shared authoring analysis
 
-`Talewright.Tale.Analysis` is the editor-neutral API for source-aware analysis.
+`Talewright.Tale.Analysis` is the compiler API for source-aware analysis.
 It uses the same Tale parser, manifest reader, and compiler checks as runtime
 compilation. It does not add editor state to `StoryDefinition` or change
 `StoryCompiler.Compile` diagnostics.
+
+`Talewright.Authoring` is a separate development-tool library containing workspace
+management and project metadata integration. It references the compiler, never the
+reverse, and is not included in the shipped `Talewright` or `Talewright.Player`
+packages. Tool hosts reference its project explicitly; it is not a separately
+published NuGet package. Only the parser-backed analysis API remains in the
+compiler, so tools reuse parsing and semantic checks without shipping workspace
+or project-metadata infrastructure with games.
 
 ## Snapshots and partial results
 
@@ -33,7 +41,7 @@ hover, LSP transport, lint, or evaluated gameplay values itself.
 
 ## Workspace lifecycle
 
-`StoryWorkspace` owns one story's disk snapshot and unsaved document overlays.
+`Talewright.Authoring.StoryWorkspace` owns one story's disk snapshot and unsaved document overlays.
 `FindStoryRoot` finds the nearest ancestor containing `story.yaml`; a host can
 instead construct a workspace explicitly for a new, unsaved story.
 
@@ -82,10 +90,11 @@ The authoring host reads the explicitly configured file:
 
 ```csharp
 var metadata = AuthoringProjectMetadata.FromJson(File.ReadAllText(metadataPath));
-var analysis = StoryAnalyzer.AnalyzeWithMetadata(source, metadata);
+var analysis = metadata.Analyze(source);
 var workspace = StoryWorkspace.FromMetadata(source, metadata);
 ```
 
+`AuthoringProjectMetadata` is also in `Talewright.Authoring`.
 Version 1 carries predicate/modifier names and ruleset stat/tier/check-support
 contracts, not executable code. Export runs the supplied ruleset factories only
 as an explicit trusted operation; import never loads assemblies or evaluates
