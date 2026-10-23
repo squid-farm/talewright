@@ -41,6 +41,9 @@ public static class CommandLine
             config.AddCommand<ValidateCommand>("validate")
                 .WithDescription("Validate a story folder with stable human or JSON diagnostics.")
                 .WithData(writers);
+            config.AddCommand<LintCommand>("lint")
+                .WithDescription("Check a story with configurable Tale-aware lint rules.")
+                .WithData(writers);
             config.AddCommand<PublishCommand>("publish")
                 .WithDescription("Publish a validated story archive or complete deployable game.")
                 .WithData(writers);
@@ -68,6 +71,8 @@ public static class CommandLine
             config.PropagateExceptions();
             config.CaseSensitivity(CaseSensitivity.All);
             config.AddCommand<InvocationFailureCommand>("validate")
+                .WithData(new InvocationFailure(message, output, error));
+            config.AddCommand<InvocationFailureCommand>("lint")
                 .WithData(new InvocationFailure(message, output, error));
         });
         try
@@ -200,7 +205,9 @@ public sealed class InvocationFailureCommand : Command<InvocationFailureSettings
     }
 }
 
-internal sealed record DiagnosticOutput(string Code, string Severity, string Message, string File, int Line, int Column);
+internal sealed record DiagnosticOutput(string Code, string Severity, string Message, string File, int Line, int Column,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? EndLine = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? EndColumn = null);
 internal sealed record ErrorOutput(string Code, string Message);
 internal sealed record ValidationOutput(int SchemaVersion, bool Success, DiagnosticOutput[] Diagnostics,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ErrorOutput? Error = null);

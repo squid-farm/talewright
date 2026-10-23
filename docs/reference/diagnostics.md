@@ -79,12 +79,24 @@ When you see several errors, fix the first one and check again: one mistake can 
 |---|---|---|
 | TW5001 | Project authoring metadata is required but missing. Built-in-only analysis cannot fully represent the project. | Explicitly supply the project's compiler options or exported [authoring metadata](../developer/authoring-analysis.md#c-project-registrations). Editors never automatically execute project code. |
 
+## Lint rule codes
+
+Lint rules use stable `TWL` IDs, separate from compiler diagnostic codes. They run on shared source-aware
+analysis and do not replace or duplicate compiler diagnostics. Their severities and per-file suppressions
+are configured in the optional story-root `talewright.lint.json`; see the [`lint` CLI reference](cli.md#lint).
+
+| Code | Meaning | Usual fix |
+|---|---|---|
+| TWL001 | A scene ID is not lowercase kebab-case, optionally grouped with dots. | Use lowercase words separated by hyphens, and dots to group scenes (for example `ending.empty-handed`). |
+| TWL002 | The manifest story ID is not lowercase kebab-case. | Use a short lowercase ID with words separated by hyphens (for example `night-ferry`). |
+
 ## Command-line codes
 
-`talewright validate --format json` reports these for problems with the command itself rather than
+`talewright validate` and `talewright lint` report these for problems with the command itself rather than
 the story. See the [CLI reference](cli.md#output-contract).
 
 | Code | Meaning |
 |---|---|
 | TWCLI001 | Invalid command or options. |
 | TWCLI002 | An input/output operation failed, an existing publish destination needs `--force` in noninteractive use, the destination changed during publication, or a required file, tool or desktop component is missing. |
+| TWCLI003 | `talewright lint` configuration is invalid. |

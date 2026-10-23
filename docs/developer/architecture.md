@@ -77,7 +77,8 @@ Two more projects glue it together:
   frame). It is the only project that knows about all the others.
 
 `Talewright.Authoring` is a development-tool library above the compiler. It owns
-unsaved workspaces, analysis scheduling, and explicit project metadata integration.
+unsaved workspaces, analysis scheduling, explicit project metadata integration,
+and the shared Tale-aware lint rules/configuration consumed by the CLI and editor.
 The compiler exposes parser-backed partial analysis without depending on this
 library. Authoring is excluded from the shipped engine and player packages; see
 [shared authoring analysis](authoring-analysis.md).
