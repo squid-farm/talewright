@@ -21,6 +21,8 @@ python3 -m unittest discover -s docs -p test_docs.py -v
 
 Wrapper installation diagnostics go to stderr so machine-readable Nx stdout remains valid JSON,
 including on clean CI runners. The cold-install regression test exercises this first-use path.
+Both launchers quote the wrapper path, including when invoked by absolute path from a checkout
+whose directory name contains spaces.
 
 Preview the PR task graph using the actual base and head revisions:
 

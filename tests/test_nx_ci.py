@@ -92,6 +92,29 @@ class AggregateTests(unittest.TestCase):
 
 
 class NxExecutionTests(unittest.TestCase):
+    def test_launcher_preserves_absolute_paths_and_arguments_with_spaces(self):
+        with tempfile.TemporaryDirectory(prefix="talewright nx launcher ") as directory:
+            workspace = Path(directory)
+            (workspace / ".nx").mkdir()
+            (workspace / ".nx/nxw.js").write_text(
+                "console.log(JSON.stringify(process.argv.slice(2)));", encoding="utf-8",
+            )
+            launcher = workspace / ("nx.bat" if os.name == "nt" else "nx")
+            shutil.copy2(ROOT / launcher.name, launcher)
+            arguments = ["show", "project with spaces", "--json"]
+            command = [str(launcher), *arguments]
+            if os.name == "nt":
+                command = ["cmd", "/c", *command]
+            result = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertEqual(arguments, json.loads(result.stdout))
+
+    def test_windows_launcher_quotes_wrapper_path(self):
+        launcher = (ROOT / "nx.bat").read_text(encoding="utf-8")
+        self.assertIn('node "%path_to_root%.nx\\nxw.js" %*', launcher)
+
     def test_cold_wrapper_install_keeps_graph_stdout_valid_json(self):
         with tempfile.TemporaryDirectory(prefix="talewright-nx-cold-") as directory:
             workspace = Path(directory)
