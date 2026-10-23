@@ -52,6 +52,11 @@ The web host uses `PageTitle`; the desktop host updates its native window title.
 Register `ISaveStore` for the host: `FileSaveStore` on desktop or the scoped
 `IndexedDbSaveStore` from `Talewright.Player.Saves` on web. `TalewrightApp` supplies it to `StoryPlayer`;
 custom consumers without a store still play normally but have no save controls.
+**Quick Save** writes/replaces one dedicated checkpoint for the story, without named-save
+overwrite confirmation. It uses the same atomic storage, summary and persisted-progress
+load guard as named saves. The dialog marks it **Quick Save checkpoint**, independently of
+user-entered names; Quick Save can never overwrite a named slot. Failure keeps the previous
+checkpoint and reports advice; retry using Quick Save. This is explicit saving, not autosave.
 Use **Saves** to open the modal and automatically refresh its list. New entries show scene title,
 actual UTC save time and character name. Legacy/malformed details are explicitly unavailable;
 listing never replays a story. Saving to an existing name requires **Confirm overwrite**.

@@ -49,6 +49,15 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Load My save");
         await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
+        await Driver.ClickAsync("Quick Save");
+        if (Driver is NativePlayerDriver native)
+        {
+            Assert.Contains("Quick Save checkpoint saved.", (await native.SnapshotAsync()).Content);
+        }
+        else
+        {
+            await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Quick Save checkpoint saved.");
+        }
         if (PlayerTarget.IsDesktop)
         {
             await Driver.DisposeAsync();
@@ -66,7 +75,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         }
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
         await Driver.ClickAsync("Saves");
-        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load Quick Save checkpoint");
         await Driver.ClickAsync("Load save");
         await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
         await Driver.ClickAsync("Back");

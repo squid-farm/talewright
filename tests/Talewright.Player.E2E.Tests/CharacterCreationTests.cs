@@ -46,6 +46,32 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Quick_checkpoint_keeps_created_identity_and_summarizes_effective_name()
+    {
+        var fixture = Fixture();
+        await Upload(fixture);
+        await Page.GetByLabel("First name", new() { Exact = true }).FillAsync("Robin");
+        await Page.GetByLabel("Last name", new() { Exact = true }).FillAsync("Vale");
+        await Driver.ClickAsync("Start story");
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Quick Save");
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Quick Save checkpoint saved.");
+        await Driver.ClickAsync("Saves");
+        await Expect(Page.Locator("[data-save-kind=quick]")).ToContainTextAsync("Robin Vale");
+        await Page.ReloadAsync();
+        await Upload(fixture);
+        await Driver.ClickAsync("Start story");
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load Quick Save checkpoint");
+        await Driver.ClickAsync("Load save");
+        await Observe(new(null, "Second passage text."));
+        await AssertState(state => Assert.Contains("Robin Vale", state.Sheet));
+        await Driver.ClickAsync("Back");
+        await Observe(new(null, "Robin's"));
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Default_name_can_be_restored_without_resetting_other_choices()
     {
         await Upload(Fixture());

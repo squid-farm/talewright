@@ -67,6 +67,7 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
     .tw-bar { justify-content: flex-start; }
     .tw-bar-actions { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
     .tw-bar-actions > .tw-link, .tw-overflow > .tw-link { font-size: .8rem; padding: .25rem; }
+    .tw-bar-actions > .tw-quick-save { max-width: 3.5rem; }
 }
 .tw-link { background: none; border: none; cursor: pointer; color: var(--tw-accent); font-family: var(--tw-ui-font); font-size: 0.9rem; padding: 0; }
 .tw-link:hover { text-decoration: underline; }

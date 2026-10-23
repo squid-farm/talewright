@@ -43,7 +43,8 @@ async function execute(mode, operation) {
             const request = operation(transaction.objectStore("saves"));
             transaction.oncomplete = () => resolve(request.result);
             transaction.onerror = () => reject(storageError(transaction.error ?? request.error));
-            transaction.onabort = () => reject(storageError(transaction.error ?? request.error));
+            transaction.onabort = () => reject(storageError(
+                transaction.error ?? request.error ?? new DOMException("Save transaction aborted.", "AbortError")));
         });
     } catch (error) {
         if (error instanceof DOMException) {
@@ -57,7 +58,7 @@ async function execute(mode, operation) {
 
 export async function list(storyId) {
     const keys = await execute("readonly", store => store.index("storyId").getAllKeys(IDBKeyRange.only(storyId)));
-    return keys.map(key => key[1]).sort();
+    return keys.map(key => key[1]).filter(slot => slot !== "\0quick").sort();
 }
 
 export async function read(storyId, slot) {

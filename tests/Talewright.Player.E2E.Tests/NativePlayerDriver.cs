@@ -120,6 +120,8 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task OpenBundledAsync() => await CommandAsync("click", new { pattern = @".* Built-in$", role = "push button" });
     public async Task ClickAsync(string name) =>
         await CommandAsync("click", new { name, role = "push button" });
+    public async Task ClickWithinAsync(string name, string within) =>
+        await CommandAsync("click", new { name, role = "push button", within });
     public async Task ChooseAsync(string label) =>
         await CommandAsync("click", new { pattern = @"^\d+\.\s*" + Regex.Escape(label) + "$", role = "push button", within = "Story choices" });
     public async Task PressAsync(string key) => await CommandAsync("key", new { key });

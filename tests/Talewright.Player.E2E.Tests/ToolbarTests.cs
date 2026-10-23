@@ -224,7 +224,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         {
             var nodes = (await native.SnapshotAsync()).Descendants().ToArray();
             var window = nodes.First(node => node.Role == "frame").Bounds;
-            foreach (var name in new[] { "Back", "Forward", "Saves", "More actions" })
+            foreach (var name in new[] { "Back", "Forward", "Quick Save", "Saves", "More actions" })
             {
                 var bounds = nodes.First(node => node.Role == "push button" && node.Name == name).Bounds;
                 Assert.True(bounds.Y >= window.Y && bounds.Y + bounds.Height <= window.Y + window.Height, $"{name} remains visible.");
@@ -233,7 +233,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         }
         else
         {
-            foreach (var name in new[] { "Back", "Forward", "Saves", "More actions" })
+            foreach (var name in new[] { "Back", "Forward", "Quick Save", "Saves", "More actions" })
             {
                 await Expect(Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true })).ToBeInViewportAsync();
             }
