@@ -281,6 +281,10 @@ public static class StoryLintAnalyzer
         ArgumentNullException.ThrowIfNull(analysis);
         configuration ??= LintConfiguration.Defaults;
         var findings = new List<StoryLintDiagnostic>();
+        var invalidSceneIdLocations = analysis.Diagnostics
+            .Where(diagnostic => diagnostic.Code == "TW1008")
+            .Select(diagnostic => (diagnostic.Location.File, diagnostic.Location.Line))
+            .ToHashSet();
 
         foreach (var symbol in analysis.Symbols)
         {
@@ -297,10 +301,8 @@ public static class StoryLintAnalyzer
                 continue;
             }
 
-            if (ruleId == StoryLintRules.SceneIdStyle && analysis.Diagnostics.Any(diagnostic =>
-                    diagnostic.Code == "TW1008" &&
-                    diagnostic.Location.File == range.Start.File &&
-                    diagnostic.Location.Line == range.Start.Line))
+            if (ruleId == StoryLintRules.SceneIdStyle &&
+                invalidSceneIdLocations.Contains((range.Start.File, range.Start.Line)))
             {
                 continue;
             }
