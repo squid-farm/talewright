@@ -591,6 +591,8 @@ internal sealed partial class TaleParser
             var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
             if (dcStart >= 0)
                 analysis.Expression(ExpressionContextKind.Number, text[(dcStart + 4)..], At(column + dcStart + 4));
+            else if (text.EndsWith(" dc", StringComparison.Ordinal))
+                analysis.Expression(ExpressionContextKind.Number, string.Empty, At(column + text.Length));
         }
         if (_symbols.World.Ruleset.SkillCheckRule is null)
         {

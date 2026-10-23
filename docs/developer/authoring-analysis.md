@@ -47,6 +47,8 @@ conditions and effects are retained even when another field is missing or the
 trigger ID is missing/duplicated. Skill-check difficulties are collected before
 ruleset, actor, or stat resolution, and a bare `@requires` exposes an empty
 condition range at the insertion point after the keyword.
+Block and choice skill checks ending in `dc` similarly retain an empty numeric
+context immediately after `dc`, including when trailing spaces were trimmed.
 
 This initial API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not provide completion,

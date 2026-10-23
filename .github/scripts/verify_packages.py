@@ -97,7 +97,7 @@ def verify(directory, version):
             dependencies = {item.attrib["id"]: item.attrib["version"]
                             for item in metadata.findall(".//{*}dependency")}
             if identity in {"Talewright", "Talewright.Player"}:
-                if "Talewright.Authoring" in dependencies or any(
+                if any(name.casefold() == "talewright.authoring" for name in dependencies) or any(
                         Path(name).name.startswith("Talewright.Authoring.") for name in names):
                     raise ValueError(f"{path}: runtime package includes authoring infrastructure")
             if identity == "Talewright.Cli":

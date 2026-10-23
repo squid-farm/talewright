@@ -22,6 +22,23 @@ public class StoryAnalysisTests
         new Dictionary<string, string> { ["story.yaml"] = yaml, ["main.tale"] = tale });
 
     [Fact]
+    public void Terminal_dc_preserves_empty_difficulty_context_in_blocks_and_choices()
+    {
+        foreach (var prefix in new[] { "::: skill-check athletics dc", "* [Go] skill-check athletics dc" })
+        foreach (var trailing in new[] { "", " ", "   " })
+        {
+            var source = Source("=== first\n" + prefix + trailing);
+            var analysis = StoryAnalyzer.Analyze(source);
+            Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+            Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == "TW1013");
+            var expression = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Number);
+            Assert.Empty(expression.Text);
+            Assert.Equal(new SourceLocation("main.tale", 2, prefix.Length + 1), expression.Range.Start);
+            Assert.Equal(expression.Range.Start, expression.Range.End);
+        }
+    }
+
+    [Fact]
     public void Bare_requires_context_is_at_the_insertion_point()
     {
         var source = Source("=== first\n@requires");
