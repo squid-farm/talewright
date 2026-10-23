@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Talewright.Tale.Analysis;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
@@ -76,16 +77,19 @@ public sealed class StoryLintTests
     [Fact]
     public void Configuration_sets_rule_severity_and_file_specific_suppression()
     {
-        var configuration = LintConfiguration.Parse("""
+        var configurationJson = JsonSerializer.Serialize(new
+        {
+            rules = new Dictionary<string, string> { ["TWL001"] = "off" },
+            suppressions = new Dictionary<string, string[]>
             {
-              "rules": { "TWL001": "off" },
-              "suppressions": { "story.yaml": ["TWL002"] }
-            }
-            """);
+                [StorySource.ManifestFileName] = [StoryLintRules.StoryIdStyle],
+            },
+        });
+        var configuration = LintConfiguration.Parse(configurationJson);
 
         Assert.Equal(LintSeverity.Off, configuration.SeverityFor(StoryLintRules.SceneIdStyle));
         Assert.Equal(LintSeverity.Warning, configuration.SeverityFor(StoryLintRules.StoryIdStyle));
-        Assert.True(configuration.IsSuppressed("story.yaml", StoryLintRules.StoryIdStyle));
+        Assert.True(configuration.IsSuppressed(StorySource.ManifestFileName, StoryLintRules.StoryIdStyle));
         Assert.False(configuration.IsSuppressed("main.tale", StoryLintRules.StoryIdStyle));
     }
 

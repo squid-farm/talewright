@@ -46,8 +46,14 @@ public sealed class LintTests : IDisposable
     [Fact]
     public void Configuration_suppresses_only_the_selected_rule_in_the_selected_file()
     {
-        File.WriteAllText(Path.Combine(_root, LintConfiguration.FileName),
-            """{"suppressions":{"story.yaml":["TWL002"]}}""");
+        var config = JsonSerializer.Serialize(new
+        {
+            suppressions = new Dictionary<string, string[]>
+            {
+                [StorySource.ManifestFileName] = [StoryLintRules.StoryIdStyle],
+            },
+        });
+        File.WriteAllText(Path.Combine(_root, LintConfiguration.FileName), config);
 
         var result = Run("--format", "json");
 
