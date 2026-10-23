@@ -13,7 +13,7 @@
             @if (_story.Creation is not null && _character is null)
             {
                 <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
-                <button type="button" class="tw-link" @onclick="ShowLibrary">Library</button>
+                <button type="button" class="tw-link tw-creation-library" @onclick="ShowLibrary">Library</button>
             }
             else
             {
