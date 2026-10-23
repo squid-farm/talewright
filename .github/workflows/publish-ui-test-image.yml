@@ -1,16 +1,19 @@
 name: Publish UI test image
 
+# Publishes the tag from .github/docker/ui-tests/image.json only when it is not already in GHCR.
+# Changing the image definition without bumping that tag fails, so published tags never change content.
 on:
   workflow_dispatch:
-    inputs:
-      image-tag:
-        description: 'Versioned image tag (example: pw1.63.0-r1)'
-        required: true
-        default: pw1.63.0-r1
   push:
     branches: [main]
     paths:
       - '.github/docker/ui-tests/**'
+      - '.github/scripts/ui_test_image_plan.py'
+      - '.github/workflows/publish-ui-test-image.yml'
+  pull_request:
+    paths:
+      - '.github/docker/ui-tests/**'
+      - '.github/scripts/ui_test_image_plan.py'
       - '.github/workflows/publish-ui-test-image.yml'
 
 permissions:
@@ -21,28 +24,24 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     outputs:
-      reference: ${{ steps.metadata.outputs.reference }}
+      reference: ${{ steps.plan.outputs.reference }}
+      publish: ${{ steps.plan.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
-      - name: Validate versioned image reference
-        id: metadata
+        with:
+          fetch-depth: 0
+      - name: Decide whether the image changed
+        id: plan
         env:
-          IMAGE_TAG: ${{ inputs.image-tag }}
-        run: |
-          python3 - <<'PY'
-          import json, os, re
-          from pathlib import Path
-          reference = json.loads(Path(".github/docker/ui-tests/image.json").read_text())["reference"]
-          if not re.fullmatch(r"ghcr\.io/squid-farm/talewright-ui-tests:pw\d+\.\d+\.\d+-r\d+", reference):
-              raise SystemExit(f"Invalid image reference: {reference}")
-          if os.environ["IMAGE_TAG"] and reference.rsplit(":", 1)[1] != os.environ["IMAGE_TAG"]:
-              raise SystemExit("Requested tag must match image.json; update image metadata for a new revision")
-          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write(f"reference={reference}\n")
-          PY
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: python3 .github/scripts/ui_test_image_plan.py --event "$EVENT" --ref "$GITHUB_REF" --base "$BASE" --head "$HEAD"
       - name: Build candidate image
+        if: steps.plan.outputs.build == 'true'
         run: docker build -t talewright-ui-tests:candidate .github/docker/ui-tests
       - name: Verify browser and native prerequisites in the candidate
+        if: steps.plan.outputs.build == 'true'
         run: |
           docker run --rm --init --shm-size=1g \
             --user 1001:1001 \
@@ -51,10 +50,10 @@ jobs:
             talewright-ui-tests:candidate \
             bash -e -c 'mkdir -p "$HOME"; python3 /opt/talewright-ui/verify.py; python3 tests/run_e2e.py web --filter FullyQualifiedName~StoryLoadingTests; python3 tests/run_e2e.py linux --probe'
       - name: Save validated candidate
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        if: steps.plan.outputs.publish == 'true'
         run: docker save talewright-ui-tests:candidate | gzip > "${{ runner.temp }}/ui-test-image.tar.gz"
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        if: steps.plan.outputs.publish == 'true'
         with:
           name: ui-test-image-candidate
           path: ${{ runner.temp }}/ui-test-image.tar.gz
@@ -63,7 +62,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: needs.validate.outputs.publish == 'true' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 45

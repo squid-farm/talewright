@@ -14,6 +14,7 @@ sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
 from publish_samples import normalize_base_path
 from verify_packages import ENGINE_ASSEMBLIES, verify, verify_desktop_archive
+import ui_test_image_plan
 
 
 class ReleaseVersionTests(unittest.TestCase):
@@ -282,6 +283,58 @@ class UiTestImageContracts(unittest.TestCase):
         self.assertIn("branches: [main]", content)
         self.assertNotIn("pull_request_target", content)
         self.assertIn("packages: write", content)
+        publish = content.split("\n  publish:\n", 1)[1]
+        self.assertIn("if: needs.validate.outputs.publish == 'true' && github.ref == 'refs/heads/main'", publish)
+        self.assertNotIn("packages: write", content.split("\n  publish:\n", 1)[0])
+
+    def test_publish_plan_only_publishes_unpublished_tags_from_main(self):
+        plan = ui_test_image_plan
+        reference = "ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r2"
+        main = "refs/heads/main"
+        cases = [
+            ("push", main, True, False, True, True),
+            ("push", main, False, True, False, False),
+            ("workflow_dispatch", main, True, False, True, True),
+            ("workflow_dispatch", main, True, True, False, False),
+            ("workflow_dispatch", "refs/heads/topic", True, False, True, False),
+            ("pull_request", "refs/pull/1/merge", True, False, True, False),
+            ("pull_request", "refs/pull/1/merge", False, True, False, False),
+        ]
+        for event, ref, changed, exists, build, publish in cases:
+            with self.subTest(event=event, ref=ref, changed=changed, exists=exists):
+                result = plan.decide(event, ref, changed, exists, reference)
+                self.assertEqual((result["build"], result["publish"]), (build, publish))
+        for event in ("push", "pull_request"):
+            with self.subTest(event=event, stale_tag=True):
+                with self.assertRaisesRegex(SystemExit, "Bump the revision"):
+                    plan.decide(event, main, True, True, reference)
+
+    def test_publish_plan_detects_image_definition_changes(self):
+        plan = ui_test_image_plan
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            git = lambda *args: subprocess.run(["git", *args], cwd=root, check=True,
+                                               capture_output=True, text=True).stdout.strip()
+            git("init", "-q")
+            git("config", "user.email", "ci@example.com")
+            git("config", "user.name", "CI")
+            context = root / plan.CONTEXT
+            context.mkdir(parents=True)
+            (context / "Dockerfile").write_text("FROM scratch\n")
+            (root / "README.md").write_text("one\n")
+            git("add", ".")
+            git("commit", "-qm", "base")
+            base = git("rev-parse", "HEAD")
+            (root / "README.md").write_text("two\n")
+            git("commit", "-qam", "docs")
+            docs = git("rev-parse", "HEAD")
+            (context / "Dockerfile").write_text("FROM scratch\nENV X=1\n")
+            git("commit", "-qam", "image")
+            image = git("rev-parse", "HEAD")
+
+            self.assertFalse(plan.context_changed(base, docs, root))
+            self.assertTrue(plan.context_changed(docs, image, root))
+            self.assertTrue(plan.context_changed(plan.ZERO_SHA, image, root))
 
     def test_container_jobs_preserve_nx_routing_and_selection(self):
         content = (self.ROOT / ".github/workflows/tests.yml").read_text()
