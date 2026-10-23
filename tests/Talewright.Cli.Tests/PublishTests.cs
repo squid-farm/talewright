@@ -9,6 +9,7 @@ public sealed class PublishTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-publish-test-{Guid.NewGuid():N}");
     private string Story => Path.Combine(_root, "story");
     private string Zip => Path.Combine(_root, "output.zip");
+    private string SplitDirectory => Path.Combine(_root, "split");
 
     public PublishTests()
     {
@@ -46,6 +47,348 @@ public sealed class PublishTests : IDisposable
             action();
         },
     };
+
+    private (int Code, string Output, string Error) RunSplitControlled(TextReader input,
+        bool inputRedirected = false, PublishCommand.Operations? publication = null, params string[] args)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = CommandLine.Run(
+            ["publish", Story, "--output", SplitDirectory, "-a", "--target", "desktop", "--split", .. args],
+            output, error, new CliInput(input, inputRedirected, false), publication);
+        return (code, output.ToString(), error.ToString());
+    }
+
+    private PublishCommand.Operations SplitBuilds(Action<string, string>? afterBuild = null) =>
+        PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, runtime, _, _, _) =>
+            {
+                var output = Path.Combine(working, "output");
+                Directory.CreateDirectory(output);
+                var executable = runtime!.StartsWith("win-", StringComparison.Ordinal)
+                    ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+                File.WriteAllText(Path.Combine(output, executable), runtime);
+                File.WriteAllText(Path.Combine(output, "Talewright.Host.Desktop.pdb"), runtime);
+                afterBuild?.Invoke(runtime, output);
+                return output;
+            },
+        };
+
+    private void AssertSplitSet(string directory)
+    {
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            var path = Path.Combine(directory, $"publish-{runtime}.zip");
+            Assert.True(File.Exists(path), $"Missing archive for {runtime}.");
+            using var archive = ZipFile.OpenRead(path);
+            var names = archive.Entries.Select(entry => entry.FullName).ToArray();
+            Assert.Contains("Talewright.Host.Desktop.pdb", names);
+            Assert.Contains("DEPLOYMENT.txt", names);
+            Assert.Contains("ENGINE-LICENSE.txt", names);
+            Assert.DoesNotContain(names, name => name.StartsWith("start.", StringComparison.Ordinal));
+            Assert.DoesNotContain(names, name => PublishCommand.DesktopRuntimes.Any(other =>
+                other != runtime && name.Contains(other, StringComparison.Ordinal)));
+            using var deployment = new StreamReader(archive.GetEntry("DEPLOYMENT.txt")!.Open());
+            Assert.Contains(runtime, deployment.ReadToEnd());
+            var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+            using var reader = new StreamReader(archive.GetEntry(executable)!.Open());
+            Assert.Equal(runtime, reader.ReadToEnd());
+        }
+    }
+
+    [Fact]
+    public void Universal_desktop_publication_keeps_all_runtime_folders_and_launchers()
+    {
+        var builds = new List<string>();
+        var publication = SplitBuilds((runtime, _) => builds.Add(runtime));
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["-a", "--target", "desktop"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Equal(PublishCommand.DesktopRuntimes, builds);
+        using var archive = ZipFile.OpenRead(Zip);
+        var names = archive.Entries.Select(entry => entry.FullName).ToArray();
+        Assert.Contains("start.cmd", names);
+        Assert.Contains("start.sh", names);
+        Assert.Contains("start.command", names);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+            Assert.Contains($"{runtime}/{executable}", names);
+            Assert.Contains($"{runtime}/Talewright.Host.Desktop.pdb", names);
+        }
+    }
+
+    [Fact]
+    public void Single_runtime_desktop_publication_keeps_root_apphost_without_universal_launchers()
+    {
+        var builds = new List<string>();
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: SplitBuilds((runtime, _) => builds.Add(runtime)),
+            args: ["-a", "--target", "desktop", "--runtime", "linux-x64"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Equal(["linux-x64"], builds);
+        using var archive = ZipFile.OpenRead(Zip);
+        var names = archive.Entries.Select(entry => entry.FullName).ToArray();
+        Assert.Contains("Talewright.Host.Desktop", names);
+        Assert.Contains("Talewright.Host.Desktop.pdb", names);
+        Assert.DoesNotContain(names, name => name.StartsWith("start.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Split_publishes_one_runtime_archive_per_build_without_universal_launchers()
+    {
+        var builds = new List<string>();
+        var archives = 0;
+        var publication = SplitBuilds((runtime, _) => builds.Add(runtime)) with
+        {
+            CreateZip = (content, path, universal) =>
+            {
+                Assert.False(universal);
+                archives++;
+                PublishCommand.Operations.Default.CreateZip(content, path, universal);
+            },
+        };
+
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true, publication);
+
+        Assert.Equal(0, result.Code);
+        Assert.Equal(PublishCommand.DesktopRuntimes, builds);
+        Assert.Equal(PublishCommand.DesktopRuntimes.Length, archives);
+        AssertSplitSet(SplitDirectory);
+        Assert.Contains("publish-linux-x64.zip", result.Output);
+        using var linux = ZipFile.OpenRead(Path.Combine(SplitDirectory, "publish-linux-x64.zip"));
+        Assert.DoesNotContain("start.sh", linux.Entries.Select(entry => entry.FullName));
+    }
+
+    [Fact]
+    public void Split_requires_all_in_one_desktop_output_and_a_directory()
+    {
+        foreach (var args in new[]
+        {
+            new[] { "--split" },
+            new[] { "-a", "--split", "--target", "web" },
+            new[] { "-a", "--split", "--target", "desktop", "--runtime", "linux-x64" },
+        })
+        {
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var result = CommandLine.Run(["publish", Story, "--output", SplitDirectory, .. args],
+                output, error, new CliInput(new UnreadableInput(), true, true));
+            Assert.Equal(2, result);
+            Assert.Contains("--split requires", error.ToString());
+            Assert.False(Directory.Exists(SplitDirectory));
+        }
+
+        var zipPath = Path.Combine(_root, "not-a-directory.zip");
+        using var zipOutput = new StringWriter();
+        using var zipError = new StringWriter();
+        Assert.Equal(2, CommandLine.Run(
+            ["publish", Story, "--output", zipPath, "-a", "--target", "desktop", "--split"],
+            zipOutput, zipError, new CliInput(new UnreadableInput(), true, true)));
+        Assert.Contains("directory, not a ZIP path", zipError.ToString());
+    }
+
+    [Fact]
+    public void Split_noninteractive_collision_fails_before_build_and_preserves_all_outputs()
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        var existing = Path.Combine(SplitDirectory, "publish-win-x64.zip");
+        File.WriteAllText(existing, "keep");
+        var builds = 0;
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true,
+            SplitBuilds((_, _) => builds++));
+        Assert.Equal(2, result.Code);
+        Assert.Contains("--force", result.Error);
+        Assert.Equal(0, builds);
+        Assert.Equal("keep", File.ReadAllText(existing));
+        Assert.Single(Directory.GetFiles(SplitDirectory));
+    }
+
+    [Fact]
+    public void Split_build_failure_preserves_existing_outputs_and_cleans_staged_archives()
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        var existing = Path.Combine(SplitDirectory, "publish-linux-x64.zip");
+        File.WriteAllText(existing, "keep");
+        var builds = 0;
+        var successful = SplitBuilds();
+        var publication = successful with
+        {
+            BuildHost = (working, target, runtime, story, output, error) =>
+            {
+                if (++builds == 4)
+                {
+                    throw new PublishCommand.PublishBuildException("controlled split build failure");
+                }
+
+                return successful.BuildHost(working, target, runtime, story, output, error);
+            },
+        };
+        var result = RunSplitControlled(new StringReader("yes\n"), publication: publication);
+
+        Assert.Equal(1, result.Code);
+        Assert.Contains("controlled split build failure", result.Error);
+        Assert.Equal(4, builds);
+        Assert.Equal("keep", File.ReadAllText(existing));
+        Assert.Single(Directory.GetFiles(SplitDirectory));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Split_decline_or_archive_failure_leaves_existing_files_untouched(bool failArchive)
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        var existing = Path.Combine(SplitDirectory, "publish-linux-x64.zip");
+        File.WriteAllText(existing, "keep");
+        var builds = 0;
+        var archives = 0;
+        var publication = SplitBuilds((_, _) => builds++) with
+        {
+            CreateZip = (content, path, universal) =>
+            {
+                if (failArchive && ++archives == 4)
+                {
+                    File.WriteAllText(path, "partial");
+                    throw new IOException("controlled split archive failure");
+                }
+
+                PublishCommand.Operations.Default.CreateZip(content, path, universal);
+            },
+        };
+        var result = RunSplitControlled(failArchive ? new StringReader("yes\n") : new StringReader("n\n"),
+            publication: publication);
+
+        Assert.Equal(2, result.Code);
+        Assert.Equal("keep", File.ReadAllText(existing));
+        Assert.Empty(Directory.GetFiles(SplitDirectory, "*.tmp"));
+        if (failArchive)
+        {
+            Assert.Contains("controlled split archive failure", result.Error);
+            Assert.Equal(4, builds);
+            Assert.Single(Directory.GetFiles(SplitDirectory, "*.zip"));
+        }
+        else
+        {
+            Assert.Contains("Publication cancelled", result.Error);
+            Assert.Equal(0, builds);
+        }
+    }
+
+    [Fact]
+    public void Split_replacement_confirmation_covers_set_and_success_replaces_it()
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        var existing = Path.Combine(SplitDirectory, "publish-linux-x64.zip");
+        File.WriteAllText(existing, "old");
+        var result = RunSplitControlled(new StringReader("yes\n"), publication: SplitBuilds());
+        Assert.Equal(0, result.Code);
+        Assert.Contains("Replace all existing outputs?", result.Error);
+        AssertSplitSet(SplitDirectory);
+    }
+
+    [Fact]
+    public void Split_force_replaces_the_full_set_without_prompting()
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            File.WriteAllText(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"), $"old:{runtime}");
+        }
+
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true,
+            publication: SplitBuilds(), args: ["--force"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        AssertSplitSet(SplitDirectory);
+    }
+
+    [Fact]
+    public void Split_force_does_not_inspect_existing_archive_contents()
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        var inaccessible = Path.Combine(SplitDirectory, "publish-linux-x64.zip");
+        File.WriteAllText(inaccessible, "inaccessible");
+        var publication = SplitBuilds() with
+        {
+            CaptureDestination = path =>
+            {
+                if (File.ReadAllText(path) == "inaccessible")
+                {
+                    throw new UnauthorizedAccessException("Existing archive cannot be read.");
+                }
+
+                return PublishCommand.Operations.Default.CaptureDestination(path);
+            },
+        };
+
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["--force"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        AssertSplitSet(SplitDirectory);
+    }
+
+    [Theory]
+    [InlineData("empty")]
+    [InlineData("mixed")]
+    [InlineData("all-existing")]
+    public void Split_installation_failure_rolls_back_existing_and_new_archives(string contents)
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        string[] existingRuntimes = contents switch
+        {
+            "empty" => [],
+            "mixed" => ["win-x64"],
+            "all-existing" => PublishCommand.DesktopRuntimes,
+            _ => throw new ArgumentOutOfRangeException(nameof(contents)),
+        };
+        foreach (var runtime in existingRuntimes)
+        {
+            File.WriteAllText(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"), $"old:{runtime}");
+        }
+
+        var installations = 0;
+        var publication = SplitBuilds() with
+        {
+            MoveFile = (source, target) =>
+            {
+                if (source.EndsWith(".zip.tmp", StringComparison.Ordinal) && ++installations == 2)
+                {
+                    throw new IOException("controlled installation failure");
+                }
+
+                File.Move(source, target);
+            },
+        };
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["--force"]);
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("controlled installation failure", result.Error);
+        Assert.Equal(2, installations);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            var path = Path.Combine(SplitDirectory, $"publish-{runtime}.zip");
+            if (existingRuntimes.Contains(runtime))
+            {
+                Assert.Equal($"old:{runtime}", File.ReadAllText(path));
+            }
+            else
+            {
+                Assert.False(File.Exists(path), $"New archive '{runtime}' should have been rolled back.");
+            }
+        }
+        Assert.Empty(Directory.GetFiles(SplitDirectory, "*.tmp"));
+        Assert.Empty(Directory.GetFiles(SplitDirectory, "*.bak"));
+    }
 
     [Theory]
     [InlineData("y\n")]
