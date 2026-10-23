@@ -78,8 +78,8 @@ Disk changes re-read the bounded shared story source loader; no project code is
 executed. File-loading errors are reported, not treated as successful analysis.
 
 Clients must forward create/change/delete events for `**/*.tale`, `**/story.talewright.yaml`,
-project files, and configured authoring metadata. The VS Code client installs
-these watchers, including the configured metadata path. Other clients
+`**/talewright.lint.json`, project files, and configured authoring metadata. The VS Code client installs
+these watchers, including the lint configuration and configured metadata path. Other clients
 can use didSave for saved open documents, but need watched-file events for
 closed-file additions/deletions. The server does not install its own filesystem
 watcher or recursively open unrelated stories at initialization.
@@ -96,10 +96,13 @@ watch events recreate the workspace and retain overlays. See
 Do not configure a project DLL as metadata: no build target, assembly, ruleset
 factory, or arbitrary C# code is automatically run.
 
-The shared Tale-aware lint rules and configuration API are being added in #150.
-LSP consumption is tracked separately in #151: the server should call the same
-rule implementation on its current analysis snapshot, include compiler diagnostics
-once, and report invalid lint configuration recoverably without stopping the server.
+The shared Tale-aware lint rules and configuration API are implemented in #150.
+The language server uses the same `talewright.lint.json` configuration and shared
+rule implementation on each current analysis snapshot. Lint findings preserve
+their source ranges; compiler diagnostics are published once. Invalid lint
+configuration is reported on the configuration file as `TWLSP004` while compiler
+analysis continues, and correcting the file clears that diagnostic without
+restarting the server. LSP integration and CLI parity are tracked in #151.
 
 ## Neovim (another LSP client)
 

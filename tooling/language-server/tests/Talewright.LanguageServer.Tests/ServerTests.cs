@@ -437,6 +437,90 @@ public sealed class ServerTests
     }
 
     [Fact]
+    public async Task Lint_diagnostics_match_cli_rules_suppressions_and_compiler_results()
+    {
+        await using var client = new Client();
+        var manifest = Manifest.Replace("id: lsp-test", "id: Lsp_Test", StringComparison.Ordinal)
+            .Replace("start: start", "start: Start_Scene", StringComparison.Ordinal);
+        const string tale = "=== Start_Scene\n* [Missing] -> absent\n";
+        File.WriteAllText(client.PathOf("story.talewright.yaml"), manifest);
+        File.WriteAllText(client.PathOf("start.tale"), tale);
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName),
+            """{"rules":{"TWL001":"error"},"suppressions":{"story.talewright.yaml":["TWL002"]}}""");
+
+        var output = new StringWriter();
+        Assert.Equal(1, CommandLine.Run(["lint", client.Root, "--format", "json"], output, new StringWriter()));
+        using var cli = JsonDocument.Parse(output.ToString());
+        var expected = cli.RootElement.GetProperty("diagnostics").EnumerateArray().ToArray();
+
+        await client.Initialize();
+        await client.Open("story.talewright.yaml", manifest, 1);
+        await client.Open("start.tale", tale, 1);
+        var actual = (await client.Diagnostics("story.talewright.yaml", 1))
+            .Select(diagnostic => (File: "story.talewright.yaml", Diagnostic: diagnostic))
+            .Concat((await client.Diagnostics("start.tale", 1))
+                .Select(diagnostic => (File: "start.tale", Diagnostic: diagnostic)))
+            .ToArray();
+
+        Assert.Equal(expected.Length, actual.Length);
+        foreach (var expectedDiagnostic in expected)
+        {
+            var file = expectedDiagnostic.GetProperty("file").GetString()!;
+            var match = Assert.Single(actual, item =>
+                item.File == file &&
+                item.Diagnostic.GetProperty("code").GetString() == expectedDiagnostic.GetProperty("code").GetString());
+            var diagnostic = match.Diagnostic;
+            Assert.Equal(expectedDiagnostic.GetProperty("severity").GetString() == "error" ? 1 : 2,
+                diagnostic.GetProperty("severity").GetInt32());
+            Assert.Equal(expectedDiagnostic.GetProperty("message").GetString(),
+                diagnostic.GetProperty("message").GetString());
+            Assert.Equal(expectedDiagnostic.GetProperty("line").GetInt32() - 1,
+                diagnostic.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+            Assert.Equal(expectedDiagnostic.GetProperty("column").GetInt32() - 1,
+                diagnostic.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
+            if (expectedDiagnostic.TryGetProperty("endLine", out var endLine))
+            {
+                Assert.Equal(endLine.GetInt32() - 1,
+                    diagnostic.GetProperty("range").GetProperty("end").GetProperty("line").GetInt32());
+                Assert.Equal(expectedDiagnostic.GetProperty("endColumn").GetInt32() - 1,
+                    diagnostic.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32());
+            }
+        }
+        Assert.Contains(actual, item => item.Diagnostic.GetProperty("code").GetString() == "TWL001" &&
+            item.Diagnostic.GetProperty("severity").GetInt32() == 1);
+        Assert.DoesNotContain(actual, item => item.Diagnostic.GetProperty("code").GetString() == "TWL002");
+    }
+
+    [Fact]
+    public async Task Invalid_lint_configuration_is_diagnosed_and_recovers_after_watched_change()
+    {
+        await using var client = new Client();
+        const string tale = "=== Start_Scene\nHello.\n-> END\n";
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"invalid"}}""");
+        await client.Initialize();
+        await client.Open("start.tale", tale, 1);
+
+        var configurationDiagnostics = await client.Diagnostics(LintConfiguration.FileName, null);
+        Assert.Collection(configurationDiagnostics, diagnostic =>
+        {
+            Assert.Equal("TWLSP004", diagnostic.GetProperty("code").GetString());
+            Assert.Equal(1, diagnostic.GetProperty("severity").GetInt32());
+            Assert.Contains("Invalid lint configuration", diagnostic.GetProperty("message").GetString());
+        });
+        Assert.Contains(await client.Diagnostics("start.tale", 1),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TWL001");
+
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"off"}}""");
+        await client.Watch(LintConfiguration.FileName, 2);
+
+        Assert.Empty(await client.Diagnostics(LintConfiguration.FileName, null));
+        Assert.DoesNotContain(await client.Diagnostics("start.tale", 1),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TWL001");
+        var unknown = await client.Request("unknown", new { });
+        Assert.Equal(-32601, unknown.GetProperty("error").GetProperty("code").GetInt32());
+    }
+
+    [Fact]
     public async Task Csharp_project_is_never_executed_and_missing_metadata_is_explicit()
     {
         await using var client = new Client();
