@@ -73,10 +73,14 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<CompletionSite> CompletionSites { get; } = [];
 
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
+        => ReferenceCore(text, location, kind, keywords);
+
+    private void ReferenceCore(string text, SourceLocation location, AuthoringSymbolKind kind,
+        IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null)
     {
         var range = Range(location, text);
         CompletionSites.Add(new(text, range, [kind], keywords,
-            Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray()));
+            Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray(), Candidates: candidates));
         if (text.Length == 0 && source.Files.TryGetValue(location.File, out var content))
         {
             if (!_lines.TryGetValue(location.File, out var lines))
@@ -85,7 +89,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             for (var column = location.Column; column <= line.Length && char.IsWhiteSpace(line[column - 1]); column++)
             {
                 var point = location with { Column = column + 1 };
-                CompletionSites.Add(new("", new(point, point), [kind], keywords, [point]));
+                CompletionSites.Add(new("", new(point, point), [kind], keywords, [point], Candidates: candidates));
             }
         }
     }
@@ -206,28 +210,34 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             Range(location with { Column = start + 1 }, id.Value)));
     }
 
+    internal void DisabledStats(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset) =>
+        ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats.Select(stat =>
+            new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null)).ToArray());
+
+    private void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null)
+    {
+        if (node is YamlSequenceNode sequence)
+        {
+            foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind, candidates);
+            return;
+        }
+        if (node is not YamlScalarNode scalar) return;
+        Scalar(scalar);
+        var location = new SourceLocation(StorySource.ManifestFileName, (int)scalar.Start.Line, (int)scalar.Start.Column);
+        var mapping = _scalars[location];
+        var text = scalar.Value ?? "";
+        if (text.Length == 0)
+        {
+            ReferenceCore("", mapping.Range(0, 0).Start, kind, [], candidates);
+            return;
+        }
+        CompletionSites.Add(new(text, mapping.Range(0, text.Length), [kind], [],
+            Enumerable.Range(0, text.Length + 1).Select(index => mapping.Range(index, 0).Start).ToArray(),
+            Candidates: candidates));
+    }
+
     internal void Manifest(YamlMappingNode root)
     {
-        void ReferenceNode(YamlNode node, AuthoringSymbolKind kind)
-        {
-            if (node is YamlSequenceNode sequence)
-            {
-                foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind);
-                return;
-            }
-            if (node is not YamlScalarNode scalar) return;
-            Scalar(scalar);
-            var location = new SourceLocation(StorySource.ManifestFileName, (int)scalar.Start.Line, (int)scalar.Start.Column);
-            var mapping = _scalars[location];
-            var text = scalar.Value ?? "";
-            if (text.Length == 0)
-            {
-                Reference("", mapping.Range(0, 0).Start, kind);
-                return;
-            }
-            CompletionSites.Add(new(text, mapping.Range(0, text.Length), [kind], [],
-                Enumerable.Range(0, text.Length + 1).Select(index => mapping.Range(index, 0).Start).ToArray()));
-        }
         void Walk(YamlNode node, string[] path)
         {
             if (node is YamlMappingNode map)
@@ -238,7 +248,6 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     var next = path.Append(name).ToArray();
                     if (next is ["start"]) ReferenceNode(value, AuthoringSymbolKind.Scene);
                     else if (next is ["ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset);
-                    else if (next is ["ruleset", "disable"]) ReferenceNode(value, AuthoringSymbolKind.Stat);
                     else if (path is ["characters", _, "inventory"]) ReferenceNode(key, AuthoringSymbolKind.Item);
                     else if (next is ["characters", _, "inventory"] && value is YamlSequenceNode)
                         ReferenceNode(value, AuthoringSymbolKind.Item);

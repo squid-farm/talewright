@@ -19,12 +19,13 @@ public static class StoryCompletion
         {
             var length = site.Positions.TakeWhile(point => Compare(point, position) <= 0).Count() - 1;
             var prefix = site.Text[..Math.Clamp(length, 0, site.Text.Length)];
-            var symbols = analysis.Symbols.Where(symbol => site.Kinds.Contains(symbol.Kind))
+            var symbols = (site.Candidates ?? analysis.Symbols).Where(symbol => site.Kinds.Contains(symbol.Kind))
                 .Select(symbol => (symbol.Name, Detail: $"{symbol.Kind}: {symbol.Type}"));
             foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword => (keyword, "Tale syntax"))))
             {
                 if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
-                result.Add(new(name, detail, site.Range, name));
+                var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;
+                result.Add(new(name, detail, site.Range, newText));
             }
         }
         return result.Distinct().OrderBy(item => item.Label, StringComparer.Ordinal).ToArray();

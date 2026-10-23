@@ -254,7 +254,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         await ReplyAsync(id, new
         {
             isIncomplete = false,
-            items = items.Select(item => new
+            items = items.Where(item => item.Range.Start.Line == item.Range.End.Line).Select(item => new
             {
                 label = item.Label,
                 detail = item.Detail,

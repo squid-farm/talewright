@@ -5,7 +5,8 @@ namespace Talewright.Tale.Analysis;
 
 /// <summary>Parser-recognized reference slot, with decoded token boundaries mapped to authored UTF-16 positions.</summary>
 public sealed record CompletionSite(string Text, SourceRange Range, IReadOnlyList<AuthoringSymbolKind> Kinds,
-    IReadOnlyList<string> Keywords, IReadOnlyList<SourceLocation> Positions);
+    IReadOnlyList<string> Keywords, IReadOnlyList<SourceLocation> Positions,
+    char? FollowingDelimiter = null, IReadOnlyList<AuthoringSymbol>? Candidates = null);
 
 internal static class ExpressionCompletion
 {
@@ -30,7 +31,12 @@ internal static class ExpressionCompletion
                 (previous.Kind == TokenKind.String && start <= previous.Offset + previous.Text.Length + 1 ||
                  previous is { Kind: TokenKind.Error, Text: "unterminated string" })) continue;
             var end = start;
-            while (end < text.Length && (char.IsLetterOrDigit(text[end]) || text[end] is '_' or '-' or '.')) end++;
+            if (tokenIndex < tokens.Count && tokens[tokenIndex] is { Kind: TokenKind.Identifier } identifier &&
+                identifier.Offset == start)
+                end += identifier.Text.Length;
+            else if (tokenIndex > 0 && tokens[tokenIndex - 1] is { Kind: TokenKind.NamedPredicate } predicate &&
+                     predicate.Offset + 1 == start)
+                end += predicate.Text.Length;
             if (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '-' or '.')) continue;
             var before = tokens.GetRange(Math.Max(0, tokenIndex - 2), Math.Min(2, tokenIndex)).ToArray();
             AuthoringSymbolKind[] kinds = [];
@@ -50,6 +56,8 @@ internal static class ExpressionCompletion
                     "flag" when kind != ExpressionContextKind.Number => [AuthoringSymbolKind.Flag],
                     "var" => [AuthoringSymbolKind.Variable],
                     "faction" => [AuthoringSymbolKind.Faction],
+                    "item" when kind is ExpressionContextKind.Substitution or ExpressionContextKind.Condition
+                        => [AuthoringSymbolKind.Item],
                     _ when symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == ns.Text)
                         => [AuthoringSymbolKind.Stat],
                     _ => []
@@ -66,6 +74,13 @@ internal static class ExpressionCompletion
                 kinds = kind == ExpressionContextKind.Effects ? [AuthoringSymbolKind.Item] : [];
             else if (before is [.., { Text: "give" or "take" }])
                 kinds = kind == ExpressionContextKind.Effects ? [AuthoringSymbolKind.Character] : [];
+            else if (kind == ExpressionContextKind.Effects && tokenIndex >= 3 &&
+                     tokens[tokenIndex - 3] is { Kind: TokenKind.Identifier, Text: "give" or "take" } &&
+                     before is [{ Kind: TokenKind.Identifier }, { Kind: TokenKind.Identifier }])
+            {
+                kinds = [AuthoringSymbolKind.Character];
+                keywords = ["var:", "faction:"];
+            }
             else if (before is [.., { Text: "set" or "clear" }])
                 keywords = kind == ExpressionContextKind.Effects ? ["flag:"] : [];
             else if (before.Length == 0 || before[^1].Kind is TokenKind.LeftParen or TokenKind.Semicolon
@@ -81,13 +96,14 @@ internal static class ExpressionCompletion
                         => ["set", "clear", "give", "take", "var:", "faction:"],
                     ExpressionContextKind.Effects => ["var:", "faction:"],
                     ExpressionContextKind.Number => ["var:"],
-                    ExpressionContextKind.Substitution => ["var:", "flag:", "faction:"],
-                    _ => ["flag:", "var:", "faction:", "visited(", "true", "false", "not"]
+                    ExpressionContextKind.Substitution => ["var:", "flag:", "faction:", "item:"],
+                    _ => ["flag:", "var:", "faction:", "item:", "visited(", "true", "false", "not"]
                 };
             }
             if (kinds.Length == 0 && keywords.Length == 0) continue;
             yield return new(text[start..end], map(start, end - start), kinds, keywords,
-                Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray());
+                Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray(),
+                end < text.Length && text[end] is ':' or '(' ? text[end] : null);
         }
     }
 }

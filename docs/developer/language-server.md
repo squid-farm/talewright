@@ -66,7 +66,9 @@ the cached snapshot is invalid, without waiting for the diagnostic debounce.
 
 Supported slots include scene diverts (including `END`), speech characters,
 scene metadata directives, skill-check actors/stats, and expression namespaces
-for stats, items, factions, flags, and variables. `visited(` offers scene IDs;
+for stats, items, factions, flags, and variables. `visited(` offers scene IDs.
+`item:` references offer item names, and `give`/`take` quantities offer numeric
+expression operands after the actor and item.
 `@` in conditions offers explicitly registered predicates, and `#` in
 substitutions offers registered modifiers. Ordinary prose, comments, expression
 string literals, and unknown namespaces do not receive story-ID suggestions.
@@ -80,8 +82,15 @@ and effects use the same expression contexts as Tale. Quoted and escaped YAML
 scalars map decoded prefixes back to authored replacement ranges. Red Hat YAML
 continues to provide structural key/schema suggestions independently.
 
+`ruleset.disable` uses the selected base ruleset's stat IDs before disables and
+YAML additions; ordinary stat references use the final story stat table.
+Completion preserves existing namespace/call delimiters as well as effect
+operators, including when YAML escapes encode the delimiters.
+
 Limitations: YAML must remain parseable (an empty scalar is fine, an unclosed
-quote or collection is not); the server does not repair YAML or propose arbitrary
+quote or collection is not). Identifiers split across physical lines, such as a
+quoted YAML escaped line continuation, are omitted from LSP completion because
+the primary replacement edit must be single-line. The server does not repair YAML or propose arbitrary
 new declarations. Suggestions are reference/syntax names, not evaluated gameplay
 values. Required missing or invalid project metadata returns an explicit
 completion-unavailable JSON-RPC error (`-32001`), in addition to its diagnostic,

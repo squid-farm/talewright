@@ -1,3 +1,4 @@
+using Talewright.Core.Rulesets;
 using Talewright.Tale.Analysis;
 using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
@@ -47,6 +48,11 @@ public sealed class StoryCompletionTests
     [InlineData("::: skill-check |", "guide")]
     [InlineData("{player:pronoun.su|", "pronoun.subject")]
     [InlineData("{player:first-name# cap|", "capitalize")]
+    [InlineData("{item:ro|}", "rope")]
+    [InlineData("@requires item:ro| == \"Rope\"", "rope")]
+    [InlineData("~ give player rope |", "var:")]
+    [InlineData("~ take player rope |", "guide")]
+    [InlineData("~ take player rope va|", "var:")]
     public void Completes_only_parser_recognized_reference_slots(string line, string expected)
     {
         var (analysis, position) = Analyze("=== first\n" + line);
@@ -146,6 +152,90 @@ public sealed class StoryCompletionTests
         Assert.Contains(items, item => item.Label == "var:");
         Assert.DoesNotContain(items, item => item.Label is "set" or "clear" or "give" or "take");
     }
+
+    [Theory]
+    [InlineData("give")]
+    [InlineData("take")]
+    public void Inventory_quantity_is_a_numeric_operand_not_an_item_or_effect_slot(string command)
+    {
+        var (analysis, position) = Analyze($"=== first\n~ {command} player rope |");
+        var items = StoryCompletion.Complete(analysis, position);
+        Assert.Contains(items, item => item.Label == "var:");
+        Assert.Contains(items, item => item.Label == "player");
+        Assert.DoesNotContain(items, item => item.Label is "rope" or "set" or "clear" or "give" or "take" or "flag:");
+    }
+
+    [Theory]
+    [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
+    [InlineData("~ player:h|p+=3", "hp", "~ player:hp+=3")]
+    [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
+    [InlineData("@requires vis|ited(first)", "visited(", "@requires visited(first)")]
+    [InlineData("@requires va|", "var:", "@requires var:")]
+    [InlineData("@requires vis|", "visited(", "@requires visited(")]
+    [InlineData("{item:ro|pe}", "rope", "{item:rope}")]
+    [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]
+    [InlineData("~ take player rope gu|", "guide", "~ take player rope guide")]
+    public void Applying_completion_preserves_operators_and_existing_delimiters(string marked, string label, string expected)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == label);
+        var original = marked.Replace("|", "");
+        Assert.Equal(expected, Apply(original, item.Range.Start.Column, item.Range.End.Column, item.NewText));
+    }
+
+    [Theory]
+    [InlineData("va|r\\u003acoins > 0", "var:", "var\\u003acoins > 0")]
+    [InlineData("vis|ited\\u0028first)", "visited(", "visited\\u0028first)")]
+    [InlineData("va|", "var:", "var:")]
+    public void Applying_yaml_completion_preserves_decoded_delimiters(string expression, string label, string expected)
+    {
+        var marked = Manifest + "\ntriggers:\n  - id: check\n    when: \"" + expression + "\"\n    do: set flag:ready";
+        var caret = marked.IndexOf('|');
+        var position = Position(StorySource.ManifestFileName, marked[..caret]);
+        var yaml = marked.Remove(caret, 1);
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n-> END"
+        });
+        var analysis = StoryAnalyzer.Analyze(source);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == label);
+        var line = yaml.Split('\n')[position.Line - 1];
+        Assert.Equal("    when: \"" + expected + "\"",
+            Apply(line, item.Range.Start.Column, item.Range.End.Column, item.NewText));
+    }
+
+    [Theory]
+    [InlineData("hp")]
+    [InlineData("focus")]
+    public void Disable_candidates_use_selected_base_not_final_story_stats(string disabled)
+    {
+        var options = new CompilerOptions
+        {
+            Rulesets = new Dictionary<string, Func<Ruleset>>(CompilerOptions.DefaultRulesets())
+            {
+                ["project"] = () => new RulesetBuilder("project")
+                    .AddStat(new(new("focus"), "Focus", StatCategory.Custom, 0, 10, 5)).Build()
+            }
+        };
+        var baseName = disabled == "hp" ? "generic" : "project";
+        var yaml = Manifest + $"\nruleset:\n  base: {baseName}\n  disable: [{disabled}]\n  stats:\n    - id: added\n      min: 0\n      max: 10";
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n{player:added}\n-> END"
+        });
+        var analysis = AuthoringProjectMetadata.Export(options).Analyze(source);
+        var line = Array.FindIndex(yaml.Split('\n'), value => value.Contains("disable:", StringComparison.Ordinal)) + 1;
+        var items = StoryCompletion.Complete(analysis, new(StorySource.ManifestFileName, line, 13));
+        Assert.Contains(items, item => item.Label == disabled);
+        Assert.DoesNotContain(items, item => item.Label == "added");
+        if (baseName == "project") Assert.DoesNotContain(items, item => item.Label == "hp");
+        var ordinary = StoryCompletion.Complete(analysis, new("main.tale", 2, 9));
+        Assert.Contains(ordinary, item => item.Label == "added");
+        Assert.DoesNotContain(ordinary, item => item.Label == disabled);
+    }
+
+    private static string Apply(string line, int start, int end, string newText) =>
+        line[..(start - 1)] + newText + line[(end - 1)..];
 
     private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked)
     {

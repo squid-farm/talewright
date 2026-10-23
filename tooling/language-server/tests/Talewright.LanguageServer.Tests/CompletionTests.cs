@@ -1,11 +1,36 @@
 using System.Text.Json;
 using Talewright.Authoring;
+using Talewright.Tale.Analysis;
 using Talewright.Tale.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
+    [Fact]
+    public async Task Multiline_yaml_identifiers_are_not_returned_as_primary_completion_edits()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var marked = Manifest.Replace("start: start", "start: \"sta\\\n  |rt\"");
+        var text = marked.Replace("|", "");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = text, ["start.tale"] = Valid
+        });
+        Assert.Contains(StoryAnalyzer.Analyze(source).CompletionSites, site =>
+            site.Text == "start" && site.Range.Start.Line != site.Range.End.Line);
+        await client.Open(StorySource.ManifestFileName, text, 1);
+        Assert.Empty(Items(await Completion(client, StorySource.ManifestFileName, marked)));
+        // Single-line scalar edits remain available after the same unsaved buffer changes.
+        marked = Manifest.Replace("start: start", "start: \"sta|rt\"");
+        await client.Change(StorySource.ManifestFileName, marked.Replace("|", ""), 2);
+        var item = Assert.Single(Items(await Completion(client, StorySource.ManifestFileName, marked)), HasLabel("start"));
+        var range = item.GetProperty("textEdit").GetProperty("range");
+        Assert.Equal(range.GetProperty("start").GetProperty("line").GetInt32(),
+            range.GetProperty("end").GetProperty("line").GetInt32());
+    }
+
     [Theory]
     [InlineData("-> sta|", "start")]
     [InlineData("> pla|", "player")]
@@ -15,6 +40,10 @@ public sealed partial class ServerTests
     [InlineData("@requires var:co|", "coins")]
     [InlineData("@requires faction:gu|", "guild")]
     [InlineData("@requires player has ro|", "rope")]
+    [InlineData("{item:ro|}", "rope")]
+    [InlineData("@requires item:ro| == \"Rope\"", "rope")]
+    [InlineData("~ give player rope |", "var:")]
+    [InlineData("~ take player rope |", "player")]
     [InlineData("@requires @IsH|", "IsHero")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
@@ -38,6 +67,30 @@ public sealed partial class ServerTests
         var item = Assert.Single(Items(response), item => item.GetProperty("label").GetString() == expected);
         Assert.Equal(expected, item.GetProperty("textEdit").GetProperty("newText").GetString());
         Assert.Equal(1, item.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
+    [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
+    [InlineData("@requires vis|ited(start)", "visited(", "@requires visited(start)")]
+    [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]
+    [InlineData("~ take player rope pla|", "player", "~ take player rope player")]
+    public async Task Applying_protocol_text_edit_preserves_surrounding_syntax(string line, string label, string expected)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel(label));
+        var edit = item.GetProperty("textEdit");
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        Assert.Equal(1, start.GetProperty("line").GetInt32());
+        Assert.Equal(1, end.GetProperty("line").GetInt32());
+        var original = line.Replace("|", "");
+        Assert.Equal(expected, original[..start.GetProperty("character").GetInt32()] +
+            edit.GetProperty("newText").GetString() + original[end.GetProperty("character").GetInt32()..]);
     }
 
     [Fact]
