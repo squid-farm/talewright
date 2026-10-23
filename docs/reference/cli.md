@@ -1,12 +1,13 @@
 # CLI reference
 
-The `talewright` command checks, debugs and publishes stories. See
+The `talewright` command validates, lints, debugs and publishes stories. See
 [Getting started](../guide/getting-started.md#install-the-desktop-tools) to install it. Until
 ready-made downloads arrive, use `dotnet run --project tooling/cli/src/Talewright.Cli --` in place of `talewright`.
 
 | Command | Does |
 |---|---|
 | `talewright validate <story>` | Checks a story folder for errors and warnings. |
+| `talewright lint <story>` | Checks compiler diagnostics and configurable Tale-aware rules. |
 | `talewright debug <story>` | Opens the Author Debugger. |
 | `talewright publish <story>` | Builds a story zip, web game or desktop game. |
 
@@ -63,9 +64,50 @@ Operational errors go to stderr.
   `line` and `column`. Positions are one-based; `0` means unspecified. `--warnings-as-errors` doesn't
   change reported severities.
 - Operational failures (exit 2) return `success: false`, empty `diagnostics` and
-  `error: {"code": "TWCLI001" | "TWCLI002", "message": "..."}`: `TWCLI001` for invocation errors,
-  `TWCLI002` for input errors.
+  `error: {"code": "TWCLI001" | "TWCLI002" | "TWCLI003", "message": "..."}`: `TWCLI001` for invocation errors,
+  `TWCLI002` for input errors, and `TWCLI003` for invalid lint configuration.
 - A readable folder with no `story.talewright.yaml` is a compiler diagnostic (`TW4002`), not an operational error.
+
+## lint
+
+```bash
+talewright lint path/to/story
+talewright lint path/to/story --format json --warnings-as-errors
+talewright lint path/to/story --rule TWL001=error
+```
+
+`lint` includes compiler diagnostics once, then applies shared Tale-aware rules. Compiler diagnostics
+cannot be suppressed by lint configuration. Lint findings use stable `TWL` codes and source ranges;
+their JSON diagnostics include exclusive `endLine` and `endColumn` positions.
+
+The optional `talewright.lint.json` file lives at the story root, beside the canonical manifest:
+
+```json
+{
+  "rules": {
+    "TWL001": "warning",
+    "TWL002": "warning"
+  },
+  "suppressions": {
+    "chapters/draft.tale": ["TWL001"]
+  }
+}
+```
+
+Rule severities are `off`, `warning` or `error`. Both initial rules default to `warning`; config values
+override those defaults. A suppression hides only the listed lint rule in that relative file. Paths use
+forward slashes and cannot contain `.` or `..` path segments. Repeat `--rule ID=SEVERITY` to override
+configuration for individual rules; command-line values take precedence. `--warnings-as-errors` uses the
+same policy as `validate`, and warnings otherwise pass by default.
+
+| Option | Effect |
+|---|---|
+| `--rule <ID=SEVERITY>` | Override one rule's severity (`off`, `warning`, or `error`); may be repeated. |
+| `--warnings-as-errors` | Fail if any compiler or lint warning is reported. |
+| `--format json` | Machine-readable diagnostics, including ranges for lint findings. |
+
+Invalid configuration, including unknown rule IDs or malformed suppression paths, is an explicit
+operational error (`TWCLI003`, exit 2).
 
 ## debug
 

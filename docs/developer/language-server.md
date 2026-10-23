@@ -141,8 +141,10 @@ watch events recreate the workspace and retain overlays. See
 Do not configure a project DLL as metadata: no build target, assembly, ruleset
 factory, or arbitrary C# code is automatically run.
 
-Shared lint is not integrated yet because #30 has no shared lint API. Compiler
-diagnostics do not wait for it; future lint integration must deduplicate results.
+The shared Tale-aware lint rules and configuration API are being added in #150.
+LSP consumption is tracked separately in #151: the server should call the same
+rule implementation on its current analysis snapshot, include compiler diagnostics
+once, and report invalid lint configuration recoverably without stopping the server.
 
 ## Neovim (another LSP client)
 

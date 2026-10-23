@@ -22,10 +22,11 @@ var analysis = StoryAnalyzer.Analyze(source);
 ```
 
 The result contains the immutable source snapshot, diagnostics, declaration
-symbols, and parser-recognized expression contexts. Symbols include cross-file
-scenes, manifest characters/items/factions/stats/flags/variables, effect-declared
-flags/variables, and available predicates/modifiers/rulesets. A declaration range
-is absent for registered or built-in symbols that have no authored location.
+symbols, and parser-recognized expression contexts. Symbols include the manifest
+story ID, cross-file scenes, manifest characters/items/factions/stats/flags/variables,
+effect-declared flags/variables, and available predicates/modifiers/rulesets. A
+declaration range is absent for registered or built-in symbols that have no authored
+location.
 Ranges are half-open, with 1-based lines and UTF-16 columns; protocol hosts must
 convert these to their own position conventions.
 
@@ -51,10 +52,14 @@ condition range at the insertion point after the keyword.
 Block and choice skill checks ending in `dc` similarly retain an empty numeric
 context immediately after `dc`, including when trailing spaces were trimmed.
 
+The shared `Talewright.Authoring.StoryLintAnalyzer` consumes these source ranges
+for stable Tale-aware lint findings. The CLI integration is being delivered in
+#150; LSP consumption of the same rule results is tracked in #151.
+
 The [language server](language-server.md) hosts this API for editor diagnostics.
 This API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not provide completion,
-hover, LSP transport, lint, or evaluated gameplay values itself.
+hover, LSP transport, or evaluated gameplay values itself.
 
 ## Workspace lifecycle
 
