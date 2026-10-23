@@ -210,6 +210,8 @@ internal sealed partial class TaleParser
 
     private bool TryParseMetadata(string line, int indent)
     {
+        var keyword = line[1..].Split(' ', 2)[0];
+        _symbols.Analysis?.Reference(keyword, At(indent + 1), AuthoringSymbolKind.Directive, MetadataKeys);
         var parts = line[1..].Split(' ', 2, StringSplitOptions.TrimEntries);
         var key = parts[0];
         var value = parts.Length > 1 ? parts[1] : string.Empty;
@@ -380,6 +382,9 @@ internal sealed partial class TaleParser
 
         var body = line[1..];
         var colon = body.IndexOf(':', StringComparison.Ordinal);
+        var speakerText = (colon < 0 ? body : body[..colon]).Trim();
+        _symbols.Analysis?.Reference(speakerText, At(indent + 1 + body.Length - body.TrimStart().Length),
+            AuthoringSymbolKind.Character);
         var who = colon > 0 ? body[..colon].Trim() : string.Empty;
         if (who.Length == 0 || !IdPattern().IsMatch(who))
         {
@@ -435,6 +440,7 @@ internal sealed partial class TaleParser
         var lead = text.Length - text.TrimStart().Length;
         var id = text.Trim();
         var location = At(column + lead);
+        _symbols.Analysis?.Reference(id, location, AuthoringSymbolKind.Scene, "END");
         if (id == "END")
         {
             return DivertTarget.End;
@@ -588,6 +594,25 @@ internal sealed partial class TaleParser
     {
         if (_symbols.Analysis is { } analysis)
         {
+            var offset = 0;
+            var references = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).TakeWhile(word => word != "dc").Take(2).ToArray();
+            if (references.Length == 0)
+            {
+                analysis.Reference("", At(column), AuthoringSymbolKind.Character);
+                analysis.Reference("", At(column), AuthoringSymbolKind.Stat);
+            }
+            for (var index = 0; index < references.Length; index++)
+            {
+                var word = references[index];
+                offset = text.IndexOf(word, offset, StringComparison.Ordinal);
+                analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Stat);
+                if (index == 0) analysis.Reference(word, At(column + offset), AuthoringSymbolKind.Character);
+                offset += word.Length;
+            }
+            if (references.Length == 1 && column + offset < _lines[_index].Length &&
+                char.IsWhiteSpace(_lines[_index][column + offset]) &&
+                _symbols.World.Characters.ContainsKey(new EntityId(references[0])))
+                analysis.Reference("", At(column + offset + 1), AuthoringSymbolKind.Stat);
             var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
             if (dcStart >= 0)
                 analysis.Expression(ExpressionContextKind.Number, text[(dcStart + 4)..], At(column + dcStart + 4));

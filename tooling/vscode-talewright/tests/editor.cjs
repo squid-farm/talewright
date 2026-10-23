@@ -160,7 +160,8 @@ async function waitForDiagnostics(document, predicate, timeoutMs = 15000) {
 async function testLiveDiagnostics() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-editor-'));
   try {
-    await fs.writeFile(path.join(folder, 'story.talewright.yaml'), 'id: live\ntitle: Live\nstart: start\n');
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
+      'id: live\ntitle: Live\nstart: start\ncharacters:\n  player: {first-name: Ada}\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -173,7 +174,30 @@ async function testLiveDiagnostics() {
     assert.equal(document.isDirty, true, 'Exercise an unsaved overlay');
     await waitForCompiler(document, items => items.length === 0);
     assert.ok((await fs.readFile(file, 'utf8')).includes('missing'), 'Disk must remain invalid');
-    console.log('Installed VSIX LSP smoke passed: compiler diagnostics and clearing after unsaved edits.');
+    const completionEdit = new vscode.WorkspaceEdit();
+    completionEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n-> sta');
+    assert.equal(await vscode.workspace.applyEdit(completionEdit), true);
+    let completions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, new vscode.Position(1, 6));
+    const scene = completions.items.find(item => item.label === 'start');
+    assert.ok(scene, 'Shared language server must complete an unsaved Tale divert');
+    assert.equal(scene.insertText, 'start');
+    assert.equal(scene.range.start.character, 3);
+    assert.equal(scene.range.end.character, 6);
+    const manifest = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
+    await vscode.window.showTextDocument(manifest);
+    await waitForCompiler(manifest, items => items.some(item => item.code === 'TW4003') || items.length === 0);
+    const manifestEdit = new vscode.WorkspaceEdit();
+    manifestEdit.replace(manifest.uri, new vscode.Range(2, 7, 2, 12), '"sta"');
+    assert.equal(await vscode.workspace.applyEdit(manifestEdit), true);
+    completions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', manifest.uri, new vscode.Position(2, 11));
+    assert.ok(completions.items.some(item => item.label === 'start' && item.detail?.startsWith('Scene:')),
+      'Canonical manifest values must use shared story completion alongside Red Hat YAML');
+    assert.equal(manifest.isDirty, true, 'Manifest completion must use the unsaved overlay');
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, Tale and canonical manifest semantic completion.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await fs.rm(folder, { recursive: true, force: true });

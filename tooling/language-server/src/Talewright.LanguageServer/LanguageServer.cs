@@ -133,6 +133,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     capabilities = new
                     {
                         positionEncoding = "utf-16",
+                        completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
                     },
@@ -159,6 +160,10 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     break;
                 case "textDocument/didOpen":
                     Open(parameters);
+                    break;
+                case "textDocument/completion":
+                    if (!hasId) throw new ArgumentException("completion requires a request id.");
+                    await CompleteAsync(id, parameters, cancellationToken);
                     break;
                 case "textDocument/didChange":
                     Change(parameters);
@@ -214,6 +219,57 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         _documents.Add(path, new(story.Root, version, text));
         ReconcileStory(story);
         Schedule(story);
+    }
+
+    private async Task CompleteAsync(JsonElement id, JsonElement parameters, CancellationToken cancellationToken)
+    {
+        var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
+        if (!_documents.TryGetValue(path, out var document))
+            throw new ArgumentException("Completion requires an open story document.");
+        var point = parameters.GetProperty("position");
+        if (!point.GetProperty("line").TryGetInt32(out var line) || !point.GetProperty("character").TryGetInt32(out var character))
+            throw new ArgumentException("Completion positions must be 32-bit integers.");
+        var lines = document.Text.ReplaceLineEndings("\n").Split('\n');
+        if (line < 0 || line >= lines.Length || character < 0 || character > lines[line].Length)
+            throw new ArgumentException("Completion position is outside the current document.");
+        var story = _stories[document.Root];
+        if (story.MetadataError is { } error)
+        {
+            await ErrorAsync(id, -32001, $"Semantic completion unavailable: {error.Message}", cancellationToken);
+            return;
+        }
+        var analysis = story.Workspace.Current;
+        if (analysis is null)
+        {
+            var update = await story.Workspace.AnalyzeAsync(TimeSpan.Zero, cancellationToken);
+            if (!update.Published) throw new InvalidOperationException("Completion snapshot was superseded; request again.");
+            analysis = update.Analysis;
+        }
+        if (analysis.Diagnostics.FirstOrDefault(diagnostic => diagnostic.Code is "TW5001" or "TW5002") is { } unavailable)
+        {
+            await ErrorAsync(id, -32001, $"Semantic completion unavailable: {unavailable.Message}", cancellationToken);
+            return;
+        }
+        var items = StoryCompletion.Complete(analysis, new(Relative(story.Root, path), line + 1, character + 1));
+        await ReplyAsync(id, new
+        {
+            isIncomplete = false,
+            items = items.Select(item => new
+            {
+                label = item.Label,
+                detail = item.Detail,
+                kind = 6,
+                textEdit = new
+                {
+                    range = new
+                    {
+                        start = new { line = item.Range.Start.Line - 1, character = item.Range.Start.Column - 1 },
+                        end = new { line = item.Range.End.Line - 1, character = item.Range.End.Column - 1 }
+                    },
+                    newText = item.NewText
+                }
+            }).ToArray()
+        }, cancellationToken);
     }
 
     private void Change(JsonElement parameters)

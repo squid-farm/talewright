@@ -8,7 +8,7 @@ using Talewright.Tale.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
 
-public sealed class ServerTests
+public sealed partial class ServerTests
 {
     private const string Manifest = "id: lsp-test\ntitle: LSP test\nstart: start\ncharacters:\n  player: {first-name: Ada}\n";
     private const string Valid = "=== start\nHello.\n-> END\n";
