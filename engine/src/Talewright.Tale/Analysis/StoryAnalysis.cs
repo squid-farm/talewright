@@ -10,7 +10,7 @@ namespace Talewright.Tale.Analysis;
 /// <summary>Half-open UTF-16 source range. Lines and columns are 1-based.</summary>
 public sealed record SourceRange(SourceLocation Start, SourceLocation End);
 
-public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset }
+public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story }
 
 /// <summary>A declaration, including unresolved declarations retained during incomplete edits.</summary>
 public sealed record AuthoringSymbol(string Name, AuthoringSymbolKind Kind, string Type, SourceRange? Declaration);
@@ -152,6 +152,13 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         {
             if (key is YamlScalarNode { Value: { Length: > 0 } name })
                 Symbols.Add(new(name, kind, type, At(key)));
+        }
+        if (Get(root, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
+        {
+            Scalar(idNode);
+            var location = new SourceLocation(StorySource.ManifestFileName, (int)idNode.Start.Line, (int)idNode.Start.Column);
+            Symbols.Add(new(storyId, AuthoringSymbolKind.Story, "story",
+                _scalars[location].Range(0, storyId.Length)));
         }
         foreach (var (name, kind, type) in new[]
         {
