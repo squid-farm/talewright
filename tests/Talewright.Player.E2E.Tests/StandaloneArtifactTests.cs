@@ -27,7 +27,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         var creation = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1";
         if (creation)
         {
-            await AssertLibraryUnavailable();
+            await AssertLibraryUnavailable(duringCreation: true);
             await Driver.ClickAsync("Start story");
         }
         await AssertState(state =>
@@ -61,7 +61,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
 
         if (creation)
         {
-            await AssertLibraryUnavailable();
+            await AssertLibraryUnavailable(duringCreation: true);
             await Driver.ClickAsync("Start story");
         }
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));

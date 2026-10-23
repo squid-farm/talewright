@@ -62,7 +62,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         };
         var path = await WriteArchive("creation.zip", fixture.Zip());
         await Driver.StartAsync("--no-library", path);
-        await AssertLibraryUnavailable();
+        await AssertLibraryUnavailable(duringCreation: true);
         await Driver.ClickAsync("Start story");
         await Observe(new(null, "First passage"));
         await AssertLibraryUnavailable();

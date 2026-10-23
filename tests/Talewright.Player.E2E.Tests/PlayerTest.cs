@@ -83,16 +83,33 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
 
     protected async Task Library() => await Driver.ClickAsync("Library");
 
-    protected async Task AssertLibraryUnavailable()
+    protected async Task AssertLibraryUnavailable(bool duringCreation = false)
     {
         if (Driver is NativePlayerDriver native)
         {
+            var timer = Stopwatch.StartNew();
             var snapshot = await native.SnapshotAsync();
+            while (duringCreation && !snapshot.Descendants().Any(node =>
+                node.Role == "push button" && node.Name == "Start story") &&
+                timer.Elapsed < TimeSpan.FromSeconds(15))
+            {
+                await Task.Delay(100);
+                snapshot = await native.SnapshotAsync();
+            }
+            if (duringCreation)
+            {
+                Assert.Contains(snapshot.Descendants(), node =>
+                    node.Role == "push button" && node.Name == "Start story");
+            }
             Assert.DoesNotContain(snapshot.Descendants(), node =>
                 node.Name is "Library" or "Story archive");
         }
         else
         {
+            if (duringCreation)
+            {
+                await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })).ToBeVisibleAsync();
+            }
             await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Library", Exact = true })).ToHaveCountAsync(0);
             await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
             await Expect(Page.Locator(".tw-library")).ToHaveCountAsync(0);
