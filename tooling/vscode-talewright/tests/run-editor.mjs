@@ -20,6 +20,10 @@ try {
     ...profileArgs, '--install-extension', path.join(root, 'artifacts/talewright.vsix'),
     '--force', '--no-sandbox',
   ], { stdio: 'inherit', shell: process.platform === 'win32' });
+  execFileSync(cli, [
+    ...cliArgs.filter(arg => !arg.startsWith('--extensions-dir=') && !arg.startsWith('--user-data-dir=')),
+    ...profileArgs, '--install-extension', 'redhat.vscode-yaml', '--force', '--no-sandbox',
+  ], { stdio: 'inherit', shell: process.platform === 'win32' });
   await runTests({
     vscodeExecutablePath: executable,
     extensionDevelopmentPath: path.join(root, 'tests/host'),

@@ -1,0 +1,51 @@
+id: supported-forms
+title: Supported forms
+version: 1.2.3
+start: beginning
+randomness: off
+seed: 42
+undo: false
+ruleset:
+  base: none
+  stats:
+    - id: focus
+      min: 0
+      max: 8
+characters:
+  player:
+    first-name: Ada
+    pronouns: they
+    stats: {focus: 4}
+    inventory: [coin]
+  guide:
+    first-name: Wick
+    pronouns:
+      subject: xe
+      object: xem
+      possessive: xyr
+      possessive-pronoun: xyrs
+      reflexive: xemself
+      plural: true
+    inventory: {coin: 2}
+items:
+  coin: Silver coin
+  charm:
+    name: Jade charm
+    modifiers: {focus: 2}
+factions:
+  guild: {name: Guild}
+  ferrymen: {name: Ferry Guild, standing: 2}
+flags: [ready]
+vars: {attempts: 0}
+triggers:
+  - id: once
+    when: flag:ready
+    do: set flag:done
+    once: true
+creation:
+  name: true
+  pronouns: [they, she]
+  stats: {focus: [4, 8]}
+  presets:
+    explorer:
+      stats: {focus: 8}

@@ -1,0 +1,8 @@
+id: preset-whitespace
+title: Whitespace preset ID
+start: beginning
+characters:
+  player: {first-name: Ada}
+creation:
+  presets:
+    " \t ": {}

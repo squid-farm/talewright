@@ -1,0 +1,6 @@
+id: unknown-key
+title: Unknown manifest key
+start: beginning
+characters:
+  player: {first-name: Ada}
+unknown-root: true
