@@ -49,6 +49,58 @@ class CiRoutingTests(unittest.TestCase):
             plan["checks"],
         )
 
+    def test_owned_inputs_select_only_consumer_groups(self):
+        scenarios = (
+            ("samples/LostRelic/chapters/01-camp.tale", {"build", "browser", "linux-desktop"}),
+            ("samples/LostRelic/story.talewright.yaml", {"build", "browser", "linux-desktop"}),
+            ("player/tests/run_e2e.py", {"browser", "linux-desktop"}),
+            ("player/tests/native/atspi_adapter.py", {"browser", "linux-desktop"}),
+            ("examples/CSharpStory/Directory.Build.props", {"build", "editor"}),
+            ("benchmarks/performance/publish_results.py", {"checks"}),
+            ("benchmarks/performance/run_publication.py", {"checks"}),
+            ("benchmarks/performance/test_publish_results.py", {"checks"}),
+        )
+        for changed, groups in scenarios:
+            with self.subTest(changed=changed):
+                graph = affected_graph(changed)
+                self.assertFalse(any(
+                    task.startswith("talewright-workspace:") for task in graph["tasks"]["tasks"]
+                ))
+                plan = make_plan(graph)
+                self.assertEqual(groups, {group for group, tasks in plan.items() if tasks})
+                self.assertEqual([], plan["unit"])
+                if "browser" in groups:
+                    self.assertEqual(
+                        {"e2e-web", "e2e-published-web"},
+                        {task["target"] for task in plan["browser"]},
+                    )
+                    self.assertEqual(
+                        {"e2e-linux", "e2e-published-linux"},
+                        {task["target"] for task in plan["linux-desktop"]},
+                    )
+                if "checks" in groups:
+                    self.assertEqual(
+                        [{"project": "talewright-performance-tooling", "target": "check"}],
+                        plan["checks"],
+                    )
+
+    def test_mixed_owned_inputs_preserve_all_consumer_tasks(self):
+        files = (
+            "samples/LostRelic/chapters/01-camp.tale",
+            "player/tests/run_e2e.py",
+            "examples/CSharpStory/Directory.Build.props",
+            "benchmarks/performance/publish_results.py",
+        )
+        expected = {group: set() for group in GROUPS}
+        for changed in files:
+            for group, tasks in make_plan(affected_graph(changed)).items():
+                expected[group].update((task["project"], task["target"]) for task in tasks)
+        actual = make_plan(affected_graph(*files))
+        self.assertEqual(expected, {
+            group: {(task["project"], task["target"]) for task in tasks}
+            for group, tasks in actual.items()
+        })
+
     def test_editor_and_documentation_plans_do_not_run_product_jobs(self):
         for changed, expected in [
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),
@@ -67,6 +119,9 @@ class CiRoutingTests(unittest.TestCase):
         ).stdout))
         self.assertEqual(set(GROUPS), {group for group, tasks in full.items() if tasks})
         self.assertEqual(full, fallback)
+        self.assertIn(
+            {"project": "talewright-performance-tooling", "target": "check"}, full["checks"],
+        )
         self.assertEqual(8, len(full["unit"]))
         self.assertIn(
             {"project": "Talewright.Authoring.Tests", "target": "test"}, full["unit"],

@@ -196,13 +196,25 @@ class NxSelectionTests(unittest.TestCase):
     def test_shared_runner_changes_select_browser_and_native_verification(self):
         for changed in ("player/tests/run_e2e.py", "player/tests/native/atspi_adapter.py"):
             with self.subTest(changed=changed):
-                self.assert_selected(
+                selected = self.assert_selected(
                     affected_graph(changed),
                     "Talewright.Player.E2E.Tests:e2e-web",
                     "Talewright.Player.E2E.Tests:e2e-linux",
                     "Talewright.Player.E2E.Tests:e2e-published-web",
                     "Talewright.Player.E2E.Tests:e2e-published-linux",
                 )
+                self.assertFalse(any(task.startswith("talewright-workspace:") for task in selected))
+
+    def test_example_settings_preserve_all_example_consumers(self):
+        graph = affected_graph("examples/CSharpStory/Directory.Build.props")
+        selected = self.assert_selected(
+            graph, "talewright-packaging:package-check", "talewright-editor:compiler-contract",
+            *(f"{project}:build:release" for project in ("Story", "Web", "Desktop", "Validator")),
+        )
+        self.assertFalse(any(task.startswith("talewright-workspace:") for task in selected))
+        for project in ("Story", "Web", "Desktop", "Validator"):
+            edges = graph["graph"]["dependencies"][project]
+            self.assertIn("talewright-example-settings", {edge["target"] for edge in edges})
 
     def test_documentation_changes_select_documentation_checks_only(self):
         graph = affected_graph("docs/guide/first-story.md")

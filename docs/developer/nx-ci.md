@@ -58,6 +58,10 @@ Projects already covered by test/package contracts retain those contracts rather
 | `Talewright.Player.E2E.Tests` | `e2e-web` preserves the three-browser matrix; `e2e-linux` and `e2e-linux-probe` retain the native runner. Explicit non-code dependencies cover CLI, debugger, player, hosts, and runtime contracts. Published web and desktop targets retain their existing publish-and-smoke commands. |
 | `talewright-packaging` | `package-check` wraps the existing versioned solution build, three pack commands, and clean-consumer verifier. Supply `VERSION`. Explicit dependencies include the engine/player packages, CLI, both source hosts copied into publishing assets, and all four CSharpStory projects consumed by the installed-package verifier. This separate contract does not change ordinary CLI build prerequisites. |
 | `talewright-docs` | `check` validates relative Markdown links for changes under `docs/`. Documentation changes also select editor checks because schema tests consume documented YAML examples; unrelated product suites stay unselected. |
+| `talewright-samples` (`samples/`) | Story assets belong to a content project. Both source hosts depend on it because they embed the bundled stories; affected hosts propagate to package verification and all regular/published browser and Linux E2E targets, not unrelated unit/editor suites. |
+| `talewright-e2e-runner` (`player/tests/`) | Owns `run_e2e.py` and `native/` helpers outside the more-specific E2E test project. The E2E test project depends on it, selecting browser/Linux regression and published-game targets without root fallback. |
+| `talewright-example-settings` (`examples/CSharpStory/`) | Owns the example-local `Directory.Build.props`. All four example projects depend on it, preserving compilation, package-consumer checks and the editor's Story-fixture contracts. Their more-specific roots still own ordinary example source edits. |
+| `talewright-performance-tooling` (`benchmarks/performance/`) | `check` runs the performance-report Python unit tests in `checks`. Script edits do not select exhaustive performance workloads or product suites. Both full verification and unknown-path fallback include this check. |
 | No-impact repository metadata | `.nxignore` excludes `.vscode/`, agent guidance under `.github/{skills,agents,prompts,instructions}/`, `.github/copilot-instructions.md`, root `AGENTS.md`, and the explicitly listed repository README/contribution/license/ownership/ignore files. PRs changing only these files select no work targets, but still run selection and aggregate verification. Product docs and unknown paths are not blanket-excluded. |
 | `talewright-workspace` fallback | Unowned/root and newly introduced paths select broad verification rather than silently producing no tasks. No-op targets depend on the real projects, so broad selection uses the same commands without running duplicate solution tests. `docs/` is a more-specific project and receives documentation checks. |
 
@@ -67,7 +71,7 @@ explicit no-impact paths in `.nxignore` before affected computation, including s
 Changing `.nxignore` itself retains conservative verification. The graph selection
 tests exercise editor-only, snippet, rules/compiler, UI, runtime/save, CLI/publish, shared/unknown,
 and documentation-only changes, and assert build prerequisite edges. Changes to shared test runners
-under `player/tests/` belong to the E2E project. Repository CI contracts remain
+under `player/tests/` belong to the runner project consumed by the E2E project. Repository CI contracts remain
 under root `tests/` and propagate through their explicit contract edge.
 
 ## CI jobs and coverage
@@ -83,7 +87,7 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit. Also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
 | `tests / linux-desktop` | Accessibility/chooser probe, complete regular native regression suite, then focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
-| `tests / checks` | Applicable CI/selection regression tests, documentation-link checks, and bounded performance budgets. |
+| `tests / checks` | Applicable CI/selection regression tests, documentation-link checks, performance-report Python tests, and bounded performance budgets. |
 
 “Regular” browser/native coverage excludes `RealCorpus`, just as before this change. PR E2E is not
 reduced to a tiny smoke subset when core changes are affected: the full regular regression matrix is

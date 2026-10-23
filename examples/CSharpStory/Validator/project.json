@@ -1,0 +1,4 @@
+{
+  "name": "Validator",
+  "implicitDependencies": ["talewright-example-settings"]
+}

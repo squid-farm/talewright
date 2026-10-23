@@ -1,0 +1,13 @@
+{
+  "name": "talewright-performance-tooling",
+  "tags": ["type:tooling", "area:testing"],
+  "targets": {
+    "check": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "python3 -m unittest discover -s benchmarks/performance -p 'test_*.py' -v"
+      }
+    }
+  }
+}
