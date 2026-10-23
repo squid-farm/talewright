@@ -27,10 +27,10 @@ my-story/
 ```
 
 > **Tip:** In VS Code, install Red Hat's
-> [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) to catch
-> YAML formatting mistakes in `story.yaml` as you type. Talewright-aware checking and completion for
-> `story.yaml`, plus `.tale` highlighting, are on the way
-> ([#31](https://github.com/squid-farm/talewright/issues/31)).
+> [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) and the
+> [Tale extension](../../tooling/vscode-talewright/README.md). Together they provide `.tale`
+> highlighting and structural key completion/validation for `story.yaml`. Run
+> `talewright validate` for story-specific checks such as whether your starting scene exists.
 
 ## Install the desktop tools
 

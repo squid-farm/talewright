@@ -1,7 +1,7 @@
 {
   "name": "talewright",
   "displayName": "Talewright",
-  "description": "Tale story syntax highlighting and authoring snippets.",
+  "description": "Tale story highlighting, snippets, and story.yaml schema support.",
   "version": "0.1.0",
   "publisher": "squid-farm",
   "license": "MPL-2.0",
@@ -14,7 +14,10 @@
     "vscode": "^1.100.0",
     "node": ">=22"
   },
-  "categories": ["Programming Languages", "Snippets"],
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
   "contributes": {
     "configurationDefaults": {
       "[tale]": {
@@ -25,8 +28,13 @@
     "languages": [
       {
         "id": "tale",
-        "aliases": ["Tale", "tale"],
-        "extensions": [".tale"],
+        "aliases": [
+          "Tale",
+          "tale"
+        ],
+        "extensions": [
+          ".tale"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -42,6 +50,12 @@
         "language": "tale",
         "path": "./snippets/tale.json"
       }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": ["story.yaml"],
+        "url": "./schemas/story.schema.json"
+      }
     ]
   },
   "scripts": {
@@ -53,7 +67,9 @@
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.0.0",
+    "ajv": "^8.20.0",
     "vscode-oniguruma": "2.0.1",
-    "vscode-textmate": "9.3.2"
+    "vscode-textmate": "9.3.2",
+    "yaml": "^2.9.1"
   }
 }

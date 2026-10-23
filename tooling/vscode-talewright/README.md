@@ -1,18 +1,21 @@
 # Tale for VS Code
 
-Highlight Talewright `.tale` stories and insert common story structures without
-running your story, the CLI, or a language server.
+Highlight Talewright `.tale` stories, insert common story structures, and provide
+structural validation and key completion for `story.yaml` without running your
+story, the CLI, or a language server.
 
 ## Install
 
 This extension is distributed as a local VSIX, not through the Marketplace.
 Use VS Code 1.100 or later.
 
-1. Obtain `talewright.vsix` from the **Editor tooling** workflow artifact, or build
+1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
+   from the VS Code Marketplace. It provides the YAML editor features used by the schema.
+2. Obtain `talewright.vsix` from the **Editor tooling** workflow artifact, or build
    it using the commands below.
-2. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
+3. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
    select the file. Reload VS Code if prompted.
-3. Open a `.tale` file. The language indicator at the bottom should say **Tale**.
+4. Open a `.tale` file. The language indicator at the bottom should say **Tale**.
 
 This package identifier is `squid-farm.talewright`; it does not imply a registered
 Marketplace publisher or a published Marketplace extension.
@@ -50,11 +53,33 @@ edit does not color the rest of the story. A `*` or `_` with no closing
 delimiter later on the line stays plain text. Highlighting of formatting that
 spans multiple lines, and some ambiguous delimiter runs, is consequently approximate.
 
-## Not included
+## `story.yaml` support
 
-- `story.yaml` schema/completion: tracked separately in
-  [#119](https://github.com/squid-farm/talewright/issues/119).
-- Compiler diagnostics, semantic completion, hover, lint, formatting or LSP.
+With Red Hat YAML installed, the extension associates `story.yaml` with the bundled
+JSON Schema. It validates manifest structure, offers known keys, and shows field
+descriptions. It does not know story-specific IDs or whether a referenced scene,
+stat, item, or faction exists; use `talewright validate <story-folder>` for those
+compiler checks.
+
+The same schema can be used by another YAML language server with this modeline at
+the top of `story.yaml`:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json
+```
+
+Or point `$schema` to a local copy of
+[`schemas/story.schema.json`](./schemas/story.schema.json). SchemaStore discovery
+is tracked separately and is not required for either option.
+
+The schema reflects structural key/type rules and editor-friendly canonical YAML
+forms. The compiler remains authoritative for story-specific references, custom
+ruleset registration, integer bounds and Tale expressions. YAML tooling can also
+report structural errors differently from compiler diagnostics. The reader
+currently accepts some scalar spellings or YAML forms beyond the schema's
+documented canonical values; use the forms in the examples for portable feedback.
+
+- Compiler diagnostics, story-specific completion, hover, lint, formatting or LSP.
 - Any CLI execution, gameplay, network service, telemetry, or extension runtime.
 
 Keep using `talewright validate <story-folder>` for correctness checks. See the
@@ -81,7 +106,10 @@ npm run test:editor
 
 Tests download VS Code 1.100.3 into the ignored `.vscode-test` directory unless
 `VSCODE_EXECUTABLE_PATH` points to an existing editor executable (for example,
-`/usr/share/code/code`, not the `bin/code` CLI wrapper). Tokenization tests use
+`/usr/share/code/code`, not the `bin/code` CLI wrapper). The isolated editor smoke
+also installs the Red Hat YAML extension from the Marketplace and tests schema
+validation, diagnostic clearing, completion, hover, and modeline fallback.
+Tokenization tests use
 that editor's built-in Markdown grammar with real TextMate/Oniguruma engines,
 not mocked regex matching. Compiler tests expand every snippet in a minimal
 story with the referenced scenes and default generic ruleset.
@@ -113,9 +141,14 @@ profile. Run packaging first.
 7. Type prose containing apostrophes and braces. Check that no unexpected closing
    characters are inserted. Try different light/dark themes; exact colors depend
    on the theme.
-8. Open `story.yaml`: this slice should not claim to provide YAML diagnostics or
-   completion. The extension must not launch a CLI, debugger, or story session.
+8. Open `story.yaml` with Red Hat YAML installed. Confirm key completion,
+   descriptions, unknown-key and wrong-type diagnostics. Remove a problem and
+   confirm its diagnostic clears. Try the modeline in another YAML language
+   server if available. The extension must not launch a CLI, debugger, or story
+   session.
 
-The automated installed-VSIX smoke covers association, the five default snippet
-expansions and placeholder navigation, prose typing, and comment toggling. It
-does not substitute for visual/theme checks or testing every operating system.
+The automated installed-VSIX smoke covers Tale association, the five default
+snippet expansions and placeholder navigation, prose typing, and comment
+toggling. Automated package tests also verify the bundled schema and YAML
+contribution. They do not substitute for manually checking Red Hat YAML
+completion/diagnostics, visual/theme checks, or testing every operating system.
