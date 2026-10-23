@@ -283,6 +283,19 @@ class UiTestImageContracts(unittest.TestCase):
         self.assertNotIn("pull_request_target", content)
         self.assertIn("packages: write", content)
 
+    def test_container_jobs_preserve_nx_routing_and_selection(self):
+        content = (self.ROOT / ".github/workflows/tests.yml").read_text()
+        for job, following in (("browser", "linux-desktop"), ("linux-desktop", "editor")):
+            with self.subTest(job=job):
+                section = content.split(f"\n  {job}:\n", 1)[1].split(f"\n  {following}:\n", 1)[0]
+                self.assertIn("needs: plan", section)
+                self.assertIn("if: fromJSON(needs.plan.outputs.selected)", section)
+                self.assertIn(f"python3 .github/scripts/nx_ci.py run {job}", section)
+                self.assertIn("name: nx-ci-plan", section)
+                self.assertIn("path: artifacts/ci", section)
+                self.assertNotIn("actions/setup-node", section)
+                self.assertNotIn("actions/setup-dotnet", section)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,220 @@
+import json
+import os
+from pathlib import Path
+import subprocess
+import unittest
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+NX = ROOT / "nx"
+TARGETS = [
+    "test",
+    "compiler-contract",
+    "e2e-web",
+    "e2e-linux",
+    "e2e-published-web",
+    "e2e-published-linux",
+    "package-check",
+    "check",
+    "editor-smoke",
+    "editor-full",
+    "editor-contract",
+    "ci-check",
+    "budget",
+]
+
+
+def affected_graph(*files):
+    environment = dict(os.environ, NX_DAEMON="false")
+    result = subprocess.run(
+        [
+            str(NX),
+            "affected",
+            "-t",
+            *TARGETS,
+            f"--files={','.join(files)}",
+            "--dry-run",
+            "--graph=stdout",
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
+class NxSelectionTests(unittest.TestCase):
+    def assert_selected(self, graph, *tasks):
+        selected = set(graph["tasks"]["tasks"])
+        self.assertTrue(set(tasks).issubset(selected), f"Missing {set(tasks) - selected}")
+        return selected
+
+    def test_highlighting_changes_select_editor_checks_only(self):
+        graph = affected_graph("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json")
+        selected = self.assert_selected(
+            graph,
+            "talewright-editor:test",
+            "talewright-editor:package-check",
+            "talewright-editor:editor-smoke",
+        )
+        self.assertFalse(any(":e2e-" in task for task in selected))
+        self.assertNotIn("Talewright.Core.Tests:test", selected)
+        self.assertNotIn("Talewright.Runtime.Tests:test", selected)
+
+    def test_snippet_changes_select_the_compiler_contract(self):
+        graph = affected_graph("tooling/vscode-talewright/snippets/tale.json")
+        selected = self.assert_selected(graph, "talewright-snippets:compiler-contract")
+        self.assertNotIn("Talewright.Tale.Tests:test", selected)
+        self.assertNotIn("talewright-workspace:editor-contract", selected)
+
+    def test_rules_changes_select_affected_units_and_downstream_e2e(self):
+        graph = affected_graph("src/Talewright.Rules/Talewright.Rules.csproj")
+        selected = self.assert_selected(
+            graph,
+            "Talewright.Rules.Tests:test",
+            "Talewright.Tale.Tests:test",
+            "Talewright.Runtime.Tests:test",
+            "Talewright.Player.E2E.Tests:e2e-web",
+            "Talewright.Player.E2E.Tests:e2e-linux",
+        )
+
+    def test_player_ui_changes_select_player_e2e_not_engine_unit_suites(self):
+        graph = affected_graph("src/Talewright.Player/Components/PlayerToolbar.razor")
+        selected = self.assert_selected(graph, "Talewright.Player.E2E.Tests:e2e-web")
+        for test in ("Talewright.Core.Tests:test", "Talewright.Rules.Tests:test", "Talewright.Runtime.Tests:test"):
+            self.assertNotIn(test, selected)
+
+    def test_runtime_changes_select_persistence_and_published_game_flows(self):
+        graph = affected_graph("src/Talewright.Runtime/Talewright.Runtime.csproj")
+        selected = self.assert_selected(
+            graph,
+            "Talewright.Runtime.Tests:test",
+            "Talewright.Player.E2E.Tests:e2e-web",
+            "Talewright.Player.E2E.Tests:e2e-linux",
+            "Talewright.Player.E2E.Tests:e2e-published-web",
+            "Talewright.Player.E2E.Tests:e2e-published-linux",
+        )
+
+    def test_cli_changes_select_artifact_and_published_game_checks(self):
+        graph = affected_graph("src/Talewright.Cli/Talewright.Cli.csproj")
+        self.assert_selected(
+            graph,
+            "Talewright.Cli:package-check",
+            "Talewright.Player.E2E.Tests:e2e-published-web",
+            "Talewright.Player.E2E.Tests:e2e-published-linux",
+        )
+
+    def test_shared_and_unclassified_changes_are_conservative(self):
+        for changed in (
+                "Directory.Build.props", ".github/workflows/build.yml",
+                ".github/docker/ui-tests/Dockerfile", ".github/workflows/tests.yml",
+                "src/Talewright.NewModule/Feature.cs"):
+            with self.subTest(changed=changed):
+                graph = affected_graph(changed)
+                selected = self.assert_selected(
+                    graph,
+                    "talewright-workspace:test",
+                    "talewright-workspace:e2e-web",
+                    "talewright-workspace:e2e-linux",
+                    "talewright-workspace:e2e-published-web",
+                    "talewright-workspace:e2e-published-linux",
+                    "talewright-workspace:package-check",
+                    "talewright-workspace:editor-full",
+                    "talewright-workspace:budget",
+                    "talewright-workspace:ci-check",
+                )
+
+    def test_shared_runner_changes_select_browser_and_native_verification(self):
+        for changed in ("tests/run_e2e.py", "tests/native/atspi_adapter.py"):
+            with self.subTest(changed=changed):
+                self.assert_selected(
+                    affected_graph(changed),
+                    "Talewright.Player.E2E.Tests:e2e-web",
+                    "Talewright.Player.E2E.Tests:e2e-linux",
+                    "Talewright.Player.E2E.Tests:e2e-published-web",
+                    "Talewright.Player.E2E.Tests:e2e-published-linux",
+                )
+
+    def test_documentation_changes_select_documentation_checks_only(self):
+        graph = affected_graph("docs/guide/first-story.md")
+        selected = self.assert_selected(graph, "talewright-docs:check")
+        self.assertFalse(any(":test" in task or ":e2e-" in task for task in selected))
+
+    def test_task_graph_orders_build_prerequisites(self):
+        graph = affected_graph("src/Talewright.Runtime/Talewright.Runtime.csproj")
+        dependencies = graph["tasks"]["dependencies"]
+        self.assertIn(
+            {"id": "Talewright.Runtime.Tests:build:release"},
+            dependencies["Talewright.Runtime.Tests:test"],
+        )
+        self.assertIn(
+            {"id": "Talewright.Runtime:build:release"},
+            dependencies["Talewright.Runtime.Tests:build:release"],
+        )
+        self.assertIn(
+            {"id": "Talewright.Tale.Tests:build:release"},
+            dependencies["Talewright.Tale.Tests:test"],
+        )
+        self.assertIn(
+            {"id": "Talewright.Player.E2E.Tests:build:release"},
+            dependencies["Talewright.Player.E2E.Tests:e2e-published-web"],
+        )
+
+    def test_inferred_graph_covers_project_references_and_explicit_contracts(self):
+        environment = dict(os.environ, NX_DAEMON="false")
+        result = subprocess.run(
+            [str(NX), "graph", "--print"],
+            cwd=ROOT,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        graph = json.loads(result.stdout)["graph"]
+        roots = {
+            data["data"]["root"].replace("\\", "/"): name
+            for name, data in graph["nodes"].items()
+        }
+        expected = set()
+        projects = 0
+        for project_file in ROOT.rglob("*.csproj"):
+            if {"bin", "obj", "node_modules"}.intersection(project_file.parts):
+                continue
+            project_root = project_file.parent.relative_to(ROOT).as_posix()
+            source = roots.get(project_root)
+            self.assertIsNotNone(source, f"No Nx project for {project_file.relative_to(ROOT)}")
+            projects += 1
+            for reference in ET.parse(project_file).iter():
+                if reference.tag.rsplit("}", 1)[-1] != "ProjectReference":
+                    continue
+                target_path = (project_file.parent / reference.attrib["Include"].replace("\\", "/")).resolve()
+                target = roots.get(target_path.parent.relative_to(ROOT).as_posix())
+                self.assertIsNotNone(target, f"No Nx project for reference {target_path}")
+                expected.add((source, target))
+
+        for project_file in ROOT.rglob("project.json"):
+            project = json.loads(project_file.read_text(encoding="utf-8"))
+            expected.update((project["name"], dependency) for dependency in project.get("implicitDependencies", []))
+
+        actual = {
+            (source, dependency["target"])
+            for source, dependencies in graph["dependencies"].items()
+            for dependency in dependencies
+        }
+        self.assertEqual(26, projects)
+        self.assertTrue(expected.issubset(actual), f"Missing graph edges: {expected - actual}")
+
+    def test_browser_matrix_and_uncached_targets_are_preserved(self):
+        graph = affected_graph("src/Talewright.Player/Components/PlayerToolbar.razor")
+        project = graph["graph"]["nodes"]["Talewright.Player.E2E.Tests"]["data"]
+        target = project["targets"]["e2e-web"]
+        self.assertEqual({"chromium", "firefox", "webkit"}, set(target["configurations"]))
+        for data in graph["graph"]["nodes"].values():
+            for target in data["data"].get("targets", {}).values():
+                self.assertFalse(target.get("cache", False), f"Unexpected cache on {data['name']}:{target}")
+
+
+if __name__ == "__main__":
+    unittest.main()

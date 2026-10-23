@@ -1,0 +1,14 @@
+{
+  "name": "talewright-snippets",
+  "implicitDependencies": ["talewright-snippet-contract-source"],
+  "tags": ["type:contract", "area:editor"],
+  "targets": {
+    "compiler-contract": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "dotnet test tests/Talewright.Tale.Tests -c Release --filter FullyQualifiedName~EditorSnippetTests"
+      }
+    }
+  }
+}

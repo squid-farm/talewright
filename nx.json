@@ -6,15 +6,35 @@
     }
   },
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "main",
   "targetDefaults": {
+    "*": {
+      "cache": false
+    },
     "build": {
-      "cache": true
+      "cache": false,
+      "options": {
+        "args": ["--no-dependencies"]
+      }
+    },
+    "build:release": {
+      "cache": false,
+      "options": {
+        "args": ["--no-dependencies", "--configuration", "Release"]
+      }
     },
     "test": {
-      "cache": true
+      "cache": false,
+      "dependsOn": ["build:release"],
+      "options": {
+        "args": [
+          "--no-build", "--no-restore", "--configuration", "Release",
+          "--logger", "trx", "--results-directory", "artifacts/unit"
+        ]
+      }
     },
     "lint": {
-      "cache": true
+      "cache": false
     }
   },
   "plugins": [

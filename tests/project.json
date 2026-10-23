@@ -1,0 +1,12 @@
+{
+  "name": "talewright-ci-tests",
+  "targets": {
+    "ci-check": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
+      }
+    }
+  }
+}

@@ -5,3 +5,4 @@ artifacts/**
 .gitignore
 .vscodeignore
 package-lock.json
+**/project.json

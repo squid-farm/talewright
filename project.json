@@ -1,0 +1,56 @@
+{
+  "name": "talewright-workspace",
+  "tags": ["type:verification-fallback"],
+  "targets": {
+    "test": {
+      "executor": "nx:noop",
+      "options": {"args": []},
+      "dependsOn": [
+        {"projects": ["*", "!talewright-workspace", "!Talewright.Player.E2E.Tests"], "target": "test"}
+      ]
+    },
+    "e2e-web": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["Talewright.Player.E2E.Tests"], "target": "e2e-web"}]
+    },
+    "e2e-linux": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["Talewright.Player.E2E.Tests"], "target": "e2e-linux"}]
+    },
+    "e2e-published-web": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["Talewright.Player.E2E.Tests"], "target": "e2e-published-web"}]
+    },
+    "e2e-published-linux": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["Talewright.Player.E2E.Tests"], "target": "e2e-published-linux"}]
+    },
+    "package-check": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["Talewright.Cli"], "target": "package-check"}]
+    },
+    "ci-check": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["talewright-ci-tests"], "target": "ci-check"}]
+    },
+    "check": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["talewright-docs"], "target": "check"}]
+    },
+    "budget": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["Talewright.Benchmarks"], "target": "budget"}]
+    },
+    "editor-full": {
+      "executor": "nx:noop",
+      "dependsOn": [
+        {"projects": ["talewright-editor"], "target": "test"},
+        {"projects": ["talewright-editor"], "target": "editor-smoke"}
+      ]
+    },
+    "editor-contract": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["talewright-snippets"], "target": "compiler-contract"}]
+    }
+  }
+}
