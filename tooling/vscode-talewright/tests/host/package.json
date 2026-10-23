@@ -1,0 +1,6 @@
+{
+  "name": "talewright-editor-test-host",
+  "version": "0.0.0",
+  "publisher": "squid-farm",
+  "engines": {"vscode": "^1.100.0"}
+}

@@ -3,6 +3,10 @@
 A tour of what you can do, with a short example for each. The [Tale syntax reference](../reference/tale-syntax.md)
 has every rule and option.
 
+For VS Code highlighting and scene/choice snippets, install the local
+[Tale extension](../../tooling/vscode-talewright/README.md). It helps you edit;
+use `talewright validate` to check story correctness.
+
 ## Organizing your files
 
 - Put scenes in as many `.tale` files and subfolders as you like. Talewright reads them all.

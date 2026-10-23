@@ -1,0 +1,38 @@
+{
+  "Scene": {
+    "prefix": "tale-scene",
+    "description": "Declare a scene with prose and a final divert.",
+    "body": ["=== ${1:scene.id}", "${2:Your story continues here.}", "-> ${3:END}", "$0"]
+  },
+  "Choice": {
+    "prefix": "tale-choice",
+    "description": "Offer a choice leading to another scene.",
+    "body": ["* [${1:Continue}] -> ${2:scene.id}$0"]
+  },
+  "Conditional": {
+    "prefix": "tale-if",
+    "description": "Conditional prose with an alternate branch.",
+    "body": ["{if ${1:true}}", "${2:When the condition holds.}", "{else}", "${3:Otherwise.}", "{/if}", "$0"]
+  },
+  "Choice skill check": {
+    "prefix": "tale-choice-check",
+    "description": "Offer a skill check with both outcomes.",
+    "body": [
+      "* [${1:Climb the wall}] skill-check ${2:athletics} dc ${3:12}",
+      "  success: -> ${4:scene.success}",
+      "  failure: -> ${5:scene.failure}",
+      "$0"
+    ]
+  },
+  "Entry skill check": {
+    "prefix": "tale-check",
+    "description": "Resolve a skill check when entering the scene.",
+    "body": [
+      "::: skill-check ${1:perception} dc ${2:12}",
+      "success: -> ${3:scene.success}",
+      "failure: -> ${4:scene.failure}",
+      ":::",
+      "$0"
+    ]
+  }
+}

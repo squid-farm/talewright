@@ -1,0 +1,59 @@
+{
+  "name": "talewright",
+  "displayName": "Talewright",
+  "description": "Tale story syntax highlighting and authoring snippets.",
+  "version": "0.1.0",
+  "publisher": "squid-farm",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/squid-farm/talewright.git",
+    "directory": "tooling/vscode-talewright"
+  },
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=22"
+  },
+  "categories": ["Programming Languages", "Snippets"],
+  "contributes": {
+    "configurationDefaults": {
+      "[tale]": {
+        "editor.autoClosingBrackets": "never",
+        "editor.autoClosingQuotes": "never"
+      }
+    },
+    "languages": [
+      {
+        "id": "tale",
+        "aliases": ["Tale", "tale"],
+        "extensions": [".tale"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tale",
+        "scopeName": "text.tale",
+        "path": "./syntaxes/tale.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "tale",
+        "path": "./snippets/tale.json"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:editor": "node tests/run-editor.mjs",
+    "package": "node tests/package.mjs",
+    "test:package": "node tests/check-package.mjs"
+  },
+  "devDependencies": {
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.3.2"
+  }
+}
