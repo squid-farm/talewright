@@ -58,10 +58,13 @@ Projects already covered by test/package contracts retain those contracts rather
 | `Talewright.Player.E2E.Tests` | `e2e-web` preserves the three-browser matrix; `e2e-linux` and `e2e-linux-probe` retain the native runner. Explicit non-code dependencies cover CLI, debugger, player, hosts, and runtime contracts. Published web and desktop targets retain their existing publish-and-smoke commands. |
 | `talewright-packaging` | `package-check` wraps the existing versioned solution build, three pack commands, and clean-consumer verifier. Supply `VERSION`. Explicit dependencies include the engine/player packages, CLI, both source hosts copied into publishing assets, and all four CSharpStory projects consumed by the installed-package verifier. This separate contract does not change ordinary CLI build prerequisites. |
 | `talewright-docs` | `check` validates relative Markdown links for changes under `docs/`. Documentation changes also select editor checks because schema tests consume documented YAML examples; unrelated product suites stay unselected. |
+| No-impact repository metadata | `.nxignore` excludes `.vscode/`, agent guidance under `.github/{skills,agents,prompts,instructions}/`, `.github/copilot-instructions.md`, root `AGENTS.md`, and the explicitly listed repository README/contribution/license/ownership/ignore files. PRs changing only these files select no work targets, but still run selection and aggregate verification. Product docs and unknown paths are not blanket-excluded. |
 | `talewright-workspace` fallback | Unowned/root and newly introduced paths select broad verification rather than silently producing no tasks. No-op targets depend on the real projects, so broad selection uses the same commands without running duplicate solution tests. `docs/` is a more-specific project and receives documentation checks. |
 
 Shared inputs include the SDK, build props, solution, NuGet configuration, Nx configuration, and
-`.github/` workflows. Those changes conservatively affect verification targets. The graph selection
+`.github/` workflows. Those changes conservatively affect verification targets; Nx filters the
+explicit no-impact paths in `.nxignore` before affected computation, including shared inputs.
+Changing `.nxignore` itself retains conservative verification. The graph selection
 tests exercise editor-only, snippet, rules/compiler, UI, runtime/save, CLI/publish, shared/unknown,
 and documentation-only changes, and assert build prerequisite edges. Changes to shared test runners
 under `player/tests/` belong to the E2E project. Repository CI contracts remain
@@ -93,6 +96,12 @@ unselected jobs. Failures, cancellations, missing results, unexpected execution/
 errors fail closed. Browser matrix fail-fast remains disabled, so every browser produces evidence.
 NuGet/sample publication additionally requires the aggregate.
 
+For a no-impact PR, `build` and all Tests work jobs skip. The reusable Tests workflow still runs
+its planning and verification jobs and returns success; the top-level **CI verification** check
+therefore succeeds rather than being skipped or left pending. Mixed metadata/source changes retain
+the source change's affected tasks. Full-verification events do not use these exclusions to select
+projects: they still run every regular verification target.
+
 Browser and Linux desktop jobs use the [prebuilt UI environment](ui-test-image.md) instead of
 installing SDK/browser/native dependencies per job. They keep the same selection manifest and
 `nx_ci.py run` entry points, including the native probe prerequisite and published-artifact targets.
@@ -102,8 +111,10 @@ npm home, and NuGet home directories. Image files under `.github/` remain shared
 The repository ruleset was inspected during implementation: its required-status-check list was empty.
 This change preserves `build`, `unit`, `browser`, `linux-desktop`, and editor `syntax` job IDs, but editor
 now runs as a reusable job inside Tests, so its displayed check context changes. After a first PR run
-confirms the emitted contexts, maintainers should require **CI verification** rather than path-filtered
-or conditionally skipped leaf checks. No repository protection settings are changed by this PR.
+confirms the emitted contexts, maintainers should add **CI verification** to the ruleset's required
+status checks rather than requiring `build`, conditional Tests leaf checks, or the nested
+`tests / verification` check. Keep that top-level name stable. No repository protection settings
+are changed by this PR.
 
 ## Full verification
 
