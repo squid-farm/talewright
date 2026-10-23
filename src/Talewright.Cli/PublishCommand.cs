@@ -77,9 +77,13 @@ public sealed class PublishCommand : Command<PublishSettings>
 
     internal sealed record Operations(
         Func<string, string, string?, string, TextWriter, TextWriter, string> BuildHost,
-        Action<string, string, bool> CreateZip)
+        Action<string, string, bool> CreateZip,
+        Func<string, DestinationState> CaptureDestination,
+        Action<string, string> MoveFile)
     {
-        internal static Operations Default { get; } = new(PublishCommand.BuildHost, PublishCommand.CreateZip);
+        internal static Operations Default { get; } = new(
+            PublishCommand.BuildHost, PublishCommand.CreateZip,
+            DestinationState.Capture, File.Move);
     }
 
     private static int Run(PublishSettings settings, CommandWriters writers)
@@ -234,7 +238,9 @@ public sealed class PublishCommand : Command<PublishSettings>
                     throw new IOException($"Output '{path}' is a directory. No archives were published.");
                 }
 
-                approved[path] = File.Exists(path) ? DestinationState.Capture(path) : null;
+                approved[path] = !settings.Force && File.Exists(path)
+                    ? publication.CaptureDestination(path)
+                    : null;
             }
 
             var existing = approved.Where(pair => pair.Value is not null).Select(pair => pair.Key).ToArray();
@@ -282,7 +288,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             {
                 foreach (var (path, state) in approved)
                 {
-                    var current = File.Exists(path) ? DestinationState.Capture(path) : null;
+                    var current = File.Exists(path) ? publication.CaptureDestination(path) : null;
                     if (current != state)
                     {
                         throw new IOException($"Output '{path}' changed after approval. No archives were published. Retry to approve the current files, choose a new --output directory, or use --force.");
@@ -301,7 +307,7 @@ public sealed class PublishCommand : Command<PublishSettings>
 
                     if (!settings.Force)
                     {
-                        var current = File.Exists(final) ? DestinationState.Capture(final) : null;
+                        var current = File.Exists(final) ? publication.CaptureDestination(final) : null;
                         if (current != approved[final])
                         {
                             throw new IOException($"Output '{final}' changed after approval. No archives were published. Retry to approve the current files, choose a new --output directory, or use --force.");
@@ -311,16 +317,16 @@ public sealed class PublishCommand : Command<PublishSettings>
                     if (File.Exists(final))
                     {
                         var backup = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.bak");
-                        File.Move(final, backup);
+                        publication.MoveFile(final, backup);
                         backups.Add(final, backup);
                     }
                 }
 
                 foreach (var (_, temporary, final) in staged)
                 {
-                    File.Move(temporary, final);
+                    publication.MoveFile(temporary, final);
                     installed.Add(final, null);
-                    installed[final] = DestinationState.Capture(final);
+                    installed[final] = publication.CaptureDestination(final);
                 }
             }
             catch (Exception commitError)
@@ -332,7 +338,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                     {
                         if (File.Exists(path))
                         {
-                            if (state is null || DestinationState.Capture(path) != state)
+                            if (state is null || publication.CaptureDestination(path) != state)
                             {
                                 throw new IOException($"Output '{path}' changed during rollback and was left untouched.");
                             }
@@ -350,7 +356,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 {
                     try
                     {
-                        File.Move(backup, final);
+                        publication.MoveFile(backup, final);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
@@ -415,7 +421,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private sealed record DestinationState(long Length, DateTime LastWriteTimeUtc, DateTime CreationTimeUtc,
+    internal sealed record DestinationState(long Length, DateTime LastWriteTimeUtc, DateTime CreationTimeUtc,
         string? LinkTarget, string Hash)
     {
         internal static DestinationState Capture(string path)

@@ -310,32 +310,83 @@ public sealed class PublishTests : IDisposable
     }
 
     [Fact]
-    public void Split_commit_failure_restores_preexisting_archives()
+    public void Split_force_does_not_inspect_existing_archive_contents()
     {
         Directory.CreateDirectory(SplitDirectory);
-        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        var inaccessible = Path.Combine(SplitDirectory, "publish-linux-x64.zip");
+        File.WriteAllText(inaccessible, "inaccessible");
+        var publication = SplitBuilds() with
+        {
+            CaptureDestination = path =>
+            {
+                if (File.ReadAllText(path) == "inaccessible")
+                {
+                    throw new UnauthorizedAccessException("Existing archive cannot be read.");
+                }
+
+                return PublishCommand.Operations.Default.CaptureDestination(path);
+            },
+        };
+
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["--force"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        AssertSplitSet(SplitDirectory);
+    }
+
+    [Theory]
+    [InlineData("empty")]
+    [InlineData("mixed")]
+    [InlineData("all-existing")]
+    public void Split_installation_failure_rolls_back_existing_and_new_archives(string contents)
+    {
+        Directory.CreateDirectory(SplitDirectory);
+        string[] existingRuntimes = contents switch
+        {
+            "empty" => [],
+            "mixed" => ["win-x64"],
+            "all-existing" => PublishCommand.DesktopRuntimes,
+            _ => throw new ArgumentOutOfRangeException(nameof(contents)),
+        };
+        foreach (var runtime in existingRuntimes)
         {
             File.WriteAllText(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"), $"old:{runtime}");
         }
 
-        var finalTarget = Path.Combine(SplitDirectory, "publish-osx-arm64.zip");
-        var publication = SplitBuilds((runtime, _) =>
+        var installations = 0;
+        var publication = SplitBuilds() with
         {
-            if (runtime == "osx-arm64")
+            MoveFile = (source, target) =>
             {
-                File.Delete(finalTarget);
-                Directory.CreateDirectory(finalTarget);
-            }
-        });
-        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true, publication, "--force");
+                if (source.EndsWith(".zip.tmp", StringComparison.Ordinal) && ++installations == 2)
+                {
+                    throw new IOException("controlled installation failure");
+                }
+
+                File.Move(source, target);
+            },
+        };
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["--force"]);
+
         Assert.Equal(2, result.Code);
-        Assert.Contains("became a directory", result.Error);
-        foreach (var runtime in PublishCommand.DesktopRuntimes[..^1])
+        Assert.Contains("controlled installation failure", result.Error);
+        Assert.Equal(2, installations);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
         {
-            Assert.Equal($"old:{runtime}", File.ReadAllText(Path.Combine(SplitDirectory, $"publish-{runtime}.zip")));
+            var path = Path.Combine(SplitDirectory, $"publish-{runtime}.zip");
+            if (existingRuntimes.Contains(runtime))
+            {
+                Assert.Equal($"old:{runtime}", File.ReadAllText(path));
+            }
+            else
+            {
+                Assert.False(File.Exists(path), $"New archive '{runtime}' should have been rolled back.");
+            }
         }
         Assert.Empty(Directory.GetFiles(SplitDirectory, "*.tmp"));
-        Assert.True(Directory.Exists(finalTarget));
         Assert.Empty(Directory.GetFiles(SplitDirectory, "*.bak"));
     }
 
