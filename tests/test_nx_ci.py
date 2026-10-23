@@ -42,7 +42,10 @@ class CiRoutingTests(unittest.TestCase):
         ).stdout))
         self.assertEqual(set(GROUPS), {group for group, tasks in full.items() if tasks})
         self.assertEqual(full, fallback)
-        self.assertEqual(6, len(full["unit"]))
+        self.assertEqual(7, len(full["unit"]))
+        self.assertIn(
+            {"project": "Talewright.Authoring.Tests", "target": "test"}, full["unit"],
+        )
         self.assertNotIn(
             {"project": "Talewright.Player.E2E.Tests", "target": "test"}, full["unit"],
         )

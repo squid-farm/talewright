@@ -2,6 +2,7 @@ using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
+using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Parsing;
 
@@ -11,6 +12,7 @@ namespace Talewright.Tale.Parsing;
 /// </summary>
 internal sealed class StorySymbols
 {
+    public AnalysisCollector? Analysis { get; init; }
     public required WorldDefinition World { get; init; }
     public required IReadOnlySet<FlagId> Flags { get; init; }
     public required IReadOnlySet<VarId> Variables { get; init; }

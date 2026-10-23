@@ -3,6 +3,7 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Tale.Diagnostics;
+using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Parsing;
 
@@ -44,7 +45,8 @@ internal sealed class ExpressionParser
 
     private sealed class ParseException : Exception;
 
-    internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables)
+    internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables,
+        Action<string, bool, int>? declaration = null)
     {
         var tokens = Lexer.Tokenize(text);
         for (var start = 0; start < tokens.Count - 1;)
@@ -63,6 +65,7 @@ internal sealed class ExpressionParser
                 { Kind: TokenKind.Identifier } flag])
             {
                 flags.Add(new FlagId(flag.Text));
+                declaration?.Invoke(flag.Text, true, flag.Offset);
             }
             else if (statement is [
                 { Kind: TokenKind.Identifier, Text: "var" },
@@ -72,6 +75,7 @@ internal sealed class ExpressionParser
                 .. var amount] && amount.Length > 0)
             {
                 variables.TryAdd(new VarId(variable.Text), 0);
+                declaration?.Invoke(variable.Text, false, variable.Offset);
             }
 
             start = end + 1;
@@ -79,8 +83,9 @@ internal sealed class ExpressionParser
     }
 
     /// <summary>Parses a boolean condition. Returns null (with diagnostics) on error.</summary>
-    public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
-        ParseTyped(text, location, symbols, diagnostics, ExprType.Bool);
+    public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
+        SourceLocation? authoringLocation = null) =>
+        ParseTyped(text, location, symbols, diagnostics, ExprType.Bool, authoringLocation);
 
     /// <summary>Parses a numeric expression. Returns null (with diagnostics) on error.</summary>
     public static Expr? ParseNumber(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
@@ -89,6 +94,7 @@ internal sealed class ExpressionParser
     /// <summary>Parses the inside of <c>{reference#modifier…}</c>.</summary>
     public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
     {
+        symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location);
         var parts = text.Split('#');
         var parser = new ExpressionParser(parts[0], location, symbols, diagnostics);
         try
@@ -126,6 +132,7 @@ internal sealed class ExpressionParser
     /// <summary>Parses <c>;</c>-separated effects. Returns null (with diagnostics) on error.</summary>
     public static List<Effect>? ParseEffects(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
     {
+        symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location);
         var parser = new ExpressionParser(text, location, symbols, diagnostics);
         try
         {
@@ -151,8 +158,11 @@ internal sealed class ExpressionParser
         }
     }
 
-    private static Expr? ParseTyped(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics, ExprType type)
+    private static Expr? ParseTyped(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics, ExprType type,
+        SourceLocation? authoringLocation = null)
     {
+        symbols.Analysis?.Expression(type == ExprType.Bool ? ExpressionContextKind.Condition : ExpressionContextKind.Number,
+            text, authoringLocation ?? location);
         var parser = new ExpressionParser(text, location, symbols, diagnostics);
         try
         {

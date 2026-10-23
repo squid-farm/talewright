@@ -96,6 +96,10 @@ def verify(directory, version):
                     raise ValueError(f"{path}: missing {required}")
             dependencies = {item.attrib["id"]: item.attrib["version"]
                             for item in metadata.findall(".//{*}dependency")}
+            if identity in {"Talewright", "Talewright.Player"}:
+                if any(name.casefold() == "talewright.authoring" for name in dependencies) or any(
+                        Path(name).name.startswith("Talewright.Authoring.") for name in names):
+                    raise ValueError(f"{path}: runtime package includes authoring infrastructure")
             if identity == "Talewright.Cli":
                 settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
                 command = settings.find("Commands/Command")

@@ -8,6 +8,7 @@ using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
+using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Parsing;
 
@@ -42,6 +43,7 @@ internal sealed class StoryYamlReader
     private readonly string _file;
     private readonly DiagnosticBag _diagnostics;
     private readonly CompilerOptions _options;
+    private AnalysisCollector? _analysis;
 
     private StoryYamlReader(string file, DiagnosticBag diagnostics, CompilerOptions options)
     {
@@ -50,8 +52,9 @@ internal sealed class StoryYamlReader
         _options = options;
     }
 
-    public static StoryManifest? Read(string file, string text, DiagnosticBag diagnostics, CompilerOptions options) =>
-        new StoryYamlReader(file, diagnostics, options).Read(text);
+    public static StoryManifest? Read(string file, string text, DiagnosticBag diagnostics, CompilerOptions options,
+        AnalysisCollector? analysis = null) =>
+        new StoryYamlReader(file, diagnostics, options) { _analysis = analysis }.Read(text);
 
     private SourceLocation At(YamlNode node) => new(_file, (int)node.Start.Line, (int)node.Start.Column);
 
@@ -75,6 +78,7 @@ internal sealed class StoryYamlReader
         }
 
         CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "undo", "creation", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
+        _analysis?.Manifest(root);
 
         var ruleset = ReadRuleset(Get(root, "ruleset"));
         var items = ReadItems(Get(root, "items"), ruleset);
@@ -517,6 +521,15 @@ internal sealed class StoryYamlReader
             }
 
             CheckKeys(map, "id", "when", "do", "once");
+            if (_analysis is not null)
+            {
+                foreach (var (key, kind) in new[] { ("when", ExpressionContextKind.Condition), ("do", ExpressionContextKind.Effects) })
+                {
+                    if (Get(map, key) is not YamlScalarNode scalar) continue;
+                    _analysis.Scalar(scalar);
+                    _analysis.Expression(kind, scalar.Value ?? string.Empty, At(scalar));
+                }
+            }
             var idNode = Get(map, "id");
             var id = RequiredScalar(map, "id");
             if (id is null)

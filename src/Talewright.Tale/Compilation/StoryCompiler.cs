@@ -8,6 +8,7 @@ using Talewright.Tale.Parsing;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Compilation;
 
@@ -29,19 +30,27 @@ public static class StoryCompiler
 {
     /// <summary>Compiles <paramref name="source"/>.</summary>
     public static CompilationResult Compile(StorySource source, CompilerOptions? options = null)
+        => CompileCore(source, options ?? CompilerOptions.Default, null);
+
+    internal static CompilationResult CompileForAnalysis(StorySource source, CompilerOptions options, AnalysisCollector collector)
+        => CompileCore(source, options, collector);
+
+    private static CompilationResult CompileCore(StorySource source, CompilerOptions options, AnalysisCollector? analysis)
     {
-        options ??= CompilerOptions.Default;
         var diagnostics = new DiagnosticBag();
+        analysis?.Registrations();
 
         if (!source.Files.TryGetValue(StorySource.ManifestFileName, out var yaml))
         {
             diagnostics.Error("TW4002", "The story has no story.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
+            analysis?.DiscoverWithoutManifest();
             return new CompilationResult(null, diagnostics.Items);
         }
 
-        var manifest = StoryYamlReader.Read(StorySource.ManifestFileName, yaml, diagnostics, options);
+        var manifest = StoryYamlReader.Read(StorySource.ManifestFileName, yaml, diagnostics, options, analysis);
         if (manifest is null)
         {
+            analysis?.DiscoverWithoutManifest();
             return new CompilationResult(null, diagnostics.Items);
         }
 
@@ -68,6 +77,7 @@ public static class StoryCompiler
         {
             TaleParser.Discover(path, text, discoverySymbols, DiscoverEffects, (id, location) =>
             {
+                analysis?.Scene(id, location);
                 if (!scenes.TryAdd(id, location))
                 {
                     diagnostics.Error("TW3010", $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
@@ -82,6 +92,7 @@ public static class StoryCompiler
 
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
             manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables);
+        analysis?.World(world);
         var symbols = new StorySymbols
         {
             World = world,
@@ -90,6 +101,7 @@ public static class StoryCompiler
             Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,
+            Analysis = analysis,
         };
 
         var parsed = new List<ParsedScene>();

@@ -253,7 +253,13 @@ class NxSelectionTests(unittest.TestCase):
             for source, dependencies in graph["dependencies"].items()
             for dependency in dependencies
         }
-        self.assertEqual(26, projects)
+        self.assertEqual(28, projects)
+        self.assertIn(
+            ("Talewright.Authoring", "Talewright.Tale"), actual,
+        )
+        self.assertIn(
+            ("Talewright.Authoring.Tests", "Talewright.Authoring"), actual,
+        )
         self.assertTrue(expected.issubset(actual), f"Missing graph edges: {expected - actual}")
 
     def test_browser_matrix_and_uncached_targets_are_preserved(self):

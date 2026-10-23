@@ -7,6 +7,7 @@ using Markdig.Syntax.Inlines;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Tale.Diagnostics;
+using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Parsing;
 
@@ -157,6 +158,16 @@ internal static class InlineParser
             var close = FindClosingBrace(text, i);
             if (close < 0)
             {
+                if (context.Symbols.Analysis is { } analysis)
+                {
+                    analysis.InlineRange(context.Source, i + 1, text.Length);
+                    var incomplete = text[(i + 1)..];
+                    var lead = incomplete.Length - incomplete.TrimStart().Length;
+                    var condition = incomplete[lead..].StartsWith("if ", StringComparison.Ordinal);
+                    var offset = condition ? lead + 3 : 0;
+                    analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
+                        incomplete[offset..], context.Source.Locate(i + 1).Offset(offset));
+                }
                 context.Diagnostics.Error("TW1004", "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(i));
                 result.Append(text, i, text.Length - i);
                 break;
@@ -164,6 +175,7 @@ internal static class InlineParser
 
             var inner = text[(i + 1)..close];
             var location = context.Source.Locate(i + 1);
+            context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
             context.Fragments.Add(ParseFragment(inner, location, context));
             result.Append(PlaceholderStart).Append(context.Fragments.Count - 1).Append(PlaceholderEnd);
             i = close + 1;

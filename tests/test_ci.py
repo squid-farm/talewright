@@ -138,6 +138,29 @@ class PackageBoundaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify(directory, "1.2.3")
 
+    def test_runtime_packages_reject_authoring_infrastructure(self):
+        for identity in ["Talewright", "Talewright.Player"]:
+            for dependency in [None, "Talewright.Authoring", "talewright.authoring", "TALEWRIGHT.AUTHORING"]:
+                with self.subTest(identity=identity, dependency=dependency), tempfile.TemporaryDirectory() as temporary:
+                    directory = Path(temporary)
+                    for package_id in ["Talewright", "Talewright.Player", "Talewright.Cli"]:
+                        self.write_package(directory, package_id)
+                    path = directory / f"{identity}.1.2.3.nupkg"
+                    with ZipFile(path) as package:
+                        entries = {name: package.read(name) for name in package.namelist()}
+                    if dependency is None:
+                        entries["lib/net10.0/Talewright.Authoring.dll"] = b"tooling"
+                    else:
+                        spec = f"{identity}.nuspec"
+                        entries[spec] = entries[spec].replace(b"</metadata>", (
+                            f'<dependencies><dependency id="{dependency}" version="1.2.3" />'
+                            '</dependencies></metadata>').encode())
+                    with ZipFile(path, "w") as package:
+                        for name, content in entries.items():
+                            package.writestr(name, content)
+                    with self.assertRaisesRegex(ValueError, "runtime package includes authoring infrastructure"):
+                        verify(directory, "1.2.3")
+
     def test_missing_player_asset_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
