@@ -34,7 +34,7 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Load My save");
         await Observe(new(null, "Second passage text."));
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Observe(new(null, "Mara's"));
         await Driver.ClickAsync("Saved games");
         await Driver.ClickAsync("Load My save");
@@ -156,7 +156,7 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Driver.ClickAsync("Saved games");
         await Driver.ClickAsync("Load My save");
         await Observe(new(null, "Robin's"));
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Observe(new(null, "Robin's"));
     }
 }

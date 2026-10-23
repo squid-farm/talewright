@@ -55,7 +55,7 @@ public sealed class SharedInteractionTests(WebHostFixture host, ITestOutputHelpe
             Assert.True(state.PassageFocused);
             Assert.True(state.PassageInWindow);
         });
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Observe(new(null, "Long beginning"));
         await AssertState(state => Assert.True(state.PassageFocused));
         await Library();

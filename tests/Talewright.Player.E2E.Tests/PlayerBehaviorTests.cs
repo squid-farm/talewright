@@ -134,7 +134,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Driver.ClickAsync("Back to Player Test Continue where you left off");
         await Observe(new(null, "Inventory: ready.", Sheet: ["Test charm"]));
         await AssertState(state => Assert.Contains("Collect supplies", state.Transcript));
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Observe(new(null, "Inventory: empty."));
         await AssertState(state =>
         {
@@ -187,7 +187,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Roll once");
         await Observe(new(null, "Athletics check:"));
         var note = (await Driver.ObserveAsync()).Passage;
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Observe(new(null, "", ["Roll once"]));
         await Choose("Roll once");
         await AssertState(state => Assert.Equal(note, state.Passage));

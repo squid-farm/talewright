@@ -182,7 +182,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Forward");
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(StoryHistory.MaxChoices + 1);
         await Expect(Choices).ToBeDisabledAsync();
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
         await Expect(Choices).ToBeEnabledAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);

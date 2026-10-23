@@ -67,7 +67,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Observe(new(null, "First passage"));
         await AssertLibraryUnavailable();
         await Choose("Walk onward");
-        await Driver.ClickAsync("Restart");
+        await Restart();
         await Observe(new(null, "First passage"));
         await AssertLibraryUnavailable();
     }

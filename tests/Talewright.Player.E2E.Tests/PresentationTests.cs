@@ -25,7 +25,7 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Page.GetByRole(AriaRole.Button, new() { Name = "Back to Player Test Continue where you left off" }).ClickAsync();
         await Expect(Latest).ToBeFocusedAsync();
         await Expect(Latest).ToBeInViewportAsync();
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true }).ClickAsync();
+        await Restart();
         await Expect(Latest).ToContainTextAsync("Long beginning");
         await Expect(Latest).ToBeFocusedAsync();
         await Page.WaitForFunctionAsync("() => scrollY < 2");
