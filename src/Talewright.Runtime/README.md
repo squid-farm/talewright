@@ -95,7 +95,42 @@ Replay requires the same unchanged compiled story and deterministic, side-effect
 extensions, just like ordinary choice replay. Session isolation cannot undo
 external effects performed by custom C# delegates. Rebuilding costs time
 proportional to the selected path; author commands are bounded by `StoryHistory.MaxChoices`.
-Portable scenarios and player-save compatibility bypass are not implemented here.
+Player-save compatibility is never bypassed. Portable author recipes are described below.
+
+### Portable author scenarios
+
+For author controls, see the [scenario workflow](../../docs/guide/testing-your-story.md#share-and-restore-a-debugging-scenario).
+`AuthorScenario.Export(session, extensionIdentity)` returns bounded version-1 UTF-8 JSON;
+`Import(story, bytes, extensionIdentity)` constructs a separate candidate and validates the full
+timeline, including redo, before restoring the requested cursor. `AuthorScenarioImport` exposes the
+candidate, whether it was adopted to different source, and replay differences. Neither API mutates
+an existing session or does file I/O.
+
+The host supplies its trusted compiler/extension compatibility identity (for built-ins,
+`CompilerOptions.Default.CompatibilityId`); compiled stories also need a content fingerprint.
+The scenario stores story ID/version/fingerprint, the explicit extension identity, and the
+`author-replay-v1` protocol plus engine package version (informational version excluding build metadata).
+No extension is discovered or loaded from a file. Custom hosts must version extension behavior
+honestly and keep callbacks deterministic and side-effect-free.
+
+Replay evidence hashes typed events, all declared inspection state, styled passage/choice
+presentation and the visible frame at both the cursor and end of redo. Evidence is a drift check,
+not authentication; no recorded events or state are applied from the file.
+`adoptDifferentSource: true` permits a different source fingerprint/version **within the same story ID**
+while still requiring engine/extension compatibility. It revalidates/replays, reports differing
+source/current/end evidence, and returns a run tied to the new story. Even unchanged evidence cannot
+prove semantic equivalence of positional choices. This is an explicit new scenario, not migration.
+
+`StoryHistory.Restore(story, playerBytes).ForkAuthor()` first enforces ordinary save compatibility
+and full redo validation, then retains the normal start, character, seed, choices and cursor in an
+independent synthetic session. Normal save bytes, rules and slots are untouched.
+
+The format rejects unknown members/commands/versions, duplicate JSON keys, null collections and
+invalid character/setup/command IDs. Limits: 2 MiB, 10,000 commands, 10,000 fields per value batch,
+512-character identifiers, JSON depth 32, 32-bit integer values and unsigned 64-bit seed.
+Stat values and inventory quantities must be present explicitly; missing numeric members are not zero.
+Character names retain the normal 80-character bounds. Export with pending redo replays it before
+writing evidence. Import reexecutes commands; it does not restore arbitrary mutable engine internals.
 
 ### Live editing and author navigation
 

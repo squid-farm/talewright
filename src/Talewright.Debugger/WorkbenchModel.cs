@@ -63,6 +63,103 @@ public sealed class WorkbenchModel(string root)
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
     public IReadOnlyList<SetupNumber> EditNumbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> EditFlags { get; private set; } = [];
+    public string ScenarioPath { get; set; } = "";
+    public bool ConfirmOverwrite { get; set; }
+    public string PlayerSavePath { get; set; } = "";
+    public string? ScenarioStatus { get; private set; }
+
+    public async Task ExportScenario() => await AttemptFile(async () =>
+    {
+        var confirmed = ConfirmOverwrite;
+        ConfirmOverwrite = false;
+        var session = Session ?? throw new InvalidOperationException("Start a scene first.");
+        var bytes = AuthorScenario.Export(session, CompilerOptions.Default.CompatibilityId!);
+        var path = ScenarioPath;
+        await AuthorScenarioFiles.ExportAsync(path, bytes, Root, confirmed);
+        ScenarioStatus = $"Synthetic scenario exported: {Path.GetFullPath(path)}. No source or player slot was written.";
+    });
+
+    public Task ImportScenario() => LoadScenario(adopt: false);
+    public Task AdoptScenario() => LoadScenario(adopt: true);
+
+    private async Task LoadScenario(bool adopt) => await AttemptFile(async () =>
+    {
+        var bytes = await AuthorScenarioFiles.ReadAsync(ScenarioPath);
+        var story = Story ?? throw new InvalidOperationException("Load a story first.");
+        var candidate = AuthorScenario.Import(story, bytes, CompilerOptions.Default.CompatibilityId!, adopt);
+        AdoptSession(candidate.Session);
+        ScenarioStatus = candidate.Adopted
+            ? "New synthetic scenario adopted to accepted source. " + string.Join(" ", candidate.Differences)
+                + " Export to a new path to keep the original scenario."
+            : "Exact synthetic scenario imported; complete replay and redo verified.";
+        ConfirmOverwrite = false;
+    });
+
+    public async Task ImportPlayerSave() => await AttemptFile(async () =>
+    {
+        var bytes = await AuthorScenarioFiles.ReadAsync(PlayerSavePath);
+        var story = Story ?? throw new InvalidOperationException("Load a story first.");
+        var history = StoryHistory.Restore(story, bytes);
+        var candidate = history.ForkAuthor();
+        AdoptSession(candidate);
+        ScenarioStatus = "Compatible player save read only and forked into a synthetic author timeline, including redo. Original save unchanged.";
+        ConfirmOverwrite = false;
+    });
+
+    private void AdoptSession(AuthorSession candidate)
+    {
+        var inspection = candidate.Inspect();
+        var setup = candidate.Setup;
+        int? Requested(SetupNumber field) => field.Kind switch
+        {
+            SetupNumberKind.Variable => setup.Variables.TryGetValue(new(field.Id), out var value) ? value : null,
+            SetupNumberKind.Standing => setup.Standings.TryGetValue(new(field.Id), out var value) ? value : null,
+            SetupNumberKind.Stat => setup.Stats.SingleOrDefault(value => value.Character.Value == field.Character && value.Stat.Value == field.Id)?.Value,
+            SetupNumberKind.Inventory => setup.Inventory.SingleOrDefault(value => value.Character.Value == field.Character && value.Item.Value == field.Id)?.Quantity,
+            _ => throw new InvalidOperationException($"Unsupported setup field {field.Kind}."),
+        };
+        var numbers = Numbers.Select(field =>
+        {
+            var requested = Requested(field);
+            return new SetupNumber(field.Kind, field.Id, field.Label, 0, field.Character)
+            {
+                Enabled = requested.HasValue,
+                Value = requested?.ToString(CultureInfo.InvariantCulture) ?? field.Value,
+            };
+        }).ToArray();
+        var flags = Flags.Select(flag => new SetupFlag(flag.Id)
+        {
+            Enabled = setup.Flags.ContainsKey(flag.Id),
+            Value = setup.Flags.GetValueOrDefault(flag.Id),
+        }).ToArray();
+        Numbers = numbers;
+        Flags = flags;
+        Session = candidate;
+        Inspection = inspection;
+        Character = candidate.Character;
+        Target = candidate.StartScene.Value;
+        Seed = candidate.Seed.ToString(CultureInfo.InvariantCulture);
+        ++CreationRevision;
+        RefreshEdits();
+    }
+
+    private async Task AttemptFile(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            if (!SourceRejected)
+            {
+                Error = null;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
+            or InvalidOperationException or NotSupportedException or KeyNotFoundException or ArithmeticException)
+        {
+            ScenarioStatus = null;
+            Error = $"Scenario operation failed: {ex.Message}. Any previous run and input files are unchanged.";
+        }
+    }
 
     public void Reload() => ApplySource(SourceCompilation.Load(Root), restart: true);
 
@@ -234,6 +331,10 @@ public sealed class WorkbenchModel(string root)
                 Flags = Array.AsReadOnly(flags);
                 Target = target;
                 Seed = seed;
+                if (string.IsNullOrEmpty(ScenarioPath))
+                {
+                    ScenarioPath = Path.Combine(AuthorScenarioFiles.DefaultDirectory(story.Id), "scenario.twscenario");
+                }
                 Character = selection;
                 ++CreationRevision;
                 Session = null;

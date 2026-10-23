@@ -4,7 +4,7 @@
 <main class="author-workbench">
     <h1>Talewright Author Debugger</h1>
     <p>@Model.Root</p>
-    <p>Local scene playtesting. No player saves are read or written.</p>
+    <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
     <p>Saved Tale changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
     <button type="button" @onclick="Rescan">Rescan / retry watcher</button>
     <button type="button" @onclick="Restart">Restart from source</button>
@@ -28,6 +28,22 @@
     @if (Model.Story is { } story)
     {
         <h2>@story.Title</h2>
+        <section aria-label="Portable author scenarios">
+            <h2>Portable author scenarios</h2>
+            <p>Synthetic .twscenario replay recipes, not player saves. Exact import verifies accepted source, extensions and engine/tool compatibility, including redo. Failed imports keep the active run.</p>
+            <label>Scenario file path <input aria-label="Scenario file path" @bind="Model.ScenarioPath" /></label>
+            <label><input type="checkbox" @bind="Model.ConfirmOverwrite" /> Confirm replacement of existing scenario file on next export</label>
+            <button type="button" disabled="@(Model.Session is null)" @onclick="Model.ExportScenario">Export synthetic scenario</button>
+            <button type="button" @onclick="Model.ImportScenario">Import exact scenario</button>
+            <p>Adoption is explicit and creates a new synthetic scenario against accepted source, not a migration. It revalidates the full timeline and reports replay differences. Engine/extensions and story ID must still match. Import never rewrites the original file.</p>
+            <button type="button" @onclick="Model.AdoptScenario">Adopt scenario to accepted source</button>
+            <label>Player save file path (read only) <input aria-label="Player save file path" @bind="Model.PlayerSavePath" /></label>
+            <button type="button" @onclick="Model.ImportPlayerSave">Fork compatible player save</button>
+            @if (Model.ScenarioStatus is { } scenarioStatus)
+            {
+                <p role="status">@scenarioStatus</p>
+            }
+        </section>
         <section aria-label="Scene setup">
             <h2>Scene setup</h2>
             <label>Search scenes <input aria-label="Search scenes" @bind="_sceneSearch" @bind:event="oninput" /></label>

@@ -93,6 +93,43 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         Assert.True(contrast >= 4.5, $"Button text contrast was {contrast:F2}:1 in {(dark ? "dark" : "light")} mode.");
     }
 
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    [Trait("Host", "Browser")]
+    public async Task Creation_actions_are_separated_and_keep_their_keyboard_order(int width, bool dark)
+    {
+        await Page.SetViewportSizeAsync(width, 900);
+        await Page.EmulateMediaAsync(new() { ColorScheme = dark ? ColorScheme.Dark : ColorScheme.Light });
+        await Upload(Fixture());
+
+        var start = Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true });
+        var library = Page.GetByRole(AriaRole.Button, new() { Name = "Library", Exact = true });
+        await Expect(start).ToBeVisibleAsync();
+        await Expect(library).ToBeVisibleAsync();
+        var startBounds = await start.BoundingBoxAsync();
+        var libraryBounds = await library.BoundingBoxAsync();
+        Assert.NotNull(startBounds);
+        Assert.NotNull(libraryBounds);
+        var rootFontSize = await Page.Locator("html").EvaluateAsync<double>("e => parseFloat(getComputedStyle(e).fontSize)");
+        var gap = libraryBounds.Y - (startBounds.Y + startBounds.Height);
+        Assert.True(gap >= rootFontSize, $"Creation actions need at least 1rem of separation; measured {gap:F2}px.");
+        Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
+
+        await start.FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(library).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true })).ToBeVisibleAsync();
+        await Driver.ClickAsync("Back to Player Test Continue where you left off");
+        await Expect(start).ToBeVisibleAsync();
+        await start.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Observe(new(null, "Mara's"));
+    }
+
     [Fact]
     [Trait("Host", "Browser")]
     public async Task Invalid_names_do_not_start_and_selected_identity_survives_reload()

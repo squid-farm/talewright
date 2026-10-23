@@ -38,6 +38,11 @@ public sealed class StoryHistory
     public bool CanBack => Story.UndoEnabled && Cursor > 0;
     public bool CanForward => Story.UndoEnabled && Cursor < _choices.Count;
 
+    /// <summary>Forks validated player replay inputs into isolated synthetic author tooling, retaining redo.</summary>
+    public AuthorSession ForkAuthor(bool captureDecisions = true) =>
+        AuthorSession.RestoreTimeline(Story, Story.Start, new AuthorSetup(), Seed, Character,
+            _choices.Select(key => (AuthorCommand)new AuthorChoice(key)).ToArray(), Cursor, captureDecisions);
+
     public void Choose(string key)
     {
         if (Cursor >= MaxChoices)

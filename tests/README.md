@@ -490,14 +490,23 @@ atomic-save/rename/delete/burst patterns, watcher retry and shutdown.
 Runtime author-reload tests verify pre-entry visits/effects/RNG/trigger parity,
 changed current-entry behavior, schema/choice-meaning rejection and failed
 candidate cascades without touching the good run.
+Scenario tests cover character/setup/choice/edit/jump replay, cursor and redo, exact identities,
+explicit cross-source adoption, normal-save forks, typed values and byte/field/command limits.
+File/model checks verify one-shot overwrite confirmation, atomic replacement, rejected imports,
+source-map retention, protected export paths (including parent symlinks), and unchanged input saves.
 
 `python3 tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
 builds and exercises the actual native workbench: repair/reload, late-scene
 search, setup, seed, choices, recorded explanations, watched Tale adoption,
 YAML restart gating, incompatible-history preservation and graceful window close.
+The portable-scenario case performs setup at scene1000, explains a branch, reloads Tale, edits state,
+rolls dice, exports with pending redo, closes the native process and imports in another process.
+Re-exported bytes must match before Forward resumes the retained redo.
 It uses the same isolated
 Xvfb/D-Bus/AT-SPI infrastructure as the player; assertions remain in C#.
 Set `TALEWRIGHT_DEBUGGER_EXECUTABLE` to an installed tool's
 `Talewright.Debugger.dll` to check packaged assets outside the checkout.
 Package verification checks debugger/native assets, headless launch errors and
 exclusion from Player packages and published games.
+For a copyable fixture and beginner-oriented manual release checks, use the
+[debugger test plan](../docs/guide/debugger-test-plan.md).

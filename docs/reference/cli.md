@@ -88,8 +88,8 @@ and [source reload/restart](../guide/testing-your-story.md#editing-while-you-tes
 For API and reconstruction invariants, see the [runtime documentation](../../src/Talewright.Runtime/README.md#live-editing-and-author-navigation).
 
 **Distribution.** Debugger assets ship in the CLI tool, not in Player packages or published games.
-Save editing and portable scenarios are not supported yet
-([#64](https://github.com/squid-farm/talewright/issues/64)).
+See the testing guide for [portable scenarios and read-only player-save forks](../guide/testing-your-story.md#share-and-restore-a-debugging-scenario)
+and a [hands-on test plan](../guide/debugger-test-plan.md). Author scenarios never become player saves.
 
 ## publish
 
