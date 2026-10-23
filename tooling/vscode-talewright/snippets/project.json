@@ -6,8 +6,9 @@
     "compiler-contract": {
       "executor": "nx:run-commands",
       "cache": false,
+      "dependsOn": [{"projects": ["Talewright.Tale.Tests"], "target": "build:release"}],
       "options": {
-        "command": "dotnet test tests/Talewright.Tale.Tests -c Release --filter FullyQualifiedName~EditorSnippetTests"
+        "command": "dotnet test tests/Talewright.Tale.Tests -c Release --no-build --no-restore --filter FullyQualifiedName~EditorSnippetTests"
       }
     }
   }

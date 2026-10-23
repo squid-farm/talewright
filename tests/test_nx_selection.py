@@ -175,6 +175,18 @@ class NxSelectionTests(unittest.TestCase):
             dependencies["Talewright.Player.E2E.Tests:e2e-published-web"],
         )
 
+    def test_editor_contracts_share_build_without_concurrent_dotnet_builds(self):
+        graph = affected_graph("Directory.Build.props")
+        for project in ("talewright-editor", "talewright-snippets"):
+            task = f"{project}:compiler-contract"
+            self.assertIn(
+                {"id": "Talewright.Tale.Tests:build:release"},
+                graph["tasks"]["dependencies"][task],
+            )
+            command = graph["graph"]["nodes"][project]["data"]["targets"]["compiler-contract"]["options"]["command"]
+            self.assertIn("--no-build", command)
+            self.assertIn("--no-restore", command)
+
     def test_inferred_graph_covers_project_references_and_explicit_contracts(self):
         environment = dict(os.environ, NX_DAEMON="false")
         result = subprocess.run(
