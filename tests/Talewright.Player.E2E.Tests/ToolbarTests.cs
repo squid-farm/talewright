@@ -23,6 +23,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         {
             await Upload(TestStories.Linear);
             await requested.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await AssertState(state => Assert.True(state.PassageFocused));
             var toggle = Page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
             await Expect(toggle).ToBeVisibleAsync();
             await Expect(toggle).ToBeDisabledAsync();
@@ -43,6 +44,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
     public async Task Save_refresh_does_not_pull_focus_back_into_open_disclosure()
     {
         await Upload(TestStories.Linear);
+        await AssertState(state => Assert.True(state.PassageFocused));
         await Driver.ClickAsync("More actions");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Shift+Tab");
@@ -111,6 +113,8 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         await Page.SetViewportSizeAsync(width, 900);
         await Page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.Reduce });
         await Upload(TestStories.Long);
+        // The first passage scrolls to the top and takes focus once revealed; wait so it cannot undo the focus below.
+        await AssertState(state => Assert.True(state.PassageFocused));
         await Choices.First.FocusAsync();
         await Expect(Choices.First).ToBeInViewportAsync();
         var bar = (await Page.Locator(".tw-bar").BoundingBoxAsync())!;
