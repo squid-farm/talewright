@@ -78,6 +78,10 @@ ruleset registration, integer bounds and Tale expressions. YAML tooling can also
 report structural errors differently from compiler diagnostics. The reader
 currently accepts some scalar spellings or YAML forms beyond the schema's
 documented canonical values; use the forms in the examples for portable feedback.
+For example, faction values must be mappings (`guild: {name: Guild}`): the
+compiler silently ignores a scalar faction display name. Unknown keys are schema
+errors but compiler warnings (`TW4006`). Creation preset IDs must contain a
+non-whitespace character and be no longer than 80 characters.
 
 - Compiler diagnostics, story-specific completion, hover, lint, formatting or LSP.
 - Any CLI execution, gameplay, network service, telemetry, or extension runtime.
@@ -113,6 +117,9 @@ Tokenization tests use
 that editor's built-in Markdown grammar with real TextMate/Oniguruma engines,
 not mocked regex matching. Compiler tests expand every snippet in a minimal
 story with the referenced scenes and default generic ruleset.
+Shared YAML fixtures under `tests/fixtures/manifests` run against both the schema
+and `StoryCompiler`; compiler tests assert diagnostics and materialized values
+and defaults, including documented schema/compiler differences.
 
 `npm run package` bundles the repository MPL-2.0 license and produces
 `artifacts/talewright.vsix`, without runtime dependencies or test tooling.

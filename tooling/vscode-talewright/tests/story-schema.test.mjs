@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
 import Ajv from 'ajv';
 import { parse } from 'yaml';
@@ -153,42 +153,36 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
   }
 });
 
-test('schema accepts supported open maps, alternatives, and custom ruleset IDs', () => {
-  const story = {
-    id: 'open-values',
-    title: 'Open values',
-    start: 'beginning',
-    ruleset: {
-      base: 'project-rules',
-      stats: [{ id: 'focus', category: 'custom', min: 0, max: 8 }],
-    },
-    characters: {
-      player: { 'first-name': 'Ada', pronouns: 'they', inventory: ['coin'], stats: { focus: 4 } },
-      guide: {
-        'first-name': 'Wick',
-        pronouns: {
-          subject: 'xe',
-          object: 'xem',
-          possessive: 'xyr',
-          'possessive-pronoun': 'xyrs',
-          reflexive: 'xemself',
-        },
-        inventory: { coin: 2 },
-      },
-    },
-    items: {
-      coin: 'Silver coin',
-      charm: { name: 'Jade charm', modifiers: { focus: 2 } },
-    },
-    factions: {
-      guild: 'Guild',
-      ferrymen: { name: 'Ferry Guild', standing: 2 },
-    },
-    flags: ['ready'],
-    vars: { attempts: 0 },
-    triggers: [{ id: 'once', when: 'flag:ready', do: 'set flag:done', once: true }],
-  };
-  assertValid(validateManifest, story, 'open maps and supported alternatives');
+test('shared compiler/schema manifest fixtures cover supported forms and diagnostic differences', async () => {
+  const directory = 'tooling/vscode-talewright/tests/fixtures/manifests/';
+  const cases = JSON.parse(await read(`${directory}cases.json`));
+  assert.deepEqual(cases.map(fixture => fixture.file).sort(),
+    (await readdir(new URL(directory, root))).filter(file => file.endsWith('.yaml')).sort());
+  for (const fixture of cases) {
+    const manifest = parsedYaml(await read(`${directory}${fixture.file}`), fixture.file);
+    if (fixture.schemaValid) {
+      assertValid(validateManifest, manifest, fixture.file);
+    } else {
+      assertInvalid(validateManifest, manifest, fixture.file);
+    }
+  }
+});
+
+test('schema permits custom ruleset IDs without hard-coding registrations', async () => {
+  const story = parsedYaml(await read(
+    'tooling/vscode-talewright/tests/fixtures/manifests/supported-forms.yaml'), 'supported forms');
+  story.ruleset.base = 'project-rules';
+  assertValid(validateManifest, story, 'custom ruleset ID');
+});
+
+test('preset IDs retain open author keys within compiler structural bounds', () => {
+  const validate = compileSubschema(schema.definitions.creation.properties.presets);
+  for (const id of ['', ' \t ', 'x'.repeat(81)]) {
+    assertInvalid(validate, { [id]: {} }, `invalid preset ID ${JSON.stringify(id)}`, 'propertyNames');
+  }
+  for (const id of ['x', 'x'.repeat(80), ' custom preset ']) {
+    assertValid(validate, { [id]: {} }, `valid preset ID ${JSON.stringify(id)}`);
+  }
 });
 
 test('schema rejects missing required fields, wrong types, and invalid closed enums', () => {

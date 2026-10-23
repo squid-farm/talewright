@@ -59,7 +59,7 @@
       "type": "object",
       "description": "Factions keyed by story-specific IDs.",
       "additionalProperties": {
-        "$ref": "#/definitions/factionValue"
+        "$ref": "#/definitions/faction"
       }
     },
     "items": {
@@ -302,18 +302,6 @@
       },
       "additionalProperties": false
     },
-    "factionValue": {
-      "oneOf": [
-        {
-          "type": "string",
-          "minLength": 1,
-          "description": "Short form: the faction's display name."
-        },
-        {
-          "$ref": "#/definitions/faction"
-        }
-      ]
-    },
     "faction": {
       "type": "object",
       "properties": {
@@ -362,6 +350,11 @@
         "presets": {
           "type": "object",
           "maxProperties": 16,
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "\\S"
+          },
           "description": "Named starting-stat presets. A preset's stats must respect ruleset bounds and selectable choices.",
           "additionalProperties": {
             "$ref": "#/definitions/preset"
