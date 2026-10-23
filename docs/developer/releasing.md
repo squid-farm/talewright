@@ -13,6 +13,10 @@ only after both pass:
 | Version tag `v*` | **Publish NuGet** pushes the already-verified packages to GitHub Packages with the run's `GITHUB_TOKEN`. |
 | PR / manual | Validation only. |
 
+The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
+public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/update procedure is documented in
+[UI test container image](ui-test-image.md).
+
 ## Repository settings
 
 1. **Settings > Pages > Source:** GitHub Actions, and allow `main` in the `github-pages` environment's
@@ -20,11 +24,11 @@ only after both pass:
 2. Let the publishing jobs use their scoped Pages/OIDC and `packages: write` permissions. No PAT secret
    is needed. After the first publication, check package visibility and repository/Actions access;
    publishing doesn't set those for you.
-3. Branch protection should require each check individually: `build`, `tests / unit`,
-   `tests / browser (chromium)`, `tests / browser (firefox)`, `tests / browser (webkit)` and
-   `tests / linux-desktop`. In the **Build** workflow, `build` and `tests` run independently (only
-   publishing waits for both), and no check named `Build` is reported, so requiring the workflow
-   name, or `build` alone, would let PRs merge with failing tests.
+3. For the UI test image package, keep GHCR visibility public so fork PRs can pull it without credentials.
+   The first publish may default to private, so confirm and adjust package visibility explicitly.
+4. After confirming the emitted context on a PR, require **CI verification** rather than conditional
+   leaf jobs. The Nx-aware aggregate rejects failures, cancellations, and unexpected skips while
+   permitting legitimately unselected jobs. See [Nx CI orchestration](nx-ci.md).
 
 ## Cutting a release
 
