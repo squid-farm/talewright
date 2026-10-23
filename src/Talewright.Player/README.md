@@ -14,7 +14,7 @@ See [registry setup](../../docs/developer/csharp-extensions.md).
 
 | Component | Job |
 |---|---|
-| `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `MaxUploadBytes` (20 MB). |
+| `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
 | `PlayerToolbar` | Title and navigation/save/restart/library buttons; enabled states and actions come from the parent. |
 | `SavedGamesPanel` | Slot-name input, slot list and explicit overwrite confirmation; all persistence and state live in the parent. |
@@ -36,6 +36,11 @@ See [registry setup](../../docs/developer/csharp-extensions.md).
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
+
+`LibraryEnabled=false` requires an `AutoStartStoryId` and removes Library navigation
+and upload UI during both creation and play. A failed startup shows diagnostics
+and lets the player retry the selected story. Auto-start alone does not disable
+the library. Published web and desktop hosts explicitly disable it.
 Pass `TalewrightApp.Options` for custom `CompilerOptions`; its default preserves
 built-in behavior. Use one explicit options factory for the player and build-time
 validation, as in the [C# example](../../examples/CSharpStory/README.md).

@@ -83,6 +83,22 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
 
     protected async Task Library() => await Driver.ClickAsync("Library");
 
+    protected async Task AssertLibraryUnavailable()
+    {
+        if (Driver is NativePlayerDriver native)
+        {
+            var snapshot = await native.SnapshotAsync();
+            Assert.DoesNotContain(snapshot.Descendants(), node =>
+                node.Name is "Library" or "Story archive");
+        }
+        else
+        {
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Library", Exact = true })).ToHaveCountAsync(0);
+            await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
+            await Expect(Page.Locator(".tw-library")).ToHaveCountAsync(0);
+        }
+    }
+
     protected async Task Observe(PlayerStep step)
     {
         await AssertState(state =>

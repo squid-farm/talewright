@@ -29,7 +29,8 @@ talewright publish my-story -a --target web --output my-game-web.zip
 ```
 
 `-a` (short for `--all-in-one`) bundles the player with your story. The game opens straight into your
-story, with no library screen or samples.
+story, with no library screen, Library navigation, or samples. This also applies
+during character creation; save/load, history, and Restart remain available during play.
 
 - **itch.io:** create a project, set *Kind of project* to **HTML**, upload the zip and tick
   *This file will be played in the browser*.
@@ -50,6 +51,11 @@ zip** and run:
 | Windows | `start.cmd` |
 | macOS | `start.command` |
 | Linux | `start.sh` (or `sh start.sh`) |
+
+Like a web game, the published app stays in your story and does not expose Library
+navigation. The general-purpose desktop player still has a library by default;
+its optional `--no-library story-folder-or-zip` launch mode is described in the
+[desktop host guide](../../src/Talewright.Host.Desktop/README.md#run).
 
 The universal zip is large because it includes everything for six platforms. To build for one
 platform only, add `--runtime` with one of `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64` or

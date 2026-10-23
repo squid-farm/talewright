@@ -13,16 +13,37 @@
             @if (_story.Creation is not null && _character is null)
             {
                 <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
-                <button type="button" class="tw-link tw-creation-library" @onclick="ShowLibrary">Library</button>
+                @if (LibraryEnabled)
+                {
+                    <button type="button" class="tw-link tw-creation-library" @onclick="ShowLibrary">Library</button>
+                }
             }
             else
             {
-                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="ShowLibrary" SaveStore="Services.GetService<ISaveStore>()" />
+                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="Services.GetService<ISaveStore>()" />
             }
         </div>
     }
 
-    @if (_story is null || _showLibrary)
+    @if (!LibraryEnabled && _story is null)
+    {
+        <section aria-label="Story startup">
+            <h1>@(_failedTitle ?? "Talewright")</h1>
+            @if (_error is not null)
+            {
+                <p class="tw-error" role="alert">@_error</p>
+            }
+            @if (_diagnostics.Count > 0)
+            {
+                <DiagnosticList Diagnostics="_diagnostics" />
+            }
+            @if (_entries?.Any(entry => entry.Id == AutoStartStoryId) == true)
+            {
+                <button type="button" class="tw-choice" @onclick="RetryStoryAsync">Retry opening story</button>
+            }
+        </section>
+    }
+    else if (LibraryEnabled && (_story is null || _showLibrary))
     {
         <section class="tw-library">
             <h1>Talewright</h1>
@@ -82,6 +103,10 @@
     [Parameter]
     public string? AutoStartStoryId { get; set; }
 
+    /// <summary>Whether players can browse, upload, or return to the library. Independent of auto-start.</summary>
+    [Parameter]
+    public bool LibraryEnabled { get; set; } = true;
+
     /// <summary>Largest upload accepted, in bytes.</summary>
     [Parameter]
     public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
@@ -103,12 +128,22 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!LibraryEnabled && AutoStartStoryId is null)
+        {
+            throw new InvalidOperationException("A story must be selected when the library is disabled.");
+        }
         _entries = await Library.ListAsync();
         if (AutoStartStoryId is not null && _entries.FirstOrDefault(e => e.Id == AutoStartStoryId) is { } entry)
         {
             await OpenAsync(entry);
         }
+        else if (!LibraryEnabled)
+        {
+            _error = "The selected story could not be found.";
+        }
     }
+
+    private Task RetryStoryAsync() => OpenAsync(_entries!.First(entry => entry.Id == AutoStartStoryId));
 
     private async Task OpenAsync(StoryEntry entry)
     {

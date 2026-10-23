@@ -282,7 +282,8 @@ CI also publishes a selected story with no development samples and tests the
 extracted ZIP. Standalone cases are explicitly skipped in normal development-host
 runs; opt in with `TALEWRIGHT_STANDALONE=1` and `Artifact=Standalone`.
 These checks verify auto-start, title, play, save/load across a host restart,
-history, and (in browsers) a one-story library, real styling, JS and network errors.
+history, Restart, absence of Library/upload controls during creation and play,
+and (in browsers) real styling, JS and network errors.
 
 ```bash
 dotnet run --project src/Talewright.Cli -c Release -- \

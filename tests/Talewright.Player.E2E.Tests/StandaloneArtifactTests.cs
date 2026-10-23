@@ -27,6 +27,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         var creation = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1";
         if (creation)
         {
+            await AssertLibraryUnavailable();
             await Driver.ClickAsync("Start story");
         }
         await AssertState(state =>
@@ -35,6 +36,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
             Assert.Equal(title, state.WindowTitle);
             Assert.NotEmpty(state.Choices);
         });
+        await AssertLibraryUnavailable();
         var first = await Driver.ObserveAsync();
         if (creation)
         {
@@ -59,6 +61,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
 
         if (creation)
         {
+            await AssertLibraryUnavailable();
             await Driver.ClickAsync("Start story");
         }
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
@@ -67,12 +70,11 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
         await Driver.ClickAsync("Back");
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
-        await Library();
-        await AssertState(state => Assert.Equal("Talewright", state.WindowTitle));
+        await Driver.ClickAsync("Restart");
+        await AssertState(state => Assert.Equal(first.Passage, state.Passage));
+        await AssertLibraryUnavailable();
         if (!PlayerTarget.IsDesktop)
         {
-            await Expect(Page.Locator(".tw-story-list li")).ToHaveCountAsync(1);
-            await Expect(Page.Locator(".tw-story-list")).ToContainTextAsync(title);
             Assert.Equal("rgb(250, 248, 243)", await Page.Locator("body").EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));
         }
     }
