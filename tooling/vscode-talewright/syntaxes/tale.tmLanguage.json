@@ -172,26 +172,26 @@
         {"include": "#template"},
         {
           "comment": "Delimiters open only when a closing run follows on the line; unmatched delimiters stay literal.",
-          "begin": "\\*\\*(?=\\S)(?=.*?[^\\s*]\\*{2,3}(?!\\*))",
+          "begin": "\\*\\*(?=\\S)(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?[^\\s*\\\\]\\*{2,3}(?!\\*)))",
           "end": "(?<=\\S)\\*\\*(?!\\*)|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(?<!\\w)__(?=\\S)(?=.*?\\S__(?!\\w))",
+          "begin": "(?<!\\w)__(?=\\S)(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?[^\\s\\\\]__(?!\\w)))",
           "end": "(?<=\\S)__(?!\\w)|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
           "comment": "A single * closes emphasis only alone or before a ** run, never inside a ** closer.",
-          "begin": "\\*(?=[^\\s*]|\\*\\*[^\\s*])(?=.*?[^\\s*]\\*(?:\\*\\*)?(?!\\*))",
+          "begin": "\\*(?=[^\\s*]|\\*\\*[^\\s*])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?[^\\s*\\\\]\\*(?:\\*\\*)?(?!\\*)))",
           "end": "(?<=[^\\s*])\\*(?=(?:\\*\\*)?(?!\\*))|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(?<!\\w)_(?=\\S)(?=.*?\\S_(?!\\w))",
+          "begin": "(?<!\\w)_(?=\\S)(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?[^\\s\\\\]_(?!\\w)))",
           "end": "(?<=\\S)_(?!\\w)|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]

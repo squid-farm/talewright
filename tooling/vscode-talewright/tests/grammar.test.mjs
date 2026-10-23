@@ -87,6 +87,11 @@ test('Tale syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['**a*b** after', 'b', 'markup.bold.markdown'],
     ['***both*** after', 'both', 'markup.bold.markdown'],
     ['***both*** after', 'both', 'markup.italic.markdown'],
+    ['**real \\** still bold** after', 'still bold', 'markup.bold.markdown'],
+    ['*real \\* still italic* after', 'still italic', 'markup.italic.markdown'],
+    ['__real \\__ still bold__ after', 'still bold', 'markup.bold.markdown'],
+    ['_real \\_ still italic_ after', 'still italic', 'markup.italic.markdown'],
+    ['*real `code*` still italic* after', 'still italic', 'markup.italic.markdown'],
     ['[Hello {player:first-name}](https://example.org)', 'first-name', 'variable.other.member.tale'],
     ['[Hello {player:first-name}](https://example.org)', 'first-name', 'string.other.link.title.markdown'],
     ['[Hello {player:first-name}](https://example.org)', 'example.org', 'markup.underline.link.markdown'],
@@ -113,6 +118,9 @@ test('ordinary prose, Markdown, comments and escaped braces are not Tale command
   for (const [line, text] of [
     ['__snake__case__ after', 'after'], ['_snake_case_words_ after', 'after'],
     ['**a*b** after', 'after'], ['*a**b**c* after', 'after'], ['***both*** after', 'after'],
+    ['**literal\\** plain', 'plain'], ['*literal\\* plain', 'plain'],
+    ['__literal\\__ plain', 'plain'], ['_literal\\_ plain', 'plain'],
+    ['An *unfinished `code*` after', 'after'],
     ['2 * 3 and 4*', '3'], ['a ** b', 'b'], ['[{player:name}](https://example.org) after', 'after'],
   ]) {
     const offset = line.indexOf(text);
