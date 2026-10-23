@@ -69,7 +69,9 @@ need an updated player; earlier players do not recognize the additional metadata
 ## Character creation
 
 If the story has a [`creation`](writing-stories.md#character-creation) section, players first choose
-their name, pronouns, preset and starting stats. **Use default name** restores the author's name.
+their name, pronouns, preset and starting stats. Pronoun choices show the full forms:
+**she/her/herself**, **he/him/himself**, **they/them/themselves**, or **it/itself**,
+depending on which sets the author offers. **Use default name** restores the author's name.
 Restart keeps the created character. Loading a save switches to the character in that save.
 
 ## Very long playthroughs

@@ -23,6 +23,48 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
             """,
     };
 
+    [Theory]
+    [InlineData("she", "she/her/herself", "she/her/herself")]
+    [InlineData("he", "he/him/himself", "he/him/himself")]
+    [InlineData("they", "they/them/themselves", "they/them/themselves")]
+    [InlineData("it", "it/itself", "it/it/itself")]
+    public async Task Full_pronoun_labels_keep_keyword_values_and_survive_save_load(
+        string keyword, string label, string storyForms)
+    {
+        var fixture = Fixture();
+        fixture = fixture with
+        {
+            Tale = TestStories.Linear.Tale.Replace("Mara's",
+                "{player:pronoun.subject}/{player:pronoun.object}/{player:pronoun.reflexive}"),
+            Yaml = fixture.Yaml.Replace("pronouns: [they, she]", $"pronouns: [{keyword}, " +
+                string.Join(", ", new[] { "she", "he", "they", "it" }.Where(value => value != keyword)) + "]"),
+        };
+        await Upload(fixture);
+        if (PlayerTarget.IsDesktop)
+        {
+            await AssertState(state => Assert.Contains(label, state.Library));
+        }
+        else
+        {
+            var picker = Page.GetByRole(AriaRole.Combobox, new() { Name = "Pronouns", Exact = true });
+            await Expect(picker.Locator("option")).ToHaveCountAsync(4);
+            await Expect(picker.Locator($"option[value='{keyword}']")).ToHaveTextAsync(label);
+            await picker.SelectOptionAsync(new SelectOptionValue { Label = label });
+            await Expect(picker).ToHaveValueAsync(keyword);
+        }
+        await Driver.ClickAsync("Start story");
+        await Observe(new(null, storyForms));
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Load My save");
+        await Observe(new(null, storyForms));
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await Observe(new(null, storyForms));
+    }
+
     [Fact]
     public async Task Default_creation_plays_saves_replays_and_restarts_on_both_hosts()
     {
