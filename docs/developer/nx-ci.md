@@ -31,11 +31,19 @@ cat artifacts/ci/plan.json
 
 Selection invokes `nx affected --dry-run --graph=stdout`. The small CI adapter groups actual graph
 tasks by required execution environment, not by changed paths. Nx still executes each selected target
-and its prerequisites. Independent projects run with `--parallel=3`; target phases are ordered to avoid
+and its prerequisites. Independent verification tasks run with `--parallel=3`; target phases are ordered to avoid
 packaging/editor and native report-output races. `editor-smoke` also explicitly depends on packaging,
 and native regressions depend on the accessibility probe.
 Editor compiler contracts share the Tale test project's Release build prerequisite and execute with
 `--no-build --no-restore`, preventing concurrent MSBuild writes when both contracts are selected.
+.NET build targets use `parallelism: false`: Razor static-web-assets targets can revisit referenced
+projects even with `--no-dependencies`, so concurrent host builds can write the same intermediate cache.
+Nx still orders prerequisites and runs independent non-build verification concurrently.
+
+Selection also requests inferred `build:release` targets. Builds outside every selected verification
+project's transitive dependency graph run in `checks`; this compiles leaf projects such as
+`Talewright.BenchmarkDotNet` and newly inferred libraries instead of silently accepting an empty plan.
+Projects already covered by test/package contracts retain those contracts rather than duplicate builds.
 
 ## Project and target matrix
 

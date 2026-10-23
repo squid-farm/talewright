@@ -17,6 +17,13 @@ from nx_ci import GROUPS, TARGETS, make_plan, nx, verify_results
 
 
 class CiRoutingTests(unittest.TestCase):
+    def test_real_inferred_leaf_has_nonempty_compilation_plan(self):
+        plan = make_plan(affected_graph("tests/Talewright.BenchmarkDotNet/Program.cs"))
+        self.assertIn(
+            {"project": "Talewright.BenchmarkDotNet", "target": "build:release"},
+            plan["checks"],
+        )
+
     def test_editor_and_documentation_plans_do_not_run_product_jobs(self):
         for changed, expected in [
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),

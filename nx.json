@@ -13,12 +13,14 @@
     },
     "build": {
       "cache": false,
+      "parallelism": false,
       "options": {
         "args": ["--no-dependencies"]
       }
     },
     "build:release": {
       "cache": false,
+      "parallelism": false,
       "options": {
         "args": ["--no-dependencies", "--configuration", "Release"]
       }

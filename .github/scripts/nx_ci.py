@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TARGETS = [
     "test", "compiler-contract", "package-check", "editor-smoke",
     "e2e-web", "e2e-linux", "e2e-published-web", "e2e-published-linux",
-    "ci-check", "check", "budget", "editor-full", "editor-contract",
+    "ci-check", "check", "budget", "editor-full", "editor-contract", "build:release",
 ]
 GROUPS = ("build", "unit", "browser", "linux-desktop", "editor", "checks")
 
@@ -28,6 +28,8 @@ def nx(*arguments, capture=False, environment=None):
 def task_group(project, target):
     if project == "talewright-workspace":
         return None
+    if target == "build:release":
+        return "checks"
     if project == "talewright-editor" or target == "compiler-contract":
         return "editor"
     if target == "test":
@@ -48,11 +50,27 @@ def task_group(project, target):
 
 def make_plan(graph):
     groups = {group: [] for group in GROUPS}
+    covered = set()
+
+    def cover(project):
+        if project in covered:
+            return
+        covered.add(project)
+        for dependency in graph["graph"]["dependencies"].get(project, []):
+            cover(dependency["target"])
+
     for task in graph["tasks"]["tasks"].values():
         project, target = task["target"]["project"], task["target"]["target"]
+        if target == "build:release":
+            continue
         group = task_group(project, target)
         if group:
             groups[group].append({"project": project, "target": target})
+            cover(project)
+    for task in graph["tasks"]["tasks"].values():
+        project, target = task["target"]["project"], task["target"]["target"]
+        if target == "build:release" and project != "talewright-workspace" and project not in covered:
+            groups["checks"].append({"project": project, "target": target})
     for tasks in groups.values():
         tasks.sort(key=lambda task: (TARGETS.index(task["target"]), task["project"]))
     return groups

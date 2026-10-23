@@ -2,6 +2,10 @@
   "name": "talewright-workspace",
   "tags": ["type:verification-fallback"],
   "targets": {
+    "build:release": {
+      "executor": "nx:noop",
+      "dependsOn": [{"projects": ["*", "!talewright-workspace"], "target": "build:release"}]
+    },
     "test": {
       "executor": "nx:noop",
       "options": {"args": []},

@@ -21,6 +21,7 @@ TARGETS = [
     "editor-contract",
     "ci-check",
     "budget",
+    "build:release",
 ]
 
 
@@ -125,6 +126,10 @@ class NxSelectionTests(unittest.TestCase):
                 graph = affected_graph(changed)
                 self.assert_selected(graph, "talewright-packaging:package-check")
                 self.assertNotIn("talewright-workspace:package-check", graph["tasks"]["tasks"])
+
+    def test_inferred_leaf_project_selects_release_compilation(self):
+        graph = affected_graph("tests/Talewright.BenchmarkDotNet/Program.cs")
+        self.assert_selected(graph, "Talewright.BenchmarkDotNet:build:release")
 
     def test_shared_and_unclassified_changes_are_conservative(self):
         for changed in (
@@ -256,6 +261,9 @@ class NxSelectionTests(unittest.TestCase):
         project = graph["graph"]["nodes"]["Talewright.Player.E2E.Tests"]["data"]
         target = project["targets"]["e2e-web"]
         self.assertEqual({"chromium", "firefox", "webkit"}, set(target["configurations"]))
+        for name in ("Talewright.Host.Web", "Talewright.Host.Desktop", "Talewright.Player"):
+            build = graph["graph"]["nodes"][name]["data"]["targets"]["build:release"]
+            self.assertFalse(build["parallelism"], f"Concurrent Razor build enabled for {name}")
         for data in graph["graph"]["nodes"].values():
             for target in data["data"].get("targets", {}).values():
                 self.assertFalse(target.get("cache", False), f"Unexpected cache on {data['name']}:{target}")
