@@ -24,6 +24,7 @@ public class StoryBenchmarks
     private string _saveRoot = null!;
     private string _publishOutput = null!;
     private byte[] _save = [];
+    private byte[] _redoPrefixSave = [];
     private string _choiceKey = "";
 
     [ParamsSource(nameof(TierNames))]
@@ -48,6 +49,14 @@ public class StoryBenchmarks
 
         _history = BuildHistory(tier.HistoryDepth);
         _choiceKey = _history.Current.Choices[0].Key;
+        var redoPrefix = BuildHistory(tier.HistoryDepth);
+        var redoCursor = tier.HistoryDepth / 2;
+        while (redoPrefix.Cursor > redoCursor)
+        {
+            redoPrefix.Back();
+        }
+
+        _redoPrefixSave = redoPrefix.Save();
         var hubFiles = _directorySource.Files.ToDictionary(pair => pair.Key, pair => pair.Value);
         hubFiles[StorySource.ManifestFileName] = hubFiles[StorySource.ManifestFileName]
             .Replace("start: scene.0", $"start: scene.{tier.SceneCount - 1}", StringComparison.Ordinal);
@@ -191,6 +200,18 @@ public class StoryBenchmarks
         if (restored.Cursor != _history.Cursor || restored.Events.Count != _history.Events.Count)
         {
             throw new InvalidOperationException("Restore did not reproduce the measured history.");
+        }
+
+        return restored;
+    }
+
+    [Benchmark]
+    public StoryHistory RestoreAtRedoPrefix()
+    {
+        var restored = StoryHistory.Restore(_story, _redoPrefixSave);
+        if (restored.Cursor != PerformanceCorpusTier.Get(TierName).HistoryDepth / 2 || !restored.CanForward)
+        {
+            throw new InvalidOperationException("Restore did not preserve the measured redo prefix.");
         }
 
         return restored;
