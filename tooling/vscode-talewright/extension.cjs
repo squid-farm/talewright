@@ -11,7 +11,13 @@ async function activate(context) {
   const command = configuration.get('languageServer.command', 'talewright-lsp');
   const args = configuration.get('languageServer.args', ['--stdio']);
   const metadataPath = configuration.get('languageServer.metadataPath', '');
-  const fileEvents = ['**/*.tale', '**/story.talewright.yaml', '**/*.csproj', '**/*.authoring.json']
+  const fileEvents = [
+    '**/*.tale',
+    '**/story.talewright.yaml',
+    '**/talewright.lint.json',
+    '**/*.csproj',
+    '**/*.authoring.json',
+  ]
     .map(pattern => vscode.workspace.createFileSystemWatcher(pattern));
   if (metadataPath) {
     const pattern = path.isAbsolute(metadataPath)

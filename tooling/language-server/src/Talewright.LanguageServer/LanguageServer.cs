@@ -23,10 +23,16 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private sealed record Document(string Root, int Version, string Text);
     private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error);
     private sealed record ProtocolError(int Code, string Message);
-    private sealed class Story(string root, StoryWorkspace workspace)
+    private sealed class Story(
+        string root,
+        StoryWorkspace workspace,
+        LintConfiguration lintConfiguration,
+        Exception? lintConfigurationError)
     {
         public string Root { get; } = root;
         public StoryWorkspace Workspace { get; } = workspace;
+        public LintConfiguration LintConfiguration { get; } = lintConfiguration;
+        public Exception? LintConfigurationError { get; } = lintConfigurationError;
         public long Generation { get; set; }
         public CancellationTokenSource? Pending { get; set; }
         public HashSet<string> Published { get; } = new(PathComparer);
@@ -353,24 +359,41 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     {
         var children = _stories.Keys.Where(candidate => !PathComparer.Equals(candidate, root) && IsWithin(root, candidate)).ToArray();
         var source = Directory.Exists(root) ? StorySource.FromDirectory(root, children) : new StorySource(new Dictionary<string, string>());
+        var lintConfiguration = LintConfiguration.Defaults;
+        Exception? lintConfigurationError = null;
+        try
+        {
+            lintConfiguration = LintConfiguration.LoadFromDirectory(root);
+        }
+        catch (Exception exception) when (exception is LintConfigurationException or IOException or UnauthorizedAccessException
+            or ArgumentException or NotSupportedException)
+        {
+            lintConfigurationError = exception;
+        }
+
+        StoryWorkspace workspace;
+        Exception? metadataError = null;
         if (_metadataPath is not null)
         {
             try
             {
                 var metadata = AuthoringProjectMetadata.FromJson(File.ReadAllText(Path.GetFullPath(_metadataPath, root)));
-                return new(root, StoryWorkspace.FromMetadata(source, metadata));
+                workspace = StoryWorkspace.FromMetadata(source, metadata);
             }
             catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
             {
-                return new(root, new StoryWorkspace(source, requiresProjectMetadata: true))
-                {
-                    MetadataError = new InvalidDataException($"Authoring metadata '{_metadataPath}': {exception.Message}", exception)
-                };
+                workspace = new StoryWorkspace(source, requiresProjectMetadata: true);
+                metadataError = new InvalidDataException($"Authoring metadata '{_metadataPath}': {exception.Message}", exception);
             }
         }
-        return new(root, new StoryWorkspace(source,
-            requiresProjectMetadata: _requiresMetadata ||
-                (Directory.Exists(root) && Directory.EnumerateFiles(root, "*.csproj").Any())));
+        else
+        {
+            workspace = new StoryWorkspace(source,
+                requiresProjectMetadata: _requiresMetadata ||
+                    (Directory.Exists(root) && Directory.EnumerateFiles(root, "*.csproj").Any()));
+        }
+
+        return new(root, workspace, lintConfiguration, lintConfigurationError) { MetadataError = metadataError };
     }
 
     private static string Relative(string root, string path) => Path.GetRelativePath(root, path).Replace('\\', '/');
@@ -443,11 +466,16 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             await errors.WriteLineAsync($"TWLSP003: {error.Message}");
             await NotifyAsync("window/showMessage", new { type = 1, message = $"Talewright analysis failed: {error.Message}" }, cancellationToken);
             var manifest = Path.Combine(story.Root, StorySource.ManifestFileName);
-            foreach (var path in story.Published.Append(manifest).Distinct(PathComparer).ToArray())
+            var lintConfiguration = Path.Combine(story.Root, LintConfiguration.FileName);
+            var errorPaths = story.Published.Append(manifest);
+            if (story.LintConfigurationError is not null) errorPaths = errorPaths.Append(lintConfiguration);
+            foreach (var path in errorPaths.Distinct(PathComparer).ToArray())
             {
                 var diagnostics = PathComparer.Equals(path, manifest)
                     ? new[] { ToDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5002",
                         $"Cannot analyze story: {error.Message}", new(StorySource.ManifestFileName, 1, 1)), "") }
+                    : PathComparer.Equals(path, lintConfiguration) && story.LintConfigurationError is { } configurationError
+                        ? new[] { ToLintConfigurationDiagnostic(configurationError.Message) }
                     : [];
                 await NotifyAsync("textDocument/publishDiagnostics", new
                 {
@@ -458,28 +486,51 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             }
             story.Published.Clear();
             story.Published.Add(manifest);
+            if (story.LintConfigurationError is not null) story.Published.Add(lintConfiguration);
             return;
         }
         if (completed.Update is not { Published: true } update) return;
-        var groups = update.Analysis.Diagnostics.GroupBy(diagnostic =>
-                string.IsNullOrEmpty(diagnostic.Location.File) ? StorySource.ManifestFileName : diagnostic.Location.File)
-            .ToDictionary(group => Path.GetFullPath(group.Key, story.Root), group => group.ToArray(), PathComparer);
+        var lintResult = StoryLintAnalyzer.Analyze(update.Analysis, story.LintConfiguration);
+        var groups = new Dictionary<string, List<object>>(PathComparer);
+        foreach (var diagnostic in lintResult.CompilerDiagnostics)
+        {
+            var file = string.IsNullOrEmpty(diagnostic.Location.File)
+                ? StorySource.ManifestFileName
+                : diagnostic.Location.File;
+            Add(file, ToDiagnostic(diagnostic, update.Analysis.Source.Files.GetValueOrDefault(file, "")));
+        }
+        foreach (var diagnostic in lintResult.RuleDiagnostics)
+        {
+            var file = diagnostic.Range.Start.File;
+            Add(file, ToDiagnostic(diagnostic, update.Analysis.Source.Files.GetValueOrDefault(file, "")));
+        }
+        if (story.LintConfigurationError is { } lintError)
+        {
+            Add(LintConfiguration.FileName, ToLintConfigurationDiagnostic(lintError.Message));
+        }
+
         var paths = groups.Keys.Concat(story.Published)
             .Concat(_documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).Select(pair => pair.Key))
             .Distinct(PathComparer).Order(PathComparer).ToArray();
         foreach (var path in paths)
         {
             var diagnostics = groups.TryGetValue(path, out var found) ? found : [];
-            var text = update.Analysis.Source.Files.GetValueOrDefault(Relative(story.Root, path), "");
             await NotifyAsync("textDocument/publishDiagnostics", new
             {
                 uri = UriFromPath(path),
                 version = _documents.TryGetValue(path, out var document) ? (int?)document.Version : null,
-                diagnostics = diagnostics.Select(diagnostic => ToDiagnostic(diagnostic, text)).ToArray()
+                diagnostics = diagnostics.ToArray()
             }, cancellationToken);
         }
         story.Published.Clear();
         foreach (var path in groups.Keys) story.Published.Add(path);
+
+        void Add(string relativeFile, object diagnostic)
+        {
+            var path = Path.GetFullPath(relativeFile, story.Root);
+            if (!groups.TryGetValue(path, out var diagnostics)) groups.Add(path, diagnostics = []);
+            diagnostics.Add(diagnostic);
+        }
     }
 
     private static object ToDiagnostic(Diagnostic diagnostic, string text)
@@ -496,6 +547,36 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             source = "talewright",
             message = diagnostic.Message
         };
+    }
+
+    private static object ToDiagnostic(StoryLintDiagnostic diagnostic, string text)
+    {
+        var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        var start = ToPosition(diagnostic.Range.Start, lines);
+        var end = ToPosition(diagnostic.Range.End, lines);
+        return new
+        {
+            range = new { start, end },
+            severity = diagnostic.Severity == DiagnosticSeverity.Error ? 1 : 2,
+            code = diagnostic.Code,
+            source = "talewright",
+            message = diagnostic.Message
+        };
+    }
+
+    private static object ToLintConfigurationDiagnostic(string message) => new
+    {
+        range = new { start = new { line = 0, character = 0 }, end = new { line = 0, character = 0 } },
+        severity = 1,
+        code = "TWLSP004",
+        source = "talewright",
+        message = $"Invalid lint configuration: {message}"
+    };
+
+    private static object ToPosition(SourceLocation location, string[] lines)
+    {
+        var line = Math.Clamp(location.Line - 1, 0, lines.Length - 1);
+        return new { line, character = Math.Clamp(location.Column - 1, 0, lines[line].Length) };
     }
 
     private Task ReplyAsync(JsonElement id, object? result, CancellationToken cancellationToken) =>

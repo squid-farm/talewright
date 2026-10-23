@@ -17,6 +17,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 |---|---|---|
 | TW5001 | Required C# authoring registrations are missing. | Explicitly export and configure data-only project metadata; editors never build or execute project code automatically. |
 | TW5002 | The language server cannot analyze the story with its configured metadata. | Fix the reported metadata file/data error and refresh it. See [language-server configuration](../developer/language-server.md). |
+| TWLSP004 | The language server cannot read or parse `talewright.lint.json`. | Fix the reported configuration error; live analysis continues with default rule settings until the file is valid. |
 
 ## TW1xxx: writing mistakes in `.tale` files
 

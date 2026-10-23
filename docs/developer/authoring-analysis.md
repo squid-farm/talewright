@@ -53,8 +53,8 @@ Block and choice skill checks ending in `dc` similarly retain an empty numeric
 context immediately after `dc`, including when trailing spaces were trimmed.
 
 The shared `Talewright.Authoring.StoryLintAnalyzer` consumes these source ranges
-for stable Tale-aware lint findings. The CLI integration is being delivered in
-#150; LSP consumption of the same rule results is tracked in #151.
+for stable Tale-aware lint findings. The CLI integration is delivered in #150;
+the language server also consumes the same rule results and configuration in #151.
 
 The [language server](language-server.md) hosts this API for editor diagnostics.
 This API exposes declaration ranges and expression extents, not a complete
