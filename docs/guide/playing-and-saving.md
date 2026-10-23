@@ -28,12 +28,11 @@ The web player, the desktop player and published games all share the same screen
 
 The toolbar stays visible while you scroll. Quick Save confirmations and storage errors appear
 in the toolbar without returning you to the start of the passage.
-The Saves dialog refreshes automatically when opened.
-Each new save shows its name, scene title, real-world save time (UTC) and character name.
-Older saves show **Details unavailable** instead of an invented timestamp.
-The **Quick Save checkpoint** appears separately from entries marked **Named save** in the same list,
-with the same scene, time and character details. Each story has its own checkpoint. Saving again
-replaces only that checkpoint; use named saves to keep multiple points in the story.
+The Saves dialog refreshes automatically when opened and lists the newest saves first.
+Each new save shows its name, scene title, save time in your local time zone and character name.
+If saved details cannot be read, the dialog marks them unavailable rather than inventing a timestamp.
+Each story has its own Quick Save checkpoint. Saving again replaces only that checkpoint; use named
+saves to keep multiple points in the story.
 
 Loading asks **Load save** or **Keep playing** only if your current progress is not safely saved.
 This includes undo/redo history and your character, not just the visible passage.

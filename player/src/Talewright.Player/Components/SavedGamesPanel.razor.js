@@ -25,6 +25,13 @@ export function initialize(dialog, reference) {
 
 export function synchronize(dialog, open, pending) {
     const state = dialogs.get(dialog);
+    for (const time of dialog.querySelectorAll("time[datetime]")) {
+        const date = new Date(time.dateTime);
+        time.textContent = new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short"
+        }).format(date);
+    }
     if (open && !dialog.open) {
         dialog.showModal();
         dialog.focus();
