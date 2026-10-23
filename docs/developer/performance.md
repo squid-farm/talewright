@@ -26,7 +26,29 @@ stories or maximum file/byte limits. Compile and restore allocated approximately
 Compilation p95 reached 878 ms during a separate run under concurrent build load.
 
 See [methodology, reproduction commands and recorded results](../../tests/README.md#reproducible-performance-budgets).
-The broader **10 / 100 / 500 / 1,000 real-file BenchmarkDotNet suite** remains
-tracked in [#57](https://github.com/squid-farm/talewright/issues/57); it has not yet
-produced results.
 
+## First GitHub-hosted real-file baseline
+
+The first successful [Real-file performance workflow run](https://github.com/squid-farm/talewright/actions/runs/39902796074)
+completed on 2026-10-23. Its BenchmarkDotNet suite measured 106 cases, including generated file-count,
+byte-volume, scene-count, and history-depth corpora. Two representative
+independent-dimension results are:
+
+| Operation | Mean | p95 | Managed allocations per operation |
+|---|---:|---:|---:|
+| Load and compile generated 10,000-scene corpus from disk | 398.3 ms | 418.5 ms | 719.87 MB |
+| Restore generated 10,000-choice history | 132.2 ms | 139.8 ms | 91.73 MB |
+
+These are results from one GitHub-hosted `ubuntu-24.04` run (.NET 10.0.13,
+Ubuntu 24.04.5, four-core AMD EPYC 7763 runner), with five warmups and thirty
+measured iterations per BenchmarkDotNet case. Runner power and filesystem cache
+are uncontrolled. Managed allocations are not peak or retained memory, and a
+single hosted run is a recorded baseline—not a performance guarantee or budget.
+
+The browser and Linux Photino integration jobs passed, and all three publication
+workloads completed. See the [full run report](https://github.com/squid-farm/talewright/blob/performance-results/reports/39902796074-1.md)
+for all 106 benchmark cases, player observations, publication timings and runner
+metadata, or browse the [durable performance history](https://github.com/squid-farm/talewright/blob/performance-results/index.md).
+The full deterministic corpus, BenchmarkDotNet output and integration evidence
+are available as [GitHub Actions artifacts](https://github.com/squid-farm/talewright/actions/runs/39902796074)
+(retained for 30 days).
