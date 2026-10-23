@@ -56,8 +56,7 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-bar h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.5rem; margin: 0.5rem 0; }
 .tw-bar-actions { display: flex; gap: .25rem; flex-shrink: 0; }
 .tw-bar-actions > .tw-link, .tw-overflow > .tw-link { min-width: 44px; min-height: 44px; padding: .25rem .5rem; }
-.tw-overflow { position: relative; }
-.tw-overflow-actions { position: absolute; right: 0; top: 100%; min-width: 10rem; padding: .5rem; background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; box-shadow: 0 3px 8px #0003; }
+.tw-overflow-actions { position: absolute; right: 0; top: 100%; box-sizing: border-box; min-width: min(10rem, 100%); max-width: 100%; padding: .5rem; background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; box-shadow: 0 3px 8px #0003; }
 .tw-overflow-actions:not([hidden]) { display: grid; }
 .tw-overflow-actions .tw-link { text-align: left; min-height: 44px; padding: .25rem .5rem; }
 .tw-confirm { max-width: min(28rem, calc(100% - 4rem)); color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; }

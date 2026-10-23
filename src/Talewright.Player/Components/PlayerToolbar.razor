@@ -15,7 +15,7 @@
         }
         <div class="tw-overflow">
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
-                    disabled="@Busy" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
+                    disabled="@(Busy || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
                 <button type="button" class="tw-link" disabled="@Busy" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
@@ -52,6 +52,8 @@
     private ElementReference _bar, _toggle, _menu, _confirmation;
     private IJSObjectReference? _module;
     private bool _menuOpen;
+    private bool _initialized;
+    private bool _focusMenu;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -59,14 +61,21 @@
         {
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/PlayerToolbar.razor.js");
             await _module.InvokeVoidAsync("initialize", _bar, _toggle, _menu, _confirmation);
+            _initialized = true;
+            StateHasChanged();
         }
-        if (_menuOpen)
+        if (_focusMenu)
         {
+            _focusMenu = false;
             await _module!.InvokeVoidAsync("focusMenu", _menu);
         }
     }
 
-    private void ToggleMenu() => _menuOpen = !_menuOpen;
+    private void ToggleMenu()
+    {
+        _menuOpen = !_menuOpen;
+        _focusMenu = _menuOpen;
+    }
 
     private async Task ConfirmRestart()
     {

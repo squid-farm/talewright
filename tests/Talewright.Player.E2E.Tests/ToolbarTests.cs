@@ -7,6 +7,80 @@ namespace Talewright.Player.E2E.Tests;
 
 public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Overflow_is_disabled_until_its_module_is_initialized()
+    {
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.RouteAsync("**/PlayerToolbar.razor.js", async route =>
+        {
+            requested.SetResult();
+            await release.Task;
+            await route.ContinueAsync();
+        });
+        try
+        {
+            await Upload(TestStories.Linear);
+            await requested.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            var toggle = Page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
+            await Expect(toggle).ToBeVisibleAsync();
+            await Expect(toggle).ToBeDisabledAsync();
+            await Expect(toggle).ToHaveAttributeAsync("aria-expanded", "false");
+            release.SetResult();
+            await Expect(toggle).ToBeEnabledAsync();
+            await toggle.ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Save_refresh_does_not_pull_focus_back_into_open_disclosure()
+    {
+        await Upload(TestStories.Linear);
+        await Driver.ClickAsync("More actions");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        var saves = Page.GetByRole(AriaRole.Button, new() { Name = "Saved games", Exact = true });
+        await Expect(saves).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save game", Exact = true })).ToBeEnabledAsync();
+        await Expect(saves).ToBeEnabledAsync();
+        Assert.False(await Page.Locator(".tw-overflow-actions").EvaluateAsync<bool>(
+            "menu => menu.contains(document.activeElement)"), "Save refresh must not pull focus into the disclosure.");
+        await saves.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(saves).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Open_overflow_stays_inside_viewport_when_primary_controls_wrap()
+    {
+        await Page.SetViewportSizeAsync(240, 900);
+        await Upload(TestStories.Linear);
+        var toggle = Page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
+        var back = Page.GetByRole(AriaRole.Button, new() { Name = "Back", Exact = true });
+        await toggle.ClickAsync();
+        var toggleBounds = (await toggle.BoundingBoxAsync())!;
+        var backBounds = (await back.BoundingBoxAsync())!;
+        Assert.True(toggleBounds.Y >= backBounds.Y + backBounds.Height, "The controls wrap onto a second row.");
+        foreach (var name in new[] { "Restart", "Library" })
+        {
+            var action = Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
+            await Expect(action).ToBeVisibleAsync();
+            var bounds = (await action.BoundingBoxAsync())!;
+            Assert.True(bounds.X >= 0 && bounds.X + bounds.Width <= 240, $"{name} is fully inside the viewport.");
+        }
+        Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
+    }
+
     [Theory]
     [InlineData(390)]
     [InlineData(1100)]

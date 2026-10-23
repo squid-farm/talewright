@@ -284,6 +284,9 @@ and wide widths. Browser coverage also checks focused-choice/passage clearance,
 light/dark backgrounds, history boundaries, disclosure keyboard behavior, modal
 Restart confirmation, cancellation, and focus restoration. Restart and Library
 are reached through **More actions**; Restart requires confirmation.
+Toolbar regressions also delay the JavaScript module response to check initialization
+gating, exercise save refresh after tabbing out of the disclosure, and verify the
+open popup stays inside a viewport narrow enough to wrap the primary controls.
 
 CI also publishes a selected story with no development samples and tests the
 extracted ZIP. Standalone cases are explicitly skipped in normal development-host
