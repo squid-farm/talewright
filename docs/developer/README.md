@@ -16,6 +16,7 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [UI test container image](ui-test-image.md) | Build/publish process and CI image rollout for browser/Linux player tests |
 | [Nx CI orchestration](nx-ci.md) | Affected selection, task graph, developer commands, and verification matrix |
 | [Performance](performance.md) | Recorded benchmark results and how they were measured |
+| [Performance scorecard](performance-scorecard.md) | Cross-host baseline, measured dimensions, limitations, and budget status |
 | [Testing](../../tests/README.md) | Unit, browser, desktop and performance test suites |
 
 Projects are grouped into engine, player, apps, tooling, packaging, and benchmarks.
