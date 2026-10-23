@@ -16,6 +16,9 @@ Save coverage includes metadata/legacy compatibility and canonical replay identi
 suite, plus modal focus/escape, narrow light/dark layout, summaries, redo-aware discard protection,
 failed writes, failed loads and reload/process-restart persistence in the player suite.
 Both IndexedDB and native Linux file storage are exercised; save lists never replay histories.
+Quick Save tests cover repeated replacement, names colliding with the checkpoint's display label,
+story isolation, redo and process/reload persistence, created identity, quota/transaction-abort
+and native I/O failures. Sticky-toolbar tests check Quick Save during actual scrolling.
 
 ### Reproducible performance budgets
 

@@ -38,6 +38,10 @@ public sealed class FileSaveStore(string root) : ISaveStore
         var slots = new List<string>();
         foreach (var path in paths)
         {
+            if (Path.GetFileName(path) == "quick.json")
+            {
+                continue;
+            }
             var name = Path.GetFileNameWithoutExtension(path);
             try
             {
@@ -54,9 +58,25 @@ public sealed class FileSaveStore(string root) : ISaveStore
         return Task.FromResult<IReadOnlyList<string>>(slots.Order(StringComparer.Ordinal).ToArray());
     }
 
-    public async Task<byte[]> ReadAsync(string storyId, string slot)
+    public Task<byte[]> ReadAsync(string storyId, string slot) => ReadFileAsync(SlotPath(storyId, slot));
+
+    public Task<byte[]> ReadQuickAsync(string storyId) => ReadFileAsync(Path.Combine(StoryDirectory(storyId), "quick.json"));
+
+    public Task WriteQuickAsync(string storyId, byte[] data) =>
+        WriteFileAsync(Path.Combine(StoryDirectory(storyId), "quick.json"), data, overwrite: true);
+
+    private static async Task<byte[]> ReadFileAsync(string path)
     {
-        await using var stream = new FileStream(SlotPath(storyId, slot), FileMode.Open, FileAccess.Read, FileShare.Read);
+        FileStream stream;
+        try
+        {
+            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            throw new FileNotFoundException("No save exists at this location.", path, ex);
+        }
+        await using var ownedStream = stream;
         if (stream.Length is 0 or > StoryHistory.MaxSaveBytes)
         {
             throw new InvalidDataException("This saved game is empty or too large to load (maximum 2 MiB). Choose another save.");
@@ -67,10 +87,12 @@ public sealed class FileSaveStore(string root) : ISaveStore
         return data;
     }
 
-    public async Task WriteAsync(string storyId, string slot, byte[] data, bool overwrite = false)
+    public Task WriteAsync(string storyId, string slot, byte[] data, bool overwrite = false) =>
+        WriteFileAsync(SlotPath(storyId, slot), data, overwrite);
+
+    private static async Task WriteFileAsync(string target, byte[] data, bool overwrite)
     {
         SaveNames.ValidateData(data);
-        var target = SlotPath(storyId, slot);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         var temporary = target + $".{Guid.NewGuid():N}.tmp";
         try
