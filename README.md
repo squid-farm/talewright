@@ -28,7 +28,9 @@ cast in one `story.yaml`. No programming required.
 - **Proper RPG rules.** Stats, skills, d20 skill checks, items that modify stats, factions with
   reputation tiers, XP and levels. Use the default ruleset, tweak it, or replace it.
 - **Big branching stories.** Hubs and storylets offer whichever scenes are currently available, so you
-  don't have to wire every path by hand. A 10,000-scene story [compiles in about 140 ms](docs/developer/performance.md).
+  don't have to wire every path by hand. A 10,000-scene story compiled in about 140 ms in a local
+  smoke benchmark; the first GitHub-hosted real-file run measured disk load + compile at 398 ms mean
+  / 419 ms p95. See the [recorded performance results](docs/developer/performance.md).
 - **Grammar handled for you.** Names, pronouns (including custom sets), possessives ("Burns's") and a/an.
 - **Errors caught before players see them.** Broken links, unknown items and typo'd stats are reported
   with file and line number when the story loads.
