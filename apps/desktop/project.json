@@ -1,0 +1,4 @@
+{
+  "name": "Talewright.Host.Desktop",
+  "implicitDependencies": ["talewright-samples"]
+}

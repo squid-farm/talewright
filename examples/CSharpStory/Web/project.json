@@ -1,0 +1,4 @@
+{
+  "name": "Web",
+  "implicitDependencies": ["talewright-example-settings"]
+}

@@ -39,7 +39,7 @@
     },
     "check": {
       "executor": "nx:noop",
-      "dependsOn": [{"projects": ["talewright-docs"], "target": "check"}]
+      "dependsOn": [{"projects": ["*", "!talewright-workspace"], "target": "check"}]
     },
     "budget": {
       "executor": "nx:noop",

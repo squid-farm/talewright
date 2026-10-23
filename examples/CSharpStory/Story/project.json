@@ -1,0 +1,4 @@
+{
+  "name": "Story",
+  "implicitDependencies": ["talewright-example-settings"]
+}

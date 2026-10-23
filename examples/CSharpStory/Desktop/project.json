@@ -1,0 +1,4 @@
+{
+  "name": "Desktop",
+  "implicitDependencies": ["talewright-example-settings"]
+}

@@ -1,0 +1,4 @@
+{
+  "name": "Talewright.Host.Web",
+  "implicitDependencies": ["talewright-samples"]
+}
