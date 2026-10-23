@@ -29,14 +29,21 @@ When dependency versions change, publish a new image first, then update workflow
 
 Workflow: [.github/workflows/publish-ui-test-image.yml](../../.github/workflows/publish-ui-test-image.yml)
 
-- `push` to `main` touching image files runs candidate validation only.
-- `workflow_dispatch` on `main` with a versioned tag matching the image metadata publishes the
-  validated candidate to GHCR. Existing tags are not overwritten.
+The tag in [image.json](../../.github/docker/ui-tests/image.json) is the source of truth, and the
+image is published only when it changes:
+
+- If that tag is not in GHCR yet, the workflow builds and verifies the candidate. It publishes
+  automatically on `push` to `main`; pull requests only validate.
+- If the tag already exists and the image definition is unchanged, nothing is built or published.
+- If the image definition changed but the tag already exists, the workflow fails and asks for a
+  revision bump. Pull requests get this check before merge.
+- `workflow_dispatch` on `main` publishes the current tag only if it is missing (for example, to retry
+  a failed publish). Existing tags are never overwritten.
 
 Suggested rollout:
 
-1. Update image definition and metadata.
-2. Run the publish workflow manually with a new versioned tag (`pw<playwright>-r<revision>`).
+1. Update the image definition and bump the tag in `image.json` (`pw<playwright>-r<revision>`).
+2. Merge; the push to `main` publishes the new tag.
 3. Copy the published immutable digest from the workflow summary.
 4. Update consuming workflow references.
 5. Verify browser and native jobs on a PR.
