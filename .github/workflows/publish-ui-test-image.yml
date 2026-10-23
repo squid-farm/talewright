@@ -48,7 +48,7 @@ jobs:
             -e HOME=/tmp/talewright-ui-home \
             -v "$PWD":/workspace \
             talewright-ui-tests:candidate \
-            bash -e -c 'mkdir -p "$HOME"; python3 /opt/talewright-ui/verify.py; python3 tests/run_e2e.py web --filter FullyQualifiedName~StoryLoadingTests; python3 tests/run_e2e.py linux --probe'
+            bash -e -c 'mkdir -p "$HOME"; python3 /opt/talewright-ui/verify.py; python3 player/tests/run_e2e.py web --filter FullyQualifiedName~StoryLoadingTests; python3 player/tests/run_e2e.py linux --probe'
       - name: Save validated candidate
         if: steps.plan.outputs.publish == 'true'
         run: docker save talewright-ui-tests:candidate | gzip > "${{ runner.temp }}/ui-test-image.tar.gz"

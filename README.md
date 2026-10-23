@@ -51,10 +51,10 @@ to any scene with any game state.
 1. Install the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 2. Download [Talewright as a zip](https://github.com/squid-farm/talewright/archive/refs/heads/main.zip),
    extract it, and open a terminal in the extracted folder.
-3. Check that it works: `dotnet run --project src/Talewright.Cli -- validate samples/LostRelic`
+3. Check that it works: `dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostRelic`
 
 The docs write commands as `talewright ...`. Until downloads are ready, read that as
-`dotnet run --project src/Talewright.Cli -- ...`, run from the extracted folder.
+`dotnet run --project tooling/cli/src/Talewright.Cli -- ...`, run from the extracted folder.
 
 Ready-made downloads are planned ([#33](https://github.com/squid-farm/talewright/issues/33)).
 [Getting started](docs/guide/getting-started.md#install-the-desktop-tools) has the details, including
@@ -91,6 +91,22 @@ Players don't need .NET. See [Sharing your story](docs/guide/sharing-your-story.
 | Extend the engine in C# or contribute | [Developer docs](docs/developer/README.md) · [Contributing](CONTRIBUTING.md) |
 
 All docs start at the **[documentation home](docs/README.md)**.
+
+## Source layout
+
+This is a monorepo organized by responsibility:
+
+- [engine/](engine/): headless libraries and compiler, with local tests.
+- [player/](player/): reusable Blazor player and UI tests.
+- [apps/](apps/): runnable web and desktop hosts.
+- [tooling/](tooling/): authoring infrastructure, CLI, debugger, and VS Code extension.
+- [packaging/](packaging/): aggregate engine NuGet packaging.
+- [benchmarks/](benchmarks/): performance workloads and measurement tools.
+
+Tests live with their area; root [tests/](tests/) contains repository-wide CI
+contracts and the verification guide. Shared build settings and the
+[solution](Talewright.slnx) stay at the root. See the
+[contributor layout guide](CONTRIBUTING.md#repository-layout) for details.
 
 ## Project status
 

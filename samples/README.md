@@ -79,7 +79,7 @@ be rejected visibly without replacing your active playthrough or saved bytes.
   editing are not implemented features and are not claimed by this sample.
 
 **Play it** in the [web player](https://squid-farm.github.io/talewright/), or with the [desktop tools](../docs/guide/getting-started.md#install-the-desktop-tools):
-`dotnet run --project src/Talewright.Host.Desktop -- samples/LostRelic`.
+`dotnet run --project apps/desktop -- samples/LostRelic`.
 
 ## Use a sample as a starting point
 

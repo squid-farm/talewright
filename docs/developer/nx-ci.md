@@ -51,8 +51,8 @@ Projects already covered by test/package contracts retain those contracts rather
 
 | Project / change area | Selected verification |
 |---|---|
-| .NET projects under `src/`, `tests/`, and `examples/` | `@nx/dotnet` infers `build`, `test`, and packaging/run targets. MSBuild `ProjectReference` edges propagate affected selection and order prerequisite builds. |
-| `tests/Talewright.Tale.Tests` | `test` excludes the editor snippet compiler contract; that contract is separately selectable. |
+| .NET projects under `engine/`, `player/`, `apps/`, `tooling/`, `packaging/`, `benchmarks/`, and `examples/` | `@nx/dotnet` infers `build`, `test`, and packaging/run targets. MSBuild `ProjectReference` edges propagate affected selection and order prerequisite builds. |
+| `engine/tests/Talewright.Tale.Tests` | `test` excludes the editor snippet compiler contract; that contract is separately selectable. |
 | `talewright-snippets` | `compiler-contract` compiles the shipped snippet defaults against the Tale compiler. The test source is a separate graph node so compiler changes select this contract without treating all Tale tests as editor assets. |
 | `talewright-editor` | `test`, `package-check`, and `editor-smoke` wrap the existing extension checks and package/installed-editor commands. `compiler-contract` runs the manifest-schema compiler fixtures separately from Tale units. Explicit dependencies on the compiler, Tale test project, documentation, and example Story project preserve schema fixture verification when those inputs change. |
 | `Talewright.Player.E2E.Tests` | `e2e-web` preserves the three-browser matrix; `e2e-linux` and `e2e-linux-probe` retain the native runner. Explicit non-code dependencies cover CLI, debugger, player, hosts, and runtime contracts. Published web and desktop targets retain their existing publish-and-smoke commands. |
@@ -64,7 +64,8 @@ Shared inputs include the SDK, build props, solution, NuGet configuration, Nx co
 `.github/` workflows. Those changes conservatively affect verification targets. The graph selection
 tests exercise editor-only, snippet, rules/compiler, UI, runtime/save, CLI/publish, shared/unknown,
 and documentation-only changes, and assert build prerequisite edges. Changes to shared test runners
-under `tests/` also propagate to E2E through an explicit contract edge.
+under `player/tests/` belong to the E2E project. Repository CI contracts remain
+under root `tests/` and propagate through their explicit contract edge.
 
 ## CI jobs and coverage
 
@@ -75,7 +76,7 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | Job | PR coverage when selected |
 |---|---|
 | `build` | Existing Release solution build, NuGet packs, clean library consumers, installed CLI and publication checks. |
-| `tests / unit` | Every test in each affected headless unit project, in Release. The normal Tale suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under `tests/*/artifacts/unit`. |
+| `tests / unit` | Every test in each affected headless unit project, in Release. The normal Tale suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
 | `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit. Also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
 | `tests / linux-desktop` | Accessibility/chooser probe, complete regular native regression suite, then focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
@@ -119,7 +120,7 @@ python3 .github/scripts/nx_ci.py run checks
 npm ci --prefix tooling/vscode-talewright
 python3 .github/scripts/nx_ci.py run editor
 for browser in chromium firefox webkit; do
-  python3 tests/run_e2e.py install-browsers --browser "$browser"
+  python3 player/tests/run_e2e.py install-browsers --browser "$browser"
   python3 .github/scripts/nx_ci.py run browser --browser "$browser"
 done
 python3 .github/scripts/nx_ci.py run linux-desktop

@@ -26,14 +26,14 @@ def main():
         base = normalize_base_path(args.base_path)
     except ValueError as error:
         parser.error(str(error))
-    shell = ROOT / "src/Talewright.Host.Web/wwwroot/index.html"
+    shell = ROOT / "apps/web/wwwroot/index.html"
     original = shell.read_text()
     marker = '<base href="/" />'
     if original.count(marker) != 1:
         parser.error("Expected exactly one root base element in the web shell.")
     try:
         shell.write_text(original.replace(marker, f'<base href="{base}" />'))
-        subprocess.run(["dotnet", "publish", "src/Talewright.Host.Web", "-c", "Release",
+        subprocess.run(["dotnet", "publish", "apps/web", "-c", "Release",
                         "-o", str(args.output.resolve())], cwd=ROOT, check=True)
     finally:
         shell.write_text(original)

@@ -71,8 +71,8 @@ talewright debug /absolute/path/to/debugger-story
 For an unmerged PR checkout, run from the repository/worktree instead:
 
 ```bash
-dotnet run --project src/Talewright.Cli -c Release -- validate /absolute/path/to/debugger-story
-dotnet run --project src/Talewright.Cli -c Release -- debug /absolute/path/to/debugger-story
+dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- validate /absolute/path/to/debugger-story
+dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- debug /absolute/path/to/debugger-story
 ```
 
 Expect validation success and a native **Talewright Author Debugger** window. There is no browser

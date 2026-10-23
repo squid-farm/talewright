@@ -76,7 +76,7 @@ talewright validate path/to/night-ferry
 ```
 
 > Need the tool? [Install the desktop tools](getting-started.md#install-the-desktop-tools) first; it
-> takes a few minutes. Until ready-made downloads arrive, type `dotnet run --project src/Talewright.Cli --`
+> takes a few minutes. Until ready-made downloads arrive, type `dotnet run --project tooling/cli/src/Talewright.Cli --`
 > in place of `talewright`. Not ready for that yet? [Use the web player](#no-desktop-tools-use-the-web-player)
 > instead.
 
@@ -111,7 +111,7 @@ Check again, and this time you'll see `Validation succeeded.` Now play it. The d
 folder directly, with no zipping:
 
 ```bash
-dotnet run --project src/Talewright.Host.Desktop -- path/to/night-ferry
+dotnet run --project apps/desktop -- path/to/night-ferry
 ```
 
 You can play from start to finish. After each change, choose **Library** and open the story again; it

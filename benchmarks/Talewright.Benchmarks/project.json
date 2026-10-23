@@ -1,0 +1,13 @@
+{
+  "name": "Talewright.Benchmarks",
+  "targets": {
+    "budget": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build:release"],
+      "cache": false,
+      "options": {
+        "command": "dotnet run --project benchmarks/Talewright.Benchmarks -c Release"
+      }
+    }
+  }
+}

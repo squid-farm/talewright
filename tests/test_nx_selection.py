@@ -77,7 +77,7 @@ class NxSelectionTests(unittest.TestCase):
         self.assertNotIn("Talewright.Runtime.Tests:test", selected)
 
     def test_rules_changes_select_affected_units_and_downstream_e2e(self):
-        graph = affected_graph("src/Talewright.Rules/Talewright.Rules.csproj")
+        graph = affected_graph("engine/src/Talewright.Rules/Talewright.Rules.csproj")
         selected = self.assert_selected(
             graph,
             "Talewright.Rules.Tests:test",
@@ -88,13 +88,13 @@ class NxSelectionTests(unittest.TestCase):
         )
 
     def test_player_ui_changes_select_player_e2e_not_engine_unit_suites(self):
-        graph = affected_graph("src/Talewright.Player/Components/PlayerToolbar.razor")
+        graph = affected_graph("player/src/Talewright.Player/Components/PlayerToolbar.razor")
         selected = self.assert_selected(graph, "Talewright.Player.E2E.Tests:e2e-web")
         for test in ("Talewright.Core.Tests:test", "Talewright.Rules.Tests:test", "Talewright.Runtime.Tests:test"):
             self.assertNotIn(test, selected)
 
     def test_runtime_changes_select_persistence_and_published_game_flows(self):
-        graph = affected_graph("src/Talewright.Runtime/Talewright.Runtime.csproj")
+        graph = affected_graph("engine/src/Talewright.Runtime/Talewright.Runtime.csproj")
         selected = self.assert_selected(
             graph,
             "Talewright.Runtime.Tests:test",
@@ -105,7 +105,7 @@ class NxSelectionTests(unittest.TestCase):
         )
 
     def test_cli_changes_select_artifact_and_published_game_checks(self):
-        graph = affected_graph("src/Talewright.Cli/Talewright.Cli.csproj")
+        graph = affected_graph("tooling/cli/src/Talewright.Cli/Talewright.Cli.csproj")
         self.assert_selected(
             graph,
             "talewright-packaging:package-check",
@@ -115,8 +115,8 @@ class NxSelectionTests(unittest.TestCase):
 
     def test_host_and_example_inputs_select_installed_package_verification(self):
         for changed in (
-            "src/Talewright.Host.Web/Program.cs",
-            "src/Talewright.Host.Desktop/Program.cs",
+            "apps/web/Program.cs",
+            "apps/desktop/Program.cs",
             "examples/CSharpStory/Web/Web.csproj",
             "examples/CSharpStory/Desktop/Desktop.csproj",
             "examples/CSharpStory/Validator/Validator.csproj",
@@ -128,7 +128,7 @@ class NxSelectionTests(unittest.TestCase):
                 self.assertNotIn("talewright-workspace:package-check", graph["tasks"]["tasks"])
 
     def test_inferred_leaf_project_selects_release_compilation(self):
-        graph = affected_graph("tests/Talewright.BenchmarkDotNet/Program.cs")
+        graph = affected_graph("benchmarks/Talewright.BenchmarkDotNet/Program.cs")
         self.assert_selected(graph, "Talewright.BenchmarkDotNet:build:release")
 
     def test_shared_and_unclassified_changes_are_conservative(self):
@@ -152,7 +152,7 @@ class NxSelectionTests(unittest.TestCase):
                 )
 
     def test_shared_runner_changes_select_browser_and_native_verification(self):
-        for changed in ("tests/run_e2e.py", "tests/native/atspi_adapter.py"):
+        for changed in ("player/tests/run_e2e.py", "player/tests/native/atspi_adapter.py"):
             with self.subTest(changed=changed):
                 self.assert_selected(
                     affected_graph(changed),
@@ -174,14 +174,14 @@ class NxSelectionTests(unittest.TestCase):
             "docs/reference/tale-syntax.md",
             "examples/CSharpStory/Story/Content/story.yaml",
             "tooling/vscode-talewright/schemas/story.schema.json",
-            "tests/Talewright.Tale.Tests/EditorManifestSchemaTests.cs",
+            "engine/tests/Talewright.Tale.Tests/EditorManifestSchemaTests.cs",
         ):
             with self.subTest(changed=changed):
                 self.assert_selected(affected_graph(changed), "talewright-editor:compiler-contract",
                                      "talewright-editor:test")
 
     def test_task_graph_orders_build_prerequisites(self):
-        graph = affected_graph("src/Talewright.Runtime/Talewright.Runtime.csproj")
+        graph = affected_graph("engine/src/Talewright.Runtime/Talewright.Runtime.csproj")
         dependencies = graph["tasks"]["dependencies"]
         self.assertIn(
             {"id": "Talewright.Runtime.Tests:build:release"},
@@ -263,7 +263,7 @@ class NxSelectionTests(unittest.TestCase):
         self.assertTrue(expected.issubset(actual), f"Missing graph edges: {expected - actual}")
 
     def test_browser_matrix_and_uncached_targets_are_preserved(self):
-        graph = affected_graph("src/Talewright.Player/Components/PlayerToolbar.razor")
+        graph = affected_graph("player/src/Talewright.Player/Components/PlayerToolbar.razor")
         project = graph["graph"]["nodes"]["Talewright.Player.E2E.Tests"]["data"]
         target = project["targets"]["e2e-web"]
         self.assertEqual({"chromium", "firefox", "webkit"}, set(target["configurations"]))

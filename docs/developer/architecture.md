@@ -2,7 +2,7 @@
 
 This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
 extension points are, and where to look when something breaks. [the plan](plan.md) records _why_ (decisions,
-research, roadmap); this document records _what is actually built_. The [ADRs](adr/) hold the big decisions in
+research, roadmap); this document records _what is actually built_. The [ADRs](adr) hold the big decisions in
 long form, and the [Tale syntax reference](../reference/tale-syntax.md) is the authoritative reference for the story language.
 
 Contents:
@@ -24,12 +24,31 @@ Contents:
 ### NuGet distribution
 
 Project boundaries and the dependency graph below remain intact. The
-`src/Talewright/Talewright.csproj` shell references all six headless projects and
+`packaging/Talewright/Talewright.csproj` shell references all six headless projects and
 packages their existing assemblies together as `Talewright`; it contains no engine
 implementation. `Talewright.Player` retains its direct Runtime project reference,
 and its published package depends on `Talewright`. Both packages share one version.
-The component projects are not separately published. Source paths, namespaces, and
-assembly identities are unchanged; packaging is independent of code organization.
+The component projects are not separately published. Namespaces and assembly
+identities are independent of source paths; packaging is independent of code organization.
+
+### Repository areas
+
+The workspace is organized by responsibility, not by implementation language:
+
+- `engine/src` and `engine/tests`: reusable headless libraries and their tests.
+- `player/src` and `player/tests`: reusable UI, opt-in end-to-end suites, and their runners.
+- `apps/web` and `apps/desktop`: runnable hosts of the player.
+- `tooling/authoring`, `tooling/cli`, and `tooling/debugger`: development tools,
+  each with local source/tests where applicable. The VS Code extension remains
+  in `tooling/vscode-talewright`.
+- `packaging/Talewright`: the aggregate NuGet packaging shell.
+- `benchmarks`: performance budgets, BenchmarkDotNet workloads, and report tooling.
+- Root `tests`: repository-wide CI/Nx contracts only.
+
+The root solution mirrors these areas. Shared story fixtures are in
+`engine/tests/Talewright.TestStories`; the separate player E2E solution remains
+opt-in. Root build defaults, Nx, and CI coordinate all areas. See
+[Contributing](../../CONTRIBUTING.md#repository-layout) for paths and commands.
 
 Ordinary story authors need no NuGet project dependencies. C# customizers normally
 install only `Talewright.Player`; headless/custom-UI consumers install `Talewright`.
@@ -344,7 +363,7 @@ samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Co
 
 ## 5. The engine loop in detail
 
-All of this is in `src/Talewright.Runtime/StorySession.cs` (the class remarks repeat it next to the code).
+All of this is in `engine/src/Talewright.Runtime/StorySession.cs` (the class remarks repeat it next to the code).
 
 **Entering a scene** (`Enter`):
 
@@ -449,13 +468,13 @@ One xUnit test project per engine project, under `tests/` (the generic ruleset i
 
 The player has one C#/xUnit authoring surface with shared assertions behind browser and Linux drivers.
 Playwright handles browsers; Python is only a thin AT-SPI command adapter for actual Linux Photino,
-not a second test suite. Both reuse C#-defined story fixtures from `tests/Talewright.TestStories`; generated ZIPs and folders are not
+not a second test suite. Both reuse C#-defined story fixtures from `engine/tests/Talewright.TestStories`; generated ZIPs and folders are not
 checked in or shipped. Sample-specific routes are deliberately not the detailed UI test contract.
 See [testing guidance](../../tests/README.md) for the per-host coverage matrix, native prerequisites, commands,
 failure evidence, and the distinction between Playwright WebKit and system webviews.
 
 Run fast engine tests with `dotnet test` from the repo root. Player UI suites are explicit:
-`python3 tests/run_e2e.py web` and `python3 tests/run_e2e.py linux`.
+`python3 player/tests/run_e2e.py web` and `python3 player/tests/run_e2e.py linux`.
 
 ---
 

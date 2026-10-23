@@ -1,28 +1,46 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Talewright/Talewright.csproj" />
-    <Project Path="src/Talewright.Authoring/Talewright.Authoring.csproj" />
-    <Project Path="src/Talewright.Cli/Talewright.Cli.csproj" />
-    <Project Path="src/Talewright.Core/Talewright.Core.csproj" />
-    <Project Path="src/Talewright.Debugger/Talewright.Debugger.csproj" />
-    <Project Path="src/Talewright.Host.Desktop/Talewright.Host.Desktop.csproj" />
-    <Project Path="src/Talewright.Host.Web/Talewright.Host.Web.csproj" />
-    <Project Path="src/Talewright.Narrative/Talewright.Narrative.csproj" />
-    <Project Path="src/Talewright.Player/Talewright.Player.csproj" />
-    <Project Path="src/Talewright.Rules/Talewright.Rules.csproj" />
-    <Project Path="src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" />
-    <Project Path="src/Talewright.Runtime/Talewright.Runtime.csproj" />
-    <Project Path="src/Talewright.Tale/Talewright.Tale.csproj" />
+  <Folder Name="/engine/src/">
+    <Project Path="engine/src/Talewright.Core/Talewright.Core.csproj" />
+    <Project Path="engine/src/Talewright.Narrative/Talewright.Narrative.csproj" />
+    <Project Path="engine/src/Talewright.Rules/Talewright.Rules.csproj" />
+    <Project Path="engine/src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" />
+    <Project Path="engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
+    <Project Path="engine/src/Talewright.Tale/Talewright.Tale.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Talewright.Authoring.Tests/Talewright.Authoring.Tests.csproj" />
-    <Project Path="tests/Talewright.Benchmarks/Talewright.Benchmarks.csproj" />
-    <Project Path="tests/Talewright.Cli.Tests/Talewright.Cli.Tests.csproj" />
-    <Project Path="tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />
-    <Project Path="tests/Talewright.Narrative.Tests/Talewright.Narrative.Tests.csproj" />
-    <Project Path="tests/Talewright.Rules.Tests/Talewright.Rules.Tests.csproj" />
-    <Project Path="tests/Talewright.Runtime.Tests/Talewright.Runtime.Tests.csproj" />
-    <Project Path="tests/Talewright.Tale.Tests/Talewright.Tale.Tests.csproj" />
-    <Project Path="tests/Talewright.TestStories/Talewright.TestStories.csproj" />
+  <Folder Name="/engine/tests/">
+    <Project Path="engine/tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.Narrative.Tests/Talewright.Narrative.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.Rules.Tests/Talewright.Rules.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.Runtime.Tests/Talewright.Runtime.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.Tale.Tests/Talewright.Tale.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
+  </Folder>
+  <Folder Name="/player/src/">
+    <Project Path="player/src/Talewright.Player/Talewright.Player.csproj" />
+  </Folder>
+  <Folder Name="/apps/">
+    <Project Path="apps/desktop/Talewright.Host.Desktop.csproj" />
+    <Project Path="apps/web/Talewright.Host.Web.csproj" />
+  </Folder>
+  <Folder Name="/tooling/authoring/src/">
+    <Project Path="tooling/authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
+  </Folder>
+  <Folder Name="/tooling/authoring/tests/">
+    <Project Path="tooling/authoring/tests/Talewright.Authoring.Tests/Talewright.Authoring.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tooling/cli/src/">
+    <Project Path="tooling/cli/src/Talewright.Cli/Talewright.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tooling/cli/tests/">
+    <Project Path="tooling/cli/tests/Talewright.Cli.Tests/Talewright.Cli.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tooling/debugger/">
+    <Project Path="tooling/debugger/src/Talewright.Debugger/Talewright.Debugger.csproj" />
+  </Folder>
+  <Folder Name="/packaging/">
+    <Project Path="packaging/Talewright/Talewright.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Talewright.Benchmarks/Talewright.Benchmarks.csproj" />
   </Folder>
 </Solution>

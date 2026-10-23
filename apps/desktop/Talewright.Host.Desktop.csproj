@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TalewrightIncludeSamples Condition="'$(TalewrightIncludeSamples)' == ''">true</TalewrightIncludeSamples>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Photino.Blazor" Version="4.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../player/src/Talewright.Player/Talewright.Player.csproj" />
+    <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
+  </ItemGroup>
+
+  <!-- Photino serves wwwroot from the output folder. -->
+  <ItemGroup>
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Bundled sample stories, embedded as stories/<Story>/<path> (see EmbeddedStoryLibrary). -->
+  <ItemGroup Condition="'$(TalewrightIncludeSamples)' == 'true'">
+    <EmbeddedResource Include="../../samples/**/*.tale;../../samples/**/*.yaml" LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
+  </ItemGroup>
+
+</Project>

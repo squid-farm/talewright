@@ -92,7 +92,7 @@ def select(args):
 
 
 def verify_unit_reports(expected):
-    reports = list((ROOT / "tests").glob("*/artifacts/unit/*.trx"))
+    reports = unit_reports()
     if len(reports) != expected:
         raise ValueError(f"Expected {expected} unit reports; found {len(reports)}")
     for report in reports:
@@ -101,6 +101,14 @@ def verify_unit_reports(expected):
             raise ValueError(f"No tests executed: {report}")
         if int(counters.attrib["failed"]) != 0:
             raise ValueError(f"Failed tests: {report}")
+
+
+def unit_reports():
+    return [
+        report
+        for area in ("engine", "player", "tooling")
+        for report in (ROOT / area).glob("**/artifacts/unit/*.trx")
+    ]
 
 
 def run_group(args):
@@ -112,7 +120,7 @@ def run_group(args):
         if task_group(task["project"], task["target"]) != args.group:
             raise ValueError(f"Misrouted task in {args.group}: {task}")
     if args.group == "unit":
-        for report in (ROOT / "tests").glob("*/artifacts/unit/*.trx"):
+        for report in unit_reports():
             report.unlink()
     for target in TARGETS:
         projects = [task["project"] for task in tasks if task["target"] == target]
