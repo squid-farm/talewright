@@ -440,7 +440,7 @@ event means touching `GameState.Apply`), and save formats.
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
-| What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Tale syntax reference](../reference/tale-syntax.md#1-storyyaml)                                                                       |
+| What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Tale syntax reference](../reference/tale-syntax.md#1-storytalewrightyaml)                                                                       |
 | How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Tale syntax reference](../reference/tale-syntax.md)                                                                     |
 | How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
 | What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx src/`                                                                  |

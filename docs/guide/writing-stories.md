@@ -35,7 +35,7 @@ Use them in prose, and Talewright takes care of the grammar:
 > guide: Careful.                                 → dialogue spoken by Tomas
 ```
 
-Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/tale-syntax.md#1-storyyaml).
+Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/tale-syntax.md#1-storytalewrightyaml).
 See [substitutions](../reference/tale-syntax.md#3-substitutions) for everything you can insert and the
 `#modifiers` you can apply.
 
@@ -51,7 +51,7 @@ By default, stories use a familiar d20-style ruleset:
 | Progression | `xp`, `level` (1–20) |
 
 You can add your own stats (`courage`, `sanity`, ...), remove ones you don't want, or start from an
-empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/tale-syntax.md#1-storyyaml).
+empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/tale-syntax.md#1-storytalewrightyaml).
 
 Change stats with effects: `~ player:hp -= 2` on its own line when a scene starts, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
