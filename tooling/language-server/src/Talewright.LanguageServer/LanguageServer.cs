@@ -466,11 +466,16 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             await errors.WriteLineAsync($"TWLSP003: {error.Message}");
             await NotifyAsync("window/showMessage", new { type = 1, message = $"Talewright analysis failed: {error.Message}" }, cancellationToken);
             var manifest = Path.Combine(story.Root, StorySource.ManifestFileName);
-            foreach (var path in story.Published.Append(manifest).Distinct(PathComparer).ToArray())
+            var lintConfiguration = Path.Combine(story.Root, LintConfiguration.FileName);
+            var errorPaths = story.Published.Append(manifest);
+            if (story.LintConfigurationError is not null) errorPaths = errorPaths.Append(lintConfiguration);
+            foreach (var path in errorPaths.Distinct(PathComparer).ToArray())
             {
                 var diagnostics = PathComparer.Equals(path, manifest)
                     ? new[] { ToDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5002",
                         $"Cannot analyze story: {error.Message}", new(StorySource.ManifestFileName, 1, 1)), "") }
+                    : PathComparer.Equals(path, lintConfiguration) && story.LintConfigurationError is { } configurationError
+                        ? new[] { ToLintConfigurationDiagnostic(configurationError.Message) }
                     : [];
                 await NotifyAsync("textDocument/publishDiagnostics", new
                 {
@@ -481,6 +486,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             }
             story.Published.Clear();
             story.Published.Add(manifest);
+            if (story.LintConfigurationError is not null) story.Published.Add(lintConfiguration);
             return;
         }
         if (completed.Update is not { Published: true } update) return;

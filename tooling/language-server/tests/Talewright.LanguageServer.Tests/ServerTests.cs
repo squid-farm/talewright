@@ -521,6 +521,29 @@ public sealed class ServerTests
     }
 
     [Fact]
+    public async Task Invalid_lint_configuration_is_published_and_cleared_when_metadata_is_invalid()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"invalid"}}""");
+        await client.Initialize(new { metadataPath = "missing.authoring.json" });
+        await client.Open("start.tale", "=== Start_Scene\nHello.\n-> END\n", 1);
+
+        Assert.Contains(await client.Diagnostics("story.talewright.yaml", null),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW5002");
+        Assert.Contains(await client.Diagnostics(LintConfiguration.FileName, null),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TWLSP004");
+
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"off"}}""");
+        await client.Watch(LintConfiguration.FileName, 2);
+
+        Assert.Empty(await client.Diagnostics(LintConfiguration.FileName, null));
+        Assert.Contains(await client.Diagnostics("story.talewright.yaml", null),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW5002");
+        var unknown = await client.Request("unknown", new { });
+        Assert.Equal(-32601, unknown.GetProperty("error").GetProperty("code").GetInt32());
+    }
+
+    [Fact]
     public async Task Csharp_project_is_never_executed_and_missing_metadata_is_explicit()
     {
         await using var client = new Client();
