@@ -62,7 +62,7 @@ function performInstallation(currentInstallation, nxJson) {
         // --include=dev forces install even if consumer env sets NODE_ENV=production / omit=dev.
         cp.execSync('npm i --include=dev', {
             cwd: path.dirname(installationPath),
-            stdio: 'inherit',
+            stdio: ['inherit', 2, 2],
             windowsHide: true,
         });
     }

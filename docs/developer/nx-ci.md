@@ -19,6 +19,9 @@ python3 -m unittest discover -s tests -p 'test_nx*.py' -v
 python3 -m unittest discover -s docs -p test_docs.py -v
 ```
 
+Wrapper installation diagnostics go to stderr so machine-readable Nx stdout remains valid JSON,
+including on clean CI runners. The cold-install regression test exercises this first-use path.
+
 Preview the PR task graph using the actual base and head revisions:
 
 ```sh
