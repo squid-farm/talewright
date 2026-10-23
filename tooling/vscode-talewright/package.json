@@ -1,7 +1,7 @@
 {
   "name": "talewright",
   "displayName": "Talewright",
-  "description": "Tale highlighting, snippets, story.yaml schema, and shared live compiler diagnostics.",
+  "description": "Tale highlighting, snippets, story.talewright.yaml schema, and shared live compiler diagnostics.",
   "version": "0.1.0",
   "publisher": "squid-farm",
   "license": "MPL-2.0",
@@ -72,7 +72,7 @@
     ],
     "yamlValidation": [
       {
-        "fileMatch": ["story.yaml"],
+        "fileMatch": ["*.talewright.yaml"],
         "url": "./schemas/story.schema.json"
       }
     ]

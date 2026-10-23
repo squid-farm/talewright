@@ -23,7 +23,7 @@ public sealed class StoryDefinition
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
 
-    /// <summary>Fixed seed from story.yaml, or null for a random seed per playthrough.</summary>
+    /// <summary>Fixed seed from story.talewright.yaml, or null for a random seed per playthrough.</summary>
     public ulong? Seed { get; init; }
 
     public required WorldDefinition World { get; init; }

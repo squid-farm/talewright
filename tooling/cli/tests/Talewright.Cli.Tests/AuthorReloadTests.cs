@@ -28,7 +28,7 @@ public sealed class AuthorReloadTests : IDisposable
     public AuthorReloadTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), Yaml);
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml);
         Write(Tale);
     }
 
@@ -36,7 +36,7 @@ public sealed class AuthorReloadTests : IDisposable
     private SourceCompilation Load() => SourceCompilation.Load(_root);
     private static SourceCompilation Source(string tale, string yaml = Yaml)
     {
-        var source = new StorySource(new Dictionary<string, string> { ["story.yaml"] = yaml, ["main.tale"] = tale });
+        var source = new StorySource(new Dictionary<string, string> { ["story.talewright.yaml"] = yaml, ["main.tale"] = tale });
         return new(source, StoryCompiler.Compile(source), null);
     }
 
@@ -72,14 +72,14 @@ public sealed class AuthorReloadTests : IDisposable
         var flag = Assert.Single(model.Flags);
         flag.Enabled = true;
         flag.Value = true;
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), Yaml + "\n# Edited YAML");
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml + "\n# Edited YAML");
         Write("=== start\n-> missing");
         Assert.False(model.ApplySource(Load()));
         Assert.True(model.RestartRequired);
         Write(Tale.Replace("Old passage.", "After YAML."));
         Assert.False(model.ApplySource(Load()));
         Assert.Same(original, model.Session);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), Yaml);
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml);
         Assert.False(model.ApplySource(Load()));
         model.Reload();
         Assert.Null(model.Error);
@@ -100,7 +100,7 @@ public sealed class AuthorReloadTests : IDisposable
         var field = model.Numbers.Single(field => field.Label == "var:count");
         field.Enabled = true;
         field.Value = "7";
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), Yaml.Replace("flags: [ready]", "flags: []")
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml.Replace("flags: [ready]", "flags: []")
             .Replace("vars: {count: 0}", "vars: {}"));
         Write(Tale.Replace("~ var:count += 1", ""));
         model.Reload();
@@ -134,7 +134,7 @@ public sealed class AuthorReloadTests : IDisposable
                 do: set flag:chain-{i + 1}
                 once: true
             """));
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), Yaml.Replace("flags: [ready]", "flags: [ready, chain-0]")
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml.Replace("flags: [ready]", "flags: [ready, chain-0]")
             + "\ntriggers:\n" + triggers);
         model.Reload();
         model.Start();
@@ -168,7 +168,7 @@ public sealed class AuthorReloadTests : IDisposable
     public void Creation_is_retained_for_prose_reload_and_incompatible_options_are_named_on_restart()
     {
         var yaml = Yaml + "\ncreation:\n  name: true\n  stats:\n    str: [12, 16]\n";
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), yaml);
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), yaml);
         var model = new WorkbenchModel(_root);
         model.Reload();
         var selection = model.Story!.Creation!.Default(model.Story.World.Characters[new("player")]) with
@@ -181,7 +181,7 @@ public sealed class AuthorReloadTests : IDisposable
         Assert.True(model.ApplySource(Source(Tale.Replace("Old passage.", "Revised."), yaml)));
         Assert.Equal(revision, model.CreationRevision);
         Assert.Equal("Alex", model.Character!.FirstName);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), yaml.Replace("[12, 16]", "[12]"));
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), yaml.Replace("[12, 16]", "[12]"));
         model.Reload();
         Assert.Contains("creation stat:str=16", model.Error);
         Assert.NotNull(model.Session);
@@ -307,7 +307,7 @@ public sealed class AuthorReloadTests : IDisposable
         await watcher.RescanAsync();
         Assert.Contains("watcher failed", model.Error);
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), Yaml);
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml);
         Write(Tale);
         await watcher.RescanAsync();
         Assert.True(model.RestartRequired);

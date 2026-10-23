@@ -17,7 +17,7 @@ public sealed class SourceViewTests
     {
         var source = new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = yaml, ["first.tale"] = first, ["nested/second.tale"] = second,
+            ["story.talewright.yaml"] = yaml, ["first.tale"] = first, ["nested/second.tale"] = second,
         });
         return new(source, StoryCompiler.Compile(source), null);
     }

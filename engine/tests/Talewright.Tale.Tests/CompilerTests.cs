@@ -48,7 +48,7 @@ public class CompilerTests
     private static CompilationResult Compile(string tale, string yaml = Yaml, CompilerOptions? options = null) =>
         StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml,
             ["main.tale"] = tale,
         }), options);
 
@@ -146,7 +146,7 @@ public class CompilerTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = Yaml,
+            ["story.talewright.yaml"] = Yaml,
             ["01.tale"] = """
                 === a
                 {if flag:entry}Entry.{/if}
@@ -451,7 +451,7 @@ public class CompilerTests
         var error = Error("=== a\n-> END", "TW4003", yaml);
 
         Assert.Contains("minimum (10) must not be greater than its maximum (0)", error.Message);
-        Assert.Equal("story.yaml", error.Location.File);
+        Assert.Equal("story.talewright.yaml", error.Location.File);
     }
 
     [Fact]
@@ -502,13 +502,13 @@ public class CompilerTests
                 writer.Write(text);
             }
 
-            Add("my-story/story.yaml", Yaml);
+            Add("my-story/story.talewright.yaml", Yaml);
             Add("my-story/chapters/one.tale", "=== a\n-> END");
         }
 
         stream.Position = 0;
         var source = StorySource.FromZip(stream);
-        Assert.Equal(["chapters/one.tale", "story.yaml"], source.Files.Keys.Order());
+        Assert.Equal(["chapters/one.tale", "story.talewright.yaml"], source.Files.Keys.Order());
         Assert.True(StoryCompiler.Compile(source).Success);
     }
 

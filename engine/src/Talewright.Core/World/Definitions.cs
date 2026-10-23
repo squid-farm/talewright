@@ -3,7 +3,7 @@ using Talewright.Core.Rulesets;
 
 namespace Talewright.Core.World;
 
-/// <summary>Static declaration of a character (player or NPC) as authored in <c>story.yaml</c>.</summary>
+/// <summary>Static declaration of a character (player or NPC) as authored in <c>story.talewright.yaml</c>.</summary>
 /// <param name="Id">Character id; <see cref="EntityId.Player"/> for the protagonist.</param>
 /// <param name="FirstName">Given name.</param>
 /// <param name="LastName">Family name, may be empty.</param>

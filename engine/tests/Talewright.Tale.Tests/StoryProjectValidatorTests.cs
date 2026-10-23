@@ -12,7 +12,7 @@ public sealed class StoryProjectValidatorTests : IDisposable
     public StoryProjectValidatorTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"),
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
             "id: build\ntitle: Build\nstart: a\nruleset: {base: custom}\ncharacters:\n  player: {first-name: Author}\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"),
             "=== a\n{player:first-name#greeting}\n* [Continue] (requires: @Ready) -> END\n");

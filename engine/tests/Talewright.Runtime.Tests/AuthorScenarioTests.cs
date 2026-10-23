@@ -28,7 +28,7 @@ public sealed class AuthorScenarioTests
     private static StoryDefinition Story(string tale = Tale) =>
         StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = """
+            ["story.talewright.yaml"] = """
                 id: portable
                 title: Portable
                 version: 1.0.0
@@ -290,7 +290,7 @@ public sealed class AuthorScenarioTests
         var ids = Enumerable.Range(0, 5000).Select(index => $"flag-{index:D4}-" + new string('x', 490)).ToArray();
         var compiled = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = $"id: export-limit\ntitle: Export limit\nstart: start\nflags: [{string.Join(", ", ids)}]\ncharacters:\n  player: {{first-name: Tester}}\n",
+            ["story.talewright.yaml"] = $"id: export-limit\ntitle: Export limit\nstart: start\nflags: [{string.Join(", ", ids)}]\ncharacters:\n  player: {{first-name: Tester}}\n",
             ["main.tale"] = "=== start\n* [Stay] -> start",
         }));
         Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));

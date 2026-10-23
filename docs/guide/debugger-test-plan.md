@@ -13,7 +13,7 @@ until these steps are executed there.
 
 Create a folder named `debugger-story` with these two files:
 
-**story.yaml**
+**story.talewright.yaml**
 
 ```yaml
 id: debugger-review
@@ -166,7 +166,7 @@ Keep a copy of the successful export. Test on copies only:
 
 ## 7. YAML restart and ordinary player-save isolation
 
-1. Add a comment to `story.yaml`. Expect **Restart required**; passage and accepted source stay.
+1. Add a comment to `story.talewright.yaml`. Expect **Restart required**; passage and accepted source stay.
    More Tale saves must not bypass that requirement.
 2. Click **Restart from source**. Expect the run cleared only after validation, with compatible
    origin scene/seed/setup/character retained. **Start selected scene** starts a fresh run.

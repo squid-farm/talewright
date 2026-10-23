@@ -8,7 +8,7 @@ public sealed record StoryFixture(string Id, string Yaml, string Tale)
 {
     public IReadOnlyDictionary<string, string> Files => new Dictionary<string, string>
     {
-        ["story.yaml"] = Yaml,
+        ["story.talewright.yaml"] = Yaml,
         ["chapters/main.tale"] = Tale,
     };
 

@@ -116,7 +116,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         var fixture = Fixture();
         var story = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = fixture.Yaml, ["chapters/main.tale"] = fixture.Tale,
+            ["story.talewright.yaml"] = fixture.Yaml, ["chapters/main.tale"] = fixture.Tale,
         })).Story!;
         var history = new StoryHistory(story, 7);
         history.Choose("c0");
@@ -510,7 +510,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         var fixture = Fixture() with { Tale = "=== start\nAt the limit.\n* [Again] -> start" };
         var source = new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = fixture.Yaml,
+            ["story.talewright.yaml"] = fixture.Yaml,
             ["chapters/main.tale"] = fixture.Tale,
         });
         var story = StoryCompiler.Compile(source).Story!;

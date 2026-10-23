@@ -12,10 +12,10 @@ using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Parsing;
 
-/// <summary>An expression or effect list written in story.yaml, parsed later once all symbols are known.</summary>
+/// <summary>An expression or effect list written in story.talewright.yaml, parsed later once all symbols are known.</summary>
 internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once);
 
-/// <summary>Everything read from story.yaml.</summary>
+/// <summary>Everything read from story.talewright.yaml.</summary>
 internal sealed class StoryManifest
 {
     public string Id { get; set; } = string.Empty;
@@ -35,7 +35,7 @@ internal sealed class StoryManifest
 }
 
 /// <summary>
-/// Reads story.yaml with the YamlDotNet representation model (no reflection, so it is trim/WASM safe and keeps
+/// Reads story.talewright.yaml with the YamlDotNet representation model (no reflection, so it is trim/WASM safe and keeps
 /// line numbers for diagnostics). Codes are <c>TW4xxx</c>.
 /// </summary>
 internal sealed class StoryYamlReader
@@ -73,7 +73,7 @@ internal sealed class StoryYamlReader
 
         if (stream.Documents.Count == 0 || stream.Documents[0].RootNode is not YamlMappingNode root)
         {
-            _diagnostics.Error("TW4001", "story.yaml must be a mapping (key: value pairs).", new SourceLocation(_file, 1, 1));
+            _diagnostics.Error("TW4001", "story.talewright.yaml must be a mapping (key: value pairs).", new SourceLocation(_file, 1, 1));
             return null;
         }
 
@@ -380,7 +380,7 @@ internal sealed class StoryYamlReader
         var map = node is null ? null : Mapping(node, "characters");
         if (map is null || !map.Children.Any(c => Scalar(c.Key) == EntityId.Player.Value))
         {
-            _diagnostics.Error("TW4002", "story.yaml must declare the protagonist under 'characters: player:'.", node is null ? At(root) : At(node));
+            _diagnostics.Error("TW4002", "story.talewright.yaml must declare the protagonist under 'characters: player:'.", node is null ? At(root) : At(node));
         }
 
         foreach (var (key, value) in map?.Children ?? Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>())

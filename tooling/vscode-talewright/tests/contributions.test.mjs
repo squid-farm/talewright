@@ -22,10 +22,16 @@ test('package wires Tale syntax, snippets, manifest schema, and the thin LSP cli
     await readFile(new URL(`../${manifest.contributes[contribution][0].path}`, import.meta.url));
   }
   assert.deepEqual(manifest.contributes.yamlValidation, [{
-    fileMatch: ['story.yaml'],
+    fileMatch: ['*.talewright.yaml'],
     url: './schemas/story.schema.json',
   }]);
   await readFile(new URL(`../${manifest.contributes.yamlValidation[0].url}`, import.meta.url));
+  const [pattern] = manifest.contributes.yamlValidation[0].fileMatch;
+  const matches = name => new RegExp(`^${pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*')}$`).test(name);
+  for (const name of ['story.talewright.yaml']) assert.ok(matches(name), name);
+  for (const name of ['story.yaml', 'story.talewright.yml', 'talewright.yaml', 'docker-compose.yaml']) {
+    assert.ok(!matches(name), name);
+  }
   const config = await json(manifest.contributes.languages[0].configuration);
   assert.equal(config.comments.lineComment, '//');
   assert.deepEqual(config.autoClosingPairs, []);

@@ -172,7 +172,7 @@ class NxSelectionTests(unittest.TestCase):
     def test_schema_fixture_inputs_select_editor_contracts(self):
         for changed in (
             "docs/reference/tale-syntax.md",
-            "examples/CSharpStory/Story/Content/story.yaml",
+            "examples/CSharpStory/Story/Content/story.talewright.yaml",
             "tooling/vscode-talewright/schemas/story.schema.json",
             "engine/tests/Talewright.Tale.Tests/EditorManifestSchemaTests.cs",
         ):

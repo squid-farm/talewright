@@ -18,9 +18,9 @@ the first camp hub; no edits or temporary copy are needed.
 
 | Feature | Where |
 |---|---|
-| Character creation, presets, legal stat choices, restore default name | `story.yaml`; Explorer/Scholar, strength and courage. Explorer retains authored strength; omitted courage defaults to the first option, 3, not the later zero |
-| Generic ruleset extension/removal, custom bounded stat | `story.yaml`: adds Courage (0–10) and disables unused Performance; field exercise saturates courage at 10 |
-| Built-in and explicit custom pronoun sets; NPC stats | player creation and guide declaration in `story.yaml`; register prose in `workshop.identity` |
+| Character creation, presets, legal stat choices, restore default name | `story.talewright.yaml`; Explorer/Scholar, strength and courage. Explorer retains authored strength; omitted courage defaults to the first option, 3, not the later zero |
+| Generic ruleset extension/removal, custom bounded stat | `story.talewright.yaml`: adds Courage (0–10) and disables unused Performance; field exercise saturates courage at 10 |
+| Built-in and explicit custom pronoun sets; NPC stats | player creation and guide declaration in `story.talewright.yaml`; register prose in `workshop.identity` |
 | Hub with storylets (`@priority`, `@once`) | `camp.hub` and `camp.supplies` / `camp.guide` / `camp.journal` in `01-camp.tale` |
 | Intersection hub, cap, stable equal-priority order, empty-hub fallback | `workshop.hub`: `all(workshop,lesson)`, two offers at a time; ledger precedes register on a priority tie; completion returns to camp |
 | Union hub, eligibility changes, `not`, visits | `field.hub`: `any(field,practice)`, one offer; signal becomes eligible after resolve; completion returns to camp |
@@ -83,7 +83,7 @@ be rejected visibly without replacing your active playthrough or saved bytes.
 
 ## Use a sample as a starting point
 
-Copy `LostRelic/`, change `id` and `title` in `story.yaml`, and start editing. The
+Copy `LostRelic/`, change `id` and `title` in `story.talewright.yaml`, and start editing. The
 [first story tutorial](../docs/guide/first-story.md) explains the basics, and the
 [Tale syntax reference](../docs/reference/tale-syntax.md) covers everything else.
 

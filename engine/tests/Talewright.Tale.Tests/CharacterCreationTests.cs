@@ -15,7 +15,7 @@ public sealed class CharacterCreationTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = $$"""
+            ["story.talewright.yaml"] = $$"""
                 id: creation
                 title: Creation
                 start: a
@@ -44,7 +44,7 @@ public sealed class CharacterCreationTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = $$$"""
+            ["story.talewright.yaml"] = $$$"""
                 id: creation
                 title: Creation
                 start: a
@@ -77,7 +77,7 @@ public sealed class CharacterCreationTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = $"id: creation\ntitle: Creation\nstart: a\ncharacters:\n  player: {{first-name: Default}}\ncreation:\n  {body}\n",
+            ["story.talewright.yaml"] = $"id: creation\ntitle: Creation\nstart: a\ncharacters:\n  player: {{first-name: Default}}\ncreation:\n  {body}\n",
             ["main.tale"] = "=== a\n-> END",
         }));
         Assert.False(result.Success);

@@ -12,7 +12,7 @@ public sealed class DebuggerTests : IDisposable
     public DebuggerTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"), """
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), """
             id: debug
             title: Debug
             start: scene1
@@ -196,7 +196,7 @@ public sealed class DebuggerTests : IDisposable
     [Fact]
     public void Creation_selection_is_required_and_setup_overrides_only_enabled_fields()
     {
-        File.AppendAllText(Path.Combine(_root, "story.yaml"), """
+        File.AppendAllText(Path.Combine(_root, "story.talewright.yaml"), """
 
             creation:
               name: true

@@ -58,7 +58,7 @@ async function testYamlSchema() {
 
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-yaml-editor-'));
   try {
-    const file = path.join(folder, 'story.yaml');
+    const file = path.join(folder, 'story.talewright.yaml');
     const invalid = [
       'id: schema-smoke',
       'title: Schema smoke',

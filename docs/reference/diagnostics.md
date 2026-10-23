@@ -40,7 +40,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 
 | Code | Meaning | Usual fix |
 |---|---|---|
-| TW2001 | Unknown character, stat, item or faction. | Fix the spelling, or declare it in `story.yaml`. |
+| TW2001 | Unknown character, stat, item or faction. | Fix the spelling, or declare it in `story.talewright.yaml`. |
 | TW2002 | Unknown scene. | Fix the spelling, or add the scene. |
 | TW2003 | Wrong kind of value, e.g. comparing a stat with text. | Compare numbers with numbers, tiers with tiers (`faction:x >= friendly`). |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |
@@ -56,20 +56,20 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW3003 | A choice or check outcome has no target, and the scene has no `->` to fall through to. | Give it a target or add a `->` line to the scene. Also appears as a side effect of TW2002. |
 | TW3005 | The ruleset has no skill-check rule. | Use the `generic` ruleset, or remove the checks. |
 | TW3006 | More than one `::: skill-check` block in a scene, or one inside `{if}`. | Move the check into its own scene. |
-| TW3007 | The `start` scene doesn't exist. | Fix `start:` in `story.yaml`. |
+| TW3007 | The `start` scene doesn't exist. | Fix `start:` in `story.talewright.yaml`. |
 | ⚠ TW3008 | A hub has no scenes with its tags. | Tag some scenes, or fix the hub's tag. |
 | ⚠ TW3009 | A scene can never be reached. | Link to it, or remove it. Only shown once there are no errors. |
 | TW3010 | Two scenes have the same id. | Rename one. The message says where the first one is. |
 
-## TW4xxx: `story.yaml`
+## TW4xxx: `story.talewright.yaml`
 
 | Code | Meaning | Usual fix |
 |---|---|---|
 | TW4001 | Invalid YAML. | Check indentation (spaces, not tabs) and colons. |
-| TW4002 | Something required is missing: `story.yaml` itself, `id`, `title`, `start`, the `player` character, a character's `first-name`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. |
+| TW4002 | Something required is missing: `story.talewright.yaml` itself, `id`, `title`, `start`, the `player` character, a character's `first-name`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. |
 | TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. | Read the message for the allowed values. |
 | TW4004 | Unknown ruleset. | Use `generic` or `none`. |
-| TW4005 | Unknown stat or item in `story.yaml`. | Fix the spelling, or declare it under `ruleset.stats` / `items`. |
+| TW4005 | Unknown stat or item in `story.talewright.yaml`. | Fix the spelling, or declare it under `ruleset.stats` / `items`. |
 | ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |
 | TW4007 | Two triggers have the same id. | Rename one. |
 
