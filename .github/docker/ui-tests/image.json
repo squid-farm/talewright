@@ -1,0 +1,6 @@
+{
+  "reference": "ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1",
+  "playwright": "1.63.0",
+  "sdk_request": "10.0.100",
+  "node_major": 22
+}

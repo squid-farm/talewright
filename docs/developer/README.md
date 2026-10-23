@@ -12,6 +12,7 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [Decision records](adr/) | The big design decisions in long form |
 | [Issue tracking](issues.md) | Full claim/status workflow for people and agents |
 | [Releasing and CI](releasing.md) | Workflows, GitHub Pages, version tags, package publication |
+| [UI test container image](ui-test-image.md) | Build/publish process and CI image rollout for browser/Linux player tests |
 | [Performance](performance.md) | Recorded benchmark results and how they were measured |
 | [Testing](../../tests/README.md) | Unit, browser, desktop and performance test suites |
 
