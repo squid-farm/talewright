@@ -10,6 +10,7 @@
     "package-check": {
       "executor": "nx:run-commands",
       "cache": false,
+      "inputs": ["default", "^default", "packageInfrastructure"],
       "options": {
         "command": "test -n \"$VERSION\" && dotnet build Talewright.slnx -c Release -p:Version=\"$VERSION\" -p:ContinuousIntegrationBuild=true && dotnet pack packaging/Talewright -c Release --no-build -p:Version=\"$VERSION\" -o artifacts/packages && dotnet pack player/src/Talewright.Player -c Release --no-build -p:Version=\"$VERSION\" -o artifacts/packages && dotnet pack tooling/cli/src/Talewright.Cli -c Release --no-build -p:Version=\"$VERSION\" -o artifacts/packages && dotnet pack tooling/language-server/src/Talewright.LanguageServer -c Release --no-build -p:Version=\"$VERSION\" -o artifacts/packages && python3 .github/scripts/verify_packages.py artifacts/packages \"$VERSION\" --smoke"
       }

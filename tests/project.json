@@ -4,6 +4,7 @@
     "ci-check": {
       "executor": "nx:run-commands",
       "cache": false,
+      "inputs": ["default", "{workspaceRoot}/.github/**/*"],
       "options": {
         "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
       }

@@ -5,6 +5,7 @@
     "check": {
       "executor": "nx:run-commands",
       "cache": false,
+      "inputs": ["default", "testWorkflow", "{workspaceRoot}/.github/workflows/performance.yml"],
       "options": {
         "command": "python3 -m unittest discover -s benchmarks/performance -p 'test_*.py' -v"
       }

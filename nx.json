@@ -28,6 +28,16 @@
     "test": {
       "cache": false,
       "dependsOn": ["build:release"],
+      "inputs": [
+        "default",
+        "^production",
+        {"workingDirectory": "absolute"},
+        {"dependentTasksOutputFiles": "**/*"},
+        {"env": "NUGET_PACKAGES"},
+        "{workspaceRoot}/Directory.Build.props",
+        "{workspaceRoot}/global.json",
+        "testWorkflow"
+      ],
       "options": {
         "args": [
           "--no-build", "--no-restore", "--configuration", "Release",
@@ -37,6 +47,18 @@
     },
     "lint": {
       "cache": false
+    },
+    "compiler-contract": {
+      "cache": false,
+      "inputs": ["default", "^default", "editorWorkflow"]
+    },
+    "check": {
+      "cache": false,
+      "inputs": ["default", "^default", "testWorkflow"]
+    },
+    "budget": {
+      "cache": false,
+      "inputs": ["default", "^default", "testWorkflow"]
     }
   },
   "plugins": [
@@ -44,13 +66,30 @@
   ],
   "namedInputs": {
     "sharedGlobals": [
-      "{workspaceRoot}/.github/**/*",
       "{workspaceRoot}/Directory.Build.*",
       "{workspaceRoot}/Directory.Packages.props",
       "{workspaceRoot}/NuGet.Config",
       "{workspaceRoot}/Talewright.slnx",
       "{workspaceRoot}/global.json",
       "{workspaceRoot}/nx.json"
+    ],
+    "testWorkflow": [
+      "{workspaceRoot}/.github/workflows/tests.yml"
+    ],
+    "editorWorkflow": [
+      "testWorkflow",
+      "{workspaceRoot}/.github/workflows/editor-tooling.yml"
+    ],
+    "packageInfrastructure": [
+      "{workspaceRoot}/.github/workflows/build.yml",
+      "{workspaceRoot}/.github/workflows/publish-nuget.yml",
+      "{workspaceRoot}/.github/scripts/package_version.py",
+      "{workspaceRoot}/.github/scripts/verify_packages.py"
+    ],
+    "browserInfrastructure": [
+      "testWorkflow",
+      "{workspaceRoot}/.github/workflows/publish-samples.yml",
+      "{workspaceRoot}/.github/scripts/publish_samples.py"
     ],
     "default": [
       "sharedGlobals",

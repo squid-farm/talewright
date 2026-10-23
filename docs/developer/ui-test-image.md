@@ -69,8 +69,11 @@ Its digest is `sha256:d636d1fc9c49ff2eaa65341c1056738b35a2b4dac8e455df2738b8c9da
 This change incorporates the `a533824` handoff and subsequent `394d6c6` update (including the `ddee903`
 main/schema integration) from `feature/123-nx-orchestration`. Containerized jobs
 retain its affected-job selection, Nx runner commands, artifact paths, and standalone coverage.
-The image provides Node 22/npm for those commands; it does not replace Nx. `.github/**` is already a
-shared Nx input, so image definitions and workflow reference changes select broad verification.
+The image provides Node 22/npm for those commands; it does not replace Nx.
+Image-definition changes select CI contracts plus this workflow's independent candidate build,
+browser story-loading tests and native probe, rather than the entire product suite.
+Changes to the consumer workflow references select their driven groups according to the
+[CI-infrastructure matrix](nx-ci.md#ci-infrastructure-change-matrix).
 
 Non-root jobs need a writable checkout (including `.nx/installation`), home directory, npm cache,
 and NuGet cache. GitHub-hosted Ubuntu runners and the image user both use UID/GID 1001.
