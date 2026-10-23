@@ -20,7 +20,7 @@ class CiRoutingTests(unittest.TestCase):
         for changed, expected in [
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),
             ("tooling/vscode-talewright/snippets/tale.json", {"editor"}),
-            ("docs/guide/first-story.md", {"checks"}),
+            ("docs/guide/first-story.md", {"checks", "editor"}),
         ]:
             with self.subTest(changed=changed):
                 plan = make_plan(affected_graph(changed))

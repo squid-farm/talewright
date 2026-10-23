@@ -71,9 +71,13 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-link { background: none; border: none; cursor: pointer; color: var(--tw-accent); font-family: var(--tw-ui-font); font-size: 0.9rem; padding: 0; }
 .tw-link:hover { text-decoration: underline; }
 .tw-link:disabled { color: var(--tw-muted); cursor: default; text-decoration: none; }
-.tw-saves { min-width: 0; margin: 1rem 0; padding: 0.75rem; border: 1px solid var(--tw-border); font-family: var(--tw-ui-font); }
+.tw-saves { box-sizing: border-box; width: min(36rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); overflow: auto; overflow-wrap: anywhere; padding: 1rem; color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; font-family: var(--tw-ui-font); }
+.tw-saves::backdrop { background: #0008; }
+.tw-saves fieldset { min-width: 0; border: 1px solid var(--tw-border); }
+.tw-save-list { list-style: none; padding: 0; }
+.tw-save-list li { display: grid; grid-template-columns: minmax(0, 1fr); gap: .25rem; padding: .75rem 0; border-top: 1px solid var(--tw-border); overflow-wrap: anywhere; }
 .tw-saves input { box-sizing: border-box; max-width: 100%; color: var(--tw-fg); background: var(--tw-bg); border: 1px solid var(--tw-border); font: inherit; }
-.tw-saves button { margin: 0.25rem; padding: 0.25rem 0.5rem; color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 4px; cursor: pointer; }
+.tw-saves button { min-width: 0; overflow-wrap: anywhere; margin: 0.25rem; padding: 0.25rem 0.5rem; color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 4px; cursor: pointer; }
 .tw-columns { display: grid; grid-template-columns: minmax(0, 1fr) 16rem; gap: 2rem; align-items: start; }
 @media (max-width: 52rem) { .tw-columns { grid-template-columns: 1fr; } }
 

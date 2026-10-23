@@ -6,7 +6,7 @@
       "dependsOn": ["build:release"],
       "cache": false,
       "options": {
-        "command": "dotnet test --filter FullyQualifiedName!~EditorSnippetTests",
+        "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests'",
         "cwd": "tests/Talewright.Tale.Tests"
       }
     }

@@ -8,13 +8,14 @@
                    CanBack="_session.CanBack" CanForward="_session.CanForward" CanSave="@(SaveStore is not null)"
                    OnBack="Back" OnForward="Forward" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit" />
 
-    @if (_showSaves && SaveStore is not null)
+    @if (SaveStore is not null)
     {
-        <SavedGamesPanel Busy="_busy" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
-                         OnSave="SaveAsync" OnRefresh="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
-                         OnLoad="LoadAsync" />
+        <SavedGamesPanel Open="_showSaves" Busy="_busy" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
+                         Message="@_saveMessage" Error="_saveError" PendingLoad="@_pendingLoad"
+                         OnSave="SaveAsync" OnRetry="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
+                         OnLoad="RequestLoadAsync" OnConfirmLoad="ConfirmLoadAsync" OnCancelLoad="CloseSaves" OnClose="CloseSaves" />
     }
-    @if (_saveMessage is not null)
+    @if (_saveMessage is not null && !_showSaves)
     {
         <p class="@(_saveError ? "tw-error" : "tw-save-status")" role="@(_saveError ? "alert" : "status")">@_saveMessage</p>
     }
@@ -83,7 +84,8 @@
     private string _slot = "My save";
     private string? _pendingOverwrite;
     private string? _saveMessage;
-    private IReadOnlyList<string> _slots = [];
+    private IReadOnlyList<SaveEntry> _slots = [];
+    private string? _pendingLoad;
 
     protected override void OnParametersSet()
     {
@@ -109,6 +111,7 @@
         _busy = false;
         _showSaves = false;
         _pendingOverwrite = null;
+        _pendingLoad = null;
         _saveMessage = null;
         _slots = [];
         _focusLatest = true;
@@ -138,16 +141,21 @@
 
     private async Task ShowSavesAsync()
     {
-        _showSaves = !_showSaves;
-        if (_showSaves)
-        {
-            await RefreshSlotsAsync();
-        }
+        _showSaves = true;
+        _pendingLoad = null;
+        await RefreshSlotsAsync();
+    }
+
+    private void CloseSaves()
+    {
+        _showSaves = false;
+        _pendingLoad = null;
+        _pendingOverwrite = null;
     }
 
     private Task RefreshSlotsAsync() => SaveOperationAsync(async generation =>
     {
-        var slots = await SaveStore!.ListAsync(Story.Id);
+        var slots = await SaveStore!.ListEntriesAsync(Story.Id);
         if (generation == _generation)
         {
             _slots = slots;
@@ -157,7 +165,7 @@
     private Task SaveAsync(bool overwrite)
     {
         var slot = _slot.Trim();
-        if (!overwrite && _slots.Contains(slot, StringComparer.Ordinal))
+        if (!overwrite && _slots.Any(entry => entry.Slot == slot))
         {
             _pendingOverwrite = slot;
             return Task.CompletedTask;
@@ -171,18 +179,42 @@
             }
 
             var id = Story.Id;
-            await SaveStore!.WriteAsync(id, slot, _session.Save(), overwrite);
-            var slots = await SaveStore.ListAsync(id);
+            var data = _session.Save(_session.CaptureSummary(DateTimeOffset.UtcNow));
+            await SaveStore!.WriteAsync(id, slot, data, overwrite);
             if (generation == _generation)
             {
                 _pendingOverwrite = null;
+                _slots = _slots.Where(entry => entry.Slot != slot)
+                    .Append(StoryHistory.DescribeSave(slot, data)).OrderBy(entry => entry.Slot, StringComparer.Ordinal).ToArray();
                 _saveMessage = $"Saved '{slot}'.";
-                _slots = slots;
             }
         });
     }
 
-    private Task LoadAsync(string slot) => SaveOperationAsync(async generation =>
+    private Task RequestLoadAsync(string slot) => SaveOperationAsync(async generation =>
+    {
+        var slots = await SaveStore!.ListEntriesAsync(Story.Id);
+        if (generation != _generation)
+        {
+            return;
+        }
+        _slots = slots;
+        var currentProgress = _session.TryProgressKey(out var progressKey) ? progressKey : null;
+        if (currentProgress is null || !_slots.Any(entry => entry.ProgressKey == currentProgress))
+        {
+            _pendingLoad = slot;
+            return;
+        }
+        await LoadAsync(slot, generation);
+    });
+
+    private Task ConfirmLoadAsync()
+    {
+        var slot = _pendingLoad ?? throw new InvalidOperationException("Choose a save before confirming a load.");
+        return SaveOperationAsync(generation => LoadAsync(slot, generation));
+    }
+
+    private async Task LoadAsync(string slot, int generation)
     {
         var story = Story;
         var bytes = await SaveStore!.ReadAsync(story.Id, slot);
@@ -191,10 +223,12 @@
         {
             _session = candidate;
             _pendingOverwrite = null;
+            _pendingLoad = null;
+            _showSaves = false;
             _saveMessage = $"Loaded '{slot}'.";
             _focusLatest = true;
         }
-    });
+    }
 
     private async Task SaveOperationAsync(Func<int, Task> operation)
     {

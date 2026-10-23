@@ -44,6 +44,9 @@ public sealed class CharacterCreationTests
         Assert.Equal("she", history.State.GetCharacterDefinition(EntityId.Player).Pronouns.Subject);
         Assert.Equal(16, history.State.GetBaseStat(EntityId.Player, new StatId("str")));
         Assert.Equal(15, history.State.GetBaseStat(EntityId.Player, new StatId("hp")));
+        Assert.Equal("Robin Vale", history.CaptureSummary(DateTimeOffset.UtcNow).CharacterName);
+        Assert.NotEqual(history.ProgressKey, new StoryHistory(story, 42, selection with { FirstName = "Other" }).ProgressKey);
+        Assert.NotEqual(history.ProgressKey, new StoryHistory(story, 42, selection with { Pronouns = "they" }).ProgressKey);
         history.Choose("c0");
         history.Back();
         var saved = StoryHistory.Restore(story, history.Save());

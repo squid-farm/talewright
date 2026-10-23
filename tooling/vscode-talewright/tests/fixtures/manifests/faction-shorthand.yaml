@@ -1,0 +1,7 @@
+id: faction-shorthand
+title: Faction shorthand is not a display name
+start: beginning
+characters:
+  player: {first-name: Ada}
+factions:
+  guild: Explorers Guild

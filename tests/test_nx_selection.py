@@ -137,7 +137,20 @@ class NxSelectionTests(unittest.TestCase):
     def test_documentation_changes_select_documentation_checks_only(self):
         graph = affected_graph("docs/guide/first-story.md")
         selected = self.assert_selected(graph, "talewright-docs:check")
-        self.assertFalse(any(":test" in task or ":e2e-" in task for task in selected))
+        self.assertIn("talewright-editor:compiler-contract", selected)
+        self.assertFalse(any(":e2e-" in task for task in selected))
+        self.assertNotIn("Talewright.Tale.Tests:test", selected)
+
+    def test_schema_fixture_inputs_select_editor_contracts(self):
+        for changed in (
+            "docs/reference/tale-syntax.md",
+            "examples/CSharpStory/Story/Content/story.yaml",
+            "tooling/vscode-talewright/schemas/story.schema.json",
+            "tests/Talewright.Tale.Tests/EditorManifestSchemaTests.cs",
+        ):
+            with self.subTest(changed=changed):
+                self.assert_selected(affected_graph(changed), "talewright-editor:compiler-contract",
+                                     "talewright-editor:test")
 
     def test_task_graph_orders_build_prerequisites(self):
         graph = affected_graph("src/Talewright.Runtime/Talewright.Runtime.csproj")

@@ -15,9 +15,16 @@ test('VSIX contains exactly the distributable assets', async () => {
     'extension/language-configuration.json',
     'extension/package.json',
     'extension/snippets/tale.json',
+    'extension/schemas/story.schema.json',
     'extension/syntaxes/tale.tmLanguage.json',
   ].sort());
-  for (const file of ['language-configuration.json', 'package.json', 'snippets/tale.json', 'syntaxes/tale.tmLanguage.json']) {
+  for (const file of [
+    'language-configuration.json',
+    'package.json',
+    'schemas/story.schema.json',
+    'snippets/tale.json',
+    'syntaxes/tale.tmLanguage.json',
+  ]) {
     assert.equal(execFileSync('unzip', ['-p', archive, `extension/${file}`], { encoding: 'utf8' }),
       await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
   }

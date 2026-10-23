@@ -1,0 +1,10 @@
+[
+  { "file": "defaults.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "faction-shorthand.yaml", "schemaValid": false, "compilerCodes": [] },
+  { "file": "preset-empty.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
+  { "file": "preset-whitespace.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
+  { "file": "preset-too-long.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
+  { "file": "wrong-type.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
+  { "file": "unknown-key.yaml", "schemaValid": false, "compilerCodes": ["TW4006"] }
+]

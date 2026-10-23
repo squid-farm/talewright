@@ -1,0 +1,6 @@
+id: wrong-type
+title: Wrong variable type
+start: beginning
+characters:
+  player: {first-name: Ada}
+vars: {attempts: many}

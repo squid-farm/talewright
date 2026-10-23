@@ -4,13 +4,14 @@ import { test } from 'node:test';
 
 const json = async file => JSON.parse(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
 
-test('declarative package wires only Tale syntax and snippets', async () => {
+test('declarative package wires Tale syntax, snippets, and manifest schema', async () => {
   const manifest = await json('package.json');
   assert.equal(manifest.main, undefined);
   assert.equal(manifest.browser, undefined);
   assert.equal(manifest.activationEvents, undefined);
   assert.equal(manifest.dependencies, undefined);
-  assert.deepEqual(Object.keys(manifest.contributes).sort(), ['configurationDefaults', 'grammars', 'languages', 'snippets']);
+  assert.deepEqual(Object.keys(manifest.contributes).sort(),
+    ['configurationDefaults', 'grammars', 'languages', 'snippets', 'yamlValidation']);
   assert.deepEqual(manifest.contributes.configurationDefaults['[tale]'], {
     'editor.autoClosingBrackets': 'never',
     'editor.autoClosingQuotes': 'never',
@@ -20,6 +21,11 @@ test('declarative package wires only Tale syntax and snippets', async () => {
   for (const contribution of ['grammars', 'snippets']) {
     await readFile(new URL(`../${manifest.contributes[contribution][0].path}`, import.meta.url));
   }
+  assert.deepEqual(manifest.contributes.yamlValidation, [{
+    fileMatch: ['story.yaml'],
+    url: './schemas/story.schema.json',
+  }]);
+  await readFile(new URL(`../${manifest.contributes.yamlValidation[0].url}`, import.meta.url));
   const config = await json(manifest.contributes.languages[0].configuration);
   assert.equal(config.comments.lineComment, '//');
   assert.deepEqual(config.autoClosingPairs, []);

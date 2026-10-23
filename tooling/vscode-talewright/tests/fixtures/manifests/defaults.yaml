@@ -1,0 +1,13 @@
+id: defaults
+title: Defaults
+start: beginning
+characters:
+  player:
+    first-name: Ada
+items:
+  coin: {}
+factions:
+  guild: {}
+creation:
+  presets:
+    explorer: {}
