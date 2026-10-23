@@ -1,0 +1,16 @@
+{
+  "name": "Talewright.Player.E2E.Tests",
+  "implicitDependencies": [
+    "Talewright.Cli",
+    "Talewright.Debugger",
+    "Talewright.Host.Desktop",
+    "Talewright.Host.Web",
+    "Talewright.Player",
+    "Talewright.Runtime"
+  ],
+  "targets": {
+    "test": {
+      "cache": false
+    }
+  }
+}
