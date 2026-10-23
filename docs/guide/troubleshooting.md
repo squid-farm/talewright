@@ -5,7 +5,7 @@
 The player lists each problem with its file and line. Fix the **first** error and try again: one mistake
 can cause several messages. Look up any code in [error codes](../reference/diagnostics.md).
 
-If the list says the story has no `story.yaml`, make sure the zip contains `story.yaml`, either at the
+If the list says the story has no `story.talewright.yaml`, make sure the zip contains `story.talewright.yaml`, either at the
 top level or inside a single folder.
 
 ## A choice I wrote doesn't appear

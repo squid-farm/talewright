@@ -468,14 +468,14 @@ internal sealed class ExpressionParser
             case "flag":
                 if (!_symbols.Flags.Contains(new FlagId(path.Text)))
                 {
-                    Fail("TW2004", $"Flag '{path.Text}' is never set by any effect and is not declared in story.yaml.", path.Offset);
+                    Fail("TW2004", $"Flag '{path.Text}' is never set by any effect and is not declared in story.talewright.yaml.", path.Offset);
                 }
 
                 return new FlagRef(new FlagId(path.Text));
             case "var":
                 if (!_symbols.Variables.Contains(new VarId(path.Text)))
                 {
-                    Fail("TW2004", $"Variable '{path.Text}' is never assigned by any effect and is not declared in story.yaml.", path.Offset);
+                    Fail("TW2004", $"Variable '{path.Text}' is never assigned by any effect and is not declared in story.talewright.yaml.", path.Offset);
                 }
 
                 return new VarRef(new VarId(path.Text));

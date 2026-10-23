@@ -19,7 +19,7 @@ public class StoryAnalysisTests
         """;
 
     private static StorySource Source(string tale = "=== first\n-> END", string yaml = Manifest) => new(
-        new Dictionary<string, string> { ["story.yaml"] = yaml, ["main.tale"] = tale });
+        new Dictionary<string, string> { ["story.talewright.yaml"] = yaml, ["main.tale"] = tale });
 
     [Fact]
     public void Terminal_dc_preserves_empty_difficulty_context_in_blocks_and_choices()
@@ -63,7 +63,7 @@ public class StoryAnalysisTests
         {
             ["main.tale"] = $"=== first\n::: skill-check {check} dc player:hp +\nsuccess: -> END\nfailure: -> END\n:::",
         };
-        if (manifest is not null) files["story.yaml"] = manifest.Length == 0 ? Manifest : manifest;
+        if (manifest is not null) files["story.talewright.yaml"] = manifest.Length == 0 ? Manifest : manifest;
         var source = new StorySource(files);
         var analysis = StoryAnalyzer.Analyze(source);
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
@@ -176,7 +176,7 @@ public class StoryAnalysisTests
         {
             ["main.tale"] = "=== first\n> player: Hello {player:\n~ set flag:ready",
         };
-        if (yaml is not null) files["story.yaml"] = yaml;
+        if (yaml is not null) files["story.talewright.yaml"] = yaml;
         var source = new StorySource(files);
         var analysis = StoryAnalyzer.Analyze(source, options);
         Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics, analysis.Diagnostics);
@@ -264,7 +264,7 @@ public class StoryAnalysisTests
     {
         var analysis = StoryAnalyzer.Analyze(Source());
         var diagnostic = new Diagnostic(DiagnosticSeverity.Error, "HOST001", "Host error.",
-            new SourceLocation("story.yaml", 1, 1));
+            new SourceLocation("story.talewright.yaml", 1, 1));
         var extended = analysis.WithDiagnostic(diagnostic);
         Assert.DoesNotContain(diagnostic, analysis.Diagnostics);
         Assert.Contains(diagnostic, extended.Diagnostics);
@@ -285,8 +285,8 @@ public class StoryAnalysisTests
         Assert.Equal(new SourceLocation("main.tale", 1, 7), scene.Declaration!.Start);
         Assert.Equal(new SourceLocation("main.tale", 1, 12), scene.Declaration.End);
         var player = Assert.Single(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Character);
-        Assert.Equal(new SourceLocation("story.yaml", 5, 3), player.Declaration!.Start);
-        Assert.Equal(new SourceLocation("story.yaml", 5, 9), player.Declaration.End);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 5, 3), player.Declaration!.Start);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 5, 9), player.Declaration.End);
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Item && symbol.Name == "coin");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Faction && symbol.Name == "guild");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == "str");
@@ -383,18 +383,18 @@ public class StoryAnalysisTests
         Assert.Contains(changed.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW2002");
         Assert.True(workspace.Change("chapters/next.tale", 2, "=== next\n-> END"));
         Assert.False(workspace.Change("chapters/next.tale", 1, "=== old\n-> END"));
-        workspace.Open("story.yaml", 1, Manifest.Replace("start: first", "start: next"));
+        workspace.Open("story.talewright.yaml", 1, Manifest.Replace("start: first", "start: next"));
         var overlay = await workspace.AnalyzeAsync(TimeSpan.Zero);
-        Assert.Contains("start: next", overlay.Analysis.Source.Files["story.yaml"]);
-        Assert.True(workspace.Change("story.yaml", 2, Manifest.Replace("start: first", "start: unknown")));
+        Assert.Contains("start: next", overlay.Analysis.Source.Files["story.talewright.yaml"]);
+        Assert.True(workspace.Change("story.talewright.yaml", 2, Manifest.Replace("start: first", "start: unknown")));
         var yamlChanged = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(yamlChanged.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW3007");
-        Assert.True(workspace.Change("story.yaml", 3, Manifest));
+        Assert.True(workspace.Change("story.talewright.yaml", 3, Manifest));
         workspace.UpdateFile("chapters/next.tale", null);
         var deletedUnderOverlay = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(deletedUnderOverlay.Analysis.Symbols, symbol => symbol.Name == "next");
         workspace.Close("chapters/next.tale");
-        workspace.Close("story.yaml");
+        workspace.Close("story.talewright.yaml");
         var deleted = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.DoesNotContain(deleted.Analysis.Symbols, symbol => symbol.Name == "next");
         Assert.Contains(deleted.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW2002");
@@ -411,12 +411,12 @@ public class StoryAnalysisTests
         var changed = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(changed.Analysis.Symbols, symbol => symbol.Name == "changed");
         Assert.DoesNotContain(changed.Analysis.Symbols, symbol => symbol.Name == "old");
-        workspace.Open("story.yaml", 1, "characters: [");
+        workspace.Open("story.talewright.yaml", 1, "characters: [");
         var invalid = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(invalid.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW4001");
         Assert.DoesNotContain(invalid.Analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Character);
         Assert.Contains(invalid.Analysis.Symbols, symbol => symbol.Name == "changed");
-        workspace.Close("story.yaml");
+        workspace.Close("story.talewright.yaml");
         var restored = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(restored.Analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Character);
     }
@@ -514,20 +514,25 @@ public class StoryAnalysisTests
         Directory.CreateDirectory(Path.Combine(root, "nested", "chapters"));
         try
         {
-            File.WriteAllText(Path.Combine(root, "story.yaml"), Manifest);
+            File.WriteAllText(Path.Combine(root, "story.talewright.yaml"), Manifest);
             File.WriteAllText(Path.Combine(root, "example.csproj"), "<Project />");
             var project = StoryWorkspace.FromDirectory(root);
             var analysis = await project.AnalyzeAsync(TimeSpan.Zero);
             Assert.Contains(analysis.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW5001");
             Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
-            File.WriteAllText(Path.Combine(root, "nested", "story.yaml"), Manifest);
+            File.WriteAllText(Path.Combine(root, "nested", "story.talewright.yaml"), Manifest);
             Assert.Equal(Path.Combine(root, "nested"), StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters")));
+            File.WriteAllText(Path.Combine(root, "nested", "chapters", "story.yaml"), Manifest);
+            Assert.Equal(Path.Combine(root, "nested"), StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
+            File.Delete(Path.Combine(root, "nested", "chapters", "story.yaml"));
+            new StoryWorkspace(Source()).Open("story.talewright.yaml", 1, Manifest);
+            Assert.Throws<ArgumentException>(() => new StoryWorkspace(Source()).Open("story.yaml", 1, Manifest));
             Assert.Throws<ArgumentException>(() => new StoryWorkspace(Source()).Open("../file.tale", 1, ""));
         }
         finally
         {
-            File.Delete(Path.Combine(root, "nested", "story.yaml"));
-            File.Delete(Path.Combine(root, "story.yaml"));
+            File.Delete(Path.Combine(root, "nested", "story.talewright.yaml"));
+            File.Delete(Path.Combine(root, "story.talewright.yaml"));
             File.Delete(Path.Combine(root, "example.csproj"));
             Directory.Delete(Path.Combine(root, "nested", "chapters"));
             Directory.Delete(Path.Combine(root, "nested"));

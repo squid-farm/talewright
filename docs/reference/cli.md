@@ -34,7 +34,7 @@ talewright validate path/to/story
 talewright validate path/to/story --format json --warnings-as-errors
 ```
 
-Runs the same compiler as the players on a folder containing `story.yaml` and `.tale` files. Validation
+Runs the same compiler as the players on a folder containing `story.talewright.yaml` and `.tale` files. Validation
 proves the story is well formed; it doesn't play every possible path.
 
 | Option | Effect |
@@ -65,7 +65,7 @@ Operational errors go to stderr.
 - Operational failures (exit 2) return `success: false`, empty `diagnostics` and
   `error: {"code": "TWCLI001" | "TWCLI002", "message": "..."}`: `TWCLI001` for invocation errors,
   `TWCLI002` for input errors.
-- A readable folder with no `story.yaml` is a compiler diagnostic (`TW4002`), not an operational error.
+- A readable folder with no `story.talewright.yaml` is a compiler diagnostic (`TW4002`), not an operational error.
 
 ## debug
 
@@ -106,7 +106,7 @@ Validates first, then builds. For a walkthrough, see [Sharing your story](../gui
 | Option | Effect |
 |---|---|
 | `-o`, `--output <path>` | Output ZIP, or output directory with `--split`. |
-| `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds just `story.yaml` and `.tale` files in their folder layout. `--a` is not accepted. |
+| `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds just `story.talewright.yaml` and `.tale` files in their folder layout. `--a` is not accepted. |
 | `--target web` | Default. A static site with a root `index.html` and relative URLs. |
 | `--target desktop` | A self-contained desktop app. |
 | `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
@@ -199,5 +199,5 @@ human-readable diagnostics only (`--format json` is for `validate`).
 | Output (before compression) | 20,000 files and 512 MiB (1 GiB for the universal desktop zip) |
 
 Files are rechecked after UTF-8 staging, because UTF-16 input can grow when rewritten. Only
-`story.yaml` and `.tale` files are included. Media support will extend this deliberately; other files
+`story.talewright.yaml` and `.tale` files are included. Media support will extend this deliberately; other files
 are never bundled automatically.

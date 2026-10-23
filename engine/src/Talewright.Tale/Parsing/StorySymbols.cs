@@ -7,7 +7,7 @@ using Talewright.Tale.Analysis;
 namespace Talewright.Tale.Parsing;
 
 /// <summary>
-/// Everything a reference can resolve to. Built from story.yaml plus syntax discovery across all .tale files
+/// Everything a reference can resolve to. Built from story.talewright.yaml plus syntax discovery across all .tale files
 /// (scene ids, and flags/variables that some effect assigns).
 /// </summary>
 internal sealed class StorySymbols

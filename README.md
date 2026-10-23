@@ -13,7 +13,7 @@
 
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
 and many branches. You write scenes in `.tale` files, a small extension of Markdown, and describe your
-cast in one `story.yaml`. No programming required.
+cast in one `story.talewright.yaml`. No programming required.
 
 ```tale
 === temple.entrance
@@ -67,7 +67,7 @@ Linux notes and Git instructions.
 
 ## Write your first story
 
-1. Create a folder with a `story.yaml` (title, start scene, characters) and a `story.tale` (your scenes).
+1. Create a folder with a `story.talewright.yaml` (title, start scene, characters) and a `story.tale` (your scenes).
    You can also copy the [sample story](samples/LostRelic) and edit it.
 2. Check it: `talewright validate my-story` lists every problem with its file and line.
 3. Play it in the desktop player, which opens the folder directly. Or zip the folder and choose

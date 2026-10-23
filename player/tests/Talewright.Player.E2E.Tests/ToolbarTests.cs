@@ -9,6 +9,63 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
 {
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Resize_delivery_defers_layout_writes_and_disposal_cancels_pending_updates()
+    {
+        var checks = await Page.EvaluateAsync<Dictionary<string, bool>>("""
+            async () => {
+                const toolbar = await import("./_content/Talewright.Player/Components/PlayerToolbar.razor.js");
+                const originalObserver = window.ResizeObserver;
+                let notify;
+                let disconnected = false;
+                window.ResizeObserver = class {
+                    constructor(callback) { notify = callback; }
+                    observe() {}
+                    disconnect() { disconnected = true; }
+                };
+                const player = document.createElement("div");
+                player.className = "tw-player";
+                const bar = player.appendChild(document.createElement("header"));
+                const toggle = document.createElement("button");
+                const menu = document.createElement("div");
+                const confirmation = document.createElement("dialog");
+                const rootStyle = document.documentElement.style;
+                const property = "--tw-toolbar-offset";
+                const originalOffset = rootStyle.getPropertyValue(property);
+                let reads = 0;
+                bar.getBoundingClientRect = () => {
+                    reads++;
+                    return { height: 42 };
+                };
+                const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+                try {
+                    toolbar.initialize(bar, toggle, menu, confirmation);
+                    notify();
+                    notify();
+                    const deferred = reads === 0 && player.style.getPropertyValue(property) === "";
+                    await nextFrame();
+                    const coalesced = reads === 1;
+                    const updated = player.style.getPropertyValue(property) === "60px"
+                        && rootStyle.getPropertyValue(property) === "60px";
+                    notify();
+                    toolbar.dispose(bar);
+                    await nextFrame();
+                    const cancelled = disconnected && reads === 1 && rootStyle.getPropertyValue(property) === "";
+                    return { deferred, coalesced, updated, cancelled };
+                } finally {
+                    window.ResizeObserver = originalObserver;
+                    if (originalOffset) rootStyle.setProperty(property, originalOffset);
+                    else rootStyle.removeProperty(property);
+                }
+            }
+            """);
+        foreach (var (check, passed) in checks)
+        {
+            Assert.True(passed, check);
+        }
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Overflow_is_disabled_until_its_module_is_initialized()
     {
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

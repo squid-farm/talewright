@@ -14,7 +14,7 @@ public sealed class PublishTests : IDisposable
     public PublishTests()
     {
         Directory.CreateDirectory(Path.Combine(Story, "chapters"));
-        File.WriteAllText(Path.Combine(Story, "story.yaml"),
+        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"),
             "id: publish\ntitle: Publish\nstart: a\ncharacters:\n  player: {first-name: Tester}\n");
         File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), "=== a\nHello.\n-> END");
         File.WriteAllText(Path.Combine(Story, "private-notes.txt"), "Not story content");
@@ -695,9 +695,28 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(0, result.Code);
         Assert.Empty(result.Error);
         using var zip = ZipFile.OpenRead(Zip);
-        Assert.Equal(["chapters/main.tale", "story.yaml"], zip.Entries.Select(e => e.FullName).Order());
+        Assert.Equal(["chapters/main.tale", "story.talewright.yaml"], zip.Entries.Select(e => e.FullName).Order());
         using var stream = File.OpenRead(Zip);
         Assert.True(StoryCompiler.Compile(StorySource.FromZip(stream)).Success);
+    }
+
+    [Fact]
+    public void Publication_does_not_treat_or_ship_generic_story_yaml_as_the_manifest()
+    {
+        File.WriteAllText(Path.Combine(Story, "story.yaml"), "id: other\ntitle: Other tool\n");
+        Assert.Equal(0, Run().Code);
+        using (var zip = ZipFile.OpenRead(Zip))
+        {
+            Assert.Equal(["chapters/main.tale", "story.talewright.yaml"], zip.Entries.Select(e => e.FullName).Order());
+        }
+
+        File.Delete(Zip);
+        File.Delete(Path.Combine(Story, StorySource.ManifestFileName));
+        var result = Run();
+        Assert.Equal(1, result.Code);
+        Assert.Contains("TW4002", result.Output + result.Error);
+        Assert.Contains("story.talewright.yaml", result.Output + result.Error);
+        Assert.False(File.Exists(Zip));
     }
 
     [Fact]

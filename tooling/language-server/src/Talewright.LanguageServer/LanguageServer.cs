@@ -320,7 +320,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                 .OfType<string>().Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
             ?? _folders.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
             ?? fallbackRoot
-            ?? throw new ArgumentException($"No story.yaml or workspace root found for {path}.");
+            ?? throw new ArgumentException($"No story.talewright.yaml or workspace root found for {path}.");
         if (_stories.TryGetValue(root, out var existing)) return existing;
         var story = LoadStory(root);
         _stories.Add(root, story);

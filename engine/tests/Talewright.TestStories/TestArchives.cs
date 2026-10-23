@@ -24,8 +24,8 @@ public static class TestArchives
     {
         "zip" => Encoding.UTF8.GetBytes("This is not a ZIP."),
         "manifest" => Create([new("main.tale", "=== start\n-> END")]),
-        "yaml" => Create([new("story.yaml", "title: [broken"), new("main.tale", "=== start\n-> END")]),
-        "tale" => Create([new("story.yaml", TestStories.DefaultYaml),
+        "yaml" => Create([new("story.talewright.yaml", "title: [broken"), new("main.tale", "=== start\n-> END")]),
+        "tale" => Create([new("story.talewright.yaml", TestStories.DefaultYaml),
             new("chapters/main.tale", "=== start\n@hub missing-hub\n* [Missing destination] -> missing\n=== orphan\n-> END")]),
         "file-limit" => Create([new("huge.tale", new string('x', 5 * 1024 * 1024 + 1))]),
         "count-limit" => Create(Enumerable.Range(0, 1001).Select(i => new KeyValuePair<string, string>($"{i}.tale", ""))),

@@ -15,7 +15,7 @@ public sealed class DebuggerTests
             "debugger", Guid.NewGuid().ToString("N"));
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"),
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
                 "id: native-debug\ntitle: Native Debug\nstart: scene1\nflags: [ready]\ncharacters:\n  player: {first-name: Tester}\n");
             var tale = Path.Combine(root, "main.tale");
             await File.WriteAllTextAsync(tale, "=== scene1\n-> missing");
@@ -78,7 +78,7 @@ public sealed class DebuggerTests
                 * [Finish] -> END
                 """;
         var tale = Path.Combine(root, "main.tale");
-        var manifest = Path.Combine(root, "story.yaml");
+        var manifest = Path.Combine(root, "story.talewright.yaml");
         try
         {
             await File.WriteAllTextAsync(manifest, yaml);
@@ -153,7 +153,7 @@ public sealed class DebuggerTests
             """;
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"), """
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"), """
                 id: live-native
                 title: Native live edits
                 start: start
@@ -220,7 +220,7 @@ public sealed class DebuggerTests
             + "\n=== late\n// OLD ACCEPTED SOURCE\n* [Return] -> first\n";
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"),
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
                 "id: source-native\ntitle: Native Source\nstart: first\ncharacters:\n  player: {first-name: Tester}\n");
             var firstPath = Path.Combine(root, "first.tale");
             var latePath = Path.Combine(root, "late.tale");
@@ -271,7 +271,7 @@ public sealed class DebuggerTests
             "debugger-source-scroll", Guid.NewGuid().ToString("N"));
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(root, "story.yaml"),
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
                 "id: scroll\ntitle: Source Scroll\nstart: first\ncharacters:\n  player: {first-name: Tester}\n");
             await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), "=== first\n"
                 + string.Join("\n", Enumerable.Range(1, 150).Select(i => $"// source line {i}"))
@@ -332,7 +332,7 @@ public sealed class DebuggerTests
         var tale = Path.Combine(story, "main.tale");
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(story, "story.yaml"), """
+            await File.WriteAllTextAsync(Path.Combine(story, "story.talewright.yaml"), """
                 id: native-portable
                 title: Portable Native
                 start: scene1

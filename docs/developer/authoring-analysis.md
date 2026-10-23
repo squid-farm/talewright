@@ -59,7 +59,7 @@ hover, LSP transport, lint, or evaluated gameplay values itself.
 ## Workspace lifecycle
 
 `Talewright.Authoring.StoryWorkspace` owns one story's disk snapshot and unsaved document overlays.
-`FindStoryRoot` finds the nearest ancestor containing `story.yaml`; a host can
+`FindStoryRoot` finds the nearest ancestor containing `story.talewright.yaml`; a host can
 instead construct a workspace explicitly for a new, unsaved story.
 
 ```csharp
@@ -75,7 +75,7 @@ if (update.Published)
 
 Hosts forward filesystem add/change/delete notifications through `UpdateFile`
 (null text means deletion). Open overlays take precedence, including for
-`story.yaml`. Closing an overlay restores the latest disk content supplied by
+`story.talewright.yaml`. Closing an overlay restores the latest disk content supplied by
 the host. `Change` returns false for superseded document versions; lifecycle
 misuse and invalid paths throw rather than silently succeed.
 

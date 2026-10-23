@@ -1,6 +1,6 @@
 # Tale syntax reference
 
-A story is a **folder** containing one `story.yaml` and any number of `*.tale` files (subfolders allowed).
+A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
 `.tale` is a Markdown superset: prose is CommonMark inline Markdown, plus a small set of line-level directives.
 
 The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
@@ -11,7 +11,7 @@ New to Talewright? Start with the [author guide](../guide/README.md). This page 
 
 ---
 
-## 1. `story.yaml`
+## 1. `story.talewright.yaml`
 
 ```yaml
 id: lost-relic # kebab-case, unique
@@ -255,5 +255,5 @@ With `randomness: off`, checks are deterministic (`10 + modifiers ≥ DC`).
 ## 7. Diagnostics
 
 Every compiler message has a stable code (`TW1xxx` syntax, `TW2xxx` names and types, `TW3xxx` story
-structure, `TW4xxx` story.yaml) and a `file:line:column` location. See [error codes](diagnostics.md)
+structure, `TW4xxx` story.talewright.yaml) and a `file:line:column` location. See [error codes](diagnostics.md)
 for what each one means and how to fix it.

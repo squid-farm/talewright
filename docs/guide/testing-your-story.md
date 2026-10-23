@@ -98,7 +98,7 @@ scene you're on, keeping the state you'd built up to reach it. You stay where yo
 
 Some changes can't be applied safely in place, for example editing a scene the player already passed
 through, changing Tale-inferred flags/variables, removing a target, or reloading a run that ended
-without entering a new scene. Any change to `story.yaml`, even a comment, also needs a restart.
+without entering a new scene. Any change to `story.talewright.yaml`, even a comment, also needs a restart.
 A file-watcher failure requires a restart because source changes may have been missed.
 In those cases the debugger asks you to click
 **Restart from source**. You don't have to set anything up again: it keeps your selected scene, seed,

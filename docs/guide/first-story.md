@@ -7,7 +7,7 @@ have those yet, the [web player](https://squid-farm.github.io/talewright/) works
 
 ## 1. Create the story folder
 
-Make a folder called `night-ferry`. Inside it, create a file called `story.yaml`:
+Make a folder called `night-ferry`. Inside it, create a file called `story.talewright.yaml`:
 
 ```yaml
 id: night-ferry
@@ -131,7 +131,7 @@ Instead, you'll see the same list of problems:
 
 ![The web player listing story errors](../images/errors.png)
 
-> This screenshot shows two other common mistakes: an item that was never declared in `story.yaml`,
+> This screenshot shows two other common mistakes: an item that was never declared in `story.talewright.yaml`,
 > and a misspelled stat.
 
 After each change, re-zip the folder, go back to the library and open it again.

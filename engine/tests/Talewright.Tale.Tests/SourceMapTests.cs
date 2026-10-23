@@ -9,7 +9,7 @@ public sealed class SourceMapTests
 
     private static CompilationResult Compile(string tale, string? other = null)
     {
-        var files = new Dictionary<string, string> { ["story.yaml"] = Yaml, ["a.tale"] = tale };
+        var files = new Dictionary<string, string> { ["story.talewright.yaml"] = Yaml, ["a.tale"] = tale };
         if (other is not null) { files["nested/b.TALE"] = other; }
         return StoryCompiler.Compile(new StorySource(files));
     }
@@ -83,7 +83,7 @@ public sealed class SourceMapTests
     [Fact]
     public void Source_snapshot_cannot_be_changed_through_the_original_dictionary_or_exposed_views()
     {
-        var files = new Dictionary<string, string> { ["story.yaml"] = Yaml, ["a.tale"] = "=== first\n-> END" };
+        var files = new Dictionary<string, string> { ["story.talewright.yaml"] = Yaml, ["a.tale"] = "=== first\n-> END" };
         var source = new StorySource(files);
         files["a.tale"] = "Not the compiled source";
         var result = StoryCompiler.Compile(source);

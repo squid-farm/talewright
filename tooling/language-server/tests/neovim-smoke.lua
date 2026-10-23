@@ -3,7 +3,7 @@ vim.fn.mkdir(root, "p")
 vim.fn.writefile({
   "id: nvim-smoke", "title: Neovim smoke", "start: start",
   "characters:", "  player: {first-name: Ada}",
-}, root .. "/story.yaml")
+}, root .. "/story.talewright.yaml")
 vim.fn.writefile({ "=== start", "* [Go] -> missing" }, root .. "/start.tale")
 local ok, failure = pcall(function()
   vim.cmd.edit(vim.fn.fnameescape(root .. "/start.tale"))
@@ -30,7 +30,7 @@ local ok, failure = pcall(function()
   print("Neovim LSP smoke passed: compiler diagnostics, unsaved fixes, clearing, shutdown.")
 end)
 vim.fn.delete(root .. "/start.tale")
-vim.fn.delete(root .. "/story.yaml")
+vim.fn.delete(root .. "/story.talewright.yaml")
 vim.fn.delete(root, "d")
 if not ok then error(failure) end
 vim.cmd("qa!")

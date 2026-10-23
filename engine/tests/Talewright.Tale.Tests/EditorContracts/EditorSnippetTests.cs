@@ -53,7 +53,7 @@ public class EditorSnippetTests
                 """;
             var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
             {
-                ["story.yaml"] = yaml,
+                ["story.talewright.yaml"] = yaml,
                 ["snippet.tale"] = tale,
             }));
             Assert.True(result.Success, $"{snippet.Name}:\n{string.Join("\n", result.Diagnostics)}");

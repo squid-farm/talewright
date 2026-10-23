@@ -61,17 +61,20 @@ edit does not color the rest of the story. A `*` or `_` with no closing
 delimiter later on the line stays plain text. Highlighting of formatting that
 spans multiple lines, and some ambiguous delimiter runs, is consequently approximate.
 
-## `story.yaml` support
+## `story.talewright.yaml` support
 
-With Red Hat YAML installed, the extension associates `story.yaml` with the bundled
-JSON Schema. It validates manifest structure, offers known keys, and shows field
+Every story's manifest is named `story.talewright.yaml` at the story root; the
+engine, CLI, and player recognize no other manifest filename. With Red Hat YAML
+installed, the extension associates `*.talewright.yaml` files with the bundled
+JSON Schema. The wildcard is only an editor schema-discovery convention; it does
+not make other basenames valid story manifests. It validates manifest structure, offers known keys, and shows field
 descriptions. It does not know story-specific IDs or whether a referenced scene,
 stat, item, or faction exists. The optional language server supplies those
 compiler checks, including whole-story diagnostics for unsaved edits; use
 `talewright validate <story-folder>` for command-line validation.
 
-The same schema can be used by another YAML language server with this modeline at
-the top of `story.yaml`:
+Editors that don't use the SchemaStore catalog can use the same schema with this
+modeline at the top of `story.talewright.yaml`:
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json
@@ -85,8 +88,10 @@ is tracked separately and is not required for either option.
 
 The canonical schema is maintained in this repository and bundled in the VSIX.
 Its public `main` URL above is the rolling schema for the current manifest format.
-SchemaStore registration uses that same URL and the exact filename `story.yaml`;
-it does not maintain a second copy of the schema. Submission alone does not mean
+SchemaStore registration
+([SchemaStore/schemastore#6539](https://github.com/SchemaStore/schemastore/pull/6539))
+uses that same URL with the `*.talewright.yaml` file pattern; it does not
+maintain a second copy of the schema, so the schema file must not move. Submission alone does not mean
 automatic discovery is available: SchemaStore must accept and publish the entry,
 and an editor may need to refresh its catalog.
 
@@ -99,7 +104,7 @@ The VSIX always uses its bundled schema, independent of catalog/network access.
 
 After SchemaStore accepts the submission, verify discovery in another
 SchemaStore-capable YAML editor with no Talewright extension or schema modeline:
-open `story.yaml`, request root-key completion, introduce an unknown key, and
+open `story.talewright.yaml`, request root-key completion, introduce an unknown key, and
 remove it to check diagnostics clear. Until that verification is recorded, use
 the explicit modeline or local-file fallback rather than assume auto-discovery.
 
@@ -188,7 +193,7 @@ profile. Run packaging first.
 7. Type prose containing apostrophes and braces. Check that no unexpected closing
    characters are inserted. Try different light/dark themes; exact colors depend
    on the theme.
-8. Open `story.yaml` with Red Hat YAML installed. Confirm key completion,
+8. Open `story.talewright.yaml` with Red Hat YAML installed. Confirm key completion,
    descriptions, unknown-key and wrong-type diagnostics. Remove a problem and
    confirm its diagnostic clears. Try the modeline in another YAML language
    server if available. The extension must not launch a CLI, debugger, or story

@@ -8,7 +8,7 @@ using Talewright.Rules.Expressions;
 
 namespace Talewright.Rules.Checks;
 
-/// <summary>Whether a story uses dice. Configured per story (<c>randomness:</c> in story.yaml).</summary>
+/// <summary>Whether a story uses dice. Configured per story (<c>randomness:</c> in story.talewright.yaml).</summary>
 public enum RandomnessMode
 {
     /// <summary>No dice; checks resolve deterministically (the ruleset decides how, e.g. "take 10").</summary>
