@@ -216,9 +216,9 @@ class NxSelectionTests(unittest.TestCase):
             self.assertIn("talewright-example-settings", {edge["target"] for edge in edges})
 
     def test_documentation_changes_select_documentation_checks_only(self):
-        graph = affected_graph("docs/guide/first-story.md")
+        graph = affected_graph("docs/developer/architecture.md")
         selected = self.assert_selected(graph, "talewright-docs:check")
-        self.assertIn("talewright-editor:compiler-contract", selected)
+        self.assertFalse(any(task.startswith("talewright-editor:") for task in selected))
         self.assertFalse(any(":e2e-" in task for task in selected))
         self.assertNotIn("Talewright.Tale.Tests:test", selected)
 
@@ -323,6 +323,7 @@ class NxSelectionTests(unittest.TestCase):
             self.assertNotIn((runtime, "Talewright.LanguageServer"), actual)
         self.assertNotIn(("Talewright.Player.E2E.Tests", "talewright-ci-tests"), actual)
         self.assertTrue(expected.issubset(actual), f"Missing graph edges: {expected - actual}")
+        self.assertNotIn(("talewright-editor", "talewright-docs"), actual)
 
     def test_browser_matrix_and_uncached_targets_are_preserved(self):
         graph = affected_graph("player/src/Talewright.Player/Components/PlayerToolbar.razor")
