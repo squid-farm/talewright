@@ -1,7 +1,11 @@
 {
-  "name": "Talewright.Cli",
-  "implicitDependencies": ["Talewright", "Talewright.Player"],
-  "tags": ["type:application", "area:publishing"],
+  "name": "talewright-packaging",
+  "implicitDependencies": [
+    "Talewright", "Talewright.Player", "Talewright.Cli",
+    "Talewright.Host.Web", "Talewright.Host.Desktop",
+    "Web", "Desktop", "Validator", "Story"
+  ],
+  "tags": ["type:contract", "area:publishing"],
   "targets": {
     "package-check": {
       "executor": "nx:run-commands",

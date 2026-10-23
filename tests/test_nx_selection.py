@@ -65,9 +65,15 @@ class NxSelectionTests(unittest.TestCase):
 
     def test_snippet_changes_select_the_compiler_contract(self):
         graph = affected_graph("tooling/vscode-talewright/snippets/tale.json")
-        selected = self.assert_selected(graph, "talewright-snippets:compiler-contract")
+        selected = self.assert_selected(
+            graph, "talewright-snippets:compiler-contract", "talewright-editor:test",
+            "talewright-editor:package-check", "talewright-editor:editor-smoke",
+        )
         self.assertNotIn("Talewright.Tale.Tests:test", selected)
         self.assertNotIn("talewright-workspace:editor-contract", selected)
+        self.assertFalse(any(":e2e-" in task for task in selected))
+        self.assertNotIn("Talewright.Core.Tests:test", selected)
+        self.assertNotIn("Talewright.Runtime.Tests:test", selected)
 
     def test_rules_changes_select_affected_units_and_downstream_e2e(self):
         graph = affected_graph("src/Talewright.Rules/Talewright.Rules.csproj")
@@ -101,10 +107,24 @@ class NxSelectionTests(unittest.TestCase):
         graph = affected_graph("src/Talewright.Cli/Talewright.Cli.csproj")
         self.assert_selected(
             graph,
-            "Talewright.Cli:package-check",
+            "talewright-packaging:package-check",
             "Talewright.Player.E2E.Tests:e2e-published-web",
             "Talewright.Player.E2E.Tests:e2e-published-linux",
         )
+
+    def test_host_and_example_inputs_select_installed_package_verification(self):
+        for changed in (
+            "src/Talewright.Host.Web/Program.cs",
+            "src/Talewright.Host.Desktop/Program.cs",
+            "examples/CSharpStory/Web/Web.csproj",
+            "examples/CSharpStory/Desktop/Desktop.csproj",
+            "examples/CSharpStory/Validator/Validator.csproj",
+            "examples/CSharpStory/Story/Content/main.tale",
+        ):
+            with self.subTest(changed=changed):
+                graph = affected_graph(changed)
+                self.assert_selected(graph, "talewright-packaging:package-check")
+                self.assertNotIn("talewright-workspace:package-check", graph["tasks"]["tasks"])
 
     def test_shared_and_unclassified_changes_are_conservative(self):
         for changed in (

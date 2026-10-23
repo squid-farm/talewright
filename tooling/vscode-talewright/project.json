@@ -1,6 +1,6 @@
 {
   "name": "talewright-editor",
-  "implicitDependencies": ["talewright-docs", "Story", "Talewright.Tale", "Talewright.Tale.Tests"],
+  "implicitDependencies": ["talewright-docs", "Story", "Talewright.Tale", "Talewright.Tale.Tests", "talewright-snippets"],
   "tags": ["type:tooling", "area:editor"],
   "targets": {
     "compiler-contract": {

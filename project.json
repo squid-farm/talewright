@@ -27,7 +27,7 @@
     },
     "package-check": {
       "executor": "nx:noop",
-      "dependsOn": [{"projects": ["Talewright.Cli"], "target": "package-check"}]
+      "dependsOn": [{"projects": ["talewright-packaging"], "target": "package-check"}]
     },
     "ci-check": {
       "executor": "nx:noop",

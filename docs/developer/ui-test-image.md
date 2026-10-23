@@ -66,6 +66,8 @@ writable `HOME`; do not make the checkout globally writable or run native tests 
 
 ## Local validation
 
+The following is historical local rollout evidence, not the current hosted CI status.
+
 The candidate image built successfully. A non-root Chromium run passed 86 tests with one intentionally
 skipped standalone case. The native accessibility/chooser probe passed with Docker's default security
 profiles and without disabling WebKit sandboxing. One earlier probe attempt failed with an AT-SPI
@@ -81,5 +83,20 @@ The merged Nx browser adapter executed the full Chromium regression suite and co
 `Overflow_keyboard_modal_and_themed_background_work(dark: False)` at the toolbar assertion (85 passed,
 one failed, one standalone skip). A focused rerun of story-loading and toolbar cases passed all 14
 cases in Firefox and WebKit; Chromium passed the 12 story-loading cases but failed both toolbar
-variants. That Chromium failure remains unresolved and must not be treated as a successful validation.
-Both toolbar variants still fail after the `394d6c6` update, now at assertion line 155.
+variants. Both toolbar variants still failed in that local environment after the `394d6c6` update,
+at assertion line 155. Those local failures were not counted as successful validation.
+
+## Hosted validation and included scope
+
+The image rollout from #129 was merged into the Nx branch and is included in #132, not a separate
+pending rollout. This includes the GHCR publisher workflow and container provisioning for both regular
+and performance browser/native jobs. Nx commands, affected gates, artifact handling, and aggregate
+verification remain in place.
+
+[Build run 39897624656](https://github.com/squid-farm/talewright/actions/runs/39897624656)
+at `1b5bc32` passed all three containerized browser matrix jobs (regular regressions and published-web
+smoke), the containerized Linux desktop job (probe, regular regressions, and published-desktop smoke),
+editor verification, unit tests, package verification, checks, and both verification aggregates.
+This satisfies the regular hosted container rollout gates despite the earlier local toolbar failures.
+The separate real-file performance workflow has not been executed as part of this evidence; its
+container changes still need their scheduled/manual performance run. No measured CI speedup is claimed.
