@@ -348,18 +348,82 @@ Windows/macOS/ARM64 build verification is not a substitute for runtime testing.
 
 ### M2 verified matrix and remaining release checks
 
-Local final gates on Linux x64 (.NET 10.0.13):
+#### Post-feedback integration evidence (2026-10-23)
+
+After the Saves dialog follow-up in [PR #140](https://github.com/squid-farm/talewright/pull/140),
+main commit `ad68d16fa663856fd65712ea253f105d0173fd43` passed
+[Build run 39979206122](https://github.com/squid-farm/talewright/actions/runs/39979206122).
+Both verification aggregates and sample build/deployment completed successfully.
+This includes the merged character-creation fixes, published-game navigation,
+sticky toolbar, saves dialog, and Quick Save work tracked by
+[#81](https://github.com/squid-farm/talewright/issues/81),
+[#82](https://github.com/squid-farm/talewright/issues/82),
+[#78](https://github.com/squid-farm/talewright/issues/78),
+[#79](https://github.com/squid-farm/talewright/issues/79),
+[#76](https://github.com/squid-farm/talewright/issues/76), and
+[#83](https://github.com/squid-farm/talewright/issues/83).
+
+| Surface | Retained CI evidence |
+|---|---|
+| Headless Release | `unit-results`: 615 passed across seven projects (Core 19, Narrative 12, Rules 32, Runtime 243, Tale 95, Authoring 55, CLI 159) |
+| Player in browsers | `player-chromium`, `player-firefox`, `player-webkit`: 106 passed per browser in the ordinary Release-host regression runs |
+| Native Linux player | `player-linux-desktop/linux-regression.trx`: 77 passed against actual Photino/WebKitGTK; native probe also passed |
+| Extracted standalone web ZIP | `standalone-chromium.trx`, `standalone-firefox.trx`, `standalone-webkit.trx`: one pass each against published Lost Relic with creation enabled, served beneath `/games/published` |
+| Extracted standalone desktop ZIP | `linux-standalone.trx`: one pass through the universal launcher's self-contained Linux x64 payload, with creation enabled |
+| Installed packages | Build job passed `package-check`, including both fresh library consumers and installed CLI validation/publication/C# consumers; packages retained in `nuget-packages` |
+| CI/docs contracts | Checks job passed 22 and 29 Python contract tests and the documentation check |
+| Bounded performance | Checks job passed the existing compile/load/startup/save/restore/history budgets; browser performance cases passed in all three engines |
+| Graph selection and integration | `nx-ci-plan` records full verification, including both ordinary and published-artifact UI targets; test and CI aggregates passed, followed by sample build and deployment |
+
+The standalone case is intentionally not executed against ordinary development
+hosts: each ordinary browser/native TRX reports that one case as `NotExecuted`.
+The separate standalone TRX files above prove it ran and passed against extracted
+publisher output; these are not waived or retried failures. Standalone coverage
+includes creation, play, save, browser reload/native process restart, load,
+Back, Restart, and absence of Library/upload navigation.
+
+The checks job's .NET 10.0.13 / Ubuntu 24.04.5 bounded workload reported these
+p95 values (seven measured samples after warmup, not a new BenchmarkDotNet study):
+
+| Workload | p95 | Existing budget |
+|---|---:|---:|
+| Compile 10,000 scenes | 221.92 ms | 2,500 ms |
+| ZIP load + compile 10,000 scenes | 211.09 ms | 3,000 ms |
+| Startup at 10,000 scenes | 0.02 ms | 250 ms |
+| Save 10,000 choices | 0.48 ms | 500 ms |
+| Restore 10,000 choices | 184.44 ms | 2,000 ms |
+| Back + Forward at 10,000 choices | 179.61 ms | 2,000 ms |
+
+The original cancelled #75 merge run is also resolved:
+[run 39827756885, attempt 2](https://github.com/squid-farm/talewright/actions/runs/39827756885/attempts/2)
+completed successfully on `60ea1be`. Its first attempt exhausted the native
+Linux job's 20-minute limit; the earlier Firefox timeout was a separate apt-mirror
+stall. The diagnosis is recorded on [#33](https://github.com/squid-farm/talewright/issues/33).
+Current UI jobs use the pinned prebuilt test image rather than repeating that
+dependency installation. No assertion timeout changes or failure waivers are
+part of this closeout.
+
+Windows, macOS and ARM64 native execution, and a clean-install Ubuntu prerequisite
+check ([#85](https://github.com/squid-farm/talewright/issues/85)), remain unverified.
+These results do not claim signing, notarization, installers, save migration, or
+pre-1.0 backward-compatibility guarantees. The project lead decides when to close
+the M2 milestone.
+
+#### Original local delivery evidence
+
+The following records the earlier Linux x64 delivery gates (.NET 10.0.13), not
+the test counts or package version of the post-feedback CI run above:
 
 | Surface | Evidence |
 |---|---|
 | Headless Release | Build with no warnings; 248 tests passed across six projects |
 | Player in browsers | 64 passed each in Chromium, Firefox and Playwright WebKit; standalone case intentionally skipped in ordinary runs |
 | Native Linux player | 52 passed against the actual Photino window; separate native preflight passed |
-| Extracted standalone web ZIPs | Lost Relic and a creation-enabled story passed in all three browsers beneath `/games/final`; real styles/modules, title, choices, save/reload/Back, one-story library, no JS/network errors |
+| Extracted standalone web ZIPs | Lost Relic and a creation-enabled story passed in all three browsers beneath `/games/final`; real styles/modules, title, choices, save/reload/Back, the then-current one-story library, no JS/network errors |
 | Extracted standalone desktop ZIPs | Universal launcher's Linux x64 selection and a creation-enabled single-RID binary passed play/save/process-restart/load/Back |
 | Desktop payloads | Linux/Windows/macOS x64+ARM64 self-contained builds, Photino libraries, .NET payload, executable modes and launchers verified |
 | Installed packages | Three `0.1.0-m2.7` local packages passed fresh-cache consumers, installed CLI validate/story/web/universal publication, C# web/desktop builds and intentional invalid-Tale build failure |
-| CI scripts | 12 Python contract tests passed; actual GitHub Actions run still requires pushing/review |
+| CI scripts | 12 Python contract tests passed locally; GitHub Actions had not yet run at that delivery checkpoint |
 
 This matrix is local evidence, not an assertion that a release has been published.
 Playwright WebKit is not macOS WKWebView. Windows, macOS and ARM64 native
