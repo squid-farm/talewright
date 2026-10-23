@@ -61,6 +61,21 @@ The universal zip is large because it includes everything for six platforms. To 
 platform only, add `--runtime` with one of `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64` or
 `linux-arm64`. Players then run `Talewright.Host.Desktop` (`.exe` on Windows).
 
+To publish all six platforms as separate files, use `--split` and give `--output` a directory:
+
+```bash
+talewright publish my-story -a --target desktop --split --output desktop-builds/
+```
+
+This produces one self-contained ZIP per runtime, for example `my-story-linux-x64.zip` and
+`my-story-win-arm64.zip`. Each has only that runtime's app and does not contain the universal
+`start.*` launchers. Upload the ZIPs to your release or itch.io download page as separate
+platform downloads, and label each with its runtime; do not describe the macOS ZIP as signed or
+as an app bundle. The command builds each runtime once and stages the complete set before replacing
+existing files. If any target exists, interactive use asks once before the build; scripts must pass
+`--force` to replace existing ZIPs. Build and archive failures leave previous ZIPs untouched.
+The final six replacements are separate filesystem operations, not a crash-atomic transaction.
+
 **Current limits:** desktop games aren't installers, aren't code-signed (Windows and macOS may warn
 players the first time) and aren't macOS `.app` bundles. So far only Linux x64 builds have been
 tested; Windows, macOS and ARM builds are unverified.

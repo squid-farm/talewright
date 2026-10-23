@@ -98,18 +98,45 @@ talewright publish path/to/story --output story.zip
 talewright publish path/to/story -a --target web --output game-web.zip
 talewright publish path/to/story -a --target desktop --output game-desktop.zip
 talewright publish path/to/story -a --target desktop --runtime win-x64 --output game-windows.zip
+talewright publish path/to/story -a --target desktop --split --output desktop-builds/
 ```
 
 Validates first, then builds. For a walkthrough, see [Sharing your story](../guide/sharing-your-story.md).
 
 | Option | Effect |
 |---|---|
-| `-o`, `--output <file>` | Output zip. |
+| `-o`, `--output <path>` | Output ZIP, or output directory with `--split`. |
 | `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds just `story.yaml` and `.tale` files in their folder layout. `--a` is not accepted. |
 | `--target web` | Default. A static site with a root `index.html` and relative URLs. |
 | `--target desktop` | A self-contained desktop app. |
 | `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
+| `--split` | With `-a --target desktop`, write one self-contained ZIP per supported runtime into the `--output` directory. Cannot be combined with `--runtime`; it is not supported for story-only or web output. Filenames are `<story-id>-<rid>.zip`. |
 | `--force` | Authorize replacement without asking, independently of `--non-interactive`. |
+
+### Split desktop output
+
+```bash
+talewright publish path/to/story -a --target desktop --split --output desktop-builds/
+```
+
+This builds each of the six supported RIDs once and writes six ZIPs, such as
+`desktop-builds/my-story-linux-x64.zip` and `desktop-builds/my-story-osx-arm64.zip`.
+Each contains only its runtime-specific self-contained apphost and files, the published story,
+the engine license and deployment instructions. The universal `start.cmd`, `start.sh` and
+`start.command` launchers are not included. PDB inclusion is unchanged. These are unsigned
+standalone ZIPs, not installers or macOS app bundles.
+
+If any output already exists, an interactive terminal lists the existing paths and asks once
+whether to replace the set. Declining preserves every existing file and exits 2. In non-interactive
+or redirected use, an existing output requires `--force`; `--force` authorizes replacing the full
+set. The output directory is created as needed. Build and archive all six outputs to temporary files
+before replacing any destination, so a build/archive failure leaves the previous set intact.
+
+The six final file replacements are not one filesystem transaction. A machine crash or filesystem
+failure during that final replacement phase can expose a partial set; ordinary replacement errors
+trigger best-effort rollback, retaining recovery backups if rollback itself fails. Concurrent
+publishers targeting the same directory are not locked out. Do not rely on cross-file atomicity or
+crash durability. Each ZIP independently retains the published-output limits.
 
 ### Replacing an existing archive
 
