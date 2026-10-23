@@ -35,10 +35,6 @@ internal static class ExpressionCompletion
                 identifier.Offset == start)
             {
                 end += identifier.Text.Length;
-                // Recover unfinished names only at expression end; lexer-separated operators stay outside the edit.
-                var unfinishedEnd = end;
-                while (unfinishedEnd < text.Length && text[unfinishedEnd] is '.' or '-') unfinishedEnd++;
-                if (unfinishedEnd == text.Length) end = unfinishedEnd;
             }
             else if (tokenIndex > 0 && tokens[tokenIndex - 1] is { Kind: TokenKind.NamedPredicate } predicate &&
                      predicate.Offset + 1 == start)
@@ -107,6 +103,19 @@ internal static class ExpressionCompletion
                 };
             }
             if (kinds.Length == 0 && keywords.Length == 0) continue;
+            // Numeric references retain a trailing subtraction token; name slots may recover an unfinished hyphen.
+            var unfinishedEnd = end;
+            while (unfinishedEnd < text.Length && (text[unfinishedEnd] == '.' ||
+                   text[unfinishedEnd] == '-' && !kinds.Any(candidate => candidate is
+                       AuthoringSymbolKind.Stat or AuthoringSymbolKind.Variable or AuthoringSymbolKind.Faction)))
+                unfinishedEnd++;
+            if (unfinishedEnd == text.Length) end = unfinishedEnd;
+            if (kinds.Contains(AuthoringSymbolKind.Faction))
+            {
+                var path = text[start..end];
+                var dot = path.LastIndexOf('.');
+                if (dot >= 0 && path[(dot + 1)..] is "name" or "tier") end = start + dot;
+            }
             yield return new(text[start..end], map(start, end - start), kinds, keywords,
                 Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray(),
                 end < text.Length && text[end] is ':' or '(' ? text[end] : null);

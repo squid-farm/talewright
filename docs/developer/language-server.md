@@ -84,8 +84,11 @@ continues to provide structural key/schema suggestions independently.
 
 `ruleset.disable` uses the selected base ruleset's stat IDs before disables and
 YAML additions; ordinary stat references use the final story stat table.
+Empty inventory/disabled-stat flow lists offer insertion edits inside the
+brackets, including when there is whitespace between them.
 Completion preserves existing namespace/call delimiters as well as effect
-operators, including when YAML escapes encode the delimiters.
+operators, including when YAML escapes encode the delimiters. Faction ID edits
+also retain existing `.name` and `.tier` member access.
 
 Limitations: YAML must remain parseable (an empty scalar is fine, an unclosed
 quote or collection is not). Identifiers split across physical lines, such as a

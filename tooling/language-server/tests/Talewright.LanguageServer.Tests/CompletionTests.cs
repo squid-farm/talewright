@@ -76,6 +76,9 @@ public sealed partial class ServerTests
     [InlineData("{player:pronoun.|}", "pronoun.subject", "{player:pronoun.subject}")]
     [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
+    [InlineData("~ player:hp -= player:h|p-", "hp", "~ player:hp -= player:hp-")]
+    [InlineData("{faction:gu|ild.name}", "guild", "{faction:guild.name}")]
+    [InlineData("{faction:gu|ild.tier}", "guild", "{faction:guild.tier}")]
     [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
     [InlineData("@requires vis|ited(start)", "visited(", "@requires visited(start)")]
     [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]
@@ -83,6 +86,7 @@ public sealed partial class ServerTests
     public async Task Applying_protocol_text_edit_preserves_surrounding_syntax(string line, string label, string expected)
     {
         await using var client = new Client();
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "factions: {guild: {name: Guild}}\n");
         await client.Initialize();
         var marked = "=== start\n" + line;
         await client.Open("start.tale", marked.Replace("|", ""), 1);
@@ -96,6 +100,31 @@ public sealed partial class ServerTests
         var original = line.Replace("|", "");
         Assert.Equal(expected, original[..start.GetProperty("character").GetInt32()] +
             edit.GetProperty("newText").GetString() + original[end.GetProperty("character").GetInt32()..]);
+    }
+
+    [Theory]
+    [InlineData("inventory: [|]", "rope", "[rope]")]
+    [InlineData("inventory: [ | ]", "rope", "[ rope ]")]
+    [InlineData("disable: [|]", "hp", "[hp]")]
+    [InlineData("disable: [  | ]", "hp", "[  hp ]")]
+    public async Task Empty_manifest_lists_return_zero_width_edits_inside_brackets(string list, string label, string expected)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var marked = list.StartsWith("inventory", StringComparison.Ordinal)
+            ? Manifest.Replace("player: {first-name: Ada}", "player: {first-name: Ada, " + list + "}") + "items: {rope: Rope}\n"
+            : Manifest + "ruleset: {" + list + "}\n";
+        await client.Open(StorySource.ManifestFileName, marked.Replace("|", ""), 1);
+        var item = Assert.Single(Items(await Completion(client, StorySource.ManifestFileName, marked)), HasLabel(label));
+        var range = item.GetProperty("textEdit").GetProperty("range");
+        Assert.Equal(range.GetProperty("start").ToString(), range.GetProperty("end").ToString());
+        var prefix = marked[..marked.IndexOf('|')].Split('\n');
+        var start = range.GetProperty("start");
+        Assert.Equal(prefix.Length - 1, start.GetProperty("line").GetInt32());
+        Assert.Equal(prefix[^1].Length, start.GetProperty("character").GetInt32());
+        var line = marked.Replace("|", "").Split('\n')[prefix.Length - 1];
+        var column = start.GetProperty("character").GetInt32();
+        Assert.Contains(expected, line[..column] + item.GetProperty("textEdit").GetProperty("newText").GetString() + line[column..]);
     }
 
     [Fact]

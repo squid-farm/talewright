@@ -174,6 +174,12 @@ public sealed class StoryCompletionTests
     [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
     [InlineData("~ player:hp|- 3", "hp", "~ player:hp- 3")]
+    [InlineData("~ player:hp -= player:h|p-", "hp", "~ player:hp -= player:hp-")]
+    [InlineData("~ player:hp -= var:co|ins-", "coins", "~ player:hp -= var:coins-")]
+    [InlineData("~ player:hp -= faction:gu|ild-", "guild", "~ player:hp -= faction:guild-")]
+    [InlineData("{faction:gu|ild.name}", "guild", "{faction:guild.name}")]
+    [InlineData("{faction:gu|ild.tier}", "guild", "{faction:guild.tier}")]
+    [InlineData("@requires faction:gu|ild.tier == hostile", "guild", "@requires faction:guild.tier == hostile")]
     [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
     [InlineData("@requires vis|ited(first)", "visited(", "@requires visited(first)")]
     [InlineData("@requires va|", "var:", "@requires var:")]
@@ -194,6 +200,7 @@ public sealed class StoryCompletionTests
     [InlineData("vis|ited\\u0028first)", "visited(", "visited\\u0028first)")]
     [InlineData("va|", "var:", "var:")]
     [InlineData("flag:door\\u002d|", "door-open", "flag:door-open")]
+    [InlineData("faction:gu|ild\\u002ename == item:rope", "guild", "faction:guild\\u002ename == item:rope")]
     public void Applying_yaml_completion_preserves_decoded_delimiters(string expression, string label, string expected)
     {
         var marked = Manifest + "\ntriggers:\n  - id: check\n    when: \"" + expression + "\"\n    do: set flag:ready";
@@ -239,6 +246,55 @@ public sealed class StoryCompletionTests
         var ordinary = StoryCompletion.Complete(analysis, new("main.tale", 2, 9));
         Assert.Contains(ordinary, item => item.Label == "added");
         Assert.DoesNotContain(ordinary, item => item.Label == disabled);
+    }
+
+    [Theory]
+    [InlineData("characters:\n  player: {first-name: Ada, inventory: [|]}", "rope", "[rope]")]
+    [InlineData("characters:\n  player: {first-name: Ada, inventory: [ | ]}", "rope", "[ rope ]")]
+    [InlineData("characters:\n  player: {first-name: Ada, inventory: [  |]}", "rope", "[  rope]")]
+    [InlineData("characters:\n  player: {first-name: Ada, inventory: [\n    |]}", "rope", "    rope]")]
+    [InlineData("ruleset: {disable: [|]}", "hp", "[hp]")]
+    [InlineData("ruleset: {disable: [ | ]}", "hp", "[ hp ]")]
+    [InlineData("ruleset: {disable: [|  ]}", "hp", "[hp  ]")]
+    [InlineData("ruleset: {disable: [\n  |]}", "hp", "  hp]")]
+    public void Empty_flow_reference_lists_offer_insertion_edits(string fragment, string label, string expectedList)
+    {
+        var marked = "id: flow\ntitle: Flow\nstart: first\nitems: {rope: Rope}\n" +
+            (fragment.StartsWith("ruleset", StringComparison.Ordinal) ? "characters: {player: {first-name: Ada}}\n" : "") +
+            fragment;
+        var caret = marked.IndexOf('|');
+        var position = Position(StorySource.ManifestFileName, marked[..caret]);
+        var yaml = marked.Remove(caret, 1);
+        var analysis = StoryAnalyzer.Analyze(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n-> END"
+        }));
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == label);
+        Assert.Equal(position, item.Range.Start);
+        Assert.Equal(position, item.Range.End);
+        var line = yaml.Split('\n')[position.Line - 1];
+        Assert.Contains(expectedList, Apply(line, item.Range.Start.Column, item.Range.End.Column, item.NewText));
+    }
+
+    [Fact]
+    public void Empty_disable_list_retains_base_only_candidates()
+    {
+        var options = new CompilerOptions
+        {
+            Rulesets = new Dictionary<string, Func<Ruleset>>(CompilerOptions.DefaultRulesets())
+            {
+                ["project"] = () => new RulesetBuilder("project")
+                    .AddStat(new(new("focus"), "Focus", StatCategory.Custom, 0, 10, 5)).Build()
+            }
+        };
+        var marked = Manifest + "\nruleset:\n  base: project\n  disable: [ | ]\n  stats: [{id: added, min: 0, max: 10}]";
+        var caret = marked.IndexOf('|');
+        var analysis = AuthoringProjectMetadata.Export(options).Analyze(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = marked.Remove(caret, 1), ["main.tale"] = "=== first\n-> END"
+        }));
+        var items = StoryCompletion.Complete(analysis, Position(StorySource.ManifestFileName, marked[..caret]));
+        Assert.Equal("focus", Assert.Single(items).Label);
     }
 
     private static string Apply(string line, int start, int end, string newText) =>

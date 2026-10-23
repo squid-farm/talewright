@@ -218,6 +218,31 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     {
         if (node is YamlSequenceNode sequence)
         {
+            if (sequence.Children.Count == 0)
+            {
+                if (!_lines.TryGetValue(StorySource.ManifestFileName, out var lines))
+                    _lines.Add(StorySource.ManifestFileName,
+                        lines = source.Files[StorySource.ManifestFileName].ReplaceLineEndings("\n").Split('\n'));
+                var opened = false;
+                // Empty sequence end marks can equal their start; inspect only its authored whitespace and brackets.
+                for (var line = (int)sequence.Start.Line; line <= lines.Length; line++)
+                {
+                    var first = line == sequence.Start.Line ? (int)sequence.Start.Column : 1;
+                    var last = lines[line - 1].Length + 1;
+                    for (var column = first; column <= last; column++)
+                    {
+                        var character = column <= lines[line - 1].Length ? lines[line - 1][column - 1] : '\n';
+                        if (opened && (char.IsWhiteSpace(character) || character == ']'))
+                        {
+                            var point = new SourceLocation(StorySource.ManifestFileName, line, column);
+                            CompletionSites.Add(new("", new(point, point), [kind], [], [point], Candidates: candidates));
+                        }
+                        if (character == ']') return;
+                        if (!opened && character == '[') opened = true;
+                        else if (!char.IsWhiteSpace(character)) return;
+                    }
+                }
+            }
             foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind, candidates);
             return;
         }
