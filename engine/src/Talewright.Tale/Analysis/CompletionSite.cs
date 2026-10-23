@@ -33,7 +33,13 @@ internal static class ExpressionCompletion
             var end = start;
             if (tokenIndex < tokens.Count && tokens[tokenIndex] is { Kind: TokenKind.Identifier } identifier &&
                 identifier.Offset == start)
+            {
                 end += identifier.Text.Length;
+                // Recover unfinished names only at expression end; lexer-separated operators stay outside the edit.
+                var unfinishedEnd = end;
+                while (unfinishedEnd < text.Length && text[unfinishedEnd] is '.' or '-') unfinishedEnd++;
+                if (unfinishedEnd == text.Length) end = unfinishedEnd;
+            }
             else if (tokenIndex > 0 && tokens[tokenIndex - 1] is { Kind: TokenKind.NamedPredicate } predicate &&
                      predicate.Offset + 1 == start)
                 end += predicate.Text.Length;

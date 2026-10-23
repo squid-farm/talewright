@@ -45,6 +45,8 @@ public sealed partial class ServerTests
     [InlineData("~ give player rope |", "var:")]
     [InlineData("~ take player rope |", "player")]
     [InlineData("@requires @IsH|", "IsHero")]
+    [InlineData("@requires flag:door-|", "door-open")]
+    [InlineData("{player:pronoun.|}", "pronoun.subject")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
     {
@@ -56,7 +58,7 @@ public sealed partial class ServerTests
         };
         File.WriteAllText(client.PathOf("project.authoring.json"), registrations.ToJson());
         File.AppendAllText(client.PathOf("story.talewright.yaml"),
-            "flags: [ready]\nvars: {coins: 1}\nitems:\n  rope: {name: Rope}\nfactions:\n  guild: {name: Guild}\n");
+            "flags: [ready, door-open]\nvars: {coins: 1}\nitems:\n  rope: {name: Rope}\nfactions:\n  guild: {name: Guild}\n");
         var initialized = await client.Initialize(new { metadataPath = "project.authoring.json" });
         Assert.False(initialized.GetProperty("result").GetProperty("capabilities").GetProperty("completionProvider")
             .GetProperty("resolveProvider").GetBoolean());
@@ -71,6 +73,9 @@ public sealed partial class ServerTests
 
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
+    [InlineData("{player:pronoun.|}", "pronoun.subject", "{player:pronoun.subject}")]
+    [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
+    [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
     [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
     [InlineData("@requires vis|ited(start)", "visited(", "@requires visited(start)")]
     [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]

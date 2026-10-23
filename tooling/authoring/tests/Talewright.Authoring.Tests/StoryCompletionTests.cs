@@ -18,7 +18,7 @@ public sealed class StoryCompletionTests
           rope: {name: Rope}
         factions:
           guild: {name: Guild}
-        flags: [ready]
+        flags: [ready, door-open]
         vars: {coins: 0}
         """;
 
@@ -168,6 +168,12 @@ public sealed class StoryCompletionTests
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:h|p+=3", "hp", "~ player:hp+=3")]
+    [InlineData("{player:pronoun.|}", "pronoun.subject", "{player:pronoun.subject}")]
+    [InlineData("{player:pronoun.|", "pronoun.subject", "{player:pronoun.subject")]
+    [InlineData("@requires flag:door-|", "door-open", "@requires flag:door-open")]
+    [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
+    [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
+    [InlineData("~ player:hp|- 3", "hp", "~ player:hp- 3")]
     [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
     [InlineData("@requires vis|ited(first)", "visited(", "@requires visited(first)")]
     [InlineData("@requires va|", "var:", "@requires var:")]
@@ -187,6 +193,7 @@ public sealed class StoryCompletionTests
     [InlineData("va|r\\u003acoins > 0", "var:", "var\\u003acoins > 0")]
     [InlineData("vis|ited\\u0028first)", "visited(", "visited\\u0028first)")]
     [InlineData("va|", "var:", "var:")]
+    [InlineData("flag:door\\u002d|", "door-open", "flag:door-open")]
     public void Applying_yaml_completion_preserves_decoded_delimiters(string expression, string label, string expected)
     {
         var marked = Manifest + "\ntriggers:\n  - id: check\n    when: \"" + expression + "\"\n    do: set flag:ready";
