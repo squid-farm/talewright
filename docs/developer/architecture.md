@@ -38,7 +38,8 @@ The workspace is organized by responsibility, not by implementation language:
 - `engine/src` and `engine/tests`: reusable headless libraries and their tests.
 - `player/src` and `player/tests`: reusable UI, opt-in end-to-end suites, and their runners.
 - `apps/web` and `apps/desktop`: runnable hosts of the player.
-- `tooling/authoring`, `tooling/cli`, and `tooling/debugger`: development tools,
+- `tooling/authoring`, `tooling/cli`, `tooling/debugger`, and
+  [`tooling/language-server`](language-server.md): development tools,
   each with local source/tests where applicable. The VS Code extension remains
   in `tooling/vscode-talewright`.
 - `packaging/Talewright`: the aggregate NuGet packaging shell.

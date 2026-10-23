@@ -1,8 +1,7 @@
 # Tale for VS Code
 
 Highlight Talewright `.tale` stories, insert common story structures, and provide
-structural validation and key completion for `story.yaml` without running your
-story, the CLI, or a language server.
+schema support and shared live compiler diagnostics without running your story.
 
 ## Install
 
@@ -16,6 +15,15 @@ Use VS Code 1.100 or later.
 3. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
    select the file. Reload VS Code if prompted.
 4. Open a `.tale` file. The language indicator at the bottom should say **Tale**.
+5. For live compiler diagnostics, install the separate `Talewright.LanguageServer`
+   .NET tool (requires .NET 10) from the Talewright package feed. The extension
+   launches `talewright-lsp --stdio`; it never installs or builds it automatically.
+   See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
+   Configure `talewright.languageServer.command`/`args` for a local build, or set
+   `talewright.languageServer.enabled` to `false` for schema/syntax-only use.
+   Reload the window after changing settings. Launch errors appear in the
+   **Talewright Language Server** output channel. Untrusted workspaces never
+   launch a process.
 
 This package identifier is `squid-farm.talewright`; it does not imply a registered
 Marketplace publisher or a published Marketplace extension.
@@ -58,8 +66,9 @@ spans multiple lines, and some ambiguous delimiter runs, is consequently approxi
 With Red Hat YAML installed, the extension associates `story.yaml` with the bundled
 JSON Schema. It validates manifest structure, offers known keys, and shows field
 descriptions. It does not know story-specific IDs or whether a referenced scene,
-stat, item, or faction exists; use `talewright validate <story-folder>` for those
-compiler checks.
+stat, item, or faction exists. The optional language server supplies those
+compiler checks, including whole-story diagnostics for unsaved edits; use
+`talewright validate <story-folder>` for command-line validation.
 
 The same schema can be used by another YAML language server with this modeline at
 the top of `story.yaml`:
@@ -105,8 +114,14 @@ compiler silently ignores a scalar faction display name. Unknown keys are schema
 errors but compiler warnings (`TW4006`). Creation preset IDs must contain a
 non-whitespace character and be no longer than 80 characters.
 
-- Compiler diagnostics, story-specific completion, hover, lint, formatting or LSP.
-- Any CLI execution, gameplay, network service, telemetry, or extension runtime.
+## Not included
+
+- Story-specific completion, hover, lint, formatting, or runtime debugging.
+- Implicit project builds/assembly execution, gameplay, network service, or telemetry.
+
+The language server uses only shared compiler/authoring analysis. Custom C#
+registrations require explicitly exported data-only metadata; see
+[project metadata](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#client-contract-and-workspace-behavior).
 
 Keep using `talewright validate <story-folder>` for correctness checks. See the
 [Tale reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/tale-syntax.md)
@@ -124,6 +139,7 @@ From this directory:
 npm ci
 npm test
 dotnet test ../../engine/tests/Talewright.Tale.Tests -c Release
+dotnet build ../language-server/src/Talewright.LanguageServer -c Release
 npm run package
 npm run test:package
 npm run test:editor
@@ -144,11 +160,13 @@ and `StoryCompiler`; compiler tests assert diagnostics and materialized values
 and defaults, including documented schema/compiler differences.
 
 `npm run package` bundles the repository MPL-2.0 license and produces
-`artifacts/talewright.vsix`, without runtime dependencies or test tooling.
+`artifacts/talewright.vsix`, including the bundled thin LSP client but no .NET
+server binaries or test tooling.
 `npm run test:package` verifies the exact archive contents.
 `npm run test:editor` installs that VSIX into a temporary isolated profile,
 verifies file association, actual snippet expansion/Tab navigation, prose typing
-and comment toggling, then
+and comment toggling, then exercises compiler diagnostics and clearing on an
+unsaved edit using the local Release server build, and
 removes the profile. It does not install anything into your normal VS Code
 profile. Run packaging first.
 

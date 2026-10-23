@@ -1,6 +1,6 @@
 {
   "name": "talewright-editor",
-  "implicitDependencies": ["talewright-docs", "Story", "Talewright.Tale", "Talewright.Tale.Tests", "talewright-snippets"],
+  "implicitDependencies": ["talewright-docs", "Story", "Talewright.Tale", "Talewright.Tale.Tests", "Talewright.LanguageServer", "talewright-snippets"],
   "tags": ["type:tooling", "area:editor"],
   "targets": {
     "compiler-contract": {
@@ -31,7 +31,7 @@
     },
     "editor-smoke": {
       "executor": "nx:run-commands",
-      "dependsOn": ["package-check"],
+      "dependsOn": ["package-check", {"projects": ["Talewright.LanguageServer"], "target": "build:release"}],
       "cache": false,
       "options": {
         "command": "xvfb-run -a npm run test:editor",

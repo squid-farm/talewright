@@ -3,7 +3,7 @@
 ## Workflows
 
 **Build** runs on PRs to `main`, pushes to `main`, version tags and manual runs. It builds Release,
-checks the libraries and the CLI tool from clean, isolated consumer projects, and calls the reusable
+checks the libraries and the CLI/language-server tools from clean, isolated consumers, and calls the reusable
 **Tests** workflow (unit tests, Chromium, Firefox, WebKit and real Linux Photino). Publishing happens
 only after both pass:
 
@@ -43,7 +43,9 @@ git push origin v0.1.0-preview.1
   identifiers and build metadata (`+...`) are rejected.
 - The tag sets the version of every package. Ordinary CI builds use an unpublished
   `0.0.0-ci.RUN_NUMBER`.
-- Publication is not atomic: `Talewright` is pushed first, then `Talewright.Player` and `Talewright.Cli`.
+- Publication is not atomic: `Talewright` is pushed first, then `Talewright.Player`,
+  `Talewright.Cli`, and `Talewright.LanguageServer`. The separate language-server
+  tool installs `talewright-lsp`; it is never a dependency of shipped games.
   After a transient failure, rerun the failed run. Existing versions are skipped (not overwritten or
   compared) and missing ones are pushed. Other failures (authentication, network, validation) still fail.
 - **Never move or reuse a release tag.** Fix mistakes with a new version.

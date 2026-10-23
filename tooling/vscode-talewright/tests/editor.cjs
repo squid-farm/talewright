@@ -9,10 +9,11 @@ exports.run = async () => {
   assert.ok(extension, 'Extension must be registered in the clean editor');
   assert.ok(extension.extensionPath.includes(`${path.sep}extensions${path.sep}`),
     'Exercise the installed VSIX, not the development source');
-  assert.equal(extension.packageJSON.main, undefined);
+  assert.equal(extension.packageJSON.main, './dist/extension.cjs');
   const snippets = JSON.parse(await fs.readFile(path.join(extension.extensionPath, 'snippets/tale.json'), 'utf8'));
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-editor-'));
   try {
+    await fs.writeFile(path.join(folder, 'story.yaml'), 'id: smoke\ntitle: Smoke\nstart: smoke\n');
     const file = path.join(folder, 'smoke.tale');
     await fs.writeFile(file, '=== smoke\nHello.\n-> END\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -47,6 +48,7 @@ exports.run = async () => {
     await fs.rm(folder, { recursive: true, force: true });
   }
   await testYamlSchema();
+  await testLiveDiagnostics();
 };
 
 async function testYamlSchema() {
@@ -146,11 +148,44 @@ async function replaceDocument(document, text) {
 async function waitForDiagnostics(document, predicate, timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   do {
-    const diagnostics = vscode.languages.getDiagnostics(document.uri);
+    const diagnostics = vscode.languages.getDiagnostics(document.uri).filter(item => item.source !== 'talewright');
     if (predicate(diagnostics)) return diagnostics;
     await new Promise(resolve => setTimeout(resolve, 100));
   } while (Date.now() < deadline);
   assert.fail(`Timed out waiting for YAML diagnostics: ${
     vscode.languages.getDiagnostics(document.uri).map(item => item.message).join('; ')
   }`);
+}
+
+async function testLiveDiagnostics() {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-editor-'));
+  try {
+    await fs.writeFile(path.join(folder, 'story.yaml'), 'id: live\ntitle: Live\nstart: start\n');
+    const file = path.join(folder, 'start.tale');
+    await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
+    const document = await vscode.workspace.openTextDocument(file);
+    await vscode.window.showTextDocument(document);
+    await waitForCompiler(document, items => items.length > 0);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\nHello.\n-> END\n');
+    assert.equal(await vscode.workspace.applyEdit(edit), true);
+    assert.equal(document.isDirty, true, 'Exercise an unsaved overlay');
+    await waitForCompiler(document, items => items.length === 0);
+    assert.ok((await fs.readFile(file, 'utf8')).includes('missing'), 'Disk must remain invalid');
+    console.log('Installed VSIX LSP smoke passed: compiler diagnostics and clearing after unsaved edits.');
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function waitForCompiler(document, predicate) {
+  const deadline = Date.now() + 20000;
+  do {
+    const diagnostics = vscode.languages.getDiagnostics(document.uri).filter(item => item.source === 'talewright');
+    if (predicate(diagnostics)) return diagnostics;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  assert.fail(`Timed out waiting for compiler diagnostics: ${JSON.stringify(vscode.languages.getDiagnostics(document.uri))}`);
 }

@@ -253,13 +253,21 @@ class NxSelectionTests(unittest.TestCase):
             for source, dependencies in graph["dependencies"].items()
             for dependency in dependencies
         }
-        self.assertEqual(28, projects)
+        self.assertEqual(30, projects)
         self.assertIn(
             ("Talewright.Authoring", "Talewright.Tale"), actual,
         )
         self.assertIn(
             ("Talewright.Authoring.Tests", "Talewright.Authoring"), actual,
         )
+        self.assertIn(
+            ("Talewright.LanguageServer", "Talewright.Authoring"), actual,
+        )
+        self.assertIn(
+            ("Talewright.LanguageServer.Tests", "Talewright.LanguageServer"), actual,
+        )
+        for runtime in ("Talewright", "Talewright.Player", "Talewright.Cli"):
+            self.assertNotIn((runtime, "Talewright.LanguageServer"), actual)
         self.assertTrue(expected.issubset(actual), f"Missing graph edges: {expected - actual}")
 
     def test_browser_matrix_and_uncached_targets_are_preserved(self):

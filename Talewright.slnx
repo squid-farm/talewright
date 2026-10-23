@@ -37,6 +37,12 @@
   <Folder Name="/tooling/debugger/">
     <Project Path="tooling/debugger/src/Talewright.Debugger/Talewright.Debugger.csproj" />
   </Folder>
+  <Folder Name="/tooling/language-server/src/">
+    <Project Path="tooling/language-server/src/Talewright.LanguageServer/Talewright.LanguageServer.csproj" />
+  </Folder>
+  <Folder Name="/tooling/language-server/tests/">
+    <Project Path="tooling/language-server/tests/Talewright.LanguageServer.Tests/Talewright.LanguageServer.Tests.csproj" />
+  </Folder>
   <Folder Name="/packaging/">
     <Project Path="packaging/Talewright/Talewright.csproj" />
   </Folder>

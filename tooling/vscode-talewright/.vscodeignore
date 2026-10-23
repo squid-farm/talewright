@@ -5,4 +5,5 @@ artifacts/**
 .gitignore
 .vscodeignore
 package-lock.json
+extension.cjs
 **/project.json

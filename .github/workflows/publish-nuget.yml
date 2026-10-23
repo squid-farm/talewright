@@ -33,7 +33,7 @@ jobs:
         run: |
           test "$(python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME")" = "$VERSION"
           python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION"
-      - name: Push engine, player, and CLI
+      - name: Push engine, player, CLI, and language server
         env:
           VERSION: ${{ inputs.version }}
           NUGET_AUTH_TOKEN: ${{ github.token }}
@@ -44,4 +44,6 @@ jobs:
           dotnet nuget push "artifacts/packages/Talewright.Player.$VERSION.nupkg" \
             --source "$source" --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate
           dotnet nuget push "artifacts/packages/Talewright.Cli.$VERSION.nupkg" \
+            --source "$source" --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate
+          dotnet nuget push "artifacts/packages/Talewright.LanguageServer.$VERSION.nupkg" \
             --source "$source" --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate

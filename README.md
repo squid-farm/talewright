@@ -104,7 +104,8 @@ This is a monorepo organized by responsibility:
 - [engine/](engine/): headless libraries and compiler, with local tests.
 - [player/](player/): reusable Blazor player and UI tests.
 - [apps/](apps/): runnable web and desktop hosts.
-- [tooling/](tooling/): authoring infrastructure, CLI, debugger, and VS Code extension.
+- [tooling/](tooling/): authoring infrastructure, CLI, debugger,
+  [language server](docs/developer/language-server.md), and VS Code extension.
 - [packaging/](packaging/): aggregate engine NuGet packaging.
 - [benchmarks/](benchmarks/): performance workloads and measurement tools.
 
