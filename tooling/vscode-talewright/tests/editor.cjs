@@ -13,7 +13,7 @@ exports.run = async () => {
   const snippets = JSON.parse(await fs.readFile(path.join(extension.extensionPath, 'snippets/tale.json'), 'utf8'));
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-editor-'));
   try {
-    await fs.writeFile(path.join(folder, 'story.yaml'), 'id: smoke\ntitle: Smoke\nstart: smoke\n');
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'), 'id: smoke\ntitle: Smoke\nstart: smoke\n');
     const file = path.join(folder, 'smoke.tale');
     await fs.writeFile(file, '=== smoke\nHello.\n-> END\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -160,7 +160,7 @@ async function waitForDiagnostics(document, predicate, timeoutMs = 15000) {
 async function testLiveDiagnostics() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-editor-'));
   try {
-    await fs.writeFile(path.join(folder, 'story.yaml'), 'id: live\ntitle: Live\nstart: start\n');
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'), 'id: live\ntitle: Live\nstart: start\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);

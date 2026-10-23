@@ -8,7 +8,7 @@ test('package wires Tale syntax, snippets, manifest schema, and the thin LSP cli
   const manifest = await json('package.json');
   assert.equal(manifest.main, './dist/extension.cjs');
   assert.equal(manifest.browser, undefined);
-  assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.yaml']);
+  assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.talewright.yaml']);
   assert.ok(manifest.dependencies['vscode-languageclient']);
   assert.deepEqual(Object.keys(manifest.contributes).sort(),
     ['configuration', 'configurationDefaults', 'grammars', 'languages', 'snippets', 'yamlValidation']);

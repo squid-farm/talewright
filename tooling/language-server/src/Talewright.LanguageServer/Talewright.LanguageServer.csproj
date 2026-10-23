@@ -4,7 +4,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>talewright-lsp</ToolCommandName>
     <IsPackable>true</IsPackable>
-    <Description>Editor-neutral Tale and story.yaml live diagnostics over LSP stdio.</Description>
+    <Description>Editor-neutral Tale and story.talewright.yaml live diagnostics over LSP stdio.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
