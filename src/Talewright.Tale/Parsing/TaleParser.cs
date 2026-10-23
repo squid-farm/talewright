@@ -226,8 +226,9 @@ internal sealed partial class TaleParser
                 scene.Title = value;
                 return true;
             case "requires":
-                var expressionColumn = valueColumn + line[(valueColumn - indent)..].Length -
-                    line[(valueColumn - indent)..].TrimStart().Length;
+                var expressionColumn = line.IndexOf(' ', StringComparison.Ordinal) < 0
+                    ? indent + line.Length
+                    : valueColumn + line[(valueColumn - indent)..].Length - line[(valueColumn - indent)..].TrimStart().Length;
                 scene.Requires = ExpressionParser.ParseCondition(value, At(valueColumn), _symbols, _diagnostics,
                     At(expressionColumn));
                 return true;
@@ -585,6 +586,12 @@ internal sealed partial class TaleParser
     /// <summary>Parses <c>[actor] skill dc expr</c>.</summary>
     private SkillCheck? ParseCheckSpec(string text, int column)
     {
+        if (_symbols.Analysis is { } analysis)
+        {
+            var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
+            if (dcStart >= 0)
+                analysis.Expression(ExpressionContextKind.Number, text[(dcStart + 4)..], At(column + dcStart + 4));
+        }
         if (_symbols.World.Ruleset.SkillCheckRule is null)
         {
             _diagnostics.Error("TW3005", $"The '{_symbols.World.Ruleset.Id}' ruleset has no skill-check rule, so skill-check cannot be used.", At(column));

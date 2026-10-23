@@ -42,6 +42,11 @@ unfinished choice conditions/effects. Authoring ranges track the original Tale
 whitespace and YAML scalar encoding: quotes and block headers are excluded;
 escapes and folded whitespace map back to their authored spans rather than
 being treated as offsets in decoded text. Compiler diagnostic points are unchanged.
+YAML source mapping supports LF, CRLF, and CR line endings. Available trigger
+conditions and effects are retained even when another field is missing or the
+trigger ID is missing/duplicated. Skill-check difficulties are collected before
+ruleset, actor, or stat resolution, and a bare `@requires` exposes an empty
+condition range at the insertion point after the keyword.
 
 This initial API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not provide completion,

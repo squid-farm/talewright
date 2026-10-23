@@ -112,8 +112,20 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Scalar(YamlScalarNode node)
     {
         var text = source.Files[StorySource.ManifestFileName];
-        _manifestLineStarts ??= [0, .. text.Select((character, index) => (character, index))
-            .Where(pair => pair.character == '\n').Select(pair => pair.index + 1)];
+        if (_manifestLineStarts is null)
+        {
+            var starts = new List<int> { 0 };
+            for (var index = 0; index < text.Length; index++)
+            {
+                if (text[index] == '\r')
+                {
+                    if (index + 1 < text.Length && text[index + 1] == '\n') index++;
+                    starts.Add(index + 1);
+                }
+                else if (text[index] == '\n') starts.Add(index + 1);
+            }
+            _manifestLineStarts = starts.ToArray();
+        }
         _scalars.TryAdd(new SourceLocation(StorySource.ManifestFileName, (int)node.Start.Line, (int)node.Start.Column),
             new YamlScalarSource(text, node, _manifestLineStarts));
     }

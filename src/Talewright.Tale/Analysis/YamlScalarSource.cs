@@ -34,8 +34,10 @@ internal sealed class YamlScalarSource
         }
         else if (scalar.Style is ScalarStyle.Literal or ScalarStyle.Folded)
         {
-            var newline = source.IndexOf('\n', start, end - start);
+            var newline = source.AsSpan(start, end - start).IndexOfAny('\r', '\n');
+            if (newline >= 0) newline += start;
             start = newline < 0 ? end : newline + 1;
+            if (newline >= 0 && source[newline] == '\r' && start < end && source[start] == '\n') start++;
             while (start < end && source[start] is ' ' or '\t') start++;
         }
         _start = start;

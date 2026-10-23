@@ -22,6 +22,93 @@ public class StoryAnalysisTests
         new Dictionary<string, string> { ["story.yaml"] = yaml, ["main.tale"] = tale });
 
     [Fact]
+    public void Bare_requires_context_is_at_the_insertion_point()
+    {
+        var source = Source("=== first\n@requires");
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var expression = Assert.Single(analysis.Expressions);
+        Assert.Equal(ExpressionContextKind.Condition, expression.Kind);
+        Assert.Empty(expression.Text);
+        Assert.Equal(new SourceLocation("main.tale", 2, 10), expression.Range.Start);
+        Assert.Equal(expression.Range.Start, expression.Range.End);
+    }
+
+    [Theory]
+    [InlineData(null, "missing unknown")]
+    [InlineData("characters: [", "missing unknown")]
+    [InlineData("ruleset: {base: none}", "missing unknown")]
+    [InlineData("", "missing unknown")]
+    [InlineData("", "player unknown")]
+    public void Difficulty_context_precedes_ruleset_actor_and_stat_validation(string? manifest, string check)
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.tale"] = $"=== first\n::: skill-check {check} dc player:hp +\nsuccess: -> END\nfailure: -> END\n:::",
+        };
+        if (manifest is not null) files["story.yaml"] = manifest.Length == 0 ? Manifest : manifest;
+        var source = new StorySource(files);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var expression = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Number);
+        Assert.Equal("player:hp +", expression.Text);
+        Assert.Equal(expression.Text, Slice(source, expression.Range));
+    }
+
+    [Theory]
+    [InlineData("\"set flag:ready\"")]
+    [InlineData("|\n      set flag:ready\n")]
+    [InlineData(">-\n      set\n      flag:ready\n")]
+    public void Cr_only_yaml_scalar_ranges_match_compiler_diagnostics(string scalar)
+    {
+        var yaml = (Manifest + "\ntriggers:\n  - id: cr\n    when: \"player:hp > 0\"\n    do: " + scalar)
+            .ReplaceLineEndings("\r");
+        var source = Source(yaml: yaml);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var flag = Assert.Single(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Flag);
+        Assert.Equal("ready", Slice(source, flag.Declaration!));
+        var effects = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Effects);
+        Assert.StartsWith("set", Slice(source, effects.Range));
+        Assert.Equal(9, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
+    }
+
+    [Theory]
+    [InlineData("id: partial\n    when: \"player:hp >\"")]
+    [InlineData("id: partial\n    when: \"player:hp >\"\n    do: \"\"")]
+    [InlineData("when: \"player:hp >\"")]
+    [InlineData("id: duplicate\n    when: true\n    do: set flag:first\n  - id: duplicate\n    when: \"player:hp >\"")]
+    public void Partial_triggers_keep_available_condition_contexts(string trigger)
+    {
+        var source = Source(yaml: Manifest + "\ntriggers:\n  - " + trigger);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var expression = Assert.Single(analysis.Expressions, context => context.Text == "player:hp >");
+        Assert.Equal(ExpressionContextKind.Condition, expression.Kind);
+        Assert.Equal(expression.Text, Slice(source, expression.Range));
+    }
+
+    [Theory]
+    [InlineData("id: partial\n    do: \"set flag:ready; var:count += 1\"")]
+    [InlineData("id: partial\n    when: \"\"\n    do: \"set flag:ready; var:count += 1\"")]
+    [InlineData("do: \"set flag:ready; var:count += 1\"")]
+    [InlineData("id: duplicate\n    when: true\n    do: set flag:first\n  - id: duplicate\n    do: \"set flag:ready; var:count += 1\"")]
+    public void Partial_triggers_keep_effects_and_declarations(string trigger)
+    {
+        var source = Source(yaml: Manifest + "\ntriggers:\n  - " + trigger);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var expression = Assert.Single(analysis.Expressions, context => context.Text == "set flag:ready; var:count += 1");
+        Assert.Equal(ExpressionContextKind.Effects, expression.Kind);
+        Assert.Equal(expression.Text, Slice(source, expression.Range));
+        foreach (var name in new[] { "ready", "count" })
+        {
+            var symbol = Assert.Single(analysis.Symbols, symbol => symbol.Name == name);
+            Assert.Equal(name, Slice(source, symbol.Declaration!));
+        }
+    }
+
+    [Fact]
     public void Normalized_tale_conditions_have_authored_ranges_without_changing_diagnostics()
     {
         var source = Source("=== first\n@requires    player:hp > 0\n{  if player:hp > 0}\nText\n{/if}\n-> END");

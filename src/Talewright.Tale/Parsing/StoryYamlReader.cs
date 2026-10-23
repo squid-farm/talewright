@@ -521,6 +521,15 @@ internal sealed class StoryYamlReader
             }
 
             CheckKeys(map, "id", "when", "do", "once");
+            if (_analysis is not null)
+            {
+                foreach (var (key, kind) in new[] { ("when", ExpressionContextKind.Condition), ("do", ExpressionContextKind.Effects) })
+                {
+                    if (Get(map, key) is not YamlScalarNode scalar) continue;
+                    _analysis.Scalar(scalar);
+                    _analysis.Expression(kind, scalar.Value ?? string.Empty, At(scalar));
+                }
+            }
             var idNode = Get(map, "id");
             var id = RequiredScalar(map, "id");
             if (id is null)
@@ -536,11 +545,6 @@ internal sealed class StoryYamlReader
 
             var when = RequiredScalar(map, "when");
             var effects = RequiredScalar(map, "do");
-            if (_analysis is not null)
-            {
-                if (Get(map, "when") is YamlScalarNode condition) _analysis.Scalar(condition);
-                if (Get(map, "do") is YamlScalarNode effect) _analysis.Scalar(effect);
-            }
             if (when is null || effects is null)
             {
                 continue;
