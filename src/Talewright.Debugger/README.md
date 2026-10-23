@@ -29,8 +29,10 @@ How it's built:
 - **Scenario files.** `AuthorScenarioFiles` bounds reads, resolves links and link-target ancestors
   with a 64-link cycle/depth guard before excluding story
   and player-save locations, and uses confirmed, same-directory atomic replacements for `.twscenario`
-  exports. Imports are candidates against accepted source; errors leave the active run and input files
-  unchanged. See [replay format/API invariants](../Talewright.Runtime/README.md#portable-author-scenarios).
+  exports. Raw link targets containing `..` are rejected before normalization, including links in
+  protected roots; use direct paths instead. Imports are candidates against accepted source; errors
+  leave the active run and input files unchanged. See
+  [replay format/API invariants](../Talewright.Runtime/README.md#portable-author-scenarios).
 - **Source view.** `SourceView` consumes only `WorkbenchModel.AcceptedSourceMap` from successful adoption,
   not disk reads or candidate diagnostics. The map pairs [parser-owned ranges](../Talewright.Tale/README.md#accepted-source-provenance)
   with immutable compiled text. At most 100 rows render per file window; scene/snapshot changes reset

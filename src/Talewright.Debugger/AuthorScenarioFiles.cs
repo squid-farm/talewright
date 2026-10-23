@@ -85,9 +85,15 @@ public static class AuthorScenarioFiles
             {
                 current = Path.Combine(current, parts[index]);
                 FileSystemInfo info = Directory.Exists(current) ? new DirectoryInfo(current) : new FileInfo(current);
-                if (info.LinkTarget is null)
+                var linkTarget = info.LinkTarget;
+                if (linkTarget is null)
                 {
                     continue;
+                }
+                if (linkTarget.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries).Contains("..", StringComparer.Ordinal))
+                {
+                    throw new IOException("Scenario path links cannot contain parent traversal ('..'). Choose a direct path without such links.");
                 }
                 if (links == 64)
                 {

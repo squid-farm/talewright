@@ -340,6 +340,84 @@ public sealed class AuthorScenarioTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Export_rejects_parent_traversal_in_raw_link_targets_without_writing_either_destination(
+        bool absoluteTarget, bool overwrite)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var actual = Path.Combine(_root, "actual");
+        var intended = Path.Combine(actual, "output", "test.twscenario");
+        var unintended = Path.Combine(_root, "output", "test.twscenario");
+        Directory.CreateDirectory(Path.Combine(actual, "nested"));
+        Directory.CreateDirectory(Path.GetDirectoryName(intended)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(unintended)!);
+        var originalIntended = new byte[] { 1, 2, 3 };
+        var originalUnintended = new byte[] { 4, 5, 6 };
+        if (overwrite)
+        {
+            await File.WriteAllBytesAsync(intended, originalIntended);
+            await File.WriteAllBytesAsync(unintended, originalUnintended);
+        }
+        Directory.CreateSymbolicLink(Path.Combine(_root, "alias"), Path.Combine("actual", "nested"));
+        var rawTarget = Path.Combine("alias", "..", "output");
+        Directory.CreateSymbolicLink(Path.Combine(_root, "bridge"),
+            absoluteTarget ? Path.Combine(_root, rawTarget) : rawTarget);
+        var model = Start();
+        var session = model.Session;
+        model.ScenarioPath = Path.Combine(_root, "bridge", "test.twscenario");
+        model.ConfirmOverwrite = overwrite;
+        await model.ExportScenario();
+        Assert.Contains("parent traversal", model.Error);
+        Assert.Same(session, model.Session);
+        if (overwrite)
+        {
+            Assert.Equal(originalIntended, await File.ReadAllBytesAsync(intended));
+            Assert.Equal(originalUnintended, await File.ReadAllBytesAsync(unintended));
+        }
+        else
+        {
+            Assert.False(File.Exists(intended));
+            Assert.False(File.Exists(unintended));
+        }
+        Assert.Equal(overwrite ? 1 : 0, Directory.GetFiles(Path.GetDirectoryName(intended)!).Length);
+        Assert.Equal(overwrite ? 1 : 0, Directory.GetFiles(Path.GetDirectoryName(unintended)!).Length);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Export_rejects_parent_traversal_in_protected_story_root_links(bool absoluteTarget)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var actual = Path.Combine(_root, "actual");
+        var storyRoot = Path.Combine(actual, "output");
+        Directory.CreateDirectory(Path.Combine(actual, "nested"));
+        Directory.CreateDirectory(storyRoot);
+        Directory.CreateSymbolicLink(Path.Combine(_root, "alias"), Path.Combine("actual", "nested"));
+        var rawTarget = Path.Combine("alias", "..", "output");
+        var bridge = Path.Combine(_root, "bridge");
+        Directory.CreateSymbolicLink(bridge, absoluteTarget ? Path.Combine(_root, rawTarget) : rawTarget);
+        var destination = Path.Combine(storyRoot, "test.twscenario");
+        var original = new byte[] { 1, 2, 3 };
+        await File.WriteAllBytesAsync(destination, original);
+        var error = await Assert.ThrowsAsync<IOException>(() =>
+            AuthorScenarioFiles.ExportAsync(destination, [4, 5, 6], bridge, overwriteConfirmed: true));
+        Assert.Contains("parent traversal", error.Message);
+        Assert.Equal(original, await File.ReadAllBytesAsync(destination));
+        Assert.Single(Directory.GetFiles(storyRoot));
+        Assert.False(Directory.Exists(Path.Combine(_root, "output")));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Export_rejects_link_cycles_including_cycles_in_target_ancestors(bool ancestorCycle)

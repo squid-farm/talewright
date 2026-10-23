@@ -140,6 +140,8 @@ source separately and use the same tool version.
 2. Click **Export synthetic scenario**. Existing files are not replaced unless you enable
    **Confirm replacement of existing scenario file on next export**. Confirmation is consumed by
    the next export attempt. Successful writes use a temporary file and atomic replacement.
+   If a symbolic link in the export path or protected story/save folders contains `..` in its target,
+   export is rejected; use direct paths without those links.
 3. In another debugger process, open the matching story, enter that path, and click
    **Import exact scenario**. You do not need to recreate the character or start a scene first.
    The entire timeline, including redo, must replay successfully before the active run is replaced.
