@@ -38,7 +38,8 @@ exports.run = async () => {
     await vscode.commands.executeCommand('editor.action.commentLine');
     assert.equal(document.getText(), 'Hello.');
     editor.selection = new vscode.Selection(0, document.getText().length, 0, document.getText().length);
-    await vscode.commands.executeCommand('type', { text: " It's {literal" });
+    // One command per character exercises the auto-closing path that a single multi-character type skips.
+    for (const character of " It's {literal") await vscode.commands.executeCommand('type', { text: character });
     assert.equal(document.getText(), "Hello. It's {literal");
     console.log('Installed VSIX smoke passed: .tale detection, five real snippet expansions and placeholder navigation, prose typing, comment toggle.');
   } finally {

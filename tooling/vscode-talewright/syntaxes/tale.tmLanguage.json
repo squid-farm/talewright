@@ -171,25 +171,27 @@
       "patterns": [
         {"include": "#template"},
         {
-          "begin": "\\*\\*(?=\\S)",
-          "end": "(?<=\\S)\\*\\*|(?=$)",
+          "comment": "Delimiters open only when a closing run follows on the line; unmatched delimiters stay literal.",
+          "begin": "\\*\\*(?=\\S)(?=.*?[^\\s*]\\*{2,3}(?!\\*))",
+          "end": "(?<=\\S)\\*\\*(?!\\*)|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(?<!\\w)__(?=\\S)",
+          "begin": "(?<!\\w)__(?=\\S)(?=.*?\\S__(?!\\w))",
           "end": "(?<=\\S)__(?!\\w)|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "\\*(?=\\S)",
-          "end": "(?<=\\S)\\*|(?=$)",
+          "comment": "A single * closes emphasis only alone or before a ** run, never inside a ** closer.",
+          "begin": "\\*(?=[^\\s*]|\\*\\*[^\\s*])(?=.*?[^\\s*]\\*(?:\\*\\*)?(?!\\*))",
+          "end": "(?<=[^\\s*])\\*(?=(?:\\*\\*)?(?!\\*))|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(?<!\\w)_(?=\\S)",
+          "begin": "(?<!\\w)_(?=\\S)(?=.*?\\S_(?!\\w))",
           "end": "(?<=\\S)_(?!\\w)|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
@@ -197,7 +199,29 @@
         {"include": "text.html.markdown#escape"},
         {"include": "text.html.markdown#raw"},
         {"include": "text.html.markdown#image-inline"},
-        {"include": "text.html.markdown#link-inline"}
+        {"include": "#link"}
+      ]
+    },
+    "link": {
+      "comment": "Inline link with a Tale-aware label; the compiler renders label text (including substitutions) and drops the target.",
+      "begin": "(\\[)(?=(?:[^\\[\\]\\\\]|\\\\.|\\[[^\\[\\]]*\\])*\\]\\()",
+      "beginCaptures": {"1": {"name": "punctuation.definition.link.title.begin.markdown"}},
+      "end": "(\\])(\\()[ \\t]*(?:(<)([^<>]*)(>)|((?:[^\\s()]|\\([^\\s()]*\\))*))[ \\t]*(\"[^\"]*\"|'[^']*')?[ \\t]*(\\))|(?=$)",
+      "endCaptures": {
+        "1": {"name": "punctuation.definition.link.title.end.markdown"},
+        "2": {"name": "punctuation.definition.metadata.markdown"},
+        "3": {"name": "punctuation.definition.link.markdown"},
+        "4": {"name": "markup.underline.link.markdown"},
+        "5": {"name": "punctuation.definition.link.markdown"},
+        "6": {"name": "markup.underline.link.markdown"},
+        "7": {"name": "string.other.link.description.title.markdown"},
+        "8": {"name": "punctuation.definition.metadata.markdown"}
+      },
+      "name": "meta.link.inline.markdown",
+      "contentName": "string.other.link.title.markdown",
+      "patterns": [
+        {"begin": "\\[", "end": "\\]|(?=$)", "patterns": [{"include": "#inline"}]},
+        {"include": "#inline"}
       ]
     }
   }

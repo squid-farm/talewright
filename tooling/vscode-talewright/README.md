@@ -39,13 +39,16 @@ override these language-specific defaults in your VS Code settings.
 
 The grammar distinguishes scene headers, metadata, speech, effects, conditions,
 choices, substitutions, and checks. It also highlights inline Markdown emphasis,
-strong text, code, images, and links. These colors describe syntax, not whether
+strong text, code, images, and links. Substitutions and conditionals inside a
+link label keep their Tale colors, because the compiler renders the label text
+and drops the target. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
 images are currently placeholders, not a claim of image rendering support.
 
 Incomplete templates and emphasis recover at line boundaries so an unfinished
-edit does not color the rest of the story. Highlighting of formatting that spans
-multiple lines is consequently approximate.
+edit does not color the rest of the story. A `*` or `_` with no closing
+delimiter later on the line stays plain text. Highlighting of formatting that
+spans multiple lines, and some ambiguous delimiter runs, is consequently approximate.
 
 ## Not included
 

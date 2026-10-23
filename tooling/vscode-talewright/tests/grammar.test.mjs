@@ -82,6 +82,18 @@ test('Tale syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['_snake_case_words_ after', 'case_words', 'markup.italic.markdown'],
     ['**bold**text', 'bold', 'markup.bold.markdown'],
     ['*it*text', 'it', 'markup.italic.markdown'],
+    ['*a**b**c*', 'b', 'markup.bold.markdown'],
+    ['*a**b**c*', 'c', 'markup.italic.markdown'],
+    ['**a*b** after', 'b', 'markup.bold.markdown'],
+    ['***both*** after', 'both', 'markup.bold.markdown'],
+    ['***both*** after', 'both', 'markup.italic.markdown'],
+    ['[Hello {player:first-name}](https://example.org)', 'first-name', 'variable.other.member.tale'],
+    ['[Hello {player:first-name}](https://example.org)', 'first-name', 'string.other.link.title.markdown'],
+    ['[Hello {player:first-name}](https://example.org)', 'example.org', 'markup.underline.link.markdown'],
+    ['[{if flag:met}Old friend{else}Stranger{/if}](https://example.org "title")', 'if', 'keyword.control.conditional.tale'],
+    ['[{if flag:met}Old friend{else}Stranger{/if}](https://example.org "title")', 'met', 'variable.other.member.tale'],
+    ['[**Bold** {player:name} [x]](<https://example.org>)', 'Bold', 'markup.bold.markdown'],
+    ['[**Bold** {player:name} [x]](<https://example.org>)', 'name', 'variable.other.member.tale'],
   ]) hasScope(line, text, scope);
 });
 
@@ -98,11 +110,17 @@ test('ordinary prose, Markdown, comments and escaped braces are not Tale command
   assert.ok(!tokens('Literal \\{player:first-name\\}').tokens.some(token => token.scopes.includes('meta.template.tale')));
   assert.ok(!tokens('A -> sign in prose').tokens.some(token => token.scopes.includes('keyword.control.divert.tale')));
   assert.ok(!tokens('snake_case_words').tokens.some(token => token.scopes.includes('markup.italic.markdown')));
-  for (const [line, text] of [['__snake__case__ after', 'after'], ['_snake_case_words_ after', 'after']]) {
+  for (const [line, text] of [
+    ['__snake__case__ after', 'after'], ['_snake_case_words_ after', 'after'],
+    ['**a*b** after', 'after'], ['*a**b**c* after', 'after'], ['***both*** after', 'after'],
+    ['2 * 3 and 4*', '3'], ['a ** b', 'b'], ['[{player:name}](https://example.org) after', 'after'],
+  ]) {
     const offset = line.indexOf(text);
     const token = tokens(line).tokens.find(token => token.startIndex <= offset && token.endIndex > offset);
-    assert.ok(!token.scopes.some(scope => scope.startsWith('markup.')), `${line}: ${text} should close formatting`);
+    assert.ok(!token.scopes.some(scope => scope.startsWith('markup.') || scope.startsWith('meta.link')), `${line}: ${text} should be outside formatting, got ${token.scopes.join(', ')}`);
   }
+  hasScope('**a*b** after', '*b', 'markup.bold.markdown');
+  assert.ok(!tokens('**a*b** after').tokens.some(token => token.scopes.includes('markup.italic.markdown')), 'unmatched * inside strong stays literal');
   const requires = '* [Continue] (requires: visited(start) and player:hp > 0) -> END';
   const close = requires.indexOf(') ->');
   const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);
