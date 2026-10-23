@@ -80,12 +80,17 @@ public static class StoryHover
         }
         foreach (var token in analysis.Tokens.Where(token => Contains(token.Range, position)))
         {
+            var unresolvedReference = analysis.CompletionSites.Any(site =>
+                site.Text == token.Text && Contains(site.Range, position) &&
+                site.Kinds.Any(kind => kind != AuthoringSymbolKind.Directive) &&
+                !site.Keywords.Any(keyword => keyword.TrimEnd(':', '(') == site.Text));
             if (token.ManifestPath is { } path)
             {
                 var description = SchemaHelp(path);
                 if (description is not null) return Help(token.Text, description, token.Range);
             }
-            else if (token.Text is not ("title" or "requires" or "tags" or "priority" or "once" or "hub" or "hub-limit" or "END") &&
+            else if (!unresolvedReference &&
+                     token.Text is not ("title" or "requires" or "tags" or "priority" or "once" or "hub" or "hub-limit" or "END") &&
                      Syntax.TryGetValue(token.Text, out var help))
                 return Help(token.Text == "*choice" ? "*" : token.Text, help, token.Range);
         }

@@ -60,6 +60,21 @@ public sealed partial class ServerTests
         Assert.Contains("`` ", contents.GetProperty("value").GetString());
     }
 
+    [Fact]
+    public async Task Hover_prefers_the_first_supported_client_format()
+    {
+        await using var client = new Client();
+        await client.Request("initialize", new
+        {
+            rootUri = new Uri(client.Root).AbsoluteUri,
+            capabilities = new { textDocument = new { hover = new { contentFormat = new[] { "plaintext", "markdown" } } } }
+        });
+        const string marked = "=== start\n> pla|yer: Hello";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        var contents = (await Hover(client, "start.tale", marked)).GetProperty("result").GetProperty("contents");
+        Assert.Equal("plaintext", contents.GetProperty("kind").GetString());
+    }
+
     [Theory]
     [InlineData("Prose sta|rt")]
     [InlineData("// -> sta|rt")]

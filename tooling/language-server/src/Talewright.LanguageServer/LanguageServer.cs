@@ -210,7 +210,9 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             capabilities.TryGetProperty("textDocument", out var textDocument) &&
             textDocument.TryGetProperty("hover", out var hover) &&
             hover.TryGetProperty("contentFormat", out var formats) && formats.ValueKind == JsonValueKind.Array)
-            _hoverMarkdown = formats.EnumerateArray().Any(format => format.ValueKind == JsonValueKind.String && format.GetString() == "markdown");
+            _hoverMarkdown = formats.EnumerateArray()
+                .Select(format => format.ValueKind == JsonValueKind.String ? format.GetString() : null)
+                .FirstOrDefault(format => format is "markdown" or "plaintext") == "markdown";
         if (parameters.TryGetProperty("workspaceFolders", out var folders) && folders.ValueKind == JsonValueKind.Array)
             foreach (var folder in folders.EnumerateArray()) _folders.Add(PathFromUri(folder.GetProperty("uri").GetString()!));
         else if (parameters.TryGetProperty("rootUri", out var root) && root.ValueKind == JsonValueKind.String)

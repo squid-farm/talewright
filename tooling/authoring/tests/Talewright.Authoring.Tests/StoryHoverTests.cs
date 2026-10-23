@@ -64,6 +64,9 @@ public sealed class StoryHoverTests
     [InlineData("-> sec|")]
     [InlineData("{tit|le}")]
     [InlineData("{EN|D}")]
+    [InlineData("{player:gi|ve}")]
+    [InlineData("{player:first-name#gi|ve}")]
+    [InlineData("@requires flag:gi|ve")]
     public void Unknown_partial_or_irrelevant_text_has_no_fabricated_help(string marked)
     {
         var (analysis, position) = Analyze("=== first\n" + marked);
@@ -161,6 +164,35 @@ public sealed class StoryHoverTests
         var analysis = Source("=== first\n-> second", yaml);
         Assert.Null(StoryHover.Get(analysis, new(StorySource.ManifestFileName, 1, 3)));
         Assert.Contains("Scene", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 5))).PlainText);
+    }
+
+    [Fact]
+    public void Skill_check_hover_uses_the_parsed_actor_and_skill_roles()
+    {
+        var yaml = Manifest.Replace("player: {first-name: Ada}",
+            "player: {first-name: Ada}\n  hp: {first-name: 'Hit Points'}");
+        var (analysis, actorPosition) = Analyze("=== first\n::: skill-check h|p athletics dc 12", yaml);
+        var actorHover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, actorPosition));
+        Assert.Contains("Character", actorHover.PlainText);
+        Assert.Contains("Declared at story.talewright.yaml", actorHover.PlainText);
+
+        var (skillAnalysis, skillPosition) = Analyze("=== first\n::: skill-check hp ath|letics dc 12", yaml);
+        var skillHover = Assert.IsType<AuthoringHover>(StoryHover.Get(skillAnalysis, skillPosition));
+        Assert.Contains("Stat", skillHover.PlainText);
+        Assert.Contains("athletics", skillHover.PlainText);
+    }
+
+    [Theory]
+    [InlineData("=== first\n* [Go] -|> second")]
+    [InlineData("=== first\n::: skill-check athletics dc 12\nsuccess: -|> second\nfailure: -> END\n:::")]
+    [InlineData("=== first\n::: skill-check athletics dc 12\nsuccess: -> second\nfailure: -|> END\n:::")]
+    public void Divert_markers_in_choices_and_check_outcomes_have_syntax_help(string marked)
+    {
+        var (analysis, position) = Analyze(marked);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
+        Assert.Contains("Diverts to", hover.PlainText);
+        Assert.Equal("->", analysis.Source.Files["main.tale"].Split('\n')[position.Line - 1]
+            [(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }
 
     [Fact]
