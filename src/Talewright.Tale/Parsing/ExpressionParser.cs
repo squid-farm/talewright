@@ -83,8 +83,9 @@ internal sealed class ExpressionParser
     }
 
     /// <summary>Parses a boolean condition. Returns null (with diagnostics) on error.</summary>
-    public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
-        ParseTyped(text, location, symbols, diagnostics, ExprType.Bool);
+    public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
+        SourceLocation? authoringLocation = null) =>
+        ParseTyped(text, location, symbols, diagnostics, ExprType.Bool, authoringLocation);
 
     /// <summary>Parses a numeric expression. Returns null (with diagnostics) on error.</summary>
     public static Expr? ParseNumber(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
@@ -157,10 +158,11 @@ internal sealed class ExpressionParser
         }
     }
 
-    private static Expr? ParseTyped(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics, ExprType type)
+    private static Expr? ParseTyped(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics, ExprType type,
+        SourceLocation? authoringLocation = null)
     {
         symbols.Analysis?.Expression(type == ExprType.Bool ? ExpressionContextKind.Condition : ExpressionContextKind.Number,
-            text, location);
+            text, authoringLocation ?? location);
         var parser = new ExpressionParser(text, location, symbols, diagnostics);
         try
         {

@@ -63,6 +63,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
 {
     private readonly Dictionary<(string File, int Line), List<(SourceText Source, int Start, int End)>> _inlineRanges = [];
     private readonly Dictionary<string, string[]> _lines = new(StringComparer.Ordinal);
+    private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
+    private int[]? _manifestLineStarts;
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
 
@@ -84,6 +86,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Expression(ExpressionContextKind kind, string text, SourceLocation location)
     {
         var range = Range(location, text);
+        _scalars.TryGetValue(location, out var scalar);
+        if (scalar is not null) range = scalar.Range(0, text.Length);
         if (_inlineRanges.TryGetValue((location.File, location.Line), out var ranges))
         {
             var inline = ranges.LastOrDefault(candidate =>
@@ -101,8 +105,17 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             ExpressionParser.CollectDeclarations(text, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
                 (name, flag, offset) => Symbols.Add(new(name,
                     flag ? AuthoringSymbolKind.Flag : AuthoringSymbolKind.Variable,
-                    flag ? "boolean" : "integer", Range(location.Offset(offset), name))));
+                    flag ? "boolean" : "integer", scalar?.Range(offset, name.Length) ?? Range(location.Offset(offset), name))));
         }
+    }
+
+    internal void Scalar(YamlScalarNode node)
+    {
+        var text = source.Files[StorySource.ManifestFileName];
+        _manifestLineStarts ??= [0, .. text.Select((character, index) => (character, index))
+            .Where(pair => pair.character == '\n').Select(pair => pair.index + 1)];
+        _scalars.TryAdd(new SourceLocation(StorySource.ManifestFileName, (int)node.Start.Line, (int)node.Start.Column),
+            new YamlScalarSource(text, node, _manifestLineStarts));
     }
 
     internal void Scene(SceneId id, SourceLocation location)
@@ -165,7 +178,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
 
     internal void DiscoverWithoutManifest()
     {
-        var world = new WorldDefinition(options.Rulesets["generic"](), [], [], [], [], new Dictionary<VarId, int>());
+        var world = new WorldDefinition(new Talewright.Core.Rulesets.RulesetBuilder("analysis-recovery").Build(),
+            [], [], [], [], new Dictionary<VarId, int>());
         var symbols = new StorySymbols
         {
             World = world, Flags = new HashSet<FlagId>(), Variables = new HashSet<VarId>(),

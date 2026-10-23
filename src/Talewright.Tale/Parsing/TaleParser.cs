@@ -6,6 +6,7 @@ using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
+using Talewright.Tale.Analysis;
 
 namespace Talewright.Tale.Parsing;
 
@@ -148,7 +149,7 @@ internal sealed partial class TaleParser
         if (IsBlockDirective(line, out var directive))
         {
             FlushParagraph();
-            ParseBlockDirective(directive, indent);
+            ParseBlockDirective(directive, indent, line);
             return;
         }
 
@@ -225,7 +226,10 @@ internal sealed partial class TaleParser
                 scene.Title = value;
                 return true;
             case "requires":
-                scene.Requires = ExpressionParser.ParseCondition(value, At(valueColumn), _symbols, _diagnostics);
+                var expressionColumn = valueColumn + line[(valueColumn - indent)..].Length -
+                    line[(valueColumn - indent)..].TrimStart().Length;
+                scene.Requires = ExpressionParser.ParseCondition(value, At(valueColumn), _symbols, _diagnostics,
+                    At(expressionColumn));
                 return true;
             case "tags":
                 foreach (var tag in value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
@@ -303,7 +307,7 @@ internal sealed partial class TaleParser
         return false;
     }
 
-    private void ParseBlockDirective(string directive, int indent)
+    private void ParseBlockDirective(string directive, int indent, string line)
     {
         var scene = _scene!;
         if (directive == "else")
@@ -330,7 +334,9 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var condition = ExpressionParser.ParseCondition(directive[3..], At(indent + 1 + 3), _symbols, _diagnostics)
+        var lead = line[1..^1].Length - line[1..^1].TrimStart().Length;
+        var condition = ExpressionParser.ParseCondition(directive[3..], At(indent + 1 + 3), _symbols, _diagnostics,
+            At(indent + 1 + lead + 3))
             ?? new BoolLiteral(false);
         scene.Frames.Push(new Frame(condition, At(indent)));
     }
@@ -384,6 +390,13 @@ internal sealed partial class TaleParser
         if (!_symbols.World.Characters.ContainsKey(speaker))
         {
             _diagnostics.Error("TW2001", $"Unknown character '{who}'. Declare it under characters in story.yaml.", At(indent + 1 + body.IndexOf(who, StringComparison.Ordinal)));
+            if (_symbols.Analysis is not null)
+            {
+                var partial = body[(colon + 1)..];
+                var whitespace = partial.Length - partial.TrimStart().Length;
+                InlineParser.Parse(SourceText.Single(partial.Trim(), At(indent + colon + 2 + whitespace)),
+                    _symbols, new DiagnosticBag());
+            }
             return;
         }
 
@@ -480,6 +493,7 @@ internal sealed partial class TaleParser
                 var end = FindClosingParen(rest, pos);
                 if (end < 0)
                 {
+                    _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[(pos + 10)..], At(column + 10));
                     _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
                     return;
                 }
@@ -492,6 +506,7 @@ internal sealed partial class TaleParser
                 var end = InlineParser.FindClosingBrace(rest, pos);
                 if (end < 0)
                 {
+                    _symbols.Analysis?.Expression(ExpressionContextKind.Effects, rest[(pos + 1)..], At(column + 1));
                     _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
                     return;
                 }
@@ -670,6 +685,7 @@ internal sealed partial class TaleParser
             var end = InlineParser.FindClosingBrace(text, pos);
             if (end < 0)
             {
+                _symbols.Analysis?.Expression(ExpressionContextKind.Effects, text[(pos + 1)..], At(column + pos + 1));
                 _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column + pos));
                 return null;
             }

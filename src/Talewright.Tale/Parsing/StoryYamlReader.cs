@@ -536,6 +536,11 @@ internal sealed class StoryYamlReader
 
             var when = RequiredScalar(map, "when");
             var effects = RequiredScalar(map, "do");
+            if (_analysis is not null)
+            {
+                if (Get(map, "when") is YamlScalarNode condition) _analysis.Scalar(condition);
+                if (Get(map, "do") is YamlScalarNode effect) _analysis.Scalar(effect);
+            }
             if (when is null || effects is null)
             {
                 continue;

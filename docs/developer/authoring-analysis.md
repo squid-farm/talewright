@@ -35,6 +35,14 @@ tree: Tale declarations and contexts are retained independently, but the API
 does not invent a repaired manifest or reuse stale symbols from a prior snapshot.
 Diagnostics remain the compiler's diagnostics for that exact input.
 
+Recovery does not require a project ruleset named `generic` or invoke project
+ruleset factories when the manifest is missing or syntactically invalid. It
+retains dialogue substitutions even when the speaker cannot be resolved, plus
+unfinished choice conditions/effects. Authoring ranges track the original Tale
+whitespace and YAML scalar encoding: quotes and block headers are excluded;
+escapes and folded whitespace map back to their authored spans rather than
+being treated as offsets in decoded text. Compiler diagnostic points are unchanged.
+
 This initial API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not provide completion,
 hover, LSP transport, lint, or evaluated gameplay values itself.

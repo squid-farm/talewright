@@ -73,8 +73,8 @@ public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predic
         Names(Predicates);
         Names(Modifiers);
         Names(Rulesets.Select(ruleset => ruleset.Id));
-        if (!Rulesets.Any(ruleset => ruleset.Id == "generic"))
-            throw new InvalidDataException("Authoring metadata must include the generic fallback ruleset.");
+        if (Rulesets.Length == 0)
+            throw new InvalidDataException("Authoring metadata must include at least one ruleset.");
         foreach (var ruleset in Rulesets)
         {
             if (string.IsNullOrWhiteSpace(ruleset.DefinitionId))

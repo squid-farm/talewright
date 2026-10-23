@@ -22,6 +22,140 @@ public class StoryAnalysisTests
         new Dictionary<string, string> { ["story.yaml"] = yaml, ["main.tale"] = tale });
 
     [Fact]
+    public void Normalized_tale_conditions_have_authored_ranges_without_changing_diagnostics()
+    {
+        var source = Source("=== first\n@requires    player:hp > 0\n{  if player:hp > 0}\nText\n{/if}\n-> END");
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var conditions = analysis.Expressions.Where(context => context.Kind == ExpressionContextKind.Condition).ToArray();
+        Assert.Equal(2, conditions.Length);
+        Assert.Equal(new SourceLocation("main.tale", 2, 14), conditions[0].Range.Start);
+        Assert.Equal(new SourceLocation("main.tale", 3, 7), conditions[1].Range.Start);
+        foreach (var expression in conditions)
+            Assert.Equal(expression.Text, Slice(source, expression.Range));
+    }
+
+    [Theory]
+    [InlineData("* [Go] (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >")]
+    [InlineData("* [Go] {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=")]
+    [InlineData("* [Go] skill-check athletics dc 12\nsuccess: {set flag:ready", ExpressionContextKind.Effects, "set flag:ready")]
+    public void Unclosed_choice_expressions_keep_partial_context(string choice, ExpressionContextKind kind, string text)
+    {
+        var source = Source("=== first\n" + choice);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == "TW1011");
+        var expression = Assert.Single(analysis.Expressions, context => context.Kind == kind);
+        Assert.Equal(kind, expression.Kind);
+        Assert.Equal(text, expression.Text);
+        Assert.Equal(text, Slice(source, expression.Range));
+        if (kind == ExpressionContextKind.Effects)
+        {
+            var flag = Assert.Single(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Flag);
+            Assert.Equal("ready", Slice(source, flag.Declaration!));
+        }
+    }
+
+    [Theory]
+    [InlineData(null, "TW4002")]
+    [InlineData("characters: [", "TW4001")]
+    public void Custom_only_catalog_recovers_tale_and_dialogue_without_a_manifest(string? yaml, string code)
+    {
+        var options = new CompilerOptions
+        {
+            Rulesets = new Dictionary<string, Func<Ruleset>>
+            {
+                ["custom"] = () => throw new InvalidOperationException("Recovery must not invoke project factories."),
+            },
+        };
+        var files = new Dictionary<string, string>
+        {
+            ["main.tale"] = "=== first\n> player: Hello {player:\n~ set flag:ready",
+        };
+        if (yaml is not null) files["story.yaml"] = yaml;
+        var source = new StorySource(files);
+        var analysis = StoryAnalyzer.Analyze(source, options);
+        Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics, analysis.Diagnostics);
+        Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == code);
+        Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Scene && symbol.Name == "first");
+        Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Flag && symbol.Name == "ready");
+        var expression = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Substitution);
+        Assert.Equal("player:", expression.Text);
+        Assert.Equal("player:", Slice(source, expression.Range));
+    }
+
+    [Fact]
+    public void Metadata_supports_custom_only_catalogs()
+    {
+        var options = new CompilerOptions
+        {
+            Rulesets = new Dictionary<string, Func<Ruleset>> { ["custom"] = () => new RulesetBuilder("custom").Build() },
+        };
+        var metadata = AuthoringProjectMetadata.FromJson(AuthoringProjectMetadata.Export(options).ToJson());
+        var source = Source(yaml: Manifest + "\nruleset: {base: custom}");
+        Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics, metadata.Analyze(source).Diagnostics);
+        Assert.DoesNotContain(metadata.Analyze(source).Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("\"set flag:ready\"", "ready")]
+    [InlineData("'set flag:ready'", "ready")]
+    [InlineData("\"set\\x20flag:re\\u0061dy\"", "re\\u0061dy")]
+    [InlineData("|\n      set flag:ready\n", "ready")]
+    [InlineData(">-\n      set\n      flag:ready\n", "ready")]
+    [InlineData("\"set\\nflag:ready\"", "ready")]
+    [InlineData("|-\r\n      set flag:ready\r\n", "ready")]
+    [InlineData("set\n      flag:ready", "ready")]
+    [InlineData("!!str \"set flag:ready\"", "ready")]
+    [InlineData("&effect \"set flag:ready\"", "ready")]
+    [InlineData("\"set flag:re\\\n      ady\"", "re\\\n      ady")]
+    public void Yaml_scalar_decoding_preserves_expression_and_declaration_extents(string scalar, string authoredName)
+    {
+        var yaml = Manifest + "\ntriggers:\n  - id: ready\n    when: \"player:hp > 0\"\n    do: " + scalar;
+        var source = Source(yaml: yaml);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var flag = Assert.Single(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Flag && symbol.Name == "ready");
+        Assert.Equal(authoredName, Slice(source, flag.Declaration!));
+        var effects = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Effects);
+        var selected = Slice(source, effects.Range);
+        Assert.StartsWith("set", selected);
+        Assert.EndsWith(authoredName, selected.TrimEnd());
+        Assert.Contains(authoredName, selected);
+        Assert.DoesNotContain("\"", selected);
+        Assert.DoesNotContain("|", selected);
+        var condition = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Condition);
+        Assert.Equal("player:hp > 0", Slice(source, condition.Range));
+    }
+
+    [Fact]
+    public void Yaml_escaped_variables_and_quoted_strings_keep_exact_ranges()
+    {
+        var source = Source(yaml: Manifest + """
+
+            triggers:
+              - id: value
+                when: 'player:first-name == ''Ada'''
+                do: "var:co\u0075nt += 1"
+            """);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        var variable = Assert.Single(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Variable && symbol.Name == "count");
+        Assert.Equal("co\\u0075nt", Slice(source, variable.Declaration!));
+        var condition = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Condition);
+        Assert.Equal("player:first-name == ''Ada''", Slice(source, condition.Range));
+    }
+
+    private static string Slice(StorySource source, SourceRange range)
+    {
+        var text = source.Files[range.Start.File].ReplaceLineEndings("\n");
+        var lines = text.Split('\n');
+        var start = lines.Take(range.Start.Line - 1).Sum(line => line.Length + 1) + range.Start.Column - 1;
+        var end = lines.Take(range.End.Line - 1).Sum(line => line.Length + 1) + range.End.Column - 1;
+        return text[start..end];
+    }
+
+    [Fact]
     public void Host_diagnostics_do_not_mutate_the_compiler_snapshot()
     {
         var analysis = StoryAnalyzer.Analyze(Source());
