@@ -23,6 +23,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         {
             await Upload(TestStories.Linear);
             await requested.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await AssertState(state => Assert.True(state.PassageFocused));
             var toggle = Page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
             await Expect(toggle).ToBeVisibleAsync();
             await Expect(toggle).ToBeDisabledAsync();
@@ -43,19 +44,19 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
     public async Task Save_refresh_does_not_pull_focus_back_into_open_disclosure()
     {
         await Upload(TestStories.Linear);
+        await AssertState(state => Assert.True(state.PassageFocused));
         await Driver.ClickAsync("More actions");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Shift+Tab");
         await Page.Keyboard.PressAsync("Shift+Tab");
-        var saves = Page.GetByRole(AriaRole.Button, new() { Name = "Saved games", Exact = true });
+        var saves = Page.GetByRole(AriaRole.Button, new() { Name = "Saves", Exact = true });
         await Expect(saves).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save game", Exact = true })).ToBeEnabledAsync();
-        await Expect(saves).ToBeEnabledAsync();
         Assert.False(await Page.Locator(".tw-overflow-actions").EvaluateAsync<bool>(
             "menu => menu.contains(document.activeElement)"), "Save refresh must not pull focus into the disclosure.");
-        await saves.FocusAsync();
-        await Page.Keyboard.PressAsync("Enter");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Close saves", Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Escape");
         await Expect(saves).ToBeFocusedAsync();
     }
 
@@ -111,6 +112,8 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         await Page.SetViewportSizeAsync(width, 900);
         await Page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.Reduce });
         await Upload(TestStories.Long);
+        // The first passage scrolls to the top and takes focus once revealed; wait so it cannot undo the focus below.
+        await AssertState(state => Assert.True(state.PassageFocused));
         await Choices.First.FocusAsync();
         await Expect(Choices.First).ToBeInViewportAsync();
         var bar = (await Page.Locator(".tw-bar").BoundingBoxAsync())!;
@@ -221,7 +224,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         {
             var nodes = (await native.SnapshotAsync()).Descendants().ToArray();
             var window = nodes.First(node => node.Role == "frame").Bounds;
-            foreach (var name in new[] { "Back", "Forward", "Saved games", "More actions" })
+            foreach (var name in new[] { "Back", "Forward", "Saves", "More actions" })
             {
                 var bounds = nodes.First(node => node.Role == "push button" && node.Name == name).Bounds;
                 Assert.True(bounds.Y >= window.Y && bounds.Y + bounds.Height <= window.Y + window.Height, $"{name} remains visible.");
@@ -230,7 +233,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         }
         else
         {
-            foreach (var name in new[] { "Back", "Forward", "Saved games", "More actions" })
+            foreach (var name in new[] { "Back", "Forward", "Saves", "More actions" })
             {
                 await Expect(Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true })).ToBeInViewportAsync();
             }

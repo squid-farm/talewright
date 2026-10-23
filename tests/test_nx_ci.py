@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,7 +21,7 @@ class CiRoutingTests(unittest.TestCase):
         for changed, expected in [
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),
             ("tooling/vscode-talewright/snippets/tale.json", {"editor"}),
-            ("docs/guide/first-story.md", {"checks"}),
+            ("docs/guide/first-story.md", {"checks", "editor"}),
         ]:
             with self.subTest(changed=changed):
                 plan = make_plan(affected_graph(changed))
@@ -84,6 +85,31 @@ class AggregateTests(unittest.TestCase):
 
 
 class NxExecutionTests(unittest.TestCase):
+    def test_cold_wrapper_install_keeps_graph_stdout_valid_json(self):
+        with tempfile.TemporaryDirectory(prefix="talewright-nx-cold-") as directory:
+            workspace = Path(directory)
+            (workspace / ".nx").mkdir()
+            shutil.copyfile(ROOT / ".nx/nxw.js", workspace / ".nx/nxw.js")
+            (workspace / "nx.json").write_text(json.dumps({
+                "installation": json.loads((ROOT / "nx.json").read_text())["installation"],
+                "plugins": [],
+            }), encoding="utf-8")
+            (workspace / "project.json").write_text(json.dumps({
+                "name": "cold-probe",
+                "targets": {"check": {"executor": "nx:noop", "cache": False}},
+            }), encoding="utf-8")
+            environment = dict(os.environ, NX_DAEMON="false", NX_NO_CLOUD="true")
+            environment.pop("NX_WRAPPER_SKIP_INSTALL", None)
+            result = subprocess.run(
+                ["node", workspace / ".nx/nxw.js", "run-many", "-t", "check",
+                 "--all", "--dry-run", "--graph=stdout"],
+                cwd=workspace, env=environment, capture_output=True, text=True, timeout=180,
+            )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            graph = json.loads(result.stdout)
+            self.assertIn("cold-probe:check", graph["tasks"]["tasks"])
+            self.assertTrue((workspace / ".nx/installation/node_modules/nx").is_dir())
+
     def test_prerequisites_run_first_and_failure_blocks_dependents(self):
         installation = ROOT / ".nx/installation/node_modules"
         with tempfile.TemporaryDirectory(prefix="talewright-nx-execution-") as directory:

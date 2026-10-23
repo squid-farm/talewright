@@ -6,8 +6,16 @@
 dotnet test
 ```
 
+For an explicit Release invocation, use `dotnet test Talewright.slnx -c Release` and verify
+the output reports actual test counts.
+
 The root solution includes compiler, runtime, rules, narrative, and core tests. It does **not** discover UI
 tests or require downloaded browsers. `Talewright.E2E.slnx` is a separate, opt-in solution in this directory.
+
+Save coverage includes metadata/legacy compatibility and canonical replay identity in the runtime
+suite, plus modal focus/escape, narrow light/dark layout, summaries, redo-aware discard protection,
+failed writes, failed loads and reload/process-restart persistence in the player suite.
+Both IndexedDB and native Linux file storage are exercised; save lists never replay histories.
 
 ### Reproducible performance budgets
 

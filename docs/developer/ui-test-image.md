@@ -53,7 +53,8 @@ Its digest is `sha256:d636d1fc9c49ff2eaa65341c1056738b35a2b4dac8e455df2738b8c9da
 
 ## Nx handoff
 
-This change incorporates the `a533824` handoff from `feature/123-nx-orchestration`. Containerized jobs
+This change incorporates the `a533824` handoff and subsequent `394d6c6` update (including the `ddee903`
+main/schema integration) from `feature/123-nx-orchestration`. Containerized jobs
 retain its affected-job selection, Nx runner commands, artifact paths, and standalone coverage.
 The image provides Node 22/npm for those commands; it does not replace Nx. `.github/**` is already a
 shared Nx input, so image definitions and workflow reference changes select broad verification.
@@ -81,3 +82,4 @@ The merged Nx browser adapter executed the full Chromium regression suite and co
 one failed, one standalone skip). A focused rerun of story-loading and toolbar cases passed all 14
 cases in Firefox and WebKit; Chromium passed the 12 story-loading cases but failed both toolbar
 variants. That Chromium failure remains unresolved and must not be treated as a successful validation.
+Both toolbar variants still fail after the `394d6c6` update, now at assertion line 155.

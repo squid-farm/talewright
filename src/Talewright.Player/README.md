@@ -17,7 +17,7 @@ See [registry setup](../../docs/developer/csharp-extensions.md).
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Restart/Library, and modal Restart confirmation. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
-| `SavedGamesPanel` | Slot-name input, slot list and explicit overwrite confirmation; all persistence and state live in the parent. |
+| `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
 | `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
@@ -52,8 +52,14 @@ The web host uses `PageTitle`; the desktop host updates its native window title.
 Register `ISaveStore` for the host: `FileSaveStore` on desktop or the scoped
 `IndexedDbSaveStore` from `Talewright.Player.Saves` on web. `TalewrightApp` supplies it to `StoryPlayer`;
 custom consumers without a store still play normally but have no save controls.
-Use **Saved games** to list slots, save a checkpoint or load one. Saving to an existing name requires
-**Confirm overwrite**. Load failures preserve the current playthrough and show an alert. Operations
+Use **Saves** to open the modal and automatically refresh its list. New entries show scene title,
+actual UTC save time and character name. Legacy/malformed details are explicitly unavailable;
+listing never replays a story. Saving to an existing name requires **Confirm overwrite**.
+Loading asks **Load save** / **Keep playing** only when the complete current replay state
+(including seed, character, cursor and redo) is not persisted in any slot. The store is checked
+again before loading; a failed write never counts as a saved state.
+Escape or **Close saves** returns focus to the toolbar. Storage errors offer **Retry save list**.
+Load failures preserve the current playthrough and show an alert. Operations
 disable conflicting controls while in flight. Browser saves live only in that origin's IndexedDB:
 clearing browser/site data removes them; no server account or cloud sync exists.
 

@@ -46,4 +46,111 @@ exports.run = async () => {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await fs.rm(folder, { recursive: true, force: true });
   }
+  await testYamlSchema();
 };
+
+async function testYamlSchema() {
+  const extension = vscode.extensions.getExtension('redhat.vscode-yaml');
+  assert.ok(extension, 'Red Hat YAML must be installed in the clean editor profile');
+  await extension.activate();
+
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-yaml-editor-'));
+  try {
+    const file = path.join(folder, 'story.yaml');
+    const invalid = [
+      'id: schema-smoke',
+      'title: Schema smoke',
+      'start: beginning',
+      'randomness: always',
+      'unknown-root: true',
+      'characters:',
+      '  player:',
+      '    first-name: Ada',
+      '    unknown-character: true',
+      '',
+    ].join('\n');
+    await fs.writeFile(file, invalid);
+    let document = await vscode.workspace.openTextDocument(file);
+    await vscode.window.showTextDocument(document);
+    let diagnostics = await waitForDiagnostics(document, items =>
+      items.some(item => item.message.includes('unknown-root')) &&
+      items.some(item => item.message.includes('Valid values: "off"')));
+    assert.ok(diagnostics.some(item => item.message.includes('unknown-character')),
+      'Schema should report unknown keys in nested character objects');
+
+    const valid = [
+      'id: schema-smoke',
+      'title: Schema smoke',
+      'start: beginning',
+      'randomness: checks-only',
+      'characters:',
+      '  player:',
+      '    first-name: Ada',
+      '    ',
+      '',
+    ].join('\n');
+    await replaceDocument(document, valid);
+    diagnostics = await waitForDiagnostics(document, items => items.length === 0);
+
+    const completionPosition = document.positionAt(document.getText().indexOf('    \n') + 4);
+    const completions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider',
+      document.uri,
+      completionPosition,
+    );
+    assert.ok(completions?.items?.some(item => item.label === 'pronouns'),
+      'Schema key completion should offer character fields');
+
+    const startPosition = document.positionAt(document.getText().indexOf('start:') + 2);
+    const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, startPosition);
+    assert.ok(hovers?.some(hover => hover.contents.some(content =>
+      (typeof content === 'string' ? content : content.value).includes('scene where play begins'))),
+    'Schema hover should show the start field description');
+
+    const fallbackSchema = path.join(folder, 'story.schema.json');
+    const taleExtension = vscode.extensions.getExtension('squid-farm.talewright');
+    assert.ok(taleExtension, 'Talewright VSIX must be installed in the clean editor profile');
+    const installedSchema = path.join(taleExtension.extensionPath, 'schemas/story.schema.json');
+    await fs.copyFile(installedSchema, fallbackSchema);
+    const fallbackFile = path.join(folder, 'fallback.yaml');
+    await fs.writeFile(fallbackFile, [
+      '# yaml-language-server: $schema=./story.schema.json',
+      'id: schema-fallback',
+      'title: Schema fallback',
+      'start: beginning',
+      'randomness: always',
+      'characters:',
+      '  player:',
+      '    first-name: Ada',
+      '',
+    ].join('\n'));
+    const fallbackDocument = await vscode.workspace.openTextDocument(fallbackFile);
+    await vscode.window.showTextDocument(fallbackDocument);
+    diagnostics = await waitForDiagnostics(fallbackDocument, items =>
+      items.some(item => item.range.start.line === 4 && item.message.includes('Valid values: "off"')));
+    assert.ok(diagnostics.length > 0, 'Modeline schema fallback should validate another YAML filename');
+    console.log('Red Hat YAML smoke passed: schema diagnostics/clearing, key completion, hover descriptions, and modeline fallback.');
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function replaceDocument(document, text) {
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
+  assert.equal(await vscode.workspace.applyEdit(edit), true, 'YAML document edit should apply');
+  await document.save();
+}
+
+async function waitForDiagnostics(document, predicate, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const diagnostics = vscode.languages.getDiagnostics(document.uri);
+    if (predicate(diagnostics)) return diagnostics;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  assert.fail(`Timed out waiting for YAML diagnostics: ${
+    vscode.languages.getDiagnostics(document.uri).map(item => item.message).join('; ')
+  }`);
+}

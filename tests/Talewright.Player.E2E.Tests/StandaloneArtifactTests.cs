@@ -45,7 +45,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         await Choose(first.Choices[0]);
         await AssertState(state => Assert.NotEqual(first.Passage, state.Passage));
         var checkpoint = await Driver.ObserveAsync();
-        await Driver.ClickAsync("Saved games");
+        await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Load My save");
         await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
@@ -65,8 +65,9 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
             await Driver.ClickAsync("Start story");
         }
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
-        await Driver.ClickAsync("Saved games");
+        await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
         await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
         await Driver.ClickAsync("Back");
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));

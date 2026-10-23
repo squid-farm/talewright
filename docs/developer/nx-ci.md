@@ -19,6 +19,9 @@ python3 -m unittest discover -s tests -p 'test_nx*.py' -v
 python3 -m unittest discover -s docs -p test_docs.py -v
 ```
 
+Wrapper installation diagnostics go to stderr so machine-readable Nx stdout remains valid JSON,
+including on clean CI runners. The cold-install regression test exercises this first-use path.
+
 Preview the PR task graph using the actual base and head revisions:
 
 ```sh
@@ -39,10 +42,10 @@ and native regressions depend on the accessibility probe.
 | .NET projects under `src/`, `tests/`, and `examples/` | `@nx/dotnet` infers `build`, `test`, and packaging/run targets. MSBuild `ProjectReference` edges propagate affected selection and order prerequisite builds. |
 | `tests/Talewright.Tale.Tests` | `test` excludes the editor snippet compiler contract; that contract is separately selectable. |
 | `talewright-snippets` | `compiler-contract` compiles the shipped snippet defaults against the Tale compiler. The test source is a separate graph node so compiler changes select this contract without treating all Tale tests as editor assets. |
-| `talewright-editor` | `test`, `package-check`, and `editor-smoke` wrap the existing extension checks and package/installed-editor commands. |
+| `talewright-editor` | `test`, `package-check`, and `editor-smoke` wrap the existing extension checks and package/installed-editor commands. `compiler-contract` runs the manifest-schema compiler fixtures separately from Tale units. Explicit dependencies on the compiler, Tale test project, documentation, and example Story project preserve schema fixture verification when those inputs change. |
 | `Talewright.Player.E2E.Tests` | `e2e-web` preserves the three-browser matrix; `e2e-linux` and `e2e-linux-probe` retain the native runner. Explicit non-code dependencies cover CLI, debugger, player, hosts, and runtime contracts. Published web and desktop targets retain their existing publish-and-smoke commands. |
 | `Talewright.Cli` and package consumers | `package-check` wraps the existing versioned solution build, three pack commands, and clean-consumer verifier. Supply `VERSION`. Keeping this versioned build/pack sequence together preserves package identity. Explicit dependencies include the umbrella engine and player packages. |
-| `talewright-docs` | `check` validates relative Markdown links for changes under `docs/`. |
+| `talewright-docs` | `check` validates relative Markdown links for changes under `docs/`. Documentation changes also select editor checks because schema tests consume documented YAML examples; unrelated product suites stay unselected. |
 | `talewright-workspace` fallback | Unowned/root and newly introduced paths select broad verification rather than silently producing no tasks. No-op targets depend on the real projects, so broad selection uses the same commands without running duplicate solution tests. `docs/` is a more-specific project and receives documentation checks. |
 
 Shared inputs include the SDK, build props, solution, NuGet configuration, Nx configuration, and

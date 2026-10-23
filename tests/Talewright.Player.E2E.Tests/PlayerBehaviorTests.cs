@@ -61,10 +61,13 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Try the field exercises");
         await Choose("Stand your ground");
         await Observe(new(null, "never above its authored maximum of ten"));
-        await Driver.ClickAsync("Saved games");
+        await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
         await Choose("Thank Tomas for the lesson");
+        await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
         await Observe(new(null, "never above its authored maximum of ten"));
         await Driver.ClickAsync("Back");
         await AssertState(state => Assert.Equal(["Stand your ground"], state.Choices));

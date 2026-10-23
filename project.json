@@ -45,6 +45,7 @@
       "executor": "nx:noop",
       "dependsOn": [
         {"projects": ["talewright-editor"], "target": "test"},
+        {"projects": ["talewright-editor"], "target": "compiler-contract"},
         {"projects": ["talewright-editor"], "target": "editor-smoke"}
       ]
     },

@@ -21,9 +21,20 @@ public sealed class IndexedDbSaveStore(IJSRuntime js) : ISaveStore, IAsyncDispos
     {
         SaveNames.Validate(storyId, slot);
         var module = await ModuleAsync();
-        var data = await module.InvokeAsync<byte[]>("read", storyId, slot);
-        SaveNames.ValidateData(data);
-        return data;
+        try
+        {
+            var data = await module.InvokeAsync<byte[]>("read", storyId, slot);
+            SaveNames.ValidateData(data);
+            return data;
+        }
+        catch (JSException ex) when (ex.Message.Contains("does not exist.", StringComparison.Ordinal))
+        {
+            throw new FileNotFoundException(ex.Message, ex);
+        }
+        catch (JSException ex) when (ex.Message.Contains("invalid or oversized data.", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(ex.Message, ex);
+        }
     }
 
     public async Task WriteAsync(string storyId, string slot, byte[] data, bool overwrite = false)
