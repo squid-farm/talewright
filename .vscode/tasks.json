@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Talewright solution",
+      "type": "shell",
+      "command": "dotnet build Talewright.slnx",
+      "inAgents": true
+    },
+    {
+      "label": "Test Talewright solution",
+      "type": "shell",
+      "command": "dotnet test Talewright.slnx",
+      "inAgents": true
+    }
+  ]
+}
