@@ -15,7 +15,7 @@ from zipfile import ZipFile
 
 from package_version import version_from_tag
 
-PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli"}
+PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli", "Talewright.LanguageServer"}
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Rules", "Narrative", "Rulesets.Generic", "Tale", "Runtime")}
 
@@ -70,6 +70,14 @@ def verify(directory, version):
             if metadata.findtext("{*}version") != version:
                 raise ValueError(f"{path}: package version does not match {version}")
             required_files = ["README.md", f"lib/net10.0/{identity}.dll"]
+            if identity == "Talewright.LanguageServer":
+                required_files = [
+                    "README.md", "tools/net10.0/any/DotnetToolSettings.xml",
+                    *[f"tools/net10.0/any/Talewright.LanguageServer.{extension}"
+                      for extension in ("dll", "deps.json", "runtimeconfig.json")],
+                    "tools/net10.0/any/Talewright.Authoring.dll",
+                    *[f"tools/net10.0/any/{assembly}.dll" for assembly in ENGINE_ASSEMBLIES - {"Talewright.Runtime"}],
+                ]
             if identity == "Talewright.Cli":
                 required_files = ["README.md", "tools/net10.0/any/DotnetToolSettings.xml",
                                   "tools/net10.0/any/Talewright.Cli.dll",
@@ -96,9 +104,18 @@ def verify(directory, version):
                     raise ValueError(f"{path}: missing {required}")
             dependencies = {item.attrib["id"]: item.attrib["version"]
                             for item in metadata.findall(".//{*}dependency")}
+            if identity == "Talewright.LanguageServer":
+                settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
+                command = settings.find("Commands/Command")
+                if command is None or command.attrib != {
+                        "Name": "talewright-lsp", "EntryPoint": "Talewright.LanguageServer.dll", "Runner": "dotnet"}:
+                    raise ValueError(f"{path}: invalid language-server tool command")
+                if any("Talewright.Player" in name or "Talewright.Debugger" in name for name in names):
+                    raise ValueError(f"{path}: language server includes UI/runtime hosting dependencies")
             if identity in {"Talewright", "Talewright.Player"}:
-                if any(name.casefold() == "talewright.authoring" for name in dependencies) or any(
-                        Path(name).name.startswith("Talewright.Authoring.") for name in names):
+                tooling = ("talewright.authoring", "talewright.languageserver")
+                if any(name.casefold() in tooling for name in dependencies) or any(
+                        Path(name).name.casefold().startswith(tuple(name + "." for name in tooling)) for name in names):
                     raise ValueError(f"{path}: runtime package includes authoring infrastructure")
             if identity == "Talewright.Cli":
                 settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
@@ -124,7 +141,7 @@ def verify(directory, version):
                                  "buildTransitive/Talewright.Player.props"]:
                     if required not in names:
                         raise ValueError(f"{path}: missing Razor asset {required}")
-            else:
+            elif identity == "Talewright":
                 if "buildTransitive/Talewright.targets" not in names:
                     raise ValueError(f"{path}: missing story validation build target")
                 if any(name.startswith(("Talewright.", "Microsoft.AspNetCore."))
@@ -138,7 +155,7 @@ def verify(directory, version):
             found[identity] = path
     if found.keys() != PACKAGE_IDS:
         raise ValueError(f"Expected exactly {sorted(PACKAGE_IDS)}; found {sorted(found)}")
-    print(f"Verified two libraries and CLI tool at {version}", flush=True)
+    print(f"Verified two libraries, CLI, and language-server tools at {version}", flush=True)
 
 
 def smoke(directory, version):
@@ -154,7 +171,7 @@ def smoke(directory, version):
   </packageSources>
   <packageSourceMapping>
     <clear />
-    <packageSource key="local"><package pattern="Talewright" /><package pattern="Talewright.Player" /><package pattern="Talewright.Cli" /></packageSource>
+    <packageSource key="local"><package pattern="Talewright" /><package pattern="Talewright.Player" /><package pattern="Talewright.Cli" /><package pattern="Talewright.LanguageServer" /></packageSource>
     <packageSource key="nuget.org"><package pattern="*" /></packageSource>
   </packageSourceMapping>
 </configuration>
@@ -232,6 +249,16 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                 if not {"talewright.css", "Components/StoryPlayer.razor.js", "Saves/IndexedDbSaveStore.js"} <= paths:
                     raise ValueError("Player consumer is missing transitive Razor static assets")
         tool_path = root / "tools"
+        subprocess.run(["dotnet", "tool", "install", "Talewright.LanguageServer", "--version", version,
+                        "--tool-path", str(tool_path), "--configfile", str(config)],
+                       cwd=root, env=environment, check=True)
+        subprocess.run([str(tool_path / "talewright-lsp"), "--help"],
+                       cwd=root, env=environment, check=True)
+        subprocess.run([
+            "dotnet", "test", str(Path(__file__).resolve().parents[2] /
+                                 "tooling/language-server/tests/Talewright.LanguageServer.Tests"),
+            "-c", "Release", "--no-build", "--no-restore",
+        ], cwd=root, env=dict(environment, TALEWRIGHT_LSP_COMMAND=str(tool_path / "talewright-lsp")), check=True)
         subprocess.run(["dotnet", "tool", "install", "Talewright.Cli", "--version", version,
                         "--tool-path", str(tool_path), "--configfile", str(config)],
                        cwd=root, env=environment, check=True)

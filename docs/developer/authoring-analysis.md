@@ -51,7 +51,8 @@ condition range at the insertion point after the keyword.
 Block and choice skill checks ending in `dc` similarly retain an empty numeric
 context immediately after `dc`, including when trailing spaces were trimmed.
 
-This initial API exposes declaration ranges and expression extents, not a complete
+The [language server](language-server.md) hosts this API for editor diagnostics.
+This API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not provide completion,
 hover, LSP transport, lint, or evaluated gameplay values itself.
 

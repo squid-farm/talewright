@@ -105,7 +105,16 @@ class PackageBoundaryTests(unittest.TestCase):
             package.writestr(f"{identity}.nuspec", f"""<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
 <metadata><id>{identity}</id><version>{version}</version>{dependencies}</metadata></package>""")
             package.writestr("README.md", "Package readme")
-            if identity == "Talewright.Cli":
+            if identity == "Talewright.LanguageServer":
+                prefix = "tools/net10.0/any/"
+                for name in ["Talewright.LanguageServer.dll", "Talewright.LanguageServer.deps.json",
+                             "Talewright.LanguageServer.runtimeconfig.json", "Talewright.Authoring.dll",
+                             *[f"{assembly}.dll" for assembly in ENGINE_ASSEMBLIES - {"Talewright.Runtime"}]]:
+                    package.writestr(prefix + name, "")
+                package.writestr(prefix + "DotnetToolSettings.xml",
+                                 '<DotNetCliTool><Commands><Command Name="talewright-lsp" '
+                                 'EntryPoint="Talewright.LanguageServer.dll" Runner="dotnet" /></Commands></DotNetCliTool>')
+            elif identity == "Talewright.Cli":
                 prefix = "tools/net10.0/any/"
                 for name in ["Talewright.Cli.dll", "Talewright.Cli.deps.json",
                              "Talewright.Cli.runtimeconfig.json",
@@ -149,7 +158,7 @@ class PackageBoundaryTests(unittest.TestCase):
                     package.writestr(name, "")
         return path
 
-    def test_exactly_two_libraries_and_tool(self):
+    def test_exactly_two_libraries_and_two_tools(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             self.write_package(directory, "Talewright")
@@ -159,6 +168,9 @@ class PackageBoundaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify(directory, "1.2.3")
             self.write_package(directory, "Talewright.Cli")
+            with self.assertRaises(ValueError):
+                verify(directory, "1.2.3")
+            self.write_package(directory, "Talewright.LanguageServer")
             verify(directory, "1.2.3")
             self.write_package(directory, "Talewright.Host.Desktop")
             with self.assertRaises(ValueError):
@@ -179,7 +191,8 @@ class PackageBoundaryTests(unittest.TestCase):
 
     def test_runtime_packages_reject_authoring_infrastructure(self):
         for identity in ["Talewright", "Talewright.Player"]:
-            for dependency in [None, "Talewright.Authoring", "talewright.authoring", "TALEWRIGHT.AUTHORING"]:
+            for dependency in [None, "Talewright.Authoring", "talewright.authoring", "TALEWRIGHT.AUTHORING",
+                               "Talewright.LanguageServer", "talewright.languageserver"]:
                 with self.subTest(identity=identity, dependency=dependency), tempfile.TemporaryDirectory() as temporary:
                     directory = Path(temporary)
                     for package_id in ["Talewright", "Talewright.Player", "Talewright.Cli"]:
@@ -213,6 +226,21 @@ class PackageBoundaryTests(unittest.TestCase):
                 for name, content in entries.items():
                     package.writestr(name, content)
             with self.assertRaisesRegex(ValueError, "missing Razor asset"):
+                verify(directory, "1.2.3")
+
+    def test_language_server_requires_its_authoring_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for identity in ["Talewright", "Talewright.Player", "Talewright.Cli", "Talewright.LanguageServer"]:
+                self.write_package(directory, identity)
+            server = directory / "Talewright.LanguageServer.1.2.3.nupkg"
+            with ZipFile(server) as package:
+                entries = {name: package.read(name) for name in package.namelist()
+                           if name != "tools/net10.0/any/Talewright.Authoring.dll"}
+            with ZipFile(server, "w") as package:
+                for name, content in entries.items():
+                    package.writestr(name, content)
+            with self.assertRaisesRegex(ValueError, "missing tools/net10.0/any/Talewright.Authoring.dll"):
                 verify(directory, "1.2.3")
 
     def test_missing_component_assembly_fails(self):

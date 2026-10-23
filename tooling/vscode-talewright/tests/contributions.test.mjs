@@ -4,14 +4,14 @@ import { test } from 'node:test';
 
 const json = async file => JSON.parse(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
 
-test('declarative package wires Tale syntax, snippets, and manifest schema', async () => {
+test('package wires Tale syntax, snippets, manifest schema, and the thin LSP client', async () => {
   const manifest = await json('package.json');
-  assert.equal(manifest.main, undefined);
+  assert.equal(manifest.main, './dist/extension.cjs');
   assert.equal(manifest.browser, undefined);
-  assert.equal(manifest.activationEvents, undefined);
-  assert.equal(manifest.dependencies, undefined);
+  assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.yaml']);
+  assert.ok(manifest.dependencies['vscode-languageclient']);
   assert.deepEqual(Object.keys(manifest.contributes).sort(),
-    ['configurationDefaults', 'grammars', 'languages', 'snippets', 'yamlValidation']);
+    ['configuration', 'configurationDefaults', 'grammars', 'languages', 'snippets', 'yamlValidation']);
   assert.deepEqual(manifest.contributes.configurationDefaults['[tale]'], {
     'editor.autoClosingBrackets': 'never',
     'editor.autoClosingQuotes': 'never',

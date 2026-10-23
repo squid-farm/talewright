@@ -11,6 +11,13 @@ chapters/02-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 **Errors** stop the story from loading. **Warnings** (marked ⚠) don't, but usually point at a mistake.
 When you see several errors, fix the first one and check again: one mistake can cause others.
 
+## Editor project configuration
+
+| Code | Meaning | Usual fix |
+|---|---|---|
+| TW5001 | Required C# authoring registrations are missing. | Explicitly export and configure data-only project metadata; editors never build or execute project code automatically. |
+| TW5002 | The language server cannot analyze the story with its configured metadata. | Fix the reported metadata file/data error and refresh it. See [language-server configuration](../developer/language-server.md). |
+
 ## TW1xxx: writing mistakes in `.tale` files
 
 | Code | Meaning | Usual fix |
