@@ -10,7 +10,7 @@ namespace Talewright.Tale.Analysis;
 /// <summary>Half-open UTF-16 source range. Lines and columns are 1-based.</summary>
 public sealed record SourceRange(SourceLocation Start, SourceLocation End);
 
-public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story }
+public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story, Directive }
 
 /// <summary>A declaration, including unresolved declarations retained during incomplete edits.</summary>
 public sealed record AuthoringSymbol(string Name, AuthoringSymbolKind Kind, string Type, SourceRange? Declaration);
@@ -28,6 +28,7 @@ public sealed class StoryAnalysis
         Source = original.Source;
         Symbols = original.Symbols;
         Expressions = original.Expressions;
+        CompletionSites = original.CompletionSites;
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
@@ -35,6 +36,7 @@ public sealed class StoryAnalysis
         Source = source;
         Symbols = Array.AsReadOnly(collector.Symbols.Distinct().ToArray());
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
+        CompletionSites = Array.AsReadOnly(collector.CompletionSites.ToArray());
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
@@ -42,6 +44,7 @@ public sealed class StoryAnalysis
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
     public IReadOnlyList<ExpressionContext> Expressions { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
+    public IReadOnlyList<CompletionSite> CompletionSites { get; }
 
     /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
     public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
@@ -67,6 +70,29 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     private int[]? _manifestLineStarts;
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
+    internal List<CompletionSite> CompletionSites { get; } = [];
+
+    internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
+        => ReferenceCore(text, location, kind, keywords);
+
+    private void ReferenceCore(string text, SourceLocation location, AuthoringSymbolKind kind,
+        IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null)
+    {
+        var range = Range(location, text);
+        CompletionSites.Add(new(text, range, [kind], keywords,
+            Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray(), Candidates: candidates));
+        if (text.Length == 0 && source.Files.TryGetValue(location.File, out var content))
+        {
+            if (!_lines.TryGetValue(location.File, out var lines))
+                _lines.Add(location.File, lines = content.ReplaceLineEndings("\n").Split('\n'));
+            var line = lines[location.Line - 1];
+            for (var column = location.Column; column <= line.Length && char.IsWhiteSpace(line[column - 1]); column++)
+            {
+                var point = location with { Column = column + 1 };
+                CompletionSites.Add(new("", new(point, point), [kind], keywords, [point], Candidates: candidates));
+            }
+        }
+    }
 
     internal void InlineRange(SourceText sourceText, int start, int end)
     {
@@ -86,6 +112,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Expression(ExpressionContextKind kind, string text, SourceLocation location)
     {
         var range = Range(location, text);
+        SourceText? inlineSource = null;
+        var inlineOffset = 0;
         _scalars.TryGetValue(location, out var scalar);
         if (scalar is not null) range = scalar.Range(0, text.Length);
         if (_inlineRanges.TryGetValue((location.File, location.Line), out var ranges))
@@ -95,11 +123,52 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 location.Column - candidate.Source.Locate(candidate.Start).Column + text.Length <= candidate.End - candidate.Start);
             if (inline.Source is not null)
             {
-                var offset = inline.Start + location.Column - inline.Source.Locate(inline.Start).Column;
-                range = new(inline.Source.Locate(offset), inline.Source.Locate(offset + text.Length));
+                inlineSource = inline.Source;
+                inlineOffset = inline.Start + location.Column - inline.Source.Locate(inline.Start).Column;
+                range = new(inlineSource.Locate(inlineOffset), inlineSource.Locate(inlineOffset + text.Length));
             }
         }
         Expressions.Add(new(kind, text, range));
+        SourceLocation[]? boundaries = null;
+        SourceRange Map(int offset, int length)
+        {
+            if (offset > text.Length)
+            {
+                var point = range.End.Offset(offset - text.Length);
+                return new(point, point.Offset(length));
+            }
+            if (scalar is not null) return scalar.Range(offset, length);
+            if (inlineSource is not null)
+                return new(inlineSource.Locate(inlineOffset + offset), inlineSource.Locate(inlineOffset + offset + length));
+            if (boundaries is null)
+            {
+                boundaries = new SourceLocation[text.Length + 1];
+                boundaries[0] = location;
+                for (var index = 0; index < text.Length; index++)
+                {
+                    var previous = boundaries[index];
+                    boundaries[index + 1] = text[index] switch
+                    {
+                        '\r' => previous with { Line = previous.Line + 1, Column = 1 },
+                        '\n' when index > 0 && text[index - 1] == '\r' => previous,
+                        '\n' => previous with { Line = previous.Line + 1, Column = 1 },
+                        _ => previous.Offset(1)
+                    };
+                }
+            }
+            return new(boundaries[offset], boundaries[offset + length]);
+        }
+        var completionText = text;
+        if (location.File != StorySource.ManifestFileName && source.Files.TryGetValue(location.File, out var content))
+        {
+            if (!_lines.TryGetValue(location.File, out var sourceLines))
+                _lines.Add(location.File, sourceLines = content.ReplaceLineEndings("\n").Split('\n'));
+            var line = sourceLines[range.End.Line - 1];
+            var end = range.End.Column - 1;
+            while (end < line.Length && char.IsWhiteSpace(line[end])) end++;
+            completionText += line[(range.End.Column - 1)..end];
+        }
+        CompletionSites.AddRange(ExpressionCompletion.Sites(completionText, kind, Map, Symbols));
         if (kind == ExpressionContextKind.Effects)
         {
             ExpressionParser.CollectDeclarations(text, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
@@ -141,8 +210,83 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             Range(location with { Column = start + 1 }, id.Value)));
     }
 
+    internal void DisabledStats(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset) =>
+        ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats.Select(stat =>
+            new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null)).ToArray());
+
+    private void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null)
+    {
+        if (node is YamlSequenceNode sequence)
+        {
+            if (sequence.Children.Count == 0)
+            {
+                if (!_lines.TryGetValue(StorySource.ManifestFileName, out var lines))
+                    _lines.Add(StorySource.ManifestFileName,
+                        lines = source.Files[StorySource.ManifestFileName].ReplaceLineEndings("\n").Split('\n'));
+                var opened = false;
+                // Empty sequence end marks can equal their start; inspect only its authored whitespace and brackets.
+                for (var line = (int)sequence.Start.Line; line <= lines.Length; line++)
+                {
+                    var first = line == sequence.Start.Line ? (int)sequence.Start.Column : 1;
+                    var last = lines[line - 1].Length + 1;
+                    for (var column = first; column <= last; column++)
+                    {
+                        var character = column <= lines[line - 1].Length ? lines[line - 1][column - 1] : '\n';
+                        if (opened && (char.IsWhiteSpace(character) || character == ']'))
+                        {
+                            var point = new SourceLocation(StorySource.ManifestFileName, line, column);
+                            CompletionSites.Add(new("", new(point, point), [kind], [], [point], Candidates: candidates));
+                        }
+                        if (character == ']') return;
+                        if (!opened && character == '[') opened = true;
+                        else if (!char.IsWhiteSpace(character)) return;
+                    }
+                }
+            }
+            foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind, candidates);
+            return;
+        }
+        if (node is not YamlScalarNode scalar) return;
+        Scalar(scalar);
+        var location = new SourceLocation(StorySource.ManifestFileName, (int)scalar.Start.Line, (int)scalar.Start.Column);
+        var mapping = _scalars[location];
+        var text = scalar.Value ?? "";
+        if (text.Length == 0)
+        {
+            ReferenceCore("", mapping.Range(0, 0).Start, kind, [], candidates);
+            return;
+        }
+        CompletionSites.Add(new(text, mapping.Range(0, text.Length), [kind], [],
+            Enumerable.Range(0, text.Length + 1).Select(index => mapping.Range(index, 0).Start).ToArray(),
+            Candidates: candidates));
+    }
+
     internal void Manifest(YamlMappingNode root)
     {
+        void Walk(YamlNode node, string[] path)
+        {
+            if (node is YamlMappingNode map)
+            {
+                foreach (var (key, value) in map.Children)
+                {
+                    if (key is not YamlScalarNode { Value: { } name }) continue;
+                    var next = path.Append(name).ToArray();
+                    if (next is ["start"]) ReferenceNode(value, AuthoringSymbolKind.Scene);
+                    else if (next is ["ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset);
+                    else if (path is ["characters", _, "inventory"]) ReferenceNode(key, AuthoringSymbolKind.Item);
+                    else if (next is ["characters", _, "inventory"] && value is YamlSequenceNode)
+                        ReferenceNode(value, AuthoringSymbolKind.Item);
+                    else if (path is ["characters", _, "stats"] or ["items", _, "modifiers"] or ["creation", "stats"]
+                        or ["creation", "presets", _, "stats"]) ReferenceNode(key, AuthoringSymbolKind.Stat);
+                    if (next is ["characters"] or ["characters", _] or ["characters", _, "inventory"]
+                        or ["characters", _, "stats"] or ["items"] or ["items", _] or ["items", _, "modifiers"]
+                        or ["ruleset"] or ["creation"] or ["creation", "stats"] or ["creation", "presets"]
+                        or ["creation", "presets", _] or ["creation", "presets", _, "stats"])
+                        Walk(value, next);
+                }
+            }
+        }
+        Walk(root, []);
         SourceRange At(YamlNode node) => new(
             new SourceLocation(StorySource.ManifestFileName, (int)node.Start.Line, (int)node.Start.Column),
             new SourceLocation(StorySource.ManifestFileName, (int)node.End.Line, (int)node.End.Column));

@@ -256,9 +256,11 @@ internal sealed class StoryYamlReader
             factory = _options.Rulesets[Rulesets.Generic.GenericRuleset.Id];
         }
 
-        var builder = factory().ToBuilder();
+        var baseRuleset = factory();
+        var builder = baseRuleset.ToBuilder();
         if (Get(map, "disable") is { } disable)
         {
+            _analysis?.DisabledStats(disable, baseRuleset);
             foreach (var item in Sequence(disable, "ruleset.disable"))
             {
                 var id = new StatId(Scalar(item) ?? string.Empty);

@@ -48,11 +48,59 @@ diagnostics are separately identified by source `talewright`.
 ## Client contract and workspace behavior
 
 The server supports initialize/initialized, shutdown/exit, full-text
-didOpen/didChange/didClose, didSave, and workspace/didChangeWatchedFiles. Positions
+didOpen/didChange/didClose, didSave, textDocument/completion, and workspace/didChangeWatchedFiles. Positions
 are UTF-16 and zero-based. Compiler point locations become zero-width ranges,
 clamped to the current file; codes, messages, and error/warning severities remain
-the compiler's. No completion, hover, formatting, or other semantic capability is
-advertised. Unsupported requests return JSON-RPC method-not-found.
+the compiler's. Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
+returns a complete list with explicit `textEdit` replacement ranges. Hover,
+signature help, inlay hints, rename, formatting, and autofixes are not advertised.
+Unsupported requests return JSON-RPC method-not-found.
+
+### Semantic completion
+
+The compiler records reference slots using its Tale parser, expression lexer,
+and existing YAML representation tree. `Talewright.Authoring` matches those slots
+against the current whole-story partial symbol table; clients contain no
+completion rules. A request analyzes the latest accepted document versions if
+the cached snapshot is invalid, without waiting for the diagnostic debounce.
+
+Supported slots include scene diverts (including `END`), speech characters,
+scene metadata directives, skill-check actors/stats, and expression namespaces
+for stats, items, factions, flags, and variables. `visited(` offers scene IDs.
+`item:` references offer item names, and `give`/`take` quantities offer numeric
+expression operands after the actor and item.
+`@` in conditions offers explicitly registered predicates, and `#` in
+substitutions offers registered modifiers. Ordinary prose, comments, expression
+string literals, and unknown namespaces do not receive story-ID suggestions.
+Identifiers replace the whole current token, including text after the cursor;
+existing `@`, `#`, quotes, and namespace colons are preserved.
+
+In canonical `story.talewright.yaml`, completion additionally resolves `start`,
+`ruleset.base`, `ruleset.disable`, character inventory/stat references, item
+modifier stats, and character-creation stats/preset stats. Trigger conditions
+and effects use the same expression contexts as Tale. Quoted and escaped YAML
+scalars map decoded prefixes back to authored replacement ranges. Red Hat YAML
+continues to provide structural key/schema suggestions independently.
+
+`ruleset.disable` uses the selected base ruleset's stat IDs before disables and
+YAML additions; ordinary stat references use the final story stat table.
+Empty inventory/disabled-stat flow lists offer insertion edits inside the
+brackets, including when there is whitespace between them.
+Completion preserves existing namespace/call delimiters as well as effect
+operators, including when YAML escapes encode the delimiters. Faction ID edits
+also retain existing `.name` and `.tier` member access.
+
+Limitations: YAML must remain parseable (an empty scalar is fine, an unclosed
+quote or collection is not). Identifiers split across physical lines, such as a
+quoted YAML escaped line continuation, are omitted from LSP completion because
+the primary replacement edit must be single-line. The server does not repair YAML or propose arbitrary
+new declarations. Suggestions are reference/syntax names, not evaluated gameplay
+values. Required missing or invalid project metadata returns an explicit
+completion-unavailable JSON-RPC error (`-32001`), in addition to its diagnostic,
+rather than misleading built-in suggestions. Completion requires an open document
+and a valid UTF-16 position; malformed/out-of-bounds requests return `-32602`.
+
+### Story ownership
 
 The nearest on-disk `story.talewright.yaml` identifies each story. An unsaved `story.talewright.yaml`
 can establish its own root; otherwise a containing initialized workspace folder
@@ -129,7 +177,8 @@ remains absent. For cross-file disk changes, configure the client to forward
 `workspace/didChangeWatchedFiles` as described above.
 
 The reproducible headless client smoke exercises initialization, compiler
-diagnostics, an unsaved fix, clearing, and clean shutdown:
+diagnostics, an unsaved fix, clearing, shared completion with exact replacement
+ranges, and clean shutdown:
 
 ```sh
 TALEWRIGHT_LSP_DLL="$PWD/tooling/language-server/src/Talewright.LanguageServer/bin/Release/net10.0/Talewright.LanguageServer.dll" \
@@ -151,11 +200,38 @@ xvfb-run -a npm run test:editor
 The stdio process tests cover lifecycle, incomplete Tale/invalid YAML, unsaved
 buffers, cross-file create/change/delete, close-to-disk, diagnostic clearing,
 superseded versions, metadata failures/recovery, and exact saved-input diagnostic
-parity with the CLI. The installed-VSIX smoke preserves the existing
-syntax/snippet/schema checks and adds compiler diagnostics/unsaved clearing.
+parity with the CLI. Completion tests cover every symbol category, irrelevant
+contexts, incomplete input, UTF-16/CRLF and escaped YAML ranges, versioned
+overlays, cross-file additions/changes/deletions, and metadata failure/recovery.
+The installed-VSIX smoke preserves the existing syntax/snippet/schema checks
+and exercises unsaved Tale and canonical manifest completion alongside diagnostics.
+
+### Beginner manual check
+
+1. Install/configure the server and extension above; open a trusted story folder
+   containing `story.talewright.yaml` and a Tale file with `=== start`.
+2. Add another file with `=== destination` and `-> END`.
+3. In the first file type `-> dest`, press **Ctrl+Space**, and select
+   `destination`. Only `dest` should be replaced. Do not save.
+4. In a header type `@req` and request completion: `requires` should appear.
+   In `@requires player:h`, request completion for registered stats such as `hp`.
+   Try `{player:first-name#cap` for the `capitalize` modifier.
+5. In the manifest change `start` to `"dest"` and request completion inside the
+   quotes: `destination` should appear without removing the quotes.
+6. Rename the second scene in an unsaved buffer, then delete its file after
+   closing it. Repeat the divert completion to confirm the list updates.
+7. Type the same prefixes in ordinary prose: no story-symbol suggestions should
+   appear (VS Code's own word/snippet suggestions may still appear).
+8. For custom C# registrations, export metadata explicitly and configure its
+   path. Verify `@YourPredicate` and `#yourModifier`; remove/corrupt the metadata
+   and confirm an explicit unavailable error instead of invented registrations.
+   Neovim clients can request the same `textDocument/completion` method or use
+   the headless smoke above; no VS Code extension is needed.
 
 Verified on Linux on 2026-10-23: stdio integration tests against both the build
 and an installed local NuGet tool; the installed VSIX in an isolated VS Code
 1.100.3 profile; and the headless Neovim 0.11.5 smoke above. Both editors received
-compiler diagnostics and cleared them after an unsaved fix. This is local test
+compiler diagnostics and cleared them after an unsaved fix; completion was also
+verified in both editors, including unsaved Tale token replacement and canonical
+manifest values in the installed VSIX. This is local test
 evidence, not a claim that the package has already been released.

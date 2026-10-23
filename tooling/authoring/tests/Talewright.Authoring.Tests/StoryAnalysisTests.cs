@@ -458,6 +458,8 @@ public class StoryAnalysisTests
         Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Predicate && symbol.Name == "Ready");
         Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Modifier && symbol.Name == "greeting");
         Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Ruleset && symbol.Name == "project");
+        Assert.Contains(StoryCompletion.Complete(analysis, new("main.tale", 2, 14)), item => item.Label == "Ready");
+        Assert.Contains(StoryCompletion.Complete(analysis, new("main.tale", 3, 23)), item => item.Label == "greeting");
         var missing = await new StoryWorkspace(source, requiresProjectMetadata: true).AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(missing.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW5001");
     }

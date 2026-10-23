@@ -1,7 +1,8 @@
 # Tale for VS Code
 
 Highlight Talewright `.tale` stories, insert common story structures, and provide
-schema support and shared live compiler diagnostics without running your story.
+schema support, shared semantic completion, and live compiler diagnostics without
+running your story.
 
 ## Install
 
@@ -15,7 +16,7 @@ Use VS Code 1.100 or later.
 3. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
    select the file. Reload VS Code if prompted.
 4. Open a `.tale` file. The language indicator at the bottom should say **Tale**.
-5. For live compiler diagnostics, install the separate `Talewright.LanguageServer`
+5. For live compiler diagnostics and semantic completion, install the separate `Talewright.LanguageServer`
    .NET tool (requires .NET 10) from the Talewright package feed. The extension
    launches `talewright-lsp --stdio`; it never installs or builds it automatically.
    See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
@@ -69,8 +70,8 @@ installed, the extension associates `*.talewright.yaml` files with the bundled
 JSON Schema. The wildcard is only an editor schema-discovery convention; it does
 not make other basenames valid story manifests. It validates manifest structure, offers known keys, and shows field
 descriptions. It does not know story-specific IDs or whether a referenced scene,
-stat, item, or faction exists. The optional language server supplies those
-compiler checks, including whole-story diagnostics for unsaved edits; use
+stat, item, or faction exists. The optional language server supplies story-specific
+reference completion and compiler checks, including whole-story diagnostics for unsaved edits; use
 `talewright validate <story-folder>` for command-line validation.
 
 Editors that don't use the SchemaStore catalog can use the same schema with this
@@ -121,12 +122,23 @@ non-whitespace character and be no longer than 80 characters.
 
 ## Not included
 
-- Story-specific completion, hover, lint, formatting, or runtime debugging.
+- Hover, signature help, inlay hints, rename, lint, formatting, or runtime debugging.
 - Implicit project builds/assembly execution, gameplay, network service, or telemetry.
 
 The language server uses only shared compiler/authoring analysis. Custom C#
 registrations require explicitly exported data-only metadata; see
 [project metadata](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#client-contract-and-workspace-behavior).
+
+Use **Ctrl+Space** in a divert (`-> dest`), speech character, metadata directive,
+condition, or substitution to request story-aware completion. The shared server
+offers scene, character, stat, item, faction, flag, variable, predicate, and
+modifier references from unsaved whole-story analysis. It also completes
+story-specific values such as manifest `start: "dest"` without replacing quotes.
+Ordinary prose receives no semantic story suggestions; VS Code can still show
+its own word/snippet suggestions. YAML must be parseable, and required custom
+metadata must be available. See the
+[capabilities and manual walkthrough](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#semantic-completion)
+for supported slots, exact replacement behavior, and limitations.
 
 Keep using `talewright validate <story-folder>` for correctness checks. See the
 [Tale reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/tale-syntax.md)
