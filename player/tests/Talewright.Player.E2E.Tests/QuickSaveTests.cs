@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Talewright.Runtime.Saves;
 using Talewright.Testing;
@@ -159,16 +157,26 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         await Driver.ClickAsync("Saves");
         await AssertText(text =>
         {
-            Assert.Contains("One replaceable checkpoint for this story", text);
             Assert.Contains("Second passage", text);
             Assert.Contains("Mara Burns", text);
-            var timestamp = Regex.Match(text, @"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z").Value;
-            Assert.True(DateTimeOffset.TryParseExact(timestamp, "u", CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal, out var savedAt));
-            Assert.InRange(savedAt, before, DateTimeOffset.UtcNow);
+            Assert.DoesNotContain("One replaceable checkpoint for this story", text);
         });
         if (!PlayerTarget.IsDesktop)
         {
+            var time = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true })
+                .Locator("[data-save-kind=quick] time");
+            var timestamp = await time.GetAttributeAsync("datetime");
+            Assert.NotNull(timestamp);
+            Assert.True(DateTimeOffset.TryParse(timestamp, out var savedAt));
+            Assert.EndsWith("Z", timestamp);
+            Assert.InRange(savedAt, before, DateTimeOffset.UtcNow);
+            var expectedLocalTime = await Page.EvaluateAsync<string>("""
+                value => new Intl.DateTimeFormat(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short"
+                }).format(new Date(value))
+                """, timestamp);
+            await Expect(time).ToHaveTextAsync(expectedLocalTime);
             await Expect(Page.Locator("[data-save-kind=quick]")).ToHaveCountAsync(1);
             await Expect(Page.Locator("[data-save-kind=named]")).ToHaveCountAsync(1);
             await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Confirm overwrite" })).ToHaveCountAsync(0);
@@ -333,7 +341,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Host", "Browser")]
-    public async Task Quick_checkpoint_is_distinguished_in_narrow_themed_dialog(bool dark)
+    public async Task Quick_checkpoint_label_and_card_fit_the_narrow_themed_dialog(bool dark)
     {
         await Page.SetViewportSizeAsync(320, 800);
         await Page.EmulateMediaAsync(new() { ColorScheme = dark ? ColorScheme.Dark : ColorScheme.Light });
@@ -341,7 +349,10 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         await QuickSave();
         await Driver.ClickAsync("Saves");
         var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true });
-        await Expect(dialog.Locator("[data-save-kind=quick]")).ToContainTextAsync("One replaceable checkpoint");
+        var quick = dialog.Locator("[data-save-kind=quick]");
+        await Expect(quick).ToContainTextAsync("Quick Save checkpoint");
+        await Expect(quick).Not.ToContainTextAsync("One replaceable checkpoint");
+        Assert.True(await quick.EvaluateAsync<bool>("e => getComputedStyle(e).borderStyle === 'solid' && parseFloat(getComputedStyle(e).paddingTop) >= 12"));
         Assert.True(await dialog.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"));
         Assert.Equal(dark ? "rgb(38, 35, 31)" : "rgb(240, 235, 224)",
             await dialog.EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));

@@ -1,7 +1,6 @@
 using Microsoft.Playwright;
 using System.Text.Json.Nodes;
 using System.Diagnostics;
-using System.Globalization;
 using System.Text.RegularExpressions;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
@@ -30,11 +29,23 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         {
             Assert.Contains("First passage", text);
             Assert.Contains("Mara Burns", text);
-            var timestamp = Regex.Match(text, @"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z").Value;
-            Assert.True(DateTimeOffset.TryParseExact(timestamp, "u", CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal, out var savedAt), $"Actual save time missing: {text}");
-            Assert.InRange(savedAt, before, DateTimeOffset.UtcNow);
         });
+        if (!PlayerTarget.IsDesktop)
+        {
+            var time = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true }).Locator("time");
+            var timestamp = await time.GetAttributeAsync("datetime");
+            Assert.NotNull(timestamp);
+            Assert.True(DateTimeOffset.TryParse(timestamp, out var savedAt), "Machine-readable UTC timestamp missing.");
+            Assert.EndsWith("Z", timestamp);
+            Assert.InRange(savedAt, before, DateTimeOffset.UtcNow);
+            var expectedLocalTime = await Page.EvaluateAsync<string>("""
+                value => new Intl.DateTimeFormat(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short"
+                }).format(new Date(value))
+                """, timestamp);
+            await Expect(time).ToHaveTextAsync(expectedLocalTime);
+        }
         await Driver.ClickAsync("Close saves");
         await Choose("Walk onward");
         await Driver.ClickAsync("Saves");
@@ -62,6 +73,41 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await AssertDialogText(text => Assert.Contains("discard unsaved progress", text));
         await Driver.ClickAsync("Keep playing");
         await Observe(new(null, "Finished safely.", Ended: true));
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Saves_are_localized_sorted_newest_first_and_visually_grouped()
+    {
+        await Upload(Fixture());
+        await Driver.ClickAsync("Saves");
+        await FillSaveName("Earlier named save");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+        await Task.Delay(TimeSpan.FromSeconds(1.1));
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Quick Save");
+        await Driver.ClickAsync("Saves");
+
+        var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true });
+        var entries = dialog.Locator(".tw-save-list > li");
+        await Expect(entries).ToHaveCountAsync(2);
+        await Expect(entries.Nth(0)).ToHaveAttributeAsync("data-save-kind", "quick");
+        await Expect(entries.Nth(1)).ToHaveAttributeAsync("data-save-kind", "named");
+        var text = await dialog.InnerTextAsync();
+        Assert.DoesNotContain("Named save", text);
+        Assert.DoesNotContain("One replaceable checkpoint for this story", text);
+
+        var form = dialog.Locator(".tw-save-form");
+        var section = dialog.Locator(".tw-save-section");
+        Assert.True(await form.EvaluateAsync<bool>("e => e.matches('fieldset') && getComputedStyle(e).borderStyle === 'solid' && parseFloat(getComputedStyle(e).paddingTop) >= 12"));
+        Assert.True(await section.EvaluateAsync<bool>("e => getComputedStyle(e).borderTopStyle === 'solid' && e.querySelector('h3')?.textContent === 'Saved games'"));
+        var cardStyles = await entries.First.EvaluateAsync<bool>("""
+            e => getComputedStyle(e).borderStyle === "solid" &&
+                parseFloat(getComputedStyle(e).borderRadius) >= 6 &&
+                parseFloat(getComputedStyle(e).paddingTop) >= 12
+            """);
+        Assert.True(cardStyles, "Each save should have a bordered, padded card.");
     }
 
     [Fact]

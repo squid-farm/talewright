@@ -6,6 +6,11 @@
 
 **Write branching, stat-driven RPG stories in plain text. Play them on the web or the desktop.**
 
+> ## ⚠️ PRE-1.0 BETA: BACKWARD COMPATIBILITY IS NOT GUARANTEED
+>
+> Talewright is currently `0.0.x-beta`. Before `v1.0`, story syntax, save formats, APIs, tooling,
+> and project structure may change without notice. **Do not expect backward compatibility until v1.**
+
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
 and many branches. You write scenes in `.tale` files, a small extension of Markdown, and describe your
 cast in one `story.yaml`. No programming required.

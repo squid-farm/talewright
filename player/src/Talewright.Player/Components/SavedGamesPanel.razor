@@ -24,8 +24,8 @@
     }
     else
     {
-        <fieldset disabled="@Busy">
-            <legend>Create a named save</legend>
+        <fieldset class="tw-save-form" disabled="@Busy">
+            <legend>Create save</legend>
             <label>Save name <input aria-label="Save name" value="@Slot" @onchange="ChangeSlot" maxlength="64" /></label>
             <button type="button" @onclick="() => OnSave.InvokeAsync(false)">Save game</button>
             @if (PendingOverwrite == Slot.Trim())
@@ -35,38 +35,40 @@
                 <button type="button" @onclick="OnCancelOverwrite">Cancel overwrite</button>
             }
         </fieldset>
-        @if (Slots.Count == 0 && !Busy)
-        {
-            <p>No saved games.</p>
-        }
-        <ul class="tw-save-list" aria-label="Saved games">
-            @foreach (var entry in Slots)
+        <section class="tw-save-section">
+            <h3 id="saved-games-heading">Saved games</h3>
+            @if (Slots.Count == 0 && !Busy)
             {
-                <li data-save-kind="@(entry.IsQuick ? "quick" : "named")"
-                    aria-label="@($"{(entry.IsQuick ? "Checkpoint" : "Named save")}: {entry.DisplayName}")">
-                    <strong>@entry.DisplayName</strong>
-                    <span>@(entry.IsQuick ? "One replaceable checkpoint for this story" : "Named save")</span>
-                    @if (entry.Summary is { } summary)
-                    {
-                        <span>@summary.SceneTitle</span>
-                        <time datetime="@summary.SavedAt.ToString("O")">@summary.SavedAt.ToString("u")</time>
-                        @if (!string.IsNullOrWhiteSpace(summary.CharacterName))
-                        {
-                            <span>@summary.CharacterName</span>
-                        }
-                    }
-                    else
-                    {
-                        <span>Details unavailable for this saved game.</span>
-                    }
-                    @if (entry.Warning is not null)
-                    {
-                        <span class="tw-error">@entry.Warning</span>
-                    }
-                    <button type="button" disabled="@Busy" @onclick="() => OnLoad.InvokeAsync(entry.Slot)">Load @entry.DisplayName</button>
-                </li>
+                <p>No saved games.</p>
             }
-        </ul>
+            <ul class="tw-save-list" aria-label="Saved games">
+                @foreach (var entry in Slots.OrderByDescending(entry => entry.Summary?.SavedAt ?? DateTimeOffset.MinValue))
+                {
+                    <li data-save-kind="@(entry.IsQuick ? "quick" : "named")"
+                        aria-label="@($"{(entry.IsQuick ? "Checkpoint" : "Named save")}: {entry.DisplayName}")">
+                        <strong>@entry.DisplayName</strong>
+                        @if (entry.Summary is { } summary)
+                        {
+                            <span>@summary.SceneTitle</span>
+                            <time datetime="@summary.SavedAt.UtcDateTime.ToString("O")"></time>
+                            @if (!string.IsNullOrWhiteSpace(summary.CharacterName))
+                            {
+                                <span>@summary.CharacterName</span>
+                            }
+                        }
+                        else
+                        {
+                            <span>Details unavailable for this saved game.</span>
+                        }
+                        @if (entry.Warning is not null)
+                        {
+                            <span class="tw-error">@entry.Warning</span>
+                        }
+                        <button type="button" disabled="@Busy" @onclick="() => OnLoad.InvokeAsync(entry.Slot)">Load @entry.DisplayName</button>
+                    </li>
+                }
+            </ul>
+        </section>
     }
 </dialog>
 
