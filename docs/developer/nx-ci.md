@@ -34,6 +34,8 @@ tasks by required execution environment, not by changed paths. Nx still executes
 and its prerequisites. Independent projects run with `--parallel=3`; target phases are ordered to avoid
 packaging/editor and native report-output races. `editor-smoke` also explicitly depends on packaging,
 and native regressions depend on the accessibility probe.
+Editor compiler contracts share the Tale test project's Release build prerequisite and execute with
+`--no-build --no-restore`, preventing concurrent MSBuild writes when both contracts are selected.
 
 ## Project and target matrix
 
