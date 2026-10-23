@@ -66,6 +66,12 @@ When you see several errors, fix the first one and check again: one mistake can 
 | ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |
 | TW4007 | Two triggers have the same id. | Rename one. |
 
+## TW5xxx: authoring integration
+
+| Code | Meaning | Usual fix |
+|---|---|---|
+| TW5001 | Project authoring metadata is required but missing. Built-in-only analysis cannot fully represent the project. | Explicitly supply the project's compiler options or exported [authoring metadata](../developer/authoring-analysis.md#c-project-registrations). Editors never automatically execute project code. |
+
 ## Command-line codes
 
 `talewright validate --format json` reports these for problems with the command itself rather than

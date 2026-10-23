@@ -44,3 +44,4 @@ Replace `VERSION` with a published version. Prereleases must be requested explic
 - [C# story example](../../examples/CSharpStory/README.md): registering a predicate and validating Tale at build time.
 - [Extension points](architecture.md#6-extension-points): what can be replaced and where.
 - [Writing your own ruleset](../../src/Talewright.Rulesets.Generic/README.md#writing-your-own-ruleset).
+- [Authoring metadata](authoring-analysis.md#c-project-registrations): export the same registrations for editor analysis without automatically loading project code.
