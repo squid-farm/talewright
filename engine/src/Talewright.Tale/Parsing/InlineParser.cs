@@ -165,6 +165,8 @@ internal static class InlineParser
                     var lead = incomplete.Length - incomplete.TrimStart().Length;
                     var condition = incomplete[lead..].StartsWith("if ", StringComparison.Ordinal);
                     var offset = condition ? lead + 3 : 0;
+                    if (condition)
+                        analysis.Tokens.Add(new("if", new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 3 + lead))));
                     analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
                         incomplete[offset..], context.Source.Locate(i + 1).Offset(offset));
                 }
@@ -175,6 +177,16 @@ internal static class InlineParser
 
             var inner = text[(i + 1)..close];
             var location = context.Source.Locate(i + 1);
+            if (context.Symbols.Analysis is { } collector)
+            {
+                var trimmed = inner.Trim();
+                var lead = inner.Length - inner.TrimStart().Length;
+                var keyword = trimmed.StartsWith("if ", StringComparison.Ordinal) ? "if" :
+                    trimmed is "else" or "/if" ? trimmed : null;
+                if (keyword is not null)
+                    collector.Tokens.Add(new(keyword, new(context.Source.Locate(i + 1 + lead),
+                        context.Source.Locate(i + 1 + lead + keyword.Length))));
+            }
             context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
             context.Fragments.Add(ParseFragment(inner, location, context));
             result.Append(PlaceholderStart).Append(context.Fragments.Count - 1).Append(PlaceholderEnd);

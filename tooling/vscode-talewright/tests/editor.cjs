@@ -185,6 +185,17 @@ async function testLiveDiagnostics() {
     assert.equal(scene.insertText, 'start');
     assert.equal(scene.range.start.character, 3);
     assert.equal(scene.range.end.character, 6);
+    const hoverEdit = new vscode.WorkspaceEdit();
+    hoverEdit.replace(document.uri, new vscode.Range(1, 3, 1, 6), 'start');
+    assert.equal(await vscode.workspace.applyEdit(hoverEdit), true);
+    const hovers = await vscode.commands.executeCommand(
+      'vscode.executeHoverProvider', document.uri, new vscode.Position(1, 5));
+    const semanticHover = hovers.find(hover => hover.contents.some(content =>
+      content.value?.includes('**Scene**') && content.value.includes('Declared at')));
+    assert.ok(semanticHover, 'Installed VSIX must display shared Markdown hover for an unsaved scene reference');
+    assert.equal(semanticHover.range.start.character, 3);
+    assert.equal(semanticHover.range.end.character, 8);
+    assert.equal(document.isDirty, true, 'Hover must not save the buffer');
     const manifest = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifest);
     await waitForCompiler(manifest, items => items.some(item => item.code === 'TW4003') || items.length === 0);
@@ -196,8 +207,12 @@ async function testLiveDiagnostics() {
     assert.ok(completions.items.some(item => item.label === 'start' && item.detail?.startsWith('Scene:')),
       'Canonical manifest values must use shared story completion alongside Red Hat YAML');
     assert.equal(manifest.isDirty, true, 'Manifest completion must use the unsaved overlay');
+    const manifestHovers = await vscode.commands.executeCommand(
+      'vscode.executeHoverProvider', manifest.uri, new vscode.Position(2, 2));
+    assert.ok(manifestHovers.some(hover => hover.contents.some(content =>
+      content.value?.includes('scene where play begins'))), 'Canonical manifest schema help remains available');
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-    console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, Tale and canonical manifest semantic completion.');
+    console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion and source-aware Markdown hover.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await fs.rm(folder, { recursive: true, force: true });
