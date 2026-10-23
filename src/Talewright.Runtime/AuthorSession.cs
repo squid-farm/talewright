@@ -246,6 +246,10 @@ public sealed class AuthorSession
         CharacterSelection? character, AuthorCommand[] commands, bool captureDecisions = false)
         => new(story, target, setup, seed, character, commands, commands.Length, captureDecisions);
 
+    internal static AuthorSession RestoreTimeline(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
+        CharacterSelection? character, AuthorCommand[] commands, int cursor, bool captureDecisions)
+        => new(story, target, setup, seed, character, commands, cursor, captureDecisions);
+
     private void Adopt(AuthorSession candidate)
     {
         _session = candidate._session;
