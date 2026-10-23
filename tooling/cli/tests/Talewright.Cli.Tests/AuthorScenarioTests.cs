@@ -17,7 +17,7 @@ public sealed class AuthorScenarioTests : IDisposable
         _story = Path.Combine(_root, "story");
         _output = Path.Combine(_root, "author", "portable.twscenario");
         Directory.CreateDirectory(_story);
-        File.WriteAllText(Path.Combine(_story, "story.yaml"), """
+        File.WriteAllText(Path.Combine(_story, "story.talewright.yaml"), """
             id: scenario-ui
             title: Portable UI
             start: start
@@ -120,7 +120,7 @@ public sealed class AuthorScenarioTests : IDisposable
         Assert.Null(model.Error);
         var original = await File.ReadAllBytesAsync(_output);
         var ids = Enumerable.Range(0, 5000).Select(index => $"flag-{index:D4}-" + new string('x', 490)).ToArray();
-        var manifest = Path.Combine(_story, "story.yaml");
+        var manifest = Path.Combine(_story, "story.talewright.yaml");
         await File.WriteAllTextAsync(manifest, (await File.ReadAllTextAsync(manifest))
             .Replace("flags: [ready]", $"flags: [{string.Join(", ", ids)}]"));
         model.Reload();

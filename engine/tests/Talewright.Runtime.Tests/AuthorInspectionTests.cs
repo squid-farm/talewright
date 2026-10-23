@@ -34,7 +34,7 @@ public sealed class AuthorInspectionTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml,
             ["main.tale"] = tale,
         }), predicates is null ? null : new CompilerOptions { Predicates = predicates });
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

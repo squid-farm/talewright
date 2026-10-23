@@ -19,7 +19,7 @@ New here? Play the [web player](https://squid-farm.github.io/talewright/), then 
 
 | | |
 |---|---|
-| [Tale syntax](reference/tale-syntax.md) | Every `story.yaml` field and `.tale` directive |
+| [Tale syntax](reference/tale-syntax.md) | Every `story.talewright.yaml` field and `.tale` directive |
 | [Error codes](reference/diagnostics.md) | What each `TWxxxx` code means and how to fix it |
 | [CLI](reference/cli.md) | `validate`, `debug` and `publish` options, output and limits |
 | [Sample stories](../samples/README.md) | *The Lost Relic* and which features it demonstrates |

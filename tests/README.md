@@ -71,7 +71,7 @@ Issue #57 adds a separate, out-of-process BenchmarkDotNet suite. The dependency-
 seven-sample `Talewright.Benchmarks` runner above remains the fast correctness/budget
 check; it is not presented as BenchmarkDotNet evidence.
 
-The deterministic corpus generator counts `story.yaml` within the file total and
+The deterministic corpus generator counts `story.talewright.yaml` within the file total and
 creates exact expanded-byte totals. The four named tiers are 10 / 100 / 500 / 1,000
 files, 100 / 1,000 / 10,000 / 50,000 scenes, 0.5 / 5 / 25 / 50 MiB, and
 100 / 1,000 / 5,000 / 10,000 choice-history depth. Scene IDs and references are
@@ -502,7 +502,7 @@ and contents:
 ```csharp
 var source = new StorySource(new Dictionary<string, string>
 {
-    ["story.yaml"] = yaml,
+    ["story.talewright.yaml"] = yaml,
     ["chapters/main.tale"] = tale,
 });
 var result = StoryCompiler.Compile(source);

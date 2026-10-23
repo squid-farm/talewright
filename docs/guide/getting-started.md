@@ -22,14 +22,14 @@ gedit, and so on. A story is just a folder of text files:
 
 ```text
 my-story/
-├── story.yaml      # title, start scene, characters, items, factions
+├── story.talewright.yaml      # title, start scene, characters, items, factions
 └── story.tale      # your scenes (use as many .tale files and subfolders as you like)
 ```
 
 > **Tip:** In VS Code, install Red Hat's
 > [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) and the
 > [Tale extension](../../tooling/vscode-talewright/README.md). Together they provide `.tale`
-> highlighting and structural key completion/validation for `story.yaml`. Run
+> highlighting and structural key completion/validation for `story.talewright.yaml`. Run
 > `talewright validate` for story-specific checks such as whether your starting scene exists.
 
 ## Install the desktop tools

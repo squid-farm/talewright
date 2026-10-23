@@ -5,7 +5,7 @@ namespace Talewright.Player.Library;
 
 /// <summary>A story the player can pick from the library screen.</summary>
 /// <param name="Id">Library-specific key passed back to <see cref="IStoryLibrary.LoadAsync"/>.</param>
-/// <param name="Title">Display title (from story.yaml, or the id if it can't be read).</param>
+/// <param name="Title">Display title (from story.talewright.yaml, or the id if it can't be read).</param>
 /// <param name="Origin">Where it came from, e.g. "Built-in" or a file path.</param>
 public sealed record StoryEntry(string Id, string Title, string Origin);
 
@@ -79,7 +79,7 @@ public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "sto
     }
 }
 
-/// <summary>Stories on disk: each path is a story folder (containing story.yaml) or a <c>.zip</c>. Desktop only.</summary>
+/// <summary>Stories on disk: each path is a story folder (containing story.talewright.yaml) or a <c>.zip</c>. Desktop only.</summary>
 public sealed class FileSystemStoryLibrary(IEnumerable<string> paths) : IStoryLibrary
 {
     private readonly List<string> _paths = paths.Select(Path.GetFullPath).ToList();

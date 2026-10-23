@@ -218,7 +218,7 @@ if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
     throw new Exception("Original Narrative assembly identity was not preserved.");
 var source = new StorySource(new Dictionary<string, string>
 {
-    ["story.yaml"] = "id: smoke\\ntitle: Smoke\\nstart: start\\nruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",
+    ["story.talewright.yaml"] = "id: smoke\\ntitle: Smoke\\nstart: start\\nruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",
     ["main.tale"] = "=== start\\nHello **world**.\\n-> END",
 });
 var result = StoryCompiler.Compile(source);
@@ -264,7 +264,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                        cwd=root, env=environment, check=True)
         story = root / "tool-story"
         story.mkdir()
-        (story / "story.yaml").write_text(
+        (story / "story.talewright.yaml").write_text(
             "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
         (story / "main.tale").write_text("=== a\nHello.\n-> translated\n")
         (story / "chapter.fr.tale").write_text("=== translated\nCulture-like chapter.\n-> END\n")
@@ -284,7 +284,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "--output", str(archive)],
                        cwd=root, env=environment, check=True)
         with ZipFile(archive) as published:
-            if set(published.namelist()) != {"story.yaml", "main.tale", "chapter.fr.tale"}:
+            if set(published.namelist()) != {"story.talewright.yaml", "main.tale", "chapter.fr.tale"}:
                 raise ValueError("Installed CLI did not produce a story-only archive")
         web = root / "web.zip"
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",

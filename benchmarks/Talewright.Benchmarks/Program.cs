@@ -28,7 +28,7 @@ foreach (var scenes in new[] { 100, 1_000, 10_000 })
 
     var source = new StorySource(new Dictionary<string, string>
     {
-        ["story.yaml"] = """
+        ["story.talewright.yaml"] = """
             id: benchmark
             title: Benchmark
             start: scene.0

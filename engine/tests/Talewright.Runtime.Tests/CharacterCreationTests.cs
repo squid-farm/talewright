@@ -22,7 +22,7 @@ public sealed class CharacterCreationTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = "id: creation\ntitle: Creation\nstart: a\ncharacters:\n  player: {first-name: Default}\n" + creation,
+            ["story.talewright.yaml"] = "id: creation\ntitle: Creation\nstart: a\ncharacters:\n  player: {first-name: Default}\n" + creation,
             ["main.tale"] = "=== a\n{player:first-name} {player:pronoun.subject} {player:str}.\n* [Next] -> b\n=== b\nDone.\n-> END\n",
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

@@ -28,7 +28,7 @@ public sealed class CompilerOptions
     /// <summary>Modifiers usable as <c>#name</c> in substitutions.</summary>
     public TextModifierRegistry Modifiers { get; init; } = TextModifierRegistry.CreateDefault();
 
-    /// <summary>Rulesets selectable with <c>ruleset.base</c> in story.yaml.</summary>
+    /// <summary>Rulesets selectable with <c>ruleset.base</c> in story.talewright.yaml.</summary>
     public IReadOnlyDictionary<string, Func<Ruleset>> Rulesets { get; init; } = DefaultRulesets();
 
     /// <summary>

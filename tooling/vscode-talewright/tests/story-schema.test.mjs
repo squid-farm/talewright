@@ -45,8 +45,8 @@ function markdownYaml(source, index) {
 
 test('schema validates every shipped story manifest', async () => {
   for (const path of [
-    'samples/LostRelic/story.yaml',
-    'examples/CSharpStory/Story/Content/story.yaml',
+    'samples/LostRelic/story.talewright.yaml',
+    'examples/CSharpStory/Story/Content/story.talewright.yaml',
   ]) {
     assertValid(validateManifest, parsedYaml(await read(path), path), path);
   }

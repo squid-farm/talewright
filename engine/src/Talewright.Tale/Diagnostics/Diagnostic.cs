@@ -18,7 +18,7 @@ public readonly record struct SourceLocation(string File, int Line, int Column)
 
 /// <summary>
 /// A compiler message. Codes are stable (<c>TW1xxx</c> syntax, <c>TW2xxx</c> references/types,
-/// <c>TW3xxx</c> story structure, <c>TW4xxx</c> story.yaml) so tools and docs can refer to them.
+/// <c>TW3xxx</c> story structure, <c>TW4xxx</c> story.talewright.yaml) so tools and docs can refer to them.
 /// </summary>
 public sealed record Diagnostic(DiagnosticSeverity Severity, string Code, string Message, SourceLocation Location)
 {

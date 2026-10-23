@@ -135,11 +135,11 @@ public sealed class ServerTests
         await client.Initialize();
         await client.Open("child/main.tale", "=== child\n* [Go] -> start\n", 1);
         await client.Diagnostics("child/main.tale", 1);
-        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
-        await client.Watch("child/story.yaml", 1);
+        File.WriteAllText(client.PathOf("child/story.talewright.yaml"), Manifest.Replace("start: start", "start: child"));
+        await client.Watch("child/story.talewright.yaml", 1);
         Assert.Contains(await client.Diagnostics("child/main.tale", 1), item => item.GetProperty("code").GetString() == "TW2002");
-        File.Delete(client.PathOf("child/story.yaml"));
-        await client.Watch("child/story.yaml", 3);
+        File.Delete(client.PathOf("child/story.talewright.yaml"));
+        await client.Watch("child/story.talewright.yaml", 3);
         Assert.Empty(await client.Diagnostics("child/main.tale", 1)); // Retired scope clears its publication.
         Assert.DoesNotContain(await client.Diagnostics("child/main.tale", 1),
             item => item.GetProperty("code").GetString() == "TW2002"); // Parent can resolve start again.
@@ -153,15 +153,15 @@ public sealed class ServerTests
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("child"));
         var manifest = Manifest.Replace("start: start", "start: child");
-        File.WriteAllText(client.PathOf("child/story.yaml"), manifest);
+        File.WriteAllText(client.PathOf("child/story.talewright.yaml"), manifest);
         await client.Initialize();
-        await client.Open("child/story.yaml", manifest, 1);
-        await client.Diagnostics("child/story.yaml", 1);
-        File.Delete(client.PathOf("child/story.yaml"));
-        await client.Watch("child/story.yaml", 3);
-        await client.Diagnostics("child/story.yaml", 1);
+        await client.Open("child/story.talewright.yaml", manifest, 1);
+        await client.Diagnostics("child/story.talewright.yaml", 1);
+        File.Delete(client.PathOf("child/story.talewright.yaml"));
+        await client.Watch("child/story.talewright.yaml", 3);
+        await client.Diagnostics("child/story.talewright.yaml", 1);
         await client.Open("child/main.tale", "=== child\n-> END\n", 1);
-        Assert.Empty(await client.Diagnostics("child/story.yaml", 1));
+        Assert.Empty(await client.Diagnostics("child/story.talewright.yaml", 1));
         Assert.Empty(await client.Diagnostics("child/main.tale", 1));
     }
 
@@ -172,20 +172,20 @@ public sealed class ServerTests
     {
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("child"));
-        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: absent"));
+        File.WriteAllText(client.PathOf("child/story.talewright.yaml"), Manifest.Replace("start: start", "start: absent"));
         await client.Initialize();
-        await client.Watch("child/story.yaml", 1);
-        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", null));
+        await client.Watch("child/story.talewright.yaml", 1);
+        Assert.NotEmpty(await client.Diagnostics("child/story.talewright.yaml", null));
         if (openTale)
         {
             await client.Open("child/main.tale", "=== child\n* [Go] -> start\n", 1);
             Assert.NotEmpty(await client.Diagnostics("child/main.tale", 1));
-            await client.Diagnostics("child/story.yaml", null);
+            await client.Diagnostics("child/story.talewright.yaml", null);
         }
-        File.Delete(client.PathOf("child/story.yaml"));
+        File.Delete(client.PathOf("child/story.talewright.yaml"));
         Directory.Delete(client.PathOf("child"));
         await client.Watch("child", 3);
-        Assert.Empty(await client.Diagnostics("child/story.yaml", null));
+        Assert.Empty(await client.Diagnostics("child/story.talewright.yaml", null));
         if (openTale)
         {
             Assert.Empty(await client.Diagnostics("child/main.tale", 1));
@@ -204,7 +204,7 @@ public sealed class ServerTests
     {
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("child"));
-        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        File.WriteAllText(client.PathOf("child/story.talewright.yaml"), Manifest.Replace("start: start", "start: child"));
         File.WriteAllText(client.PathOf("child/main.tale"), "=== child\n-> END\n");
         await client.Initialize();
         await client.Open("child/main.tale", "=== child\n-> END\n", 1);
@@ -225,17 +225,17 @@ public sealed class ServerTests
     public async Task Deleted_standalone_story_keeps_open_buffer_usable_without_workspace_folders()
     {
         await using var client = new Client();
-        File.Delete(client.PathOf("story.yaml"));
+        File.Delete(client.PathOf("story.talewright.yaml"));
         Directory.CreateDirectory(client.PathOf("child"));
-        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        File.WriteAllText(client.PathOf("child/story.talewright.yaml"), Manifest.Replace("start: start", "start: child"));
         await client.Initialize(includeRoot: false);
         await client.Open("child/main.tale", "=== child\n* [Go] -> absent\n", 1);
         Assert.NotEmpty(await client.Diagnostics("child/main.tale", 1));
-        File.Delete(client.PathOf("child/story.yaml"));
+        File.Delete(client.PathOf("child/story.talewright.yaml"));
         Directory.Delete(client.PathOf("child"));
         await client.Watch("child", 3);
         Assert.Empty(await client.Diagnostics("child/main.tale", 1));
-        Assert.Contains(await client.Diagnostics("child/story.yaml", null), item => item.GetProperty("code").GetString() == "TW4002");
+        Assert.Contains(await client.Diagnostics("child/story.talewright.yaml", null), item => item.GetProperty("code").GetString() == "TW4002");
         await client.Change("child/main.tale", "=== child\n-> END\n", 2);
         Assert.Empty(await client.Diagnostics("child/main.tale", 2));
     }
@@ -267,7 +267,7 @@ public sealed class ServerTests
     public async Task Unsaved_nested_manifest_rehomes_existing_tale_overlays_and_diagnostics(bool parentManifest)
     {
         await using var client = new Client();
-        if (!parentManifest) File.Delete(client.PathOf("story.yaml"));
+        if (!parentManifest) File.Delete(client.PathOf("story.talewright.yaml"));
         Directory.CreateDirectory(client.PathOf("child"));
         const string childValid = "=== child\nHello.\n-> END\n";
         const string childInvalid = "=== child\n* [Go] -> absent\n";
@@ -276,7 +276,7 @@ public sealed class ServerTests
         await client.Open("child/main.tale", childInvalid, 1);
         var previous = await client.Diagnostics("child/main.tale", 1);
         if (parentManifest) Assert.NotEmpty(previous);
-        await client.Open("child/story.yaml", Manifest.Replace("start: start", "start: child"), 1);
+        await client.Open("child/story.talewright.yaml", Manifest.Replace("start: start", "start: child"), 1);
         Assert.Contains(await client.Diagnostics("child/main.tale", 1),
             diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
         await client.Change("child/main.tale", childValid, 2);
@@ -293,7 +293,7 @@ public sealed class ServerTests
             diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
         await client.Change("child/main.tale", childValid, 4);
         Assert.Empty(await client.Diagnostics("child/main.tale", 4));
-        Assert.False(File.Exists(client.PathOf("child/story.yaml")));
+        Assert.False(File.Exists(client.PathOf("child/story.talewright.yaml")));
         Assert.Equal(childValid, File.ReadAllText(client.PathOf("child/main.tale")));
     }
 
@@ -303,10 +303,10 @@ public sealed class ServerTests
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("child"));
         await client.Initialize();
-        await client.Open("child/story.yaml", Manifest.Replace("start: start", "start: child"), 1);
-        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", 1));
+        await client.Open("child/story.talewright.yaml", Manifest.Replace("start: start", "start: child"), 1);
+        Assert.NotEmpty(await client.Diagnostics("child/story.talewright.yaml", 1));
         await client.Open("child/main.tale", "=== child\nHello.\n-> END\n", 1);
-        Assert.Empty(await client.Diagnostics("child/story.yaml", 1));
+        Assert.Empty(await client.Diagnostics("child/story.talewright.yaml", 1));
         Assert.Empty(await client.Diagnostics("child/main.tale", 1));
     }
 
@@ -315,7 +315,7 @@ public sealed class ServerTests
     {
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("child"));
-        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        File.WriteAllText(client.PathOf("child/story.talewright.yaml"), Manifest.Replace("start: start", "start: child"));
         const string childValid = "=== child\nHello.\n-> END\n";
         File.WriteAllText(client.PathOf("child/main.tale"), "=== child\n* [Go] -> absent\n");
         await client.Initialize();
@@ -343,19 +343,19 @@ public sealed class ServerTests
     public async Task Discarding_unsaved_child_manifest_retires_root_and_rehomes_overlays(bool parentManifest)
     {
         await using var client = new Client();
-        if (!parentManifest) File.Delete(client.PathOf("story.yaml"));
+        if (!parentManifest) File.Delete(client.PathOf("story.talewright.yaml"));
         Directory.CreateDirectory(client.PathOf("child"));
         File.WriteAllText(client.PathOf("child/main.tale"), "=== child\nHello.\n-> END\n");
         await client.Initialize();
         await client.Open("start.tale", Valid, 1);
         await client.Diagnostics("start.tale", 1);
-        await client.Open("child/story.yaml", Manifest.Replace("start: start", "start: absent"), 1);
-        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", 1));
+        await client.Open("child/story.talewright.yaml", Manifest.Replace("start: start", "start: absent"), 1);
+        Assert.NotEmpty(await client.Diagnostics("child/story.talewright.yaml", 1));
         await client.Open("child/main.tale", "=== child\n* [Go] -> absent\n", 1);
         Assert.NotEmpty(await client.Diagnostics("child/main.tale", 1));
-        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", 1));
-        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("child/story.yaml") } });
-        Assert.Empty(await client.Diagnostics("child/story.yaml", null));
+        Assert.NotEmpty(await client.Diagnostics("child/story.talewright.yaml", 1));
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("child/story.talewright.yaml") } });
+        Assert.Empty(await client.Diagnostics("child/story.talewright.yaml", null));
         await client.Diagnostics("start.tale", 1);
         await client.Diagnostics("child/main.tale", 1); // Retirement clears the old publication.
         await client.Diagnostics("child/main.tale", 1); // Ancestor reanalysis owns the overlay.
@@ -368,7 +368,7 @@ public sealed class ServerTests
         await client.Diagnostics("child/main.tale", 1);
         await client.Diagnostics("start.tale", 1);
         Assert.DoesNotContain(client.PendingDiagnostics, message =>
-            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("child/story.yaml") &&
+            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("child/story.talewright.yaml") &&
             message.GetProperty("params").GetProperty("diagnostics").GetArrayLength() != 0);
     }
 
@@ -400,10 +400,10 @@ public sealed class ServerTests
     {
         await using var client = new Client();
         await client.Initialize();
-        await client.Open("story.yaml", "id: [\n", 1);
-        Assert.NotEmpty(await client.Diagnostics("story.yaml", 1));
-        await client.Change("story.yaml", Manifest, 2);
-        Assert.Empty(await client.Diagnostics("story.yaml", 2));
+        await client.Open("story.talewright.yaml", "id: [\n", 1);
+        Assert.NotEmpty(await client.Diagnostics("story.talewright.yaml", 1));
+        await client.Change("story.talewright.yaml", Manifest, 2);
+        Assert.Empty(await client.Diagnostics("story.talewright.yaml", 2));
         await client.Open("start.tale", "=== start\n::: skill-check athletics dc\n", 1);
         Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
         await client.Change("start.tale", Valid, 2);
@@ -442,8 +442,8 @@ public sealed class ServerTests
         await using var client = new Client();
         File.WriteAllText(client.PathOf("Untrusted.csproj"), "<Project><Target Name=\"Exploit\" BeforeTargets=\"Build\"><Error Text=\"Must never run\" /></Target></Project>");
         await client.Initialize();
-        await client.Open("story.yaml", Manifest, 1);
-        Assert.Contains(await client.Diagnostics("story.yaml", 1), item => item.GetProperty("code").GetString() == "TW5001");
+        await client.Open("story.talewright.yaml", Manifest, 1);
+        Assert.Contains(await client.Diagnostics("story.talewright.yaml", 1), item => item.GetProperty("code").GetString() == "TW5001");
     }
 
     [Theory]
@@ -459,10 +459,10 @@ public sealed class ServerTests
         var error = await client.Next(message => message.TryGetProperty("method", out var method) && method.GetString() == "window/showMessage");
         Assert.Equal(1, error.GetProperty("params").GetProperty("type").GetInt32());
         Assert.Contains("missing.authoring.json", error.GetProperty("params").GetProperty("message").GetString());
-        Assert.Contains(await client.Diagnostics("story.yaml", null), item => item.GetProperty("code").GetString() == "TW5002");
+        Assert.Contains(await client.Diagnostics("story.talewright.yaml", null), item => item.GetProperty("code").GetString() == "TW5002");
         File.WriteAllText(client.PathOf("missing.authoring.json"), AuthoringProjectMetadata.Export(CompilerOptions.Default).ToJson());
         await client.Watch("missing.authoring.json", 1);
-        Assert.Empty(await client.Diagnostics("story.yaml", null));
+        Assert.Empty(await client.Diagnostics("story.talewright.yaml", null));
         Assert.Empty(await client.Diagnostics("start.tale", 1));
     }
 
@@ -473,16 +473,16 @@ public sealed class ServerTests
         await client.Initialize();
         await client.Open("start.tale", Valid, 1);
         Assert.Empty(await client.Diagnostics("start.tale", 1));
-        await client.Open("story.yaml", Manifest.Replace("start: start", "start: absent"), 1);
-        Assert.NotEmpty(await client.Diagnostics("story.yaml", 1));
-        await client.Change("story.yaml", "id: [", 2);
-        await client.Change("story.yaml", Manifest, 3);
-        Assert.Empty(await client.Diagnostics("story.yaml", 3));
-        Assert.Equal(Manifest, File.ReadAllText(client.PathOf("story.yaml")));
+        await client.Open("story.talewright.yaml", Manifest.Replace("start: start", "start: absent"), 1);
+        Assert.NotEmpty(await client.Diagnostics("story.talewright.yaml", 1));
+        await client.Change("story.talewright.yaml", "id: [", 2);
+        await client.Change("story.talewright.yaml", Manifest, 3);
+        Assert.Empty(await client.Diagnostics("story.talewright.yaml", 3));
+        Assert.Equal(Manifest, File.ReadAllText(client.PathOf("story.talewright.yaml")));
         // A request/response is an event-loop barrier; no old version may arrive after it.
         await client.Request("unknown", new { });
         Assert.DoesNotContain(client.PendingDiagnostics, message =>
-            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("story.yaml") &&
+            message.GetProperty("params").GetProperty("uri").GetString() == client.UriOf("story.talewright.yaml") &&
             message.GetProperty("params").GetProperty("version").ToString() == "2");
     }
 
@@ -501,7 +501,7 @@ public sealed class ServerTests
         public Client()
         {
             Directory.CreateDirectory(Root);
-            File.WriteAllText(PathOf("story.yaml"), Manifest);
+            File.WriteAllText(PathOf("story.talewright.yaml"), Manifest);
             File.WriteAllText(PathOf("start.tale"), Valid);
             var installed = Environment.GetEnvironmentVariable("TALEWRIGHT_LSP_COMMAND");
             var start = new ProcessStartInfo(installed ?? "dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };

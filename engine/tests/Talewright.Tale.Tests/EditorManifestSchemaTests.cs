@@ -30,7 +30,7 @@ public class EditorManifestSchemaTests
                 .Select(code => code.GetString()!).Order().ToArray();
             var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
             {
-                ["story.yaml"] = File.ReadAllText(Path.Combine(directory, file)),
+                ["story.talewright.yaml"] = File.ReadAllText(Path.Combine(directory, file)),
                 ["main.tale"] = "=== beginning\nHello.\n-> END\n",
             }));
             Assert.Equal(expectedCodes, result.Diagnostics.Select(diagnostic => diagnostic.Code).Order().ToArray());

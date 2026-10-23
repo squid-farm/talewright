@@ -36,7 +36,7 @@ public sealed class AuthorSessionTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml,
             ["main.tale"] = tale,
         }), options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

@@ -1,6 +1,6 @@
 # Talewright.Tale — the story compiler
 
-Turns a story folder (`story.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
+Turns a story folder (`story.talewright.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
 diagnostics with file, line and column. This is the **only** project that parses text, and it runs once per load.
 The syntax itself is specified in the [Tale syntax reference](../../../docs/reference/tale-syntax.md).
 
@@ -17,12 +17,12 @@ var session = new StorySession(result.Story!);
 
 Folder and ZIP loaders both accept at most 1,000 story files, 5 MiB per file and
 50 MiB total expanded text. Folder traversal rejects symbolic links inside the
-story and paths deeper than 64 directories. Only `story.yaml` and `.tale` files
+story and paths deeper than 64 directories. Only `story.talewright.yaml` and `.tale` files
 are loaded; unrelated files are not published as story content.
 
 ## Pipeline (`StoryCompiler.Compile`)
 
-1. **Manifest.** `StoryYamlReader` reads `story.yaml` (YamlDotNet node model, so error positions are exact and
+1. **Manifest.** `StoryYamlReader` reads `story.talewright.yaml` (YamlDotNet node model, so error positions are exact and
    nothing depends on reflection). Builds the ruleset (`base` → factory from `CompilerOptions.Rulesets`, then
    `disable`, then `stats`), characters, items, factions, flags, vars and triggers.
 2. **Discover.** The Tale parser collects scene ids and actual effect blocks; the expression lexer collects
@@ -56,7 +56,7 @@ and not a statement-level execution map.
 | `Compilation/StorySource.cs` | Path → text map. `FromDirectory`, `FromZip(stream)` (strips one wrapping folder), `TaleFiles` (sorted), `ReadTitle()`. |
 | `Compilation/CompilerOptions.cs` | `Predicates` (`@Name`), `Modifiers` (`#mod`), `Rulesets` (name → factory; defaults `generic` and `none`). Also `CompilationResult` (`Story`, `Diagnostics`, `Success`, `Errors`, `Warnings`). |
 | `Compilation/StoryValidator.cs` | Whole-story structural checks (TW3xxx). Reachability is skipped when there are errors so one bad divert doesn't produce a wall of warnings. |
-| `Parsing/StoryYamlReader.cs` | `story.yaml` → manifest + world. Unknown keys are warnings (TW4006) so typos are noticed. |
+| `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are warnings (TW4006) so typos are noticed. |
 | `Parsing/TaleParser.cs` | Line classifier and scene builder. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
 | `Parsing/InlineParser.cs` | Prose → `TemplateInline`s. Masks `{…}` as private-use placeholders, lets Markdig handle `*em*`/`**strong**`/`` `code` `` (paragraph parser only, autolinks off), then restores substitutions and inline `{if}`. Also `SourceText` for mapping offsets back to line/column. |
 | `Parsing/ExpressionParser.cs` | Recursive descent with type checking: conditions (`player:str >= 12 and player has rope`), numbers, substitutions (`player:first-name#possessive`), effects (`player:hp -= 2`). |
@@ -67,7 +67,7 @@ and not a statement-level execution map.
 
 ## Diagnostic codes
 
-`TW1xxx` syntax, `TW2xxx` references and types, `TW3xxx` structure, `TW4xxx` story.yaml. The full table is in
+`TW1xxx` syntax, `TW2xxx` references and types, `TW3xxx` structure, `TW4xxx` story.talewright.yaml. The full table is in
 the [error code reference](../../../docs/reference/diagnostics.md). To find where a code is raised: `grep -rn TW2002 src/`.
 
 ## Semantics worth knowing

@@ -18,7 +18,7 @@ The [Lost Relic sample](../../samples/LostRelic) uses one file per chapter.
 
 ## Characters and pronouns
 
-Declare every character in `story.yaml`. The `player` character is required.
+Declare every character in `story.talewright.yaml`. The `player` character is required.
 
 ```yaml
 characters:
@@ -35,7 +35,7 @@ Use them in prose, and Talewright takes care of the grammar:
 > guide: Careful.                                 → dialogue spoken by Tomas
 ```
 
-Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/tale-syntax.md#1-storyyaml).
+Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/tale-syntax.md#1-storytalewrightyaml).
 See [substitutions](../reference/tale-syntax.md#3-substitutions) for everything you can insert and the
 `#modifiers` you can apply.
 
@@ -51,7 +51,7 @@ By default, stories use a familiar d20-style ruleset:
 | Progression | `xp`, `level` (1–20) |
 
 You can add your own stats (`courage`, `sanity`, ...), remove ones you don't want, or start from an
-empty ruleset. See [`ruleset` in story.yaml](../reference/tale-syntax.md#1-storyyaml).
+empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/tale-syntax.md#1-storytalewrightyaml).
 
 Change stats with effects: `~ player:hp -= 2` on its own line when a scene starts, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
@@ -84,7 +84,7 @@ creates it.
 ```
 
 Checking a flag or variable that nothing ever sets is reported as a mistake (usually a typo). If it's
-intentional, declare it in `story.yaml`: `flags: [alarm-raised]` or `vars: { bribes: 0 }`.
+intentional, declare it in `story.talewright.yaml`: `flags: [alarm-raised]` or `vars: { bribes: 0 }`.
 
 ## Factions
 
@@ -104,7 +104,7 @@ Standing is a number. Its tier name is what players see and what you'll usually 
 | `allied` | 50 or higher |
 
 Standing has no upper or lower limit; these tiers just label the ranges. They come from the built-in
-ruleset and can't be changed in `story.yaml` yet. A developer can change them with a
+ruleset and can't be changed in `story.talewright.yaml` yet. A developer can change them with a
 [custom C# ruleset](../developer/csharp-extensions.md).
 
 ```tale
@@ -134,7 +134,7 @@ failure: -> hall
 A check rolls a d20 and adds the skill and its attribute bonus. Another character can make the check:
 `skill-check guide survival dc 10`. Results are shown to the player in the story.
 
-Want the same rolls every time? Set `seed: 1234` in `story.yaml`. For no dice at all, set
+Want the same rolls every time? Set `seed: 1234` in `story.talewright.yaml`. For no dice at all, set
 `randomness: off`, which treats every roll as a 10.
 
 ## Conditions
@@ -225,6 +225,6 @@ Without a `creation` section, the story starts with the `player` you wrote. See
 
 ## Other options
 
-- `undo: false` in `story.yaml` hides the **Back** and **Forward** buttons. Saves still work.
+- `undo: false` in `story.talewright.yaml` hides the **Back** and **Forward** buttons. Saves still work.
 - `![description](image-id)` reserves a spot for an image. Images aren't displayed yet
   ([#35](https://github.com/squid-farm/talewright/issues/35)).

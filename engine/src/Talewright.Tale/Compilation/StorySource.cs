@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 namespace Talewright.Tale.Compilation;
 
 /// <summary>
-/// The raw files of a story: <c>story.yaml</c> plus <c>*.tale</c> files, keyed by relative path with <c>/</c>
+/// The raw files of a story: <c>story.talewright.yaml</c> plus <c>*.tale</c> files, keyed by relative path with <c>/</c>
 /// separators. Hosts build one from a folder, a zip, or embedded resources; the compiler never touches the file
 /// system itself (so it works unchanged in the browser).
 /// </summary>
@@ -15,7 +15,7 @@ public sealed class StorySource
     private const long MaxExpandedBytes = 50L * 1024 * 1024;
 
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
-    public const string ManifestFileName = "story.yaml";
+    public const string ManifestFileName = "story.talewright.yaml";
 
     /// <summary>Extension of narrative files.</summary>
     public const string TaleExtension = ".tale";
@@ -79,7 +79,7 @@ public sealed class StorySource
     }
 
     /// <summary>
-    /// Loads a zipped story. If <c>story.yaml</c> is not at the archive root but inside a single top-level folder
+    /// Loads a zipped story. If <c>story.talewright.yaml</c> is not at the archive root but inside a single top-level folder
     /// (the usual result of "compress folder"), that folder is treated as the root. At most 1,000 story files,
     /// 5 MiB per file and 50 MiB total expanded text are read.
     /// </summary>
@@ -140,7 +140,7 @@ public sealed class StorySource
     }
 
     /// <summary>
-    /// Reads just <c>title</c> from story.yaml, without compiling (for story pickers). Returns null if it can't.
+    /// Reads just <c>title</c> from story.talewright.yaml, without compiling (for story pickers). Returns null if it can't.
     /// </summary>
     public string? ReadTitle()
     {

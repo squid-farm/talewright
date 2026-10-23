@@ -9,7 +9,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
     private static CompilationResult Compile(string metadata) => StoryCompiler.Compile(new StorySource(
         new Dictionary<string, string>
         {
-            ["story.yaml"] = "id: hubs\ntitle: Hubs\nstart: hub\ncharacters:\n  player: {first-name: Tester}\n",
+            ["story.talewright.yaml"] = "id: hubs\ntitle: Hubs\nstart: hub\ncharacters:\n  player: {first-name: Tester}\n",
             ["main.tale"] = $"=== hub\n{metadata}\n-> END\n=== other\n@tags a,b\n-> END",
         }));
 
@@ -50,7 +50,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = "id: hubs\ntitle: Hubs\nstart: hub\ncharacters:\n  player: {first-name: Tester}",
+            ["story.talewright.yaml"] = "id: hubs\ntitle: Hubs\nstart: hub\ncharacters:\n  player: {first-name: Tester}",
             ["main.tale"] = $"""
                 === hub
                 @tags self
@@ -80,7 +80,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
         var timer = Stopwatch.StartNew();
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = "id: ring\ntitle: Ring\nstart: s0\ncharacters:\n  player: {first-name: Tester}",
+            ["story.talewright.yaml"] = "id: ring\ntitle: Ring\nstart: s0\ncharacters:\n  player: {first-name: Tester}",
             ["main.tale"] = text,
         }));
         output.WriteLine($"{count} sparse hubs: {timer.Elapsed.TotalMilliseconds:F1} ms");

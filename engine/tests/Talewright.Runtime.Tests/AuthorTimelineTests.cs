@@ -55,7 +55,7 @@ public sealed class AuthorTimelineTests
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.yaml"] = yaml, ["main.tale"] = tale,
+            ["story.talewright.yaml"] = yaml, ["main.tale"] = tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;

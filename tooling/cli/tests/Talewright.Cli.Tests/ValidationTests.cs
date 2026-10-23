@@ -12,7 +12,7 @@ public sealed class ValidationTests : IDisposable
     public ValidationTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.yaml"),
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
             "id: cli\ntitle: CLI\nversion: 1\nstart: a\ncharacters:\n  player: { first-name: Tester }\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"), "=== a\nHello.\n-> END");
     }
@@ -78,7 +78,7 @@ public sealed class ValidationTests : IDisposable
     [Fact]
     public void Missing_manifest_is_a_compiler_error()
     {
-        File.Delete(Path.Combine(_root, "story.yaml"));
+        File.Delete(Path.Combine(_root, "story.talewright.yaml"));
         var result = Run("--format", "json");
         Assert.Equal(1, result.Code);
         Assert.Contains("TW4002", result.Output);

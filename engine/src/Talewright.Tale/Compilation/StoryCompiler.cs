@@ -13,12 +13,12 @@ using Talewright.Tale.Analysis;
 namespace Talewright.Tale.Compilation;
 
 /// <summary>
-/// Compiles a story (story.yaml plus <c>.tale</c> files) into a validated <see cref="StoryDefinition"/>.
+/// Compiles a story (story.talewright.yaml plus <c>.tale</c> files) into a validated <see cref="StoryDefinition"/>.
 /// </summary>
 /// <remarks>
 /// Pipeline:
 /// <list type="number">
-/// <item>Read story.yaml into a <see cref="WorldDefinition"/> (ruleset, characters, items, factions…).</item>
+/// <item>Read story.talewright.yaml into a <see cref="WorldDefinition"/> (ruleset, characters, items, factions…).</item>
 /// <item>Discover scene ids and effect assignment targets using the Tale parser and expression lexer,
 /// so forward references and auto-declared flags/variables resolve.</item>
 /// <item>Parse each <c>.tale</c> file (expressions are type-checked and resolved as they are parsed).</item>
@@ -42,7 +42,7 @@ public static class StoryCompiler
 
         if (!source.Files.TryGetValue(StorySource.ManifestFileName, out var yaml))
         {
-            diagnostics.Error("TW4002", "The story has no story.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
+            diagnostics.Error("TW4002", "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
             analysis?.DiscoverWithoutManifest();
             return new CompilationResult(null, diagnostics.Items);
         }

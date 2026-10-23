@@ -390,7 +390,7 @@ internal sealed partial class TaleParser
         var speaker = new EntityId(who);
         if (!_symbols.World.Characters.ContainsKey(speaker))
         {
-            _diagnostics.Error("TW2001", $"Unknown character '{who}'. Declare it under characters in story.yaml.", At(indent + 1 + body.IndexOf(who, StringComparison.Ordinal)));
+            _diagnostics.Error("TW2001", $"Unknown character '{who}'. Declare it under characters in story.talewright.yaml.", At(indent + 1 + body.IndexOf(who, StringComparison.Ordinal)));
             if (_symbols.Analysis is not null)
             {
                 var partial = body[(colon + 1)..];

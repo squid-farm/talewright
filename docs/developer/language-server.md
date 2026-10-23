@@ -54,7 +54,7 @@ clamped to the current file; codes, messages, and error/warning severities remai
 the compiler's. No completion, hover, formatting, or other semantic capability is
 advertised. Unsupported requests return JSON-RPC method-not-found.
 
-The nearest on-disk `story.yaml` identifies each story. An unsaved `story.yaml`
+The nearest on-disk `story.talewright.yaml` identifies each story. An unsaved `story.talewright.yaml`
 can establish its own root; otherwise a containing initialized workspace folder
 is the fallback. Multiple story roots are analyzed independently.
 An opened manifest always establishes its own directory as the root, including an
@@ -77,7 +77,7 @@ cannot publish. Diagnostics for fixed or deleted files are explicitly cleared.
 Disk changes re-read the bounded shared story source loader; no project code is
 executed. File-loading errors are reported, not treated as successful analysis.
 
-Clients must forward create/change/delete events for `**/*.tale`, `**/story.yaml`,
+Clients must forward create/change/delete events for `**/*.tale`, `**/story.talewright.yaml`,
 project files, and configured authoring metadata. The VS Code client installs
 these watchers, including the configured metadata path. Other clients
 can use didSave for saved open documents, but need watched-file events for
@@ -107,12 +107,12 @@ Neovim 0.11 or later can launch the installed tool:
 
 ```lua
 vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
-  pattern = { "*.tale", "story.yaml" },
+  pattern = { "*.tale", "story.talewright.yaml" },
   callback = function(event)
     vim.lsp.start({
       name = "talewright",
       cmd = { "talewright-lsp", "--stdio" },
-      root_dir = vim.fs.root(event.buf, "story.yaml"),
+      root_dir = vim.fs.root(event.buf, "story.talewright.yaml"),
       init_options = { requiresProjectMetadata = false },
     })
   end,

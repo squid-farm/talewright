@@ -71,7 +71,7 @@ The three tiers you asked for map onto projects like this:
 
 Two more projects glue it together:
 
-- `Talewright.Tale` is the **compiler**: it turns `.tale` + `story.yaml` text into the typed objects the other
+- `Talewright.Tale` is the **compiler**: it turns `.tale` + `story.talewright.yaml` text into the typed objects the other
   layers use. It is the _only_ place that parses strings, and it runs once when a story loads.
 - `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
   frame). It is the only project that knows about all the others.
@@ -248,18 +248,18 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
 
 - **`Compilation/`**
   - `StorySource`: a dictionary of relative path → text. Factories: `FromDirectory`, `FromZip(stream)` (a
-    single wrapping top-level folder is stripped). `ReadTitle()` peeks at `story.yaml` without compiling (used
+    single wrapping top-level folder is stripped). `ReadTitle()` peeks at `story.talewright.yaml` without compiling (used
     by the library screen).
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
     "pass your own options".
-  - `StoryCompiler`: orchestrates. Order: read `story.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
+  - `StoryCompiler`: orchestrates. Order: read `story.talewright.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
     every `.tale` for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
     validate → assemble `StoryDefinition`. Any error ⇒ `Story` is null.
   - `StoryValidator`: whole-story checks after parsing: start scene exists, dead ends, fall-through with nowhere
     to go, empty hubs, unreachable scenes.
 - **`Parsing/`**
-  - `StoryYamlReader`: `story.yaml` → manifest (uses YamlDotNet's node model, not reflection-based
+  - `StoryYamlReader`: `story.talewright.yaml` → manifest (uses YamlDotNet's node model, not reflection-based
     deserialisation, for trimming and precise error locations).
   - `TaleParser`: line-based parser for `.tale` structure: `=== scene` headers, `@directives`, `~ effects`,
     `* choices`, `-> diverts`, `::: skill-check` blocks, `{if}` blocks, speech lines, paragraphs.
@@ -332,7 +332,7 @@ templates (including a relative web base path); project changes use `XDocument` 
 
 ```
 samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Compile
-  story.yaml           ───────►  StorySource            ──────►  CompilationResult
+  story.talewright.yaml           ───────►  StorySource            ──────►  CompilationResult
   chapters/*.tale                (path → text)                    ├─ Diagnostics (shown if errors)
                                                                   └─ StoryDefinition
                                                                           │
@@ -346,7 +346,7 @@ samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Co
 
 1. **Load.** The host's `IStoryLibrary` hands back a `StorySource`. For an uploaded zip, `TalewrightApp` buffers
    it into memory first (browser streams aren't seekable) and calls `StorySource.FromZip`.
-2. **Compile.** `StoryCompiler` reads `story.yaml`:
+2. **Compile.** `StoryCompiler` reads `story.talewright.yaml`:
    - `ruleset.base` picks a ruleset factory (`generic`, `none`, or one you registered); `ruleset.disable`
      removes stats; `ruleset.stats` adds or overrides them.
    - `characters`, `items`, `factions`, `flags`, `vars`, `triggers` become the `WorldDefinition` and
@@ -409,7 +409,7 @@ not silently migrated. Older fixed-protagonist v1 saves may omit the optional ch
 
 This is how the "dating sim doesn't want strength" requirement is met, and where a community author plugs in.
 
-| I want to…                                        | Today (no code, story.yaml)                                                              | With C# (Tier 1, polished in M2)                                           |
+| I want to…                                        | Today (no code, story.talewright.yaml)                                                              | With C# (Tier 1, polished in M2)                                           |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Remove default stats                              | `ruleset: { base: generic, disable: [str, con] }`                                        | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
 | Start from nothing                                | `ruleset: { base: none }`                                                                | `new RulesetBuilder("mine")`                                               |
@@ -441,7 +441,7 @@ event means touching `GameState.Apply`), and save formats.
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
-| What can `story.yaml` contain?             | `StoryYamlReader` and the [Tale syntax reference](../reference/tale-syntax.md#1-storyyaml)                                                                       |
+| What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Tale syntax reference](../reference/tale-syntax.md#1-storytalewrightyaml)                                                                       |
 | How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Tale syntax reference](../reference/tale-syntax.md)                                                                     |
 | How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
 | What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx src/`                                                                  |
