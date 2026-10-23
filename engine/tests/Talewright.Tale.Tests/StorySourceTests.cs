@@ -61,5 +61,21 @@ public sealed class StorySourceTests : IDisposable
         Assert.Contains("64 levels", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root)).Message);
     }
 
+    [Fact]
+    public void Excluded_child_is_not_read_or_counted_against_parent_limits()
+    {
+        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== parent\n-> END\n");
+        var child = Path.Combine(_root, "child");
+        Directory.CreateDirectory(child);
+        File.WriteAllText(Path.Combine(child, "large.tale"), new string('x', 5 * 1024 * 1024 + 1));
+        for (var index = 0; index < 1_000; index++)
+            File.WriteAllText(Path.Combine(child, $"{index}.tale"), "");
+        var source = StorySource.FromDirectory(_root, [child]);
+        Assert.Equal("main.tale", Assert.Single(source.Files).Key);
+        Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root));
+        File.WriteAllText(Path.Combine(_root, "large.tale"), new string('x', 5 * 1024 * 1024 + 1));
+        Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root, [child])).Message);
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

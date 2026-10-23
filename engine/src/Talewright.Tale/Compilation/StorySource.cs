@@ -31,8 +31,13 @@ public sealed class StorySource
         Files.Where(f => f.Key.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.Key, StringComparer.Ordinal);
 
     /// <summary>Loads story files with the same count/size bounds as ZIP loading. Symbolic links are rejected.</summary>
-    public static StorySource FromDirectory(string directory)
+    public static StorySource FromDirectory(string directory) => FromDirectory(directory, []);
+
+    /// <summary>Loads one story without traversing independently owned child directories.</summary>
+    public static StorySource FromDirectory(string directory, IEnumerable<string> excludedDirectories)
     {
+        var excluded = excludedDirectories.Select(Path.GetFullPath).ToHashSet(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
         long totalBytes = 0;
         var pending = new Stack<(string Path, int Depth)>();
@@ -41,6 +46,7 @@ public sealed class StorySource
         {
             foreach (var path in Directory.EnumerateFileSystemEntries(current.Path))
             {
+                if (excluded.Contains(Path.GetFullPath(path))) continue;
                 var attributes = File.GetAttributes(path);
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
                 {

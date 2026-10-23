@@ -93,6 +93,153 @@ public sealed class ServerTests
         Assert.Empty(await client.Diagnostics("start.tale", null));
     }
 
+    [Theory]
+    [InlineData("textDocument/didOpen", "1.5")]
+    [InlineData("textDocument/didOpen", "2147483648")]
+    [InlineData("textDocument/didChange", "1.5")]
+    [InlineData("textDocument/didChange", "2147483648")]
+    public async Task Invalid_document_versions_report_errors_without_disconnect(string method, string version)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        if (method.EndsWith("didChange", StringComparison.Ordinal))
+        {
+            await client.Open("start.tale", Valid, 1);
+            await client.Diagnostics("start.tale", 1);
+        }
+        var body = JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0", method,
+            @params = new
+            {
+                textDocument = new { uri = client.UriOf("start.tale"), version = "INVALID_VERSION", text = Invalid },
+                contentChanges = new[] { new { text = Invalid } }
+            }
+        }).Replace("\"INVALID_VERSION\"", version);
+        await client.Raw(body);
+        var error = await client.Next(message => message.TryGetProperty("method", out var name) && name.GetString() == "window/showMessage");
+        Assert.Contains("32-bit integer", error.GetProperty("params").GetProperty("message").GetString());
+        var response = await client.Request("unknown", new { });
+        Assert.Equal(-32601, response.GetProperty("error").GetProperty("code").GetInt32());
+        if (method.EndsWith("didOpen", StringComparison.Ordinal)) await client.Open("start.tale", Invalid, 2);
+        else await client.Change("start.tale", Invalid, 2);
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 2));
+    }
+
+    [Fact]
+    public async Task Watched_manifest_creation_and_deletion_rehome_open_tale()
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("child"));
+        File.WriteAllText(client.PathOf("child/main.tale"), "=== child\n-> END\n");
+        await client.Initialize();
+        await client.Open("child/main.tale", "=== child\n* [Go] -> start\n", 1);
+        await client.Diagnostics("child/main.tale", 1);
+        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        await client.Watch("child/story.yaml", 1);
+        Assert.Contains(await client.Diagnostics("child/main.tale", 1), item => item.GetProperty("code").GetString() == "TW2002");
+        File.Delete(client.PathOf("child/story.yaml"));
+        await client.Watch("child/story.yaml", 3);
+        Assert.Empty(await client.Diagnostics("child/main.tale", 1)); // Retired scope clears its publication.
+        Assert.DoesNotContain(await client.Diagnostics("child/main.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2002"); // Parent can resolve start again.
+        await client.Change("child/main.tale", "=== child\n* [Go] -> absent\n", 2);
+        Assert.Contains(await client.Diagnostics("child/main.tale", 2), item => item.GetProperty("code").GetString() == "TW2002");
+    }
+
+    [Fact]
+    public async Task Deleting_disk_manifest_preserves_its_open_overlay()
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("child"));
+        var manifest = Manifest.Replace("start: start", "start: child");
+        File.WriteAllText(client.PathOf("child/story.yaml"), manifest);
+        await client.Initialize();
+        await client.Open("child/story.yaml", manifest, 1);
+        await client.Diagnostics("child/story.yaml", 1);
+        File.Delete(client.PathOf("child/story.yaml"));
+        await client.Watch("child/story.yaml", 3);
+        await client.Diagnostics("child/story.yaml", 1);
+        await client.Open("child/main.tale", "=== child\n-> END\n", 1);
+        Assert.Empty(await client.Diagnostics("child/story.yaml", 1));
+        Assert.Empty(await client.Diagnostics("child/main.tale", 1));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Deleting_story_directory_clears_closed_files_and_preserves_open_tale(bool openTale)
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("child"));
+        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: absent"));
+        await client.Initialize();
+        await client.Watch("child/story.yaml", 1);
+        Assert.NotEmpty(await client.Diagnostics("child/story.yaml", null));
+        if (openTale)
+        {
+            await client.Open("child/main.tale", "=== child\n* [Go] -> start\n", 1);
+            Assert.NotEmpty(await client.Diagnostics("child/main.tale", 1));
+            await client.Diagnostics("child/story.yaml", null);
+        }
+        File.Delete(client.PathOf("child/story.yaml"));
+        Directory.Delete(client.PathOf("child"));
+        await client.Watch("child", 3);
+        Assert.Empty(await client.Diagnostics("child/story.yaml", null));
+        if (openTale)
+        {
+            Assert.Empty(await client.Diagnostics("child/main.tale", 1));
+            Assert.DoesNotContain(await client.Diagnostics("child/main.tale", 1),
+                item => item.GetProperty("code").GetString() == "TW2002");
+            await client.Change("child/main.tale", "=== child\n* [Go] -> absent\n", 2);
+            Assert.NotEmpty(await client.Diagnostics("child/main.tale", 2));
+        }
+        Assert.Equal(-32601, (await client.Request("unknown", new { })).GetProperty("error").GetProperty("code").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Registered_child_limits_do_not_prevent_parent_analysis(bool fileCount)
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("child"));
+        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        File.WriteAllText(client.PathOf("child/main.tale"), "=== child\n-> END\n");
+        await client.Initialize();
+        await client.Open("child/main.tale", "=== child\n-> END\n", 1);
+        await client.Diagnostics("child/main.tale", 1);
+        if (fileCount)
+        {
+            for (var index = 0; index < 998; index++)
+                File.WriteAllText(client.PathOf($"child/scene{index}.tale"), $"=== scene{index}\n-> END\n");
+        }
+        else File.WriteAllText(client.PathOf("child/oversized.tale"), new string('x', 5 * 1024 * 1024 + 1));
+        await client.Open("start.tale", Valid, 1);
+        Assert.Empty(await client.Diagnostics("start.tale", 1));
+        await client.Change("start.tale", Invalid, 2);
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 2));
+    }
+
+    [Fact]
+    public async Task Deleted_standalone_story_keeps_open_buffer_usable_without_workspace_folders()
+    {
+        await using var client = new Client();
+        File.Delete(client.PathOf("story.yaml"));
+        Directory.CreateDirectory(client.PathOf("child"));
+        File.WriteAllText(client.PathOf("child/story.yaml"), Manifest.Replace("start: start", "start: child"));
+        await client.Initialize(includeRoot: false);
+        await client.Open("child/main.tale", "=== child\n* [Go] -> absent\n", 1);
+        Assert.NotEmpty(await client.Diagnostics("child/main.tale", 1));
+        File.Delete(client.PathOf("child/story.yaml"));
+        Directory.Delete(client.PathOf("child"));
+        await client.Watch("child", 3);
+        Assert.Empty(await client.Diagnostics("child/main.tale", 1));
+        Assert.Contains(await client.Diagnostics("child/story.yaml", null), item => item.GetProperty("code").GetString() == "TW4002");
+        await client.Change("child/main.tale", "=== child\n-> END\n", 2);
+        Assert.Empty(await client.Diagnostics("child/main.tale", 2));
+    }
+
     [Fact]
     public async Task Close_discards_overlay_and_registration_even_when_disk_reload_fails()
     {
@@ -373,10 +520,10 @@ public sealed class ServerTests
 
         public string PathOf(string name) => Path.Combine(Root, name);
         public string UriOf(string name) => new Uri(PathOf(name)).AbsoluteUri;
-        public Task<JsonElement> Initialize(object? options = null) => Request("initialize", new
+        public Task<JsonElement> Initialize(object? options = null, bool includeRoot = true) => Request("initialize", new
         {
             processId = Environment.ProcessId,
-            rootUri = new Uri(Root).AbsoluteUri,
+            rootUri = includeRoot ? new Uri(Root).AbsoluteUri : null,
             capabilities = new { },
             initializationOptions = options
         });

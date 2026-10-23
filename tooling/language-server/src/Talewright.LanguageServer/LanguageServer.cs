@@ -167,11 +167,11 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     await CloseAsync(parameters, cancellationToken);
                     break;
                 case "textDocument/didSave":
-                    Refresh(PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!));
+                    await RefreshAsync([PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!)], cancellationToken);
                     break;
                 case "workspace/didChangeWatchedFiles":
-                    Refresh(parameters.GetProperty("changes").EnumerateArray()
-                        .Select(change => PathFromUri(change.GetProperty("uri").GetString()!)).ToArray());
+                    await RefreshAsync(parameters.GetProperty("changes").EnumerateArray()
+                        .Select(change => PathFromUri(change.GetProperty("uri").GetString()!)).ToArray(), cancellationToken);
                     break;
                 default:
                     if (hasId) await ErrorAsync(id, -32601, $"Method not supported: {method}", cancellationToken);
@@ -207,9 +207,9 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var path = PathFromUri(document.GetProperty("uri").GetString()!);
         if (!IsStoryFile(path)) return;
         if (_documents.ContainsKey(path)) throw new InvalidOperationException($"Document already open: {path}");
-        var story = GetStory(path);
-        var version = document.GetProperty("version").GetInt32();
+        var version = DocumentVersion(document);
         var text = document.GetProperty("text").GetString()!;
+        var story = GetStory(path);
         story.Workspace.Open(Relative(story.Root, path), version, text);
         _documents.Add(path, new(story.Root, version, text));
         ReconcileStory(story);
@@ -222,7 +222,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var path = PathFromUri(document.GetProperty("uri").GetString()!);
         if (!IsStoryFile(path)) return;
         if (!_documents.TryGetValue(path, out var current)) throw new InvalidOperationException($"Document is not open: {path}");
-        var version = document.GetProperty("version").GetInt32();
+        var version = DocumentVersion(document);
         var changes = parameters.GetProperty("contentChanges");
         if (changes.GetArrayLength() != 1 || changes[0].TryGetProperty("range", out _))
             throw new ArgumentException("Expected one full-text content change.");
@@ -231,6 +231,14 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         if (!story.Workspace.Change(Relative(story.Root, path), version, text)) return;
         _documents[path] = current with { Version = version, Text = text };
         Schedule(story);
+    }
+
+    private static int DocumentVersion(JsonElement document)
+    {
+        var version = document.GetProperty("version");
+        if (version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out var value))
+            throw new ArgumentException("Document version must be a 32-bit integer.");
+        return value;
     }
 
     private async Task CloseAsync(JsonElement parameters, CancellationToken cancellationToken)
@@ -259,14 +267,6 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         story.Pending?.Cancel();
         story.Pending?.Dispose();
         _stories.Remove(story.Root);
-        var affected = new HashSet<string>(PathComparer);
-        foreach (var (path, document) in _documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).ToArray())
-        {
-            var destination = GetStory(path);
-            destination.Workspace.Open(Relative(destination.Root, path), document.Version, document.Text);
-            _documents[path] = document with { Root = destination.Root };
-            affected.Add(destination.Root);
-        }
         foreach (var path in story.Published)
         {
             await NotifyAsync("textDocument/publishDiagnostics", new
@@ -275,6 +275,14 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                 version = _documents.TryGetValue(path, out var document) ? (int?)document.Version : null,
                 diagnostics = Array.Empty<object>()
             }, cancellationToken);
+        }
+        var affected = new HashSet<string>(PathComparer);
+        foreach (var (path, document) in _documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).ToArray())
+        {
+            var destination = GetStory(path, story.Root);
+            destination.Workspace.Open(Relative(destination.Root, path), document.Version, document.Text);
+            _documents[path] = document with { Root = destination.Root };
+            affected.Add(destination.Root);
         }
         foreach (var root in _stories.Keys.Where(root => IsWithin(root, story.Root)).ToArray())
             affected.Add(root);
@@ -285,9 +293,19 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         }
     }
 
-    private void Refresh(params string[] paths)
+    private async Task RefreshAsync(string[] paths, CancellationToken cancellationToken)
     {
+        foreach (var story in _stories.Values.OrderByDescending(story => story.Root.Length).ToArray())
+        {
+            var manifest = Path.Combine(story.Root, StorySource.ManifestFileName);
+            if (!_documents.ContainsKey(manifest) && !File.Exists(manifest) &&
+                (!Directory.Exists(story.Root) || !_folders.Contains(story.Root, PathComparer)))
+                await RetireStoryAsync(story, cancellationToken);
+        }
+        foreach (var path in paths.Where(path => Path.GetFileName(path) == StorySource.ManifestFileName && File.Exists(path)))
+            ReconcileStory(GetStory(path));
         foreach (var story in _stories.Values.Where(story => paths.Any(path => IsWithin(story.Root, path) ||
+                     IsWithin(path, story.Root) ||
                      (_metadataPath is not null && PathComparer.Equals(path, Path.GetFullPath(_metadataPath, story.Root))))).ToArray())
         {
             Reload(story);
@@ -295,12 +313,13 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         }
     }
 
-    private Story GetStory(string path)
+    private Story GetStory(string path, string? fallbackRoot = null)
     {
         var root = (Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null)
             ?? _stories.Keys.Append(StoryWorkspace.FindStoryRoot(path))
                 .OfType<string>().Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
             ?? _folders.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
+            ?? fallbackRoot
             ?? throw new ArgumentException($"No story.yaml or workspace root found for {path}.");
         if (_stories.TryGetValue(root, out var existing)) return existing;
         var story = LoadStory(root);
@@ -332,12 +351,8 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
 
     private Story LoadStory(string root)
     {
-        var source = StorySource.FromDirectory(root);
         var children = _stories.Keys.Where(candidate => !PathComparer.Equals(candidate, root) && IsWithin(root, candidate)).ToArray();
-        if (children.Length != 0)
-            source = new StorySource(source.Files.Where(file =>
-                !children.Any(child => IsWithin(child, Path.GetFullPath(file.Key, root))))
-                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+        var source = Directory.Exists(root) ? StorySource.FromDirectory(root, children) : new StorySource(new Dictionary<string, string>());
         if (_metadataPath is not null)
         {
             try
@@ -354,7 +369,8 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             }
         }
         return new(root, new StoryWorkspace(source,
-            requiresProjectMetadata: _requiresMetadata || Directory.EnumerateFiles(root, "*.csproj").Any()));
+            requiresProjectMetadata: _requiresMetadata ||
+                (Directory.Exists(root) && Directory.EnumerateFiles(root, "*.csproj").Any())));
     }
 
     private static string Relative(string root, string path) => Path.GetRelativePath(root, path).Replace('\\', '/');

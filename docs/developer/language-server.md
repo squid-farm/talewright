@@ -64,9 +64,15 @@ Discovering an on-disk child manifest through a Tale open performs the same
 ownership transfer. Discarding an unsaved nested manifest retires its temporary
 root and returns its Tale overlays to the containing story/workspace, clearing
 obsolete child diagnostics.
+Watched manifest creation/deletion performs the same reconciliation without
+requiring a document open. Open manifest overlays survive disk deletion. Removing
+a story directory clears its old publications and rehomes any remaining Tale
+overlays. Independently registered child directories are skipped before reading
+their files or applying the parent's file-count, size, and nesting limits.
 Closing a document discards its overlay even if the subsequent disk reload fails.
 Only file URIs are supported. Open overlays win over disk, and close reloads disk. Versions must
-increase. Whole-story analysis is debounced by 150 ms and superseded snapshots
+be 32-bit integers and increase; invalid versions report an error without closing
+the connection. Whole-story analysis is debounced by 150 ms and superseded snapshots
 cannot publish. Diagnostics for fixed or deleted files are explicitly cleared.
 Disk changes re-read the bounded shared story source loader; no project code is
 executed. File-loading errors are reported, not treated as successful analysis.
