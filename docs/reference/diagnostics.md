@@ -36,6 +36,8 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1011 | Malformed choice. | `* [label] (requires: ...) { effects } -> target`. Check for missing `]`, `)` or `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
+| TW1014 | Malformed image call or image string escape. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments, separate them with a comma, and use `\"` or `\\` for embedded quotes or backslashes. |
+| TW1015 | Old Markdown image syntax. | Replace `![alt](path)` with `{image("path", "alt")}`; the message gives the escaped replacement. |
 
 ## TW2xxx: names and types
 

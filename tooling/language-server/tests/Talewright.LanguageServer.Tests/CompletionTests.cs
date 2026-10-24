@@ -41,6 +41,7 @@ public sealed partial class ServerTests
     [InlineData("@requires faction:gu|", "guild")]
     [InlineData("@requires player has ro|", "rope")]
     [InlineData("{item:ro|}", "rope")]
+    [InlineData("{ima|", "image(")]
     [InlineData("@requires item:ro| == \"Rope\"", "rope")]
     [InlineData("~ give player rope |", "var:")]
     [InlineData("~ take player rope |", "player")]

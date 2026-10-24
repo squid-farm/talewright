@@ -60,6 +60,6 @@ public class EditorSnippetTests
             count++;
         }
 
-        Assert.Equal(5, count);
+        Assert.Equal(6, count);
     }
 }

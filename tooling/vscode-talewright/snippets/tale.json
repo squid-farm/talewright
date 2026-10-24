@@ -9,6 +9,11 @@
     "description": "Offer a choice leading to another scene.",
     "body": ["* [${1:Continue}] -> ${2:scene.id}$0"]
   },
+  "Image": {
+    "prefix": "tale-image",
+    "description": "Insert image media with a path relative to images/ and literal alt text.",
+    "body": ["{image(\"${1:path}\", \"${2:Description}\")}$0"]
+  },
   "Conditional": {
     "prefix": "tale-if",
     "description": "Conditional prose with an alternate branch.",

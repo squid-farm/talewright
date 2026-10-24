@@ -52,6 +52,7 @@ public sealed class StoryCompletionTests
     [InlineData("{player:pronoun#possessive(|)}", "\"independent\"")]
     [InlineData("{player:first-name# cap|", "capitalize")]
     [InlineData("{item:ro|}", "rope")]
+    [InlineData("{ima|", "image(")]
     [InlineData("@requires item:ro| == \"Rope\"", "rope")]
     [InlineData("~ give player rope |", "var:")]
     [InlineData("~ take player rope |", "guide")]
@@ -74,6 +75,16 @@ public sealed class StoryCompletionTests
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "second");
+    }
+
+    [Theory]
+    [InlineData("""{image("sec|ond", "Map")}""")]
+    [InlineData("""{image("map", "{player:|}")}""")]
+    [InlineData("""{image("map", "{player:|}")""")]
+    public void Literal_image_arguments_do_not_offer_expression_completions(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        Assert.Empty(StoryCompletion.Complete(analysis, position));
     }
 
     [Theory]

@@ -162,7 +162,7 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (bold, italic and code formatting).                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
-| `![alt](media-id)`                                 | Image placeholder. Not displayed yet ([#35](https://github.com/squid-farm/talewright/issues/35)). |
+| `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
 | `~ effect`                                         | Effect applied when the scene is entered (before rendering).                                   |
 | `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
 | `-> target`                                        | Scene divert. With no choices, the player sees a single **Continue**. `-> END` ends the story. |
@@ -235,6 +235,42 @@ The old flat `possessive` and scalar `possessive-pronoun` fields are errors that
 The older `player:pronoun:object` and `player:pronoun.object` spellings are errors that name the replacement.
 The dotted forms `pronoun.subject`, `pronoun.object`, `pronoun.possessive`,
 `pronoun.possessive-pronoun` and `pronoun.reflexive` are rejected even if a custom stat has the same name.
+
+### Images
+
+```tale
+You unfold {image("maps/old_map-v2", "An old map of the northern coast.")}.
+
+> guide: Look at {image("symbols/crown", "The king's crest")}.
+* [Take {image("items/coin", "A silver coin")}] -> END
+```
+
+Both arguments are literal double-quoted strings, separated by a comma. The path is required,
+relative to the story's `images/` folder, with an optional extension. It is a file path, not a
+story identifier, so quote it even when it contains no spaces. Alt text is optional:
+`{image("maps/old_map-v2")}`.
+
+Inside either argument, `\"` means a quote and `\\` means a backslash. Other backslash escapes
+are errors. Apostrophes, commas, parentheses, brackets and braces are literal within the quotes.
+Alt text is not evaluated as a template: `"{player:name}"` remains that literal text.
+The parser preserves strings after escape decoding, including empty or whitespace-only alt text.
+Whitespace is allowed around `image`, parentheses and arguments.
+
+Images work wherever narrative templates work: prose, dialogue, choice labels, formatting and
+conditions. There is no image-specific surface allowlist or author image-size limit. Plain-string
+fields such as scene titles do not gain template support. To show the syntax literally in prose,
+escape its outer braces: `\{image("camp")\}`. Code formatting alone does not escape a template.
+The character reference `{image:name}` still means the `name` property of the character `image`.
+
+This syntax currently creates media placeholders only. It does not check path safety, supported
+formats, file existence or ambiguous extensions, apply missing-alt fallback, or display images.
+The shared resolver's [TW2010–TW2014 diagnostics](diagnostics.md#tw2xxx-names-and-types) remain
+API-only until integration. That resolver retains the agreed warning/fallback for omitted, empty
+or whitespace-only alt, and `.png`, `.jpg`, `.jpeg`, `.webp` selection order. Rendering is separate
+work in [#177](https://github.com/squid-farm/talewright/issues/177).
+
+The old `![alt](path)` form is an error with a quoted `{image("path", "alt")}` replacement.
+The proposed `@image(...)` form was not shipped and is not supported.
 
 ## 4. Expressions
 

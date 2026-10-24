@@ -787,22 +787,25 @@ internal sealed partial class TaleParser
 
     private static int FindClosingBracket(string text, int open)
     {
-        var braces = 0;
+        var brackets = 0;
         for (var i = open + 1; i < text.Length; i++)
         {
             switch (text[i])
             {
                 case '{':
-                    braces++;
-                    break;
-                case '}':
-                    braces--;
+                    i = InlineParser.FindClosingBrace(text, i);
+                    if (i < 0) return -1;
                     break;
                 case '\\':
                     i++;
                     break;
-                case ']' when braces == 0:
-                    return i;
+                case '[':
+                    brackets++;
+                    break;
+                case ']':
+                    if (brackets == 0) return i;
+                    brackets--;
+                    break;
             }
         }
 

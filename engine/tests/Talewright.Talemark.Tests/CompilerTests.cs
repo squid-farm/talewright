@@ -265,7 +265,7 @@ public class CompilerTests
     [Fact]
     public void Media_placeholders_are_kept_for_future_presentation()
     {
-        var story = Ok("=== a\n![The sealed door](door-art)\n-> END");
+        var story = Ok("=== a\n{image(\"door-art\", \"The sealed door\")}\n-> END");
 
         var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("a")).Body[0]);
         Assert.Equal(new MediaTemplate("door-art", "The sealed door"), Assert.Single(paragraph.Inlines));

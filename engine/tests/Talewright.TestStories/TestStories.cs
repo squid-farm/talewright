@@ -42,7 +42,7 @@ public static class TestStories
         A line\
         continued.
 
-        ![Reserved artwork](test-art)
+        {image("test-art", "Reserved artwork")}
 
         * [Walk onward] -> second
         * [Finish early] -> finish

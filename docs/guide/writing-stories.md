@@ -251,5 +251,8 @@ Without a `creation` section, the story starts with the `player` you wrote. See
 ## Other options
 
 - `undo: false` in `story.talewright.yaml` hides the **Back** and **Forward** buttons. Saves still work.
-- `![description](image-id)` reserves a spot for an image. Images aren't displayed yet
-  ([#35](https://github.com/squid-farm/talewright/issues/35)).
+- `{image("path", "description")}` reserves an image at that narrative position, including in
+  dialogue or a choice label. Paths are relative to `images/`; description is optional literal
+  alt text. Use `\"` for an embedded quote and `\\` for a backslash. The old Markdown image
+  form is an error. Images aren't displayed or checked against files yet; see
+  [image syntax and current limits](../reference/talemark-syntax.md#images).
