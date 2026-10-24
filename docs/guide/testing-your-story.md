@@ -70,7 +70,7 @@ viewer explains that instead of guessing a file. Source viewing is debugger-only
 ### Change state without starting over
 
 Open **Live edit values**, enable the fields you want to change, and click **Apply live edit batch**.
-You can change declared flags, integer variables, faction standing, and every character's base stats
+You can change declared flags, integer or text variables, faction standing, and every character's base stats
 and inventory. Quantities are absolute; zero removes an item. Stats use normal bounds.
 The whole batch is applied together, then normal triggers and leveling run. Text and choices refresh
 without repeating entry effects, visits or entry-check dice. An already resolved entry check keeps
@@ -90,6 +90,24 @@ Use **Back command** and **Forward command** across choices, edit batches and ju
 command after Back discards redo. This author-only navigation works even when the story disables
 player undo. Ended runs cannot be edited or jumped retaining state: go Back or start a fresh scene.
 None of these operations prove that the resulting state is reachable through ordinary play.
+
+### Inspect and override text variables
+
+Both manifest-declared text and text introduced by Talemark assignments appear under
+**Text variables** in prerequisite overrides and live edits. Enter literal text without
+surrounding quotes. To set empty text, enable the override and leave its field empty;
+disabling the override instead keeps the normal initial/current value. Numeric-looking
+text such as `12` stays text, and whitespace and non-ASCII characters are preserved.
+
+State inspection labels variables as **integer** or **text**. Text is shown as a quoted,
+escaped literal so `""`, line breaks, quotes and backslashes are unambiguous. This is a
+display representation, not new Talemark escape syntax. Setup values of the wrong type
+fail explicitly and leave the active run unchanged.
+
+Scenario exports include typed text setup and live edits. Import replays text changes,
+including pending redo, before adopting the candidate. Existing integer-only recipes
+without text fields remain supported. A text variable's type cannot change during play;
+source edits changing a declaration's type require restart and revalidation of overrides.
 
 ### Editing while you test
 

@@ -13,7 +13,7 @@
         }
     </fieldset>
     <fieldset>
-        <legend>Variables, standings, base stats and inventory</legend>
+        <legend>Integer variables, standings, base stats and inventory</legend>
         @foreach (var field in Numbers.Where(f => f.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
         {
             <div class="setup-row">
@@ -22,11 +22,23 @@
             </div>
         }
     </fieldset>
+    <fieldset>
+        <legend>Text variables</legend>
+        <p>Values are literal text, without surrounding quotes. Enable an override with an empty field to set empty text.</p>
+        @foreach (var field in Texts.Where(f => f.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+        {
+            <div class="setup-row">
+                <label><input type="checkbox" aria-label="@($"{OverrideLabel} {field.Label}")" @bind="field.Enabled" /> @field.Label (text)</label>
+                <label>Value <textarea aria-label="@($"{ValueLabel} {field.Label}")" @bind="field.Value"></textarea></label>
+            </div>
+        }
+    </fieldset>
 </details>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<SetupNumber> Numbers { get; set; } = [];
     [Parameter, EditorRequired] public IReadOnlyList<SetupFlag> Flags { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<SetupText> Texts { get; set; } = [];
     [Parameter] public string Title { get; set; } = "Prerequisite overrides";
     [Parameter] public string Prefix { get; set; } = "setup";
     private string OverrideLabel => Prefix == "setup" ? "Override" : "Edit";

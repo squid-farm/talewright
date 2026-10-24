@@ -183,3 +183,27 @@ End by validating and publishing the disposable story normally; the output conta
 files, not the workbench or scenario files. Record platform/architecture, tool version, pass/fail and
 any error messages. Do not infer native-platform support or latency budgets from a successful Linux
 run; see [measured performance and limitations](../developer/performance.md).
+
+## 8. Text variables through both declaration paths
+
+Open the repository's `examples/TextVariables` story. It includes explicit `weather`
+and `remembered-weather` declarations and an implicit `forecast` assignment.
+
+1. Confirm all three appear as text in inspection and setup controls; integer
+   variables in other stories still use numeric controls and integer labels.
+2. Before starting `shelter`, enable the `weather` override with an empty field.
+   Expect empty text, displayed as `""`, not zero or the manifest's initial value.
+3. Live-edit it to `12`, then to non-ASCII text and text containing a line break.
+   Expect literal text, with quoted/escaped inspection values and text-change events.
+   Back/Forward must reproduce each value without changing its type.
+4. Export after going Back with pending redo. Import into a fresh debugger on the
+   same source: setup fields, values, passage, events and redo must match. A separate
+   player run/save must remain unchanged.
+5. In a copy of the scenario, replace a `textVariables` string with a JSON number
+   or null. Import must fail explicitly and preserve the active run and input file.
+6. Enable a text prerequisite override, then change that declaration to an integer
+   in source. Restart must report the incompatible retained override without
+   discarding the run. Disable/correct it, restart, and confirm integer controls.
+
+These scenario JSON checks do not change authoring syntax: story declarations
+remain YAML or Talemark, not JSON.
