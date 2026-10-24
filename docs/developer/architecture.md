@@ -247,9 +247,29 @@ tag, context)`. Eligible = has the tag, requirements hold, and not already visit
 Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → CompilationResult(Story?, Diagnostics)`.
 
 - **`Compilation/`**
-  - `StorySource`: a dictionary of relative path → text. Factories: `FromDirectory`, `FromZip(stream)` (a
+  - `StorySource`: a dictionary of relative path → text, plus an immutable `ImagePaths` catalogue of
+    story-root-relative paths under `images/`. Image bytes are not read or decoded.
+    In-memory callers can supply image paths through the constructor.
+    Factories: `FromDirectory`, `FromZip(stream)` (a
     single wrapping top-level folder is stripped). `ReadTitle()` peeks at `story.talewright.yaml` without compiling (used
     by the library screen).
+  - `StoryImageResolver`: the shared path-only lookup for future compiler and CLI image checks.
+    It takes a `StorySource`, a path relative to `images/`, optional alt text, the reference's
+    source location, and a `DiagnosticBag`. It returns a `ResolvedStoryImage` with a
+    story-root-relative path and effective alt text, or null with an error.
+    Paths match case-sensitively; explicit extensions recognize PNG, JPEG and WebP regardless
+    of extension casing, but the filename must still match exactly. Extensionless paths try
+    `.png`, `.jpg`, `.jpeg`, then `.webp`, warning and listing matches if ambiguous.
+    Absolute paths, parent traversal, backslashes, web addresses, empty path segments,
+    query strings and fragments are rejected. No files are downloaded.
+    Missing, empty or whitespace-only alt text warns and uses Humanizer.Core 3.0.10 to
+    turn the filename into words, then applies invariant sentence case. For example,
+    `old_map-v2.png` becomes `Old map v2`; punctuation-only names become `Image`.
+    Author-written alt text is preserved exactly. All diagnostics point to the reference.
+    This is the foundation from #198. Its diagnostics remain API-only until a follow-up
+    connects the resolver to story compilation and the existing `talewright validate`
+    command. The syntax-only slice in #197 does not include resolver integration or
+    image-file existence checks. This adds no image rendering or image size checks.
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
     "pass your own options".

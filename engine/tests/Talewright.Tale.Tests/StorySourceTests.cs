@@ -1,4 +1,6 @@
 using Talewright.Tale.Compilation;
+using Talewright.Tale.Diagnostics;
+using System.IO.Compression;
 
 namespace Talewright.Tale.Tests;
 
@@ -143,6 +145,158 @@ public sealed class StorySourceTests : IDisposable
 
         Assert.Equal(["MyStory/main.tale"], source.Files.Keys);
         Assert.Contains(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+    }
+
+    [Fact]
+    public void In_memory_image_catalogue_is_an_ordinal_snapshot_separate_from_text()
+    {
+        var images = new List<string> { "images/map.png", "images/Map.png" };
+        var source = new StorySource(new Dictionary<string, string> { ["main.tale"] = Tale }, images);
+        images.Clear();
+
+        Assert.Equal(["images/Map.png", "images/map.png"], source.ImagePaths.Order(StringComparer.Ordinal));
+        Assert.False(source.ImagePaths.Contains("images/MAP.png"));
+        Assert.Single(source.Files);
+        Assert.Empty(new StorySource(new Dictionary<string, string>()).ImagePaths);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("WrappedStory/")]
+    public void Directory_zip_and_in_memory_image_lookup_agree(string prefix)
+    {
+        var files = new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["main.tale"] = Tale,
+            ["images/maps/old_map-v2.png"] = "not decoded as an image",
+            ["images/maps/old_map-v2.webp"] = "not decoded as an image",
+            ["images/unused.gif"] = "unsupported format",
+            ["other.png"] = "not in images/",
+        };
+        foreach (var (path, text) in files)
+        {
+            var fullPath = Path.Combine(_root, path);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            File.WriteAllText(fullPath, text);
+        }
+
+        using var zip = new MemoryStream(Talewright.Testing.TestArchives.Create(
+            files.Select(file => new KeyValuePair<string, string>(prefix + file.Key, file.Value))
+                .Concat(prefix.Length == 0 ? [] : new[]
+                {
+                    new KeyValuePair<string, string>("images/outside-wrapper.png", "outside wrapper"),
+                    new KeyValuePair<string, string>("OtherStory/images/other.png", "other story"),
+                })));
+        string[] expectedPaths = ["images/maps/old_map-v2.png", "images/maps/old_map-v2.webp", "images/unused.gif"];
+        var memory = new StorySource(files.Where(f => f.Key is "main.tale" or StorySource.ManifestFileName)
+            .ToDictionary(), expectedPaths);
+        foreach (var source in new[] { StorySource.FromDirectory(_root), StorySource.FromZip(zip), memory })
+        {
+            Assert.Equal(expectedPaths, source.ImagePaths.Order(StringComparer.Ordinal));
+            Assert.Equal(["main.tale", StorySource.ManifestFileName], source.Files.Keys.Order(StringComparer.Ordinal));
+            Assert.True(StoryCompiler.Compile(source).Success);
+
+            var diagnostics = new DiagnosticBag();
+            var location = new SourceLocation("main.tale", 2, 1);
+            var result = StoryImageResolver.Resolve(source, "maps/old_map-v2", null, location, diagnostics);
+            Assert.Equal(new ResolvedStoryImage("images/maps/old_map-v2.png", "Old map v2"), result);
+            Assert.Equal(["TW2013", "TW2014"], diagnostics.Items.Select(d => d.Code));
+            Assert.All(diagnostics.Items, diagnostic => Assert.Equal(location, diagnostic.Location));
+        }
+    }
+
+    [Fact]
+    public void Excluded_image_directory_is_not_catalogued()
+    {
+        var excluded = Path.Combine(_root, "images", "excluded");
+        Directory.CreateDirectory(excluded);
+        File.WriteAllBytes(Path.Combine(excluded, "map.png"), [0, 255, 0]);
+        Assert.Empty(StorySource.FromDirectory(_root, [excluded]).ImagePaths);
+    }
+
+    [Fact]
+    public void Binary_images_are_not_read_as_text_or_subject_to_text_size_limits()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "images"));
+        using (var image = File.Create(Path.Combine(_root, "images", "map.png")))
+        {
+            image.SetLength(5 * 1024 * 1024 + 1);
+        }
+
+        var directory = StorySource.FromDirectory(_root);
+        Assert.Empty(directory.Files);
+        Assert.Equal("images/map.png", Assert.Single(directory.ImagePaths));
+
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using var image = archive.CreateEntry("images/map.png").Open();
+            image.Write(new byte[5 * 1024 * 1024 + 1]);
+        }
+
+        buffer.Position = 0;
+        var zipped = StorySource.FromZip(buffer);
+        Assert.Empty(zipped.Files);
+        Assert.Equal("images/map.png", Assert.Single(zipped.ImagePaths));
+    }
+
+    [Fact]
+    public void Zip_image_names_are_not_normalized_into_safe_lookup_targets()
+    {
+        using var zip = new MemoryStream(Talewright.Testing.TestArchives.Create([
+            new(@"images\map.png", ""),
+            new("Images/map.png", ""),
+            new("images/maps/../map.png", ""),
+            new("images//map.png", ""),
+            new("images/", ""),
+        ]));
+        var source = StorySource.FromZip(zip);
+        var diagnostics = new DiagnosticBag();
+        Assert.Null(StoryImageResolver.Resolve(source, "map.png", "Map.", new("main.tale", 2, 1), diagnostics));
+        Assert.Equal("TW2012", Assert.Single(diagnostics.Items).Code);
+    }
+
+    [Fact]
+    public void Unix_backslashes_in_filenames_are_not_mistaken_for_directory_separators()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        Directory.CreateDirectory(Path.Combine(_root, "images"));
+        File.WriteAllBytes(Path.Combine(_root, "images", @"maps\map.png"), [0, 255]);
+
+        var source = StorySource.FromDirectory(_root);
+        Assert.Equal(@"images/maps\map.png", Assert.Single(source.ImagePaths));
+        var diagnostics = new DiagnosticBag();
+        Assert.Null(StoryImageResolver.Resolve(source, "maps/map.png", "Map.", new("main.tale", 2, 1), diagnostics));
+        Assert.Equal("TW2012", Assert.Single(diagnostics.Items).Code);
+    }
+
+    [Fact]
+    public void Directory_image_symbolic_links_are_rejected()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        Directory.CreateDirectory(Path.Combine(_root, "images"));
+        var target = Path.Combine(_root, "outside.png");
+        File.WriteAllBytes(target, [0, 255]);
+        File.CreateSymbolicLink(Path.Combine(_root, "images", "map.png"), target);
+
+        Assert.Contains("symbolic links", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root)).Message);
+    }
+
+    [Fact]
+    public void Zip_image_symbolic_links_are_rejected_without_reading_their_target()
+    {
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var image = archive.CreateEntry("images/map.png");
+            image.ExternalAttributes = unchecked((int)0xA1FF0000);
+            using var writer = new StreamWriter(image.Open());
+            writer.Write("../outside.png");
+        }
+
+        buffer.Position = 0;
+        Assert.Contains("symbolic links", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer)).Message);
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
