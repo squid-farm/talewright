@@ -8,6 +8,7 @@
     },
     "test": {
       "executor": "nx:noop",
+      "inputs": ["default"],
       "options": {"args": []},
       "dependsOn": [
         {"projects": ["*", "!talewright-workspace", "!Talewright.Player.E2E.Tests"], "target": "test"}
@@ -39,10 +40,12 @@
     },
     "check": {
       "executor": "nx:noop",
+      "inputs": ["default"],
       "dependsOn": [{"projects": ["*", "!talewright-workspace"], "target": "check"}]
     },
     "budget": {
       "executor": "nx:noop",
+      "inputs": ["default"],
       "dependsOn": [{"projects": ["Talewright.Benchmarks"], "target": "budget"}]
     },
     "editor-full": {

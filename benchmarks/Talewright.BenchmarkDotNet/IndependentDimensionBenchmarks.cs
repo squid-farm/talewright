@@ -12,6 +12,7 @@ namespace Talewright.BenchmarkDotNet;
 public class IndependentDimensionBenchmarks
 {
     private PerformanceCorpus _corpus = null!;
+    private StorySource _source = null!;
     private StoryDefinition _story = null!;
     private byte[] _save = [];
 
@@ -24,6 +25,7 @@ public class IndependentDimensionBenchmarks
         "bytes-512KiB", "bytes-5MiB", "bytes-25MiB", "bytes-50MiB",
         "scenes-100", "scenes-1000", "scenes-10000", "scenes-50000",
         "history-100", "history-1000", "history-5000", "history-10000",
+        "layout-few-files", "layout-many-files",
     ];
 
     [GlobalSetup]
@@ -32,8 +34,8 @@ public class IndependentDimensionBenchmarks
         var tier = GetTier(CorpusCase);
         var root = Path.Combine(Path.GetTempPath(), $"talewright-bdn-dim-{Environment.ProcessId}-{CorpusCase}");
         _corpus = PerformanceCorpus.Create(tier, root);
-        var source = StorySource.FromDirectory(_corpus.Root);
-        var result = StoryCompiler.Compile(source);
+        _source = StorySource.FromDirectory(_corpus.Root);
+        var result = StoryCompiler.Compile(_source);
         _story = result.Story
             ?? throw new InvalidOperationException($"Generated corpus did not compile: {string.Join("\n", result.Diagnostics)}");
         if (_story.Scenes.Count != tier.SceneCount)
@@ -49,6 +51,17 @@ public class IndependentDimensionBenchmarks
 
         _save = history.Save();
         BenchmarkMetadataWriter.Write(_corpus.Metadata);
+    }
+
+    [Benchmark]
+    public StorySource ReadAndDecodeDirectory() => StorySource.FromDirectory(_corpus.Root);
+
+    [Benchmark]
+    public StoryDefinition CompileLoadedSource()
+    {
+        var result = StoryCompiler.Compile(_source);
+        return result.Story
+            ?? throw new InvalidOperationException($"Generated corpus did not compile: {string.Join("\n", result.Diagnostics)}");
     }
 
     [Benchmark]
@@ -81,6 +94,17 @@ public class IndependentDimensionBenchmarks
     private static PerformanceCorpusTier GetTier(string corpusCase)
     {
         var parts = corpusCase.Split('-', 2);
+        if (parts[0] == "layout")
+        {
+            var fileCount = parts[1] switch
+            {
+                "few-files" => 2,
+                "many-files" => 100,
+                _ => throw new ArgumentException($"Unknown corpus layout '{parts[1]}'.", nameof(corpusCase)),
+            };
+            return new PerformanceCorpusTier(corpusCase, fileCount, 100, 5L * 1024 * 1024, 100);
+        }
+
         return parts[0] switch
         {
             "files" => new PerformanceCorpusTier(

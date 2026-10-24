@@ -52,3 +52,7 @@ metadata, or browse the [durable performance history](https://github.com/squid-f
 The full deterministic corpus, BenchmarkDotNet output and integration evidence
 are available as [GitHub Actions artifacts](https://github.com/squid-farm/talewright/actions/runs/39902796074)
 (retained for 30 days).
+
+See the [performance scorecard](performance-scorecard.md) for a cross-host view
+of browser observations, fixed-byte file-layout measurements, end-cursor versus
+redo-prefix restore, metric limitations, and the status of proposed budgets.

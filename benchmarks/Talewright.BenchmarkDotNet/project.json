@@ -1,0 +1,6 @@
+{
+  "name": "Talewright.BenchmarkDotNet",
+  "namedInputs": {
+    "default": ["sharedGlobals", "{projectRoot}/**/*", "testWorkflow"]
+  }
+}

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -106,10 +107,55 @@ class CiRoutingTests(unittest.TestCase):
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),
             ("tooling/vscode-talewright/snippets/tale.json", {"editor"}),
             ("docs/guide/first-story.md", {"checks", "editor"}),
+            ("docs/developer/architecture.md", {"checks"}),
+            ("docs/reference/diagnostics.md", {"checks"}),
         ]:
             with self.subTest(changed=changed):
                 plan = make_plan(affected_graph(changed))
                 self.assertEqual(expected, {group for group, tasks in plan.items() if tasks})
+
+    def test_documented_manifests_select_only_schema_verification(self):
+        schema_test = ROOT / "tooling/vscode-talewright/tests/story-schema.test.mjs"
+        consumed = set(re.findall(r"'(docs/[^']+\.md)'", schema_test.read_text()))
+        editor = json.loads((ROOT / "tooling/vscode-talewright/project.json").read_text())
+        self.assertEqual(
+            {f"{{workspaceRoot}}/{path}" for path in consumed},
+            set(editor["namedInputs"]["documentedManifests"]),
+        )
+        for changed in consumed:
+            with self.subTest(changed=changed):
+                graph = affected_graph(changed)
+                plan = make_plan(graph)
+                self.assertEqual(
+                    [{"project": "talewright-docs", "target": "check"}], plan["checks"],
+                )
+                self.assertEqual({
+                    ("talewright-editor", "test"),
+                    ("talewright-editor", "compiler-contract"),
+                }, {(task["project"], task["target"]) for task in plan["editor"]})
+                for group in ("build", "unit", "browser", "linux-desktop"):
+                    self.assertEqual([], plan[group])
+                self.assertIn(
+                    "Talewright.Tale.Tests:build:release", graph["tasks"]["tasks"],
+                )
+
+    def test_general_docs_do_not_hide_mixed_source_verification(self):
+        for source in (
+            "tooling/vscode-talewright/extension.cjs",
+            "engine/src/Talewright.Tale/Parsing/StoryYamlReader.cs",
+            "player/src/Talewright.Player/Components/PlayerToolbar.razor",
+        ):
+            with self.subTest(source=source):
+                expected = {
+                    group: {(task["project"], task["target"]) for task in tasks}
+                    for group, tasks in make_plan(affected_graph(source)).items()
+                }
+                expected["checks"].add(("talewright-docs", "check"))
+                actual = make_plan(affected_graph(source, "docs/developer/architecture.md"))
+                self.assertEqual(expected, {
+                    group: {(task["project"], task["target"]) for task in tasks}
+                    for group, tasks in actual.items()
+                })
 
     def test_fallback_and_full_verification_include_every_environment(self):
         fallback = make_plan(affected_graph("new-product/feature.cs"))
@@ -148,6 +194,90 @@ class CiRoutingTests(unittest.TestCase):
             )
             self.assertNotEqual(0, result.returncode)
             self.assertFalse(manifest.exists())
+
+
+class InfrastructureSelectionTests(unittest.TestCase):
+    SCENARIOS = {
+        ".github/scripts/nx_ci.py": {"checks"},
+        ".github/scripts/package_version.py": {"build", "checks"},
+        ".github/scripts/publish_samples.py": {"browser", "checks"},
+        ".github/scripts/ui_test_image_plan.py": {"checks"},
+        ".github/scripts/verify_packages.py": {"build", "checks"},
+        ".github/workflows/build.yml": {"build", "checks"},
+        ".github/workflows/editor-tooling.yml": {"editor", "checks"},
+        ".github/workflows/performance.yml": {"checks"},
+        ".github/workflows/publish-nuget.yml": {"build", "checks"},
+        ".github/workflows/publish-samples.yml": {"browser", "checks"},
+        ".github/workflows/publish-ui-test-image.yml": {"checks"},
+        ".github/workflows/tests.yml": set(GROUPS) - {"build"},
+        ".github/docker/ui-tests/Dockerfile": {"checks"},
+        ".github/docker/ui-tests/image.json": {"checks"},
+        ".github/docker/ui-tests/verify.py": {"checks"},
+    }
+
+    def test_every_current_workflow_script_and_image_file_has_a_scenario(self):
+        files = {
+            path.relative_to(ROOT).as_posix()
+            for folder in ("scripts", "workflows", "docker")
+            for path in (ROOT / ".github" / folder).rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts
+        }
+        self.assertEqual(files, set(self.SCENARIOS))
+
+    def test_infrastructure_selects_exact_driven_groups_and_contracts(self):
+        full = make_plan(json.loads(nx(
+            "run-many", "--all", "--exclude=talewright-workspace",
+            "-t", *TARGETS, "--dry-run", "--graph=stdout", capture=True,
+        ).stdout))
+        for changed, expected in self.SCENARIOS.items():
+            with self.subTest(changed=changed):
+                graph = affected_graph(changed)
+                self.assertFalse(any(
+                    task.startswith("talewright-workspace:") for task in graph["tasks"]["tasks"]
+                ))
+                plan = make_plan(graph)
+                self.assertEqual(expected, {group for group, tasks in plan.items() if tasks})
+                checks = [{"project": "talewright-ci-tests", "target": "ci-check"}]
+                if changed.endswith("/performance.yml"):
+                    checks.append({"project": "talewright-performance-tooling", "target": "check"})
+                if changed.endswith("/tests.yml"):
+                    checks = full["checks"]
+                self.assertEqual(checks, plan["checks"])
+                for group in expected - {"checks"}:
+                    self.assertEqual(full[group], plan[group])
+
+    def test_ci_tests_no_longer_select_product_e2e(self):
+        plan = make_plan(affected_graph("tests/test_ci.py"))
+        self.assertEqual(
+            {group: ([{"project": "talewright-ci-tests", "target": "ci-check"}]
+                     if group == "checks" else []) for group in GROUPS},
+            plan,
+        )
+
+    def test_image_changes_retain_dedicated_candidate_validation(self):
+        workflow = (ROOT / ".github/workflows/publish-ui-test-image.yml").read_text()
+        triggers = workflow.split("\npermissions:", 1)[0]
+        for path in (
+            ".github/docker/ui-tests/**", ".github/scripts/ui_test_image_plan.py",
+            ".github/workflows/publish-ui-test-image.yml",
+        ):
+            self.assertEqual(2, triggers.count(f"'{path}'"))
+        self.assertIn("docker build -t talewright-ui-tests:candidate", workflow)
+        self.assertIn("python3 /opt/talewright-ui/verify.py", workflow)
+        self.assertIn("FullyQualifiedName~StoryLoadingTests", workflow)
+        self.assertIn("python3 player/tests/run_e2e.py linux --probe", workflow)
+
+    def test_mixed_ci_and_product_changes_retain_both_plans(self):
+        files = (".github/scripts/nx_ci.py", "player/src/Talewright.Player/Components/PlayerToolbar.razor")
+        expected = {group: set() for group in GROUPS}
+        for changed in files:
+            for group, tasks in make_plan(affected_graph(changed)).items():
+                expected[group].update((task["project"], task["target"]) for task in tasks)
+        actual = make_plan(affected_graph(*files))
+        self.assertEqual(expected, {
+            group: {(task["project"], task["target"]) for task in tasks}
+            for group, tasks in actual.items()
+        })
 
 
 class AggregateTests(unittest.TestCase):

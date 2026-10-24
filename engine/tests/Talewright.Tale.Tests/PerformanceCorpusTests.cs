@@ -43,8 +43,33 @@ public sealed class PerformanceCorpusTests
         Assert.True(Compile(StorySource.FromDirectory(first.Root)).Scenes.Count == tier.SceneCount);
     }
 
+    [Fact]
+    public void Fixed_byte_layout_corpora_compare_few_large_files_with_many_small_files()
+    {
+        using var fewFiles = CreateLayout("few-files", 2);
+        using var manyFiles = CreateLayout("many-files", 100);
+
+        Assert.Equal(fewFiles.Metadata.ExpandedBytes, manyFiles.Metadata.ExpandedBytes);
+        Assert.Equal(5 * 1024 * 1024, fewFiles.Metadata.ExpandedBytes);
+        Assert.Equal(fewFiles.Metadata.SceneCount, manyFiles.Metadata.SceneCount);
+        Assert.Equal(100, fewFiles.Metadata.SceneCount);
+        Assert.Equal(2, fewFiles.Metadata.StoryFileCount);
+        Assert.Equal(100, manyFiles.Metadata.StoryFileCount);
+        Assert.NotEqual(fewFiles.Metadata.Sha256, manyFiles.Metadata.Sha256);
+        var fewLargestFile = Directory.EnumerateFiles(fewFiles.Root, "*.tale", SearchOption.AllDirectories)
+            .Max(path => new FileInfo(path).Length);
+        var manyLargestFile = Directory.EnumerateFiles(manyFiles.Root, "*.tale", SearchOption.AllDirectories)
+            .Max(path => new FileInfo(path).Length);
+        Assert.True(fewLargestFile > manyLargestFile);
+        Assert.Equal(100, Compile(StorySource.FromDirectory(fewFiles.Root)).Scenes.Count);
+        Assert.Equal(100, Compile(StorySource.FromDirectory(manyFiles.Root)).Scenes.Count);
+    }
+
     private static PerformanceCorpus Create(string name) =>
         PerformanceCorpus.Create(PerformanceCorpusTier.Get("Typical"), NewRoot(name));
+
+    private static PerformanceCorpus CreateLayout(string name, int fileCount) =>
+        PerformanceCorpus.Create(new PerformanceCorpusTier(name, fileCount, 100, 5 * 1024 * 1024, 100), NewRoot(name));
 
     private static string NewRoot(string name) =>
         Path.Combine(Path.GetTempPath(), $"talewright-corpus-test-{name}-{Guid.NewGuid():N}");
