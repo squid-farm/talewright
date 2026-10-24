@@ -617,6 +617,28 @@ public class CompilerTests
     }
 
     [Theory]
+    [InlineData("subject", "player:pronoun")]
+    [InlineData("object", "player:pronoun#object")]
+    [InlineData("possessive", "player:pronoun#possessive")]
+    [InlineData("possessive-pronoun", "player:pronoun#possessive(\"independent\")")]
+    [InlineData("reflexive", "player:pronoun#reflexive")]
+    public void Legacy_pronoun_forms_are_rejected_even_when_a_stat_has_the_same_name(string form, string replacement)
+    {
+        var yaml = Yaml.Replace("seed: 42", $"seed: 42\nruleset:\n  base: generic\n  stats:\n    - {{ id: pronoun.{form}, default: 3 }}");
+        var error = Error($"=== a\n{{player:pronoun.{form}}}\n-> END", "TW2001", yaml);
+        Assert.Contains($"Use '{replacement}'.", error.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, 17), error.Location);
+    }
+
+    [Fact]
+    public void Non_legacy_dotted_pronoun_stat_names_remain_valid()
+    {
+        var yaml = Yaml.Replace("seed: 42", "seed: 42\nruleset:\n  base: generic\n  stats:\n    - { id: pronoun.fluency, default: 3 }");
+        var story = Ok("=== a\n{player:pronoun.fluency}\n-> END", yaml);
+        Assert.Equal("3", Render(story, story.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
     [InlineData("{player:pronoun:subject}", "Use 'player:pronoun'.")]
     [InlineData("{player:pronoun:object}", "Use 'player:pronoun#object'.")]
     [InlineData("{player:pronoun:possessive}", "Use 'player:pronoun#possessive'.")]

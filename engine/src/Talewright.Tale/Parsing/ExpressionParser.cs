@@ -678,9 +678,14 @@ internal sealed class ExpressionParser
             Fail("TW2001", OldPronounFormMessage(ns.Text, member.Value.Text), member.Value.Offset);
         }
 
-        if (path.Text.StartsWith("pronoun.", StringComparison.Ordinal) && !_symbols.World.Ruleset.HasStat(new StatId(path.Text)))
+        if (path.Text.StartsWith("pronoun.", StringComparison.Ordinal))
         {
-            Fail("TW2001", OldPronounFormMessage(ns.Text, path.Text["pronoun.".Length..]), path.Offset + "pronoun.".Length);
+            var form = path.Text["pronoun.".Length..];
+            if (form is "subject" or "object" or "possessive" or "possessive-pronoun" or "reflexive"
+                || !_symbols.World.Ruleset.HasStat(new StatId(path.Text)))
+            {
+                Fail("TW2001", OldPronounFormMessage(ns.Text, form), path.Offset + "pronoun.".Length);
+            }
         }
 
         return path.Text switch

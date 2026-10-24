@@ -224,6 +224,8 @@ On a pronoun, `#possessive` picks the declared possessive form instead of adding
 forms they declare under `possessive-pronoun`: `determiner` and `independent`. Both values are required.
 The old flat `possessive` and scalar `possessive-pronoun` fields are errors that name the nested replacement.
 The older `player:pronoun:object` and `player:pronoun.object` spellings are errors that name the replacement.
+The dotted forms `pronoun.subject`, `pronoun.object`, `pronoun.possessive`,
+`pronoun.possessive-pronoun` and `pronoun.reflexive` are rejected even if a custom stat has the same name.
 
 ## 4. Expressions
 
