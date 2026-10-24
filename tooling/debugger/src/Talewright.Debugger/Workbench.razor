@@ -5,7 +5,7 @@
     <h1>Talewright Author Debugger</h1>
     <p>@Model.Root</p>
     <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
-    <p>Saved Tale changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
+    <p>Saved Talemark changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
     <button type="button" @onclick="Rescan">Rescan / retry watcher</button>
     <button type="button" @onclick="Restart">Restart from source</button>
     @if (Model.RestartRequired)

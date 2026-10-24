@@ -1,6 +1,6 @@
-# Tale for VS Code
+# Talemark for VS Code
 
-Highlight Talewright `.tale` stories, insert common story structures, and provide
+Write Talewright stories in **Talemark** (`.tale` files), insert common story structures, and get
 schema support, shared semantic completion/hover, and live compiler diagnostics without
 running your story.
 
@@ -15,7 +15,8 @@ Use VS Code 1.100 or later.
    it using the commands below.
 3. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
    select the file. Reload VS Code if prompted.
-4. Open a `.tale` file. The language indicator at the bottom should say **Tale**.
+4. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
+   The language ID remains `tale`.
 5. For live compiler diagnostics and semantic completion, install the separate `Talewright.LanguageServer`
    .NET tool (requires .NET 10) from the Talewright package feed. The extension
    launches `talewright-lsp --stdio`; it never installs or builds it automatically.
@@ -45,14 +46,14 @@ Use Tab to move between placeholders.
 
 Replace scene IDs and other placeholders with your story's actual declarations.
 Use **Toggle Line Comment** to add/remove `//` comments.
-Brackets can be matched, but Tale defaults disable automatic quote/bracket closing:
+Brackets can be matched, but Talemark editing defaults disable automatic quote/bracket closing:
 ordinary prose and literal braces should remain comfortable to type. You can
 override these language-specific defaults in your VS Code settings.
 
 The grammar distinguishes scene headers, metadata, speech, effects, conditions,
 choices, substitutions, and checks. It also highlights inline Markdown emphasis,
 strong text, code, images, and links. Substitutions and conditionals inside a
-link label keep their Tale colors, because the compiler renders the label text
+link label keep their Talemark colors, because the compiler renders the label text
 and drops the target. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
 images are currently placeholders, not a claim of image rendering support.
@@ -111,7 +112,7 @@ the explicit modeline or local-file fallback rather than assume auto-discovery.
 
 The schema reflects structural key/type rules and editor-friendly canonical YAML
 forms. The compiler remains authoritative for story-specific references, custom
-ruleset registration, integer bounds and Tale expressions. YAML tooling can also
+ruleset registration, integer bounds and Talemark expressions. YAML tooling can also
 report structural errors differently from compiler diagnostics. The reader
 currently accepts some scalar spellings or YAML forms beyond the schema's
 documented canonical values; use the forms in the examples for portable feedback.
@@ -160,7 +161,7 @@ Markdown links or HTML. No runtime values or C# signatures are invented. See the
 for a beginner-friendly check in VS Code and other LSP clients.
 
 Keep using `talewright validate <story-folder>` for correctness checks. See the
-[Tale reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/tale-syntax.md)
+[Talemark reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/talemark-syntax.md)
 for supported syntax.
 
 ## Build and test
@@ -209,7 +210,7 @@ profile. Run packaging first.
 ## Beginner-friendly manual test plan
 
 1. Install the VSIX in a new VS Code profile with no other language extensions.
-   Open a sample `.tale` file and confirm the language indicator says **Tale**.
+   Open a sample `.tale` file and confirm the language indicator says **Talemark**.
 2. Compare a scene header, `@requires`, `> guide:`, a `~` effect, a choice, and a
    `::: skill-check` against ordinary prose. They should be distinguishable.
 3. Try `*emphasis*`, `**strong**`, inline backticks, a link, and an image
@@ -230,7 +231,7 @@ profile. Run packaging first.
    server if available. The extension must not launch a CLI, debugger, or story
    session.
 
-The automated installed-VSIX smoke covers Tale association, the five default
+The automated installed-VSIX smoke covers Talemark file association, the five default
 snippet expansions and placeholder navigation, prose typing, and comment
 toggling. Automated package tests also verify the bundled schema and YAML
 contribution. They do not substitute for manually checking Red Hat YAML

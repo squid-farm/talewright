@@ -181,7 +181,7 @@ async function testLiveDiagnostics() {
     let completions = await vscode.commands.executeCommand(
       'vscode.executeCompletionItemProvider', document.uri, new vscode.Position(1, 6));
     const scene = completions.items.find(item => item.label === 'start');
-    assert.ok(scene, 'Shared language server must complete an unsaved Tale divert');
+    assert.ok(scene, 'Shared language server must complete an unsaved Talemark divert');
     assert.equal(scene.insertText, 'start');
     assert.equal(scene.range.start.character, 3);
     assert.equal(scene.range.end.character, 6);

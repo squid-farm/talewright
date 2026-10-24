@@ -82,7 +82,7 @@ test('compiler, schema, and editor grammar accept the same identifiers', async (
 
 test('schema validates complete and contextual documented manifest examples', async () => {
   const fullManifests = [
-    ['docs/reference/tale-syntax.md', 0],
+    ['docs/reference/talemark-syntax.md', 0],
     ['docs/guide/first-story.md', 0],
     ['docs/guide/debugger-test-plan.md', 0],
   ];
@@ -92,9 +92,9 @@ test('schema validates complete and contextual documented manifest examples', as
   }
 
   const fragmentExamples = [
-    ['docs/reference/tale-syntax.md', 1, 'pronouns'],
-    ['docs/reference/tale-syntax.md', 2, 'creation'],
-    ['docs/reference/tale-syntax.md', 3, 'vars'],
+    ['docs/reference/talemark-syntax.md', 1, 'pronouns'],
+    ['docs/reference/talemark-syntax.md', 2, 'creation'],
+    ['docs/reference/talemark-syntax.md', 3, 'vars'],
     ['docs/guide/writing-stories.md', 0, 'characters'],
     ['docs/guide/writing-stories.md', 1, 'items'],
     ['docs/guide/writing-stories.md', 2, 'vars'],

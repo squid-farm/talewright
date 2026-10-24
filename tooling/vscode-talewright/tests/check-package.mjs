@@ -38,7 +38,7 @@ test('VSIX contains exactly the distributable assets', async () => {
     if (directory && !entry.dev) assert.ok(notices.includes(`${directory} @ ${entry.version}`), `Missing notice for ${directory}`);
   }
   const readme = execFileSync('unzip', ['-p', archive, 'extension/readme.md'], { encoding: 'utf8' });
-  assert.ok(readme.includes('https://github.com/squid-farm/talewright/blob/main/docs/reference/tale-syntax.md'));
+  assert.ok(readme.includes('https://github.com/squid-farm/talewright/blob/main/docs/reference/talemark-syntax.md'));
   const links = readme.match(/https?:\/\/[^\s)]+/g) ?? [];
   assert.ok(links.every(link => !link.includes('/../')), 'Packaged links must not escape the repository URL');
 });

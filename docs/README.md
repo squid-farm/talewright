@@ -1,5 +1,8 @@
 # Talewright documentation
 
+Write in **Talemark**, the story-authoring language that powers Talewright stories.
+Keep scenes in `.tale` files and define your cast and rules in `story.talewright.yaml`.
+
 ## Writing stories
 
 New here? Play the [web player](https://squid-farm.github.io/talewright/), then follow
@@ -19,7 +22,7 @@ New here? Play the [web player](https://squid-farm.github.io/talewright/), then 
 
 | | |
 |---|---|
-| [Tale syntax](reference/tale-syntax.md) | Every `story.talewright.yaml` field and `.tale` directive |
+| [Talemark syntax](reference/talemark-syntax.md) | Every `story.talewright.yaml` field and Talemark directive |
 | [Error codes](reference/diagnostics.md) | What each `TWxxxx` code means and how to fix it |
 | [CLI](reference/cli.md) | `validate`, `debug` and `publish` options, output and limits |
 | [Sample stories](../samples/README.md) | *The Lost Relic* and which features it demonstrates |

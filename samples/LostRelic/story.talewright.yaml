@@ -1,6 +1,6 @@
 # The Lost Relic — Talewright sample story.
 # Every story is a folder: this manifest plus any number of .tale files (subfolders allowed).
-# See docs/TALE-SYNTAX.md for the full format.
+# See docs/reference/talemark-syntax.md for the full format.
 
 id: lost-relic
 title: The Lost Relic

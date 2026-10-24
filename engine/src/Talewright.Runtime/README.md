@@ -1,7 +1,7 @@
 # Talewright.Runtime — the engine loop
 
 Runs a compiled `StoryDefinition`. It is the only project that touches every layer: Core state, Rules
-(effects, checks, triggers, storylets), Narrative (rendering) and the Tale model. The UI talks to it through one
+(effects, checks, triggers, storylets), Narrative (rendering) and the compiled Talemark model. The UI talks to it through one
 small interface.
 
 ```csharp
@@ -164,7 +164,7 @@ frame, decisions, cursor and redo. Player undo policy and choice-only saves are 
 `var candidate = author.Reload(newStory)` returns an independent candidate; it
 never mutates `author`. Before entering the displayed scene, it verifies:
 
-- Compatible declarations, creation, rules and triggers, including Tale-inferred
+- Compatible declarations, creation, rules and triggers, including Talemark-inferred
   flags/variables. Custom predicates/rules/modifiers require trusted rebuild/restart.
 - Structural equality of every previously consumed scene, not merely surviving
   `c0` positional keys, plus the selected rendered label/key and generated hub

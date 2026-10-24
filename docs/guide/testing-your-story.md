@@ -51,7 +51,7 @@ led there, and **Branch explanations**: why each condition passed or failed.
 
 ### See the source being tested
 
-**Accepted Tale source** shows the complete source file in read-only, 100-line windows with line
+**Accepted Talemark source** shows the complete source file in read-only, 100-line windows with line
 numbers. It follows the current scene when you choose, jump, or use Back/Forward. Use
 **Previous source lines** / **Next source lines** to browse the file and **Go to current scene source**
 to return to the scene declaration. These controls reset the source viewport to the top of the
@@ -115,7 +115,7 @@ Leave the debugger open while you write. When you save a `.tale` file, it recomp
 scene you're on, keeping the state you'd built up to reach it. You stay where you are.
 
 Some changes can't be applied safely in place, for example editing a scene the player already passed
-through, changing Tale-inferred flags/variables, removing a target, or reloading a run that ended
+through, changing Talemark-inferred flags/variables, removing a target, or reloading a run that ended
 without entering a new scene. Any change to `story.talewright.yaml`, even a comment, also needs a restart.
 A file-watcher failure requires a restart because source changes may have been missed.
 In those cases the debugger asks you to click

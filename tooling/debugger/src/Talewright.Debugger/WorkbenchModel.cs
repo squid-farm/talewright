@@ -185,7 +185,7 @@ public sealed class WorkbenchModel(string root)
     {
         RestartRequired = true;
         SourceRejected = true;
-        ReloadStatus = "YAML changed or watcher history is uncertain. Explicit Restart from source is required; Tale saves cannot adopt mixed source.";
+        ReloadStatus = "YAML changed or watcher history is uncertain. Explicit Restart from source is required; Talemark saves cannot adopt mixed source.";
     }
 
     public void WatchFailed(string message)
@@ -275,7 +275,7 @@ public sealed class WorkbenchModel(string root)
                     AcceptedSourceMap = compiled.SourceMap;
                     SourceRejected = false;
                     Error = null;
-                    ReloadStatus = session is null ? "Tale source adopted. Ready for scene setup."
+                    ReloadStatus = session is null ? "Talemark source adopted. Ready for scene setup."
                         : $"Reload boundary: {session.Current.Scene}. Verified command prefix retained; current passage replaced, decisions rebuilt.";
                     RefreshEdits();
                 });

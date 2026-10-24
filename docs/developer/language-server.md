@@ -59,7 +59,7 @@ Unsupported requests return JSON-RPC method-not-found.
 
 ### Semantic completion
 
-The compiler records reference slots using its Tale parser, expression lexer,
+The compiler records reference slots using its Talemark parser, expression lexer,
 and existing YAML representation tree. `Talewright.Authoring` matches those slots
 against the current whole-story partial symbol table; clients contain no
 completion rules. A request analyzes the latest accepted document versions if
@@ -82,7 +82,7 @@ existing `@`, `#`, quotes, and namespace colons are preserved.
 In canonical `story.talewright.yaml`, completion additionally resolves `start`,
 `ruleset.base`, `ruleset.disable`, character inventory/stat references, item
 modifier stats, and character-creation stats/preset stats. Trigger conditions
-and effects use the same expression contexts as Tale. Quoted and escaped YAML
+and effects use the same expression contexts as Talemark. Quoted and escaped YAML
 scalars map decoded prefixes back to authored replacement ranges. Red Hat YAML
 continues to provide structural key/schema suggestions independently.
 
@@ -140,7 +140,7 @@ save files, build projects, load assemblies, or execute game code.
 #### Beginner hover check
 
 1. Install/configure the server as above and open a trusted story folder.
-2. Add `=== destination` in another Tale file and type `-> destination` in the
+2. Add `=== destination` in another Talemark file and type `-> destination` in the
    first file. Hover the target (or use VS Code **Show Hover**, **Ctrl+K Ctrl+I**).
    Expect **Scene**, its type, and the other file's declaration location/source.
 3. Without saving, rename the declaration and update the reference. Hover should
@@ -164,15 +164,15 @@ The nearest on-disk `story.talewright.yaml` identifies each story. An unsaved `s
 can establish its own root; otherwise a containing initialized workspace folder
 is the fallback. Multiple story roots are analyzed independently.
 An opened manifest always establishes its own directory as the root, including an
-unsaved nested manifest. Existing Tale overlays and diagnostic ownership move
+unsaved nested manifest. Existing Talemark overlays and diagnostic ownership move
 from ancestor workspaces to the new story; ancestor refreshes exclude that story.
-Discovering an on-disk child manifest through a Tale open performs the same
+Discovering an on-disk child manifest through a Talemark file open performs the same
 ownership transfer. Discarding an unsaved nested manifest retires its temporary
-root and returns its Tale overlays to the containing story/workspace, clearing
+root and returns its Talemark overlays to the containing story/workspace, clearing
 obsolete child diagnostics.
 Watched manifest creation/deletion performs the same reconciliation without
 requiring a document open. Open manifest overlays survive disk deletion. Removing
-a story directory clears its old publications and rehomes any remaining Tale
+a story directory clears its old publications and rehomes any remaining Talemark
 overlays. Independently registered child directories are skipped before reading
 their files or applying the parent's file-count, size, and nesting limits.
 Closing a document discards its overlay even if the subsequent disk reload fails.
@@ -202,7 +202,7 @@ watch events recreate the workspace and retain overlays. See
 Do not configure a project DLL as metadata: no build target, assembly, ruleset
 factory, or arbitrary C# code is automatically run.
 
-The shared Tale-aware lint rules and configuration API are implemented in #150.
+The shared Talemark-aware lint rules and configuration API are implemented in #150.
 The language server uses the same `talewright.lint.json` configuration and shared
 rule implementation on each current analysis snapshot. Lint findings preserve
 their source ranges; compiler diagnostics are published once. Invalid lint
@@ -228,7 +228,7 @@ vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
 })
 ```
 
-Open a Tale file in a story, change a choice target to a nonexistent scene,
+Open a Talemark file in a story, change a choice target to a nonexistent scene,
 and run `:lua vim.diagnostic.open_float()`. Restore the target without saving:
 the compiler diagnostic should disappear. Save/close/reopen and confirm it
 remains absent. For cross-file disk changes, configure the client to forward
@@ -255,14 +255,14 @@ npm run test:package
 xvfb-run -a npm run test:editor
 ```
 
-The stdio process tests cover lifecycle, incomplete Tale/invalid YAML, unsaved
+The stdio process tests cover lifecycle, incomplete Talemark/invalid YAML, unsaved
 buffers, cross-file create/change/delete, close-to-disk, diagnostic clearing,
 superseded versions, metadata failures/recovery, and exact saved-input diagnostic
 parity with the CLI. Completion tests cover every symbol category, irrelevant
 contexts, incomplete input, UTF-16/CRLF and escaped YAML ranges, versioned
 overlays, cross-file additions/changes/deletions, and metadata failure/recovery.
 The installed-VSIX smoke preserves the existing syntax/snippet/schema checks
-and exercises unsaved Tale and canonical manifest completion alongside diagnostics.
+and exercises unsaved Talemark and canonical manifest completion alongside diagnostics.
 Hover tests cover all symbol categories, syntax/schema descriptions, exact
 UTF-16/CRLF/escaped YAML ranges, unknown and incomplete input, current overlays,
 cross-file changes/deletions, Markdown/plaintext negotiation, and metadata
@@ -272,7 +272,7 @@ for unsaved references, and Neovim requests the same hover directly.
 ### Beginner manual check
 
 1. Install/configure the server and extension above; open a trusted story folder
-   containing `story.talewright.yaml` and a Tale file with `=== start`.
+   containing `story.talewright.yaml` and a Talemark file with `=== start`.
 2. Add another file with `=== destination` and `-> END`.
 3. In the first file type `-> dest`, press **Ctrl+Space**, and select
    `destination`. Only `dest` should be replaced. Do not save.
@@ -295,7 +295,7 @@ Verified on Linux on 2026-10-23: stdio integration tests against both the build
 and an installed local NuGet tool; the installed VSIX in an isolated VS Code
 1.100.3 profile; and the headless Neovim 0.11.5 smoke above. Both editors received
 compiler diagnostics and cleared them after an unsaved fix; completion was also
-verified in both editors, including unsaved Tale token replacement and canonical
+verified in both editors, including unsaved Talemark token replacement and canonical
 manifest values in the installed VSIX. Source-aware hover with declaration context
 and exact ranges was also verified in both editors. This is local test
 evidence, not a claim that the package has already been released.

@@ -39,7 +39,7 @@ internal static class AuthorReloadComparison
             && original.Seed == candidate.Seed && original.UndoEnabled == candidate.UndoEnabled
             && Equal(original.Creation, candidate.Creation)
             && Equal(original.World, candidate.World) && Equal(original.Triggers, candidate.Triggers),
-            "world declarations, creation, triggers or rules changed (including Tale auto-declarations)");
+            "world declarations, creation, triggers or rules changed (including Talemark auto-declarations)");
     }
 
     private static bool BuiltInBlocks(IEnumerable<TemplateBlock> blocks) => blocks.All(block => block switch
