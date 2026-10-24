@@ -3,7 +3,7 @@
 This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
 extension points are, and where to look when something breaks. [the plan](plan.md) records _why_ (decisions,
 research, roadmap); this document records _what is actually built_. The [ADRs](adr) hold the big decisions in
-long form, and the [Tale syntax reference](../reference/tale-syntax.md) is the authoritative reference for the story language.
+long form, and the [Talemark syntax reference](../reference/talemark-syntax.md) is the authoritative reference for the story language.
 
 Contents:
 
@@ -78,7 +78,7 @@ Two more projects glue it together:
 
 `Talewright.Authoring` is a development-tool library above the compiler. It owns
 unsaved workspaces, analysis scheduling, explicit project metadata integration,
-and the shared Tale-aware lint rules/configuration consumed by the CLI and editor.
+and the shared Talemark-aware lint rules/configuration consumed by the CLI and editor.
 The compiler exposes parser-backed partial analysis without depending on this
 library. Authoring is excluded from the shipped engine and player packages; see
 [shared authoring analysis](authoring-analysis.md).
@@ -114,8 +114,8 @@ evaluator as everything else.)
 
 | Boundary             | Type                                                                | Defined in |
 | -------------------- | ------------------------------------------------------------------- | ---------- |
-| Story files → engine | `StorySource` (path → text map)                                     | Tale       |
-| Compiler → runtime   | `StoryDefinition` (world, scenes, triggers, predicates)             | Tale       |
+| Story files → engine | `StorySource` (path → text map)                                     | `Talewright.Tale` |
+| Compiler → runtime   | `StoryDefinition` (world, scenes, triggers, predicates)             | `Talewright.Tale` |
 | Rules ↔ state        | `IGameStateView` (read) and `GameEvent`s (write)                    | Core       |
 | Templates → renderer | `TemplateBlock` / `TemplateInline` AST                              | Narrative  |
 | Renderer → UI        | `RenderedDocument` (blocks, styled runs, notes, media placeholders) | Narrative  |
@@ -461,8 +461,8 @@ event means touching `GameState.Apply`), and save formats.
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
-| What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Tale syntax reference](../reference/tale-syntax.md#1-storytalewrightyaml)                                                                       |
-| How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Tale syntax reference](../reference/tale-syntax.md)                                                                     |
+| What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Talemark syntax reference](../reference/talemark-syntax.md#1-storytalewrightyaml)                                                                       |
+| How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Talemark syntax reference](../reference/talemark-syntax.md)                                                                     |
 | How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
 | What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx src/`                                                                  |
 | Where do "Gained: X" lines come from?      | `EventNarrator.Describe`                                                                                      |

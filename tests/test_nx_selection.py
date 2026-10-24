@@ -84,7 +84,7 @@ class NxSelectionTests(unittest.TestCase):
         for changed in (
             "engine/src/Talewright.Core/Events/GameEvents.cs",
             "tooling/vscode-talewright/package.json",
-            "docs/reference/tale-syntax.md",
+            "docs/reference/talemark-syntax.md",
             "src/Talewright.NewModule/Feature.cs",
         ):
             with self.subTest(changed=changed):
@@ -224,7 +224,7 @@ class NxSelectionTests(unittest.TestCase):
 
     def test_schema_fixture_inputs_select_editor_contracts(self):
         for changed in (
-            "docs/reference/tale-syntax.md",
+            "docs/reference/talemark-syntax.md",
             "examples/CSharpStory/Story/Content/story.talewright.yaml",
             "tooling/vscode-talewright/schemas/story.schema.json",
             "engine/tests/Talewright.Tale.Tests/EditorManifestSchemaTests.cs",

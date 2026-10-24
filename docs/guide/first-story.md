@@ -41,7 +41,8 @@ This is your story's **manifest**:
 
 ## 2. Write the first scene
 
-Create `story.tale` in the same folder:
+Create `story.tale` in the same folder. This is **Talemark**, the story-authoring language
+that combines your prose with dialogue, choices, and story logic:
 
 ```tale
 === dock

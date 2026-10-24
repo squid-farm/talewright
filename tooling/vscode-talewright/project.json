@@ -5,7 +5,7 @@
   "namedInputs": {
     "default": ["sharedGlobals", "{projectRoot}/**/*", "editorWorkflow"],
     "documentedManifests": [
-      "{workspaceRoot}/docs/reference/tale-syntax.md",
+      "{workspaceRoot}/docs/reference/talemark-syntax.md",
       "{workspaceRoot}/docs/guide/first-story.md",
       "{workspaceRoot}/docs/guide/debugger-test-plan.md",
       "{workspaceRoot}/docs/guide/writing-stories.md"
