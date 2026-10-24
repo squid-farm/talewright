@@ -143,6 +143,55 @@ public class StoryHistoryTests
         Assert.True(restored.Current.IsEnded);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void Restored_history_continues_exactly_like_the_live_history(int backSteps)
+    {
+        var history = new StoryHistory(Compile(), 11);
+        for (var i = 0; i < 4; i++)
+        {
+            history.Choose("c0");
+        }
+
+        for (var i = 0; i < backSteps; i++)
+        {
+            history.Back();
+        }
+
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+
+        AssertEquivalent(history, restored);
+        Assert.Equal(ChosenLabels(history), ChosenLabels(restored));
+        Assert.Equal(history.Save(), restored.Save());
+        foreach (var live in new[] { history, restored })
+        {
+            live.Choose("c0");
+            live.Choose("c0");
+            live.Back();
+        }
+
+        AssertEquivalent(history, restored);
+        Assert.Equal(ChosenLabels(history), ChosenLabels(restored));
+        Assert.Equal(history.Save(), restored.Save());
+    }
+
+    [Fact]
+    public void Invalid_last_choice_is_rejected_when_cursor_is_at_the_end()
+    {
+        var history = new StoryHistory(Compile(), 7);
+        history.Choose("c0");
+        history.Choose("c0");
+        var save = JsonNode.Parse(history.Save())!.AsObject();
+        save["choices"]![1] = "missing";
+
+        var error = Assert.Throws<InvalidDataException>(() =>
+            StoryHistory.Restore(history.Story, Encoding.UTF8.GetBytes(save.ToJsonString())));
+
+        Assert.Contains("cannot continue at choice 2", error.Message);
+    }
+
     [Fact]
     public void Back_and_forward_rebuild_triggers_and_dice_without_reapplying_entry_effects()
     {
@@ -384,4 +433,8 @@ public class StoryHistoryTests
         Assert.Equal(expected.Current.Choices.Select(c => c.Key), actual.Current.Choices.Select(c => c.Key));
         Assert.Equal(expected.Transcript.Select(f => f.Frame.Document.ToPlainText()), actual.Transcript.Select(f => f.Frame.Document.ToPlainText()));
     }
+
+    private static string?[] ChosenLabels(StoryHistory history) =>
+        history.Transcript.Select(frame => frame.Chosen is null ? null
+            : string.Concat(frame.Chosen.OfType<Talewright.Narrative.Rendering.RenderedText>().Select(text => text.Text))).ToArray();
 }

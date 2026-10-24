@@ -156,6 +156,39 @@ dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --artifacts artifacts/fingerprint-experiment
 ```
 
+## Single-replay restore experiment
+
+Loading a save used to replay every saved choice once to validate the save,
+discard the result, start a throwaway session, then replay the choices again
+up to the save point. Restore now keeps the validated replay when the save
+point is the newest choice, which is the normal case. When the player had
+pressed Back before saving, every choice, including redo choices, is still
+validated. The visible prefix is then rebuilt, but the throwaway session is
+skipped.
+
+| Case | Unchanged mean | Changed mean | Time | Unchanged allocated/op | Changed allocated/op | Allocation |
+|---|---:|---:|---:|---:|---:|---:|
+| Newest choice, 1,000 choices | 6.36 ms | 3.68 ms | −42% | 9.19 MiB | 4.68 MiB | −49% |
+| Newest choice, 10,000 choices | 156.29 ms | 86.22 ms | −45% | 91.73 MiB | 46.58 MiB | −49% |
+| Earlier save point, Medium tier | 6.32 ms | 5.63 ms | −11% | 7.53 MiB | 7.28 MiB | −3% |
+
+The first two rows use `IndependentDimensionBenchmarks.RestoreAtConfiguredDepth`
+(history-1000 and history-10000), averaged over two runs per state in
+alternating order with 3 warmups and 15 measurements. The earlier-save-point
+row uses `StoryBenchmarks.RestoreAtRedoPrefix` (Medium tier); it is averaged
+over a second pair of alternating runs with 30 measurements, because the first
+pair was too noisy to read. Runs were local Release builds on AC power with the
+`performance` governor and no concurrent tests or benchmarks. These measure
+managed allocation and time, not retained heap or peak process memory.
+
+```bash
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.RestoreAtConfiguredDepth*history-1000*' \
+  '*StoryBenchmarks.RestoreAtRedoPrefix*Medium*' \
+  --warmupCount 3 --iterationCount 15 --iterationTime 500 \
+  --artifacts artifacts/restore-experiment
+```
+
 ## Budget status
 
 The issue's candidate goals—ordinary choice p95 below 50 ms and Back/Forward

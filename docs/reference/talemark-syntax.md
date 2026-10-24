@@ -2,9 +2,10 @@
 
 A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
 **Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
-It combines CommonMark inline Markdown prose with dialogue, choices, conditions, and RPG effects
+It combines prose with bold, italic and code formatting with dialogue, choices, conditions, and RPG effects
 through a small set of line-level directives and inline expressions. The YAML manifest defines
 the story's configuration and world; it is not Talemark source.
+It is not a general Markdown document format.
 
 The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
 Every reference is validated, and mistakes are reported with `file:line:column` and an
@@ -15,6 +16,9 @@ digits, or `_`, with optional single `.` or `-` separators between groups. Dots 
 inside one name, such as `weapon.knife` or `camp.arrival`; they never read properties.
 
 New to Talewright? Start with the [author guide](../guide/README.md). This page is the complete reference.
+The [Talemark operator registry](talemark-operators.md) defines each marker, expression precedence,
+and the current and decided quoting rules. Formatting design is tracked in
+[#200](https://github.com/squid-farm/talewright/issues/200).
 
 ---
 
@@ -154,7 +158,7 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `@hub all(tag, tag)`                               | Offer storylets carrying every listed tag.                                                   |
 | `@hub any(tag, tag)`                               | Offer storylets carrying at least one listed tag.                                             |
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
-| blank-line separated text                          | Paragraphs (inline Markdown).                                                                  |
+| blank-line separated text                          | Paragraphs (bold, italic and code formatting).                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `![alt](media-id)`                                 | Image placeholder. Not displayed yet ([#35](https://github.com/squid-farm/talewright/issues/35)). |
 | `~ effect`                                         | Effect applied when the scene is entered (before rendering).                                   |
