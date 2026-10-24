@@ -31,7 +31,7 @@ Use them in prose, and Talewright takes care of the grammar:
 ```tale
 {player:first-name#possessive} torch gutters.     → Mara's torch gutters.
 {player:last-name#possessive} reputation          → Burns's reputation
-{player:pronoun:subject#capitalize} hesitates.    → She hesitates.
+{player:pronoun#capitalize} hesitates.            → She hesitates.
 > guide: Careful.                                 → dialogue spoken by Tomas
 ```
 

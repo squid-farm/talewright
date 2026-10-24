@@ -46,7 +46,8 @@ public sealed partial class ServerTests
     [InlineData("~ take player rope |", "player")]
     [InlineData("@requires @IsH|", "IsHero")]
     [InlineData("@requires flag:door-|", "door-open")]
-    [InlineData("{player:pronoun:|}", "subject")]
+    [InlineData("{player:pronoun#|}", "reflexive")]
+    [InlineData("{player:pronoun#possessive(|)}", "\"independent\"")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
     {
@@ -71,9 +72,22 @@ public sealed partial class ServerTests
         Assert.Equal(1, item.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
     }
 
+    [Fact]
+    public async Task Possessive_pronoun_values_mark_the_default()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string marked = "=== start\n{player:pronoun#possessive(|)}";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        var items = Items(await Completion(client, "start.tale", marked)).ToArray();
+        Assert.Contains("(default)", Assert.Single(items, HasLabel("\"determiner\"")).GetProperty("detail").GetString());
+        Assert.DoesNotContain("default", Assert.Single(items, HasLabel("\"independent\"")).GetProperty("detail").GetString());
+    }
+
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
-    [InlineData("{player:pronoun:|}", "subject", "{player:pronoun:subject}")]
+    [InlineData("{player:pronoun#|}", "object", "{player:pronoun#object}")]
+    [InlineData("{player:pronoun#possessive(|)}", "\"determiner\"", "{player:pronoun#possessive(\"determiner\")}")]
     [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
     [InlineData("~ player:hp -= player:h|p-", "hp", "~ player:hp -= player:hp-")]

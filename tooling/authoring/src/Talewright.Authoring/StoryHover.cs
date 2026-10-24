@@ -75,14 +75,12 @@ public static class StoryHover
                 return Help(site.Text, directive, site.Range);
             if (site.Keywords.Contains(site.Text))
             {
-                var description = site.Text switch
+                var description = site.KeywordDetails?.GetValueOrDefault(site.Text) ?? site.Text switch
                 {
                     "first-name" or "last-name" => "Character name part used in substitutions.",
                     "name" => "Character full name or faction display name used in substitutions.",
                     "tier" => "Faction standing tier, such as hostile or friendly.",
-                    "pronoun" => "Character pronoun namespace; choose a form after the next ':'.",
-                    "subject" or "object" or "possessive" or "possessive-pronoun" or "reflexive"
-                        => "Character pronoun form used in substitutions.",
+                    "pronoun" => "Character pronoun. Gives the subject form; add #object, #possessive or #reflexive for another form.",
                     _ => null,
                 };
                 if (description is not null) return Help(site.Text, description, site.Range);

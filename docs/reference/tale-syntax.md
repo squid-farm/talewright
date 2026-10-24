@@ -189,7 +189,7 @@ by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 | Reference                                                                                   | Value                                     |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `player:first-name`, `player:last-name`, `player:name`                                      | Names (`name` = first + last)             |
-| `player:pronoun:subject` / `:object` / `:possessive` / `:possessive-pronoun` / `:reflexive` | Pronouns                                  |
+| `player:pronoun`                                                                            | Subject pronoun (`she`, `they`)           |
 | `player:<stat>`                                                                             | Effective stat value (base + modifiers)   |
 | `faction:<id>`                                                                              | Player standing with the faction (number) |
 | `faction:<id>:tier`                                                                         | Standing tier name (`friendly`, …)        |
@@ -207,6 +207,23 @@ Any character id can replace `player`.
 | `#capitalize`       | First letter upper case                                                                      |
 | `#upper` / `#lower` | Case                                                                                         |
 | `#a`                | Prefix with `a`/`an`                                                                         |
+
+**Pronoun forms.** `{player:pronoun}` gives the subject form. Choose another form with a modifier straight
+after `pronoun`, then chain other modifiers after it:
+
+| Write                                         | `she`     | `they`       |
+| --------------------------------------------- | --------- | ------------ |
+| `{player:pronoun}`                            | she       | they         |
+| `{player:pronoun#object}`                     | her       | them         |
+| `{player:pronoun#possessive}`                 | her       | their        |
+| `{player:pronoun#possessive("independent")}`  | hers      | theirs       |
+| `{player:pronoun#reflexive}`                  | herself   | themselves   |
+| `{player:pronoun#reflexive#capitalize}`       | Herself   | Themselves   |
+
+On a pronoun, `#possessive` picks the declared possessive form instead of adding `'s`. Its optional argument is
+`"determiner"` (the default, used before a noun) or `"independent"` (stands alone). Custom pronoun sets use the
+forms they declare: `possessive` for the determiner and `possessive-pronoun` for the independent form.
+The older `player:pronoun:object` and `player:pronoun.object` spellings are errors that name the replacement.
 
 ## 4. Expressions
 
