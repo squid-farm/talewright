@@ -99,7 +99,7 @@ the existing direct-start behavior. Restart keeps the active character, includin
 one restored from a save. Library reopening offers creation anew; loading a save
 then replaces that selection with the saved character.
 Custom hosts may pass `StoryPlayer.Character` with a validated selection.
-See [the manifest contract](../../../docs/reference/tale-syntax.md#optional-character-creation).
+See [the manifest contract](../../../docs/reference/talemark-syntax.md#optional-character-creation).
 
 ## Regression testing
 

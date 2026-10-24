@@ -41,7 +41,7 @@ foreach (var scenes in new[] { 100, 1_000, 10_000 })
     var cold = Stopwatch.StartNew();
     var story = Compile(source);
     cold.Stop();
-    Console.WriteLine($"First compile {scenes} scenes: {cold.Elapsed.TotalMilliseconds:F2} ms; {Encoding.UTF8.GetByteCount(tale.ToString())} Tale bytes");
+    Console.WriteLine($"First compile {scenes} scenes: {cold.Elapsed.TotalMilliseconds:F2} ms; {Encoding.UTF8.GetByteCount(tale.ToString())} Talemark bytes");
     Measure($"Compile {scenes} scenes", () => Compile(source), scenes == 10_000 ? 2_500 : 500);
     using var zip = new MemoryStream();
     using (var archive = new ZipArchive(zip, ZipArchiveMode.Create, leaveOpen: true))

@@ -39,7 +39,7 @@ function hasScope(line, text, scope) {
   assert.ok(token.scopes.includes(scope), `${line}: ${text} expected ${scope}, got ${token.scopes.join(', ')}`);
 }
 
-test('Tale syntax categories tokenize with real Oniguruma/TextMate', () => {
+test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
   for (const [line, text, scope] of [
     ['=== temple.hall', 'temple.hall', 'entity.name.section.tale'],
     ['  // {if true} * [not a choice]', '//', 'comment.line.double-slash.tale'],
@@ -113,7 +113,7 @@ test('Tale syntax categories tokenize with real Oniguruma/TextMate', () => {
   ]) hasScope(line, text, scope);
 });
 
-test('ordinary prose, Markdown, comments and escaped braces are not Tale commands', () => {
+test('ordinary prose, Markdown, comments and escaped braces are not Talemark commands', () => {
   for (const line of [
     '*emphasis*', '**strong**', 'A -> sign in prose', 'Write @title here.',
     'Literal \\{player:first-name\\}', '// * [choice] -> END',
@@ -162,7 +162,7 @@ test('unterminated edits recover before the next scene', () => {
   }
 });
 
-test('every shipped Tale sample can be tokenized without timeouts', async () => {
+test('every shipped Talemark sample can be tokenized without timeouts', async () => {
   const { glob } = await import('node:fs/promises');
   let count = 0;
   for await (const file of glob('../../samples/**/*.tale')) {

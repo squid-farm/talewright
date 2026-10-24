@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json",
   "title": "Talewright story manifest (story.talewright.yaml)",
-  "description": "Structural validation and authoring help for a Talewright story manifest. Story-specific identifiers and Tale expressions are checked by the Talewright compiler.",
+  "description": "Structural validation and authoring help for a Talewright story manifest. Story-specific identifiers and Talemark expressions are checked by the Talewright compiler.",
   "type": "object",
   "required": ["id", "title", "start", "characters"],
   "properties": {
@@ -83,7 +83,7 @@
       "items": {
         "$ref": "#/definitions/identifier"
       },
-      "description": "Optional flags to declare before any Tale effect sets them."
+      "description": "Optional flags to declare before any Talemark effect sets them."
     },
     "vars": {
       "$ref": "#/definitions/integerMap",
@@ -181,7 +181,7 @@
       "properties": {
         "id": {
           "$ref": "#/definitions/identifier",
-          "description": "Stat ID used by characters, items, and Tale expressions."
+          "description": "Stat ID used by characters, items, and Talemark expressions."
         },
         "name": {
           "type": "string",
@@ -425,11 +425,11 @@
         },
         "when": {
           "$ref": "#/definitions/nonEmptyString",
-          "description": "Tale predicate that activates the trigger."
+          "description": "Talemark predicate that activates the trigger."
         },
         "do": {
           "$ref": "#/definitions/nonEmptyString",
-          "description": "Tale effect applied when the trigger activates."
+          "description": "Talemark effect applied when the trigger activates."
         },
         "once": {
           "$ref": "#/definitions/booleanOrYesNoScalar",
