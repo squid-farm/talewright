@@ -103,7 +103,7 @@ public sealed class DebuggerTests
             Assert.Contains("Reload boundary: current", snapshot.Content);
             Assert.Contains("Seed: 42", snapshot.Content);
             await driver.ActivateAsync("Flags, variables, factions, visits and triggers");
-            snapshot = await WaitFor(driver, "var:count = 2");
+            snapshot = await WaitFor(driver, "var:count (integer) = 2");
             Assert.Contains("current visits: 1", snapshot.Content);
             await File.WriteAllTextAsync(manifest, yaml.Replace("Native reload", "Restarted title"));
             snapshot = await WaitFor(driver, "Restart required.");
