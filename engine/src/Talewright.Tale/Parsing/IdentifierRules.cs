@@ -1,21 +1,46 @@
-using System.Text.RegularExpressions;
-
 namespace Talewright.Tale.Parsing;
 
-internal static partial class IdentifierRules
+/// <summary>
+/// The one identifier rule: an ASCII letter or '_', then letters, digits and '_',
+/// with single '.' or '-' separators between word groups.
+/// </summary>
+internal static class IdentifierRules
 {
-    /// <summary>Unanchored identifier grammar shared with the manifest schema and editor grammar.</summary>
-    public const string PatternBody = @"[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*";
+    public static bool IsValid(string value)
+    {
+        if (value.Length == 0 || !IsStart(value[0]))
+        {
+            return false;
+        }
 
-    // .NET '$' also matches before a final '\n'; '\z' matches the schema's ECMAScript '$'.
-    private const string PatternText = "^" + PatternBody + @"\z";
+        var afterSeparator = false;
+        foreach (var c in value.AsSpan(1))
+        {
+            if (c is '.' or '-')
+            {
+                if (afterSeparator)
+                {
+                    return false;
+                }
 
-    [GeneratedRegex(PatternText, RegexOptions.CultureInvariant)]
-    private static partial Regex Pattern();
+                afterSeparator = true;
+            }
+            else if (IsWordChar(c))
+            {
+                afterSeparator = false;
+            }
+            else
+            {
+                return false;
+            }
+        }
 
-    public static bool IsValid(string value) => Pattern().IsMatch(value);
+        return !afterSeparator;
+    }
 
     public static bool IsStart(char value) => value is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or '_';
 
-    public static bool IsPart(char value) => IsStart(value) || value is >= '0' and <= '9' or '.' or '-';
+    public static bool IsPart(char value) => IsWordChar(value) || value is '.' or '-';
+
+    private static bool IsWordChar(char value) => IsStart(value) || value is >= '0' and <= '9';
 }

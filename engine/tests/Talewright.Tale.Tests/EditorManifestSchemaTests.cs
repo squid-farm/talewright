@@ -10,6 +10,40 @@ namespace Talewright.Tale.Tests;
 public class EditorManifestSchemaTests
 {
     [Fact]
+    public void Shared_identifier_fixture_matches_compiler_rule()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx")))
+        {
+            root = root.Parent;
+        }
+
+        Assert.NotNull(root);
+        using var fixture = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root.FullName, "tooling", "vscode-talewright", "tests", "fixtures", "identifiers.json")));
+        foreach (var (group, valid) in new[] { ("valid", true), ("invalid", false) })
+        {
+            foreach (var id in fixture.RootElement.GetProperty(group).EnumerateArray().Select(value => value.GetString()!))
+            {
+                // A JSON string is a valid YAML double-quoted scalar, so the key reaches the compiler unchanged.
+                var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+                {
+                    ["story.talewright.yaml"] = $$"""
+                        id: identifiers
+                        title: Identifiers
+                        start: beginning
+                        characters: { player: { first-name: Ada } }
+                        factions: { {{JsonSerializer.Serialize(id)}}: { name: Test } }
+                        """,
+                    ["main.tale"] = "=== beginning\nHello.\n-> END\n",
+                }));
+                Assert.True(valid == result.Success,
+                    $"{JsonSerializer.Serialize(id)} should be {group}: {string.Join("; ", result.Diagnostics.Select(d => d.Message))}");
+            }
+        }
+    }
+
+    [Fact]
     public void Shared_schema_fixtures_preserve_compiler_diagnostics_and_materialized_values()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);

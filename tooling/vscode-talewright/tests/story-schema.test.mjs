@@ -52,34 +52,27 @@ test('schema validates every shipped story manifest', async () => {
   }
 });
 
-test('compiler, schema, and editor grammar use the same identifier characters', async () => {
-  const compiler = await read('engine/src/Talewright.Tale/Parsing/IdentifierRules.cs');
-  const match = compiler.match(/PatternBody = @\"([^\"]+)\"/);
-  assert.ok(match, 'compiler identifier pattern should be discoverable');
-  assert.match(compiler, /PatternText = "\^" \+ PatternBody \+ @"\\z"/,
-    'compiler must anchor at the absolute end, matching ECMAScript $');
-  assert.equal(schema.definitions.identifier.pattern, `^${match[1]}$`);
-
+test('compiler, schema, and editor grammar accept the same identifiers', async () => {
+  const pattern = schema.definitions.identifier.pattern;
+  assert.ok(pattern.startsWith('^') && pattern.endsWith('$'), 'schema identifier pattern must be anchored');
   const grammar = await read('tooling/vscode-talewright/syntaxes/tale.tmLanguage.json');
-  assert.ok(grammar.includes(match[1]),
-    'editor grammar should use the same identifier body as compiler and manifest schema');
+  assert.ok(grammar.includes(pattern.slice(1, -1)),
+    'editor grammar should use the same identifier body as the manifest schema');
 
-  for (const id of ['player', 'temple.entrance', 'weapon.knife', 'camp-arrival', '_custom-2']) {
-    assertValid(validateManifest, {
-      id,
-      title: 'Identifier test',
-      start: 'beginning',
-      characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
-    }, `identifier ${id}`);
+  // EditorManifestSchemaTests runs the same fixture through the compiler.
+  const fixture = JSON.parse(await read('tooling/vscode-talewright/tests/fixtures/identifiers.json'));
+  const manifest = id => ({
+    id: 'identifier-test',
+    title: 'Identifier test',
+    start: 'beginning',
+    characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
+  });
+  for (const id of fixture.valid) {
+    assertValid(validateManifest, manifest(id), `identifier ${JSON.stringify(id)}`);
   }
 
-  for (const id of ['2start', 'café', 'camp..arrival', 'camp--arrival', '-camp', 'camp-', 'camp\n']) {
-    assertInvalid(validateManifest, {
-      id: 'identifier-test',
-      title: 'Identifier test',
-      start: 'beginning',
-      characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
-    }, `invalid identifier ${JSON.stringify(id)}`, 'pattern');
+  for (const id of fixture.invalid) {
+    assertInvalid(validateManifest, manifest(id), `invalid identifier ${JSON.stringify(id)}`, 'pattern');
   }
 
   const creationStats = compileSubschema(schema.definitions.creation.properties.stats);
