@@ -85,11 +85,11 @@ internal sealed class StoryYamlReader
         var factions = ReadFactions(Get(root, "factions"));
         var characters = ReadCharacters(Get(root, "characters"), root, ruleset, items);
         var flags = ReadFlags(Get(root, "flags"));
-        var (vars, textVars) = ReadVars(Get(root, "vars"));
+        var (numericVars, textVars) = ReadVars(Get(root, "vars"));
 
         var manifest = new StoryManifest
         {
-            World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, vars, textVars),
+            World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, numericVars, textVars),
             Id = RequiredIdentifier(root, "id") ?? string.Empty,
             Title = RequiredScalar(root, "title") ?? string.Empty,
             Version = Scalar(Get(root, "version")) ?? "0.0.0",
@@ -544,11 +544,11 @@ internal sealed class StoryYamlReader
 
     private (Dictionary<VarId, int> Numbers, Dictionary<VarId, string> Text) ReadVars(YamlNode? node)
     {
-        var vars = new Dictionary<VarId, int>();
+        var numericVars = new Dictionary<VarId, int>();
         var textVars = new Dictionary<VarId, string>();
         if (node is null || Mapping(node, "vars") is not { } map)
         {
-            return (vars, textVars);
+            return (numericVars, textVars);
         }
 
         foreach (var (key, value) in map.Children)
@@ -561,7 +561,7 @@ internal sealed class StoryYamlReader
             else if (value is YamlScalarNode { Value: { } raw } &&
                 int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
             {
-                vars.Add(new VarId(id), number);
+                numericVars.Add(new VarId(id), number);
             }
             else
             {
@@ -569,7 +569,7 @@ internal sealed class StoryYamlReader
             }
         }
 
-        return (vars, textVars);
+        return (numericVars, textVars);
     }
 
     private void ReadTriggers(YamlNode? node, List<RawTrigger> triggers)
