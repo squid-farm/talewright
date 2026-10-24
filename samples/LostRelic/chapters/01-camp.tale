@@ -79,3 +79,48 @@ You underline it twice.
 === camp.journal-failed
 The marks blur into each other. You close the journal with a headache and nothing else.
 -> camp.hub
+
+// Text state: an explicit manifest default, a hoisted Talemark declaration, copied values,
+// equality/inequality, empty text and literal assignments on choices.
+=== camp.watchword
+@title Agree on a night watchword
+@tags camp
+@once
+
+~ var:watch-note = ""
+
+> guide: If we lose each other after dark, call the watchword. Tonight's suggestion is "{var:watchword}".
+
+{if var:watch-note == ""}
+The watch ledger has no phrase recorded yet.
+{/if}
+
+* [Keep quiet river] -> camp.watchword-record
+* [Use silver heron instead] { var:watchword = "silver heron" } -> camp.watchword-record
+
+=== camp.watchword-record
+@title A Note for the Night Watch
+
+~ var:watch-note = var:watchword
+
+You write **{var:watch-note}** in the watch ledger. Tomas asks what should happen
+if a stranger overhears it.
+
+* [Change the watchword to lantern light] (requires: var:watchword == var:watch-note) { var:watchword = "lantern light" } -> camp.watchword-readback
+* [Retire the watchword without a replacement] (requires: var:watchword == var:watch-note) { var:watchword = "" } -> camp.watchword-readback
+
+=== camp.watchword-readback
+@title Ink Does Not Follow Orders
+
+{if var:watchword == ""}
+> guide: No watchword tonight, then. Stay within sight of the fire.
+{else}
+> guide: The current watchword is "{var:watchword}". Remember it, not the old one.
+{/if}
+
+{if var:watch-note != var:watchword}
+The ledger still reads **{var:watch-note}**. Changing the spoken watchword did not
+rewrite the ink: the note holds a copy, not a promise to follow later changes.
+{/if}
+
+* [Close the watch ledger] -> camp.hub

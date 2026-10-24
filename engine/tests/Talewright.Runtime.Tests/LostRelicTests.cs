@@ -1,6 +1,7 @@
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Core.Identity;
+using Talewright.Narrative.Rendering;
 
 namespace Talewright.Runtime.Tests;
 
@@ -32,6 +33,42 @@ public class LostRelicTests
 
     [Fact]
     public void Shipped_sample_compiles_without_errors_or_warnings() => Story();
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Watchword_demonstrates_text_declarations_copying_empty_values_and_replay(bool alternate, bool retire)
+    {
+        var history = History();
+        Assert.Equal("quiet river", history.State.GetTextVariable(new("watchword")));
+        Assert.Equal("", history.State.GetTextVariable(new("watch-note")));
+        Choose(history, "Continue");
+        Choose(history, "Agree on a night watchword");
+        Assert.Contains("no phrase recorded", history.Current.Document.ToPlainText());
+        Choose(history, alternate ? "Use silver heron instead" : "Keep quiet river");
+        var recorded = alternate ? "silver heron" : "quiet river";
+        Assert.Equal(recorded, history.State.GetTextVariable(new("watch-note")));
+        Choose(history, retire ? "Retire the watchword without a replacement" : "Change the watchword to lantern light");
+        var current = retire ? "" : "lantern light";
+        Assert.Equal(current, history.State.GetTextVariable(new("watchword")));
+        Assert.Equal(recorded, history.State.GetTextVariable(new("watch-note")));
+        Assert.Contains(retire ? "No watchword tonight" : "current watchword", history.Current.Document.ToPlainText());
+        Assert.Contains($"ledger still reads {recorded}", history.Current.Document.ToPlainText());
+        history.Back();
+        Assert.Equal(recorded, history.State.GetTextVariable(new("watchword")));
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.True(restored.CanForward);
+        history.Forward();
+        restored.Forward();
+        Assert.Equal(history.Events, restored.Events);
+        Assert.Equal(current, restored.State.GetTextVariable(new("watchword")));
+        Assert.Equal(recorded, restored.State.GetTextVariable(new("watch-note")));
+        Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+        Choose(history, "Close the watch ledger");
+        Assert.DoesNotContain(history.Current.Choices, choice => choice.Text == "Agree on a night watchword");
+    }
 
     [Fact]
     public void Workshop_demonstrates_capped_intersection_hub_inventory_arithmetic_and_replay()

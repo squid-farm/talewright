@@ -84,6 +84,30 @@ public sealed partial class ServerTests
         Assert.DoesNotContain("default", Assert.Single(items, HasLabel("\"independent\"")).GetProperty("detail").GetString());
     }
 
+    [Fact]
+    public async Task Implicit_text_types_follow_unsaved_assignments_and_report_compiler_conflicts()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string marked = "=== start\n{var:wea|ther}\n-> END";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        await client.Open("other.tale", "=== other\n~ var:weather = \"stormy\"\n-> END", 1);
+        var text = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("weather"));
+        Assert.Equal("Variable: text", text.GetProperty("detail").GetString());
+        Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
+        await client.Change("other.tale", "=== other\n~ var:weather = 1\n-> END", 2);
+        var number = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("weather"));
+        Assert.Equal("Variable: integer", number.GetProperty("detail").GetString());
+        await client.Change("other.tale", "=== other\n~ var:weather = 1\n~ var:weather = \"wrong\"\n-> END", 3);
+        Assert.Contains(await client.Diagnostics("other.tale", 3),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2003");
+        await client.Change("other.tale", "=== other\n~ var:weather =", 4);
+        var partial = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("weather"));
+        Assert.Equal("Variable: unresolved", partial.GetProperty("detail").GetString());
+        await client.Change("other.tale", "=== other\n~ var:weather = \"recovered\"\n-> END", 5);
+        Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
+    }
+
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("{player:pronoun#|}", "object", "{player:pronoun#object}")]

@@ -14,6 +14,7 @@ public sealed record AuthorSetup
 {
     public IReadOnlyDictionary<FlagId, bool> Flags { get; init; } = new Dictionary<FlagId, bool>();
     public IReadOnlyDictionary<VarId, int> Variables { get; init; } = new Dictionary<VarId, int>();
+    public IReadOnlyDictionary<VarId, string> TextVariables { get; init; } = new Dictionary<VarId, string>();
     public IReadOnlyDictionary<FactionId, int> Standings { get; init; } = new Dictionary<FactionId, int>();
     public IReadOnlyList<AuthorStatValue> Stats { get; init; } = [];
     public IReadOnlyList<AuthorItemValue> Inventory { get; init; } = [];
@@ -24,6 +25,7 @@ public sealed record AuthorSetup
         ArgumentNullException.ThrowIfNull(story);
         ArgumentNullException.ThrowIfNull(Flags);
         ArgumentNullException.ThrowIfNull(Variables);
+        ArgumentNullException.ThrowIfNull(TextVariables);
         ArgumentNullException.ThrowIfNull(Standings);
         ArgumentNullException.ThrowIfNull(Stats);
         ArgumentNullException.ThrowIfNull(Inventory);
@@ -39,7 +41,16 @@ public sealed record AuthorSetup
         {
             if (!world.Variables.ContainsKey(id))
             {
-                throw new ArgumentException($"Unknown setup variable '{id}'.");
+                throw new ArgumentException(world.TextVariables.ContainsKey(id)
+                    ? $"Setup variable '{id}' requires text, not an integer."
+                    : $"Unknown setup variable '{id}'.");
+            }
+        }
+        foreach (var (id, value) in TextVariables)
+        {
+            if (!world.TextVariables.ContainsKey(id) || value is null)
+            {
+                throw new ArgumentException($"Setup text variable '{id}' must be declared as text and have a non-null text value.");
             }
         }
         foreach (var id in Standings.Keys)
@@ -79,6 +90,7 @@ public sealed record AuthorSetup
         {
             Flags = new ReadOnlyDictionary<FlagId, bool>(Flags.ToDictionary()),
             Variables = new ReadOnlyDictionary<VarId, int>(Variables.ToDictionary()),
+            TextVariables = new ReadOnlyDictionary<VarId, string>(TextVariables.ToDictionary()),
             Standings = new ReadOnlyDictionary<FactionId, int>(Standings.ToDictionary()),
             Stats = Array.AsReadOnly(Stats.OrderBy(v => v.Character.Value, StringComparer.Ordinal)
                 .ThenBy(v => v.Stat.Value, StringComparer.Ordinal).ToArray()),
@@ -112,6 +124,10 @@ public sealed record AuthorSetup
         {
             log.AppendRange(StateChanges.SetVariable(log.State, id, value));
         }
+        foreach (var (id, value) in TextVariables.OrderBy(v => v.Key.Value, StringComparer.Ordinal))
+        {
+            log.AppendRange(StateChanges.SetTextVariable(log.State, id, value));
+        }
     }
 
     internal IEnumerable<KeyValuePair<string, string>> ReadValues(IGameStateView state)
@@ -123,6 +139,10 @@ public sealed record AuthorSetup
         foreach (var id in Variables.Keys)
         {
             yield return new($"var:{id}", state.GetVariable(id).ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var id in TextVariables.Keys)
+        {
+            yield return new($"var:{id}", state.GetTextVariable(id));
         }
         foreach (var id in Standings.Keys)
         {

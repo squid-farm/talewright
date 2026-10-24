@@ -50,6 +50,8 @@ public sealed class AuthorInspection
             .Select(id => new KeyValuePair<FlagId, bool>(id, state.GetFlag(id))).ToArray());
         Variables = Array.AsReadOnly(story.World.Variables.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
             .Select(id => new KeyValuePair<VarId, int>(id, state.GetVariable(id))).ToArray());
+        TextVariables = Array.AsReadOnly(story.World.TextVariables.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
+            .Select(id => new KeyValuePair<VarId, string>(id, state.GetTextVariable(id))).ToArray());
         Scenes = Array.AsReadOnly(story.Scenes.Select(scene =>
             new AuthorSceneInspection(scene.Id, scene.Title, state.VisitCount(scene.Id))).ToArray());
         Triggers = Array.AsReadOnly(story.Triggers.Select(trigger =>
@@ -67,6 +69,7 @@ public sealed class AuthorInspection
     public IReadOnlyList<AuthorFactionInspection> Factions { get; }
     public IReadOnlyList<KeyValuePair<FlagId, bool>> Flags { get; }
     public IReadOnlyList<KeyValuePair<VarId, int>> Variables { get; }
+    public IReadOnlyList<KeyValuePair<VarId, string>> TextVariables { get; }
     public IReadOnlyList<AuthorSceneInspection> Scenes { get; }
     public IReadOnlyList<AuthorTriggerInspection> Triggers { get; }
 

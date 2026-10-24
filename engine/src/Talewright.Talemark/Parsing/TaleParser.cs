@@ -32,14 +32,14 @@ internal sealed partial class TaleParser
     private readonly string[] _lines;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
-    private readonly Action<string>? _discoverEffects;
+    private readonly Action<string, SourceLocation>? _discoverEffects;
     private readonly Action<SceneId, SourceLocation>? _discoverScene;
     private readonly List<ParsedScene> _scenes = [];
     private SceneBuilder? _scene;
     private int _index;
 
     private TaleParser(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
-        Action<string>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null)
+        Action<string, SourceLocation>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null)
     {
         _file = file;
         _lines = text.ReplaceLineEndings("\n").Split('\n');
@@ -57,7 +57,7 @@ internal sealed partial class TaleParser
     }
 
     public static void Discover(string file, string text, StorySymbols symbols,
-        Action<string> effects, Action<SceneId, SourceLocation> scene) =>
+        Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene) =>
         new TaleParser(file, text, symbols, new DiagnosticBag(), effects, scene).Run();
 
     private SourceLocation At(int column) => new(_file, _index + 1, column + 1);
@@ -433,7 +433,7 @@ internal sealed partial class TaleParser
     {
         if (_discoverEffects is not null)
         {
-            _discoverEffects(text);
+            _discoverEffects(text, location);
             return [];
         }
 

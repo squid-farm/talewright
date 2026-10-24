@@ -105,6 +105,12 @@ Text stays text throughout the story; it cannot be mixed with numbers or used in
 arithmetic. See [text variables](../reference/talemark-syntax.md#text-variables) for
 empty values, copying, and supported operations.
 
+You can also introduce text directly with `~ var:weather = "stormy"` without a
+YAML declaration. It is available throughout the story and starts as empty text
+until that effect executes. Its type stays fixed, and assignments copy values
+rather than link variables. For declaration order and forward references, see
+[declaring variables in Talemark](../reference/talemark-syntax.md#declaring-variables-in-talemark).
+
 ## Factions
 
 ```yaml

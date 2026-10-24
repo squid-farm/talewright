@@ -6,7 +6,7 @@ Complete stories to play, read and copy. The desktop player and the
 ## The Lost Relic (`LostRelic/`)
 
 A playable kitchen-sink reference for the supported no-code authoring features:
-30 scenes across four chapter files, with three endings. Mara Burns (or your
+33 scenes across four chapter files, with three endings. Mara Burns (or your
 created explorer) and guide Tomas Okafor look for the Relic of Ysh while the
 Explorers' Guild watches. Optional camp encounters demonstrate mechanics without
 forcing a tutorial detour into every playthrough.
@@ -29,6 +29,7 @@ the first camp hub; no edits or temporary copy are needed.
 | Gated choices (`requires:` item, flag, faction tier), items modifying stats | rope at the river, glyph door, guild hand-over; `charm` (+2 WIS), `relic` (+2 CHA) |
 | Counted give/take inventory, set/clear flags, choice fall-through | `workshop.packing`: gives two rations; eating removes one and clears the packing flag, then follows the scene divert |
 | Explicit and auto-declared flags/variables; arithmetic and comparisons | manifest `packing-open`/`supplies`; `workshop.ledger` auto-declares `ledger`, uses `+ - * /`, assignment/subtraction, `==` and `!=` |
+| Explicit and implicit text variables, copied values, empty text, equality and inequality | manifest `watchword: "quiet river"`; `camp.watchword` declares `watch-note` in Talemark, copies the chosen phrase, then changes or clears the watchword without changing the note; text comparisons gate choices and prose |
 | Faction standing, tiers and a trigger | Explorers' Guild; trigger `guild-wary` fires at unfriendly or worse |
 | Custom-stat trigger, conditional entry effect | `courage-earned` sets `steady`; `field.resolve` grants conditional XP |
 | Repeatable edge-trigger behavior | `field.bell`: ring/silence/ring increments the alarm counter twice; `watch-bell` is not once-only |
@@ -49,14 +50,18 @@ the first camp hub; no edits or temporary copy are needed.
 3. Try the **field exercises**. Courage clamps at 10; the signal appears after the
    first exercise. Save here, advance, load, and try Back/Forward. Finish with the
    watch bell: ring, silence, ring again, then leave the drill.
-4. Return to camp; haggle for supplies, speak to Tomas, and study the journal.
+4. Return to camp and **agree on a night watchword**. Choose a phrase and record it,
+   then change it or retire it without a replacement. The ledger retains the old
+   phrase while the dialogue reflects the current (possibly empty) watchword.
+   Save, Back, Forward and load should preserve both values.
+5. Haggle for supplies, speak to Tomas, and study the journal.
    Cross the river, explore the temple, and choose an ending. Try keeping the relic
    to see the negative-standing trigger; try handing it over for the guild ending.
-5. Close/reopen and load your save. Publish this same folder as a story ZIP,
+6. Close/reopen and load your save. Publish this same folder as a story ZIP,
    standalone web site or universal desktop game; creation is part of each build.
 
-Version `0.2.0` intentionally invalidates saves from the earlier predefined-player
-sample: character creation and story content changed. Incompatible loads should
+Version `0.3.0` adds the text-variable watchword exercise to the character-creation
+sample and intentionally invalidates saves from earlier sample versions. Incompatible loads should
 be rejected visibly without replacing your active playthrough or saved bytes.
 
 ### Features that cannot all be enabled in one story
@@ -72,11 +77,13 @@ be rejected visibly without replacing your active playthrough or saved bytes.
   require an explicit compiled host. The companion
   [C# story example](../examples/CSharpStory/README.md) demonstrates those features;
   the no-code CLI intentionally does **not** discover or run arbitrary C#.
-- CLI validation/packaging and author-debugger setup, inspection and guarded
-  reload operate **on** this sample. They are tools, not Talemark directives.
+- CLI validation/packaging and author-debugger setup, inspection, live state
+  editing, scenario replay and guarded reload operate **on** this sample. Try
+  overriding `watchword` and `watch-note` with literal text, including empty text.
+  These are tools, not Talemark directives.
   See the [CLI guide](../docs/reference/cli.md).
-- Media rendering, autosave, save migration, point-buy and live debugger state
-  editing are not implemented features and are not claimed by this sample.
+- Media rendering, autosave, save migration and point-buy are not implemented
+  features and are not claimed by this sample.
 
 **Play it** in the [web player](https://squid-farm.github.io/talewright/), or with the [desktop tools](../docs/guide/getting-started.md#install-the-desktop-tools):
 `dotnet run --project apps/desktop -- samples/LostRelic`.

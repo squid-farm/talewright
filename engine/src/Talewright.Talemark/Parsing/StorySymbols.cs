@@ -16,6 +16,7 @@ internal sealed class StorySymbols
     public required WorldDefinition World { get; init; }
     public required IReadOnlySet<FlagId> Flags { get; init; }
     public required IReadOnlySet<VarId> Variables { get; init; }
+    public IReadOnlySet<VarId> UnresolvedVariables { get; init; } = new HashSet<VarId>();
     public required IReadOnlySet<SceneId> Scenes { get; init; }
     public required NamedPredicateRegistry Predicates { get; init; }
     public required TextModifierRegistry Modifiers { get; init; }

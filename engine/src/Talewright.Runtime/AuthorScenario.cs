@@ -218,7 +218,10 @@ public static class AuthorScenario
             }
             var state = session.Inspect();
             JsonSerializer.Serialize(writer, new ScenarioState(state.Characters, state.Factions, state.Flags,
-                state.Variables, state.Scenes, state.Triggers), ScenarioJsonContext.Default.ScenarioState);
+                state.Variables, state.Scenes, state.Triggers)
+            {
+                TextVariables = state.TextVariables.Count == 0 ? null : state.TextVariables,
+            }, ScenarioJsonContext.Default.ScenarioState);
             writer.WriteStartArray();
             foreach (var block in session.Current.Document.Blocks)
             {
@@ -302,7 +305,10 @@ internal sealed class ScenarioOutput : MemoryStream
 internal sealed record ScenarioState(IReadOnlyList<AuthorCharacterInspection> Characters,
     IReadOnlyList<AuthorFactionInspection> Factions, IReadOnlyList<KeyValuePair<FlagId, bool>> Flags,
     IReadOnlyList<KeyValuePair<VarId, int>> Variables, IReadOnlyList<AuthorSceneInspection> Scenes,
-    IReadOnlyList<AuthorTriggerInspection> Triggers);
+    IReadOnlyList<AuthorTriggerInspection> Triggers)
+{
+    public IReadOnlyList<KeyValuePair<VarId, string>>? TextVariables { get; init; }
+}
 
 internal sealed record ScenarioIdentity(string StoryId, string StoryVersion, string Fingerprint, string Extensions, string Engine);
 
@@ -328,6 +334,8 @@ internal sealed class ScenarioValues
 {
     public required Dictionary<string, bool> Flags { get; init; }
     public required Dictionary<string, int> Variables { get; init; }
+    // A setter lets source-generated deserialization retain this default in legacy scenarios.
+    public Dictionary<string, string> TextVariables { get; set; } = [];
     public required Dictionary<string, int> Standings { get; init; }
     public required ScenarioStat[] Stats { get; init; }
     public required ScenarioItem[] Inventory { get; init; }
@@ -336,6 +344,7 @@ internal sealed class ScenarioValues
     {
         Flags = setup.Flags.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Variables = setup.Variables.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
+        TextVariables = setup.TextVariables.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Standings = setup.Standings.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Stats = setup.Stats.Select(value => new ScenarioStat(value.Character.Value, value.Stat.Value, value.Value)).ToArray(),
         Inventory = setup.Inventory.Select(value => new ScenarioItem(value.Character.Value, value.Item.Value, value.Quantity)).ToArray(),
@@ -343,14 +352,18 @@ internal sealed class ScenarioValues
 
     public void Validate()
     {
-        if (Flags is null || Variables is null || Standings is null || Stats is null || Inventory is null
-            || (long)Flags.Count + Variables.Count + Standings.Count + Stats.Length + Inventory.Length > AuthorScenario.MaxFields)
+        if (Flags is null || Variables is null || TextVariables is null || Standings is null || Stats is null || Inventory is null
+            || (long)Flags.Count + Variables.Count + TextVariables.Count + Standings.Count + Stats.Length + Inventory.Length > AuthorScenario.MaxFields)
         {
             throw new InvalidDataException("Scenario value batches must contain at most 10,000 fields and no null collections.");
         }
-        foreach (var id in Flags.Keys.Concat(Variables.Keys).Concat(Standings.Keys))
+        foreach (var id in Flags.Keys.Concat(Variables.Keys).Concat(TextVariables.Keys).Concat(Standings.Keys))
         {
             AuthorScenario.Identifier(id);
+        }
+        if (TextVariables.Values.Any(value => value is null) || TextVariables.Keys.Any(Variables.ContainsKey))
+        {
+            throw new InvalidDataException("Scenario text values cannot be null or share an ID with integer values.");
         }
         foreach (var stat in Stats)
         {
@@ -376,6 +389,7 @@ internal sealed class ScenarioValues
     {
         Flags = Flags.ToDictionary(pair => new FlagId(pair.Key), pair => pair.Value),
         Variables = Variables.ToDictionary(pair => new VarId(pair.Key), pair => pair.Value),
+        TextVariables = TextVariables.ToDictionary(pair => new VarId(pair.Key), pair => pair.Value),
         Standings = Standings.ToDictionary(pair => new FactionId(pair.Key), pair => pair.Value),
         Stats = Stats.Select(value => new AuthorStatValue(new(value.Character), new(value.Stat), value.Value)).ToArray(),
         Inventory = Inventory.Select(value => new AuthorItemValue(new(value.Character), new(value.Item), value.Quantity)).ToArray(),
