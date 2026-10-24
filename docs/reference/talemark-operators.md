@@ -120,7 +120,7 @@ commands, not additional sigils.
 Variable assignment can introduce integer or text state without YAML declarations.
 Discovery is story-wide; implicit text starts empty until an assignment executes.
 The first declaration fixes the type and assignments copy values, not live links.
-See [declaration ordering and inference](tale-syntax.md#declaring-variables-in-talemark).
+See [declaration ordering and inference](talemark-syntax.md#declaring-variables-in-talemark).
 
 ### Binding order
 

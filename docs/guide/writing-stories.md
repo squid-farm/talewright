@@ -109,7 +109,7 @@ You can also introduce text directly with `~ var:weather = "stormy"` without a
 YAML declaration. It is available throughout the story and starts as empty text
 until that effect executes. Its type stays fixed, and assignments copy values
 rather than link variables. For declaration order and forward references, see
-[declaring variables in Talemark](../reference/tale-syntax.md#declaring-variables-in-talemark).
+[declaring variables in Talemark](../reference/talemark-syntax.md#declaring-variables-in-talemark).
 
 ## Factions
 
