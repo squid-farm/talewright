@@ -4,6 +4,7 @@ Each row links to a run's workflow summary; machine-readable measurements are in
 
 | Date (UTC) | Commit | Benchmarks | Player observations | Publications | Jobs | Run |
 |---|---|---:|---:|---:|---|---|
+| 2026-10-24 | `44387d66a3a5` | 150 | 19 | 3 | success/success/success | [40100095731](https://github.com/squid-farm/talewright/actions/runs/40100095731) · [report](reports/40100095731-1.md) · [JSON](runs/40100095731-1.json) |
 | 2026-10-23 | `dd746d3c8a75` | 106 | 19 | 3 | success/success/success | [39902796074](https://github.com/squid-farm/talewright/actions/runs/39902796074) · [report](reports/39902796074-1.md) · [JSON](runs/39902796074-1.json) |
 | 2026-10-22 | `894457f9c652` | 106 | 15 | 3 | success/failure (7 passed, 8 screenshot teardown failures)/not-run | local-20261022T054931Z · [report](reports/local-20261022T054931Z-1.md) · [JSON](runs/local-20261022T054931Z-1.json) |
 | 2026-10-22 | `894457f9c652` | 59 | 0 | 0 | /not-run/not-run | local-20261022-interrupted-894457f · [report](reports/local-20261022-interrupted-894457f.md) · [JSON](runs/local-20261022-interrupted-894457f.json) |
