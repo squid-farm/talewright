@@ -1,8 +1,9 @@
-# Talewright.Tale — the story compiler
+# Talewright.Tale — the Talemark compiler
 
 Turns a story folder (`story.talewright.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
 diagnostics with file, line and column. This is the **only** project that parses text, and it runs once per load.
-The syntax itself is specified in the [Tale syntax reference](../../../docs/reference/tale-syntax.md).
+The language is **Talemark**; the compiler's package and namespace remain `Talewright.Tale`.
+The syntax itself is specified in the [Talemark syntax reference](../../../docs/reference/talemark-syntax.md).
 
 ```csharp
 var result = StoryCompiler.Compile(StorySource.FromDirectory("samples/LostRelic"));
@@ -25,7 +26,7 @@ are loaded; unrelated files are not published as story content.
 1. **Manifest.** `StoryYamlReader` reads `story.talewright.yaml` (YamlDotNet node model, so error positions are exact and
    nothing depends on reflection). Builds the ruleset (`base` → factory from `CompilerOptions.Rulesets`, then
    `disable`, then `stats`), characters, items, factions, flags, vars and triggers.
-2. **Discover.** The Tale parser collects scene ids and actual effect blocks; the expression lexer collects
+2. **Discover.** The Talemark parser collects scene ids and actual effect blocks; the expression lexer collects
    assignment targets from those blocks and manifest effects. Comments, prose and choice labels do not
    declare flags/vars. Forward references across files remain supported.
 3. **Parse.** `TaleParser` walks each file line by line (files in path order). Prose goes through `InlineParser`;

@@ -1,6 +1,7 @@
 # Author guide
 
-Everything you need to write, test and share a Talewright story. No programming required.
+Everything you need to write in **Talemark**, then test and share your story with Talewright.
+Talemark is the story-authoring language in your `.tale` files. No programming required.
 
 1. **[Getting started](getting-started.md):** play a story in your browser, then install the desktop tools for checking and testing.
 2. **[Your first story](first-story.md):** build a small, complete story step by step.
@@ -10,4 +11,4 @@ Everything you need to write, test and share a Talewright story. No programming 
 6. **[Sharing your story](sharing-your-story.md):** publish a story file, a website or a desktop game.
 7. **[Troubleshooting](troubleshooting.md):** common problems and fixes.
 
-Keep the **[Tale syntax reference](../reference/tale-syntax.md)** and **[error codes](../reference/diagnostics.md)** open while you write.
+Keep the **[Talemark syntax reference](../reference/talemark-syntax.md)** and **[error codes](../reference/diagnostics.md)** open while you write.

@@ -12,8 +12,9 @@
 > and project structure may change without notice. **Do not expect backward compatibility until v1.**
 
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
-and many branches. You write scenes in `.tale` files, with bold, italic and code formatting, and describe your
-cast in one `story.talewright.yaml`. No programming required.
+and many branches. **Talemark is the story-authoring language that powers your Talewright stories.**
+Its `.tale` files combine bold, italic and code formatting with dialogue, choices, conditions, and RPG effects;
+`story.talewright.yaml` defines your cast and rules. No programming required.
 
 ```tale
 === temple.entrance
@@ -29,7 +30,7 @@ cast in one `story.talewright.yaml`. No programming required.
 
 ## Features
 
-- **Plain-text stories.** Bold, italic and code formatting, dialogue lines, choices, and inline or block `{if}` conditions.
+- **Write in Talemark.** Plain-text stories with bold, italic and code formatting, dialogue lines, choices, and inline or block `{if}` conditions.
 - **Proper RPG rules.** Stats, skills, d20 skill checks, items that modify stats, factions with
   reputation tiers, XP and levels. Use the default ruleset, tweak it, or replace it.
 - **Big branching stories.** Hubs and storylets offer whichever scenes are currently available, so you
@@ -75,7 +76,7 @@ Linux notes and Git instructions.
 4. Fix, check again, and replay.
 
 The **[first story tutorial](docs/guide/first-story.md)** walks through this with a complete example.
-Keep the **[Tale syntax reference](docs/reference/tale-syntax.md)** handy while you write.
+Keep the **[Talemark syntax reference](docs/reference/talemark-syntax.md)** handy while you write.
 
 ## Share your story
 
@@ -92,7 +93,7 @@ Players don't need .NET. See [Sharing your story](docs/guide/sharing-your-story.
 | I want to… | Read |
 |---|---|
 | Learn to write stories | [Author guide](docs/guide/README.md) |
-| Look up syntax or an error code | [Tale syntax](docs/reference/tale-syntax.md) · [Error codes](docs/reference/diagnostics.md) · [CLI](docs/reference/cli.md) |
+| Look up syntax or an error code | [Talemark syntax](docs/reference/talemark-syntax.md) · [Error codes](docs/reference/diagnostics.md) · [CLI](docs/reference/cli.md) |
 | Extend the engine in C# or contribute | [Developer docs](docs/developer/README.md) · [Contributing](CONTRIBUTING.md) |
 
 All docs start at the **[documentation home](docs/README.md)**.

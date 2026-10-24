@@ -19,7 +19,7 @@ namespace Talewright.Tale.Compilation;
 /// Pipeline:
 /// <list type="number">
 /// <item>Read story.talewright.yaml into a <see cref="WorldDefinition"/> (ruleset, characters, items, factions…).</item>
-/// <item>Discover scene ids and effect assignment targets using the Tale parser and expression lexer,
+/// <item>Discover scene ids and effect assignment targets using the Talemark parser and expression lexer,
 /// so forward references and auto-declared flags/variables resolve.</item>
 /// <item>Parse each <c>.tale</c> file (expressions are type-checked and resolved as they are parsed).</item>
 /// <item>Parse triggers, then run the whole-story <see cref="StoryValidator"/>.</item>

@@ -18,7 +18,8 @@ anywhere. The web player is enough to write and play stories, but once you're wr
 ## What you need to write stories
 
 A text editor. Anything that saves plain text works: VS Code, Notepad++, TextEdit (in plain-text mode),
-gedit, and so on. A story is just a folder of text files:
+gedit, and so on. You write scenes in **Talemark**, Talewright's story-authoring language,
+and define your cast and rules in a YAML manifest. A story is just a folder of text files:
 
 ```text
 my-story/
@@ -28,7 +29,7 @@ my-story/
 
 > **Tip:** In VS Code, install Red Hat's
 > [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) and the
-> [Tale extension](../../tooling/vscode-talewright/README.md). Together they provide `.tale`
+> [Talewright extension](../../tooling/vscode-talewright/README.md). Together they provide Talemark
 > highlighting and structural key completion/validation for `story.talewright.yaml`. Run
 > `talewright validate` for story-specific checks such as whether your starting scene exists.
 
