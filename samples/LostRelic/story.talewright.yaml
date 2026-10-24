@@ -4,7 +4,7 @@
 
 id: lost-relic
 title: The Lost Relic
-version: 0.2.0
+version: 0.3.0
 start: camp.arrival
 randomness: checks-only # dice are rolled only for skill-check directives
 # seed: 1234            # uncomment for the same rolls every playthrough
@@ -77,6 +77,7 @@ items:
 flags: [packing-open]
 vars:
   supplies: 0
+  watchword: "quiet river"
 
 triggers:
   - id: guild-wary

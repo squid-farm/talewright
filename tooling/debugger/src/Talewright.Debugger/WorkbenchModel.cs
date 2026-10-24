@@ -26,6 +26,14 @@ public sealed class SetupFlag(FlagId id)
     public bool Value { get; set; }
 }
 
+public sealed class SetupText(VarId id, string value)
+{
+    public VarId Id { get; } = id;
+    public string Label => $"var:{Id}";
+    public bool Enabled { get; set; }
+    public string Value { get; set; } = value;
+}
+
 public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text);
 
 /// <summary>UI-independent orchestration; every replacement is prepared before adoption.</summary>
@@ -61,8 +69,10 @@ public sealed class WorkbenchModel(string root)
     public string Seed { get; set; } = "";
     public IReadOnlyList<SetupNumber> Numbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
+    public IReadOnlyList<SetupText> Texts { get; private set; } = [];
     public IReadOnlyList<SetupNumber> EditNumbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> EditFlags { get; private set; } = [];
+    public IReadOnlyList<SetupText> EditTexts { get; private set; } = [];
     public string ScenarioPath { get; set; } = "";
     public bool ConfirmOverwrite { get; set; }
     public string PlayerSavePath { get; set; } = "";
@@ -132,8 +142,14 @@ public sealed class WorkbenchModel(string root)
             Enabled = setup.Flags.ContainsKey(flag.Id),
             Value = setup.Flags.GetValueOrDefault(flag.Id),
         }).ToArray();
+        var texts = Texts.Select(field => new SetupText(field.Id,
+            setup.TextVariables.GetValueOrDefault(field.Id, field.Value))
+        {
+            Enabled = setup.TextVariables.ContainsKey(field.Id),
+        }).ToArray();
         Numbers = numbers;
         Flags = flags;
+        Texts = texts;
         Session = candidate;
         Inspection = inspection;
         Character = candidate.Character;
@@ -287,13 +303,17 @@ public sealed class WorkbenchModel(string root)
                 }
             }
             var flags = story.World.Flags.Select(id => new SetupFlag(id)).ToArray();
+            var texts = story.World.TextVariables.Select(pair => new SetupText(pair.Key, pair.Value)).ToArray();
             var newKeys = numbers.Select(FieldKey).ToHashSet();
             var newFlagIds = flags.Select(flag => flag.Id).ToHashSet();
+            var newTextIds = texts.Select(field => field.Id).ToHashSet();
             var oldNumbers = Numbers.ToDictionary(FieldKey);
             var oldFlags = Flags.ToDictionary(flag => flag.Id);
+            var oldTexts = Texts.ToDictionary(field => field.Id);
             var missing = Numbers.Where(old => old.Enabled && !newKeys.Contains(FieldKey(old)))
                 .Select(field => field.Label).Concat(Flags.Where(old => old.Enabled && !newFlagIds.Contains(old.Id))
-                    .Select(field => $"flag:{field.Id}")).ToArray();
+                    .Select(field => $"flag:{field.Id}"))
+                .Concat(Texts.Where(old => old.Enabled && !newTextIds.Contains(old.Id)).Select(field => field.Label)).ToArray();
             if (missing.Length > 0)
             {
                 throw new ArgumentException($"Setup IDs changed/removed: {string.Join(", ", missing)}. Disable or correct those overrides before restarting");
@@ -317,7 +337,15 @@ public sealed class WorkbenchModel(string root)
                     flag.Value = old.Value;
                 }
             }
-            BuildSetup(numbers, flags).Validate(story);
+            foreach (var field in texts)
+            {
+                if (oldTexts.TryGetValue(field.Id, out var old))
+                {
+                    field.Enabled = old.Enabled;
+                    if (old.Enabled) field.Value = old.Value;
+                }
+            }
+            BuildSetup(numbers, flags, texts).Validate(story);
             var selection = RevalidateCharacter(story);
             var target = string.IsNullOrWhiteSpace(Target) ? story.Start.Value : Target;
             story.GetScene(new(target));
@@ -329,6 +357,7 @@ public sealed class WorkbenchModel(string root)
                 Story = story;
                 Numbers = numbers.AsReadOnly();
                 Flags = Array.AsReadOnly(flags);
+                Texts = Array.AsReadOnly(texts);
                 Target = target;
                 Seed = seed;
                 if (string.IsNullOrEmpty(ScenarioPath))
@@ -411,7 +440,7 @@ public sealed class WorkbenchModel(string root)
         {
             var story = Story ?? throw new InvalidOperationException("Load a valid story first.");
             var candidate = AuthorSession.Create(story, new SceneId(Target), captureDecisions: true,
-                BuildSetup(Numbers, Flags), ParseSeed(Seed), Character);
+                BuildSetup(Numbers, Flags, Texts), ParseSeed(Seed), Character);
             var inspection = candidate.Inspect();
             Session = candidate;
             Inspection = inspection;
@@ -429,7 +458,8 @@ public sealed class WorkbenchModel(string root)
             ? seed : throw new ArgumentException("Seed must be an unsigned 64-bit integer, or empty for the story/random default.");
     }
 
-    private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupFlag> flags)
+    private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupFlag> flags,
+        IEnumerable<SetupText> texts)
     {
         var variables = new Dictionary<VarId, int>();
         var standings = new Dictionary<FactionId, int>();
@@ -454,6 +484,7 @@ public sealed class WorkbenchModel(string root)
         {
             Flags = flags.Where(field => field.Enabled).ToDictionary(field => field.Id, field => field.Value),
             Variables = variables,
+            TextVariables = texts.Where(field => field.Enabled).ToDictionary(field => field.Id, field => field.Value),
             Standings = standings,
             Stats = stats,
             Inventory = inventory,
@@ -461,7 +492,7 @@ public sealed class WorkbenchModel(string root)
     }
 
     public void Choose(string key) => RunCommand(session => session.Choose(key));
-    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags)));
+    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags, EditTexts)));
     public void JumpPreservingState() => RunCommand(session => session.Jump(new SceneId(Target)));
     public void Back() => RunCommand(session => session.Back());
     public void Forward() => RunCommand(session => session.Forward());
@@ -480,6 +511,7 @@ public sealed class WorkbenchModel(string root)
         {
             EditNumbers = [];
             EditFlags = [];
+            EditTexts = [];
             return;
         }
         var state = session.State;
@@ -492,6 +524,7 @@ public sealed class WorkbenchModel(string root)
             _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
         }, field.Character)).ToArray();
         EditFlags = Flags.Select(flag => new SetupFlag(flag.Id) { Value = state.GetFlag(flag.Id) }).ToArray();
+        EditTexts = Texts.Select(field => new SetupText(field.Id, state.GetTextVariable(field.Id))).ToArray();
     }
 
     private void Attempt(Action action)
