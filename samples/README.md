@@ -73,7 +73,7 @@ be rejected visibly without replacing your active playthrough or saved bytes.
   [C# story example](../examples/CSharpStory/README.md) demonstrates those features;
   the no-code CLI intentionally does **not** discover or run arbitrary C#.
 - CLI validation/packaging and author-debugger setup, inspection and guarded
-  reload operate **on** this sample. They are tools, not Tale directives.
+  reload operate **on** this sample. They are tools, not Talemark directives.
   See the [CLI guide](../docs/reference/cli.md).
 - Media rendering, autosave, save migration, point-buy and live debugger state
   editing are not implemented features and are not claimed by this sample.
@@ -85,7 +85,7 @@ be rejected visibly without replacing your active playthrough or saved bytes.
 
 Copy `LostRelic/`, change `id` and `title` in `story.talewright.yaml`, and start editing. The
 [first story tutorial](../docs/guide/first-story.md) explains the basics, and the
-[Tale syntax reference](../docs/reference/tale-syntax.md) covers everything else.
+[Talemark syntax reference](../docs/reference/talemark-syntax.md) covers everything else.
 
 ## For contributors
 

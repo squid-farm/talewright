@@ -7,7 +7,7 @@ ready-made downloads arrive, use `dotnet run --project tooling/cli/src/Talewrigh
 | Command | Does |
 |---|---|
 | `talewright validate <story>` | Checks a story folder for errors and warnings. |
-| `talewright lint <story>` | Checks compiler diagnostics and configurable Tale-aware rules. |
+| `talewright lint <story>` | Checks compiler diagnostics and configurable Talemark-aware rules. |
 | `talewright debug <story>` | Opens the Author Debugger. |
 | `talewright publish <story>` | Builds a story zip, web game or desktop game. |
 
@@ -76,7 +76,7 @@ talewright lint path/to/story --format json --warnings-as-errors
 talewright lint path/to/story --rule TWL001=error
 ```
 
-`lint` includes compiler diagnostics once, then applies shared Tale-aware rules. Compiler diagnostics
+`lint` includes compiler diagnostics once, then applies shared Talemark-aware rules. Compiler diagnostics
 cannot be suppressed by lint configuration. Lint findings use stable `TWL` codes and source ranges;
 their JSON diagnostics include exclusive `endLine` and `endColumn` positions.
 

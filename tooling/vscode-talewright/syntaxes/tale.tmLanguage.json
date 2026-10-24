@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Tale",
+  "name": "Talemark",
   "scopeName": "text.tale",
   "patterns": [
     {
@@ -213,7 +213,7 @@
       ]
     },
     "link": {
-      "comment": "Inline link with a Tale-aware label; the compiler renders label text (including substitutions) and drops the target.",
+      "comment": "Inline link with a Talemark-aware label; the compiler renders label text (including substitutions) and drops the target.",
       "begin": "(\\[)(?=(?:[^\\[\\]\\\\]|\\\\.|\\[[^\\[\\]]*\\])*\\]\\()",
       "beginCaptures": {"1": {"name": "punctuation.definition.link.title.begin.markdown"}},
       "end": "(\\])(\\()[ \\t]*(?:(<)([^<>]*)(>)|((?:[^\\s()]|\\([^\\s()]*\\))*))[ \\t]*(\"[^\"]*\"|'[^']*')?[ \\t]*(\\))|(?=$)",

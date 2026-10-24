@@ -10,7 +10,7 @@ No Blazor or Photino dependencies.
 | [Rules](../../engine/src/Talewright.Rules/README.md) | Conditions, effects, checks, triggers, storylet selection |
 | [Narrative](../../engine/src/Talewright.Narrative/README.md) | Templates, grammar, presentation-independent documents |
 | [Rulesets.Generic](../../engine/src/Talewright.Rulesets.Generic/README.md) | The default, behaviorally replaceable d20 ruleset |
-| [Tale](../../engine/src/Talewright.Tale/README.md) | Story source loading, compilation, validation, diagnostics |
+| [Talewright.Tale](../../engine/src/Talewright.Tale/README.md) | Talemark source loading, compilation, validation, diagnostics |
 | [Runtime](../../engine/src/Talewright.Runtime/README.md) | Story sessions, frames, event narration |
 
 - **Dependencies:** Markdig and YamlDotNet are package dependencies, not bundled. Component project
@@ -20,7 +20,7 @@ No Blazor or Photino dependencies.
 - **Build-time validation:** the package includes an opt-in MSBuild target. Set `TalewrightStoryProject`
   to the validator console app's project file (`.csproj`, not its compiled executable; the target
   restores and builds it) and `TalewrightStoryRoot` to the story folder, and call
-  `StoryProjectValidator.Validate` with the same `CompilerOptions` factory as your hosts. Invalid Tale
+  `StoryProjectValidator.Validate` with the same `CompilerOptions` factory as your hosts. Invalid Talemark
   fails the build with source-positioned diagnostics. See the
   [C# story example](../../examples/CSharpStory/README.md).
 

@@ -1,5 +1,5 @@
-<section aria-label="Accepted Tale source">
-    <h3>Accepted Tale source</h3>
+<section aria-label="Accepted Talemark source">
+    <h3>Accepted Talemark source</h3>
     <p>Read-only accepted compilation snapshot, not newer disk text. Highlighting is scene provenance, not a statement-level instruction pointer.</p>
     @if (Pending)
     {
@@ -22,7 +22,7 @@
         <div @key="_navigationRevision" class="source-window" tabindex="0" aria-label="Read-only accepted source lines">
             <table class="source-lines">
                 <caption>Showing accepted lines @_firstLine to @LastLine of @_lines.Length</caption>
-                <thead><tr><th scope="col">Line</th><th scope="col">Tale source</th></tr></thead>
+                <thead><tr><th scope="col">Line</th><th scope="col">Talemark source</th></tr></thead>
                 <tbody>
                     @for (var line = _firstLine; line <= LastLine; line++)
                     {

@@ -1,10 +1,11 @@
 # Writing stories
 
-A tour of what you can do, with a short example for each. The [Tale syntax reference](../reference/tale-syntax.md)
+A tour of writing stories in **Talemark**, with a short example for each feature.
+The [Talemark syntax reference](../reference/talemark-syntax.md)
 has every rule and option.
 
 For VS Code highlighting and scene/choice snippets, install the local
-[Tale extension](../../tooling/vscode-talewright/README.md). It helps you edit;
+[Talewright extension](../../tooling/vscode-talewright/README.md). It helps you edit;
 use `talewright validate` to check story correctness.
 
 ## Organizing your files
@@ -35,8 +36,8 @@ Use them in prose, and Talewright takes care of the grammar:
 > guide: Careful.                                 → dialogue spoken by Tomas
 ```
 
-Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/tale-syntax.md#1-storytalewrightyaml).
-See [substitutions](../reference/tale-syntax.md#3-substitutions) for everything you can insert and the
+Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/talemark-syntax.md#1-storytalewrightyaml).
+See [substitutions](../reference/talemark-syntax.md#3-substitutions) for everything you can insert and the
 `#modifiers` you can apply.
 
 ## Stats and skills
@@ -51,7 +52,7 @@ By default, stories use a familiar d20-style ruleset:
 | Progression | `xp`, `level` (1–20) |
 
 You can add your own stats (`courage`, `sanity`, ...), remove ones you don't want, or start from an
-empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/tale-syntax.md#1-storytalewrightyaml).
+empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
 
 Change stats with effects: `~ player:hp -= 2` on its own line when a scene starts, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
@@ -148,7 +149,7 @@ visited(temple.hall)
 faction:explorers-guild:tier <= unfriendly
 ```
 
-See [expressions](../reference/tale-syntax.md#4-expressions) for the full list.
+See [expressions](../reference/talemark-syntax.md#4-expressions) for the full list.
 
 ## Conditional text
 
@@ -191,7 +192,7 @@ available:
 Every scene tagged `camp` whose `@requires` is true appears as a choice, using its `@title`. `@once`
 removes it after the first visit, and `@priority` controls the order. You can also match several tags
 with `@hub all(...)` / `@hub any(...)`, or cap how many show with `@hub-limit 3`.
-See [scenes](../reference/tale-syntax.md#2-scenes).
+See [scenes](../reference/talemark-syntax.md#2-scenes).
 
 ## Triggers
 
@@ -221,7 +222,7 @@ creation:
 ```
 
 Without a `creation` section, the story starts with the `player` you wrote. See
-[character creation](../reference/tale-syntax.md#optional-character-creation) for the limits and defaults.
+[character creation](../reference/talemark-syntax.md#optional-character-creation) for the limits and defaults.
 
 ## Other options
 
