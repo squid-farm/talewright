@@ -5,8 +5,8 @@ using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Analysis;
 
 namespace Talewright.Authoring;
 

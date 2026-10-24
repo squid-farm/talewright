@@ -2,8 +2,8 @@ using System.Text.Json.Nodes;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime.Tests;
 

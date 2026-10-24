@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json.Nodes;
 using Talewright.Debugger;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli.Tests;
 

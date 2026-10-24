@@ -4,7 +4,7 @@ using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

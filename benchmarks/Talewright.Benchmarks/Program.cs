@@ -4,8 +4,8 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text;
 using Talewright.Runtime;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 Console.WriteLine($"Runtime: {RuntimeInformation.FrameworkDescription}; OS: {RuntimeInformation.OSDescription}; CPU: {RuntimeInformation.ProcessArchitecture}");
 Console.WriteLine("Seven measured iterations after one warmup; p95 is the maximum of seven. Allocations are current-thread managed bytes.");

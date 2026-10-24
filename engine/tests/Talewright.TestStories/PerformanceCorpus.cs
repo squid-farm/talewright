@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Testing;
 

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Talewright.Cli;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli.Tests;
 

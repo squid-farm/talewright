@@ -1,6 +1,6 @@
 {
   "name": "talewright-editor",
-  "implicitDependencies": ["Story", "Talewright.Tale", "Talewright.Tale.Tests", "Talewright.LanguageServer", "talewright-snippets"],
+  "implicitDependencies": ["Story", "Talewright.Talemark", "Talewright.Talemark.Tests", "Talewright.LanguageServer", "talewright-snippets"],
   "tags": ["type:tooling", "area:editor"],
   "namedInputs": {
     "default": ["sharedGlobals", "{projectRoot}/**/*", "editorWorkflow"],
@@ -16,9 +16,9 @@
       "executor": "nx:run-commands",
       "cache": false,
       "inputs": ["default", "^default", "editorWorkflow", "documentedManifests"],
-      "dependsOn": [{"projects": ["Talewright.Tale.Tests"], "target": "build:release"}],
+      "dependsOn": [{"projects": ["Talewright.Talemark.Tests"], "target": "build:release"}],
       "options": {
-        "command": "dotnet test engine/tests/Talewright.Tale.Tests -c Release --no-build --no-restore --filter FullyQualifiedName~EditorManifestSchemaTests"
+        "command": "dotnet test engine/tests/Talewright.Talemark.Tests -c Release --no-build --no-restore --filter FullyQualifiedName~EditorManifestSchemaTests"
       }
     },
     "test": {

@@ -1,0 +1,5 @@
+{
+  "name": "talewright-snippet-contract-source",
+  "implicitDependencies": ["Talewright.Talemark", "Talewright.Talemark.Tests"],
+  "tags": ["type:contract", "area:editor"]
+}

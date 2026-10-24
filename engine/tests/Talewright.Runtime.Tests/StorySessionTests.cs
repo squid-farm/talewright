@@ -1,8 +1,8 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime.Tests;
 

@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

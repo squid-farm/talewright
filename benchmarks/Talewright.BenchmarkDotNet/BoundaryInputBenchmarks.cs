@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using System.IO.Compression;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.BenchmarkDotNet;
 

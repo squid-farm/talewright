@@ -175,7 +175,7 @@ From this directory:
 ```bash
 npm ci
 npm test
-dotnet test ../../engine/tests/Talewright.Tale.Tests -c Release
+dotnet test ../../engine/tests/Talewright.Talemark.Tests -c Release
 dotnet build ../language-server/src/Talewright.LanguageServer -c Release
 npm run package
 npm run test:package

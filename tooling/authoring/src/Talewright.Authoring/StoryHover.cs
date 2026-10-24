@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Talewright.Tale.Analysis;
-using Talewright.Tale.Diagnostics;
+using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Authoring;
 

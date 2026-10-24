@@ -11,7 +11,7 @@
     <ProjectReference Include="../../engine/src/Talewright.Rules/Talewright.Rules.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../engine/src/Talewright.Narrative/Talewright.Narrative.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../engine/src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" PrivateAssets="all" />
-    <ProjectReference Include="../../engine/src/Talewright.Tale/Talewright.Tale.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../../engine/src/Talewright.Talemark/Talewright.Talemark.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" PrivateAssets="all" />
     <PackageReference Include="Humanizer.Core" Version="3.0.10" />
     <PackageReference Include="Markdig" Version="1.4.2" />

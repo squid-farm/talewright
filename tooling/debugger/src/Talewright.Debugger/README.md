@@ -34,7 +34,7 @@ How it's built:
   leave the active run and input files unchanged. See
   [replay format/API invariants](../../../../engine/src/Talewright.Runtime/README.md#portable-author-scenarios).
 - **Source view.** `SourceView` consumes only `WorkbenchModel.AcceptedSourceMap` from successful adoption,
-  not disk reads or candidate diagnostics. The map pairs [parser-owned ranges](../../../../engine/src/Talewright.Tale/README.md#accepted-source-provenance)
+  not disk reads or candidate diagnostics. The map pairs [parser-owned ranges](../../../../engine/src/Talewright.Talemark/README.md#accepted-source-provenance)
   with immutable compiled text. At most 100 rows render per file window; scene/snapshot changes reset
   the window to the scene declaration. Watcher generations publish pending status on the same dispatcher
   as source adoption. For controls and stale-state meaning, see the [author guide](../../../../docs/guide/testing-your-story.md#see-the-source-being-tested).

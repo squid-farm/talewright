@@ -1,4 +1,4 @@
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;

@@ -1,6 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;

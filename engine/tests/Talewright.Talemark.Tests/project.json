@@ -1,0 +1,14 @@
+{
+  "name": "Talewright.Talemark.Tests",
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build:release"],
+      "cache": false,
+      "options": {
+        "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests'",
+        "cwd": "engine/tests/Talewright.Talemark.Tests"
+      }
+    }
+  }
+}

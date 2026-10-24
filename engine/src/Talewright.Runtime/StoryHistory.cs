@@ -7,7 +7,7 @@ using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Runtime.Saves;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

@@ -36,7 +36,7 @@ tasks by required execution environment, not by changed paths. Nx still executes
 and its prerequisites. Independent verification tasks run with `--parallel=3`; target phases are ordered to avoid
 packaging/editor and native report-output races. `editor-smoke` also explicitly depends on packaging,
 and native regressions depend on the accessibility probe.
-Editor compiler contracts share the `Talewright.Tale.Tests` project's Release build prerequisite and execute with
+Editor compiler contracts share the `Talewright.Talemark.Tests` project's Release build prerequisite and execute with
 `--no-build --no-restore`, preventing concurrent MSBuild writes when both contracts are selected.
 .NET build targets use `parallelism: false`: Razor static-web-assets targets can revisit referenced
 projects even with `--no-dependencies`, so concurrent host builds can write the same intermediate cache.
@@ -52,9 +52,9 @@ Projects already covered by test/package contracts retain those contracts rather
 | Project / change area | Selected verification |
 |---|---|
 | .NET projects under `engine/`, `player/`, `apps/`, `tooling/`, `packaging/`, `benchmarks/`, and `examples/` | `@nx/dotnet` infers `build`, `test`, and packaging/run targets. MSBuild `ProjectReference` edges propagate affected selection and order prerequisite builds. |
-| `engine/tests/Talewright.Tale.Tests` | `test` excludes the editor snippet compiler contract; that contract is separately selectable. |
+| `engine/tests/Talewright.Talemark.Tests` | `test` excludes the editor snippet compiler contract; that contract is separately selectable. |
 | `talewright-snippets` | `compiler-contract` compiles the shipped snippet defaults against the Talemark compiler. The test source is a separate graph node so compiler changes select this contract without treating all compiler tests as editor assets. |
-| `talewright-editor` | `test`, `package-check`, and `editor-smoke` wrap the existing extension checks and package/installed-editor commands. `compiler-contract` runs the manifest-schema compiler fixtures separately from compiler units. Explicit dependencies on the compiler, `Talewright.Tale.Tests` project and example Story project preserve fixture verification. Target-specific `documentedManifests` inputs cover the four docs consumed by schema tests without selecting package/installed-editor checks for doc edits. |
+| `talewright-editor` | `test`, `package-check`, and `editor-smoke` wrap the existing extension checks and package/installed-editor commands. `compiler-contract` runs the manifest-schema compiler fixtures separately from compiler units. Explicit dependencies on the compiler, `Talewright.Talemark.Tests` project and example Story project preserve fixture verification. Target-specific `documentedManifests` inputs cover the four docs consumed by schema tests without selecting package/installed-editor checks for doc edits. |
 | `Talewright.Player.E2E.Tests` | `e2e-web` preserves the three-browser matrix; `e2e-linux` and `e2e-linux-probe` retain the native runner. Explicit non-code dependencies cover CLI, debugger, player, hosts, and runtime contracts. Published web and desktop targets retain their existing publish-and-smoke commands. |
 | `talewright-packaging` | `package-check` wraps the existing versioned solution build, three pack commands, and clean-consumer verifier. Supply `VERSION`. Explicit dependencies include the engine/player packages, CLI, both source hosts copied into publishing assets, and all four CSharpStory projects consumed by the installed-package verifier. This separate contract does not change ordinary CLI build prerequisites. |
 | `talewright-docs` | `check` validates relative Markdown links for changes under `docs/`. General docs edits select only this check. The editor's schema inputs additionally select Node tests and the compiler contract for `reference/talemark-syntax.md`, `guide/first-story.md`, `guide/debugger-test-plan.md` and `guide/writing-stories.md`, whose YAML examples are consumed by `story-schema.test.mjs`. These edits retain compiler build prerequisites but do not select editor packaging/smoke or unrelated product suites. |
@@ -117,7 +117,7 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | Job | PR coverage when selected |
 |---|---|
 | `build` | Existing Release solution build, NuGet packs, clean library consumers, installed CLI and publication checks. |
-| `tests / unit` | Every test in each affected headless unit project, in Release. The normal `Talewright.Tale.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
+| `tests / unit` | Every test in each affected headless unit project, in Release. The normal `Talewright.Talemark.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
 | `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit. Also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
 | `tests / linux-desktop` | Accessibility/chooser probe, complete regular native regression suite, then focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |

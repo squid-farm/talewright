@@ -71,7 +71,7 @@ The three tiers you asked for map onto projects like this:
 
 Two more projects glue it together:
 
-- `Talewright.Tale` is the **compiler**: it turns `.tale` + `story.talewright.yaml` text into the typed objects the other
+- `Talewright.Talemark` is the **compiler**: it turns `.tale` + `story.talewright.yaml` text into the typed objects the other
   layers use. It is the _only_ place that parses strings, and it runs once when a story loads.
 - `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
   frame). It is the only project that knows about all the others.
@@ -97,7 +97,7 @@ Arrows mean "references". Nothing points upward; the engine never knows about th
              Talewright.Runtime  (StorySession, EventNarrator)
                      │
                      ▼
-             Talewright.Tale ─────────────────► Talewright.Rulesets.Generic
+             Talewright.Talemark ─────────────────► Talewright.Rulesets.Generic
              (compiler, StoryDefinition)                │
                │            │                           │
                ▼            ▼                           │
@@ -114,8 +114,8 @@ evaluator as everything else.)
 
 | Boundary             | Type                                                                | Defined in |
 | -------------------- | ------------------------------------------------------------------- | ---------- |
-| Story files → engine | `StorySource` (path → text map)                                     | `Talewright.Tale` |
-| Compiler → runtime   | `StoryDefinition` (world, scenes, triggers, predicates)             | `Talewright.Tale` |
+| Story files → engine | `StorySource` (path → text map)                                     | `Talewright.Talemark` |
+| Compiler → runtime   | `StoryDefinition` (world, scenes, triggers, predicates)             | `Talewright.Talemark` |
 | Rules ↔ state        | `IGameStateView` (read) and `GameEvent`s (write)                    | Core       |
 | Templates → renderer | `TemplateBlock` / `TemplateInline` AST                              | Narrative  |
 | Renderer → UI        | `RenderedDocument` (blocks, styled runs, notes, media placeholders) | Narrative  |
@@ -242,7 +242,7 @@ tag, context)`. Eligible = has the tag, requirements hold, and not already visit
   `RenderedParagraph`, `RenderedSpeech`, `RenderedNote` (system messages like "Gained: rope", with a
   `NoteKind`), and inlines `RenderedText(Text, Style)`, `RenderedLineBreak`, `RenderedMedia(MediaId, AltText)`.
 
-### 3.5 `Talewright.Tale` — the compiler
+### 3.5 `Talewright.Talemark` — the compiler
 
 Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → CompilationResult(Story?, Diagnostics)`.
 
@@ -483,7 +483,7 @@ One xUnit test project per engine project, under `tests/` (the generic ruleset i
 | `Talewright.Core.Tests`      | initial state, clamping, item modifiers, no-op changes, replay/truncate, dice, removing/replacing stats, tiers, d20 checks, leveling                                                        |
 | `Talewright.Rules.Tests`     | expression evaluation, effects, triggers (once, edge, pass cap), storylet selection, checks                                                                                                 |
 | `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
-| `Talewright.Tale.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
+| `Talewright.Talemark.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
 | `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, and sample compilation smoke |
 | `Talewright.Cli.Tests`       | validation output/exit policies, bounded publication and archive contracts |
 | `Talewright.Player.E2E.Tests` | one C#/xUnit suite: production Release web host in Chromium, Firefox, and WebKit plus real Linux Photino; opt-in, outside the root solution |

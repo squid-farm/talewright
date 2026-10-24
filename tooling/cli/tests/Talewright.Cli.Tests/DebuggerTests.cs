@@ -1,7 +1,7 @@
 using Talewright.Debugger;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli.Tests;
 

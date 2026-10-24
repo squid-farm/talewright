@@ -5,7 +5,7 @@ using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Rulesets.Generic;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

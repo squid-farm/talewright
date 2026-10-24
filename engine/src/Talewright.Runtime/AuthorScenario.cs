@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
