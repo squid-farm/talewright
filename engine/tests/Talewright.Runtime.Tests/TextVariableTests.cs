@@ -59,5 +59,8 @@ public class TextVariableTests
             StoryHistory.Restore(result.Story!, Encoding.UTF8.GetBytes(json.ToJsonString())));
         Assert.Equal(before, history.Save());
         Assert.Equal("", history.State.GetTextVariable(new("weather")));
+
+        var scenario = AuthorScenario.Export(history.ForkAuthor(), "text-history");
+        Assert.Equal(history.Events, AuthorScenario.Import(result.Story!, scenario, "text-history").Session.Events);
     }
 }
