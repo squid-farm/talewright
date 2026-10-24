@@ -125,6 +125,10 @@ The initial value fixes the variable's type. Completion and hover identify
 `integer` or `text` from compiler analysis, including unsaved manifest changes.
 Live compiler diagnostics reject incompatible assignments and numeric operations
 on text. Use quoted YAML text values for consistent compiler/schema feedback.
+Talemark assignments can also introduce variables: `~ var:weather = "stormy"`.
+Completion and hover use the same story-wide inference as validation, including
+forward references, assignment chains and unsaved files. Incomplete or unresolved
+declarations retain symbols marked `unresolved`, not a guessed integer type.
 
 ## Not included
 
