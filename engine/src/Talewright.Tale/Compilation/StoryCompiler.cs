@@ -63,10 +63,13 @@ public static class StoryCompiler
         var scenes = new Dictionary<SceneId, SourceLocation>();
         var flags = manifest.World.Flags.ToHashSet();
         var variables = manifest.World.Variables.ToDictionary();
-        void DiscoverEffects(string text)
+        var textVariables = manifest.World.TextVariables.ToDictionary();
+        var declarations = new List<VariableDeclaration>();
+        var discoveredNumbers = new Dictionary<VarId, int>();
+        void DiscoverEffects(string text, SourceLocation location)
         {
-            ExpressionParser.CollectDeclarations(text, flags, variables);
-            foreach (var id in manifest.World.TextVariables.Keys) variables.Remove(id);
+            ExpressionParser.CollectDeclarations(text, flags, discoveredNumbers,
+                typedDeclaration: declarations.Add, location: location);
         }
         var discoverySymbols = new StorySymbols
         {
@@ -89,19 +92,22 @@ public static class StoryCompiler
             });
         }
 
-        foreach (var text in manifest.EffectText)
+        foreach (var trigger in manifest.Triggers)
         {
-            DiscoverEffects(text);
+            DiscoverEffects(trigger.Do, trigger.DoLocation);
         }
 
+        var unresolved = VariableDiscovery.Resolve(manifest.World, flags, scenes.Keys.ToHashSet(),
+            declarations, variables, textVariables, options, diagnostics);
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
-            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, manifest.World.TextVariables);
+            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, textVariables);
         analysis?.World(world);
         var symbols = new StorySymbols
         {
             World = world,
             Flags = world.Flags,
-            Variables = world.Variables.Keys.Concat(world.TextVariables.Keys).ToHashSet(),
+            Variables = world.Variables.Keys.Concat(world.TextVariables.Keys).Concat(unresolved).ToHashSet(),
+            UnresolvedVariables = unresolved,
             Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,

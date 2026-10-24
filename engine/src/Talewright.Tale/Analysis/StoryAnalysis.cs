@@ -392,7 +392,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         };
         foreach (var (file, text) in source.TaleFiles)
         {
-            TaleParser.Discover(file, text, symbols, _ => { }, Scene);
+            TaleParser.Discover(file, text, symbols, (_, _) => { }, Scene);
             TaleParser.Parse(file, text, symbols, new DiagnosticBag());
         }
     }

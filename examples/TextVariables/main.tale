@@ -1,6 +1,8 @@
 === clearing
+~ var:forecast = "stormy"
 The weather is {var:weather}.
-* [Watch the storm arrive] { var:remembered-weather = var:weather; var:weather = "stormy" } -> shelter
+The forecast is {var:forecast}.
+* [Watch the storm arrive] { var:remembered-weather = var:weather; var:weather = var:forecast } -> shelter
 
 === shelter
 It was {var:remembered-weather}. Now it is {var:weather}.

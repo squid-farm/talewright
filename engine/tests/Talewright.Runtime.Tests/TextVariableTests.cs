@@ -8,8 +8,10 @@ namespace Talewright.Runtime.Tests;
 
 public class TextVariableTests
 {
-    [Fact]
-    public void Text_history_preserves_values_events_narrative_redo_and_failed_restore_isolation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Text_history_preserves_values_events_narrative_redo_and_failed_restore_isolation(bool implicitDeclarations)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
@@ -19,10 +21,7 @@ public class TextVariableTests
                 start: a
                 characters:
                   player: { first-name: Tester }
-                vars:
-                  weather: ""
-                  copy: ""
-                """,
+                """ + (implicitDeclarations ? "" : "\nvars:\n  weather: \"\"\n  copy: \"\""),
             ["main.tale"] = """
                 === a
                 Initial [{var:weather}].
