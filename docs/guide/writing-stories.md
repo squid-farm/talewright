@@ -86,6 +86,24 @@ creates it.
 Checking a flag or variable that nothing ever sets is reported as a mistake (usually a typo). If it's
 intentional, declare it in `story.talewright.yaml`: `flags: [alarm-raised]` or `vars: { bribes: 0 }`.
 
+Variables can also hold text. Declare a quoted initial value in the manifest, then
+assign and display it in Talemark:
+
+```yaml
+vars:
+  weather: "sunny"
+```
+
+```text
+~ var:weather = "stormy"
+The weather is {var:weather}.
+{if var:weather == "stormy"}Find shelter.{/if}
+```
+
+Text stays text throughout the story; it cannot be mixed with numbers or used in
+arithmetic. See [text variables](../reference/tale-syntax.md#text-variables) for
+empty values, copying, and supported operations.
+
 ## Factions
 
 ```yaml

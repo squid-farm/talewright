@@ -29,6 +29,8 @@ public sealed record FlagChanged(FlagId Flag, bool Value) : GameEvent;
 
 public sealed record VariableChanged(VarId Variable, int OldValue, int NewValue) : GameEvent;
 
+public sealed record TextVariableChanged(VarId Variable, string OldValue, string NewValue) : GameEvent;
+
 /// <summary>The story moved to a scene. Position is state, not a hard-coded pointer, so any scene can follow any scene.</summary>
 public sealed record SceneEntered(SceneId Scene) : GameEvent;
 

@@ -1,0 +1,10 @@
+id: text-variables
+title: A change in the weather
+version: 1
+start: clearing
+characters:
+  player:
+    first-name: Traveller
+vars:
+  weather: "sunny"
+  remembered-weather: ""

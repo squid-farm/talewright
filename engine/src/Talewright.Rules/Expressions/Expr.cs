@@ -70,6 +70,11 @@ public sealed record VarRef(VarId Variable) : Expr
     public override ExprType Type => ExprType.Number;
 }
 
+public sealed record TextVarRef(VarId Variable) : Expr
+{
+    public override ExprType Type => ExprType.Text;
+}
+
 public enum NamePart
 {
     First,

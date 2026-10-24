@@ -24,6 +24,8 @@ public sealed record ChangeStanding(FactionId Faction, AssignOp Op, Expr Amount)
 
 public sealed record ChangeVariable(VarId Variable, AssignOp Op, Expr Amount) : Effect;
 
+public sealed record SetTextVariable(VarId Variable, Expr Value) : Effect;
+
 public sealed record SetFlag(FlagId Flag, bool Value) : Effect;
 
 public sealed record GiveItem(EntityId Character, ItemId Item, Expr Quantity) : Effect;
@@ -52,6 +54,9 @@ public static class EffectExecutor
             ChangeStat e => StateChanges.SetStat(state, e.Character, e.Stat, Apply(state.GetBaseStat(e.Character, e.Stat), e.Op, Eval(e.Amount))),
             ChangeStanding e => StateChanges.SetStanding(state, e.Faction, Apply(state.GetStanding(e.Faction), e.Op, Eval(e.Amount))),
             ChangeVariable e => StateChanges.SetVariable(state, e.Variable, Apply(state.GetVariable(e.Variable), e.Op, Eval(e.Amount))),
+            SetTextVariable e when e.Value.Type == ExprType.Text =>
+                StateChanges.SetTextVariable(state, e.Variable, ExpressionEvaluator.Evaluate(e.Value, context).Text
+                    ?? throw new InvalidOperationException("A text expression produced no text.")),
             SetFlag e => StateChanges.SetFlag(state, e.Flag, e.Value),
             GiveItem e => StateChanges.GiveItem(e.Character, e.Item, Eval(e.Quantity)),
             TakeItem e => StateChanges.TakeItem(state, e.Character, e.Item, Eval(e.Quantity)),

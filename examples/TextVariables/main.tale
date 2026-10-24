@@ -1,0 +1,10 @@
+=== clearing
+The weather is {var:weather}.
+* [Watch the storm arrive] { var:remembered-weather = var:weather; var:weather = "stormy" } -> shelter
+
+=== shelter
+It was {var:remembered-weather}. Now it is {var:weather}.
+{if var:weather == "stormy"}Rain drums on the roof.{/if}
+{if var:weather != var:remembered-weather}You are glad you found shelter.{/if}
+* [Wait for clear skies] { var:weather = "sunny" } -> clearing
+* [Stay here] -> END

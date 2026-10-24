@@ -43,7 +43,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 |---|---|---|
 | TW2001 | Unknown character, stat, item or faction. | Fix the spelling, or declare it in `story.talewright.yaml`. |
 | TW2002 | Unknown scene. | Fix the spelling, or add the scene. |
-| TW2003 | Wrong kind of value, e.g. comparing a stat with text. | Compare numbers with numbers, tiers with tiers (`faction:x >= friendly`). |
+| TW2003 | Wrong kind of value, e.g. assigning text to a number, comparing text with a number, or arithmetic on text. | Keep each variable's declared type. Text uses `=` and text-to-text `==` / `!=`; numbers retain arithmetic. Declare text with a quoted initial value under `vars:`. |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |
 | TW2005 | Unknown `@predicate`. | Named predicates come from C# extensions; check the name or register it. |
 | TW2006 | Unknown `#modifier`. | Use `#possessive`, `#capitalize`, `#upper`, `#lower` or `#a`. |
