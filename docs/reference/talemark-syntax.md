@@ -1,7 +1,10 @@
-# Tale syntax reference
+# Talemark syntax reference
 
 A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
-`.tale` is a Markdown superset: prose is CommonMark inline Markdown, plus a small set of line-level directives.
+**Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
+It combines CommonMark inline Markdown prose with dialogue, choices, conditions, and RPG effects
+through a small set of line-level directives and inline expressions. The YAML manifest defines
+the story's configuration and world; it is not Talemark source.
 
 The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
 Every reference is validated, and mistakes are reported with `file:line:column` and an

@@ -229,7 +229,7 @@ and its CSS/JavaScript assets, not just project-reference builds. CI also packs 
 the separate `Talewright.Cli` tool, running JSON validation and story/standalone
 publication outside the checkout.
 The same isolated package check builds the C# authoring example's web and desktop
-hosts, then injects invalid Tale into its temporary copy and requires the build
+hosts, then injects invalid Talemark into its temporary copy and requires the build
 to fail with the exact file/line and stable compiler code.
 
 ```bash
@@ -595,9 +595,9 @@ source-map retention, protected export paths (including parent symlinks), and un
 
 `python3 player/tests/run_e2e.py linux --filter FullyQualifiedName~DebuggerTests`
 builds and exercises the actual native workbench: repair/reload, late-scene
-search, setup, seed, choices, recorded explanations, watched Tale adoption,
+search, setup, seed, choices, recorded explanations, watched Talemark adoption,
 YAML restart gating, incompatible-history preservation and graceful window close.
-The portable-scenario case performs setup at scene1000, explains a branch, reloads Tale, edits state,
+The portable-scenario case performs setup at scene1000, explains a branch, reloads Talemark, edits state,
 rolls dice, exports with pending redo, closes the native process and imports in another process.
 Re-exported bytes must match before Forward resumes the retained redo.
 It uses the same isolated

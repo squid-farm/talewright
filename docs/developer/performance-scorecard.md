@@ -77,8 +77,8 @@ the figures are not an immutable upstream-commit baseline.
 ### Fixed-byte, fixed-scene file layout
 
 The two deterministic corpora both contain 100 scenes, 110 choices, and exactly
-5 MiB expanded source. One has two story files (one large Tale file); the other
-has 100 story files (99 small Tale files). The benchmark reports mean, observed
+5 MiB expanded source. One has two story files (one large Talemark file); the other
+has 100 story files (99 small Talemark files). The benchmark reports mean, observed
 p95, standard deviation, and allocated bytes.
 
 | Operation | Layout | Mean | p95 | Std. dev. | Allocated |

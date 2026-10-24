@@ -22,7 +22,7 @@ public static class StoryCompletion
             var symbols = (site.Candidates ?? analysis.Symbols).Where(symbol => site.Kinds.Contains(symbol.Kind))
                 .Select(symbol => (symbol.Name, Detail: $"{symbol.Kind}: {symbol.Type}"));
             foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword =>
-                         (keyword, site.KeywordDetails?.GetValueOrDefault(keyword) ?? "Tale syntax"))))
+                         (keyword, site.KeywordDetails?.GetValueOrDefault(keyword) ?? "Talemark syntax"))))
             {
                 if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
                 var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;

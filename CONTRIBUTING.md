@@ -36,7 +36,7 @@ prerequisites, targeted runs, performance budgets and other platforms.
 | `engine/src/Talewright.Rules` | Conditions, effects, checks, triggers, storylets |
 | `engine/src/Talewright.Narrative` | Templates, grammar, presentation-independent documents |
 | `engine/src/Talewright.Rulesets.Generic` | Default d20 ruleset |
-| `engine/src/Talewright.Tale` | `.tale` / `story.talewright.yaml` compiler and diagnostics |
+| `engine/src/Talewright.Tale` | Talemark and `story.talewright.yaml` compiler and diagnostics |
 | `engine/src/Talewright.Runtime` | Story sessions, history, saves, author sessions |
 | `packaging/Talewright` | Packaging shell: ships the six projects above as one NuGet package |
 | `player/src/Talewright.Player` | Shared Blazor UI (Razor Class Library) |
@@ -72,5 +72,5 @@ Agents and multi-worker sessions: follow the full [issue workflow](docs/develope
 
 Author-facing docs (`README.md`, `docs/guide`, `docs/reference`) are written for non-programmers:
 task first, short paragraphs, examples before rules. Put implementation detail in `docs/developer` or
-the project READMEs. When behavior changes, update the [Tale syntax reference](docs/reference/tale-syntax.md)
+the project READMEs. When behavior changes, update the [Talemark syntax reference](docs/reference/talemark-syntax.md)
 and [error codes](docs/reference/diagnostics.md) in the same PR.
