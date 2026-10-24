@@ -42,7 +42,7 @@ public static class CommandLine
                 .WithDescription("Validate a story folder with stable human or JSON diagnostics.")
                 .WithData(writers);
             config.AddCommand<LintCommand>("lint")
-                .WithDescription("Check a story with configurable Tale-aware lint rules.")
+                .WithDescription("Check a story with configurable Talemark-aware lint rules.")
                 .WithData(writers);
             config.AddCommand<PublishCommand>("publish")
                 .WithDescription("Publish a validated story archive or complete deployable game.")

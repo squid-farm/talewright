@@ -19,7 +19,7 @@ including archive generation/upload, compilation and rendering; not p95 values).
 These are recorded local measurements on **Linux Mint 22.3 x64 / .NET 10.0.13**,
 not universal performance guarantees. The .NET table uses warmed execution with
 tiered compilation disabled, seven samples per operation, and nearest-rank p95
-(the largest sample). The synthetic story has one Tale file of about 1.24 MB;
+(the largest sample). The synthetic story has one Talemark file of about 1.24 MB;
 these numbers do **not** measure cold process/disk startup, complex real-world
 stories or maximum file/byte limits. Compile and restore allocated approximately
 118 MiB and 81 MiB respectively; those are managed allocations, not peak memory.

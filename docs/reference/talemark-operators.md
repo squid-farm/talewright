@@ -4,7 +4,7 @@ Talemark is the language inside `.tale` files. This is the authoritative list of
 operators, after the property and pronoun changes in
 [#191](https://github.com/squid-farm/talewright/issues/191) and
 [#190](https://github.com/squid-farm/talewright/issues/190).
-See the [syntax reference](tale-syntax.md) for complete stories and the
+See the [syntax reference](talemark-syntax.md) for complete stories and the
 [language-change checklist](../developer/language-changes.md) before proposing new syntax.
 
 **Status matters.** Unless marked **decided, not implemented**, examples below describe the current
@@ -153,7 +153,7 @@ The compiler accepts one string, not a comma-separated list. Other built-in modi
 `#capitalize`, `#upper`, `#lower`, `#a`, and `#possessive` on a name.
 `#object` and `#reflexive` select a pronoun form and must immediately follow `pronoun`.
 Plain `pronoun` is the subject form; `#subject` is an error.
-See the [pronoun forms table](tale-syntax.md#3-substitutions).
+See the [pronoun forms table](talemark-syntax.md#3-substitutions).
 
 Completion offers finite values after `#possessive(` and identifies `"determiner"` as the default.
 `"hers"` is not an alias for `"independent"`: it produces TW2006 pointing at the argument.

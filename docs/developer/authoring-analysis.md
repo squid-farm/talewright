@@ -1,7 +1,7 @@
 # Shared authoring analysis
 
 `Talewright.Tale.Analysis` is the compiler API for source-aware analysis.
-It uses the same Tale parser, manifest reader, and compiler checks as runtime
+It uses the same Talemark parser, manifest reader, and compiler checks as runtime
 compilation. It does not add editor state to `StoryDefinition` or change
 `StoryCompiler.Compile` diagnostics.
 
@@ -33,14 +33,14 @@ convert these to their own position conventions.
 Incomplete expressions retain their original text and context even when parsing
 reports an error. Semantically invalid YAML still contributes available
 declarations. Syntactically invalid YAML cannot provide a trustworthy manifest
-tree: Tale declarations and contexts are retained independently, but the API
+tree: Talemark declarations and contexts are retained independently, but the API
 does not invent a repaired manifest or reuse stale symbols from a prior snapshot.
 Diagnostics remain the compiler's diagnostics for that exact input.
 
 Recovery does not require a project ruleset named `generic` or invoke project
 ruleset factories when the manifest is missing or syntactically invalid. It
 retains dialogue substitutions even when the speaker cannot be resolved, plus
-unfinished choice conditions/effects. Authoring ranges track the original Tale
+unfinished choice conditions/effects. Authoring ranges track the original Talemark
 whitespace and YAML scalar encoding: quotes and block headers are excluded;
 escapes and folded whitespace map back to their authored spans rather than
 being treated as offsets in decoded text. Compiler diagnostic points are unchanged.
@@ -53,7 +53,7 @@ Block and choice skill checks ending in `dc` similarly retain an empty numeric
 context immediately after `dc`, including when trailing spaces were trimmed.
 
 The shared `Talewright.Authoring.StoryLintAnalyzer` consumes these source ranges
-for stable Tale-aware lint findings. The CLI integration is delivered in #150;
+for stable Talemark-aware lint findings. The CLI integration is delivered in #150;
 the language server also consumes the same rule results and configuration in #151.
 
 The [language server](language-server.md) hosts this API for editor diagnostics.
