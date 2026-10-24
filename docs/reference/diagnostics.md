@@ -53,8 +53,9 @@ When you see several errors, fix the first one and check again: one mistake can 
 | ⚠ TW2013 | An extensionless image path matches several files. | Include the extension to choose explicitly. Otherwise the first match wins in `.png`, `.jpg`, `.jpeg`, `.webp` order. |
 | ⚠ TW2014 | Image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. |
 
-The image codes are currently available through the shared image resolver API. Story syntax
-and `talewright validate` will use them when the new image syntax is connected in #197.
+These image codes remain API-only until a follow-up connects the shared image resolver
+to story compilation and `talewright validate`. The syntax-only slice in #197 does not
+include resolver integration or image-file existence checks.
 
 ## TW3xxx: story structure
 

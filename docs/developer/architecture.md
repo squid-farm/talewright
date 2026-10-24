@@ -266,9 +266,10 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     turn the filename into words, then applies invariant sentence case. For example,
     `old_map-v2.png` becomes `Old map v2`; punctuation-only names become `Image`.
     Author-written alt text is preserved exactly. All diagnostics point to the reference.
-    This is the foundation from #198: #197 will wire the new image syntax into the
-    compiler and existing `talewright validate` command. Until then, no story syntax
-    invokes the resolver. This adds no image rendering or image size checks.
+    This is the foundation from #198. Its diagnostics remain API-only until a follow-up
+    connects the resolver to story compilation and the existing `talewright validate`
+    command. The syntax-only slice in #197 does not include resolver integration or
+    image-file existence checks. This adds no image rendering or image size checks.
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
     "pass your own options".
