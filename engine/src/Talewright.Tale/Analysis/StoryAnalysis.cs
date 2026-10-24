@@ -71,6 +71,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     private readonly Dictionary<string, string[]> _lines = new(StringComparer.Ordinal);
     private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
     private int[]? _manifestLineStarts;
+    private readonly Dictionary<string, string> _variableTypes = new(StringComparer.Ordinal);
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSite> CompletionSites { get; } = [];
@@ -181,7 +182,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             ExpressionParser.CollectDeclarations(text, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
                 (name, flag, offset) => Symbols.Add(new(name,
                     flag ? AuthoringSymbolKind.Flag : AuthoringSymbolKind.Variable,
-                    flag ? "boolean" : "integer", scalar?.Range(offset, name.Length) ?? Range(location.Offset(offset), name))));
+                    flag ? "boolean" : _variableTypes.GetValueOrDefault(name, "integer"),
+                    scalar?.Range(offset, name.Length) ?? Range(location.Offset(offset), name))));
         }
     }
 
@@ -355,6 +357,14 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
 
     internal void World(WorldDefinition world)
     {
+        foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = "integer";
+        foreach (var id in world.TextVariables.Keys) _variableTypes[id.Value] = "text";
+        for (var index = 0; index < Symbols.Count; index++)
+        {
+            var symbol = Symbols[index];
+            if (symbol.Kind == AuthoringSymbolKind.Variable && _variableTypes.TryGetValue(symbol.Name, out var type))
+                Symbols[index] = symbol with { Type = type };
+        }
         foreach (var stat in world.Ruleset.Stats)
             if (!Symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat.Id.Value))
                 Symbols.Add(new(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null));

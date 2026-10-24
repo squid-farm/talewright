@@ -94,8 +94,10 @@ test('schema validates complete and contextual documented manifest examples', as
   const fragmentExamples = [
     ['docs/reference/tale-syntax.md', 1, 'pronouns'],
     ['docs/reference/tale-syntax.md', 2, 'creation'],
+    ['docs/reference/tale-syntax.md', 3, 'vars'],
     ['docs/guide/writing-stories.md', 0, 'characters'],
     ['docs/guide/writing-stories.md', 1, 'items'],
+    ['docs/guide/writing-stories.md', 2, 'vars'],
     ['docs/guide/writing-stories.md', 3, 'factions'],
     ['docs/guide/writing-stories.md', 4, 'triggers'],
     ['docs/guide/writing-stories.md', 5, 'creation'],
