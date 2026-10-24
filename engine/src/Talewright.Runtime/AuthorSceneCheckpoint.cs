@@ -107,6 +107,7 @@ internal sealed class AuthorStateView(GameState state) : IGameStateView
     public int GetStanding(FactionId faction) => state.GetStanding(faction);
     public bool GetFlag(FlagId flag) => state.GetFlag(flag);
     public int GetVariable(VarId variable) => state.GetVariable(variable);
+    public string GetTextVariable(VarId variable) => state.GetTextVariable(variable);
     public int VisitCount(SceneId scene) => state.VisitCount(scene);
     public bool HasFiredTrigger(string triggerId) => state.HasFiredTrigger(triggerId);
 }

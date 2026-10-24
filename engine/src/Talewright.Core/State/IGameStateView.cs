@@ -44,6 +44,8 @@ public interface IGameStateView
 
     int GetVariable(VarId variable);
 
+    string GetTextVariable(VarId variable);
+
     /// <summary>Number of times a scene has been entered.</summary>
     int VisitCount(SceneId scene);
 

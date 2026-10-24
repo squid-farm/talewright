@@ -85,11 +85,11 @@ internal sealed class StoryYamlReader
         var factions = ReadFactions(Get(root, "factions"));
         var characters = ReadCharacters(Get(root, "characters"), root, ruleset, items);
         var flags = ReadFlags(Get(root, "flags"));
-        var vars = ReadVars(Get(root, "vars"));
+        var (vars, textVars) = ReadVars(Get(root, "vars"));
 
         var manifest = new StoryManifest
         {
-            World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, vars),
+            World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, vars, textVars),
             Id = RequiredIdentifier(root, "id") ?? string.Empty,
             Title = RequiredScalar(root, "title") ?? string.Empty,
             Version = Scalar(Get(root, "version")) ?? "0.0.0",
@@ -542,20 +542,34 @@ internal sealed class StoryYamlReader
         return flags;
     }
 
-    private Dictionary<VarId, int> ReadVars(YamlNode? node)
+    private (Dictionary<VarId, int> Numbers, Dictionary<VarId, string> Text) ReadVars(YamlNode? node)
     {
         var vars = new Dictionary<VarId, int>();
+        var textVars = new Dictionary<VarId, string>();
         if (node is null || Mapping(node, "vars") is not { } map)
         {
-            return vars;
+            return (vars, textVars);
         }
 
         foreach (var (key, value) in map.Children)
         {
-            if (Identifier(key, "variable id") is { } id) vars[new VarId(id)] = Int(value) ?? 0;
+            if (Identifier(key, "variable id") is not { } id) continue;
+            if (value is YamlScalarNode { Style: ScalarStyle.DoubleQuoted or ScalarStyle.SingleQuoted } text)
+            {
+                textVars.Add(new VarId(id), text.Value ?? "");
+            }
+            else if (value is YamlScalarNode { Value: { } raw } &&
+                int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+            {
+                vars.Add(new VarId(id), number);
+            }
+            else
+            {
+                Error(value, "TW4003", $"Variable '{id}' needs a whole number or quoted text value.", 0);
+            }
         }
 
-        return vars;
+        return (vars, textVars);
     }
 
     private void ReadTriggers(YamlNode? node, List<RawTrigger> triggers)

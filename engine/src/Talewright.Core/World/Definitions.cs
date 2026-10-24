@@ -41,7 +41,8 @@ public sealed class WorldDefinition
         IEnumerable<ItemDefinition> items,
         IEnumerable<FactionDefinition> factions,
         IEnumerable<FlagId> flags,
-        IReadOnlyDictionary<VarId, int> variables)
+        IReadOnlyDictionary<VarId, int> variables,
+        IReadOnlyDictionary<VarId, string>? textVariables = null)
     {
         Ruleset = ruleset;
         Characters = characters.ToDictionary(c => c.Id);
@@ -49,6 +50,15 @@ public sealed class WorldDefinition
         Factions = factions.ToDictionary(f => f.Id);
         Flags = flags.ToHashSet();
         Variables = variables;
+        TextVariables = textVariables ?? new Dictionary<VarId, string>();
+        if (Variables.Keys.Any(TextVariables.ContainsKey))
+        {
+            throw new ArgumentException("A variable cannot be both integer and text.", nameof(textVariables));
+        }
+        if (TextVariables.Values.Any(value => value is null))
+        {
+            throw new ArgumentException("Text variable values cannot be null.", nameof(textVariables));
+        }
     }
 
     public Ruleset Ruleset { get; }
@@ -59,4 +69,6 @@ public sealed class WorldDefinition
 
     /// <summary>Declared variables with their initial values.</summary>
     public IReadOnlyDictionary<VarId, int> Variables { get; }
+
+    public IReadOnlyDictionary<VarId, string> TextVariables { get; }
 }
