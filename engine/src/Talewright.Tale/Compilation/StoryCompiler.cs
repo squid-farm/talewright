@@ -166,14 +166,25 @@ public static class StoryCompiler
             return null;
         }
 
+        // Saves store this fingerprint: the hashed bytes must stay identical to length-prefixed UTF-8.
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var encoder = Encoding.UTF8.GetEncoder();
         void Append(string text)
         {
-            var bytes = Encoding.UTF8.GetBytes(text);
             Span<byte> length = stackalloc byte[4];
-            BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+            BinaryPrimitives.WriteInt32LittleEndian(length, Encoding.UTF8.GetByteCount(text));
             hash.AppendData(length);
-            hash.AppendData(bytes);
+
+            Span<byte> buffer = stackalloc byte[4096];
+            var remaining = text.AsSpan();
+            encoder.Reset();
+            bool completed;
+            do
+            {
+                encoder.Convert(remaining, buffer, flush: true, out var charsUsed, out var bytesUsed, out completed);
+                hash.AppendData(buffer[..bytesUsed]);
+                remaining = remaining[charsUsed..];
+            } while (!completed);
         }
 
         Append("talewright-replay-v1");

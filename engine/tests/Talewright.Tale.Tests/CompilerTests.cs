@@ -10,6 +10,9 @@ using Talewright.Tale.Compilation;
 using Talewright.Tale.Diagnostics;
 using Talewright.Tale.Model;
 using System.IO.Compression;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Talewright.Tale.Tests;
 
@@ -70,6 +73,49 @@ public class CompilerTests
 
     private static string Render(StoryDefinition story, SceneDefinition scene, GameState? state = null) =>
         new TemplateRenderer().Render(scene.Body, state ?? GameState.CreateInitial(story.World, 1)).ToPlainText();
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4095)]
+    [InlineData(4096)]
+    [InlineData(4097)]
+    [InlineData(20000)]
+    public void Fingerprint_preserves_length_prefixed_utf8_bytes(int paddingLength)
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = Yaml,
+            ["main.tale"] = "=== a\nHello.\n-> END",
+            ["z-data"] = new string('x', paddingLength) + "\u00e9\u4e16\ud83d\ude00\ud800",
+            ["a-\u00e9-data"] = "\udc00" + new string('\u4e16', paddingLength) + "\ud83d\ude00",
+            ["empty"] = "",
+        };
+        const string compatibilityId = "fingerprint-test-\u00e9";
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        void Append(string text)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+            Span<byte> length = stackalloc byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+            hash.AppendData(length);
+            hash.AppendData(bytes);
+        }
+
+        Append("talewright-replay-v1");
+        Append(compatibilityId);
+        foreach (var (path, text) in files.OrderBy(file => file.Key, StringComparer.Ordinal))
+        {
+            Append(path);
+            Append(text);
+        }
+
+        var expected = Convert.ToHexString(hash.GetHashAndReset());
+        var result = StoryCompiler.Compile(new StorySource(files),
+            new CompilerOptions { CompatibilityId = compatibilityId });
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Equal(expected, result.Story!.ContentFingerprint);
+    }
 
     [Fact]
     public void Compiles_yaml_metadata_world_and_triggers()
