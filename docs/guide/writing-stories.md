@@ -102,7 +102,7 @@ The weather is {var:weather}.
 ```
 
 Text stays text throughout the story; it cannot be mixed with numbers or used in
-arithmetic. See [text variables](../reference/tale-syntax.md#text-variables) for
+arithmetic. See [text variables](../reference/talemark-syntax.md#text-variables) for
 empty values, copying, and supported operations.
 
 ## Factions
