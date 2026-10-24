@@ -31,6 +31,17 @@ public sealed class StoryHistory
         _frames = [new HistoryFrame(_session.Start())];
     }
 
+    private StoryHistory(StoryDefinition story, CharacterSelection? character, StorySession session,
+        List<HistoryFrame> frames, IEnumerable<string> choices, int cursor)
+    {
+        Story = story;
+        Character = character;
+        _session = session;
+        _frames = frames;
+        _choices.AddRange(choices);
+        Cursor = cursor;
+    }
+
     public StoryDefinition Story { get; }
     public CharacterSelection? Character { get; }
     public ulong Seed => _session.Seed;
@@ -236,11 +247,13 @@ public sealed class StoryHistory
         {
             throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
         }
-        Replay(story, save.Seed, save.Choices, character);
-        var result = new StoryHistory(story, save.Seed, character);
-        result._choices.AddRange(save.Choices);
-        result.MoveTo(save.Cursor);
-        return result;
+        var (session, frames) = Replay(story, save.Seed, save.Choices, character);
+        if (save.Cursor < save.Choices.Length)
+        {
+            (session, frames) = Replay(story, save.Seed, save.Choices.Take(save.Cursor), character);
+        }
+
+        return new StoryHistory(story, character, session, frames, save.Choices, save.Cursor);
     }
 
     private static (StorySession Session, List<HistoryFrame> Frames) Replay(
