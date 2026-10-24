@@ -62,7 +62,6 @@ items:
 flags: [door-open] # optional; flags/vars are also auto-declared when an effect sets them
 vars:
   torches-lit: 0
-  weather: "sunny"
 
 triggers:
   - id: guild-turns
