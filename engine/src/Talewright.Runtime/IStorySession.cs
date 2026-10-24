@@ -1,6 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Core.State;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

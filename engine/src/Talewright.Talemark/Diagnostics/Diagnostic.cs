@@ -1,4 +1,4 @@
-namespace Talewright.Tale.Diagnostics;
+namespace Talewright.Talemark.Diagnostics;
 
 public enum DiagnosticSeverity
 {

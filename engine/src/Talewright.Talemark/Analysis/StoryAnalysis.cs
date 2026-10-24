@@ -1,11 +1,11 @@
 using Talewright.Core.Identity;
 using Talewright.Core.World;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Parsing;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Parsing;
 using YamlDotNet.RepresentationModel;
 
-namespace Talewright.Tale.Analysis;
+namespace Talewright.Talemark.Analysis;
 
 /// <summary>Half-open UTF-16 source range. Lines and columns are 1-based.</summary>
 public sealed record SourceRange(SourceLocation Start, SourceLocation End);

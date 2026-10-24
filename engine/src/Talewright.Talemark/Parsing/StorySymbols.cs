@@ -2,9 +2,9 @@ using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Analysis;
 
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 /// <summary>
 /// Everything a reference can resolve to. Built from story.talewright.yaml plus syntax discovery across all .tale files

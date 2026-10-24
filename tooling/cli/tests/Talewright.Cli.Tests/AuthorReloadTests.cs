@@ -1,6 +1,6 @@
 using Talewright.Debugger;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli.Tests;
 

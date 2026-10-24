@@ -4,8 +4,8 @@ using System.Text.Json.Nodes;
 using BenchmarkDotNet.Attributes;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 using Talewright.Testing;
 
 namespace Talewright.BenchmarkDotNet;

@@ -4,7 +4,7 @@
     <ProjectReference Include="../Talewright.Core/Talewright.Core.csproj" />
     <ProjectReference Include="../Talewright.Rules/Talewright.Rules.csproj" />
     <ProjectReference Include="../Talewright.Narrative/Talewright.Narrative.csproj" />
-    <ProjectReference Include="../Talewright.Tale/Talewright.Tale.csproj" />
+    <ProjectReference Include="../Talewright.Talemark/Talewright.Talemark.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

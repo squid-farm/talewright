@@ -1,5 +1,5 @@
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 using Talewright.Core.Identity;
 
 namespace Talewright.Runtime.Tests;

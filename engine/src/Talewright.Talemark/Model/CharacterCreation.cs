@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using Talewright.Core.Identity;
 using Talewright.Core.World;
 
-namespace Talewright.Tale.Model;
+namespace Talewright.Talemark.Model;
 
 public sealed record CharacterPreset(string Id, string Label, IReadOnlyDictionary<StatId, int> Stats);
 

@@ -5,14 +5,14 @@
     <Project Path="engine/src/Talewright.Rules/Talewright.Rules.csproj" />
     <Project Path="engine/src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" />
     <Project Path="engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
-    <Project Path="engine/src/Talewright.Tale/Talewright.Tale.csproj" />
+    <Project Path="engine/src/Talewright.Talemark/Talewright.Talemark.csproj" />
   </Folder>
   <Folder Name="/engine/tests/">
     <Project Path="engine/tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />
     <Project Path="engine/tests/Talewright.Narrative.Tests/Talewright.Narrative.Tests.csproj" />
     <Project Path="engine/tests/Talewright.Rules.Tests/Talewright.Rules.Tests.csproj" />
     <Project Path="engine/tests/Talewright.Runtime.Tests/Talewright.Runtime.Tests.csproj" />
-    <Project Path="engine/tests/Talewright.Tale.Tests/Talewright.Tale.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.Talemark.Tests/Talewright.Talemark.Tests.csproj" />
     <Project Path="engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
   </Folder>
   <Folder Name="/player/src/">

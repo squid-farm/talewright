@@ -3,9 +3,9 @@ using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public class EditorManifestSchemaTests
 {

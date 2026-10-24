@@ -1,9 +1,9 @@
 using Talewright.Core.Rulesets;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Analysis;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
+using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Authoring;
 
 namespace Talewright.Authoring.Tests;

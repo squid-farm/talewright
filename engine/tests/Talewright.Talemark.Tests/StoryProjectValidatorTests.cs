@@ -1,9 +1,9 @@
 using Talewright.Core.Rulesets;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public sealed class StoryProjectValidatorTests : IDisposable
 {

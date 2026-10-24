@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Talewright.Authoring;
-using Talewright.Tale.Analysis;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
 

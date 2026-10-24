@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Talewright.Authoring;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
 

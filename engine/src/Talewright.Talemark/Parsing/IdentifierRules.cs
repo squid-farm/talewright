@@ -1,4 +1,4 @@
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 /// <summary>
 /// The one identifier rule: an ASCII letter or '_', then letters, digits and '_',

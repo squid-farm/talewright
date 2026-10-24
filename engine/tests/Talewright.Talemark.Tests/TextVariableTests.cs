@@ -3,9 +3,9 @@ using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Rules.Effects;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public class TextVariableTests
 {

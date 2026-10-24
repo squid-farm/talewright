@@ -2,10 +2,10 @@ using Talewright.Core.Rulesets;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Rulesets.Generic;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// Extension points available to the compiler. No-code stories use <see cref="Default"/>; C# story projects

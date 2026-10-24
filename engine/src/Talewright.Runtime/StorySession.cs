@@ -12,7 +12,7 @@ using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Rules.Triggers;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

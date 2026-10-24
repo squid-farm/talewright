@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public class EditorSnippetTests
 {

@@ -1,8 +1,10 @@
-# Talewright.Tale — the Talemark compiler
+# Talewright.Talemark — the Talemark compiler
 
 Turns a story folder (`story.talewright.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
 diagnostics with file, line and column. This is the **only** project that parses text, and it runs once per load.
-The language is **Talemark**; the compiler's package and namespace remain `Talewright.Tale`.
+The compiler's assembly and namespace are `Talewright.Talemark`; it ships inside the aggregate
+`Talewright` package, not as a separately published package. See the
+[C# migration note](../../../docs/developer/csharp-extensions.md#compiler-identity-migration).
 The syntax itself is specified in the [Talemark syntax reference](../../../docs/reference/talemark-syntax.md).
 
 ```csharp

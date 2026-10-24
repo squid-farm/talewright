@@ -1,5 +1,5 @@
 using CSharpStory;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 if (args.Length != 1)
 {

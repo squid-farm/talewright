@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using Talewright.Core.Identity;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// Whole-line scene provenance: inclusive, 1-based lines from the declaration through the line

@@ -1,9 +1,9 @@
 using System.Text.RegularExpressions;
 using System.Globalization;
 using Humanizer;
-using Talewright.Tale.Diagnostics;
+using Talewright.Talemark.Diagnostics;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>A resolved image path relative to the story root, with its effective alt text.</summary>
 public sealed record ResolvedStoryImage(string Path, string AltText);

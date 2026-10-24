@@ -2,7 +2,7 @@ using System.IO.Compression;
 using System.Collections.ObjectModel;
 using System.Collections.Frozen;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// The source text and image-path catalogue of a story, keyed by relative path with <c>/</c>

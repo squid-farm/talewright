@@ -1,10 +1,10 @@
 using Talewright.Core.Identity;
 using Talewright.Rules.Storylets;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
-using Talewright.Tale.Parsing;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
+using Talewright.Talemark.Parsing;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// Whole-story structural checks that need every scene at once (<c>TW3xxx</c>): the start scene exists, no

@@ -1,7 +1,7 @@
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Talewright.Core.Identity;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public sealed class CharacterCreationTests
 {

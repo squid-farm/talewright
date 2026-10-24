@@ -1,7 +1,7 @@
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Parsing;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Parsing;
 
-namespace Talewright.Tale.Analysis;
+namespace Talewright.Talemark.Analysis;
 
 /// <summary>
 /// Parser-recognized reference slot, with decoded token boundaries mapped to authored UTF-16 positions.

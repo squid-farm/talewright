@@ -4,8 +4,8 @@ using Talewright.Core.State;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime.Tests;
 

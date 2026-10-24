@@ -13,10 +13,12 @@ as the user-facing **story-authoring language** name. Talewright remains the eng
 tooling brand. Use “Talemark syntax” for language constructs, “Talemark source” for authored text,
 and “`.tale` files” for files. The separate `story.talewright.yaml` manifest is not Talemark source.
 
-This is a display-name decision, not an API or format rename: retain `.tale`, code fences and editor
-language ID `tale`, grammar scope `text.tale`, and existing packages, namespaces, and types such as
-`Talewright.Tale` and `TaleParser`. Editor display names, debugger labels, and author-facing
-help use Talemark too; this does not change story syntax or runtime behavior.
+The original display-name decision did not rename APIs or formats. The separate
+[compiler identity migration (#231)](../csharp-extensions.md#compiler-identity-migration) now names
+the compiler namespace and assembly `Talewright.Talemark`. Retain `.tale`, code fences and editor
+language ID `tale`, grammar scope `text.tale`, aggregate package IDs, and individual types such as
+`TaleParser`. Editor display names, debugger labels, and author-facing help use Talemark too;
+neither naming change alters story syntax or runtime behavior.
 
 An unrelated [Talemark film/book diary app](https://talemark.app/en/) already uses the name.
 The project lead accepted that discoverability trade-off; use “Talewright's Talemark” where context
@@ -47,5 +49,5 @@ require idempotence. Ambiguous story repairs and general formatting are not part
 Generic Markdown linting/formatting cannot be applied wholesale because Talemark has different structural
 semantics.
 
-These are planned capabilities, not implemented interfaces. See [the plan](../plan.md#45-talemark-compiler-talewrighttale)
+These are planned capabilities, not implemented interfaces. See [the plan](../plan.md#45-talemark-compiler-talewrighttalemark)
 for scope, relative effort, dependencies, and acceptance checks.

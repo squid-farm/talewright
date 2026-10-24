@@ -17,7 +17,7 @@ from package_version import version_from_tag
 
 PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli", "Talewright.LanguageServer"}
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
-                     ("Core", "Rules", "Narrative", "Rulesets.Generic", "Tale", "Runtime")}
+                     ("Core", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
 
 
 def verify_desktop_archive(path):
@@ -191,7 +191,7 @@ def smoke(directory, version):
             (project / "EngineApi.cs").write_text("""public static class EngineApi
 {
     public static object CreateRuleset() => new Talewright.Core.Rulesets.RulesetBuilder("consumer").Build();
-    public static System.Type Compiler => typeof(Talewright.Tale.Compilation.StoryCompiler);
+    public static System.Type Compiler => typeof(Talewright.Talemark.Compilation.StoryCompiler);
     public static System.Type Runtime => typeof(Talewright.Runtime.IStorySession);
     public static string NarrativeAssembly => typeof(Talewright.Narrative.Rendering.RenderedDocument).Assembly.GetName().Name;
 }
@@ -201,7 +201,7 @@ def smoke(directory, version):
             else:
                 (project / "Program.cs").write_text("""using System;
 using System.Collections.Generic;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Talewright.Runtime;
 
 if (args.Length == 1)
@@ -216,6 +216,8 @@ if (args.Length == 1)
 }
 if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
     throw new Exception("Original Narrative assembly identity was not preserved.");
+if (EngineApi.Compiler.Assembly.GetName().Name != "Talewright.Talemark")
+    throw new Exception("Compiler assembly identity does not match the Talemark namespace.");
 var source = new StorySource(new Dictionary<string, string>
 {
     ["story.talewright.yaml"] = "id: smoke\\ntitle: Smoke\\nstart: start\\nruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",

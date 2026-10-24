@@ -7,7 +7,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Rules.Triggers;
 
-namespace Talewright.Tale.Model;
+namespace Talewright.Talemark.Model;
 
 /// <summary>
 /// A fully compiled, validated story. Immutable and free of source text: the runtime only ever sees this.

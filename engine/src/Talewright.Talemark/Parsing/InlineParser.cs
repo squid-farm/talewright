@@ -6,10 +6,10 @@ using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Analysis;
 
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 /// <summary>
 /// A run of source text (one or more joined lines) that remembers where every character came from, so

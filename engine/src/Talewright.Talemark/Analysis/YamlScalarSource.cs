@@ -1,9 +1,9 @@
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
-namespace Talewright.Tale.Analysis;
+namespace Talewright.Talemark.Analysis;
 
 /// <summary>Maps decoded scalar characters to their authored extents, including escapes and folded whitespace.</summary>
 internal sealed class YamlScalarSource

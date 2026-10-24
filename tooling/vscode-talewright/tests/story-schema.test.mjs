@@ -158,7 +158,7 @@ test('custom possessive pronouns require nested determiner and independent value
 });
 
 test('schema rejects unknown keys at every closed reader mapping', async () => {
-  const source = await read('engine/src/Talewright.Tale/Parsing/StoryYamlReader.cs');
+  const source = await read('engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs');
   const readerSets = [...source.matchAll(/CheckKeys\(\w+,\s*((?:"[^"]+"\s*,?\s*)+)\);/g)]
     .map(match => [...match[1].matchAll(/"([^"]+)"/g)].map(key => key[1]).sort());
   assert.ok(readerSets.length > 0, 'reader CheckKeys lists should be discoverable');

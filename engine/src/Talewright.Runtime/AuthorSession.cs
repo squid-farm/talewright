@@ -3,7 +3,7 @@ using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.State;
 using Talewright.Rules.Diagnostics;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 

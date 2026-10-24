@@ -10,7 +10,7 @@ No Blazor or Photino dependencies.
 | [Rules](../../engine/src/Talewright.Rules/README.md) | Conditions, effects, checks, triggers, storylet selection |
 | [Narrative](../../engine/src/Talewright.Narrative/README.md) | Templates, grammar, presentation-independent documents |
 | [Rulesets.Generic](../../engine/src/Talewright.Rulesets.Generic/README.md) | The default, behaviorally replaceable d20 ruleset |
-| [Talewright.Tale](../../engine/src/Talewright.Tale/README.md) | Talemark source loading, compilation, validation, diagnostics |
+| [Talewright.Talemark](../../engine/src/Talewright.Talemark/README.md) | Talemark source loading, compilation, validation, diagnostics |
 | [Runtime](../../engine/src/Talewright.Runtime/README.md) | Story sessions, frames, event narration |
 
 - **Dependencies:** Markdig and YamlDotNet are package dependencies, not bundled. Component project

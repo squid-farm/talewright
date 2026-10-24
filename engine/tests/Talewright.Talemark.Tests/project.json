@@ -1,5 +1,5 @@
 {
-  "name": "Talewright.Tale.Tests",
+  "name": "Talewright.Talemark.Tests",
   "targets": {
     "test": {
       "executor": "nx:run-commands",
@@ -7,7 +7,7 @@
       "cache": false,
       "options": {
         "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests'",
-        "cwd": "engine/tests/Talewright.Tale.Tests"
+        "cwd": "engine/tests/Talewright.Talemark.Tests"
       }
     }
   }

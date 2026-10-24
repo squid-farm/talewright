@@ -1,6 +1,6 @@
 # Shared authoring analysis
 
-`Talewright.Tale.Analysis` is the compiler API for source-aware analysis.
+`Talewright.Talemark.Analysis` is the compiler API for source-aware analysis.
 It uses the same Talemark parser, manifest reader, and compiler checks as runtime
 compilation. It does not add editor state to `StoryDefinition` or change
 `StoryCompiler.Compile` diagnostics.

@@ -1,5 +1,5 @@
 using Talewright.Debugger;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;

@@ -60,6 +60,10 @@ class PagesPathTests(unittest.TestCase):
 class RepositoryLayoutTests(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[1]
 
+    def test_engine_package_uses_the_Talemark_compiler_identity(self):
+        self.assertIn("Talewright.Talemark", ENGINE_ASSEMBLIES)
+        self.assertEqual(6, len(ENGINE_ASSEMBLIES))
+
     def test_both_hosts_embed_all_bundled_story_files(self):
         expected = {
             path.resolve()

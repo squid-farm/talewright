@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Talewright.Tale/Talewright.Tale.csproj" />
+    <ProjectReference Include="../../src/Talewright.Talemark/Talewright.Talemark.csproj" />
     <ProjectReference Include="../Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>
 

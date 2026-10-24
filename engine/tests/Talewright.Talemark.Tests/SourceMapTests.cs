@@ -1,7 +1,7 @@
 using Talewright.Core.Identity;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public sealed class SourceMapTests
 {

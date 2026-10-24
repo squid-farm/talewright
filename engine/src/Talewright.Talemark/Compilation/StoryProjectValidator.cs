@@ -1,6 +1,6 @@
-using Talewright.Tale.Diagnostics;
+using Talewright.Talemark.Diagnostics;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>Build-time validation for C# authoring projects with explicitly registered extensions.</summary>
 public static class StoryProjectValidator

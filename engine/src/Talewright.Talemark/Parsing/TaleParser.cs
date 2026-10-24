@@ -3,11 +3,11 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
+using Talewright.Talemark.Analysis;
 
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 /// <summary>A compiled scene plus where it was declared (for validator diagnostics).</summary>
 internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Location)

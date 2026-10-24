@@ -16,8 +16,27 @@ application still supplies the host (Photino, Blazor WebAssembly, …) and a sto
 samples and test helpers are not packaged.
 
 `Talewright` is a packaging shell around the six headless projects (Core, Rules, Narrative,
-Rulesets.Generic, Tale, Runtime). They keep their own namespaces and assembly names, but they are not
+Rulesets.Generic, Talemark, Runtime). They keep their own namespaces and assembly names, but they are not
 published as separate packages.
+
+## Compiler identity migration
+
+[Issue #231](https://github.com/squid-farm/talewright/issues/231) renames the compiler's namespace,
+project, and assembly from `Talewright.Tale` to `Talewright.Talemark`. This is an intentional
+source and binary breaking change for C# consumers, with no compatibility shim or type forwarding.
+
+- Change imports and fully qualified names from `Talewright.Tale.*` to `Talewright.Talemark.*`.
+- For source integrations, update project references to
+  `engine/src/Talewright.Talemark/Talewright.Talemark.csproj`.
+- For direct assembly integrations, replace `Talewright.Tale.dll` with `Talewright.Talemark.dll`.
+- Rebuild extensions and hosts against the same updated Talewright packages. The aggregate NuGet
+  package IDs remain `Talewright` and `Talewright.Player`; there is no new compiler package to install.
+
+The compiler tests and their project directory are now `Talewright.Talemark.Tests`.
+Individual API names such as `TaleParser` and `TaleFiles` are unchanged. So are `.tale` stories,
+`story.talewright.yaml`, the editor language ID/code-fence name `tale`, and grammar scope `text.tale`.
+The rename does not change story syntax, runtime behavior, or the save format; existing saves
+retain the same story/source compatibility requirements.
 
 ## Install from GitHub Packages
 

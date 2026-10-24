@@ -1,7 +1,7 @@
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public sealed class PerformanceCorpusTests
 {
@@ -74,7 +74,7 @@ public sealed class PerformanceCorpusTests
     private static string NewRoot(string name) =>
         Path.Combine(Path.GetTempPath(), $"talewright-corpus-test-{name}-{Guid.NewGuid():N}");
 
-    private static Talewright.Tale.Model.StoryDefinition Compile(StorySource source)
+    private static Talewright.Talemark.Model.StoryDefinition Compile(StorySource source)
     {
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));

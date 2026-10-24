@@ -1,4 +1,4 @@
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 internal enum TokenKind
 {

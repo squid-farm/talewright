@@ -2,10 +2,10 @@ using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Analysis;
 
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 /// <summary>
 /// Recursive-descent parser for expressions, substitutions and effects. Resolves every reference against

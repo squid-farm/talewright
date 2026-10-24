@@ -3,14 +3,14 @@ using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Analysis;
 
-namespace Talewright.Tale.Parsing;
+namespace Talewright.Talemark.Parsing;
 
 /// <summary>An expression or effect list written in story.talewright.yaml, parsed later once all symbols are known.</summary>
 internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once);

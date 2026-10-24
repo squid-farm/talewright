@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 using Xunit.Abstractions;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public sealed class RicherHubTests(ITestOutputHelper output)
 {

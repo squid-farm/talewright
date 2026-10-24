@@ -1,8 +1,8 @@
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using System.IO.Compression;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public sealed class StorySourceTests : IDisposable
 {

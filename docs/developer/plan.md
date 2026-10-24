@@ -64,7 +64,7 @@ Reusable pieces:
 | D1 | .NET 10, C#, Blazor; Photino desktop + Blazor WASM web. **Desktop first.** |
 | D2 | Name **Talewright**; namespaces/packages `Talewright.*` |
 | D3 | License **MPL-2.0**. User acknowledged that commercial use is allowed; only modified engine files must stay open. |
-| D4 | Story-authoring language: **Talemark**, written in **`.tale`** files, combines bold, italic and code formatting with story directives and expressions. `story.talewright.yaml` holds story configuration and schema. The display name does not rename packages, namespaces, APIs, or the `.tale` extension; see [ADR 0003](adr/0003-tale-markup.md). See the [operator registry](../reference/talemark-operators.md); further formatting design is tracked in #200. |
+| D4 | Story-authoring language: **Talemark**, written in **`.tale`** files, combines bold, italic and code formatting with story directives and expressions. `story.talewright.yaml` holds story configuration and schema. The compiler identity is `Talewright.Talemark`; aggregate package IDs, individual API names, and the `.tale` extension are unchanged; see [ADR 0003](adr/0003-tale-markup.md). See the [operator registry](../reference/talemark-operators.md); further formatting design is tracked in #200. |
 | D5 | Two authoring paths sharing **one compiler library**: (a) **no-code** story folder/zip loaded by the player app, compiled once at load; (b) **C# story project** compiled at build time, with errors as build diagnostics (M2). The runtime never parses text during play; it runs on a typed AST. |
 | D6 | The template renderer outputs a **presentation-agnostic document model (AST)**, not HTML. It includes media placeholders for future images. |
 | D7 | Conditions: **both** inline expressions and named C# predicates. Both compile to the same predicate tree and run in one evaluator, the rules engine. |
@@ -104,7 +104,7 @@ Reusable pieces:
  └──────────────┘   └───────────────┘   └──────────────────────┘
         ▲ compiled from
  ┌──────┴────────────────────────────────────┐
- │ Talewright.Tale compiler (.tale + yaml)   │  Markdig + YamlDotNet → typed StoryDefinition + diagnostics
+ │ Talewright.Talemark compiler (.tale + yaml)   │  Markdig + YamlDotNet → typed StoryDefinition + diagnostics
  └───────────────────────────────────────────┘
 ```
 
@@ -148,7 +148,7 @@ Reusable pieces:
 - **Pronouns:** `{player:pronoun}` → she; `#object` → her; `#possessive` → her; `#possessive("independent")` → hers; `#reflexive` → herself. Built-in she/he/they sets plus custom sets. Verb agreement helper is a stretch goal (`{player:pronoun} {player:verb.is}`).
 - **Grammar provider seam:** the `IGrammar` interface ships with English first, which keeps localization possible later.
 
-### 4.5 Talemark compiler (`Talewright.Tale`)
+### 4.5 Talemark compiler (`Talewright.Talemark`)
 - Markdig pipeline plus custom extensions, YAML front matter and `story.talewright.yaml`.
 - **Validation against the schema:** every path and name, stat type and comparison type, every divert target and every item/faction id is checked. Unreachable or dead-end scenes produce warnings.
 - **Diagnostics** carry file, line, column, code and message. The same diagnostics will feed the CLI, MSBuild and the VS Code language server (M3).
@@ -249,7 +249,7 @@ src/
   Talewright.Rules/             predicates, evaluator, storylets, modifiers, triggers, skill checks
   Talewright.Narrative/         template AST, document model, renderer, grammar/pronouns
   Talewright.Rulesets.Generic/  default d20-ish attributes & skills (opt-out)
-  Talewright.Tale/              .tale + story.talewright.yaml compiler (Markdig, YamlDotNet), diagnostics
+  Talewright.Talemark/              .tale + story.talewright.yaml compiler (Markdig, YamlDotNet), diagnostics
   Talewright.Runtime/           IStorySession facade, command handling, frame production
   Talewright.Player/            Razor Class Library (UI)
   Talewright.Host.Desktop/      Photino.Blazor host

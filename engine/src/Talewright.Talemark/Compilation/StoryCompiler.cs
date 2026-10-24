@@ -2,15 +2,15 @@ using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Triggers;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
-using Talewright.Tale.Parsing;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
+using Talewright.Talemark.Parsing;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
-using Talewright.Tale.Analysis;
+using Talewright.Talemark.Analysis;
 
-namespace Talewright.Tale.Compilation;
+namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// Compiles a story (story.talewright.yaml plus <c>.tale</c> files) into a validated <see cref="StoryDefinition"/>.

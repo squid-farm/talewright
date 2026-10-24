@@ -136,13 +136,13 @@ class CiRoutingTests(unittest.TestCase):
                 for group in ("build", "unit", "browser", "linux-desktop"):
                     self.assertEqual([], plan[group])
                 self.assertIn(
-                    "Talewright.Tale.Tests:build:release", graph["tasks"]["tasks"],
+                    "Talewright.Talemark.Tests:build:release", graph["tasks"]["tasks"],
                 )
 
     def test_general_docs_do_not_hide_mixed_source_verification(self):
         for source in (
             "tooling/vscode-talewright/extension.cjs",
-            "engine/src/Talewright.Tale/Parsing/StoryYamlReader.cs",
+            "engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs",
             "player/src/Talewright.Player/Components/PlayerToolbar.razor",
         ):
             with self.subTest(source=source):

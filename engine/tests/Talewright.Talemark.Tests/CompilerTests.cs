@@ -6,18 +6,25 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 using System.IO.Compression;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Talewright.Tale.Tests;
+namespace Talewright.Talemark.Tests;
 
 public class CompilerTests
 {
+    [Fact]
+    public void Compiler_namespace_and_assembly_use_the_Talemark_identity()
+    {
+        Assert.Equal("Talewright.Talemark.Compilation", typeof(StoryCompiler).Namespace);
+        Assert.Equal("Talewright.Talemark", typeof(StoryCompiler).Assembly.GetName().Name);
+    }
+
     private const string Yaml = """
         id: test
         title: Test Story

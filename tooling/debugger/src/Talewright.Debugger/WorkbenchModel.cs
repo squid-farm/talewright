@@ -1,9 +1,9 @@
 using System.Globalization;
 using Talewright.Core.Identity;
 using Talewright.Runtime;
-using Talewright.Tale.Compilation;
-using Talewright.Tale.Diagnostics;
-using Talewright.Tale.Model;
+using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Debugger;
 

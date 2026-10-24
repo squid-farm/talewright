@@ -111,7 +111,7 @@ class NxSelectionTests(unittest.TestCase):
             graph, "talewright-snippets:compiler-contract", "talewright-editor:test",
             "talewright-editor:package-check", "talewright-editor:editor-smoke",
         )
-        self.assertNotIn("Talewright.Tale.Tests:test", selected)
+        self.assertNotIn("Talewright.Talemark.Tests:test", selected)
         self.assertNotIn("talewright-workspace:editor-contract", selected)
         self.assertFalse(any(":e2e-" in task for task in selected))
         self.assertNotIn("Talewright.Core.Tests:test", selected)
@@ -122,7 +122,7 @@ class NxSelectionTests(unittest.TestCase):
         selected = self.assert_selected(
             graph,
             "Talewright.Rules.Tests:test",
-            "Talewright.Tale.Tests:test",
+            "Talewright.Talemark.Tests:test",
             "Talewright.Runtime.Tests:test",
             "Talewright.Player.E2E.Tests:e2e-web",
             "Talewright.Player.E2E.Tests:e2e-linux",
@@ -220,14 +220,14 @@ class NxSelectionTests(unittest.TestCase):
         selected = self.assert_selected(graph, "talewright-docs:check")
         self.assertFalse(any(task.startswith("talewright-editor:") for task in selected))
         self.assertFalse(any(":e2e-" in task for task in selected))
-        self.assertNotIn("Talewright.Tale.Tests:test", selected)
+        self.assertNotIn("Talewright.Talemark.Tests:test", selected)
 
     def test_schema_fixture_inputs_select_editor_contracts(self):
         for changed in (
             "docs/reference/talemark-syntax.md",
             "examples/CSharpStory/Story/Content/story.talewright.yaml",
             "tooling/vscode-talewright/schemas/story.schema.json",
-            "engine/tests/Talewright.Tale.Tests/EditorManifestSchemaTests.cs",
+            "engine/tests/Talewright.Talemark.Tests/EditorManifestSchemaTests.cs",
         ):
             with self.subTest(changed=changed):
                 self.assert_selected(affected_graph(changed), "talewright-editor:compiler-contract",
@@ -245,8 +245,8 @@ class NxSelectionTests(unittest.TestCase):
             dependencies["Talewright.Runtime.Tests:build:release"],
         )
         self.assertIn(
-            {"id": "Talewright.Tale.Tests:build:release"},
-            dependencies["Talewright.Tale.Tests:test"],
+            {"id": "Talewright.Talemark.Tests:build:release"},
+            dependencies["Talewright.Talemark.Tests:test"],
         )
         self.assertIn(
             {"id": "Talewright.Player.E2E.Tests:build:release"},
@@ -258,7 +258,7 @@ class NxSelectionTests(unittest.TestCase):
         for project in ("talewright-editor", "talewright-snippets"):
             task = f"{project}:compiler-contract"
             self.assertIn(
-                {"id": "Talewright.Tale.Tests:build:release"},
+                {"id": "Talewright.Talemark.Tests:build:release"},
                 graph["tasks"]["dependencies"][task],
             )
             command = graph["graph"]["nodes"][project]["data"]["targets"]["compiler-contract"]["options"]["command"]
@@ -308,7 +308,7 @@ class NxSelectionTests(unittest.TestCase):
         }
         self.assertEqual(30, projects)
         self.assertIn(
-            ("Talewright.Authoring", "Talewright.Tale"), actual,
+            ("Talewright.Authoring", "Talewright.Talemark"), actual,
         )
         self.assertIn(
             ("Talewright.Authoring.Tests", "Talewright.Authoring"), actual,

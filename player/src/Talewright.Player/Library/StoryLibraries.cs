@@ -1,5 +1,5 @@
 using System.Reflection;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Player.Library;
 

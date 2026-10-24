@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Talewright.Core.Events;
 using Talewright.Narrative.Rendering;
-using Talewright.Tale.Compilation;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Runtime.Tests;
 
