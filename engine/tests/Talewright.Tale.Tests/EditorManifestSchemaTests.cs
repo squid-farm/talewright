@@ -79,6 +79,13 @@ public class EditorManifestSchemaTests
             var player = story.World.Characters[EntityId.Player];
             switch (file)
             {
+                case "text-variables.yaml":
+                    Assert.Equal("stormy", story.World.TextVariables[new("weather")]);
+                    Assert.Equal("", story.World.TextVariables[new("empty")]);
+                    Assert.Equal("12", story.World.TextVariables[new("numeric-label")]);
+                    Assert.Equal("\u96ea", story.World.TextVariables[new("unicode")]);
+                    Assert.Equal(1, story.World.Variables[new("count")]);
+                    break;
                 case "defaults.yaml":
                     Assert.Equal("0.0.0", story.Version);
                     Assert.Equal(RandomnessMode.ChecksOnly, story.Randomness);

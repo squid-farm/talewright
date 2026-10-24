@@ -61,6 +61,22 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Text_variable_hover_tracks_unsaved_manifest_type_changes_across_files()
+    {
+        await using var client = new Client();
+        const string declarations = "vars:\n  weather: \"sunny\"\n";
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), declarations);
+        await client.Initialize();
+        const string marked = "=== start\n{var:wea|ther}\n-> END";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
+        await client.Open(StorySource.ManifestFileName, Manifest + declarations.Replace("\"sunny\"", "0"), 1);
+        Assert.Contains("(integer)", Text(await Hover(client, "start.tale", marked)));
+        await client.Change(StorySource.ManifestFileName, Manifest + declarations, 2);
+        Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
+    }
+
+    [Fact]
     public async Task Hover_prefers_the_first_supported_client_format()
     {
         await using var client = new Client();

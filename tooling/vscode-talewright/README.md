@@ -121,6 +121,12 @@ compiler silently ignores a scalar faction display name. Unknown keys are schema
 errors but compiler warnings (`TW4006`). Creation preset IDs must contain a
 non-whitespace character and be no longer than 80 characters.
 
+Under `vars`, integers and quoted text (including `""` and `"12"`) are supported.
+The initial value fixes the variable's type. Completion and hover identify
+`integer` or `text` from compiler analysis, including unsaved manifest changes.
+Live compiler diagnostics reject incompatible assignments and numeric operations
+on text. Use quoted YAML text values for consistent compiler/schema feedback.
+
 ## Not included
 
 - Signature help, inlay hints, rename, lint, formatting, or runtime debugging.

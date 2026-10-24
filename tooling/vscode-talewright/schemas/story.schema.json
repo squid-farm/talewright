@@ -86,8 +86,17 @@
       "description": "Optional flags to declare before any Talemark effect sets them."
     },
     "vars": {
-      "$ref": "#/definitions/integerMap",
-      "description": "Optional integer variables keyed by story-specific IDs."
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/definitions/integer" },
+          { "type": "string" }
+        ]
+      },
+      "description": "Optional integer or text variables keyed by story-specific IDs. Quote text initial values, including empty text and numeric-looking text. Initial values establish fixed types."
     },
     "triggers": {
       "type": "array",
