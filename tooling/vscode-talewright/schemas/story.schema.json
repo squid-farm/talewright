@@ -357,6 +357,9 @@
           "type": "object",
           "maxProperties": 32,
           "description": "Selectable values by ruleset stat ID. Each list must contain 1 to 100 distinct, in-range integers.",
+          "propertyNames": {
+            "$ref": "#/definitions/identifier"
+          },
           "additionalProperties": {
             "type": "array",
             "minItems": 1,

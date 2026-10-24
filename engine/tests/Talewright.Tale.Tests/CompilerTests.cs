@@ -419,6 +419,7 @@ public class CompilerTests
     [InlineData("guards:", "pläyer:")]
     [InlineData("relic:", "bad..item:")]
     [InlineData("guild:", "guild-:")]
+    [InlineData("guards:", "\"guards\\n\":")]
     [InlineData("vars: { torches: 1 }", "vars: {\"bad/id\": 0}")]
     [InlineData("vars: { torches: 1 }", "flags: [bad name]\nvars: { torches: 1 }")]
     public void Manifest_entity_ids_enforce_shared_identifier_grammar(string original, string replacement)

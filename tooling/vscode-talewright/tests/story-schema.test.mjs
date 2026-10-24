@@ -54,12 +54,14 @@ test('schema validates every shipped story manifest', async () => {
 
 test('compiler, schema, and editor grammar use the same identifier characters', async () => {
   const compiler = await read('engine/src/Talewright.Tale/Parsing/IdentifierRules.cs');
-  const match = compiler.match(/PatternText = @\"([^\"]+)\"/);
+  const match = compiler.match(/PatternBody = @\"([^\"]+)\"/);
   assert.ok(match, 'compiler identifier pattern should be discoverable');
-  assert.equal(schema.definitions.identifier.pattern, match[1]);
+  assert.match(compiler, /PatternText = "\^" \+ PatternBody \+ @"\\z"/,
+    'compiler must anchor at the absolute end, matching ECMAScript $');
+  assert.equal(schema.definitions.identifier.pattern, `^${match[1]}$`);
 
   const grammar = await read('tooling/vscode-talewright/syntaxes/tale.tmLanguage.json');
-  assert.ok(grammar.includes(match[1].slice(1, -1)),
+  assert.ok(grammar.includes(match[1]),
     'editor grammar should use the same identifier body as compiler and manifest schema');
 
   for (const id of ['player', 'temple.entrance', 'weapon.knife', 'camp-arrival', '_custom-2']) {
@@ -71,14 +73,18 @@ test('compiler, schema, and editor grammar use the same identifier characters', 
     }, `identifier ${id}`);
   }
 
-  for (const id of ['2start', 'café', 'camp..arrival', 'camp--arrival', '-camp', 'camp-']) {
+  for (const id of ['2start', 'café', 'camp..arrival', 'camp--arrival', '-camp', 'camp-', 'camp\n']) {
     assertInvalid(validateManifest, {
       id: 'identifier-test',
       title: 'Identifier test',
       start: 'beginning',
       characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
-    }, `invalid identifier ${id}`, 'pattern');
+    }, `invalid identifier ${JSON.stringify(id)}`, 'pattern');
   }
+
+  const creationStats = compileSubschema(schema.definitions.creation.properties.stats);
+  assertValid(creationStats, { str: [8] }, 'creation stat ID');
+  assertInvalid(creationStats, { 'bad/id': [8] }, 'invalid creation stat ID', 'propertyNames');
 });
 
 test('schema validates complete and contextual documented manifest examples', async () => {
