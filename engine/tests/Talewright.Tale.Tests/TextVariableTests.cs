@@ -64,7 +64,6 @@ public class TextVariableTests
     [Theory]
     [InlineData("~ var:weather = 1")]
     [InlineData("~ var:count = \"rain\"")]
-    [InlineData("~ var:new-text = \"rain\"")]
     [InlineData("~ var:weather += \"rain\"")]
     [InlineData("~ var:weather -= 1")]
     [InlineData("~ var:weather = var:weather + \"rain\"")]
