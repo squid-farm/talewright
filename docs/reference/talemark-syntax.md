@@ -1,7 +1,10 @@
-# Tale syntax reference
+# Talemark syntax reference
 
 A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
-`.tale` supports prose with bold, italic and code formatting, plus scene directives, choices and expressions.
+**Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
+It combines prose with bold, italic and code formatting with dialogue, choices, conditions, and RPG effects
+through a small set of line-level directives and inline expressions. The YAML manifest defines
+the story's configuration and world; it is not Talemark source.
 It is not a general Markdown document format.
 
 The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
@@ -62,6 +65,7 @@ items:
 flags: [door-open] # optional; flags/vars are also auto-declared when an effect sets them
 vars:
   torches-lit: 0
+  weather: "sunny"
 
 triggers:
   - id: guild-turns

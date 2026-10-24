@@ -16,7 +16,7 @@ How it fits together:
   and a ruleset. Both hosts pass its options to the shared player, and the Validator uses the same
   factory at build time.
 - **Build-time validation.** The package's `buildTransitive/Talewright.targets` runs the
-  `TalewrightStoryProject` validator against `TalewrightStoryRoot` before host compilation. Invalid Tale
+  `TalewrightStoryProject` validator against `TalewrightStoryRoot` before host compilation. Invalid Talemark
   emits `file(line,column): error TWxxxx: message` and fails the build. Design-time IDE builds skip it.
   The properties may also be passed globally with `-p:`; the nested validator build strips them to avoid
   recursion.

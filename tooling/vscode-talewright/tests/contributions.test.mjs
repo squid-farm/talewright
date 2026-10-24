@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 const json = async file => JSON.parse(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
 
-test('package wires Tale syntax, snippets, manifest schema, and the thin LSP client', async () => {
+test('package wires Talemark syntax, snippets, manifest schema, and the thin LSP client', async () => {
   const manifest = await json('package.json');
   assert.equal(manifest.main, './dist/extension.cjs');
   assert.equal(manifest.browser, undefined);
@@ -17,6 +17,9 @@ test('package wires Tale syntax, snippets, manifest schema, and the thin LSP cli
     'editor.autoClosingQuotes': 'never',
   });
   assert.deepEqual(manifest.contributes.languages[0].extensions, ['.tale']);
+  assert.equal(manifest.contributes.languages[0].id, 'tale');
+  assert.deepEqual(manifest.contributes.languages[0].aliases, ['Talemark', 'tale']);
+  assert.equal((await json('syntaxes/tale.tmLanguage.json')).name, 'Talemark');
   assert.equal(manifest.contributes.grammars[0].scopeName, 'text.tale');
   for (const contribution of ['grammars', 'snippets']) {
     await readFile(new URL(`../${manifest.contributes[contribution][0].path}`, import.meta.url));
