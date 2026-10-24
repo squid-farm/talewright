@@ -189,6 +189,42 @@ dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --artifacts artifacts/restore-experiment
 ```
 
+## Source-loading allocation experiment
+
+`StorySource.ReadText` now decodes directly from the input stream through a
+bounded `StreamReader` instead of copying every file into a growing
+`MemoryStream` first. The 4 KiB reader buffer and byte limits preserve
+`StreamReader`'s BOM detection and replacement behavior for malformed input.
+This avoids the 81,920-byte per-file buffer and intermediate full-file copy;
+the reader still has per-file internal buffers, and no pooled/shared buffer
+was introduced.
+
+The `ReadAndDecodeDirectory` cases use the same 5 MiB aggregate input, scene
+count and history depth, varying only the layout: two large files versus 100
+smaller files. Local Release runs were on AC power; unchanged and changed
+states were alternated. Both 100-file runs used 3 warmups and 15 measurements
+of 500 ms. The few-file timing was noisy, so it was repeated with 5 warmups and
+30 measurements of one second.
+
+| Layout | Unchanged allocated/op | Changed allocated/op | Allocation change | Unchanged mean | Changed mean | Timing change |
+|---|---:|---:|---:|---:|---:|---:|
+| 2 files | 30.15 MiB | 20.10 MiB | −33.3% | 12.13 ms | 12.67 ms | +4.4% (within noise) |
+| 100 files | 33.92 MiB | 21.96 MiB | −35.2% | 10.87 ms | 10.38 ms | −4.4% (within noise) |
+
+The longer 2-file comparison's mean was 12.13 ms unchanged and 12.67 ms
+changed; its median moved by +6.4%. These differences are smaller than the
+run-to-run spread and do not establish a timing regression or speedup. The
+allocation reduction is consistent across both layouts. This is a warm local
+directory-read benchmark, not cold-open latency, UI responsiveness, retained
+heap or peak process memory. The latter measurements remain deferred to #212.
+
+```bash
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.ReadAndDecodeDirectory*layout-*' \
+  --warmupCount 3 --iterationCount 15 --iterationTime 500 \
+  --artifacts artifacts/source-loading-experiment
+```
+
 ## Budget status
 
 The issue's candidate goals—ordinary choice p95 below 50 ms and Back/Forward

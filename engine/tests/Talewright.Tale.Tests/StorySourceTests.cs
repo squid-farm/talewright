@@ -48,6 +48,67 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
+    public void Directory_and_zip_preserve_stream_reader_bom_and_malformed_input_behavior()
+    {
+        var files = new Dictionary<string, byte[]>
+        {
+            ["utf16.tale"] = [0xFF, 0xFE, (byte)'h', 0, (byte)'i', 0],
+            ["malformed.tale"] = [0xC3, 0x28],
+        };
+        foreach (var (path, bytes) in files)
+        {
+            File.WriteAllBytes(Path.Combine(_root, path), bytes);
+        }
+
+        var directorySource = StorySource.FromDirectory(_root);
+        using var zipBuffer = new MemoryStream();
+        using (var archive = new ZipArchive(zipBuffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (path, bytes) in files)
+            {
+                using var entry = archive.CreateEntry(path).Open();
+                entry.Write(bytes);
+            }
+        }
+
+        zipBuffer.Position = 0;
+        var zipSource = StorySource.FromZip(zipBuffer);
+
+        foreach (var source in new[] { directorySource, zipSource })
+        {
+            Assert.Equal("hi", source.Files["utf16.tale"]);
+            Assert.Equal("\uFFFD(", source.Files["malformed.tale"]);
+        }
+    }
+
+    [Fact]
+    public void Zip_expanded_limits_are_enforced_while_reading_entry_bytes()
+    {
+        using var oversizedFile = new MemoryStream();
+        using (var archive = new ZipArchive(oversizedFile, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using var entry = archive.CreateEntry("large.tale").Open();
+            WriteBytes(entry, 5L * 1024 * 1024 + 1);
+        }
+
+        oversizedFile.Position = 0;
+        Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(oversizedFile)).Message);
+
+        using var oversizedTotal = new MemoryStream();
+        using (var archive = new ZipArchive(oversizedTotal, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            for (var index = 0; index < 11; index++)
+            {
+                using var entry = archive.CreateEntry($"{index}.tale").Open();
+                WriteBytes(entry, index == 10 ? 1 : 5L * 1024 * 1024);
+            }
+        }
+
+        oversizedTotal.Position = 0;
+        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(oversizedTotal)).Message);
+    }
+
+    [Fact]
     public void Directory_accepts_64_levels_and_rejects_65()
     {
         var path = _root;
@@ -300,4 +361,15 @@ public sealed class StorySourceTests : IDisposable
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
+
+    private static void WriteBytes(Stream output, long count)
+    {
+        var buffer = new byte[8192];
+        while (count > 0)
+        {
+            var length = (int)Math.Min(count, buffer.Length);
+            output.Write(buffer, 0, length);
+            count -= length;
+        }
+    }
 }
