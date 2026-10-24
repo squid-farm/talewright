@@ -73,10 +73,15 @@ internal sealed class ExpressionParser
                 { Kind: TokenKind.Colon },
                 { Kind: TokenKind.Identifier } variable,
                 { Kind: TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign },
-                .. var amount] && amount.Length > 0)
+                .. var amount])
             {
                 variables.TryAdd(new VarId(variable.Text), 0);
                 declaration?.Invoke(variable.Text, false, variable.Offset);
+                if (amount.Length == 0)
+                {
+                    start = end + 1;
+                    continue;
+                }
                 var numeric = statement[3].Kind is TokenKind.PlusAssign or TokenKind.MinusAssign ||
                     amount.Any(token => token.Kind is TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash);
                 typedDeclaration?.Invoke(new(new(variable.Text), text[amount[0].Offset..tokens[end].Offset],
