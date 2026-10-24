@@ -1,4 +1,7 @@
-"""Route Nx-selected tasks to existing CI environments; never classify changed paths."""
+"""Route Nx-selected tasks to existing CI environments; never classify changed paths.
+
+Changed-path selection belongs to Nx inputs, not this environment router.
+"""
 
 import argparse
 import json
