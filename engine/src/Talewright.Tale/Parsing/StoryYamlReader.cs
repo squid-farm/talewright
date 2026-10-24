@@ -90,10 +90,10 @@ internal sealed class StoryYamlReader
         var manifest = new StoryManifest
         {
             World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, vars),
-            Id = RequiredScalar(root, "id") ?? string.Empty,
+            Id = RequiredIdentifier(root, "id") ?? string.Empty,
             Title = RequiredScalar(root, "title") ?? string.Empty,
             Version = Scalar(Get(root, "version")) ?? "0.0.0",
-            Start = RequiredScalar(root, "start") ?? string.Empty,
+            Start = RequiredIdentifier(root, "start") ?? string.Empty,
             StartLocation = Get(root, "start") is { } startNode ? At(startNode) : new SourceLocation(_file, 1, 1),
         };
 
@@ -162,7 +162,9 @@ internal sealed class StoryYamlReader
         {
             foreach (var (key, value) in statMap.Children)
             {
-                var id = new StatId(Scalar(key) ?? "");
+                var rawId = Identifier(key, "creation stat id");
+                if (rawId is null) continue;
+                var id = new StatId(rawId);
                 if (!ruleset.StatsById.TryGetValue(id, out var definition))
                 {
                     Error(key, "TW4005", $"Unknown creation stat '{id}'.", 0);
@@ -207,10 +209,15 @@ internal sealed class StoryYamlReader
                 }
 
                 CheckKeys(preset, "label", "stats");
-                var id = Scalar(key) ?? "";
-                if (string.IsNullOrWhiteSpace(id) || id.Length > 80)
+                var id = Identifier(key, "preset id");
+                if (id is null)
                 {
-                    Error(key, "TW4003", "Preset ids must contain 1 to 80 characters.", 0);
+                    continue;
+                }
+                if (id.Length > 80)
+                {
+                    Error(key, "TW4003", "Preset ids must contain at most 80 characters.", 0);
+                    continue;
                 }
 
                 var presetStats = ReadStatMap(Get(preset, "stats"), ruleset);
@@ -249,7 +256,9 @@ internal sealed class StoryYamlReader
         }
 
         CheckKeys(map, "base", "disable", "stats");
-        var baseId = Scalar(Get(map, "base")) ?? Rulesets.Generic.GenericRuleset.Id;
+        var baseNode = Get(map, "base");
+        var baseId = baseNode is null ? Rulesets.Generic.GenericRuleset.Id
+            : Identifier(baseNode, "ruleset id") ?? Rulesets.Generic.GenericRuleset.Id;
         if (!_options.Rulesets.TryGetValue(baseId, out var factory))
         {
             Error(Get(map, "base")!, "TW4004", $"Unknown ruleset '{baseId}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
@@ -263,7 +272,9 @@ internal sealed class StoryYamlReader
             _analysis?.DisabledStats(disable, baseRuleset);
             foreach (var item in Sequence(disable, "ruleset.disable"))
             {
-                var id = new StatId(Scalar(item) ?? string.Empty);
+                var rawId = Identifier(item, "stat id");
+                if (rawId is null) continue;
+                var id = new StatId(rawId);
                 if (builder.HasStat(id))
                 {
                     builder.RemoveStat(id);
@@ -285,7 +296,7 @@ internal sealed class StoryYamlReader
                 }
 
                 CheckKeys(stat, "id", "name", "category", "min", "max", "default");
-                var id = RequiredScalar(stat, "id");
+                var id = RequiredIdentifier(stat, "id");
                 if (id is null)
                 {
                     continue;
@@ -330,7 +341,9 @@ internal sealed class StoryYamlReader
 
         foreach (var (key, value) in map.Children)
         {
-            var id = new ItemId(Scalar(key) ?? string.Empty);
+            var rawId = Identifier(key, "item id");
+            if (rawId is null) continue;
+            var id = new ItemId(rawId);
             var name = id.Value;
             var modifiers = new Dictionary<StatId, int>();
             if (value is YamlMappingNode body)
@@ -360,7 +373,8 @@ internal sealed class StoryYamlReader
 
         foreach (var (key, value) in map.Children)
         {
-            var id = Scalar(key) ?? string.Empty;
+            var id = Identifier(key, "faction id");
+            if (id is null) continue;
             var name = id;
             var standing = 0;
             if (value is YamlMappingNode body)
@@ -387,7 +401,8 @@ internal sealed class StoryYamlReader
 
         foreach (var (key, value) in map?.Children ?? Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>())
         {
-            var id = Scalar(key) ?? string.Empty;
+            var id = Identifier(key, "character id");
+            if (id is null) continue;
             if (Mapping(value, $"characters.{id}") is not { } body)
             {
                 continue;
@@ -445,7 +460,9 @@ internal sealed class StoryYamlReader
 
         foreach (var (key, value) in map.Children)
         {
-            var id = new StatId(Scalar(key) ?? string.Empty);
+            var rawId = Identifier(key, "stat id");
+            if (rawId is null) continue;
+            var id = new StatId(rawId);
             if (!ruleset.HasStat(id))
             {
                 Error(key, "TW4005", $"Unknown stat '{id}' (ruleset '{ruleset.Id}'). Add it under ruleset.stats.", 0);
@@ -475,7 +492,9 @@ internal sealed class StoryYamlReader
 
         foreach (var (key, quantity) in entries)
         {
-            var id = new ItemId(Scalar(key) ?? string.Empty);
+            var rawId = Identifier(key, "item id");
+            if (rawId is null) continue;
+            var id = new ItemId(rawId);
             if (!items.ContainsKey(id))
             {
                 Error(key, "TW4005", $"Unknown item '{id}'. Declare it under items.", 0);
@@ -488,8 +507,17 @@ internal sealed class StoryYamlReader
         return inventory;
     }
 
-    private List<FlagId> ReadFlags(YamlNode? node) =>
-        node is null ? [] : Sequence(node, "flags").Select(n => new FlagId(Scalar(n) ?? string.Empty)).ToList();
+    private List<FlagId> ReadFlags(YamlNode? node)
+    {
+        var flags = new List<FlagId>();
+        if (node is null) return flags;
+        foreach (var item in Sequence(node, "flags"))
+        {
+            if (Identifier(item, "flag id") is { } id) flags.Add(new FlagId(id));
+        }
+
+        return flags;
+    }
 
     private Dictionary<VarId, int> ReadVars(YamlNode? node)
     {
@@ -501,7 +529,7 @@ internal sealed class StoryYamlReader
 
         foreach (var (key, value) in map.Children)
         {
-            vars[new VarId(Scalar(key) ?? string.Empty)] = Int(value) ?? 0;
+            if (Identifier(key, "variable id") is { } id) vars[new VarId(id)] = Int(value) ?? 0;
         }
 
         return vars;
@@ -533,7 +561,7 @@ internal sealed class StoryYamlReader
                 }
             }
             var idNode = Get(map, "id");
-            var id = RequiredScalar(map, "id");
+            var id = RequiredIdentifier(map, "id");
             if (id is null)
             {
                 continue;
@@ -576,6 +604,26 @@ internal sealed class StoryYamlReader
         {
             _diagnostics.Error("TW4003", $"'{key}' must be a single value.", At(node));
             return null;
+        }
+
+        return value;
+    }
+
+    private string? RequiredIdentifier(YamlMappingNode map, string key)
+    {
+        var value = RequiredScalar(map, key);
+        var node = Get(map, key);
+        return value is null || node is null ? null : Identifier(node, $"'{key}'");
+    }
+
+    private string? Identifier(YamlNode node, string what)
+    {
+        var value = Scalar(node);
+        if (value is null || !IdentifierRules.IsValid(value))
+        {
+            var found = value is null ? "a non-string value" : $"'{value}'";
+            return Error<string?>(node, "TW4003",
+                $"Invalid {what} {found}. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators.", null);
         }
 
         return value;

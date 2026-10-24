@@ -31,7 +31,7 @@ Use them in prose, and Talewright takes care of the grammar:
 ```tale
 {player:first-name#possessive} torch gutters.     → Mara's torch gutters.
 {player:last-name#possessive} reputation          → Burns's reputation
-{player:pronoun.subject#capitalize} hesitates.    → She hesitates.
+{player:pronoun:subject#capitalize} hesitates.    → She hesitates.
 > guide: Careful.                                 → dialogue spoken by Tomas
 ```
 
@@ -109,7 +109,7 @@ ruleset and can't be changed in `story.talewright.yaml` yet. A developer can cha
 
 ```tale
 * [Shove the door] { faction:explorers-guild -= 10 } -> hall
-{if faction:explorers-guild >= friendly}The guild speaks well of you.{/if}
+{if faction:explorers-guild:tier >= friendly}The guild speaks well of you.{/if}
 ```
 
 ## Skill checks
@@ -145,7 +145,7 @@ Use conditions in `requires:`, `{if}` and triggers:
 player:dex >= 12 and not flag:alarm-raised
 player has rope or player:athletics > 3
 visited(temple.hall)
-faction:explorers-guild <= unfriendly
+faction:explorers-guild:tier <= unfriendly
 ```
 
 See [expressions](../reference/tale-syntax.md#4-expressions) for the full list.

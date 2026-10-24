@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
@@ -29,9 +28,6 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 /// </remarks>
 internal sealed partial class TaleParser
 {
-    [GeneratedRegex(@"^[A-Za-z0-9_]+(?:[.\-][A-Za-z0-9_]+)*$")]
-    internal static partial Regex IdPattern();
-
     private readonly string _file;
     private readonly string[] _lines;
     private readonly StorySymbols _symbols;
@@ -107,9 +103,9 @@ internal sealed partial class TaleParser
     {
         _discoverScene?.Invoke(new SceneId(id), location);
         _scene = new SceneBuilder(new SceneId(id), location);
-        if (!IdPattern().IsMatch(id) || id == "END")
+        if (!IdentifierRules.IsValid(id) || id == "END")
         {
-            _diagnostics.Error("TW1008", $"'{id}' is not a valid scene id. Use letters, digits, '-', '_' and '.' (e.g. temple.entrance).", location);
+            _diagnostics.Error("TW1008", $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators (e.g. temple.entrance).", location);
         }
     }
 
@@ -395,7 +391,7 @@ internal sealed partial class TaleParser
         _symbols.Analysis?.Reference(speakerText, At(indent + 1 + body.Length - body.TrimStart().Length),
             AuthoringSymbolKind.Character);
         var who = colon > 0 ? body[..colon].Trim() : string.Empty;
-        if (who.Length == 0 || !IdPattern().IsMatch(who))
+        if (who.Length == 0 || !IdentifierRules.IsValid(who))
         {
             _diagnostics.Error("TW1007", "Speech lines look like '> who: text', where who is a character id.", At(indent));
             return;
@@ -458,6 +454,14 @@ internal sealed partial class TaleParser
         if (id.Length == 0)
         {
             _diagnostics.Error("TW1010", "Divert needs a target: '-> scene.id' or '-> END'.", location);
+            return null;
+        }
+
+        if (!IdentifierRules.IsValid(id))
+        {
+            _diagnostics.Error("TW1008",
+                $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators.",
+                location);
             return null;
         }
 

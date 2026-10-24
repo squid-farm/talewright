@@ -1,0 +1,4 @@
+{
+  "valid": ["player", "_custom-2", "temple.entrance", "weapon.knife", "camp-arrival", "a.b-c_d", "A1"],
+  "invalid": ["", "2start", "café", "camp..arrival", "camp--arrival", "camp.-arrival", "-camp", "camp-", ".camp", "camp.", "bad/id", "bad id", "camp\n", "camp\r\n", "\ncamp"]
+}

@@ -6,12 +6,12 @@
 ![A clearing at the jungle's edge, tents sagging in the heat](camp-art)
 
 The boat leaves {player:first-name} at the edge of the jungle with a pack, a {item:torch#lower} and
-three weeks of unanswered letters. The {faction:explorers-guild.name} has given {player:pronoun.object}
+three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun:object}
 one season to find the **Relic of Ysh** before they hand the expedition to someone more *reliable*.
 
 > guide: {player:first-name} {player:last-name}. You're later than your letter promised. I'm Tomas — the guild sent me.
 
-{player:last-name#possessive} reputation for punctuality is, {player:pronoun.subject} has to admit, deserved.
+{player:last-name#possessive} reputation for punctuality is, {player:pronoun:subject} has to admit, deserved.
 
 -> camp.hub
 
@@ -64,7 +64,7 @@ talking only in numbers.
 @once
 @priority 5
 
-You spread {player:pronoun.possessive} field journal across your knees. The glyph rubbings from the museum
+You spread {player:pronoun:possessive} field journal across your knees. The glyph rubbings from the museum
 are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
 
 * [Puzzle out the glyphs] skill-check history dc 12

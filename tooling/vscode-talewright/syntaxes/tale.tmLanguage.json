@@ -28,7 +28,7 @@
       "patterns": [{"include": "#inline"}]
     },
     {
-      "begin": "^\\s*(>)\\s*([A-Za-z0-9_.-]+)(:)",
+      "begin": "^\\s*(>)\\s*([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)",
       "beginCaptures": {
         "1": {"name": "punctuation.definition.speech.tale"},
         "2": {"name": "entity.name.tag.character.tale"},
@@ -99,7 +99,7 @@
   ],
   "repository": {
     "target": {
-      "match": "(->)\\s*([A-Za-z0-9_.-]+)?",
+      "match": "(->)\\s*([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)?",
       "captures": {
         "1": {"name": "keyword.control.divert.tale"},
         "2": {"name": "entity.name.section.target.tale"}
@@ -149,14 +149,24 @@
           "name": "string.quoted.double.tale",
           "patterns": [{"match": "\\\\.", "name": "constant.character.escape.tale"}]
         },
-        {"match": "@[A-Za-z0-9_.-]+", "name": "support.function.predicate.tale"},
-        {"match": "#[A-Za-z0-9_.-]+", "name": "support.function.modifier.tale"},
+        {"match": "@[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*", "name": "support.function.predicate.tale"},
+        {"match": "#[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*", "name": "support.function.modifier.tale"},
         {"match": "\\b(?:true|false|hostile|unfriendly|neutral|friendly|allied)\\b", "name": "constant.language.tale"},
         {"match": "\\b(?:and|or|not|has|set|clear|give|take|dc)\\b", "name": "keyword.operator.word.tale"},
         {"match": "\\bvisited(?=\\s*\\()", "name": "support.function.tale"},
         {"include": "#paren"},
         {
-          "match": "\\b([A-Za-z0-9_.-]+)(:)([A-Za-z0-9_.-]+)",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)",
+          "captures": {
+            "1": {"name": "variable.other.owner.tale"},
+            "2": {"name": "punctuation.separator.tale"},
+            "3": {"name": "variable.other.member.tale"},
+            "4": {"name": "punctuation.separator.tale"},
+            "5": {"name": "variable.other.member.tale"}
+          }
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)",
           "captures": {
             "1": {"name": "variable.other.owner.tale"},
             "2": {"name": "punctuation.separator.tale"},

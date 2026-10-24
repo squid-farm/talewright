@@ -52,6 +52,34 @@ test('schema validates every shipped story manifest', async () => {
   }
 });
 
+test('compiler, schema, and editor grammar accept the same identifiers', async () => {
+  const pattern = schema.definitions.identifier.pattern;
+  assert.ok(pattern.startsWith('^') && pattern.endsWith('$'), 'schema identifier pattern must be anchored');
+  const grammar = await read('tooling/vscode-talewright/syntaxes/tale.tmLanguage.json');
+  assert.ok(grammar.includes(pattern.slice(1, -1)),
+    'editor grammar should use the same identifier body as the manifest schema');
+
+  // EditorManifestSchemaTests runs the same fixture through the compiler.
+  const fixture = JSON.parse(await read('tooling/vscode-talewright/tests/fixtures/identifiers.json'));
+  const manifest = id => ({
+    id: 'identifier-test',
+    title: 'Identifier test',
+    start: 'beginning',
+    characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
+  });
+  for (const id of fixture.valid) {
+    assertValid(validateManifest, manifest(id), `identifier ${JSON.stringify(id)}`);
+  }
+
+  for (const id of fixture.invalid) {
+    assertInvalid(validateManifest, manifest(id), `invalid identifier ${JSON.stringify(id)}`, 'pattern');
+  }
+
+  const creationStats = compileSubschema(schema.definitions.creation.properties.stats);
+  assertValid(creationStats, { str: [8] }, 'creation stat ID');
+  assertInvalid(creationStats, { 'bad/id': [8] }, 'invalid creation stat ID', 'propertyNames');
+});
+
 test('schema validates complete and contextual documented manifest examples', async () => {
   const fullManifests = [
     ['docs/reference/tale-syntax.md', 0],
@@ -175,12 +203,12 @@ test('schema permits custom ruleset IDs without hard-coding registrations', asyn
   assertValid(validateManifest, story, 'custom ruleset ID');
 });
 
-test('preset IDs retain open author keys within compiler structural bounds', () => {
+test('preset IDs use the shared identifier rule and retain the existing 80-character bound', () => {
   const validate = compileSubschema(schema.definitions.creation.properties.presets);
-  for (const id of ['', ' \t ', 'x'.repeat(81)]) {
+  for (const id of ['', ' space ', 'bad/id', 'x'.repeat(81)]) {
     assertInvalid(validate, { [id]: {} }, `invalid preset ID ${JSON.stringify(id)}`, 'propertyNames');
   }
-  for (const id of ['x', 'x'.repeat(80), ' custom preset ']) {
+  for (const id of ['x', 'x'.repeat(80), 'custom-preset']) {
     assertValid(validate, { [id]: {} }, `valid preset ID ${JSON.stringify(id)}`);
   }
 });

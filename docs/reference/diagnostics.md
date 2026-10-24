@@ -30,7 +30,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1005 | Unbalanced `{if}` / `{else}` / `{/if}`. | Inline conditions must open and close in the same paragraph. Block conditions need their own lines. |
 | TW1006 | Bad scene metadata (`@title`, `@hub`, `@hub-limit`, ...). | Put metadata directly after the `===` line, once each. `@hub-limit` needs `@hub`. |
 | TW1007 | Malformed dialogue line. | `> who: text`, where `who` is a character id. |
-| TW1008 | Invalid scene id. | Letters, digits, `-`, `_` and `.`, e.g. `temple.entrance`. |
+| TW1008 | Invalid scene id. | Use the shared ASCII identifier form: start with a letter or `_`, then use letters, digits, `_`, and single `.` or `-` separators, e.g. `temple.entrance`. |
 | TW1009 | Skill check outcomes are missing or misplaced. | Every check needs both `success:` and `failure:` lines directly below it. |
 | TW1010 | `->` without a target. | `-> scene.id` or `-> END`. |
 | TW1011 | Malformed choice. | `* [label] (requires: ...) { effects } -> target`. Check for missing `]`, `)` or `}`. |
@@ -77,7 +77,7 @@ include resolver integration or image-file existence checks.
 |---|---|---|
 | TW4001 | Invalid YAML. | Check indentation (spaces, not tabs) and colons. |
 | TW4002 | Something required is missing: `story.talewright.yaml` itself, `id`, `title`, `start`, the `player` character, a character's `first-name`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. |
-| TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. | Read the message for the allowed values. |
+| TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers. | Read the message for the allowed values. |
 | TW4004 | Unknown ruleset. | Use `generic` or `none`. |
 | TW4005 | Unknown stat or item in `story.talewright.yaml`. | Fix the spelling, or declare it under `ruleset.stats` / `items`. |
 | ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |

@@ -87,9 +87,9 @@ continues to provide structural key/schema suggestions independently.
 YAML additions; ordinary stat references use the final story stat table.
 Empty inventory/disabled-stat flow lists offer insertion edits inside the
 brackets, including when there is whitespace between them.
-Completion preserves existing namespace/call delimiters as well as effect
-operators, including when YAML escapes encode the delimiters. Faction ID edits
-also retain existing `.name` and `.tier` member access.
+Completion preserves existing namespace/property delimiters as well as effect
+operators, including when YAML escapes encode the delimiters. Faction IDs and
+their `:name`/`:tier` properties have separate completion slots.
 
 Limitations: YAML must remain parseable (an empty scalar is fine, an unclosed
 quote or collection is not). Identifiers split across physical lines, such as a

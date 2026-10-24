@@ -35,7 +35,7 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         fixture = fixture with
         {
             Tale = TestStories.Linear.Tale.Replace("Mara's",
-                "{player:pronoun.subject}/{player:pronoun.object}/{player:pronoun.reflexive}"),
+                "{player:pronoun:subject}/{player:pronoun:object}/{player:pronoun:reflexive}"),
             Yaml = fixture.Yaml.Replace("pronouns: [they, she]", $"pronouns: [{keyword}, " +
                 string.Join(", ", new[] { "she", "he", "they", "it" }.Where(value => value != keyword)) + "]"),
         };
