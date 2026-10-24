@@ -113,6 +113,49 @@ p95 and Back/Forward at 3.10 ms p95. Both had multimodal-distribution warnings;
 the Back/Forward iteration was below BenchmarkDotNet's recommended duration.
 Do not use those short observations to set a product budget.
 
+## Fingerprint allocation experiment
+
+A local experiment on base commit `bcffef9` replaces full-file UTF-8 arrays
+used for replay fingerprints with a 4 KiB encoding buffer. It preserves the
+length-prefixed SHA-256 input, including Unicode and invalid-surrogate
+replacement; saves must not acquire a different fingerprint.
+
+The independent `CompileLoadedSource` byte-volume cases hold file count (100),
+scene count (100), and history depth (100) constant. Changed-code screening
+came first; only after allocation savings looked promising was the production
+change temporarily removed for unchanged-code comparison. The test additions
+remained in place for both states.
+
+| Source size | Unchanged allocated/op | Changed allocated/op | Reduction | Unchanged mean | Changed mean |
+|---|---:|---:|---:|---:|---:|
+| 5 MiB | 26.65 MiB | 21.65 MiB | 18.8% | 11.65 ms | 11.25 ms |
+| 50 MiB | 251.65 MiB | 201.64 MiB | 19.9% | 82.73 ms | 77.02 ms |
+
+Means are averages of two runs per state, ordered unchanged → changed, then
+changed → unchanged, to offset drift. Runs were local Release builds on Linux
+Mint 22.3, Ryzen 9 7940HS, .NET 10.0.13, on AC power with the CPU governor and
+power profile set to `performance`, and no concurrent tests or benchmarks
+(an idle browser remained open). The 5 MiB case used five warmups and 20
+measurements; the 50 MiB case used three warmups and 15 measurements of about
+one second.
+
+Allocation savings were stable across runs. The 50 MiB timing improvement
+(about 7%) was consistent in both orders; the 5 MiB timing difference (about
+3%) is within run-to-run noise. Earlier quick runs that showed a 20–25% timing
+improvement were taken on battery with concurrent E2E load and are discarded.
+Gen0/Gen1/Gen2 collections per 1,000 operations at 50 MiB fell from 24/22/22
+to 19/17/17. These figures are not retained-heap or isolated process-memory
+measurements.
+
+Reproduce either size with the same command on unchanged and changed code:
+
+```bash
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.CompileLoadedSource*bytes-50MiB*' \
+  --warmupCount 3 --iterationCount 15 --iterationTime 1000 \
+  --artifacts artifacts/fingerprint-experiment
+```
+
 ## Budget status
 
 The issue's candidate goals—ordinary choice p95 below 50 ms and Back/Forward
