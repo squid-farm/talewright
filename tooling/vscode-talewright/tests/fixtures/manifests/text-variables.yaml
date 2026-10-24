@@ -1,0 +1,11 @@
+id: text-schema
+title: Text schema
+start: beginning
+characters:
+  player: { first-name: Ada }
+vars:
+  weather: "stormy"
+  empty: ""
+  numeric-label: "12"
+  unicode: "\u96ea"
+  count: 1
