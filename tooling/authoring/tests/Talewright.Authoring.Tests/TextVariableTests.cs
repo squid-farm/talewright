@@ -55,4 +55,46 @@ public class TextVariableTests
         Assert.Contains(StoryCompletion.Complete(analysis, new SourceLocation("a.tale", 2, 7)),
             completion => completion.Label == "weather" && completion.Detail == $"Variable: {type}");
     }
+
+    [Fact]
+    public async Task Implicit_symbols_track_chains_file_changes_unsaved_edits_and_recovery()
+    {
+        var workspace = new StoryWorkspace(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = Manifest.Replace("  weather: \"sunny\"\n", ""),
+            ["a.tale"] = "=== a\n{var:weather}\n~ var:copy = var:weather\n-> b",
+            ["b.tale"] = "=== b\n~ var:weather = \"stormy\"\n-> END",
+        }));
+        async Task<StoryAnalysis> Analyze()
+        {
+            var analysis = (await workspace.AnalyzeAsync(TimeSpan.Zero)).Analysis;
+            Assert.Equal(StoryCompiler.Compile(analysis.Source).Diagnostics, analysis.Diagnostics);
+            return analysis;
+        }
+        var text = await Analyze();
+        AssertType(text, "text");
+        Assert.Contains(text.Symbols, symbol => symbol.Name == "copy" && symbol.Type == "text");
+        workspace.Open("b.tale", 1, "=== b\n~ var:weather = 1\n-> END");
+        AssertType(await Analyze(), "integer");
+        workspace.Change("b.tale", 2, "=== b\n~ var:weather = var:copy\n-> END");
+        var cycle = await Analyze();
+        AssertType(cycle, "unresolved");
+        Assert.Contains(cycle.Diagnostics, diagnostic => diagnostic.Code == "TW2007");
+        workspace.Change("b.tale", 3, "=== b\n~ var:weather =");
+        var incomplete = await Analyze();
+        AssertType(incomplete, "unresolved");
+        workspace.Change("b.tale", 4, "=== b\n~ var:weather = \"stormy\"\n-> END");
+        AssertType(await Analyze(), "text");
+        workspace.Close("b.tale");
+        workspace.UpdateFile("b.tale", "=== b\n~ var:weather = 2\n~ var:weather = \"wrong\"\n-> END");
+        var conflict = await Analyze();
+        AssertType(conflict, "integer");
+        Assert.Contains(conflict.Diagnostics, diagnostic => diagnostic.Code == "TW2003");
+        workspace.UpdateFile("b.tale", null);
+        var removed = await Analyze();
+        Assert.DoesNotContain(removed.Symbols, symbol => symbol.Name == "weather");
+        Assert.Contains(removed.Diagnostics, diagnostic => diagnostic.Code == "TW2004");
+        workspace.UpdateFile("b.tale", "=== b\n~ var:weather = \"restored\"\n-> END");
+        AssertType(await Analyze(), "text");
+    }
 }

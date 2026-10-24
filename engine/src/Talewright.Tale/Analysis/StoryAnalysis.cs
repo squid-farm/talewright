@@ -182,7 +182,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             ExpressionParser.CollectDeclarations(text, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
                 (name, flag, offset) => Symbols.Add(new(name,
                     flag ? AuthoringSymbolKind.Flag : AuthoringSymbolKind.Variable,
-                    flag ? "boolean" : _variableTypes.GetValueOrDefault(name, "integer"),
+                    flag ? "boolean" : _variableTypes.GetValueOrDefault(name, "unresolved"),
                     scalar?.Range(offset, name.Length) ?? Range(location.Offset(offset), name))));
         }
     }
@@ -355,10 +355,11 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 if (Get(stat, "id") is { } id) Add(id, AuthoringSymbolKind.Stat, "integer");
     }
 
-    internal void World(WorldDefinition world)
+    internal void World(WorldDefinition world, IReadOnlySet<VarId>? unresolved = null)
     {
         foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = "integer";
         foreach (var id in world.TextVariables.Keys) _variableTypes[id.Value] = "text";
+        foreach (var id in unresolved ?? new HashSet<VarId>()) _variableTypes[id.Value] = "unresolved";
         for (var index = 0; index < Symbols.Count; index++)
         {
             var symbol = Symbols[index];

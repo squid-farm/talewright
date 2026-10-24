@@ -101,7 +101,7 @@ public static class StoryCompiler
             declarations, variables, textVariables, options, diagnostics);
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
             manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, textVariables);
-        analysis?.World(world);
+        analysis?.World(world, unresolved);
         var symbols = new StorySymbols
         {
             World = world,
