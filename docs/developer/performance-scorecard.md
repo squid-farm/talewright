@@ -225,6 +225,45 @@ dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --artifacts artifacts/source-loading-experiment
 ```
 
+## Parser comment-line materialization experiment
+
+`TaleParser` no longer normalizes the whole source into a second string and
+splits it into an array containing a string for every line. It scans line
+ranges in the immutable source and skips comment lines before creating a
+string. Non-comment lines still become strings for the existing parser APIs.
+The line scanner preserves CR, LF, CRLF, NEL, line-separator and
+paragraph-separator handling, including an empty line after a terminal
+newline.
+
+The `CompileLoadedSource` benchmarks hold 100 files, 100 scenes and history
+depth 100 constant; the synthetic corpora are padded primarily with long
+comments. Runs used local Release builds on AC power, alternating unchanged
+and changed states, with 3 warmups, 10 measurements and 500 ms per measurement.
+
+| Source size | Unchanged allocated/op | Changed allocated/op | Allocation change | Unchanged mean | Changed mean | Mean-time change |
+|---|---:|---:|---:|---:|---:|---:|
+| 5 MiB | 21.66 MiB | 1.68 MiB | −92.3% | 11.69 ms | 5.12 ms | −56.2% |
+| 50 MiB | 201.65 MiB | 1.68 MiB | −99.2% | 71.16 ms | 41.86 ms | −41.2% |
+
+Each state is the average of two runs; the timing results were consistent
+between the alternating runs. The synthetic workload intentionally stresses
+comment padding, so these results demonstrate parser churn on that workload,
+not the same percentage gain on typical hand-written stories. They measure
+compile time and managed allocation, not live heap, peak process memory or
+editor responsiveness.
+
+The existing source-map, parser/compiler, implicit text-variable and full
+non-E2E test suites passed, including diagnostic/forward-inference cases.
+No grammar, lexer, escape or diagnostic behavior was intentionally changed;
+lexer/escape work remains separate in #184.
+
+```bash
+dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.CompileLoadedSource*bytes-5MiB*' \
+  --warmupCount 3 --iterationCount 10 --iterationTime 500 \
+  --artifacts artifacts/parser-materialization
+```
+
 ## Budget status
 
 The issue's candidate goals—ordinary choice p95 below 50 ms and Back/Forward

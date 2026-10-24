@@ -29,7 +29,7 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 internal sealed partial class TaleParser
 {
     private readonly string _file;
-    private readonly string[] _lines;
+    private readonly string _text;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
     private readonly Action<string, SourceLocation>? _discoverEffects;
@@ -37,12 +37,25 @@ internal sealed partial class TaleParser
     private readonly List<ParsedScene> _scenes = [];
     private SceneBuilder? _scene;
     private int _index;
+    private int _lineStart;
+    private int _lineLength;
+    private int _nextLineStart;
+    private int _nextLineLength;
+    private int _afterNextLineStart;
+    private bool _hasCurrentLine = true;
+    private bool _hasNextLine;
+    private bool _hasAfterNextLine;
 
     private TaleParser(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
         Action<string, SourceLocation>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null)
     {
         _file = file;
-        _lines = text.ReplaceLineEndings("\n").Split('\n');
+        _text = text;
+        _lineLength = GetLineLength(0, out _nextLineStart, out _hasNextLine);
+        if (_hasNextLine)
+        {
+            _nextLineLength = GetLineLength(_nextLineStart, out _afterNextLineStart, out _hasAfterNextLine);
+        }
         _symbols = symbols;
         _diagnostics = diagnostics;
         _discoverEffects = discoverEffects;
@@ -64,14 +77,15 @@ internal sealed partial class TaleParser
 
     private void Run()
     {
-        for (_index = 0; _index < _lines.Length; _index++)
+        while (_hasCurrentLine)
         {
-            var raw = _lines[_index];
+            var raw = _text.AsSpan(_lineStart, _lineLength);
             var trimmed = raw.Trim();
             var indent = raw.Length - raw.TrimStart().Length;
 
             if (trimmed.StartsWith("//", StringComparison.Ordinal))
             {
+                AdvanceLine();
                 continue;
             }
 
@@ -79,7 +93,8 @@ internal sealed partial class TaleParser
             {
                 _symbols.Analysis?.Tokens.Add(new("===", AnalysisCollector.Range(At(indent), "===")));
                 FinishScene();
-                StartScene(trimmed[3..].Trim(), At(indent));
+                StartScene(trimmed[3..].Trim().ToString(), At(indent));
+                AdvanceLine();
                 continue;
             }
 
@@ -90,13 +105,55 @@ internal sealed partial class TaleParser
                     _diagnostics.Error("TW3001", "Text before the first scene. Start a scene with '=== scene.id'.", At(indent));
                 }
 
+                AdvanceLine();
                 continue;
             }
 
-            ParseSceneLine(trimmed, indent);
+            ParseSceneLine(trimmed.ToString(), indent);
+            AdvanceLine();
         }
 
         FinishScene();
+    }
+
+    private int GetLineLength(int start, out int nextStart, out bool hasNext)
+    {
+        var remainder = _text.AsSpan(start);
+        var lineBreak = remainder.IndexOfAny("\r\n\u0085\u2028\u2029");
+        var end = lineBreak < 0 ? _text.Length : start + lineBreak;
+        if (lineBreak < 0)
+        {
+            nextStart = end;
+            hasNext = false;
+            return end - start;
+        }
+
+        nextStart = end + 1;
+        if (_text[end] == '\r' && nextStart < _text.Length && _text[nextStart] == '\n')
+        {
+            nextStart++;
+        }
+
+        hasNext = true;
+        return end - start;
+    }
+
+    private void AdvanceLine()
+    {
+        _index++;
+        if (!_hasNextLine)
+        {
+            _hasCurrentLine = false;
+            return;
+        }
+
+        _lineStart = _nextLineStart;
+        _lineLength = _nextLineLength;
+        _nextLineStart = _afterNextLineStart;
+        _hasNextLine = _hasAfterNextLine;
+        _nextLineLength = _hasNextLine
+            ? GetLineLength(_nextLineStart, out _afterNextLineStart, out _hasAfterNextLine)
+            : 0;
     }
 
     private void StartScene(string id, SourceLocation location)
@@ -634,8 +691,8 @@ internal sealed partial class TaleParser
                 }
                 offset += word.Length;
             }
-            if (dc < 0 && references.Length == 1 && column + offset < _lines[_index].Length &&
-                char.IsWhiteSpace(_lines[_index][column + offset]) &&
+            if (dc < 0 && references.Length == 1 && column + offset < _lineLength &&
+                char.IsWhiteSpace(_text[_lineStart + column + offset]) &&
                 _symbols.World.Characters.ContainsKey(new EntityId(references[0])))
                 analysis.Reference("", At(column + offset + 1), AuthoringSymbolKind.Stat);
             var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
@@ -683,20 +740,20 @@ internal sealed partial class TaleParser
         CheckOutcome? success = null;
         CheckOutcome? failure = null;
         var closed = false;
-        while (_index + 1 < _lines.Length)
+        while (_hasNextLine)
         {
-            var raw = _lines[_index + 1];
+            var raw = _text.AsSpan(_nextLineStart, _nextLineLength);
             var line = raw.Trim();
             var indent = raw.Length - raw.TrimStart().Length;
             if (line.StartsWith("//", StringComparison.Ordinal) || (insideBlock && line.Length == 0))
             {
-                _index++;
+                AdvanceLine();
                 continue;
             }
 
-            if (insideBlock && line == ":::")
+            if (insideBlock && line.SequenceEqual(":::"))
             {
-                _index++;
+                AdvanceLine();
                 closed = true;
                 break;
             }
@@ -707,8 +764,8 @@ internal sealed partial class TaleParser
                 break;
             }
 
-            _index++;
-            var outcome = ParseOutcome(line[8..], indent + 8);
+            AdvanceLine();
+            var outcome = ParseOutcome(line[8..].ToString(), indent + 8);
             if (isSuccess)
             {
                 success = outcome;
