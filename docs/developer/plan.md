@@ -2,7 +2,7 @@
 
 > A C#/.NET engine for stat-driven, massively branching, text-first RPG visual novels.
 > Desktop (Photino) + Web (Blazor WASM). On rails first, open world later.
-> License: MPL-2.0. Story files: `.tale` (Markdown superset).
+> License: MPL-2.0. Story files: `.tale` (Talemark, with bold, italic and code formatting).
 
 This is the living roadmap, not the live task board. Track requirements, status, blockers, and implementation
 in [GitHub Issues](https://github.com/squid-farm/talewright/issues) and the
@@ -64,7 +64,7 @@ Reusable pieces:
 | D1 | .NET 10, C#, Blazor; Photino desktop + Blazor WASM web. **Desktop first.** |
 | D2 | Name **Talewright**; namespaces/packages `Talewright.*` |
 | D3 | License **MPL-2.0**. User acknowledged that commercial use is allowed; only modified engine files must stay open. |
-| D4 | Authoring format: **`.tale`** is a Markdown superset (Markdig plus custom directives), with `story.talewright.yaml` for story configuration and schema. |
+| D4 | Authoring format: **`.tale`** is Talemark, with bold, italic and code formatting plus story directives, and `story.talewright.yaml` for story configuration and schema. See the [operator registry](../reference/talemark-operators.md); further formatting design is tracked in #200. |
 | D5 | Two authoring paths sharing **one compiler library**: (a) **no-code** story folder/zip loaded by the player app, compiled once at load; (b) **C# story project** compiled at build time, with errors as build diagnostics (M2). The runtime never parses text during play; it runs on a typed AST. |
 | D6 | The template renderer outputs a **presentation-agnostic document model (AST)**, not HTML. It includes media placeholders for future images. |
 | D7 | Conditions: **both** inline expressions and named C# predicates. Both compile to the same predicate tree and run in one evaluator, the rules engine. |

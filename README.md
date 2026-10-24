@@ -12,7 +12,7 @@
 > and project structure may change without notice. **Do not expect backward compatibility until v1.**
 
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
-and many branches. You write scenes in `.tale` files, a small extension of Markdown, and describe your
+and many branches. You write scenes in `.tale` files, with bold, italic and code formatting, and describe your
 cast in one `story.talewright.yaml`. No programming required.
 
 ```tale
@@ -29,7 +29,7 @@ cast in one `story.talewright.yaml`. No programming required.
 
 ## Features
 
-- **Plain-text stories.** Markdown prose, dialogue lines, choices, and inline or block `{if}` conditions.
+- **Plain-text stories.** Bold, italic and code formatting, dialogue lines, choices, and inline or block `{if}` conditions.
 - **Proper RPG rules.** Stats, skills, d20 skill checks, items that modify stats, factions with
   reputation tiers, XP and levels. Use the default ruleset, tweak it, or replace it.
 - **Big branching stories.** Hubs and storylets offer whichever scenes are currently available, so you
