@@ -664,7 +664,9 @@ internal sealed class ExpressionParser
                     Fail("TW2004", $"Variable '{path.Text}' is never assigned by any effect and is not declared in story.talewright.yaml.", path.Offset);
                 }
 
-                return new VarRef(new VarId(path.Text));
+                return _symbols.World.TextVariables.ContainsKey(new VarId(path.Text))
+                    ? new TextVarRef(new VarId(path.Text))
+                    : new VarRef(new VarId(path.Text));
         }
 
         var character = Character(ns);
@@ -795,9 +797,23 @@ internal sealed class ExpressionParser
         };
         var amountStart = Peek.Offset;
         var amount = ParseSum();
+        if (first.Text == "var" && _symbols.World.TextVariables.ContainsKey(new VarId(target.Text)))
+        {
+            if (op != AssignOp.Set)
+            {
+                Fail("TW2003", $"Text variable '{target.Text}' supports '=' only, not '{opToken.Text}'.", opToken.Offset);
+            }
+            if (amount.Type != ExprType.Text)
+            {
+                Fail("TW2003", $"Text variable '{target.Text}' needs text, not {Describe(amount.Type)}.", amountStart);
+            }
+            return new SetTextVariable(new VarId(target.Text), amount);
+        }
         if (amount.Type != ExprType.Number)
         {
-            Fail("TW2003", "Only numbers can be assigned.", amountStart);
+            Fail("TW2003", first.Text == "var"
+                ? $"Variable '{target.Text}' needs a number. Declare text variables with a quoted initial value in story.talewright.yaml."
+                : "Only numbers can be assigned to stats or faction standings.", amountStart);
         }
 
         return first.Text switch

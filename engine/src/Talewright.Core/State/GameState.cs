@@ -18,6 +18,7 @@ public sealed class GameState : IGameStateView
     private readonly Dictionary<FactionId, int> _standings = [];
     private readonly HashSet<FlagId> _flags = [];
     private readonly Dictionary<VarId, int> _variables = [];
+    private readonly Dictionary<VarId, string> _textVariables = [];
     private readonly Dictionary<SceneId, int> _visits = [];
     private readonly HashSet<string> _firedTriggers = [];
 
@@ -62,6 +63,11 @@ public sealed class GameState : IGameStateView
         foreach (var (id, value) in world.Variables)
         {
             state._variables[id] = value;
+        }
+
+        foreach (var (id, value) in world.TextVariables)
+        {
+            state._textVariables[id] = value;
         }
 
         return state;
@@ -118,7 +124,18 @@ public sealed class GameState : IGameStateView
 
                 break;
             case VariableChanged e:
+                if (World.TextVariables.ContainsKey(e.Variable))
+                {
+                    throw new InvalidOperationException($"Variable '{e.Variable}' holds text, not an integer.");
+                }
                 _variables[e.Variable] = e.NewValue;
+                break;
+            case TextVariableChanged e:
+                if (!World.TextVariables.ContainsKey(e.Variable) || e.NewValue is null)
+                {
+                    throw new InvalidOperationException($"Variable '{e.Variable}' is not a declared text variable or its value is null.");
+                }
+                _textVariables[e.Variable] = e.NewValue;
                 break;
             case SceneEntered e:
                 CurrentScene = e.Scene;
@@ -178,7 +195,13 @@ public sealed class GameState : IGameStateView
 
     public bool GetFlag(FlagId flag) => _flags.Contains(flag);
 
-    public int GetVariable(VarId variable) => _variables.GetValueOrDefault(variable);
+    public int GetVariable(VarId variable) => World.TextVariables.ContainsKey(variable)
+        ? throw new InvalidOperationException($"Variable '{variable}' holds text, not an integer.")
+        : _variables.GetValueOrDefault(variable);
+
+    public string GetTextVariable(VarId variable) => _textVariables.TryGetValue(variable, out var value)
+        ? value
+        : throw new KeyNotFoundException($"Unknown text variable '{variable}'.");
 
     public int VisitCount(SceneId scene) => _visits.GetValueOrDefault(scene);
 

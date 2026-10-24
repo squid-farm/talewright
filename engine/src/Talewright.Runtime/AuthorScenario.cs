@@ -437,6 +437,7 @@ internal sealed class ScenarioCommand
 [JsonSerializable(typeof(StandingChanged))]
 [JsonSerializable(typeof(FlagChanged))]
 [JsonSerializable(typeof(VariableChanged))]
+[JsonSerializable(typeof(TextVariableChanged))]
 [JsonSerializable(typeof(SceneEntered))]
 [JsonSerializable(typeof(ChoiceMade))]
 [JsonSerializable(typeof(DiceRolled))]

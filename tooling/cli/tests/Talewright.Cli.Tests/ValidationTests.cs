@@ -84,6 +84,24 @@ public sealed class ValidationTests : IDisposable
         Assert.Contains("TW4002", result.Output);
     }
 
+    [Theory]
+    [InlineData("~ var:weather = \"stormy\"", 0)]
+    [InlineData("~ var:weather = 3", 1)]
+    [InlineData("~ var:weather += \"stormy\"", 1)]
+    public void Explicit_text_validation_uses_existing_exit_and_diagnostic_contract(string effect, int exit)
+    {
+        File.AppendAllText(Path.Combine(_root, "story.talewright.yaml"), "vars:\n  weather: \"sunny\"\n");
+        File.WriteAllText(Path.Combine(_root, "main.tale"), $"=== a\n{effect}\n{{var:weather}}\n-> END");
+        var result = Run("--format", "json");
+        Assert.Equal(exit, result.Code);
+        Assert.Empty(result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        Assert.Equal(exit == 0, json.RootElement.GetProperty("success").GetBoolean());
+        if (exit != 0)
+            Assert.Contains(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
+                diagnostic => diagnostic.GetProperty("code").GetString() == "TW2003");
+    }
+
     [Fact]
     public void Missing_directory_is_an_explicit_operational_error()
     {

@@ -96,9 +96,9 @@ test('schema validates complete and contextual documented manifest examples', as
     ['docs/reference/talemark-syntax.md', 2, 'creation'],
     ['docs/guide/writing-stories.md', 0, 'characters'],
     ['docs/guide/writing-stories.md', 1, 'items'],
-    ['docs/guide/writing-stories.md', 2, 'factions'],
-    ['docs/guide/writing-stories.md', 3, 'triggers'],
-    ['docs/guide/writing-stories.md', 4, 'creation'],
+    ['docs/guide/writing-stories.md', 3, 'factions'],
+    ['docs/guide/writing-stories.md', 4, 'triggers'],
+    ['docs/guide/writing-stories.md', 5, 'creation'],
   ];
   for (const [path, index, property] of fragmentExamples) {
     const name = `${path} YAML example ${index + 1} (${property})`;

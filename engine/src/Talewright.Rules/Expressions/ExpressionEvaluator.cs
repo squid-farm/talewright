@@ -66,6 +66,7 @@ public static class ExpressionEvaluator
                 : throw new InvalidOperationException("The ruleset defines no reputation tiers."),
             FlagRef e => Value.Of(state.GetFlag(e.Flag)),
             VarRef e => Value.Of(state.GetVariable(e.Variable)),
+            TextVarRef e => Value.Of(state.GetTextVariable(e.Variable)),
             NameRef e => Value.Of(Name(state, e)),
             PronounRef e => Value.Of(Pronoun(state, e)),
             FactionNameRef e => Value.Of(state.World.Factions[e.Faction].Name),

@@ -63,7 +63,8 @@ items:
   relic: { name: Relic of Ysh, modifiers: { wis: 2 } } # held items modify stats
 
 flags: [door-open] # optional; flags/vars are also auto-declared when an effect sets them
-vars: { torches-lit: 0 }
+vars:
+  torches-lit: 0
 
 triggers:
   - id: guild-turns
@@ -250,6 +251,41 @@ hostile … allied          reputation tier names (compare with faction:<id>)
 Types are checked at compile time (number, bool, text, tier).
 
 ## 5. Effects
+
+### Text variables
+
+Declare text with a quoted initial value under `vars` in `story.talewright.yaml`:
+
+```yaml
+vars:
+  weather: "sunny"
+  remembered-weather: ""
+  numeric-label: "12"
+```
+
+Use the same variable references in Talemark:
+
+```text
+~ var:remembered-weather = var:weather
+~ var:weather = "stormy"
+The weather is {var:weather}.
+{if var:weather == "stormy"}Find shelter.{/if}
+{if var:weather != var:remembered-weather}It has changed.{/if}
+```
+
+A variable's initial value fixes its type. Text assignment copies the value at that
+moment, not a live link to the source variable. Empty text and non-ASCII text are
+preserved. Quoted numbers such as `"12"` are text, not numbers.
+Text supports `=` and case-sensitive `==` / `!=`, not arithmetic, `+=`, `-=`,
+ordered comparisons, concatenation, or automatic conversion to/from numbers.
+Text currently requires an explicit declaration; implicit Talemark text
+declarations follow in [#222](https://github.com/squid-farm/talewright/issues/222).
+Existing implicit numeric declarations still start at zero.
+
+The current string-literal escape limitations in the
+[operator registry](talemark-operators.md) still apply; text variables do not add
+quote or backslash decoding. See the runnable
+[TextVariables example](../../examples/TextVariables).
 
 Separated by `;` inside `{ }`, one per `~` line.
 

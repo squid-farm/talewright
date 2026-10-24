@@ -110,7 +110,7 @@ using the quoted-text rules when it is inside syntax.
 | `has` | Inventory predicate: character ID on the left, item ID on the right. Item counts live only in inventory, not variables. | 1 | `{if player has rope}Equipped.{/if}` | TW2001 unknown character/item. |
 | `visited(...)` | Boolean predicate with one bare scene ID. | 1 | `{if visited(camp)}Back again.{/if}` | TW1001 malformed call; TW2002 unknown scene. |
 | `@` in expressions | Named boolean predicate registered by a C# story project; no arguments. Distinct from line metadata. | 1 | `{if @CanPickLock}Try the lock.{/if}` | TW2005 unregistered predicate. |
-| `=` `+=` `-=` | Assign, add or subtract a number in an effect targeting a stat, variable or faction standing. Not comparison. | Structural | `~ player:hp -= 3` | TW1003 malformed effect; TW2003 non-number; name errors. |
+| `=` `+=` `-=` | Assign, add or subtract a number in an effect targeting a stat, variable or faction standing. Text variables support `=` only and require a text expression. Not comparison. | Structural | `~ player:hp -= 3`; `~ var:weather = "stormy"` | TW1003 malformed effect; TW2003 incompatible types or numeric operations on text; name errors. |
 | `;` | Separate effects inside an effect list, not prose sentences or arguments. | Structural | `* [Pay] { var:coins -= 1; set flag:paid } -> hall` | TW1003 malformed effect; TW1001 unexpected trailing text. |
 
 Effects also use `set flag:id`, `clear flag:id`, `give character item [number-expression]` and

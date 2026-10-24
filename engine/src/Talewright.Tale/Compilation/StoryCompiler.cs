@@ -63,12 +63,16 @@ public static class StoryCompiler
         var scenes = new Dictionary<SceneId, SourceLocation>();
         var flags = manifest.World.Flags.ToHashSet();
         var variables = manifest.World.Variables.ToDictionary();
-        void DiscoverEffects(string text) => ExpressionParser.CollectDeclarations(text, flags, variables);
+        void DiscoverEffects(string text)
+        {
+            ExpressionParser.CollectDeclarations(text, flags, variables);
+            foreach (var id in manifest.World.TextVariables.Keys) variables.Remove(id);
+        }
         var discoverySymbols = new StorySymbols
         {
             World = manifest.World,
             Flags = flags,
-            Variables = variables.Keys.ToHashSet(),
+            Variables = variables.Keys.Concat(manifest.World.TextVariables.Keys).ToHashSet(),
             Scenes = new HashSet<SceneId>(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,
@@ -91,13 +95,13 @@ public static class StoryCompiler
         }
 
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
-            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables);
+            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, manifest.World.TextVariables);
         analysis?.World(world);
         var symbols = new StorySymbols
         {
             World = world,
             Flags = world.Flags,
-            Variables = world.Variables.Keys.ToHashSet(),
+            Variables = world.Variables.Keys.Concat(world.TextVariables.Keys).ToHashSet(),
             Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,

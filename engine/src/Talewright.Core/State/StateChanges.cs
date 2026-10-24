@@ -65,6 +65,16 @@ public static class StateChanges
         }
     }
 
+    public static IEnumerable<GameEvent> SetTextVariable(IGameStateView state, VarId variable, string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var old = state.GetTextVariable(variable);
+        if (!string.Equals(old, value, StringComparison.Ordinal))
+        {
+            yield return new TextVariableChanged(variable, old, value);
+        }
+    }
+
     /// <summary>Checks the ruleset's leveling rule and emits a level change if one is due.</summary>
     public static IEnumerable<GameEvent> CheckLevel(IGameStateView state, EntityId character)
     {
