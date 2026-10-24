@@ -276,9 +276,30 @@ moment, not a live link to the source variable. Empty text and non-ASCII text ar
 preserved. Quoted numbers such as `"12"` are text, not numbers.
 Text supports `=` and case-sensitive `==` / `!=`, not arithmetic, `+=`, `-=`,
 ordered comparisons, concatenation, or automatic conversion to/from numbers.
-Text currently requires an explicit declaration; implicit Talemark text
-declarations follow in [#222](https://github.com/squid-farm/talewright/issues/222).
-Existing implicit numeric declarations still start at zero.
+### Declaring variables in Talemark
+
+An assignment can introduce a variable without a manifest declaration:
+
+```text
+~ var:weather = "stormy"
+~ var:remembered-weather = var:weather
+```
+
+Declarations are discovered across the whole story before play, so references in
+earlier scenes or other files work. Implicit text starts as `""`; implicit numbers
+start at zero. Discovery does not execute the assignment: an unvisited scene cannot
+change the weather. Assignments only copy values when their effects execute.
+
+Manifest declarations establish types first. Otherwise, the first assignment
+establishes the type: `.tale` files are inspected in ordinal path order, effects in
+source order (left to right within a list), then trigger effects in manifest order.
+That order does not depend on filesystem enumeration or the reader's choices.
+Later incompatible assignments are errors, not type changes.
+
+Types can flow through forward references and assignment chains. Arithmetic and
+compound assignments require integers. When a chain has no resolvable type (for
+example, two variables only assigned from each other), the compiler reports
+TW2007: add an explicit manifest initial value to establish the type.
 
 The current string-literal escape limitations in the
 [operator registry](talemark-operators.md) still apply; text variables do not add

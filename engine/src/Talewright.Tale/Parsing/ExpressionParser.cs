@@ -46,7 +46,8 @@ internal sealed class ExpressionParser
     private sealed class ParseException : Exception;
 
     internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables,
-        Action<string, bool, int>? declaration = null)
+        Action<string, bool, int>? declaration = null,
+        Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default)
     {
         var tokens = Lexer.Tokenize(text);
         for (var start = 0; start < tokens.Count - 1;)
@@ -76,6 +77,10 @@ internal sealed class ExpressionParser
             {
                 variables.TryAdd(new VarId(variable.Text), 0);
                 declaration?.Invoke(variable.Text, false, variable.Offset);
+                var numeric = statement[3].Kind is TokenKind.PlusAssign or TokenKind.MinusAssign ||
+                    amount.Any(token => token.Kind is TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash);
+                typedDeclaration?.Invoke(new(new(variable.Text), text[amount[0].Offset..tokens[end].Offset],
+                    numeric, location.Offset(variable.Offset)));
             }
 
             start = end + 1;
@@ -90,6 +95,21 @@ internal sealed class ExpressionParser
     /// <summary>Parses a numeric expression. Returns null (with diagnostics) on error.</summary>
     public static Expr? ParseNumber(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
         ParseTyped(text, location, symbols, diagnostics, ExprType.Number);
+
+    internal static Expr? ParseValue(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
+    {
+        var parser = new ExpressionParser(text, location, symbols, diagnostics);
+        try
+        {
+            var value = parser.ParseSum();
+            parser.ExpectEnd();
+            return value;
+        }
+        catch (ParseException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>Parses the inside of <c>{reference#modifier…}</c>.</summary>
     public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
@@ -659,6 +679,10 @@ internal sealed class ExpressionParser
                     Fail("TW2001", $"Variable references do not have properties; use 'var:{path.Text}'.", member.Value.Offset);
                 }
 
+                if (_symbols.UnresolvedVariables.Contains(new VarId(path.Text)))
+                {
+                    Fail("TW2007", $"Cannot infer the type of variable '{path.Text}'. Declare an initial value under 'vars' in story.talewright.yaml.", path.Offset);
+                }
                 if (!_symbols.Variables.Contains(new VarId(path.Text)))
                 {
                     Fail("TW2004", $"Variable '{path.Text}' is never assigned by any effect and is not declared in story.talewright.yaml.", path.Offset);
@@ -787,6 +811,10 @@ internal sealed class ExpressionParser
 
         Expect(TokenKind.Colon, $"':' (effects look like 'player:hp -= 3', 'set flag:x', 'give player rope')");
         var target = Expect(TokenKind.Identifier, "a name");
+        if (first.Text == "var" && _symbols.UnresolvedVariables.Contains(new VarId(target.Text)))
+        {
+            Fail("TW2007", $"Cannot infer the type of variable '{target.Text}'. Declare an initial value under 'vars' in story.talewright.yaml.", target.Offset);
+        }
         var opToken = Next();
         var op = opToken.Kind switch
         {
@@ -812,7 +840,7 @@ internal sealed class ExpressionParser
         if (amount.Type != ExprType.Number)
         {
             Fail("TW2003", first.Text == "var"
-                ? $"Variable '{target.Text}' needs a number. Declare text variables with a quoted initial value in story.talewright.yaml."
+                ? $"Variable '{target.Text}' has a fixed integer type and needs a number, not {Describe(amount.Type)}."
                 : "Only numbers can be assigned to stats or faction standings.", amountStart);
         }
 

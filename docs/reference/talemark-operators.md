@@ -117,6 +117,11 @@ Effects also use `set flag:id`, `clear flag:id`, `give character item [number-ex
 `take character item [number-expression]`. An omitted inventory quantity is one. These are word
 commands, not additional sigils.
 
+Variable assignment can introduce integer or text state without YAML declarations.
+Discovery is story-wide; implicit text starts empty until an assignment executes.
+The first declaration fixes the type and assignments copy values, not live links.
+See [declaration ordering and inference](tale-syntax.md#declaring-variables-in-talemark).
+
 ### Binding order
 
 From tightest to loosest:
