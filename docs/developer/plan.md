@@ -145,7 +145,7 @@ Reusable pieces:
 - **Document model (output):** a presentation-agnostic `RenderedDocument` of blocks and inlines with **all substitutions resolved**. Media refs pass through as `MediaPlaceholder` nodes that M1 ignores, reserving room for images and sprites.
 - **Substitutions:** `{player:first-name#possessive}` → "Mara's", `{player:last-name#possessive}` → "Burns's" (Chicago-correct by default; see Risks/notes).
 - **Modifier pipeline:** `#possessive`, `#capitalize`, `#upper`, `#lower`, `#plural`, `#a` (a/an). Modifiers can be chained and new ones can be registered.
-- **Pronouns:** `{player:pronoun:subject}` → she; `:object` → her; `:possessive` → her; `:possessive-pronoun` → hers; `:reflexive` → herself. Built-in she/he/they sets plus custom sets. Verb agreement helper is a stretch goal (`{player:pronoun:subject} {player:verb.is}`).
+- **Pronouns:** `{player:pronoun}` → she; `#object` → her; `#possessive` → her; `#possessive("independent")` → hers; `#reflexive` → herself. Built-in she/he/they sets plus custom sets. Verb agreement helper is a stretch goal (`{player:pronoun} {player:verb.is}`).
 - **Grammar provider seam:** the `IGrammar` interface ships with English first, which keeps localization possible later.
 
 ### 4.5 `.tale` compiler (`Talewright.Tale`)

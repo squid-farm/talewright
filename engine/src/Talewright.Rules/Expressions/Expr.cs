@@ -92,7 +92,10 @@ public enum PronounForm
     Reflexive,
 }
 
-/// <summary><c>player:pronoun:subject</c> and the other pronoun forms.</summary>
+/// <summary>
+/// <c>player:pronoun</c> (subject) and the forms chosen with <c>#object</c>, <c>#possessive</c>,
+/// <c>#possessive("independent")</c> and <c>#reflexive</c>.
+/// </summary>
 public sealed record PronounRef(EntityId Character, PronounForm Form) : Expr
 {
     public override ExprType Type => ExprType.Text;

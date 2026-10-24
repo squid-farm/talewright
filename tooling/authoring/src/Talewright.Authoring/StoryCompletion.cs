@@ -21,7 +21,8 @@ public static class StoryCompletion
             var prefix = site.Text[..Math.Clamp(length, 0, site.Text.Length)];
             var symbols = (site.Candidates ?? analysis.Symbols).Where(symbol => site.Kinds.Contains(symbol.Kind))
                 .Select(symbol => (symbol.Name, Detail: $"{symbol.Kind}: {symbol.Type}"));
-            foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword => (keyword, "Tale syntax"))))
+            foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword =>
+                         (keyword, site.KeywordDetails?.GetValueOrDefault(keyword) ?? "Tale syntax"))))
             {
                 if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
                 var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;

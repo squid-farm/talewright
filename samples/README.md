@@ -33,7 +33,7 @@ the first camp hub; no edits or temporary copy are needed.
 | Custom-stat trigger, conditional entry effect | `courage-earned` sets `steady`; `field.resolve` grants conditional XP |
 | Repeatable edge-trigger behavior | `field.bell`: ring/silence/ring increments the alarm counter twice; `watch-bell` is not once-only |
 | Pronouns and possessives | prose throughout (`{player:last-name#possessive}` → "Burns's") |
-| All five pronoun references, full names, chained text modifiers and literal braces | `workshop.identity`: subject/object/possessive/possessive-pronoun/reflexive, `#upper`, `#capitalize`, `#a#capitalize`, escaped braces; existing prose uses `#lower` and `#possessive` |
+| All five pronoun references, full names, chained text modifiers and literal braces | `workshop.identity`: `pronoun`, `#object`, `#possessive`, `#possessive("independent")`, `#reflexive`, `#upper`, `#capitalize`, `#a#capitalize`, escaped braces; existing prose uses `#lower` and `#possessive` |
 | Inline and block `{if}` conditional prose, XP and level-up | throughout the chapters |
 | Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
 | Conditional diverts with unconditional fallback | `field.signal`, and `ending.return` when no relic choices are available |

@@ -251,7 +251,7 @@
     },
     "customPronouns": {
       "type": "object",
-      "required": ["subject", "object", "possessive", "possessive-pronoun", "reflexive"],
+      "required": ["subject", "object", "possessive-pronoun", "reflexive"],
       "properties": {
         "subject": {
           "$ref": "#/definitions/nonEmptyString"
@@ -259,11 +259,8 @@
         "object": {
           "$ref": "#/definitions/nonEmptyString"
         },
-        "possessive": {
-          "$ref": "#/definitions/nonEmptyString"
-        },
         "possessive-pronoun": {
-          "$ref": "#/definitions/nonEmptyString"
+          "$ref": "#/definitions/possessivePronouns"
         },
         "reflexive": {
           "$ref": "#/definitions/nonEmptyString"
@@ -271,6 +268,21 @@
         "plural": {
           "$ref": "#/definitions/booleanOrYesNoScalar",
           "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "possessivePronouns": {
+      "type": "object",
+      "required": ["determiner", "independent"],
+      "properties": {
+        "determiner": {
+          "$ref": "#/definitions/nonEmptyString",
+          "description": "Used before a noun, such as her. The default for #possessive."
+        },
+        "independent": {
+          "$ref": "#/definitions/nonEmptyString",
+          "description": "Stands alone, such as hers. Selected by #possessive(\"independent\")."
         }
       },
       "additionalProperties": false

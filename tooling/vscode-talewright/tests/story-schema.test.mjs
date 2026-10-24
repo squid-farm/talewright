@@ -137,6 +137,24 @@ test('schema validates complete and contextual documented manifest examples', as
   assert.ok(writingGuide.includes('`vars: { bribes: 0 }`'));
 });
 
+test('custom possessive pronouns require nested determiner and independent values', () => {
+  const validate = compileSubschema(schema.definitions.customPronouns);
+  const pronouns = {
+    subject: 'xe',
+    object: 'xem',
+    'possessive-pronoun': { determiner: 'xer', independent: 'xers' },
+    reflexive: 'xemself',
+  };
+  assertValid(validate, pronouns, 'nested possessive forms');
+  for (const forms of ['xers', null, [], {}, { determiner: 'xer' }, { independent: 'xers' },
+    { determiner: '', independent: 'xers' }, { determiner: 'xer', independent: [] }]) {
+    assertInvalid(validate, { ...pronouns, 'possessive-pronoun': forms }, `invalid forms ${JSON.stringify(forms)}`);
+  }
+  const { 'possessive-pronoun': omitted, ...missing } = pronouns;
+  assertInvalid(validate, missing, 'missing possessive forms', 'required');
+  assertInvalid(validate, { ...pronouns, possessive: 'xer' }, 'old flat possessive', 'additionalProperties');
+});
+
 test('schema rejects unknown keys at every closed reader mapping', async () => {
   const source = await read('engine/src/Talewright.Tale/Parsing/StoryYamlReader.cs');
   const readerSets = [...source.matchAll(/CheckKeys\(\w+,\s*((?:"[^"]+"\s*,?\s*)+)\);/g)]
@@ -151,10 +169,10 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
     ['customPronouns', schema.definitions.customPronouns, {
       subject: 'xe',
       object: 'xem',
-      possessive: 'xyr',
-      'possessive-pronoun': 'xyrs',
+      'possessive-pronoun': { determiner: 'xyr', independent: 'xyrs' },
       reflexive: 'xemself',
     }],
+    ['possessivePronouns', schema.definitions.possessivePronouns, { determiner: 'xyr', independent: 'xyrs' }],
     ['item', schema.definitions.item, {}],
     ['faction', schema.definitions.faction, {}],
     ['creation', schema.definitions.creation, {}],

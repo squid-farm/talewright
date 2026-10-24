@@ -54,6 +54,6 @@ You start sleeping with the relic under your pillow.
 === ending.empty-handed
 @title Empty-Handed
 
-You return with nothing but {player:pronoun:possessive} notes and a story nobody at the guild quite
+You return with nothing but {player:pronoun#possessive} notes and a story nobody at the guild quite
 believes. Tomas, at least, buys you a drink.
 -> END
