@@ -162,6 +162,23 @@ public sealed class ImageSyntaxTests
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf('\\') + 1), error.Location);
     }
 
+    [Theory]
+    [InlineData("""* [Pick {image("coin")] -> END""", "]", "Close it with '}'")]
+    [InlineData("""  * [🦑 Pick {image("coin")] -> END""", "]", "Close it with '}'")]
+    [InlineData("""* [Pick {image("coin", "unclosed)] -> END""", "\"unclosed", "closing double quote")]
+    [InlineData("""* [Pick {image("coin")""", "", "closing '}'")]
+    public void Unclosed_images_in_choice_labels_keep_image_diagnostics(string line, string marker, string message)
+    {
+        var result = Compile("=== start\r\n" + line + "\r\n-> END\r\n=== next\r\n-> END");
+        Assert.False(result.Success);
+        var image = Assert.Single(result.Errors, error => error.Code == "TW1014");
+        Assert.Contains(message, image.Message);
+        var column = marker.Length == 0 ? line.Length + 1 : line.IndexOf(marker, StringComparison.Ordinal) + 1;
+        Assert.Equal(new SourceLocation("main.tale", 2, column), image.Location);
+        Assert.Contains(result.Errors, error => error.Code == "TW1011");
+        Assert.DoesNotContain(result.Errors, error => error.Code is "TW1008" or "TW3010");
+    }
+
     [Fact]
     public void Multiline_image_diagnostics_map_to_the_authored_line()
     {
