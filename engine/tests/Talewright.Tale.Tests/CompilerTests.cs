@@ -192,7 +192,7 @@ public class CompilerTests
         var story = Ok("""
             === a
             {player:first-name#possessive} torch gutters. **{player:last-name#possessive}** *map* is `old`.
-            {guards:first-name#possessive#capitalize} post. {player:pronoun.subject#capitalize} carries {item:rope#a}.
+            {guards:first-name#possessive#capitalize} post. {player:pronoun:subject#capitalize} carries {item:rope#a}.
 
             > guards: Halt, {player:name}!
             -> END
@@ -361,6 +361,76 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Faction_properties_use_colons_and_dots_remain_part_of_names()
+    {
+        const string yaml = """
+            id: dotted-name-test
+            title: Dotted names
+            start: camp.arrival
+            characters: { player: { first-name: Ada } }
+            factions:
+              guild.name: { name: Guild name }
+              guild: { name: Guild }
+            """;
+        var story = Ok("""
+            === camp.arrival
+            {faction:guild:name} / {faction:guild:tier} / {faction:guild.name}
+            {player:pronoun:subject}
+            -> END
+            """, yaml);
+        Assert.Equal("camp.arrival", story.Scenes.Single().Id.Value);
+        Assert.Equal("Guild name", story.World.Factions[new Talewright.Core.Identity.FactionId("guild.name")].Name);
+    }
+
+    [Theory]
+    [InlineData("{faction:guild.name}", "faction:guild:name")]
+    [InlineData("{faction:missing.tier}", "faction:missing:tier")]
+    [InlineData("{player:pronoun.subject}", "player:pronoun:subject")]
+    public void Dotted_property_access_reports_its_colon_replacement(string reference, string replacement)
+    {
+        var error = Error($"=== a\n{reference}\n-> END", "TW2001");
+        Assert.Contains(replacement, error.Message);
+    }
+
+    [Theory]
+    [InlineData("café")]
+    [InlineData("camp..arrival")]
+    [InlineData("camp--arrival")]
+    [InlineData("-camp")]
+    [InlineData("camp-")]
+    public void Scene_ids_reject_names_outside_shared_identifier_grammar(string id)
+    {
+        var result = Compile($"=== {id}\n-> END");
+        var error = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "TW1008");
+        Assert.Contains("ASCII", error.Message);
+        Assert.Equal(new SourceLocation("main.tale", 1, 1), error.Location);
+    }
+
+    [Fact]
+    public void Scene_targets_use_the_same_identifier_grammar_as_declarations()
+    {
+        var result = Compile("=== a\n-> café");
+        var error = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "TW1008");
+        Assert.Contains("ASCII", error.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, 4), error.Location);
+    }
+
+    [Theory]
+    [InlineData("guards:", "pläyer:")]
+    [InlineData("relic:", "bad..item:")]
+    [InlineData("guild:", "guild-:")]
+    [InlineData("vars: { torches: 1 }", "vars: {\"bad/id\": 0}")]
+    [InlineData("vars: { torches: 1 }", "flags: [bad name]\nvars: { torches: 1 }")]
+    public void Manifest_entity_ids_enforce_shared_identifier_grammar(string original, string replacement)
+    {
+        var yaml = Yaml.Replace(original, replacement);
+        var result = Compile("=== a\n-> END", yaml);
+        var error = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "TW4003");
+        Assert.Contains("Invalid", error.Message);
+        Assert.Contains("ASCII", error.Message);
+    }
+
+    [Fact]
     public void Reports_structural_errors_and_warnings()
     {
         Error("=== a\nJust text.", "TW3002");
@@ -483,7 +553,7 @@ public class CompilerTests
     {
         var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive: xyr, possessive-pronoun: xyrs, reflexive: xemself }");
         var options = new CompilerOptions { Predicates = new NamedPredicateRegistry().Register("Lucky", _ => true) };
-        var result = Compile("=== a\n{if @Lucky}{player:pronoun.subject#capitalize} wins.{/if}\n-> END", yaml, options);
+        var result = Compile("=== a\n{if @Lucky}{player:pronoun:subject#capitalize} wins.{/if}\n-> END", yaml, options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
         Assert.Equal("Xe wins.", new TemplateRenderer(new Narrative.Grammar.EnglishGrammar(), options.Predicates)

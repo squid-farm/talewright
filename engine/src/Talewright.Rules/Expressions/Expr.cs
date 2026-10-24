@@ -54,7 +54,7 @@ public sealed record StandingRef(FactionId Faction) : Expr
     public override ExprType Type => ExprType.Number;
 }
 
-/// <summary><c>faction:guild.tier</c>: standing tier (also produced implicitly when comparing a faction to a tier name).</summary>
+/// <summary><c>faction:guild:tier</c>: standing tier (also produced implicitly when comparing a faction to a tier name).</summary>
 public sealed record StandingTierRef(FactionId Faction) : Expr
 {
     public override ExprType Type => ExprType.Tier;
@@ -92,13 +92,13 @@ public enum PronounForm
     Reflexive,
 }
 
-/// <summary><c>player:pronoun.subject</c> and the other pronoun forms.</summary>
+/// <summary><c>player:pronoun:subject</c> and the other pronoun forms.</summary>
 public sealed record PronounRef(EntityId Character, PronounForm Form) : Expr
 {
     public override ExprType Type => ExprType.Text;
 }
 
-/// <summary><c>faction:guild.name</c>.</summary>
+/// <summary><c>faction:guild:name</c>.</summary>
 public sealed record FactionNameRef(FactionId Faction) : Expr
 {
     public override ExprType Type => ExprType.Text;

@@ -7,6 +7,10 @@ The whole story is checked when it loads (or at build time for [C# story project
 Every reference is validated, and mistakes are reported with `file:line:column` and an
 [error code](diagnostics.md) rather than surfacing during play.
 
+Identifiers use ASCII letters and `_`: they start with a letter or `_`, then contain letters,
+digits, or `_`, with optional single `.` or `-` separators between groups. Dots group words
+inside one name, such as `weapon.knife` or `camp.arrival`; they never read properties.
+
 New to Talewright? Start with the [author guide](../guide/README.md). This page is the complete reference.
 
 ---
@@ -138,7 +142,7 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 
 | Element                                            | Meaning                                                                                        |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `=== id`                                           | Starts a scene. Ids are kebab-case segments separated by dots.                                 |
+| `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Display title (used for hub choices).                                                          |
 | `@requires expr`                                   | Eligibility predicate (storylets / hubs).                                                      |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
@@ -185,12 +189,15 @@ by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 | Reference                                                                                   | Value                                     |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `player:first-name`, `player:last-name`, `player:name`                                      | Names (`name` = first + last)             |
-| `player:pronoun.subject` / `.object` / `.possessive` / `.possessive-pronoun` / `.reflexive` | Pronouns                                  |
+| `player:pronoun:subject` / `:object` / `:possessive` / `:possessive-pronoun` / `:reflexive` | Pronouns                                  |
 | `player:<stat>`                                                                             | Effective stat value (base + modifiers)   |
 | `faction:<id>`                                                                              | Player standing with the faction (number) |
-| `faction:<id>.tier`                                                                         | Standing tier name (`friendly`, …)        |
-| `faction:<id>.name`, `item:<id>`                                                            | Display names                             |
+| `faction:<id>:tier`                                                                         | Standing tier name (`friendly`, …)        |
+| `faction:<id>:name`, `item:<id>`                                                            | Display names                             |
 | `var:<id>`, `flag:<id>`                                                                     | Story variables / flags                   |
+
+Every property separator is `:`. For example, use `faction:explorers-guild:name` and
+`faction:explorers-guild:tier`. Dots within an ID remain part of that name.
 
 Any character id can replace `player`.
 

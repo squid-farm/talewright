@@ -51,6 +51,17 @@ internal static class ExpressionCompletion
             {
                 if (kind == ExpressionContextKind.Condition) kinds = [AuthoringSymbolKind.Predicate];
             }
+            else if (before is [.., { Kind: TokenKind.Identifier } member, { Kind: TokenKind.Colon }] &&
+                     tokenIndex >= 4 &&
+                     tokens[tokenIndex - 4] is { Kind: TokenKind.Identifier } owner &&
+                     tokens[tokenIndex - 3].Kind == TokenKind.Colon)
+            {
+                if (owner.Text == "faction")
+                    keywords = ["name", "tier"];
+                else if (member.Text == "pronoun" &&
+                         symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text))
+                    keywords = ["subject", "object", "possessive", "possessive-pronoun", "reflexive"];
+            }
             else if (before is [.., { Kind: TokenKind.Identifier } ns, { Kind: TokenKind.Colon }])
             {
                 kinds = ns.Text switch
@@ -65,8 +76,7 @@ internal static class ExpressionCompletion
                     _ => []
                 };
                 if (kind == ExpressionContextKind.Substitution && kinds.Contains(AuthoringSymbolKind.Stat))
-                    keywords = ["first-name", "last-name", "name", "pronoun.subject", "pronoun.object",
-                        "pronoun.possessive", "pronoun.possessive-pronoun", "pronoun.reflexive"];
+                    keywords = ["first-name", "last-name", "name", "pronoun"];
             }
             else if (before is [.., { Text: "visited" }, { Kind: TokenKind.LeftParen }])
                 kinds = kind == ExpressionContextKind.Condition ? [AuthoringSymbolKind.Scene] : [];
@@ -110,12 +120,6 @@ internal static class ExpressionCompletion
                        AuthoringSymbolKind.Stat or AuthoringSymbolKind.Variable or AuthoringSymbolKind.Faction)))
                 unfinishedEnd++;
             if (unfinishedEnd == text.Length) end = unfinishedEnd;
-            if (kinds.Contains(AuthoringSymbolKind.Faction))
-            {
-                var path = text[start..end];
-                var dot = path.LastIndexOf('.');
-                if (dot >= 0 && path[(dot + 1)..] is "name" or "tier") end = start + dot;
-            }
             yield return new(text[start..end], map(start, end - start), kinds, keywords,
                 Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray(),
                 end < text.Length && text[end] is ':' or '(' ? text[end] : null);

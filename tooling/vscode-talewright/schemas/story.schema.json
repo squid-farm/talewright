@@ -7,7 +7,7 @@
   "required": ["id", "title", "start", "characters"],
   "properties": {
     "id": {
-      "$ref": "#/definitions/nonEmptyString",
+      "$ref": "#/definitions/identifier",
       "description": "Unique identifier for this story."
     },
     "title": {
@@ -20,7 +20,7 @@
       "description": "Author-defined story version. Defaults to 0.0.0."
     },
     "start": {
-      "$ref": "#/definitions/nonEmptyString",
+      "$ref": "#/definitions/identifier",
       "description": "ID of the scene where play begins. The compiler checks that this scene exists."
     },
     "randomness": {
@@ -51,6 +51,9 @@
       "type": "object",
       "required": ["player"],
       "description": "Characters keyed by their story-specific IDs. The player character is required.",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier"
+      },
       "additionalProperties": {
         "$ref": "#/definitions/character"
       }
@@ -58,6 +61,9 @@
     "factions": {
       "type": "object",
       "description": "Factions keyed by story-specific IDs.",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier"
+      },
       "additionalProperties": {
         "$ref": "#/definitions/faction"
       }
@@ -65,6 +71,9 @@
     "items": {
       "type": "object",
       "description": "Items keyed by story-specific IDs.",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier"
+      },
       "additionalProperties": {
         "$ref": "#/definitions/itemValue"
       }
@@ -72,7 +81,7 @@
     "flags": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/nonEmptyString"
+        "$ref": "#/definitions/identifier"
       },
       "description": "Optional flags to declare before any Tale effect sets them."
     },
@@ -93,6 +102,11 @@
     "nonEmptyString": {
       "type": "string",
       "minLength": 1
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$",
+      "description": "ASCII identifier: start with a letter or _, then use letters, digits, _, or single . and - separators."
     },
     "integer": {
       "type": "integer",
@@ -125,6 +139,9 @@
     },
     "integerMap": {
       "type": "object",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier"
+      },
       "additionalProperties": {
         "$ref": "#/definitions/integer"
       }
@@ -137,14 +154,14 @@
       "type": "object",
       "properties": {
         "base": {
-          "$ref": "#/definitions/nonEmptyString",
+          "$ref": "#/definitions/identifier",
           "default": "generic",
           "description": "Built-in rulesets include generic and none; a C# story project may register another ruleset."
         },
         "disable": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/nonEmptyString"
+            "$ref": "#/definitions/identifier"
           },
           "description": "Stat IDs to remove from the base ruleset."
         },
@@ -163,7 +180,7 @@
       "required": ["id"],
       "properties": {
         "id": {
-          "$ref": "#/definitions/nonEmptyString",
+          "$ref": "#/definitions/identifier",
           "description": "Stat ID used by characters, items, and Tale expressions."
         },
         "name": {
@@ -263,12 +280,15 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/nonEmptyString"
+            "$ref": "#/definitions/identifier"
           },
           "description": "List of item IDs; each listed item has quantity one."
         },
         {
           "type": "object",
+          "propertyNames": {
+            "$ref": "#/definitions/identifier"
+          },
           "additionalProperties": {
             "$ref": "#/definitions/integer"
           },
@@ -351,9 +371,14 @@
           "type": "object",
           "maxProperties": 16,
           "propertyNames": {
-            "minLength": 1,
-            "maxLength": 80,
-            "pattern": "\\S"
+            "allOf": [
+              {
+                "$ref": "#/definitions/identifier"
+              },
+              {
+                "maxLength": 80
+              }
+            ]
           },
           "description": "Named starting-stat presets. A preset's stats must respect ruleset bounds and selectable choices.",
           "additionalProperties": {
@@ -381,7 +406,7 @@
       "required": ["id", "when", "do"],
       "properties": {
         "id": {
-          "$ref": "#/definitions/nonEmptyString"
+          "$ref": "#/definitions/identifier"
         },
         "when": {
           "$ref": "#/definitions/nonEmptyString",

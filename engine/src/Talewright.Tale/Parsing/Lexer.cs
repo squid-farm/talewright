@@ -31,8 +31,8 @@ internal enum TokenKind
 internal readonly record struct Token(TokenKind Kind, string Text, int Offset);
 
 /// <summary>
-/// Tokenizer for expressions and effects. Identifiers may contain <c>-</c> and <c>.</c> (kebab-case ids and
-/// dotted paths), so subtraction needs spaces: <c>player:hp - 3</c>.
+/// Tokenizer for expressions and effects. Identifiers follow <see cref="IdentifierRules"/>; a dot is only
+/// part of a name, never a property separator.
 /// </summary>
 internal static class Lexer
 {
@@ -50,20 +50,16 @@ internal static class Lexer
             }
 
             var start = i;
-            if (char.IsLetter(c) || c == '_')
+            if (IdentifierRules.IsStart(c))
             {
-                while (i < text.Length && (char.IsLetterOrDigit(text[i]) || text[i] is '_' or '-' or '.'))
+                while (i < text.Length && IdentifierRules.IsPart(text[i]))
                 {
                     i++;
                 }
 
-                // Trailing '-' or '.' belong to the next token (e.g. "hp-=3").
-                while (i > start + 1 && text[i - 1] is '-' or '.')
-                {
-                    i--;
-                }
-
-                tokens.Add(new Token(TokenKind.Identifier, text[start..i], start));
+                while (i > start && text[i - 1] is '.' or '-') i--;
+                var value = text[start..i];
+                tokens.Add(new Token(IdentifierRules.IsValid(value) ? TokenKind.Identifier : TokenKind.Error, value, start));
                 continue;
             }
 

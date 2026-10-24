@@ -422,7 +422,14 @@ internal sealed class ExpressionParser
         {
             Next();
             var path = Expect(TokenKind.Identifier, $"a name after '{token.Text}:'");
-            return ResolveReference(token, path);
+            Token? member = null;
+            if (Peek.Kind == TokenKind.Colon)
+            {
+                Next();
+                member = Expect(TokenKind.Identifier, $"a property after '{token.Text}:{path.Text}:'");
+            }
+
+            return ResolveReference(token, path, member);
         }
 
         if (IsKeyword("has"))
@@ -441,31 +448,54 @@ internal sealed class ExpressionParser
         return Fail<Expr>("TW2001", $"Unknown name '{token.Text}'. References look like 'player:dex', 'faction:{{id}}', 'flag:{{id}}' or 'var:{{id}}'.", token.Offset);
     }
 
-    private Expr ResolveReference(Token ns, Token path)
+    private Expr ResolveReference(Token ns, Token path, Token? member)
     {
         switch (ns.Text)
         {
             case "faction":
             {
-                var (id, member) = SplitMember(path.Text);
-                var faction = new FactionId(id);
+                var faction = new FactionId(path.Text);
                 if (!_symbols.World.Factions.ContainsKey(faction))
                 {
-                    Fail("TW2001", $"Unknown faction '{id}'.", path.Offset);
+                    var dot = path.Text.LastIndexOf('.');
+                    var oldMember = dot < 0 ? string.Empty : path.Text[(dot + 1)..];
+                    var oldId = dot < 0 ? string.Empty : path.Text[..dot];
+                    if (member is null && oldMember is "name" or "tier")
+                    {
+                        Fail("TW2001",
+                            $"Unknown faction '{path.Text}'. Dotted property access is no longer supported; use 'faction:{oldId}:{oldMember}' for its {oldMember} property.",
+                            path.Offset + dot);
+                    }
+
+                    Fail("TW2001", $"Unknown faction '{path.Text}'.", path.Offset);
                 }
 
-                return member switch
+                if (member is null)
                 {
-                    null => new StandingRef(faction),
+                    return new StandingRef(faction);
+                }
+
+                return member.Value.Text switch
+                {
                     "tier" => new StandingTierRef(faction),
                     "name" => new FactionNameRef(faction),
-                    _ => Fail<Expr>("TW2001", $"Unknown faction property '.{member}'. Use '.tier' or '.name'.", path.Offset),
+                    _ => Fail<Expr>("TW2001", $"Unknown faction property '{member.Value.Text}'. Use 'faction:{path.Text}:tier' or 'faction:{path.Text}:name'.", member.Value.Offset),
                 };
             }
 
             case "item":
+                if (member is not null)
+                {
+                    Fail("TW2001", $"Item names are referenced as 'item:{path.Text}'; '.' only groups words inside names.", member.Value.Offset);
+                }
+
                 return new ItemNameRef(Item(path));
             case "flag":
+                if (member is not null)
+                {
+                    Fail("TW2001", $"Flag references do not have properties; use 'flag:{path.Text}'.", member.Value.Offset);
+                }
+
                 if (!_symbols.Flags.Contains(new FlagId(path.Text)))
                 {
                     Fail("TW2004", $"Flag '{path.Text}' is never set by any effect and is not declared in story.talewright.yaml.", path.Offset);
@@ -473,6 +503,11 @@ internal sealed class ExpressionParser
 
                 return new FlagRef(new FlagId(path.Text));
             case "var":
+                if (member is not null)
+                {
+                    Fail("TW2001", $"Variable references do not have properties; use 'var:{path.Text}'.", member.Value.Offset);
+                }
+
                 if (!_symbols.Variables.Contains(new VarId(path.Text)))
                 {
                     Fail("TW2004", $"Variable '{path.Text}' is never assigned by any effect and is not declared in story.talewright.yaml.", path.Offset);
@@ -482,31 +517,41 @@ internal sealed class ExpressionParser
         }
 
         var character = Character(ns);
+        if (member is not null)
+        {
+            if (path.Text != "pronoun")
+            {
+                Fail("TW2001", $"Unknown character property '{path.Text}:{member.Value.Text}'. Expected a pronoun form after 'pronoun:'.", member.Value.Offset);
+            }
+
+            return member.Value.Text switch
+            {
+                "subject" => new PronounRef(character, PronounForm.Subject),
+                "object" => new PronounRef(character, PronounForm.Object),
+                "possessive" => new PronounRef(character, PronounForm.Possessive),
+                "possessive-pronoun" => new PronounRef(character, PronounForm.PossessivePronoun),
+                "reflexive" => new PronounRef(character, PronounForm.Reflexive),
+                _ => Fail<Expr>("TW2001", $"Unknown pronoun form '{member.Value.Text}'. Use subject, object, possessive, possessive-pronoun, or reflexive.", member.Value.Offset),
+            };
+        }
+
+        if (path.Text.StartsWith("pronoun.", StringComparison.Ordinal))
+        {
+            var form = path.Text["pronoun.".Length..];
+            if (form is "subject" or "object" or "possessive" or "possessive-pronoun" or "reflexive")
+            {
+                Fail("TW2001", $"Dotted property access is no longer supported. Use '{ns.Text}:pronoun:{form}'.", path.Offset + "pronoun.".Length);
+            }
+        }
+
         return path.Text switch
         {
             "first-name" => new NameRef(character, NamePart.First),
             "last-name" => new NameRef(character, NamePart.Last),
             "name" => new NameRef(character, NamePart.Full),
-            "pronoun.subject" => new PronounRef(character, PronounForm.Subject),
-            "pronoun.object" => new PronounRef(character, PronounForm.Object),
-            "pronoun.possessive" => new PronounRef(character, PronounForm.Possessive),
-            "pronoun.possessive-pronoun" => new PronounRef(character, PronounForm.PossessivePronoun),
-            "pronoun.reflexive" => new PronounRef(character, PronounForm.Reflexive),
             _ when _symbols.World.Ruleset.HasStat(new StatId(path.Text)) => new StatRef(character, new StatId(path.Text)),
-            _ => Fail<Expr>("TW2001", $"Unknown property '{path.Text}' on '{ns.Text}'. Expected a stat, first-name, last-name, name or pronoun.<form>.", path.Offset),
+            _ => Fail<Expr>("TW2001", $"Unknown property '{path.Text}' on '{ns.Text}'. Use '<character>:pronoun:<form>' for pronouns.", path.Offset),
         };
-    }
-
-    private static (string Id, string? Member) SplitMember(string path)
-    {
-        var dot = path.LastIndexOf('.');
-        if (dot < 0)
-        {
-            return (path, null);
-        }
-
-        var member = path[(dot + 1)..];
-        return member is "tier" or "name" ? (path[..dot], member) : (path, null);
     }
 
     private EntityId Character(Token token)

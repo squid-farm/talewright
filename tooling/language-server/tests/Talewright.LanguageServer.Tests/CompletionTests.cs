@@ -46,7 +46,7 @@ public sealed partial class ServerTests
     [InlineData("~ take player rope |", "player")]
     [InlineData("@requires @IsH|", "IsHero")]
     [InlineData("@requires flag:door-|", "door-open")]
-    [InlineData("{player:pronoun.|}", "pronoun.subject")]
+    [InlineData("{player:pronoun:|}", "subject")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
     {
@@ -73,12 +73,14 @@ public sealed partial class ServerTests
 
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
-    [InlineData("{player:pronoun.|}", "pronoun.subject", "{player:pronoun.subject}")]
+    [InlineData("{player:pronoun:|}", "subject", "{player:pronoun:subject}")]
     [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
     [InlineData("~ player:hp -= player:h|p-", "hp", "~ player:hp -= player:hp-")]
-    [InlineData("{faction:gu|ild.name}", "guild", "{faction:guild.name}")]
-    [InlineData("{faction:gu|ild.tier}", "guild", "{faction:guild.tier}")]
+    [InlineData("{faction:gu|ild:name}", "guild", "{faction:guild:name}")]
+    [InlineData("{faction:gu|ild:tier}", "guild", "{faction:guild:tier}")]
+    [InlineData("{faction:guild:na|me}", "name", "{faction:guild:name}")]
+    [InlineData("{faction:guild:|}", "name", "{faction:guild:name}")]
     [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
     [InlineData("@requires vis|ited(start)", "visited(", "@requires visited(start)")]
     [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]

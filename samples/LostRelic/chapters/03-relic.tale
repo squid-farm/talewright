@@ -27,8 +27,8 @@ The walk back to camp is quiet. Tomas keeps glancing at your pack.
 === ending.guild
 @title Honoured
 
-The {faction:explorers-guild.name} hangs {player:last-name#possessive} portrait in the great hall, a little
-crooked. Your standing with them is now *{faction:explorers-guild.tier#lower}*.
+The {faction:explorers-guild:name} hangs {player:last-name#possessive} portrait in the great hall, a little
+crooked. Your standing with them is now *{faction:explorers-guild:tier#lower}*.
 {if player has idol}
 Nobody asks about the obsidian idol on your desk.
 {/if}
@@ -54,6 +54,6 @@ You start sleeping with the relic under your pillow.
 === ending.empty-handed
 @title Empty-Handed
 
-You return with nothing but {player:pronoun.possessive} notes and a story nobody at the guild quite
+You return with nothing but {player:pronoun:possessive} notes and a story nobody at the guild quite
 believes. Tomas, at least, buys you a drink.
 -> END

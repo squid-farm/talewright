@@ -33,7 +33,7 @@ public static class StoryHover
         ["visited"] = "visited(scene): true when the scene has been visited.",
         ["flag"] = "flag:id: a declared boolean story flag.",
         ["var"] = "var:id: a declared integer story variable.",
-        ["faction"] = "faction:id: numeric standing; .tier selects its reputation tier and .name its display name.",
+        ["faction"] = "faction:id: numeric standing; faction:id:tier selects its reputation tier and faction:id:name its display name.",
         ["item"] = "item:id: the item's display name.",
         ["set"] = "set flag:id: sets a flag to true.",
         ["clear"] = "clear flag:id: sets a flag to false.",
@@ -73,9 +73,20 @@ public static class StoryHover
             if (symbol is not null) return Describe(analysis, symbol, site.Range);
             if (site.Kinds.Contains(AuthoringSymbolKind.Directive) && Syntax.TryGetValue(site.Text, out var directive))
                 return Help(site.Text, directive, site.Range);
-            if (site.Keywords.Contains(site.Text) && (site.Text is "first-name" or "last-name" or "name" ||
-                site.Text.StartsWith("pronoun.", StringComparison.Ordinal)))
-                return Help(site.Text, "Character text property used in substitutions.", site.Range);
+            if (site.Keywords.Contains(site.Text))
+            {
+                var description = site.Text switch
+                {
+                    "first-name" or "last-name" => "Character name part used in substitutions.",
+                    "name" => "Character full name or faction display name used in substitutions.",
+                    "tier" => "Faction standing tier, such as hostile or friendly.",
+                    "pronoun" => "Character pronoun namespace; choose a form after the next ':'.",
+                    "subject" or "object" or "possessive" or "possessive-pronoun" or "reflexive"
+                        => "Character pronoun form used in substitutions.",
+                    _ => null,
+                };
+                if (description is not null) return Help(site.Text, description, site.Range);
+            }
             if (site.Text == "END" && site.Keywords.Contains("END")) return Help("END", Syntax["END"], site.Range);
         }
         foreach (var token in analysis.Tokens.Where(token => Contains(token.Range, position)))

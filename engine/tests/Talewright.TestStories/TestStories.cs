@@ -102,7 +102,7 @@ public static class TestStories
         * [Donate relic] { take player relic; faction:guild += 20 } -> donated
         * [Keep relic] { faction:guild -= 30 } -> kept
         === donated
-        The donation is complete. Standing: {faction:guild.tier}.
+        The donation is complete. Standing: {faction:guild:tier}.
         -> END
         === kept
         {if flag:wary}

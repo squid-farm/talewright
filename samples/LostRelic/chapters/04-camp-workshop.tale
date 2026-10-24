@@ -57,13 +57,13 @@ Tomas checks your arithmetic before trusting you with the expedition accounts.
 @once
 
 The clerk writes **{player:name#upper}**, then carefully corrects the entry to
-{player:name}. The margin says: "{player:pronoun.subject#capitalize} signed
-{player:pronoun.possessive} own name; this copy is {player:pronoun.possessive-pronoun}.
-Ask {player:pronoun.object} to check it {player:pronoun.reflexive}."
+{player:name}. The margin says: "{player:pronoun:subject#capitalize} signed
+{player:pronoun:possessive} own name; this copy is {player:pronoun:possessive-pronoun}.
+Ask {player:pronoun:object} to check it {player:pronoun:reflexive}."
 
 {item:idol#a#capitalize} decorates the clerk's stamp. Its label reads \{expedition copy\}.
 
-> guide: I use {guide:pronoun.subject}/{guide:pronoun.object}. Names matter more than the guild admits.
+> guide: I use {guide:pronoun:subject}/{guide:pronoun:object}. Names matter more than the guild admits.
 
 -> workshop.hub
 

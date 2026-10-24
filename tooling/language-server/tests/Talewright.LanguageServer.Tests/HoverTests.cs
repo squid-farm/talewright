@@ -13,7 +13,7 @@ public sealed partial class ServerTests
     [InlineData("@requires flag:rea|dy", "Flag", "ready")]
     [InlineData("{var:co|ins}", "Variable", "coins")]
     [InlineData("{item:ro|pe}", "Item", "rope")]
-    [InlineData("{faction:gu|ild.name}", "Faction", "guild")]
+    [InlineData("{faction:gu|ild:name}", "Faction", "guild")]
     [InlineData("@requires @IsH|ero", "Predicate", "IsHero")]
     [InlineData("{player:first-name#cus|tom}", "Modifier", "custom")]
     [InlineData("@req|uires player:hp > 0", "Boolean condition", "requires")]

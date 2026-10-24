@@ -52,6 +52,35 @@ test('schema validates every shipped story manifest', async () => {
   }
 });
 
+test('compiler, schema, and editor grammar use the same identifier characters', async () => {
+  const compiler = await read('engine/src/Talewright.Tale/Parsing/IdentifierRules.cs');
+  const match = compiler.match(/PatternText = @\"([^\"]+)\"/);
+  assert.ok(match, 'compiler identifier pattern should be discoverable');
+  assert.equal(schema.definitions.identifier.pattern, match[1]);
+
+  const grammar = await read('tooling/vscode-talewright/syntaxes/tale.tmLanguage.json');
+  assert.ok(grammar.includes(match[1].slice(1, -1)),
+    'editor grammar should use the same identifier body as compiler and manifest schema');
+
+  for (const id of ['player', 'temple.entrance', 'weapon.knife', 'camp-arrival', '_custom-2']) {
+    assertValid(validateManifest, {
+      id,
+      title: 'Identifier test',
+      start: 'beginning',
+      characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
+    }, `identifier ${id}`);
+  }
+
+  for (const id of ['2start', 'café', 'camp..arrival', 'camp--arrival', '-camp', 'camp-']) {
+    assertInvalid(validateManifest, {
+      id: 'identifier-test',
+      title: 'Identifier test',
+      start: 'beginning',
+      characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
+    }, `invalid identifier ${id}`, 'pattern');
+  }
+});
+
 test('schema validates complete and contextual documented manifest examples', async () => {
   const fullManifests = [
     ['docs/reference/tale-syntax.md', 0],
@@ -175,12 +204,12 @@ test('schema permits custom ruleset IDs without hard-coding registrations', asyn
   assertValid(validateManifest, story, 'custom ruleset ID');
 });
 
-test('preset IDs retain open author keys within compiler structural bounds', () => {
+test('preset IDs use the shared identifier rule and retain the existing 80-character bound', () => {
   const validate = compileSubschema(schema.definitions.creation.properties.presets);
-  for (const id of ['', ' \t ', 'x'.repeat(81)]) {
+  for (const id of ['', ' space ', 'bad/id', 'x'.repeat(81)]) {
     assertInvalid(validate, { [id]: {} }, `invalid preset ID ${JSON.stringify(id)}`, 'propertyNames');
   }
-  for (const id of ['x', 'x'.repeat(80), ' custom preset ']) {
+  for (const id of ['x', 'x'.repeat(80), 'custom-preset']) {
     assertValid(validate, { [id]: {} }, `valid preset ID ${JSON.stringify(id)}`);
   }
 });
