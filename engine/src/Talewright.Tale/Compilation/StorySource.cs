@@ -144,28 +144,61 @@ public sealed class StorySource
 
     private static string ReadText(Stream input, string path, ref long totalBytes)
     {
-        using var content = new MemoryStream();
-        var buffer = new byte[81920];
-        int bytesRead;
-        while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
+        using var bounded = new LimitedReadStream(input, path, totalBytes);
+        using var reader = new StreamReader(bounded, detectEncodingFromByteOrderMarks: true, bufferSize: 4096, leaveOpen: true);
+        var text = reader.ReadToEnd();
+        totalBytes += bounded.BytesRead;
+        return text;
+    }
+
+    private sealed class LimitedReadStream(Stream input, string path, long initialTotalBytes) : Stream
+    {
+        public long BytesRead { get; private set; }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
         {
-            if (content.Length + bytesRead > MaxStoryFileBytes)
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            ReadCore(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer) => ReadCore(buffer);
+
+        private int ReadCore(Span<byte> buffer)
+        {
+            if (buffer.IsEmpty)
+            {
+                return 0;
+            }
+
+            var fileRemaining = MaxStoryFileBytes - BytesRead;
+            var totalRemaining = MaxExpandedBytes - initialTotalBytes - BytesRead;
+            var requested = (int)Math.Min(buffer.Length, Math.Min(fileRemaining, totalRemaining) + 1);
+            var bytesRead = input.Read(buffer[..requested]);
+            if (bytesRead > fileRemaining)
             {
                 throw new InvalidDataException($"Story file '{path}' exceeds the 5 MiB expanded-size limit.");
             }
 
-            if (totalBytes + bytesRead > MaxExpandedBytes)
+            if (bytesRead > totalRemaining)
             {
                 throw new InvalidDataException("The story exceeds the 50 MiB total expanded-text limit.");
             }
 
-            content.Write(buffer, 0, bytesRead);
-            totalBytes += bytesRead;
+            BytesRead += bytesRead;
+            return bytesRead;
         }
 
-        content.Position = 0;
-        using var reader = new StreamReader(content);
-        return reader.ReadToEnd();
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     /// <summary>
