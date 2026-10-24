@@ -552,7 +552,7 @@ public class CompilerTests
     [Fact]
     public void Custom_pronouns_and_named_predicates()
     {
-        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive: xyr, possessive-pronoun: xyrs, reflexive: xemself }");
+        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself }");
         var options = new CompilerOptions { Predicates = new NamedPredicateRegistry().Register("Lucky", _ => true) };
         var result = Compile("=== a\n{if @Lucky}{player:pronoun#capitalize} wins.{/if}\n-> END", yaml, options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -577,7 +577,7 @@ public class CompilerTests
     [Fact]
     public void Custom_pronoun_sets_use_their_declared_forms()
     {
-        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive: xyr, possessive-pronoun: xyrs, reflexive: xemself }");
+        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself }");
         var result = Compile("""
             === a
             {player:pronoun}/{player:pronoun#object}/{player:pronoun#possessive}/{player:pronoun#possessive("determiner")}/{player:pronoun#possessive("independent")}/{player:pronoun#reflexive#upper}
@@ -585,6 +585,35 @@ public class CompilerTests
             """, yaml);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Equal("xe/xem/xyr/xyr/xyrs/XEMSELF", Render(result.Story!, result.Story!.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
+    [InlineData("possessive: xyr, possessive-pronoun: xyrs", "TW4003", "Use 'possessive-pronoun: { determiner: xer, independent: xers }'")]
+    [InlineData("possessive-pronoun: xyrs", "TW4003", "must be a mapping")]
+    [InlineData("possessive-pronoun: null", "TW4003", "must be a mapping")]
+    [InlineData("possessive-pronoun: []", "TW4003", "must be a mapping")]
+    [InlineData("", "TW4002", "Missing required 'possessive-pronoun'")]
+    [InlineData("possessive-pronoun: {}", "TW4002", "Missing required 'determiner'")]
+    [InlineData("possessive-pronoun: { determiner: xyr }", "TW4002", "Missing required 'independent'")]
+    [InlineData("possessive-pronoun: { independent: xyrs }", "TW4002", "Missing required 'determiner'")]
+    [InlineData("possessive-pronoun: { determiner: '', independent: xyrs }", "TW4003", "'determiner' must be a single value")]
+    [InlineData("possessive-pronoun: { determiner: xyr, independent: [] }", "TW4003", "'independent' must be a single value")]
+    public void Invalid_custom_possessive_forms_are_reported(string forms, string code, string message)
+    {
+        var yaml = Yaml.Replace("pronouns: she", $"pronouns: {{ subject: xe, object: xem, reflexive: xemself{(forms.Length > 0 ? ", " + forms : "")} }}");
+        var error = Error("=== a\n-> END", code, yaml);
+        Assert.Contains(message, error.Message);
+    }
+
+    [Fact]
+    public void Unknown_custom_possessive_keys_are_reported()
+    {
+        var yaml = Yaml.Replace("pronouns: she",
+            "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs, other: xer }, reflexive: xemself }");
+        var result = Compile("=== a\n-> END", yaml);
+        var warning = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "TW4006");
+        Assert.Contains("Unknown key 'other'", warning.Message);
+        Assert.Contains("determiner, independent", warning.Message);
     }
 
     [Theory]

@@ -72,8 +72,7 @@ pronouns:
   {
     subject: xe,
     object: xem,
-    possessive: xyr,
-    possessive-pronoun: xyrs,
+    possessive-pronoun: { determiner: xyr, independent: xyrs },
     reflexive: xemself,
     plural: false,
   }
@@ -222,7 +221,8 @@ after `pronoun`, then chain other modifiers after it:
 
 On a pronoun, `#possessive` picks the declared possessive form instead of adding `'s`. Its optional argument is
 `"determiner"` (the default, used before a noun) or `"independent"` (stands alone). Custom pronoun sets use the
-forms they declare: `possessive` for the determiner and `possessive-pronoun` for the independent form.
+forms they declare under `possessive-pronoun`: `determiner` and `independent`. Both values are required.
+The old flat `possessive` and scalar `possessive-pronoun` fields are errors that name the nested replacement.
 The older `player:pronoun:object` and `player:pronoun.object` spellings are errors that name the replacement.
 
 ## 4. Expressions

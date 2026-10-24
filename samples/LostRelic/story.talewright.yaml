@@ -41,8 +41,9 @@ characters:
     pronouns:
       subject: he
       object: him
-      possessive: his
-      possessive-pronoun: his
+      possessive-pronoun:
+        determiner: his
+        independent: his
       reflexive: himself
       plural: false
     stats: { survival: 4, wis: 14 }

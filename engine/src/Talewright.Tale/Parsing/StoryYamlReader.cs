@@ -440,14 +440,37 @@ internal sealed class StoryYamlReader
 
         if (node is YamlMappingNode map)
         {
-            CheckKeys(map, "subject", "object", "possessive", "possessive-pronoun", "reflexive", "plural");
+            CheckKeys(map, "subject", "object", "possessive-pronoun", "reflexive", "plural");
+            if (Get(map, "possessive") is { } oldPossessive)
+            {
+                Error(oldPossessive, "TW4003", "The flat 'possessive' field is no longer supported. Use 'possessive-pronoun: { determiner: xer, independent: xers }'.", 0);
+            }
+
+            var possessive = Get(map, "possessive-pronoun");
+            var determiner = "determiner";
+            var independent = "independent";
+            if (possessive is YamlMappingNode forms)
+            {
+                CheckKeys(forms, "determiner", "independent");
+                determiner = RequiredScalar(forms, "determiner") ?? determiner;
+                independent = RequiredScalar(forms, "independent") ?? independent;
+            }
+            else if (possessive is null)
+            {
+                Error(map, "TW4002", "Missing required 'possessive-pronoun'. Use 'possessive-pronoun: { determiner: xer, independent: xers }'.", 0);
+            }
+            else
+            {
+                Error(possessive, "TW4003", "'possessive-pronoun' must be a mapping with 'determiner' and 'independent' values. Use 'possessive-pronoun: { determiner: xer, independent: xers }'.", 0);
+            }
+
             string Form(string key) => RequiredScalar(map, key) ?? key;
-            return new Pronouns(Form("subject"), Form("object"), Form("possessive"), Form("possessive-pronoun"), Form("reflexive"), Scalar(Get(map, "plural")) is "true" or "yes");
+            return new Pronouns(Form("subject"), Form("object"), determiner, independent, Form("reflexive"), Scalar(Get(map, "plural")) is "true" or "yes");
         }
 
         var keyword = Scalar(node) ?? string.Empty;
         return Pronouns.FromKeyword(keyword)
-            ?? Error(node, "TW4003", $"Unknown pronouns '{keyword}'. Use she, he, they, it, or a mapping with subject/object/possessive/possessive-pronoun/reflexive.", Pronouns.They);
+            ?? Error(node, "TW4003", $"Unknown pronouns '{keyword}'. Use she, he, they, it, or a mapping with subject, object, reflexive and possessive-pronoun: {{ determiner: xer, independent: xers }}.", Pronouns.They);
     }
 
     private Dictionary<StatId, int> ReadStatMap(YamlNode? node, Ruleset ruleset)
