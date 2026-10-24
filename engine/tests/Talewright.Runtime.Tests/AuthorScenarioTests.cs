@@ -75,6 +75,18 @@ public sealed class AuthorScenarioTests
     private static byte[] Bytes(JsonNode data) => Encoding.UTF8.GetBytes(data.ToJsonString());
     private static JsonNode Data(AuthorSession? session = null) => JsonNode.Parse(AuthorScenario.Export(session ?? Start(), Extensions))!;
 
+    [Fact]
+    public void Legacy_integer_scenarios_without_text_fields_keep_their_replay_evidence()
+    {
+        var source = Start();
+        source.Edit(new() { Variables = new Dictionary<VarId, int> { [new("count")] = 8 } });
+        var data = Data(source);
+        data["setup"]!.AsObject().Remove("textVariables");
+        foreach (var command in data["commands"]!.AsArray())
+            if (command!["values"] is JsonObject values) values.Remove("textVariables");
+        Equal(source, AuthorScenario.Import(source.Story, Bytes(data), Extensions).Session);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

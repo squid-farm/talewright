@@ -62,7 +62,7 @@
                 <button type="button" @onclick="Model.ClearCharacter">Clear character selection</button>
                 <p role="status">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
             }
-            <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" />
+            <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" Texts="Model.Texts" />
             <button type="button" @onclick="Start">Start selected scene</button>
         </section>
     }
@@ -112,7 +112,7 @@
             <section aria-label="Live state editing">
                 <h3>Live state editing</h3>
                 <p>One validated batch, followed by normal triggers and leveling. No scene re-entry or entry-check reroll. After success, fields show actual values and enabled edits are cleared. Consequences appear in command history.</p>
-                <SetupFields Numbers="Model.EditNumbers" Flags="Model.EditFlags" Title="Live edit values" Prefix="live" />
+                <SetupFields Numbers="Model.EditNumbers" Flags="Model.EditFlags" Texts="Model.EditTexts" Title="Live edit values" Prefix="live" />
                 <button type="button" disabled="@session.Current.IsEnded" @onclick="Model.ApplyEdits">Apply live edit batch</button>
                 <p>Preserve-state jump uses the Target scene ID above, bypasses eligibility, and enters once with existing state, visits, fired triggers and dice. Start selected scene instead creates a fresh world using setup.</p>
                 <button type="button" disabled="@session.Current.IsEnded" @onclick="Model.JumpPreservingState">Jump retaining state</button>

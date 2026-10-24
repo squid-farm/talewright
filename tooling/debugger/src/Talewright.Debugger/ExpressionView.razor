@@ -1,6 +1,6 @@
 <li>
     <code>@Trace.Expression</code>:
-    <strong>@(Trace.Result?.ToString() ?? "Not evaluated")</strong>
+    <strong>@(Trace.Result is { Type: ExprType.Text } text ? System.Text.Json.JsonSerializer.Serialize(text.Text) : Trace.Result?.ToString() ?? "Not evaluated")</strong>
     @if (Trace.IsOpaque)
     {
         <span> (opaque C# predicate; internals unavailable)</span>
