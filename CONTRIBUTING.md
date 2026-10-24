@@ -74,3 +74,10 @@ Author-facing docs (`README.md`, `docs/guide`, `docs/reference`) are written for
 task first, short paragraphs, examples before rules. Put implementation detail in `docs/developer` or
 the project READMEs. When behavior changes, update the [Tale syntax reference](docs/reference/tale-syntax.md)
 and [error codes](docs/reference/diagnostics.md) in the same PR.
+
+## Language changes
+
+Before proposing or implementing Talemark syntax, read the
+[operator registry](docs/reference/talemark-operators.md) and complete the
+[language-change checklist](docs/developer/language-changes.md). The checklist covers alternatives,
+diagnostics, and the parser, schema, editor and documentation changes that must ship together.
