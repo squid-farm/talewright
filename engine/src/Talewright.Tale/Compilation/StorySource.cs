@@ -1,10 +1,11 @@
 using System.IO.Compression;
 using System.Collections.ObjectModel;
+using System.Collections.Frozen;
 
 namespace Talewright.Tale.Compilation;
 
 /// <summary>
-/// The raw files of a story: <c>story.talewright.yaml</c> plus <c>*.tale</c> files, keyed by relative path with <c>/</c>
+/// The source text and image-path catalogue of a story, keyed by relative path with <c>/</c>
 /// separators. Hosts build one from a folder, a zip, or embedded resources; the compiler never touches the file
 /// system itself (so it works unchanged in the browser).
 /// </summary>
@@ -20,11 +21,17 @@ public sealed class StorySource
     /// <summary>Extension of narrative files.</summary>
     public const string TaleExtension = ".tale";
 
-    public StorySource(IReadOnlyDictionary<string, string> files) =>
+    public StorySource(IReadOnlyDictionary<string, string> files, IEnumerable<string>? imagePaths = null)
+    {
         Files = new ReadOnlyDictionary<string, string>(files.ToDictionary(StringComparer.Ordinal));
+        ImagePaths = (imagePaths ?? []).ToFrozenSet(StringComparer.Ordinal);
+    }
 
     /// <summary>Relative path → file text.</summary>
     public IReadOnlyDictionary<string, string> Files { get; }
+
+    /// <summary>Story-root-relative image file paths, including the <c>images/</c> prefix. No image bytes are loaded.</summary>
+    public IReadOnlySet<string> ImagePaths { get; }
 
     /// <summary>The <c>.tale</c> files in stable (ordinal path) order.</summary>
     public IEnumerable<KeyValuePair<string, string>> TaleFiles =>
@@ -39,6 +46,7 @@ public sealed class StorySource
         var excluded = excludedDirectories.Select(Path.GetFullPath).ToHashSet(
             OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        var imagePaths = new List<string>();
         long totalBytes = 0;
         var pending = new Stack<(string Path, int Depth)>();
         pending.Push((directory, 0));
@@ -62,20 +70,27 @@ public sealed class StorySource
 
                     pending.Push((path, current.Depth + 1));
                 }
-                else if (IsStoryFile(path))
+                else
                 {
+                    var relativePath = Path.GetRelativePath(directory, path).Replace(Path.DirectorySeparatorChar, '/');
+                    if (IsImagePath(relativePath))
+                    {
+                        imagePaths.Add(relativePath);
+                    }
+
+                    if (!IsStoryFile(path)) continue;
                     if (files.Count >= MaxStoryFiles)
                     {
                         throw new InvalidDataException("A story may contain at most 1,000 story files.");
                     }
 
                     using var input = File.OpenRead(path);
-                    files[Path.GetRelativePath(directory, path).Replace('\\', '/')] = ReadText(input, path, ref totalBytes);
+                    files[relativePath] = ReadText(input, path, ref totalBytes);
                 }
             }
         }
 
-        return new StorySource(files);
+        return new StorySource(files, imagePaths);
     }
 
     /// <summary>
@@ -102,6 +117,20 @@ public sealed class StorySource
         }
 
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        var imagePaths = new List<string>();
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name) || !entry.FullName.StartsWith(root, StringComparison.Ordinal)) continue;
+            var path = entry.FullName[root.Length..];
+            if (!IsImagePath(path)) continue;
+            if (((entry.ExternalAttributes >> 16) & 0xF000) == 0xA000)
+            {
+                throw new InvalidDataException($"Story images cannot be symbolic links: '{entry.FullName}'.");
+            }
+
+            imagePaths.Add(path);
+        }
+
         long totalBytes = 0;
         foreach (var entry in storyEntries)
         {
@@ -110,7 +139,7 @@ public sealed class StorySource
             files[path[root.Length..]] = ReadText(input, path, ref totalBytes);
         }
 
-        return new StorySource(files);
+        return new StorySource(files, imagePaths);
     }
 
     private static string ReadText(Stream input, string path, ref long totalBytes)
@@ -166,4 +195,7 @@ public sealed class StorySource
 
     private static bool IsStoryFile(string path) =>
         Path.GetFileName(path) == ManifestFileName || path.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsImagePath(string path) =>
+        path.StartsWith("images/", StringComparison.Ordinal) && path.Length > "images/".Length;
 }
