@@ -68,7 +68,7 @@ public sealed partial class ServerTests
     }
 
     [Fact]
-    public async Task Image_syntax_diagnostics_clear_without_asset_lookup()
+    public async Task Image_syntax_diagnostics_clear_and_valid_calls_receive_asset_lookup()
     {
         await using var client = new Client();
         await client.Initialize();
@@ -77,7 +77,8 @@ public sealed partial class ServerTests
         var legacy = Assert.Single(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW1015");
         Assert.Contains("{image(\"camp\", \"Camp\")}", legacy.GetProperty("message").GetString());
         await client.Change("start.tale", "=== start\n{image(\"camp\", \"Camp\")}\n-> END", 2);
-        Assert.Empty(await client.Diagnostics("start.tale", 2));
+        var corrected = Assert.Single(await client.Diagnostics("start.tale", 2));
+        Assert.Equal("TW2012", corrected.GetProperty("code").GetString());
         await client.Change("start.tale", "=== start\n{image(camp)}\n-> END", 3);
         Assert.Contains(await client.Diagnostics("start.tale", 3),
             diagnostic => diagnostic.GetProperty("code").GetString() == "TW1014");

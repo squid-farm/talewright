@@ -183,12 +183,30 @@ cannot publish. Diagnostics for fixed or deleted files are explicitly cleared.
 Disk changes re-read the bounded shared story source loader; no project code is
 executed. File-loading errors are reported, not treated as successful analysis.
 
-Clients must forward create/change/delete events for `**/*.tale`, `**/story.talewright.yaml`,
+Clients must forward create/change/delete events for `**/*.tale`, `**/images/**`, `**/story.talewright.yaml`,
 `**/talewright.lint.json`, project files, and configured authoring metadata. The VS Code client installs
 these watchers, including the lint configuration and configured metadata path. Other clients
 can use didSave for saved open documents, but need watched-file events for
 closed-file additions/deletions. The server does not install its own filesystem
 watcher or recursively open unrelated stories at initialization.
+
+### Image paths
+
+Inside the first quoted argument of `{image("path", "alt")}`, completion lists
+safe PNG, JPEG and WebP files from the owning story's `images/` catalogue. Labels
+and inserted paths omit `images/`, use case-sensitive prefixes and replace the
+whole string content without replacing its quotes or alt text. Embedded quotes
+are escaped on insertion. Incomplete quoted paths also support completion.
+Alt text stays literal and offers no path or expression suggestions. Every
+narrative-template surface, including dialogue and choice labels, uses the same
+behavior; plain-string fields such as titles do not acquire image syntax.
+
+Editor analysis calls the shared image resolver for complete, well-formed calls,
+publishing TW2010–TW2014 at the path's opening quote. File notifications rebuild
+the catalogue and refresh suggestions and diagnostics while preserving unsaved
+buffers. Report a rename as deletion of the old path and creation of the new path.
+No image bytes are read, no images are rendered, and compiler/CLI image validation
+is still a separate integration step.
 
 Use `initializationOptions.metadataPath` for an explicit data-only metadata file
 (absolute or relative to each story root), and

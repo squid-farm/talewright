@@ -70,6 +70,7 @@ test('thin client launches one stdio executable and forwards source/watch config
   assert.equal(client.options.documentSelector.length, 2);
   assert.equal(client.options.documentSelector[1].pattern, '**/story.talewright.yaml');
   assert.ok(calls.watchers.some(watcher => watcher.pattern === '**/story.talewright.yaml'));
+  assert.ok(calls.watchers.some(watcher => watcher.pattern === '**/images/**'));
   assert.ok(!calls.watchers.some(watcher => watcher.pattern === '**/story.yaml'));
   assert.ok(calls.watchers.some(watcher => watcher.pattern === '**/build/registrations.json'));
   assert.ok(calls.watchers.every(watcher => context.subscriptions.includes(watcher)));

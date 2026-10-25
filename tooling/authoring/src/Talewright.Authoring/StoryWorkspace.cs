@@ -14,6 +14,7 @@ public sealed class StoryWorkspace
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, string> _disk;
+    private readonly HashSet<string> _imagePaths;
     private readonly Dictionary<string, (int Version, string Text)> _open = new(StringComparer.Ordinal);
     private readonly CompilerOptions _options;
     private readonly bool _missingMetadata;
@@ -23,6 +24,7 @@ public sealed class StoryWorkspace
     public StoryWorkspace(StorySource source, CompilerOptions? options = null, bool requiresProjectMetadata = false)
     {
         _disk = source.Files.ToDictionary(StringComparer.Ordinal);
+        _imagePaths = source.ImagePaths.ToHashSet(StringComparer.Ordinal);
         _options = options ?? CompilerOptions.Default;
         _missingMetadata = requiresProjectMetadata && options is null;
     }
@@ -72,6 +74,20 @@ public sealed class StoryWorkspace
         }
     }
 
+    /// <summary>Updates the image catalogue without reading image content. Hosts forward create/delete events.</summary>
+    public void UpdateImage(string path, bool exists)
+    {
+        if (!path.StartsWith("images/", StringComparison.Ordinal) || path.Contains('\\') ||
+            path.Split('/').Any(segment => segment is "" or "." or "..") || path.Contains(':'))
+            throw new ArgumentException("Expected a relative images/ path without traversal.", nameof(path));
+        lock (_gate)
+        {
+            if (exists) _imagePaths.Add(path);
+            else _imagePaths.Remove(path);
+            Invalidate();
+        }
+    }
+
     /// <summary>Returns false for out-of-order document changes; they never invalidate newer analysis.</summary>
     public bool Change(string path, int version, string text)
     {
@@ -110,7 +126,7 @@ public sealed class StoryWorkspace
             revision = _revision;
             var files = new Dictionary<string, string>(_disk, StringComparer.Ordinal);
             foreach (var (path, document) in _open) files[path] = document.Text;
-            snapshot = new StorySource(files);
+            snapshot = new StorySource(files, _imagePaths);
         }
         await Task.Delay(debounce, cancellationToken).ConfigureAwait(false);
         var analysis = await Task.Run(() => StoryAnalyzer.Analyze(snapshot, _options), cancellationToken).ConfigureAwait(false);

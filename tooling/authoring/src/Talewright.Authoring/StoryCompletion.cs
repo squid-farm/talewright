@@ -24,8 +24,9 @@ public static class StoryCompletion
             foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword =>
                          (keyword, site.KeywordDetails?.GetValueOrDefault(keyword) ?? "Talemark syntax"))))
             {
-                if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!name.StartsWith(prefix, site.IsImagePath ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)) continue;
                 var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;
+                if (site.IsImagePath) newText = newText.Replace("\\", "\\\\").Replace("\"", "\\\"");
                 result.Add(new(name, detail, site.Range, newText));
             }
         }

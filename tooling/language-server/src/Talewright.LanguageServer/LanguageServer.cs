@@ -141,7 +141,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     {
                         positionEncoding = "utf-16",
                         hoverProvider = true,
-                        completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(" } },
+                        completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(", "\"", "/" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
                     },
@@ -293,7 +293,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             {
                 label = item.Label,
                 detail = item.Detail,
-                kind = 6,
+                kind = item.Detail.StartsWith("Image:", StringComparison.Ordinal) ? 17 : 6,
                 textEdit = new
                 {
                     range = new
