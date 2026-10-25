@@ -148,7 +148,7 @@ Validates first, then builds. For a walkthrough, see [Sharing your story](../gui
 | Option | Effect |
 |---|---|
 | `-o`, `--output <path>` | Output ZIP, or output directory with `--split`. |
-| `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds just `story.talewright.yaml` and `.tale` files in their folder layout. `--a` is not accepted. |
+| `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds `story.talewright.yaml`, `.tale` files and safe, supported files from `images/` in their folder layout. `--a` is not accepted. |
 | `--target web` | Default. A static site with a root `index.html` and relative URLs. |
 | `--target desktop` | A self-contained desktop app. |
 | `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
@@ -227,6 +227,12 @@ WKWebView). Output isn't an installer, signed, notarized or a macOS `.app` bundl
 **Author requirements.** A .NET 10 SDK and package restore access. Installed tools carry their
 templates, binaries, UI assets and the engine license, so no source checkout is needed. The generated
 host uses precompiled Player binaries and copies their JS modules as static assets.
+
+All export formats preserve actual supported image files and their catalogue so the
+exported story passes the same compiler lookup as the source. Standalone hosts embed
+these files under the published story's resource prefix. Catalogue discovery reads
+resource names, not image bytes. This preserves compilation; image rendering and its
+deployment behavior remain separate work under #179.
 
 **Failures.** Compiler or build errors exit 1. Invalid invocation, input, output or missing tools exit 2.
 A failed build leaves any existing output unchanged and never writes a partial zip. `publish` prints

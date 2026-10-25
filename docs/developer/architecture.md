@@ -274,7 +274,10 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     This adds no image rendering, byte decoding or image size checks.
     Bundled web/desktop samples include image resources so their source catalogue
     remains complete. `EmbeddedStoryLibrary` records image resource names without
-    opening their streams; image rendering and published-story packaging remain separate.
+    opening their streams. Existing exports copy actual safe, supported image files
+    into story ZIPs and embed staged files under `stories/Published/` in standalone
+    hosts, preserving the same catalogue and lookup after export. Image rendering
+    and the remaining deployment acceptance under #179 stay separate.
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
     "pass your own options".
