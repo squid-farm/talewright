@@ -10,7 +10,7 @@ namespace Talewright.Talemark.Analysis;
 /// <summary>Half-open UTF-16 source range. Lines and columns are 1-based.</summary>
 public sealed record SourceRange(SourceLocation Start, SourceLocation End);
 
-public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story, Directive }
+public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story, Directive, Image }
 
 /// <summary>A declaration, including unresolved declarations retained during incomplete edits.</summary>
 public sealed record AuthoringSymbol(string Name, AuthoringSymbolKind Kind, string Type, SourceRange? Declaration);
@@ -61,7 +61,7 @@ public static class StoryAnalyzer
         options ??= CompilerOptions.Default;
         var collector = new AnalysisCollector(source, options);
         var result = StoryCompiler.CompileForAnalysis(source, options, collector);
-        return new StoryAnalysis(source, collector, result.Diagnostics);
+        return new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.ImageDiagnostics.Items).ToArray());
     }
 }
 
@@ -72,10 +72,22 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
     private int[]? _manifestLineStarts;
     private readonly Dictionary<string, string> _variableTypes = new(StringComparer.Ordinal);
+    private readonly AuthoringSymbol[] _imageCandidates = StoryImageResolver.CompletionPaths(source)
+        .Select(name => new AuthoringSymbol(name, AuthoringSymbolKind.Image, "image path", null)).ToArray();
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSite> CompletionSites { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
+    internal DiagnosticBag ImageDiagnostics { get; } = new();
+
+    internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)
+    {
+        CompletionSites.Add(new(path, range, [AuthoringSymbolKind.Image], [], positions,
+            Candidates: _imageCandidates, IsImagePath: true));
+    }
+
+    internal void CheckImage(string path, string alt, SourceLocation location) =>
+        StoryImageResolver.Resolve(source, path, alt, location, ImageDiagnostics);
 
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);

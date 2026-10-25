@@ -57,9 +57,15 @@ are highlighted as deprecated and reported with replacement guidance. Substituti
 link label keep their Talemark colors, because the compiler renders the label text
 and drops the target. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
-images are currently placeholders, not a claim of file validation or image rendering support.
+images are currently placeholders, not image rendering support.
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
-image-file path suggestions are separate work in #199.
+inside the first quoted argument, completion suggests supported files from the
+story's `images/` folder, including nested folders. Paths are case-sensitive.
+Completion replaces the path content and escapes embedded quotes, leaving alt
+text alone. It also works in unfinished calls, choice labels and dialogue.
+Adding, renaming or deleting image files refreshes suggestions and image lookup
+diagnostics without reopening the story. These editor checks use file paths, not
+image bytes. Compiler/CLI image validation and player rendering remain separate work.
 
 Incomplete templates and emphasis recover at line boundaries so an unfinished
 edit does not color the rest of the story. A `*` or `_` with no closing

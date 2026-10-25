@@ -10,7 +10,7 @@ namespace Talewright.Talemark.Analysis;
 public sealed record CompletionSite(string Text, SourceRange Range, IReadOnlyList<AuthoringSymbolKind> Kinds,
     IReadOnlyList<string> Keywords, IReadOnlyList<SourceLocation> Positions,
     char? FollowingDelimiter = null, IReadOnlyList<AuthoringSymbol>? Candidates = null,
-    IReadOnlyDictionary<string, string>? KeywordDetails = null);
+    IReadOnlyDictionary<string, string>? KeywordDetails = null, bool IsImagePath = false);
 
 internal static class ExpressionCompletion
 {

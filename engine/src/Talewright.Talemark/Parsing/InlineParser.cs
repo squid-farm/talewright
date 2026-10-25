@@ -163,7 +163,7 @@ internal static class InlineParser
             {
                 if (ImageSyntax.IsCall(text.AsSpan(i + 1)))
                 {
-                    ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics);
+                    ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics, context.Symbols.Analysis);
                     break;
                 }
 
@@ -193,7 +193,7 @@ internal static class InlineParser
                 var lead = inner.Length - inner.TrimStart().Length;
                 context.Symbols.Analysis?.Tokens.Add(new("image",
                     new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 1 + lead + 5))));
-                var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics);
+                var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics, context.Symbols.Analysis);
                 fragment = media is null ? null : new InlinePiece(media);
             }
             else

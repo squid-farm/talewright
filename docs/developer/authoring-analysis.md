@@ -35,7 +35,10 @@ reports an error. Semantically invalid YAML still contributes available
 declarations. Syntactically invalid YAML cannot provide a trustworthy manifest
 tree: Talemark declarations and contexts are retained independently, but the API
 does not invent a repaired manifest or reuse stale symbols from a prior snapshot.
-Diagnostics remain the compiler's diagnostics for that exact input.
+Diagnostics include the compiler's diagnostics for that exact input, plus
+TW2010–TW2014 image lookup diagnostics from the shared resolver. These editor-only
+checks read the source's image catalogue, not image bytes, and do not change
+compiler/CLI validation or populate resolved assets in the runtime model.
 
 Recovery does not require a project ruleset named `generic` or invoke project
 ruleset factories when the manifest is missing or syntactically invalid. It
@@ -79,7 +82,9 @@ if (update.Published)
 ```
 
 Hosts forward filesystem add/change/delete notifications through `UpdateFile`
-(null text means deletion). Open overlays take precedence, including for
+(null text means deletion), and image catalogue changes through `UpdateImage`
+(story-root-relative `images/` path and whether it exists). Snapshots retain the
+catalogue supplied by `StorySource`. Open overlays take precedence, including for
 `story.talewright.yaml`. Closing an overlay restores the latest disk content supplied by
 the host. `Change` returns false for superseded document versions; lifecycle
 misuse and invalid paths throw rather than silently succeed.

@@ -13,6 +13,7 @@ async function activate(context) {
   const metadataPath = configuration.get('languageServer.metadataPath', '');
   const fileEvents = [
     '**/*.tale',
+    '**/images/**',
     '**/story.talewright.yaml',
     '**/talewright.lint.json',
     '**/*.csproj',

@@ -1,6 +1,7 @@
 using System.Text;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Analysis;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -13,7 +14,8 @@ internal static class ImageSyntax
             && trimmed[5..].TrimStart().StartsWith("(", StringComparison.Ordinal);
     }
 
-    internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics)
+    internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
+        AnalysisCollector? analysis = null)
     {
         var text = source.Text;
         var i = start;
@@ -23,7 +25,7 @@ internal static class ImageSyntax
         i++;
         SkipSpace();
         var pathOffset = i;
-        if (!ReadString(out var path)) return null;
+        if (!ReadString(out var path, true)) return null;
         if (string.IsNullOrWhiteSpace(path))
         {
             Error("An image needs a non-empty path.", pathOffset);
@@ -60,6 +62,7 @@ internal static class ImageSyntax
             return null;
         }
 
+        analysis?.CheckImage(path, alt, source.Locate(pathOffset));
         return new(path, alt);
 
         void SkipSpace()
@@ -67,7 +70,7 @@ internal static class ImageSyntax
             while (i < end && char.IsWhiteSpace(text[i])) i++;
         }
 
-        bool ReadString(out string value)
+        bool ReadString(out string value, bool isPath = false)
         {
             value = "";
             if (i >= end || text[i] != '"')
@@ -78,12 +81,14 @@ internal static class ImageSyntax
 
             var quote = i++;
             var result = new StringBuilder();
+            var positions = new List<SourceLocation> { source.Locate(i) };
             while (i < end)
             {
                 var c = text[i++];
                 if (c == '"')
                 {
                     value = result.ToString();
+                    RecordPath(i - 1);
                     return true;
                 }
 
@@ -99,10 +104,19 @@ internal static class ImageSyntax
                 }
 
                 result.Append(c);
+                positions.Add(source.Locate(i));
             }
 
+            RecordPath(i);
             Error("The image argument is missing its closing double quote.", quote);
             return false;
+
+            void RecordPath(int contentEnd)
+            {
+                if (isPath)
+                    analysis?.ImagePath(result.ToString(),
+                        new(source.Locate(quote + 1), source.Locate(contentEnd)), positions);
+            }
         }
 
         void Error(string message, int offset) =>

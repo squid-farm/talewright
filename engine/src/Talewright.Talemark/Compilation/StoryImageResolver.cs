@@ -13,6 +13,13 @@ public static partial class StoryImageResolver
 {
     private static readonly string[] Extensions = [".png", ".jpg", ".jpeg", ".webp"];
 
+    /// <summary>Safe, supported image paths relative to images/, in ordinal order. Reads no image bytes.</summary>
+    public static IEnumerable<string> CompletionPaths(StorySource source) =>
+        source.ImagePaths.Where(path => path.StartsWith("images/", StringComparison.Ordinal))
+            .Select(path => path["images/".Length..])
+            .Where(path => IsSafePath(path) && Extensions.Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+            .Order(StringComparer.Ordinal);
+
     /// <summary>
     /// Resolves a path relative to the story's <c>images/</c> folder.
     /// Reports errors and warnings at the image reference, returning null on error.
