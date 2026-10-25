@@ -18,6 +18,9 @@ public sealed class SourceMapTests
     [InlineData("\n")]
     [InlineData("\r\n")]
     [InlineData("\r")]
+    [InlineData("\u0085")]
+    [InlineData("\u2028")]
+    [InlineData("\u2029")]
     public void Ranges_follow_parser_boundaries_across_files_and_line_endings(string newline)
     {
         string[] lines =
