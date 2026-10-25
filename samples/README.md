@@ -38,7 +38,7 @@ the first camp hub; no edits or temporary copy are needed.
 | Inline and block `{if}` conditional prose, XP and level-up | throughout the chapters |
 | Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
 | Conditional diverts with unconditional fallback | `field.signal`, and `ending.return` when no relic choices are available |
-| Scene titles, speech, Markdown, comments, media placeholder | throughout; opening image is intentionally a **reserved placeholder**, not rendered media |
+| Scene titles, speech, formatting, comments, image media | one illustration per chapter, with JPEG assets in `LostRelic/images/`; image display still awaits player rendering support |
 | Save/load, deterministic Back/Forward, restart and title | available through the shared player; created identity and selected stats survive replay |
 
 ### Quick acceptance route

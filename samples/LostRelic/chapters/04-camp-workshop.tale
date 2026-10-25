@@ -6,6 +6,8 @@
 @hub all(workshop,lesson)
 @hub-limit 2
 
+{image("expedition-workshop", "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.")}
+
 The workshop offers two lessons at a time. Finish one to make room for the next.
 When every lesson is done, Tomas will lead you back to camp.
 
