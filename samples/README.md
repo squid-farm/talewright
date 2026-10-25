@@ -11,6 +11,8 @@ created explorer) and guide Tomas Okafor look for the Relic of Ysh while the
 Explorers' Guild watches. Optional camp encounters demonstrate mechanics without
 forcing a tutorial detour into every playthrough.
 
+**Artwork disclosure:** The images used in *The Lost Relic* sample story are AI-generated.
+
 Opening the sample now presents **character creation**, including editable names,
 built-in pronoun choices, presets and bounded stat choices. **Start story** keeps
 the authored Mara defaults. The workshop and field exercises are available from
