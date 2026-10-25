@@ -272,6 +272,9 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     the resolver's supported safe-path catalogue. Lookup diagnostics point to the
     path's authored opening quote, and malformed calls receive only parser diagnostics.
     This adds no image rendering, byte decoding or image size checks.
+    Bundled web/desktop samples include image resources so their source catalogue
+    remains complete. `EmbeddedStoryLibrary` records image resource names without
+    opening their streams; image rendering and published-story packaging remain separate.
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
     "pass your own options".

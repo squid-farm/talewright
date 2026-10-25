@@ -114,10 +114,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     public async Task Legacy_and_unreadable_details_remain_listed_and_failed_load_preserves_session()
     {
         var fixture = Fixture();
-        var story = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
-        {
-            ["story.talewright.yaml"] = fixture.Yaml, ["chapters/main.tale"] = fixture.Tale,
-        })).Story!;
+        var story = fixture.Compile();
         var history = new StoryHistory(story, 7);
         history.Choose("c0");
         await Upload(fixture);

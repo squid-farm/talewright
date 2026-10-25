@@ -45,7 +45,10 @@ public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "sto
     /// <inheritdoc/>
     public Task<StorySource> LoadAsync(string id) =>
         Task.FromResult(Stories.TryGetValue(id, out var files)
-            ? new StorySource(files)
+            ? new StorySource(files, assembly.GetManifestResourceNames()
+                .Select(name => name.Replace('\\', '/'))
+                .Where(name => name.StartsWith($"{prefix}{id}/images/", StringComparison.Ordinal))
+                .Select(name => name[(prefix.Length + id.Length + 1)..]))
             : throw new KeyNotFoundException($"No built-in story '{id}'."));
 
     private Dictionary<string, Dictionary<string, string>> Scan()
@@ -66,6 +69,7 @@ public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "sto
             }
 
             var story = path[prefix.Length..slash];
+            if (path[(slash + 1)..].StartsWith("images/", StringComparison.Ordinal)) continue;
             using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
             if (!stories.TryGetValue(story, out var files))
             {
