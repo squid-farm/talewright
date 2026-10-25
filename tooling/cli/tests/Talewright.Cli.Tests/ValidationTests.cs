@@ -75,6 +75,52 @@ public sealed class ValidationTests : IDisposable
         Assert.Contains("\"severity\":\"warning\"", result.Output);
     }
 
+    [Theory]
+    [InlineData("""{image("maps/old_map-v2.png", "Map")}""", null, 0)]
+    [InlineData("""{image("maps/old_map-v2", "Map")}""", "TW2013", 0)]
+    [InlineData("""{image("maps/old_map-v2")}""", "TW2013,TW2014", 0)]
+    [InlineData("""{image("maps/old_map-v2.png", "")}""", "TW2014", 0)]
+    [InlineData("""{image("maps/old_map-v2.png", "  ")}""", "TW2014", 0)]
+    [InlineData("""{image("missing.png", "Map")}""", "TW2012", 1)]
+    [InlineData("""{image("maps/Old_map-v2.png", "Map")}""", "TW2012", 1)]
+    [InlineData("""{image("../map.png", "Map")}""", "TW2010", 1)]
+    [InlineData("""{image("maps\\map.png", "Map")}""", "TW2010", 1)]
+    [InlineData("""{image("map.bmp", "Map")}""", "TW2011", 1)]
+    [InlineData("""{image("missing.png",)}""", "TW1014", 1)]
+    public void Image_validation_matches_compiler_messages_severities_positions_and_exit_codes(string call, string? codes, int exitCode)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "images/maps"));
+        // Lookup checks catalogue entries, not image byte contents.
+        File.WriteAllBytes(Path.Combine(_root, "images/maps/old_map-v2.png"), []);
+        File.WriteAllBytes(Path.Combine(_root, "images/maps/old_map-v2.jpg"), []);
+        File.WriteAllText(Path.Combine(_root, "main.tale"), $"=== a\r\n  > player: 🦑 {call}\r\n-> END");
+        var expected = StoryCompiler.Compile(StorySource.FromDirectory(_root));
+        var result = Run("--format", "json");
+        Assert.Equal(exitCode, result.Code);
+        Assert.Empty(result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        Assert.Equal(exitCode == 0, json.RootElement.GetProperty("success").GetBoolean());
+        var actual = json.RootElement.GetProperty("diagnostics").EnumerateArray().ToArray();
+        Assert.Equal(codes?.Split(',') ?? [], actual.Select(diagnostic => diagnostic.GetProperty("code").GetString()));
+        Assert.Equal(expected.Diagnostics.Count, actual.Length);
+        for (var index = 0; index < actual.Length; index++)
+        {
+            var diagnostic = expected.Diagnostics[index];
+            Assert.Equal(diagnostic.Message, actual[index].GetProperty("message").GetString());
+            Assert.Equal(diagnostic.Severity.ToString().ToLowerInvariant(), actual[index].GetProperty("severity").GetString());
+            Assert.Equal("main.tale", actual[index].GetProperty("file").GetString());
+            Assert.Equal(diagnostic.Location.Line, actual[index].GetProperty("line").GetInt32());
+            Assert.Equal(diagnostic.Location.Column, actual[index].GetProperty("column").GetInt32());
+            if (diagnostic.Code.StartsWith("TW201", StringComparison.Ordinal))
+                Assert.Equal(23, diagnostic.Location.Column);
+        }
+        if (exitCode == 0 && actual.Length > 0)
+            Assert.Equal(1, Run("--warnings-as-errors").Code);
+        var text = Run();
+        Assert.Equal(exitCode, text.Code);
+        if (codes is not null) Assert.Contains(codes.Split(',')[0], text.Output);
+    }
+
     [Fact]
     public void Missing_manifest_is_a_compiler_error()
     {

@@ -90,13 +90,13 @@ public sealed class ImageCompletionTests
     [InlineData("camp.bmp", "Map", "TW2011")]
     [InlineData("maps/camp", "Map", "TW2013")]
     [InlineData("camp.jpeg", "", "TW2014")]
-    public void Editor_diagnostics_reuse_resolver_without_changing_compiler_validation(string path, string alt, string code)
+    public void Editor_diagnostics_match_compiler_without_duplicates(string path, string alt, string code)
     {
         var source = Source($"=== start\n{{image(\"{path}\", \"{alt}\")}}\n-> END");
         var analysis = StoryAnalyzer.Analyze(source);
         var diagnostic = Assert.Single(analysis.Diagnostics, diagnostic => diagnostic.Code == code);
         Assert.Equal(new SourceLocation("main.tale", 2, 8), diagnostic.Location);
-        Assert.True(StoryCompiler.Compile(source).Success);
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
     }
 
     [Fact]
@@ -116,5 +116,22 @@ public sealed class ImageCompletionTests
         var renamed = await workspace.AnalyzeAsync(TimeSpan.Zero);
         Assert.Contains(renamed.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW2012");
         Assert.Equal(new[] { "images/new.jpeg" }, renamed.Analysis.Source.ImagePaths);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("id: [")]
+    public void Manifest_recovery_keeps_image_diagnostics_and_completion_without_duplicates(string? manifest)
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.tale"] = "=== start\n{image(\"camp.jpeg\", \"Map\")}\n-> END",
+        };
+        if (manifest is not null) files[StorySource.ManifestFileName] = manifest;
+        var analysis = StoryAnalyzer.Analyze(new(files, []));
+        Assert.Single(analysis.Diagnostics, diagnostic => diagnostic.Code == "TW2012");
+        analysis = StoryAnalyzer.Analyze(new(files, ["images/camp.jpeg"]));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Code.StartsWith("TW201", StringComparison.Ordinal));
+        Assert.Single(StoryCompletion.Complete(analysis, new("main.tale", 2, 9)));
     }
 }

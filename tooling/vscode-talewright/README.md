@@ -65,7 +65,8 @@ Completion replaces the path content and escapes embedded quotes, leaving alt
 text alone. It also works in unfinished calls, choice labels and dialogue.
 Adding, renaming or deleting image files refreshes suggestions and image lookup
 diagnostics without reopening the story. These editor checks use file paths, not
-image bytes. Compiler/CLI image validation and player rendering remain separate work.
+image bytes. Compilation and `talewright validate` use the same lookup diagnostics;
+player rendering remains separate work.
 
 Incomplete templates and emphasis recover at line boundaries so an unfinished
 edit does not color the rest of the story. A `*` or `_` with no closing

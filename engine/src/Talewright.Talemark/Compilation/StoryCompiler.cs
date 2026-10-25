@@ -112,6 +112,7 @@ public static class StoryCompiler
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,
             Analysis = analysis,
+            ImageSource = source,
         };
 
         var parsed = new List<ParsedScene>();

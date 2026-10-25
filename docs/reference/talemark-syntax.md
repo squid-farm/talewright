@@ -262,16 +262,17 @@ fields such as scene titles do not gain template support. To show the syntax lit
 escape its outer braces: `\{image("camp")\}`. Code formatting alone does not escape a template.
 The character reference `{image:name}` still means the `name` property of the character `image`.
 
-Compilation currently creates media placeholders only; it does not validate image files,
-apply missing-alt fallback to the compiled story, or display images.
-Editor analysis checks path safety, supported formats, file existence, ambiguous extensions
-and missing alt through the shared resolver's
+Compilation, `talewright validate` and editor analysis check path safety, supported formats,
+file existence, ambiguous extensions and missing alt through the shared resolver's
 [TW2010–TW2014 diagnostics](diagnostics.md#tw2xxx-names-and-types).
 The editor suggests paths from `images/` in the first quoted argument and refreshes
 suggestions and diagnostics when files change. Lookup reads paths, not image bytes.
-The resolver retains the agreed warning/fallback for omitted, empty or whitespace-only
-alt, and `.png`, `.jpg`, `.jpeg`, `.webp` selection order. Compiler/CLI integration
-is still separate, as is rendering in [#177](https://github.com/squid-farm/talewright/issues/177).
+Omitted, empty or whitespace-only alt warns and uses sentence-case filename fallback.
+Explicit nonblank alt is preserved after escape decoding. Extensionless paths select
+`.png`, `.jpg`, `.jpeg`, `.webp` in that order, warning if more than one matches.
+Compiled media stores the selected path including `images/` and the effective alt text.
+Nothing is displayed yet; rendering is separate work in
+[#177](https://github.com/squid-farm/talewright/issues/177).
 
 The old `![alt](path)` form is an error with a quoted `{image("path", "alt")}` replacement.
 The proposed `@image(...)` form was not shipped and is not supported.

@@ -56,11 +56,13 @@ When you see several errors, fix the first one and check again: one mistake can 
 | ⚠ TW2013 | An extensionless image path matches several files. | Include the extension to choose explicitly. Otherwise the first match wins in `.png`, `.jpg`, `.jpeg`, `.webp` order. |
 | ⚠ TW2014 | Image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. |
 
-Editor analysis reports these image codes through the shared image resolver and refreshes
-them when image files change. Story compilation and `talewright validate` do not yet
-invoke the resolver; that integration remains separate. The syntax-only slice in #197
-did not include image-file existence checks. Editor lookup reads paths, not image bytes;
-it does not validate file contents or render images.
+Story compilation, `talewright validate` and editor analysis report these image codes
+through the same resolver. Diagnostics point to the image path's opening quote in
+the authored narrative, including dialogue and choices. Malformed image calls receive
+syntax diagnostics instead of resolver errors. Editors refresh the catalogue and
+diagnostics when files change. Lookup reads paths, not image bytes; it does not
+validate file contents or render images. Successful compilation stores the selected
+story-root-relative path and effective alt text in each media node.
 
 ## TW3xxx: story structure
 

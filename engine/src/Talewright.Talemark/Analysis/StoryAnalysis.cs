@@ -61,7 +61,7 @@ public static class StoryAnalyzer
         options ??= CompilerOptions.Default;
         var collector = new AnalysisCollector(source, options);
         var result = StoryCompiler.CompileForAnalysis(source, options, collector);
-        return new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.ImageDiagnostics.Items).ToArray());
+        return new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
     }
 }
 
@@ -78,16 +78,13 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSite> CompletionSites { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
-    internal DiagnosticBag ImageDiagnostics { get; } = new();
+    internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
 
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)
     {
         CompletionSites.Add(new(path, range, [AuthoringSymbolKind.Image], [], positions,
             Candidates: _imageCandidates, IsImagePath: true));
     }
-
-    internal void CheckImage(string path, string alt, SourceLocation location) =>
-        StoryImageResolver.Resolve(source, path, alt, location, ImageDiagnostics);
 
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
@@ -402,11 +399,15 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             World = world, Flags = new HashSet<FlagId>(), Variables = new HashSet<VarId>(),
             Scenes = new HashSet<SceneId>(), Predicates = options.Predicates, Modifiers = options.Modifiers,
             Analysis = this,
+            ImageSource = source,
         };
         foreach (var (file, text) in source.TaleFiles)
         {
             TaleParser.Discover(file, text, symbols, (_, _) => { }, Scene);
-            TaleParser.Parse(file, text, symbols, new DiagnosticBag());
+            var diagnostics = new DiagnosticBag();
+            TaleParser.Parse(file, text, symbols, diagnostics);
+            RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
+                diagnostic.Code is "TW2010" or "TW2011" or "TW2012" or "TW2013" or "TW2014"));
         }
     }
 }

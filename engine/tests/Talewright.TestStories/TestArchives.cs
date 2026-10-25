@@ -54,7 +54,7 @@ public static class TestArchives
             using var buffer = new MemoryStream();
             using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var (path, content) in TestStories.Linear.Files)
+                foreach (var (path, content) in TestStories.Linear.Entries)
                 {
                     using var writer = new StreamWriter(zip.CreateEntry(path).Open(), new UTF8Encoding(false));
                     writer.Write(content);

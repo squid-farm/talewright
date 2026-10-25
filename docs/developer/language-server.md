@@ -201,12 +201,13 @@ Alt text stays literal and offers no path or expression suggestions. Every
 narrative-template surface, including dialogue and choice labels, uses the same
 behavior; plain-string fields such as titles do not acquire image syntax.
 
-Editor analysis calls the shared image resolver for complete, well-formed calls,
+Editor analysis uses the same compiler image lookup for complete, well-formed calls,
 publishing TW2010–TW2014 at the path's opening quote. File notifications rebuild
 the catalogue and refresh suggestions and diagnostics while preserving unsaved
 buffers. Report a rename as deletion of the old path and creation of the new path.
-No image bytes are read, no images are rendered, and compiler/CLI image validation
-is still a separate integration step.
+No image bytes are read and no images are rendered. Ordinary compilation and
+`talewright validate` report the same resolver diagnostics; compiled media carries
+the selected asset path and effective alt text.
 
 Use `initializationOptions.metadataPath` for an explicit data-only metadata file
 (absolute or relative to each story root), and
