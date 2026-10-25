@@ -544,9 +544,14 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var close = FindClosingBracket(rest, pos);
+        var close = FindClosingBracket(rest, pos, out var unclosedBrace);
         if (close < 0)
         {
+            if (_discoverEffects is null && unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1)))
+            {
+                ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
+                    rest.Length, false, _diagnostics);
+            }
             _diagnostics.Error("TW1011", "Choice label is missing its closing ']'.", At(indent + 1 + pos));
             return;
         }
@@ -842,24 +847,33 @@ internal sealed partial class TaleParser
         return pos;
     }
 
-    private static int FindClosingBracket(string text, int open)
+    private static int FindClosingBracket(string text, int open, out int unclosedBrace)
     {
-        var braces = 0;
+        unclosedBrace = -1;
+        var brackets = 0;
         for (var i = open + 1; i < text.Length; i++)
         {
             switch (text[i])
             {
                 case '{':
-                    braces++;
-                    break;
-                case '}':
-                    braces--;
+                    var close = InlineParser.FindClosingBrace(text, i);
+                    if (close < 0)
+                    {
+                        unclosedBrace = i;
+                        return -1;
+                    }
+                    i = close;
                     break;
                 case '\\':
                     i++;
                     break;
-                case ']' when braces == 0:
-                    return i;
+                case '[':
+                    brackets++;
+                    break;
+                case ']':
+                    if (brackets == 0) return i;
+                    brackets--;
+                    break;
             }
         }
 

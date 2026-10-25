@@ -35,6 +35,7 @@ public static class StoryHover
         ["var"] = "var:id: a story variable with a fixed integer or text type.",
         ["faction"] = "faction:id: numeric standing; faction:id:tier selects its reputation tier and faction:id:name its display name.",
         ["item"] = "item:id: the item's display name.",
+        ["image"] = "image(\"path\", \"alt text\"): inserts image media in narrative text, dialogue or choices. Path is relative to images/; literal alt text is optional. File lookup and image rendering are separate features.",
         ["set"] = "set flag:id: sets a flag to true.",
         ["clear"] = "clear flag:id: sets a flag to false.",
         ["give"] = "give character item [quantity]: adds inventory; quantity is a numeric expression and defaults to one.",

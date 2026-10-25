@@ -68,6 +68,22 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Image_syntax_diagnostics_clear_without_asset_lookup()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale", "=== start\n![Camp](camp)\n-> END", 1);
+        var diagnostics = await client.Diagnostics("start.tale", 1);
+        var legacy = Assert.Single(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW1015");
+        Assert.Contains("{image(\"camp\", \"Camp\")}", legacy.GetProperty("message").GetString());
+        await client.Change("start.tale", "=== start\n{image(\"camp\", \"Camp\")}\n-> END", 2);
+        Assert.Empty(await client.Diagnostics("start.tale", 2));
+        await client.Change("start.tale", "=== start\n{image(camp)}\n-> END", 3);
+        Assert.Contains(await client.Diagnostics("start.tale", 3),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW1014");
+    }
+
+    [Fact]
     public async Task Unsaved_changes_clear_diagnostics_and_ignore_superseded_versions()
     {
         await using var client = new Client();

@@ -43,7 +43,7 @@ test('package wires Talemark syntax, snippets, manifest schema, and the thin LSP
 
 test('snippets have discoverable prefixes and a bounded default-expansion contract', async () => {
   const snippets = await json('snippets/tale.json');
-  assert.equal(Object.keys(snippets).length, 5);
+  assert.equal(Object.keys(snippets).length, 6);
   const prefixes = new Set();
   for (const [name, snippet] of Object.entries(snippets)) {
     assert.match(snippet.prefix, /^tale-/);

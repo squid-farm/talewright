@@ -3,7 +3,7 @@
 === camp.arrival
 @title Base Camp
 
-![A clearing at the jungle's edge, tents sagging in the heat](camp-art)
+{image("camp-art", "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.")}
 
 The boat leaves {player:first-name} at the edge of the jungle with a pack, a {item:torch#lower} and
 three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun#object}

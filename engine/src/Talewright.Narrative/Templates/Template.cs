@@ -35,7 +35,7 @@ public sealed record StyledTemplate(TextStyle Style, IReadOnlyList<TemplateInlin
 
 public sealed record LineBreakTemplate : TemplateInline;
 
-/// <summary>Placeholder for an image/sprite/sound (<c>![alt](media-id)</c>). Reserved for the media milestone.</summary>
+/// <summary>Image media from <c>{image("path", "alt text")}</c>; asset lookup and presentation are separate.</summary>
 public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInline;
 
 /// <summary>

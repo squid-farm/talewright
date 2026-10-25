@@ -11,6 +11,8 @@ created explorer) and guide Tomas Okafor look for the Relic of Ysh while the
 Explorers' Guild watches. Optional camp encounters demonstrate mechanics without
 forcing a tutorial detour into every playthrough.
 
+**Artwork disclosure:** The images used in *The Lost Relic* sample story are AI-generated.
+
 Opening the sample now presents **character creation**, including editable names,
 built-in pronoun choices, presets and bounded stat choices. **Start story** keeps
 the authored Mara defaults. The workshop and field exercises are available from
@@ -38,7 +40,7 @@ the first camp hub; no edits or temporary copy are needed.
 | Inline and block `{if}` conditional prose, XP and level-up | throughout the chapters |
 | Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
 | Conditional diverts with unconditional fallback | `field.signal`, and `ending.return` when no relic choices are available |
-| Scene titles, speech, Markdown, comments, media placeholder | throughout; opening image is intentionally a **reserved placeholder**, not rendered media |
+| Scene titles, speech, formatting, comments, image media | one illustration per chapter, with JPEG assets in `LostRelic/images/`; image display still awaits player rendering support |
 | Save/load, deterministic Back/Forward, restart and title | available through the shared player; created identity and selected stats survive replay |
 
 ### Quick acceptance route

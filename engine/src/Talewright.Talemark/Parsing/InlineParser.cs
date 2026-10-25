@@ -81,6 +81,7 @@ internal static class InlineParser
     private static MarkdownPipeline BuildPipeline()
     {
         var builder = new MarkdownPipelineBuilder();
+        builder.UsePreciseSourceLocation();
 
         // Block structure is handled by TaleParser; Markdig only ever sees one paragraph.
         builder.BlockParsers.RemoveAll(p => p is not ParagraphBlockParser);
@@ -106,6 +107,8 @@ internal static class InlineParser
         public StorySymbols Symbols { get; } = symbols;
         public DiagnosticBag Diagnostics { get; } = diagnostics;
         public List<Piece?> Fragments { get; } = [];
+        // Map Markdig's masked offsets back to authored text for migration diagnostics.
+        public List<(int Offset, int Delta, int Start, int Length)> MaskedOffsets { get; } = [];
     }
 
     /// <summary>Parses prose. Errors are reported to <paramref name="diagnostics"/>; the result is still usable.</summary>
@@ -158,6 +161,12 @@ internal static class InlineParser
             var close = FindClosingBrace(text, i);
             if (close < 0)
             {
+                if (ImageSyntax.IsCall(text.AsSpan(i + 1)))
+                {
+                    ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics);
+                    break;
+                }
+
                 if (context.Symbols.Analysis is { } analysis)
                 {
                     analysis.InlineRange(context.Source, i + 1, text.Length);
@@ -177,19 +186,35 @@ internal static class InlineParser
 
             var inner = text[(i + 1)..close];
             var location = context.Source.Locate(i + 1);
-            if (context.Symbols.Analysis is { } collector)
+            var image = ImageSyntax.IsCall(inner);
+            Piece? fragment;
+            if (image)
             {
-                var trimmed = inner.Trim();
                 var lead = inner.Length - inner.TrimStart().Length;
-                var keyword = trimmed.StartsWith("if ", StringComparison.Ordinal) ? "if" :
-                    trimmed is "else" or "/if" ? trimmed : null;
-                if (keyword is not null)
-                    collector.Tokens.Add(new(keyword, new(context.Source.Locate(i + 1 + lead),
-                        context.Source.Locate(i + 1 + lead + keyword.Length))));
+                context.Symbols.Analysis?.Tokens.Add(new("image",
+                    new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 1 + lead + 5))));
+                var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics);
+                fragment = media is null ? null : new InlinePiece(media);
             }
-            context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
-            context.Fragments.Add(ParseFragment(inner, location, context));
-            result.Append(PlaceholderStart).Append(context.Fragments.Count - 1).Append(PlaceholderEnd);
+            else
+            {
+                if (context.Symbols.Analysis is { } collector)
+                {
+                    var trimmed = inner.Trim();
+                    var lead = inner.Length - inner.TrimStart().Length;
+                    var keyword = trimmed.StartsWith("if ", StringComparison.Ordinal) ? "if" :
+                        trimmed is "else" or "/if" ? trimmed : null;
+                    if (keyword is not null)
+                        collector.Tokens.Add(new(keyword, new(context.Source.Locate(i + 1 + lead),
+                            context.Source.Locate(i + 1 + lead + keyword.Length))));
+                }
+                context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
+                fragment = ParseFragment(inner, location, context);
+            }
+            context.Fragments.Add(fragment);
+            var placeholder = $"{PlaceholderStart}{context.Fragments.Count - 1}{PlaceholderEnd}";
+            result.Append(placeholder);
+            context.MaskedOffsets.Add((result.Length, close + 1 - result.Length, i, close + 1 - i));
             i = close + 1;
         }
 
@@ -201,10 +226,15 @@ internal static class InlineParser
     {
         var depth = 0;
         var inString = false;
+        var image = ImageSyntax.IsCall(text.AsSpan(open + 1));
         for (var i = open; i < text.Length; i++)
         {
             var c = text[i];
-            if (c == '"')
+            if (image && inString && c == '\\')
+            {
+                i++;
+            }
+            else if (c == '"')
             {
                 inString = !inString;
             }
@@ -258,7 +288,9 @@ internal static class InlineParser
                     AddText(entity.Transcoded.ToString(), pieces, context);
                     break;
                 case CodeInline code:
-                    pieces.Add(new InlinePiece(new StyledTemplate(TextStyle.Code, [new TextTemplate(code.Content)])));
+                    var codePieces = new List<Piece>();
+                    AddText(code.Content, codePieces, context);
+                    pieces.Add(new InlinePiece(new StyledTemplate(TextStyle.Code, Fold(codePieces, context))));
                     break;
                 case LineBreakInline lineBreak:
                     pieces.Add(new InlinePiece(lineBreak.IsHard ? new LineBreakTemplate() : new TextTemplate(" ")));
@@ -273,7 +305,17 @@ internal static class InlineParser
                 }
 
                 case LinkInline { IsImage: true } image:
-                    pieces.Add(new InlinePiece(new MediaTemplate(image.Url ?? string.Empty, PlainText(image))));
+                    var alt = PlainText(image);
+                    for (var index = 0; index < context.MaskedOffsets.Count; index++)
+                    {
+                        var fragment = context.MaskedOffsets[index];
+                        alt = alt.Replace($"{PlaceholderStart}{index}{PlaceholderEnd}", context.Source.Text.Substring(fragment.Start, fragment.Length));
+                    }
+                    var replacement = $"{{image({ImageSyntax.Quote(image.Url ?? "")}, {ImageSyntax.Quote(alt)})}}";
+                    context.Diagnostics.Error("TW1015",
+                        $"Markdown images are no longer supported. Use {replacement} instead.",
+                        context.Source.Locate(image.Span.Start + context.MaskedOffsets
+                            .LastOrDefault(offset => offset.Offset <= image.Span.Start).Delta));
                     break;
                 case ContainerInline other:
                     // Links (and anything else with children): keep the text, drop the target. Stories have no links in v0.

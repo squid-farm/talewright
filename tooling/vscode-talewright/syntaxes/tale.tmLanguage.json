@@ -115,6 +115,18 @@
       "patterns": [
         {"match": "\\\\[{}]", "name": "constant.character.escape.tale"},
         {
+          "begin": "(\\{)\\s*(image)\\s*(\\()",
+          "beginCaptures": {
+            "1": {"name": "punctuation.section.template.begin.tale"},
+            "2": {"name": "support.function.image.tale"},
+            "3": {"name": "punctuation.section.parens.begin.tale"}
+          },
+          "end": "\\}|(?=$)",
+          "endCaptures": {"0": {"name": "punctuation.section.template.end.tale"}},
+          "name": "meta.image.tale",
+          "patterns": [{"include": "#expression"}]
+        },
+        {
           "begin": "(\\{)(/?if|else)\\b",
           "beginCaptures": {
             "1": {"name": "punctuation.section.template.begin.tale"},
@@ -208,7 +220,7 @@
         },
         {"include": "text.html.markdown#escape"},
         {"include": "text.html.markdown#raw"},
-        {"include": "text.html.markdown#image-inline"},
+        {"match": "!\\[[^\\]]*\\]\\([^)]*\\)", "name": "invalid.deprecated.image.tale"},
         {"include": "#link"}
       ]
     },

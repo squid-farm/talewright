@@ -41,8 +41,8 @@ Talemark string delimiter: apostrophes are ordinary text.
 Backslash is the escape character everywhere. Inside double quotes, `\"` means a literal double
 quote and `\\` means a literal backslash. In prose, `\{` and `\}` mean literal braces.
 For example, the decided string `"She said \"Go\"."` contains `She said "Go".`.
-These rules also apply to future reader-text arguments such as image alt text.
-They do not introduce an image spelling, quoted choice-label spelling or a new formatting feature.
+Image path and alt arguments implement these escapes today. These rules do not introduce a
+quoted choice-label spelling or a new formatting feature.
 
 **Today:** expression string literals and the possessive modifier argument use double quotes, but
 their scanners do not decode `\"` or `\\`. Unclosed strings can produce TW1001, TW2006, or TW1004
@@ -50,6 +50,9 @@ when the enclosing brace cannot be found. Prose already supports `\{` and `\}`. 
 titles, dialogue and choice labels still use their current unquoted forms:
 `@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`.
 Do not add quotes to those forms expecting them to be removed.
+Image calls use `{image("path", "alt text")}` with literal arguments; both `\"` and `\\`
+are decoded there. Unknown image escapes produce TW1014. This does not change expression-string
+or modifier-argument decoding.
 
 The manifest is YAML, not Talemark: YAML quoting and escaping still apply there. A Talemark
 expression stored in YAML must first survive YAML decoding.
@@ -72,6 +75,7 @@ there is no general escape for a line directive today. Do not assume that `\@` o
 | `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
 | `~` | Entry effect at the start of a line; followed by effects. Runs before rendering. | `~ var:coins += 1` | TW1003 malformed effect; name/type errors. |
 | `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed effect block. |
+| `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted path and optional quoted literal alt, comma-separated. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "The camp")}` | TW1014 malformed call/escape. Asset validation and rendering are not connected yet. |
 | `:::` | Delimit an entry skill-check block. Opening line takes `skill-check [actor] skill dc number-expression`; closing line has only `:::`. Both outcomes are required. | `::: skill-check perception dc 12` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3006 illegal placement or duplicate check. |
 | `:` in labels | Separates fixed control labels from their contents: `requires:`, `success:`, `failure:`. Not a property read in this context. | `success: -> hall` | TW1009 misplaced/missing outcomes; TW1011 malformed choice condition. |
 | `//` | Comment when it begins a trimmed line; the rest of the line is ignored. It is not a trailing-comment operator. | `// The guard remembers this.` | None for comment contents. |
@@ -96,9 +100,9 @@ using the quoted-text rules when it is inside syntax.
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
 | `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. A pronoun form must come first on a pronoun reference. | After the value expression | `{player:pronoun#reflexive#capitalize}` | TW2006 unknown/misplaced modifier, bad argument syntax or value. |
 | `(` `)` | Group an expression; also bound `visited`'s scene argument, modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
-| `"` | Bound text literals and modifier string arguments. No single-quoted Talemark string form. Escapes are decided as above, not yet decoded. | 1 | `{player:pronoun#possessive("independent")}` | TW1001 malformed expression; TW2006 malformed argument; TW1004 enclosing brace not found. |
+| `"` | Bound text literals, modifier string arguments and image arguments. No single-quoted Talemark string form. Only image arguments currently decode the decided escapes. | 1 | `{player:pronoun#possessive("independent")}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
 | `\` | Escape character, with the current/decided distinction described above. | During text scanning | `Literal \{braces\}` | Unescaped `{` can cause TW1004; not a numeric or boolean operator. |
-| `,` | Separate metadata tags and hub arguments today; decided separator for multiple double-quoted modifier arguments. Each modifier defines its own values. | Structural | `@hub any(temple, forest)` | TW1006 invalid hub; multi-argument modifiers are not implemented (TW2006). |
+| `,` | Separate metadata tags, hub arguments and image arguments today; decided separator for multiple double-quoted modifier arguments. Each modifier defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; multi-argument modifiers are not implemented (TW2006). |
 | Unary `-` | Negate one number. | 2 | `{var:coins + -3}` | TW2003 non-number; TW1002 oversized literal. |
 | `*` `/` | Integer multiplication and division; two numbers. A slash also appears in `{/if}` and `//` comments, with structural meanings. | 3 | `{var:coins / 2}` | TW2003 non-numbers; TW1001 missing operand. |
 | `+` `-` | Integer addition and subtraction; two numbers. Space subtraction away from names. | 4 | `{var:coins - 1}` | TW2003 non-numbers; TW1001 missing operand; TW2004 if an unintended hyphenated variable is undeclared. |
@@ -158,6 +162,23 @@ See the [pronoun forms table](talemark-syntax.md#3-substitutions).
 Completion offers finite values after `#possessive(` and identifies `"determiner"` as the default.
 `"hers"` is not an alias for `"independent"`: it produces TW2006 pointing at the argument.
 
+### Image syntax decision
+
+The approved form is `{image("path", "alt text")}`, with optional literal alt text, in every
+narrative-template context. It constructs media; it is not an expression function returning text.
+The value is the media node, with no arithmetic precedence or `#` chaining. Its strings decode
+`\"` and `\\` once. Quoted paths can contain filename punctuation without becoming story identifiers.
+Existing `{image:name}` character access is unchanged.
+
+The alternatives considered for [#197](https://github.com/squid-farm/talewright/issues/197) were
+`@image(path | "alt")`, `@image("path", "alt")`, a line-only `@image` directive, a colon form and
+`#image`. Braces give narrative insertion an explicit boundary without a new distinction between
+scene metadata and image content. Commas follow the argument convention instead of adding `|`.
+The line-only form unnecessarily limits authoring; `:` already means access, and `#` returns text,
+not media. Markdown images remain rejected, rather than supported as a second spelling.
+Image placement is not restricted for presentation preferences; authors control their content.
+Plain-string fields are a separate model boundary, not an image-specific prohibition.
+
 ## Prose formatting and legacy images
 
 These are current formatting delimiters, not a promise of general Markdown support.
@@ -169,7 +190,7 @@ The formatting design is still being considered in
 | `**...**`, `__...__` | Bold prose, choice labels or dialogue. | Inline formatting after brace parsing; backslash can escape formatting punctuation. | `**Danger**` | Unmatched formatting markers generally remain text, not a Talemark error. |
 | `*...*`, `_..._` | Italic prose, choice labels or dialogue. A leading `* ` is a choice instead. | Same formatting stage and escaping. | `*Quietly*` | Same unmatched-marker behavior. |
 | Backticks | Inline code text. Brace substitutions are still recognized before code formatting. | Backtick-delimited span after brace parsing. | `` `torch` `` | Not a block-code or brace-escape syntax. |
-| `![alt](path)` | Legacy image placeholder in prose; takes a label and path, but is not displayed. | Inline image parsing after brace parsing. | `![A torch](torch)` | No image-file validation; replacement diagnostics are part of #197, not this registry. |
+| `![alt](path)` | Rejected legacy Markdown image form. | Detected after brace parsing, with the diagnostic mapped back to the author's source. | Replace `![A torch](torch)` with `{image("torch", "A torch")}`. | TW1015 names the quoted replacement. |
 | `[text](target)` | Legacy link parsing keeps the label text but discards the destination; not a working hyperlink feature. | Inline parsing after brace parsing. | `[Go](https://example.org)` | No target validation or hyperlink guarantee. |
 
 ## Dotted-prefix completion
@@ -189,9 +210,9 @@ The language server uses the shared authoring completion provider.
 | `:` access, `.` within names, shared story-name characters | Implemented in [#191](https://github.com/squid-farm/talewright/issues/191). |
 | `#` pronoun forms, possessive values and default completion detail | Implemented in [#190](https://github.com/squid-farm/talewright/issues/190). |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
-| `\"` and `\\` inside quotes; one consistent escape scanner | Decided, not implemented. Existing expression, modifier and enclosing-brace scanners must change together under [#184](https://github.com/squid-farm/talewright/issues/184); [#197](https://github.com/squid-farm/talewright/issues/197) must apply the rule to image alt text. Prose `\{` and `\}` already work. |
+| `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197); enclosing braces and choice labels respect quoted delimiters. Expression and modifier string decoding remains separate work under [#184](https://github.com/squid-farm/talewright/issues/184). Prose `\{` and `\}` already work. |
 | Comma-separated multi-argument modifiers | Decided contract; today's modifier parser accepts at most one argument. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
-| New image syntax | [#197](https://github.com/squid-farm/talewright/issues/197) must choose a spelling using this registry and double-quoted alt text. It does not include image-file existence checks. Resolver integration remains a separate follow-up; see [image diagnostics](diagnostics.md#tw2xxx-names-and-types). |
+| New image syntax | [#197](https://github.com/squid-farm/talewright/issues/197) implements `{image("path", "alt")}` across narrative-template contexts; alt is optional and literal. Quoted paths are asset strings, not story identifiers. No file checks or rendering: resolver integration remains a separate follow-up; see [image diagnostics](diagnostics.md#tw2xxx-names-and-types). |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
 

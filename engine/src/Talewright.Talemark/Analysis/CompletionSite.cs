@@ -145,6 +145,7 @@ internal static class ExpressionCompletion
                         => ["set", "clear", "give", "take", "var:", "faction:"],
                     ExpressionContextKind.Effects => ["var:", "faction:"],
                     ExpressionContextKind.Number => ["var:"],
+                    ExpressionContextKind.Substitution when before.Length == 0 => ["var:", "flag:", "faction:", "item:", "image("],
                     ExpressionContextKind.Substitution => ["var:", "flag:", "faction:", "item:"],
                     _ => ["flag:", "var:", "faction:", "item:", "visited(", "true", "false", "not"]
                 };
