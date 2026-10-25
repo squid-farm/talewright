@@ -20,6 +20,7 @@
     private IJSObjectReference? _module;
     private DotNetObjectReference<MediaView>? _reference;
     private CancellationTokenSource? _loading;
+    private StoryImages.Lease? _lease;
     private int _handle;
     private bool _disposed;
     private bool _started;
@@ -72,16 +73,10 @@
         var token = _loading.Token;
         try
         {
-            await using var stream = await Images.OpenAsync(Media.MediaId, token);
-            using var reference = new DotNetStreamReference(stream, leaveOpen: true);
-            var mime = Path.GetExtension(Media.MediaId).ToLowerInvariant() switch
-            {
-                ".png" => "image/png",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".webp" => "image/webp",
-                _ => throw new InvalidDataException("Unsupported resolved image format."),
-            };
-            var loaded = await _module.InvokeAsync<bool>("load", token, _handle, reference, mime);
+            _lease = Images.Acquire(Media.MediaId, JS);
+            var url = await _lease.Url.WaitAsync(token);
+            if (_disposed || token.IsCancellationRequested) return;
+            var loaded = await _module.InvokeAsync<bool>("display", token, _handle, url);
             if (!loaded && !_disposed) _error = "This image could not be displayed.";
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException
@@ -119,6 +114,7 @@
             }
         }
         _reference?.Dispose();
+        if (_lease is not null) await _lease.DisposeAsync();
         _loading?.Dispose();
     }
 }

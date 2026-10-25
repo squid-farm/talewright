@@ -19,11 +19,23 @@ export function observe(image, receiver) {
 }
 
 export async function load(id, stream, mime) {
+    const url = await createUrl(stream, mime);
+    const state = images.get(id);
+    if (!state) { revokeUrl(url); return false; }
+    state.url = url;
+    return display(id, url);
+}
+
+export async function createUrl(stream, mime) {
     const bytes = await stream.arrayBuffer();
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+}
+
+export function revokeUrl(url) { URL.revokeObjectURL(url); }
+
+export async function display(id, url) {
     const state = images.get(id);
     if (!state) return false;
-    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-    state.url = url;
     const loaded = new Promise(resolve => {
         state.finish = resolve;
         state.image.onload = () => resolve(true);

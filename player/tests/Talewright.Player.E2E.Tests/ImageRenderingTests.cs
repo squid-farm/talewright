@@ -58,6 +58,50 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Repeated_embedded_history_occurrences_share_url_until_last_holder_is_removed()
+    {
+        await Page.EvaluateAsync("""
+            () => {
+                window.createdImages = [];
+                window.revokedImages = [];
+                const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
+                URL.createObjectURL = blob => { const url = create(blob); window.createdImages.push(url); return url; };
+                URL.revokeObjectURL = url => { window.revokedImages.push(url); revoke(url); };
+            }
+            """);
+        await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
+        await Choose("Continue");
+        await Choose("Visit the expedition workshop");
+        const string alt = "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.";
+        var images = Page.GetByAltText(alt, new() { Exact = true });
+        await images.First.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await images.First.ElementHandleAsync());
+        var url = await images.First.GetAttributeAsync("src");
+        await Choose("Pack a trail lunch");
+        await Choose("Eat one ration");
+        await Choose("Continue");
+        await Expect(images).ToHaveCountAsync(2);
+        await images.Last.ScrollIntoViewIfNeededAsync();
+        await Expect(images.Last).ToHaveAttributeAsync("src", url!);
+        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.createdImages.filter(value => value === url).length", url));
+        await Driver.ClickAsync("Back");
+        await Expect(images).ToHaveCountAsync(1);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.revokedImages.includes(url)", url));
+        await Driver.ClickAsync("Forward");
+        await Expect(images).ToHaveCountAsync(2);
+        await images.Last.ScrollIntoViewIfNeededAsync();
+        await Expect(images.Last).ToHaveAttributeAsync("src", url!);
+        await Library();
+        var replacement = new StoryFixture("image-replacement",
+            "id: image-replacement\ntitle: Replacement\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "=== start\nReplacement.\n-> END");
+        await Upload(replacement);
+        await Expect(Latest).ToContainTextAsync("Replacement.");
+        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.revokedImages.filter(value => value === url).length", url));
+    }
+
+    [Fact]
     public async Task Unsupported_archive_images_keep_effective_alt_and_visible_accessible_failure()
     {
         var fixture = new StoryFixture("archive-images",

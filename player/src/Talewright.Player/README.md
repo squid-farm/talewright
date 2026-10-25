@@ -22,7 +22,7 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`, and `MediaView` for resolved images on every narrative surface. |
-| `MediaView` | Per-mounted-occurrence viewport-lazy stream/Blob transport. Responsive image, effective alt and accessible visible failures; owns cancellation and its object URL until unmounted. |
+| `MediaView` | Viewport-lazy image lease and independent decode/presentation. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |
 | `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
 
@@ -54,7 +54,7 @@ Register one as a singleton `IStoryLibrary` in the host.
 
 `TalewrightApp` cascades the accepted `StoryImages`. Direct `StoryPlayer`/`DocumentView`
 consumers can supply a `CascadingValue<StoryImages>` with `StoryImages.FromDirectory` or
-`FromResources`, and must dispose it when replacing the accepted story or closing the host.
+`FromResources`, and must await `DisposeAsync` when replacing the accepted story or closing the host.
 Successful replacement cancels the old capability and unmounts its media; failed adoption
 preserves the previous capability/playthrough. Opening the library merely hides the mounted
 story, retaining its history URLs. A capability's identity is a source generation: refresh it
@@ -62,11 +62,16 @@ even when presentation text is unchanged so retained components cannot show stal
 
 The catalogue/resolver policy is reused without reading image bytes. Folder open rechecks
 catalogue membership and rejects symbolic links in the path. Files remain live: later reads
-may see changed bytes or fail. Each mounted media occurrence opens only near the viewport;
-there is no all-story read or global durable cache. Streams are disposed after transfer;
-the observer, cancellation, receiver and object URL belong to that occurrence. URLs survive
-while the passage is mounted (including history/library hiding), then are removed/revoked.
-Late completions cannot attach to a removed occurrence. No filesystem browser URL, remote
+may see changed bytes or fail. Each mounted occurrence acquires a lease only near the viewport.
+Within one accepted owner generation, identical resolved paths share one read/transfer and
+Blob URL. Alt, style and decode remain per occurrence. Removing one holder cannot cancel a
+transfer needed by another. Final release retires the entry and revokes its URL exactly once;
+a later acquisition reads the live file again. Late retired completions cannot affect a new entry.
+There is no all-story read or global durable cache. Streams are disposed after transfer;
+observers, cancellation and receivers belong to occurrences. Owner teardown invalidates
+entries and awaits asynchronous browser URL cleanup. Sharing removes duplicate transfers/data;
+it does not bound distinct images retained by history or guarantee one decoded bitmap.
+No eviction, unique-image budget, or history virtualization is introduced. No filesystem browser URL, remote
 fetch/fallback, or new author file-size limit is introduced.
 
 `LibraryEnabled=false` requires an `AutoStartStoryId` and removes Library navigation

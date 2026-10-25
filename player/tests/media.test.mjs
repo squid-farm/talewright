@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../src/Talewright.Player/Components/MediaView.razor.js", import.meta.url));
-const { observe, load, release } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
+const { observe, load, release, createUrl, revokeUrl, display } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
 let observer;
 globalThis.IntersectionObserver = class {
     constructor(callback, options) { this.callback = callback; this.options = options; observer = this; }
@@ -48,6 +48,8 @@ test("A decoded mounted/history image keeps its URL until its owner releases it"
     const id = observe(target, receiver());
     const loading = load(id, stream, "image/jpeg");
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     const url = target.src;
     assert.ok(active.has(url));
     target.onload();
@@ -60,7 +62,7 @@ test("A decoded mounted/history image keeps its URL until its owner releases it"
     release(id);
 });
 
-test("A stale stream completion cannot create a URL or update a removed image", async () => {
+test("A stale stream completion immediately revokes its URL without updating a removed image", async () => {
     const target = image();
     const id = observe(target, receiver());
     let complete;
@@ -70,13 +72,16 @@ test("A stale stream completion cannot create a URL or update a removed image", 
     complete(new Uint8Array([1]).buffer);
     assert.equal(await loading, false);
     assert.equal(target.src, null);
-    assert.equal(created, before);
+    assert.equal(created, before + 1);
+    assert.equal(active.size, 0);
 });
 
 test("Disposal during decoding resolves the pending request and revokes the URL", async () => {
     const target = image();
     const id = observe(target, receiver());
     const loading = load(id, stream, "image/webp");
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     const url = target.src;
     release(id);
@@ -91,11 +96,30 @@ test("Decode failure removes the broken src and releases its URL", async () => {
     const id = observe(target, receiver());
     const loading = load(id, stream, "image/png");
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     const url = target.src;
     target.onerror();
     assert.equal(await loading, false);
     assert.equal(target.src, null);
     assert.equal(active.has(url), false);
+    assert.equal(active.size, 0);
+});
+
+test("Shared URL presentation is independent; partial occurrence release does not revoke owner URL", async () => {
+    const url = await createUrl(stream, "image/png");
+    const first = image(), second = image();
+    const a = observe(first, receiver()), b = observe(second, receiver());
+    const loadingA = display(a, url), loadingB = display(b, url);
+    release(a);
+    assert.equal(await loadingA, false);
+    assert.ok(active.has(url));
+    assert.equal(second.src, url);
+    second.onload();
+    assert.equal(await loadingB, true);
+    release(b);
+    assert.ok(active.has(url));
+    revokeUrl(url);
     assert.equal(active.size, 0);
 });
 

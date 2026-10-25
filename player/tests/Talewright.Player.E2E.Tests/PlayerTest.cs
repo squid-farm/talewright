@@ -19,6 +19,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected ILocator Latest => Page.GetByRole(AriaRole.Region, new() { Name = "Current passage" });
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
+    protected ILocator SaveStatus => Page.GetByRole(AriaRole.Status).And(Page.Locator(".tw-save-status"));
     protected virtual bool AutoStartDesktop => true;
     protected virtual bool StartsInLibrary => true;
 

@@ -71,7 +71,7 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load Navigation");
         await Driver.ClickAsync("Load save");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToHaveTextAsync("Loaded 'Navigation'.");
+        await Expect(SaveStatus).ToHaveTextAsync("Loaded 'Navigation'.");
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(depth + 1);
         // Normalize focus after the setup dialog closes, before measuring navigation.
         await Latest.FocusAsync();

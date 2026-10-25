@@ -277,8 +277,11 @@ mounted occurrence approaches the viewport. They fit the available width, retain
 aspect ratio, and use the effective alt text. Dialogue, choices, chosen-choice history,
 styles and conditionals use the same renderer.
 
-Folder images are **live files**, not a byte snapshot: an already displayed image stays
-with its mounted passage, but later reads can see edits or fail after deletion. The
+Folder images are **live files**, not a byte snapshot. Within an accepted story generation,
+occurrences of the same resolved filename share a read and Blob URL while any loaded holder
+remains. Alt text and style stay independent. After the last holder releases it, a later
+occurrence reads again and can see edits or fail after deletion. This avoids duplicate copies,
+but does not bound retention of many distinct images; no persistent cache or eviction is added. The
 debugger refreshes image occurrences on accepted source/image changes; rejected source
 keeps the last accepted story and images. Unavailable or undecodable images show their
 effective alt and a visible, accessible failure. There is no remote fallback.

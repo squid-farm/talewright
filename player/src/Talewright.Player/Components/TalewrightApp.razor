@@ -4,7 +4,7 @@
 @inject IServiceProvider Services
 @using Microsoft.Extensions.DependencyInjection
 @using Talewright.Runtime.Saves
-@implements IDisposable
+@implements IAsyncDisposable
 
 <div class="tw-app">
     @if (_story is not null)
@@ -215,7 +215,7 @@
             _character = null;
             _showLibrary = false;
             _diagnostics = [];
-            previous?.Dispose();
+            if (previous is not null) await previous.DisposeAsync();
             await OnTitleChanged.InvokeAsync(_story!.Title);
         }
         else
@@ -247,10 +247,10 @@
         await OnTitleChanged.InvokeAsync(_story!.Title);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _disposed = true;
         ++_openGeneration;
-        _loaded?.Dispose();
+        if (_loaded is not null) await _loaded.DisposeAsync();
     }
 }

@@ -42,6 +42,7 @@ public sealed class WorkbenchModel(string root) : IDisposable
 {
     private StorySource? _acceptedSource;
     public StoryImages? Images { get; private set; }
+    private readonly List<StoryImages> _retiredImages = [];
     public string Root { get; } = root;
     public StoryDefinition? Story { get; private set; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; private set; } = [];
@@ -410,9 +411,17 @@ public sealed class WorkbenchModel(string root) : IDisposable
         var previous = Images;
         Images = StoryImages.FromDirectory(source, Root);
         previous?.Dispose();
+        if (previous is not null) _retiredImages.Add(previous);
     }
 
     public void Dispose() => Images?.Dispose();
+
+    public async Task DrainImagesAsync()
+    {
+        var retired = _retiredImages.ToArray();
+        _retiredImages.Clear();
+        foreach (var images in retired) await images.DisposeAsync();
+    }
 
     private static (SetupNumberKind Kind, string Id, string? Character) FieldKey(SetupNumber field) =>
         (field.Kind, field.Id, field.Character);

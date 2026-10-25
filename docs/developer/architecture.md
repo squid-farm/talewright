@@ -326,8 +326,10 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   `<code>`). `RenderedMedia` preserves inherited style and renders through `MediaView` on all narrative
   surfaces, including choices and chosen-label history.
 - `Components/MediaView.razor` and its JavaScript module: viewport-lazy image streaming into a Blob URL.
-  Each mounted occurrence owns its observer, cancellation, stream transfer and URL; retained history
-  keeps its URL. Removed/source-replaced occurrences reject stale completions and revoke their URL.
+  Each mounted occurrence owns its observer, cancellation and image lease; one accepted `StoryImages`
+  generation shares a transfer/Blob URL for each resolved path. Retained history keeps leases; final
+  release retires an entry and revokes its URL, without affecting a newer entry for the same path.
+  Owner teardown drains asynchronous cleanup. This reduces duplicates, not total unique-image retention.
   Missing, unsupported-source or undecodable assets show effective alt plus an accessible visible failure.
 - `Components/CharacterSheet.razor`: generated from ruleset metadata; whatever stats the story's ruleset has,
   grouped by `StatCategory`. Skills at 0 are hidden. Shows inventory and faction standings with tiers.
