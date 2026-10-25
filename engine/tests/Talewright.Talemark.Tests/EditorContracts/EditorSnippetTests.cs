@@ -55,7 +55,7 @@ public class EditorSnippetTests
             {
                 ["story.talewright.yaml"] = yaml,
                 ["snippet.tale"] = tale,
-            }));
+            }, ["images/path.png"]));
             Assert.True(result.Success, $"{snippet.Name}:\n{string.Join("\n", result.Diagnostics)}");
             count++;
         }

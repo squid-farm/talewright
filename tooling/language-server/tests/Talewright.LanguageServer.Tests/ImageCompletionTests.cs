@@ -1,7 +1,37 @@
+using Talewright.Talemark.Compilation;
+
 namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
+    [Theory]
+    [InlineData("""{image("map", "Map")}""")]
+    [InlineData("""{image("map")}""")]
+    [InlineData("""{image("missing", "Map")}""")]
+    [InlineData("""{image("../map", "Map")}""")]
+    [InlineData("""{image("map",)}""")]
+    public async Task Image_diagnostics_match_compiler_once_per_reference(string call)
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("images"));
+        File.WriteAllBytes(client.PathOf("images/map.png"), []);
+        File.WriteAllBytes(client.PathOf("images/map.jpg"), []);
+        File.WriteAllText(client.PathOf("start.tale"), $"=== start\r\n  > player: 🦑 {call}\r\n-> END");
+        var expected = StoryCompiler.Compile(StorySource.FromDirectory(client.Root)).Diagnostics;
+        await client.Initialize();
+        await client.Open("start.tale", File.ReadAllText(client.PathOf("start.tale")), 1);
+        var actual = await client.Diagnostics("start.tale", 1);
+        Assert.Equal(expected.Count, actual.Length);
+        for (var index = 0; index < actual.Length; index++)
+        {
+            Assert.Equal(expected[index].Code, actual[index].GetProperty("code").GetString());
+            Assert.Equal(expected[index].Message, actual[index].GetProperty("message").GetString());
+            var position = actual[index].GetProperty("range").GetProperty("start");
+            Assert.Equal(expected[index].Location.Line - 1, position.GetProperty("line").GetInt32());
+            Assert.Equal(expected[index].Location.Column - 1, position.GetProperty("character").GetInt32());
+        }
+    }
+
     [Fact]
     public async Task Image_watch_events_refresh_completion_and_diagnostics_without_reopening_or_losing_overlays()
     {

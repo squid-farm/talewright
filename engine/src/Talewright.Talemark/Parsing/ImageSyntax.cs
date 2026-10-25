@@ -2,6 +2,7 @@ using System.Text;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -15,8 +16,9 @@ internal static class ImageSyntax
     }
 
     internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
-        AnalysisCollector? analysis = null)
+        StorySource? imageSource, AnalysisCollector? analysis = null)
     {
+        ArgumentNullException.ThrowIfNull(imageSource);
         var text = source.Text;
         var i = start;
         SkipSpace();
@@ -62,8 +64,8 @@ internal static class ImageSyntax
             return null;
         }
 
-        analysis?.CheckImage(path, alt, source.Locate(pathOffset));
-        return new(path, alt);
+        var resolved = StoryImageResolver.Resolve(imageSource, path, alt, source.Locate(pathOffset), diagnostics);
+        return resolved is null ? null : new(resolved.Path, resolved.AltText);
 
         void SkipSpace()
         {

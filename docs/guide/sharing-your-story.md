@@ -19,8 +19,10 @@ Every `publish` checks your story first and stops if there are errors.
 talewright publish my-story --output my-story.zip
 ```
 
-The zip contains only `story.talewright.yaml` and your `.tale` files, so private notes and other files in the folder
+The zip contains `story.talewright.yaml`, your `.tale` files and supported image files
+from `images/`, preserving their folders. Private notes and unsupported image formats
 are left out. Anyone can open it with **Open a story file** in the web player.
+Images are included so their references pass validation; they are not displayed yet.
 
 ## A web game
 

@@ -10,9 +10,12 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
+    <ProjectReference Include="../../src/Talewright.Player/Talewright.Player.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../../samples/**/*.tale;../../../samples/**/*.yaml;../../../samples/**/images/**/*"
+                      LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
     <None Include="../native/atspi_adapter.py" Link="native/atspi_adapter.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

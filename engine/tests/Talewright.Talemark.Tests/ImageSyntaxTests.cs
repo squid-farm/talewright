@@ -23,7 +23,8 @@ public sealed class ImageSyntaxTests
         {
             [StorySource.ManifestFileName] = Manifest,
             ["main.tale"] = text,
-        }));
+        }, ["images/maps/camp.png", "images/maps/sector (west), v2.png", "images/a\"b.png",
+            "images/camp.png", "images/map.png", "images/coin.png", "images/bold.png", "images/conditional.png"]));
 
     private static Talewright.Talemark.Model.StoryDefinition Story(string text)
     {
@@ -38,17 +39,15 @@ public sealed class ImageSyntaxTests
         "maps/sector (west), v2", "Joel's {player:name} #upper **map**")]
     [InlineData("""{image("a\"b", "He said \"Go\"; \\ remains.")}""", "a\"b", "He said \"Go\"; \\ remains.")]
     [InlineData("""{ image ( "camp" , "A } ] { camp" ) }""", "camp", "A } ] { camp")]
-    [InlineData("""{image("camp")}""", "camp", "")]
-    [InlineData("""{image("camp", "")}""", "camp", "")]
-    [InlineData("""{image("camp", "  ")}""", "camp", "  ")]
-    [InlineData("""{image("absent.bmp", "No lookup yet")}""", "absent.bmp", "No lookup yet")]
-    public void Image_calls_produce_literal_media_without_asset_lookup(string call, string path, string alt)
+    [InlineData("""{image("camp")}""", "camp", "Camp")]
+    [InlineData("""{image("camp", "")}""", "camp", "Camp")]
+    [InlineData("""{image("camp", "  ")}""", "camp", "Camp")]
+    public void Image_calls_produce_resolved_media_with_literal_explicit_alt(string call, string path, string alt)
     {
         var result = Compile($"=== start\n{call}\n-> END");
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("TW201", StringComparison.Ordinal));
         var paragraph = Assert.IsType<ParagraphTemplate>(result.Story!.GetScene(new SceneId("start")).Body[0]);
-        Assert.Equal(new MediaTemplate(path, alt), Assert.Single(paragraph.Inlines));
+        Assert.Equal(new MediaTemplate($"images/{path}.png", alt), Assert.Single(paragraph.Inlines));
     }
 
     [Fact]
@@ -68,14 +67,14 @@ public sealed class ImageSyntaxTests
             """);
         var scene = story.GetScene(new SceneId("start"));
         var prose = Assert.IsType<ParagraphTemplate>(scene.Body[0]);
-        Assert.Equal(new MediaTemplate("camp", "Camp"), prose.Inlines.OfType<MediaTemplate>().Single());
+        Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), prose.Inlines.OfType<MediaTemplate>().Single());
         var speech = Assert.IsType<SpeechTemplate>(scene.Body[1]);
-        Assert.Equal(new MediaTemplate("map", "A } ] map"), speech.Inlines.OfType<MediaTemplate>().Single());
-        Assert.Equal(new MediaTemplate("coin", "A } ] coin"), scene.Choices[0].Label.OfType<MediaTemplate>().Single());
+        Assert.Equal(new MediaTemplate("images/map.png", "A } ] map"), speech.Inlines.OfType<MediaTemplate>().Single());
+        Assert.Equal(new MediaTemplate("images/coin.png", "A } ] coin"), scene.Choices[0].Label.OfType<MediaTemplate>().Single());
         var bold = Assert.IsType<StyledTemplate>(Assert.IsType<ParagraphTemplate>(scene.Body[2]).Inlines.Single());
-        Assert.Equal(new MediaTemplate("bold", ""), bold.Children.Single());
+        Assert.Equal(new MediaTemplate("images/bold.png", "Bold"), bold.Children.Single());
         var conditional = Assert.IsType<ConditionalInlineTemplate>(Assert.IsType<ParagraphTemplate>(scene.Body[3]).Inlines.Single());
-        Assert.Equal(new MediaTemplate("conditional", ""), conditional.Then.Single());
+        Assert.Equal(new MediaTemplate("images/conditional.png", "Conditional"), conditional.Then.Single());
     }
 
     [Fact]
@@ -85,7 +84,7 @@ public sealed class ImageSyntaxTests
         var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("start")).Body[0]);
         var code = Assert.IsType<StyledTemplate>(paragraph.Inlines.Single());
         Assert.Equal(TextStyle.Code, code.Style);
-        Assert.Equal(new MediaTemplate("camp", ""), code.Children.Single());
+        Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), code.Children.Single());
     }
 
     [Fact]
@@ -150,6 +149,7 @@ public sealed class ImageSyntaxTests
         var result = Compile($"=== start\n{call}\n-> END\n=== next\n-> END");
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Code == "TW1014" && error.Message.Contains(message, StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("TW201", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Errors, error => error.Code is "TW1008" or "TW3010");
     }
 

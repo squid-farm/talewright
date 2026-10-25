@@ -54,7 +54,7 @@ public static class TestStories
         @title Finished
         Finished safely.
         -> END
-        """);
+        """, ["images/test-art.png"]);
 
     public static readonly StoryFixture Gates = new("gates", DefaultYaml, """
         === start

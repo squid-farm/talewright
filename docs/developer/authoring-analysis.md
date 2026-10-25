@@ -35,10 +35,13 @@ reports an error. Semantically invalid YAML still contributes available
 declarations. Syntactically invalid YAML cannot provide a trustworthy manifest
 tree: Talemark declarations and contexts are retained independently, but the API
 does not invent a repaired manifest or reuse stale symbols from a prior snapshot.
-Diagnostics include the compiler's diagnostics for that exact input, plus
-TW2010–TW2014 image lookup diagnostics from the shared resolver. These editor-only
-checks read the source's image catalogue, not image bytes, and do not change
-compiler/CLI validation or populate resolved assets in the runtime model.
+Diagnostics include the compiler's diagnostics for that exact input, including
+TW2010–TW2014 from the shared image resolver, reported once per image reference.
+Lookup reads the source's image catalogue, not image bytes. Compilation stores
+resolved paths and effective alt text in media nodes; presentation stays separate.
+If a missing or malformed manifest prevents normal compilation, editor recovery
+still retains image completion slots and lookup diagnostics from the available
+narrative without inventing a repaired manifest.
 
 Recovery does not require a project ruleset named `generic` or invoke project
 ruleset factories when the manifest is missing or syntactically invalid. It

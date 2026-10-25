@@ -35,7 +35,7 @@ public sealed record StyledTemplate(TextStyle Style, IReadOnlyList<TemplateInlin
 
 public sealed record LineBreakTemplate : TemplateInline;
 
-/// <summary>Image media from <c>{image("path", "alt text")}</c>; asset lookup and presentation are separate.</summary>
+/// <summary>Image media with a resolved story-root-relative asset path and effective alt text; presentation is separate.</summary>
 public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInline;
 
 /// <summary>

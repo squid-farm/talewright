@@ -700,6 +700,119 @@ public sealed class PublishTests : IDisposable
         Assert.True(StoryCompiler.Compile(StorySource.FromZip(stream)).Success);
     }
 
+    private byte[] AddImages()
+    {
+        byte[] bytes = [0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF, 0x80];
+        Directory.CreateDirectory(Path.Combine(Story, "images", "maps"));
+        File.WriteAllBytes(Path.Combine(Story, "images", "maps", "camp.PNG"), bytes);
+        File.WriteAllBytes(Path.Combine(Story, "images", "unused.webp"), bytes);
+        File.WriteAllText(Path.Combine(Story, "images", "notes.txt"), "Private notes");
+        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"),
+            "=== a\n{image(\"maps/camp.PNG\")}\n-> END");
+        return bytes;
+    }
+
+    [Fact]
+    public void Story_zip_preserves_actual_image_bytes_and_compiles_after_loading()
+    {
+        var bytes = AddImages();
+        var result = Run();
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        using var zip = ZipFile.OpenRead(Zip);
+        Assert.Equal(["chapters/main.tale", "images/maps/camp.PNG", "images/unused.webp", "story.talewright.yaml"],
+            zip.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal));
+        using var image = zip.GetEntry("images/maps/camp.PNG")!.Open();
+        using var buffer = new MemoryStream();
+        image.CopyTo(buffer);
+        Assert.Equal(bytes, buffer.ToArray());
+        using var stream = File.OpenRead(Zip);
+        var source = StorySource.FromZip(stream);
+        Assert.Equal(["images/maps/camp.PNG", "images/unused.webp"], source.ImagePaths.Order(StringComparer.Ordinal));
+        var compiled = StoryCompiler.Compile(source);
+        Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal("TW2014", Assert.Single(compiled.Diagnostics).Code);
+    }
+
+    [Theory]
+    [InlineData("web", false, true)]
+    [InlineData("desktop", false, true)]
+    [InlineData("desktop", true, true)]
+    [InlineData("web", false, false)]
+    [InlineData("desktop", true, false)]
+    public void Every_host_build_receives_a_compilable_staged_story(string target, bool split, bool images)
+    {
+        var bytes = images ? AddImages() : [];
+        var builds = 0;
+        var publication = SplitBuilds() with
+        {
+            BuildHost = (working, _, _, story, _, _) =>
+            {
+                builds++;
+                var source = StorySource.FromDirectory(story);
+                var result = StoryCompiler.Compile(source);
+                Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+                if (images)
+                {
+                    Assert.Equal(2, source.ImagePaths.Count);
+                    Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(story, "images", "maps", "camp.PNG")));
+                    Assert.False(File.Exists(Path.Combine(story, "images", "notes.txt")));
+                }
+                else
+                {
+                    Assert.Empty(source.ImagePaths);
+                    Assert.Empty(result.Diagnostics);
+                }
+                var output = Path.Combine(working, "output");
+                Directory.CreateDirectory(output);
+                return output;
+            },
+        };
+        var published = split
+            ? RunSplitControlled(new UnreadableInput(), inputRedirected: true, publication: publication)
+            : RunControlled(new UnreadableInput(), inputRedirected: true, publication: publication,
+                args: ["-a", "--target", target]);
+        Assert.Equal(0, published.Code);
+        Assert.Empty(published.Error);
+        Assert.Equal(target == "desktop" ? PublishCommand.DesktopRuntimes.Length : 1, builds);
+    }
+
+    [Theory]
+    [InlineData("missing.png", "TW2012")]
+    [InlineData("../outside.png", "TW2010")]
+    [InlineData("https://example.com/map.png", "TW2010")]
+    [InlineData("map.bmp", "TW2011")]
+    public void Invalid_image_references_prevent_export_before_building(string path, string code)
+    {
+        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"),
+            $"=== a\n{{image(\"{path}\", \"Map\")}}\n-> END");
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (_, _, _, _, _, _) => throw new InvalidOperationException("Invalid story must not build."),
+        };
+        foreach (var args in new[] { Array.Empty<string>(), new[] { "-a", "--target", "web" } })
+        {
+            var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+                publication: publication, args: args);
+            Assert.Equal(1, result.Code);
+            Assert.Contains(code, result.Output);
+            Assert.False(File.Exists(Zip));
+        }
+    }
+
+    [Fact]
+    public void Image_symbolic_links_are_not_bundled()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        AddImages();
+        File.CreateSymbolicLink(Path.Combine(Story, "images", "link.png"),
+            Path.Combine(Story, "images", "maps", "camp.PNG"));
+        var result = Run();
+        Assert.Equal(2, result.Code);
+        Assert.Contains("symbolic links", result.Error);
+        Assert.False(File.Exists(Zip));
+    }
+
     [Fact]
     public void Publication_does_not_treat_or_ship_generic_story_yaml_as_the_manifest()
     {

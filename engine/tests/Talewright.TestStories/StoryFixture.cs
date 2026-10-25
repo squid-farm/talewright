@@ -4,7 +4,7 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Testing;
 
-public sealed record StoryFixture(string Id, string Yaml, string Tale)
+public sealed record StoryFixture(string Id, string Yaml, string Tale, IReadOnlyList<string>? ImagePaths = null)
 {
     public IReadOnlyDictionary<string, string> Files => new Dictionary<string, string>
     {
@@ -12,7 +12,11 @@ public sealed record StoryFixture(string Id, string Yaml, string Tale)
         ["chapters/main.tale"] = Tale,
     };
 
-    public StorySource Source() => new(Files);
+    // Empty asset entries exercise path lookup, not image decoding or rendering.
+    internal IEnumerable<KeyValuePair<string, string>> Entries =>
+        Files.Concat((ImagePaths ?? []).Select(path => new KeyValuePair<string, string>(path, "")));
+
+    public StorySource Source() => new(Files, ImagePaths);
 
     public StoryDefinition Compile()
     {
@@ -26,11 +30,11 @@ public sealed record StoryFixture(string Id, string Yaml, string Tale)
     }
 
     public byte[] Zip(string prefix = "") =>
-        TestArchives.Create(Files.Select(file => new KeyValuePair<string, string>(prefix + file.Key, file.Value)));
+        TestArchives.Create(Entries.Select(file => new KeyValuePair<string, string>(prefix + file.Key, file.Value)));
 
     public void WriteDirectory(string directory)
     {
-        foreach (var (path, content) in Files)
+        foreach (var (path, content) in Entries)
         {
             var target = Path.Combine(directory, path);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);

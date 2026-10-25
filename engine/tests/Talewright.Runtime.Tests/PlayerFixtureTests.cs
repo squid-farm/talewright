@@ -45,14 +45,20 @@ public class PlayerFixtureTests
         foreach (var prefix in new[] { "", "wrapped story/" })
         {
             using var zip = new MemoryStream(fixture.Zip(prefix));
-            Assert.Equal(fixture.Files.OrderBy(p => p.Key), StorySource.FromZip(zip).Files.OrderBy(p => p.Key));
+            var source = StorySource.FromZip(zip);
+            Assert.Equal(fixture.Files.OrderBy(p => p.Key), source.Files.OrderBy(p => p.Key));
+            Assert.Equal(fixture.Source().ImagePaths.Order(), source.ImagePaths.Order());
+            Assert.True(StoryCompiler.Compile(source).Success);
         }
 
         var folder = Path.Combine(Path.GetTempPath(), "talewright-fixture-" + Guid.NewGuid().ToString("N"));
         try
         {
             fixture.WriteDirectory(folder);
-            Assert.Equal(fixture.Files.OrderBy(p => p.Key), StorySource.FromDirectory(folder).Files.OrderBy(p => p.Key));
+            var source = StorySource.FromDirectory(folder);
+            Assert.Equal(fixture.Files.OrderBy(p => p.Key), source.Files.OrderBy(p => p.Key));
+            Assert.Equal(fixture.Source().ImagePaths.Order(), source.ImagePaths.Order());
+            Assert.True(StoryCompiler.Compile(source).Success);
         }
         finally
         {

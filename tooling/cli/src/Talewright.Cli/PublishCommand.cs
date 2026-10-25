@@ -164,7 +164,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             working = Path.Combine(Path.GetTempPath(), $"talewright-publish-{Guid.NewGuid():N}");
             Directory.CreateDirectory(working);
             var story = Path.Combine(working, "story");
-            WriteStory(source, story);
+            WriteStory(source, root, story);
             // Text may expand when a BOM-detected input is rewritten as UTF-8.
             _ = StorySource.FromDirectory(story);
             var content = story;
@@ -271,7 +271,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             working = Path.Combine(Path.GetTempPath(), $"talewright-publish-{Guid.NewGuid():N}");
             Directory.CreateDirectory(working);
             var story = Path.Combine(working, "story");
-            WriteStory(source, story);
+            WriteStory(source, settings.Root, story);
             _ = StorySource.FromDirectory(story);
 
             foreach (var runtime in DesktopRuntimes)
@@ -467,9 +467,24 @@ public sealed class PublishCommand : Command<PublishSettings>
         return launch + " The .NET runtime is included. Platform webview prerequisite: WebKitGTK 4.1 on Linux, WebView2 on Windows, built-in WKWebView on macOS. Linux x64 is automated here; other OS/CPU combinations require runtime verification. This ZIP is not a signed installer or macOS .app bundle.";
     }
 
-    private static void WriteStory(StorySource source, string directory)
+    private static void WriteStory(StorySource source, string root, string directory)
     {
         foreach (var (path, text) in source.Files)
+        {
+            var destination = Destination(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.WriteAllText(destination, text);
+        }
+
+        foreach (var path in StoryImageResolver.CompletionPaths(source))
+        {
+            var relative = "images/" + path;
+            var destination = Destination(relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(Path.Combine(root, relative), destination);
+        }
+
+        string Destination(string path)
         {
             var destination = Path.GetFullPath(Path.Combine(directory, path));
             if (!destination.StartsWith(Path.GetFullPath(directory) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
@@ -477,8 +492,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 throw new InvalidDataException($"Unsafe story path '{path}'.");
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.WriteAllText(destination, text);
+            return destination;
         }
     }
 
@@ -529,7 +543,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         references.Add(new XElement("PackageReference", new XAttribute("Include", "Microsoft.AspNetCore.Components.Web"),
             new XAttribute("Version", ComponentsVersion)));
         references.Add(new XElement("EmbeddedResource",
-            new XAttribute("Include", Path.Combine(story, "**", "*.tale") + ";" + Path.Combine(story, "**", "*.yaml")),
+            new XAttribute("Include", Path.Combine(story, "**", "*")),
             new XAttribute("LogicalName", "stories/Published/%(RecursiveDir)%(Filename)%(Extension)"),
             new XAttribute("WithCulture", "false")));
         xml.Root!.Add(references);
