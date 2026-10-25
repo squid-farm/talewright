@@ -127,6 +127,34 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Transcript_render_boundaries_preserve_formatted_replay_and_forked_choices()
+    {
+        await Upload(TestStories.Linear);
+        await Choose("Walk onward");
+        await Driver.ClickAsync("Back");
+        await Expect(Latest.Locator(".tw-scene-title")).ToHaveTextAsync("First passage");
+        await Expect(Latest.Locator(".tw-chosen")).ToHaveCountAsync(0);
+        await Expect(Latest.Locator("strong").First).ToHaveTextAsync("bold");
+        await Expect(Latest.Locator("em").First).ToHaveTextAsync("gentle");
+        await Expect(Latest.Locator("code")).ToHaveTextAsync("code");
+        await Expect(Latest.Locator(".tw-speaker")).ToHaveTextAsync("Tomas");
+        await Expect(Latest.Locator("br")).ToHaveCountAsync(1);
+        await Driver.ClickAsync("Forward");
+        await Expect(Latest).ToContainTextAsync("Second passage text.");
+        await Expect(Page.Locator(".tw-past .tw-chosen")).ToHaveTextAsync("→ Walk onward");
+        await Driver.ClickAsync("Back");
+        await Choose("Finish early");
+        await Expect(Latest.Locator(".tw-scene-title")).ToHaveTextAsync("Finished");
+        await Expect(Page.Locator(".tw-past .tw-chosen")).ToHaveTextAsync("→ Finish early");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Forward", Exact = true })).ToBeDisabledAsync();
+        await Restart();
+        await Expect(Latest.Locator(".tw-scene-title")).ToHaveTextAsync("First passage");
+        await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(0);
+        await Expect(Latest).ToBeFocusedAsync();
+    }
+
+    [Fact]
     public async Task Library_resume_restart_and_story_replacement_do_not_leak_state()
     {
         await Upload(TestStories.Gates);
