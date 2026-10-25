@@ -13,8 +13,16 @@
 
     private HistoryFrame? _renderedEntry;
 
-    protected override bool ShouldRender() =>
-        _renderedEntry is null || !SamePresentation(_renderedEntry, Entry);
+    protected override bool ShouldRender()
+    {
+        if (_renderedEntry is null || !SamePresentation(_renderedEntry, Entry))
+        {
+            return true;
+        }
+
+        _renderedEntry = Entry;
+        return false;
+    }
 
     protected override void OnAfterRender(bool firstRender) => _renderedEntry = Entry;
 
