@@ -23,14 +23,9 @@
             {
                 var entry = transcript[i];
                 var isLatest = i == transcript.Count - 1;
-                if (isLatest)
-                {
-                    <section class="tw-frame tw-latest" aria-label="Current passage" tabindex="-1" @ref="_latestFrame"><StoryPassage Entry="entry" /></section>
-                }
-                else
-                {
-                    <section class="tw-frame tw-past"><StoryPassage Entry="entry" /></section>
-                }
+                <section @key="(_session, i)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
+                         aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)"
+                         @ref="_latestFrame"><StoryPassage Entry="entry" /></section>
             }
 
             @if (_session.Current is { } current)

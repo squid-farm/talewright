@@ -12,7 +12,7 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Bundled samples are embedded in this assembly; players can also open a .zip from the library screen.
-builder.Services.AddSingleton<IStoryLibrary>(new EmbeddedStoryLibrary(typeof(App).Assembly));
+builder.Services.AddSingleton<IStoryLibrary>(new EmbeddedStoryLibrary(typeof(App).Assembly, enableImages: true));
 builder.Services.AddScoped<ISaveStore, IndexedDbSaveStore>();
 
 await builder.Build().RunAsync();

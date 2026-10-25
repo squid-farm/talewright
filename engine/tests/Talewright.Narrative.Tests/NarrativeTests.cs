@@ -94,6 +94,28 @@ public class NarrativeTests
     }
 
     [Fact]
+    public void Media_preserves_effective_alt_order_and_inherited_styles_without_io()
+    {
+        var rendered = new TemplateRenderer().RenderInlines(
+        [
+            new TextTemplate("Before "),
+            new StyledTemplate(TextStyle.Strong, [
+                new StyledTemplate(TextStyle.Emphasis | TextStyle.Code, [
+                    new ConditionalInlineTemplate(new BoolLiteral(true),
+                        [new MediaTemplate("images/map.png", "A map")], []),
+                ]),
+            ]),
+            new TextTemplate(" after."),
+        ], State());
+        Assert.Equal(new RenderedText("Before ", TextStyle.None), rendered[0]);
+        Assert.Equal(new RenderedMedia("images/map.png", "A map")
+        {
+            Style = TextStyle.Strong | TextStyle.Emphasis | TextStyle.Code,
+        }, rendered[1]);
+        Assert.Equal(new RenderedText(" after.", TextStyle.None), rendered[2]);
+    }
+
+    [Fact]
     public void Empty_paragraphs_are_dropped()
     {
         var document = new TemplateRenderer().Render(

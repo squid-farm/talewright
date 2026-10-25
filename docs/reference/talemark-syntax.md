@@ -271,8 +271,24 @@ Omitted, empty or whitespace-only alt warns and uses sentence-case filename fall
 Explicit nonblank alt is preserved after escape decoding. Extensionless paths select
 `.png`, `.jpg`, `.jpeg`, `.webp` in that order, warning if more than one matches.
 Compiled media stores the selected path including `images/` and the effective alt text.
-Nothing is displayed yet; rendering is separate work in
-[#177](https://github.com/squid-farm/talewright/issues/177).
+The native desktop folder player and native folder Author Debugger display these images,
+as do the built-in samples in the desktop and web players. Images load only when their
+mounted occurrence approaches the viewport. They fit the available width, retain their
+aspect ratio, and use the effective alt text. Dialogue, choices, chosen-choice history,
+styles and conditionals use the same renderer.
+
+Folder images are **live files**, not a byte snapshot: an already displayed image stays
+with its mounted passage, but later reads can see edits or fail after deletion. The
+debugger refreshes image occurrences on accepted source/image changes; rejected source
+keeps the last accepted story and images. Unavailable or undecodable images show their
+effective alt and a visible, accessible failure. There is no remote fallback.
+
+Image display from ZIPs/uploads is deferred to
+[#178](https://github.com/squid-farm/talewright/issues/178); generated published hosts and
+their deployment/subpath behavior are deferred to
+[#179](https://github.com/squid-farm/talewright/issues/179). Their existing exports retain
+the real assets/catalogue, but their unadapted image occurrences show the unavailable state.
+Text-only stories continue to work in those hosts.
 
 The old `![alt](path)` form is an error with a quoted `{image("path", "alt")}` replacement.
 The proposed `@image(...)` form was not shipped and is not supported.

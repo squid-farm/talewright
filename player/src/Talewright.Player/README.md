@@ -21,21 +21,53 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
 | `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
-| `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`. `RenderedMedia` renders nothing yet. |
+| `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`, and `MediaView` for resolved images on every narrative surface. |
+| `MediaView` | Per-mounted-occurrence viewport-lazy stream/Blob transport. Responsive image, effective alt and accessible visible failures; owns cancellation and its object URL until unmounted. |
 | `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
 
 ## Story libraries (`Library/StoryLibraries.cs`)
 
 `IStoryLibrary` has `ListAsync()` → `StoryEntry(Id, Title, Origin)` and `LoadAsync(id)` → `StorySource`.
+`OpenAsync(id)` additionally returns a disposable `LoadedStory` with optional `StoryImages`.
+Its default implementation wraps `LoadAsync` without image support, preserving custom/text-only
+libraries. The compiler's source and pure renderer never own image I/O or resources.
 
 | Implementation | Used by | Notes |
 |---|---|---|
-| `EmbeddedStoryLibrary(assembly, prefix = "stories/")` | both hosts | Reads manifest resources named `stories/<Story>/<path>`; a story needs a `story.talewright.yaml`. No HTTP, works in WASM. |
+| `EmbeddedStoryLibrary(assembly, prefix = "stories/", enableImages = false)` | both hosts | Reads manifest resources named `stories/<Story>/<path>`; a story needs a `story.talewright.yaml`. Built-in sample hosts opt into lazy image resource streams with `enableImages: true`. No HTTP, works in WASM. |
 | `FileSystemStoryLibrary(paths)` | desktop | Each path is a story folder or `.zip`. Unreadable entries are listed with the error rather than hidden. |
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
+
+### Image host coverage and ownership
+
+| Source/host | Image display |
+|---|---|
+| Native desktop, command-line story folder | Supported: live safe local files |
+| Native Author Debugger, story folder | Supported: accepted-source image generations |
+| Built-in desktop/web samples | Supported: opt-in lazy embedded resource streams |
+| Desktop ZIP / browser upload | Unavailable state; archive adapter/safety remains #178 |
+| Generated published desktop/web host | Unavailable state; published adapter/deployment remains #179 |
+| Custom library using only `LoadAsync` | Text works; images show unavailable unless it supplies a capability |
+
+`TalewrightApp` cascades the accepted `StoryImages`. Direct `StoryPlayer`/`DocumentView`
+consumers can supply a `CascadingValue<StoryImages>` with `StoryImages.FromDirectory` or
+`FromResources`, and must dispose it when replacing the accepted story or closing the host.
+Successful replacement cancels the old capability and unmounts its media; failed adoption
+preserves the previous capability/playthrough. Opening the library merely hides the mounted
+story, retaining its history URLs. A capability's identity is a source generation: refresh it
+even when presentation text is unchanged so retained components cannot show stale assets.
+
+The catalogue/resolver policy is reused without reading image bytes. Folder open rechecks
+catalogue membership and rejects symbolic links in the path. Files remain live: later reads
+may see changed bytes or fail. Each mounted media occurrence opens only near the viewport;
+there is no all-story read or global durable cache. Streams are disposed after transfer;
+the observer, cancellation, receiver and object URL belong to that occurrence. URLs survive
+while the passage is mounted (including history/library hiding), then are removed/revoked.
+Late completions cannot attach to a removed occurrence. No filesystem browser URL, remote
+fetch/fallback, or new author file-size limit is introduced.
 
 `LibraryEnabled=false` requires an `AutoStartStoryId` and removes Library navigation
 and upload UI during both creation and play. A failed startup shows diagnostics
@@ -86,7 +118,7 @@ one below 52rem.
 
 ## Not here yet
 
-- Images ([#35](https://github.com/squid-farm/talewright/issues/35)).
+- Archive/upload image adapters (#178), generated published-host image adapters and deployment behavior (#179).
 - Reader settings such as text size and a theme picker (unscheduled).
 - Story and host theming beyond CSS variables ([#13](https://github.com/squid-farm/talewright/issues/13)).
 
@@ -102,6 +134,22 @@ Custom hosts may pass `StoryPlayer.Character` with a validated selection.
 See [the manifest contract](../../../docs/reference/talemark-syntax.md#optional-character-creation).
 
 ## Regression testing
+
+Image-specific validation uses the existing test project and Node's built-in test runner:
+
+```sh
+node --test player/tests/media.test.mjs
+dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --filter 'FullyQualifiedName~StoryImagesTests'
+python3 player/tests/run_e2e.py web --browser all --filter 'FullyQualifiedName~ImageRenderingTests'
+python3 player/tests/run_e2e.py linux --filter 'FullyQualifiedName~NativeImageTests'
+```
+
+The native suite opens real image-bearing folders through the actual player and debugger
+entry points, including all narrative surfaces, live image refresh/failure, retained history,
+narrow layout and keyboard choice activation. Browser tests cover actual embedded images,
+PNG/JPEG/WebP decoding, viewport deferral, failed/successful replacement and unsupported
+archive states. Node tests cover stale stream/decode completion and URL lifetime.
+Windows WebView2 and macOS WKWebView are not exercised by the Linux harness.
 
 The shared UI is exercised against the production web host in Chromium, Firefox, and WebKit and against
 the real Linux Photino host via AT-SPI. The current passage, transcript, choices, and archive input have

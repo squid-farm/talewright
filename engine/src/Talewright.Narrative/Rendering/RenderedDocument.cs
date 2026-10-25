@@ -62,5 +62,8 @@ public sealed record RenderedText(string Text, TextStyle Style) : RenderedInline
 
 public sealed record RenderedLineBreak : RenderedInline;
 
-/// <summary>Image/sprite placeholder. Ignored by the M1 player.</summary>
-public sealed record RenderedMedia(string MediaId, string AltText) : RenderedInline;
+/// <summary>Resolved image identity, effective alt text and inherited presentation style; no asset I/O.</summary>
+public sealed record RenderedMedia(string MediaId, string AltText) : RenderedInline
+{
+    public TextStyle Style { get; init; }
+}

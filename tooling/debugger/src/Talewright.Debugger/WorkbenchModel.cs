@@ -4,6 +4,7 @@ using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
+using Talewright.Player.Library;
 
 namespace Talewright.Debugger;
 
@@ -37,9 +38,10 @@ public sealed class SetupText(VarId id, string value)
 public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text);
 
 /// <summary>UI-independent orchestration; every replacement is prepared before adoption.</summary>
-public sealed class WorkbenchModel(string root)
+public sealed class WorkbenchModel(string root) : IDisposable
 {
     private StorySource? _acceptedSource;
+    public StoryImages? Images { get; private set; }
     public string Root { get; } = root;
     public StoryDefinition? Story { get; private set; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; private set; } = [];
@@ -248,10 +250,13 @@ public sealed class WorkbenchModel(string root)
             }
             if (!restart && _acceptedSource is { } accepted && candidate.Source is { } same
                 && accepted.Files.Count == same.Files.Count
+                && accepted.ImagePaths.SetEquals(same.ImagePaths)
                 && accepted.Files.All(file => same.Files.TryGetValue(file.Key, out var text) && text == file.Value))
             {
                 return Publish(() =>
                 {
+                    AdoptImages(same);
+                    _acceptedSource = same;
                     Diagnostics = compiled.Diagnostics;
                     SourceRejected = false;
                     Error = null;
@@ -272,6 +277,7 @@ public sealed class WorkbenchModel(string root)
                     Session = session;
                     Inspection = inspection;
                     _acceptedSource = candidate.Source;
+                    AdoptImages(candidate.Source!);
                     AcceptedSourceMap = compiled.SourceMap;
                     SourceRejected = false;
                     Error = null;
@@ -372,6 +378,7 @@ public sealed class WorkbenchModel(string root)
                 SourceRejected = false;
                 RestartRequired = false;
                 _acceptedSource = candidate.Source;
+                AdoptImages(candidate.Source!);
                 AcceptedSourceMap = compiled.SourceMap;
                 Error = null;
                 ReloadStatus = "Source restarted. Compatible setup retained and revalidated; select Start selected scene for a fresh run.";
@@ -398,6 +405,15 @@ public sealed class WorkbenchModel(string root)
     }
 
     private static string? Manifest(StorySource source) => source.Files.GetValueOrDefault(StorySource.ManifestFileName);
+    private void AdoptImages(StorySource source)
+    {
+        var previous = Images;
+        Images = StoryImages.FromDirectory(source, Root);
+        previous?.Dispose();
+    }
+
+    public void Dispose() => Images?.Dispose();
+
     private static (SetupNumberKind Kind, string Id, string? Character) FieldKey(SetupNumber field) =>
         (field.Kind, field.Id, field.Character);
 
