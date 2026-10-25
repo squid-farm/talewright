@@ -98,3 +98,16 @@ test("Decode failure removes the broken src and releases its URL", async () => {
     assert.equal(active.has(url), false);
     assert.equal(active.size, 0);
 });
+
+test("Observer initialization failure leaves no unreachable component state", () => {
+    const id = observe(image(), receiver());
+    release(id);
+    const Observer = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = class { constructor() { throw new Error("Unavailable observer"); } };
+    try {
+        assert.throws(() => observe(image(), receiver()), /Unavailable observer/);
+        assert.doesNotThrow(() => release(id + 1));
+    } finally {
+        globalThis.IntersectionObserver = Observer;
+    }
+});

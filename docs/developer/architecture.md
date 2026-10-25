@@ -369,7 +369,7 @@ templates (including a relative web base path); project changes use `XDocument` 
 ## 4. Life of a story
 
 ```
-samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Compile
+samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Compile
   story.talewright.yaml           ───────►  StorySource            ──────►  CompilationResult
   chapters/*.tale                (path → text)                    ├─ Diagnostics (shown if errors)
                                                                   └─ StoryDefinition

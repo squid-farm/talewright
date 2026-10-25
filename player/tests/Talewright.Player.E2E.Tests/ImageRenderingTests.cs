@@ -24,6 +24,16 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await image.ScrollIntoViewIfNeededAsync();
         await Expect(image).ToHaveJSPropertyAsync("complete", true);
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await image.ElementHandleAsync());
+        await Page.SetViewportSizeAsync(390, 844);
+        await image.ScrollIntoViewIfNeededAsync();
+        var fits = await image.EvaluateAsync<bool>("""
+            image => {
+                const bounds = image.getBoundingClientRect();
+                return bounds.width <= 390
+                    && Math.abs(bounds.width / bounds.height - image.naturalWidth / image.naturalHeight) < 0.01;
+            }
+            """);
+        Assert.True(fits, "The actual decoded image fits a narrow viewport without distorting its aspect ratio.");
         var url = await image.GetAttributeAsync("src");
         Assert.StartsWith("blob:", url);
         await Choices.First.FocusAsync();
@@ -54,13 +64,16 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
             "id: archive-images\ntitle: Archive images\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
             """
             === start
-            Before {image("map", "A useful map")} after.
-            > player: {image("map", "Dialogue map")}
-            * [Continue {image("map", "Choice map")}] -> END
+            Before **{image("map", "A useful map")}** after.
+            > player: *{image("map", "Dialogue map")}*
+            * [Continue `{image("map", "Choice map")}`] -> END
             """, ["images/map.png"]);
         await Upload(fixture);
         foreach (var alt in new[] { "A useful map", "Dialogue map", "Choice map" })
             await Expect(Page.GetByRole(AriaRole.Img, new() { Name = alt, Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".tw-media-strong")).ToHaveCSSAsync("font-weight", "700");
+        await Expect(Page.Locator(".tw-media-emphasis")).ToHaveCSSAsync("font-style", "italic");
+        await Expect(Page.Locator(".tw-media-code")).ToHaveCSSAsync("font-family", "monospace");
         await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync(
             ["Images are unavailable for this story source.", "Images are unavailable for this story source."]);
         await Choices.First.FocusAsync();

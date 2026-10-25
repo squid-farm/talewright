@@ -4,7 +4,6 @@ let next = 0;
 export function observe(image, receiver) {
     const id = ++next;
     const state = { image, url: null, observer: null };
-    images.set(id, state);
     const request = () => {
         state.observer?.disconnect();
         receiver.invokeMethodAsync("LoadAsync").catch(error => {
@@ -15,6 +14,7 @@ export function observe(image, receiver) {
         if (entries.some(entry => entry.isIntersecting)) request();
     }, { rootMargin: "200px" });
     state.observer.observe(image);
+    images.set(id, state);
     return id;
 }
 
