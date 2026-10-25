@@ -16,7 +16,7 @@ percentile.
 | First playable passage | WebAssembly browser integration in Chromium, Firefox, and WebKit | One observation per browser/corpus; includes archive upload, compilation, and rendering |
 | Click to painted passage | Browser integration choice timing | One observation per browser/corpus; not a p95 |
 | End-cursor and redo-prefix restore | BenchmarkDotNet compares both with the same 10,000-choice save | The prefix case validates all saved choices and returns to cursor 5,000 |
-| Back/Forward | BenchmarkDotNet at 100, 1,000, and 10,000 choices | Use the 30-iteration suite for comparison; short local runs can be noisy |
+| Back/Forward | BenchmarkDotNet plus fixed-story browser navigation observations below | Browser observations include replay, component updates, DOM work and focus; native replay is measured separately, not subtracted |
 | Managed allocation | BenchmarkDotNet `MemoryDiagnoser` | Cumulative managed bytes per operation, not retained memory |
 | Live managed heap after repeated open/close/restore | Not measured | Needs a stable post-operation collection and retention protocol |
 | Process peak RSS | Benchmark worker metadata and standalone publication measurements | Worker peak includes setup and harness; it is not an isolated operation or a live heap measurement |
@@ -263,6 +263,161 @@ dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --warmupCount 3 --iterationCount 10 --iterationTime 500 \
   --artifacts artifacts/parser-materialization
 ```
+
+## Long-history navigation investigation (#146)
+
+The opt-in `HistoryNavigationPerformanceTests` test holds a one-scene looping
+story constant and varies only history depth: 100, 1,000 and 10,000 choices.
+A prepared portable save seeds each browser through the existing IndexedDB
+save/load path; archive upload, compilation and save loading are outside the
+navigation measurements. After one warmup Back/Forward pair, it records five
+pairs per depth. Back and Forward are measured separately.
+
+Browser timing starts in a capturing listener on the actual Playwright click,
+not before Playwright's actionability checks. A mutation observer records when
+the expected transcript length and current passage text are present. Animation
+frames check focus on the current passage and record the largest frame gap
+after the click. Completion is the second animation frame after DOM and focus
+readiness: a **paint opportunity**, not proof of pixels reaching the display or
+completion of smooth scrolling. Standard E2E tracing remains enabled.
+Focus is normalized after closing the setup save dialog, outside measurement;
+the probe does not validate save-dialog focus restoration.
+
+On 2026-10-25, all nine browser/depth cases passed on Linux x64, AMD Ryzen 9
+7940HS (16 logical CPUs), .NET 10.0.13. Versions were Chromium 153.0.8010.12,
+Firefox 155.0 and WebKit 26.6. Power state and background activity were not
+reliably captured for this cross-browser run, so these are exploratory local
+observations, not controlled device comparisons or percentiles. The base was
+`fc70bb171e3df506ba99f6e957c05bb2a3e1ae47` plus the measurement test.
+
+All values below are medians of five samples in milliseconds. Each cell lists
+Back / Forward, and all directions are exercised at the newest saved choice.
+
+| Browser | Choices | DOM observed | Focus observed | Paint opportunity | Largest animation-frame gap |
+|---|---:|---:|---:|---:|---:|
+| Chromium | 100 | 14.9 / 13.9 | 14.9 / 13.9 | 29.6 / 29.7 | 16.3 / 15.6 |
+| Chromium | 1,000 | 67.0 / 68.9 | 67.0 / 68.9 | 68.6 / 78.7 | 67.6 / 69.5 |
+| Chromium | 10,000 | 482.8 / 479.4 | 482.8 / 479.4 | 491.1 / 487.4 | 484.4 / 481.2 |
+| Firefox | 100 | 18 / 15 | 18 / 15 | 30 / 32 | 19 / 18 |
+| Firefox | 1,000 | 87 / 76 | 87 / 76 | 95 / 82 | 88 / 76 |
+| Firefox | 10,000 | 692 / 619 | 692 / 619 | 732 / 668 | 692 / 620 |
+| WebKit | 100 | 20 / 17 | 20 / 17 | 28 / 28 | 20 / 17 |
+| WebKit | 1,000 | 74 / 54 | 74 / 54 | 90 / 69 | 75 / 55 |
+| WebKit | 10,000 | 480 / 483 | 480 / 483 | 569 / 563 | 480 / 487 |
+
+The test also measures native `StoryHistory.Back` and `Forward` on the same
+fixture before browser setup, with current-thread managed allocation counters.
+At 10,000 choices, the native medians across these runs were 87.7–104.4 ms for
+Back and 93.8–97.8 ms for Forward, allocating about 35.53 MiB per direction.
+These are **not WASM replay timings**: subtracting them from browser completion
+would not isolate UI cost. Native assertions check the cursor and transcript
+length after each action, and exact saved bytes and deterministic event
+sequence after every pair. Browser assertions check passage text, transcript
+length, focus and the disabled Forward control at the timeline end.
+
+### Bounded next decision
+
+There is a concrete long-history navigation problem: the 10,000-choice browser
+actions have roughly 0.5–0.7 second paint-opportunity medians and similarly large
+animation-frame gaps. Native replay independently allocates and executes work
+proportional to history depth. This is a baseline, not an optimization result.
+It does not yet attribute WASM replay, transcript enumeration, component
+updates, layout, or scrolling separately, and does not complete #146's
+attribution/design acceptance.
+
+Before adopting checkpoints, the next implementation experiment should test
+stable transcript views and unchanged-passage rendering boundaries against this
+baseline. The current transcript property creates a read-only wrapper on each
+access and the player walks every passage during a render; those are concrete
+code paths to investigate, not proof that rendering dominates. Keep one
+bounded experiment: retain it only at the #141 improvement threshold, with no
+correctness or material regression, otherwise discard it and record that
+outcome. Preserve all transcript entries, selection, focus and scroll behavior.
+Do not mix in checkpoints, virtualization, threading or save-format changes.
+
+If replay attribution later justifies checkpoints, review a separate design
+before implementation. It must specify a measured retained-memory cap,
+construction/pause cost, spacing, eager versus lazy creation, invalidation on
+fork/restart/load and eviction fallback to full replay. Snapshots must include
+trigger edge state, RNG/roll position, event boundaries, character identity and
+presentation state, not only `GameState`. They remain internal accelerators,
+never trusted persisted state. Live/peak memory remains unmeasured; #212 is
+not closed by allocation counters or this navigation probe.
+
+```bash
+python3 player/tests/run_e2e.py web --browser all \
+  --filter FullyQualifiedName~HistoryNavigationPerformanceTests
+```
+
+The exact filter runs three cases per browser. Each TRX stdout contains raw
+per-action JSON under `nativeReplay` and `browserNavigation`; normal E2E
+artifacts also contain browser traces. There are no new CI timing gates.
+
+### Transcript-update experiment
+
+The bounded candidate reads the transcript view once per player render rather
+than creating a wrapper on every loop condition/index access. `StoryPassage`
+also skips descendant rendering when the displayed title, document blocks,
+styled inline values and chosen label match its last rendered presentation.
+Replay still runs in full. The comparison is structural, not a hash or a
+plain-text comparison: styling, speaker identity/name, note kind, line breaks
+and media values participate. Unrecognized block types render conservatively.
+All transcript entries remain present; there is no cache of extra histories,
+checkpoint, virtualization or change to portable saves.
+
+Matched Release publications used the same test assembly against unchanged and
+changed web roots, with two rounds per browser. The first round ran unchanged
+before changed, and the second reversed the states. Each direction below pools
+ten measured samples (five per round), not ten independent browser sessions.
+Both states ran the same transcript-length, passage-text, chosen-label-count,
+focus and retained text-selection assertions. All 36 browser/depth/state/round
+cases passed. Final player behavior, presentation and save-history validation,
+including the additional focused fork regression, passed 57 cases per browser
+in Chromium, Firefox and WebKit (171 passed, none failed or skipped).
+
+| Browser | Choices | Unchanged paint opportunity, Back / Forward (ms) | Changed, Back / Forward (ms) | Reduction, Back / Forward |
+|---|---:|---:|---:|---:|
+| Chromium | 100 | 31.5 / 29.3 | 30.5 / 29.9 | 3.2% / -1.9% |
+| Chromium | 1,000 | 90.1 / 70.2 | 63.5 / 64.0 | 29.4% / 8.8% |
+| Chromium | 10,000 | 553.9 / 539.0 | 328.2 / 349.4 | 40.8% / 35.2% |
+| Firefox | 100 | 29.5 / 30.0 | 30.0 / 30.5 | -1.7% / -1.7% |
+| Firefox | 1,000 | 114.0 / 102.0 | 82.5 / 72.5 | 27.6% / 28.9% |
+| Firefox | 10,000 | 790.0 / 818.5 | 535.0 / 520.0 | 32.3% / 36.5% |
+| WebKit | 100 | 34.0 / 35.0 | 34.5 / 32.5 | -1.5% / 7.1% |
+| WebKit | 1,000 | 95.5 / 88.5 | 67.0 / 70.5 | 29.8% / 20.3% |
+| WebKit | 10,000 | 662.5 / 673.5 | 449.5 / 473.0 | 32.2% / 29.8% |
+
+At 10,000 choices, pooled median maximum animation-frame gaps fell 36–42%
+across the six browser/direction cases. At 100 choices, Firefox's gap medians
+increased from 22 to 24.5 ms for Back and 20 to 22 ms for Forward, while its
+completion medians changed by only 0.5 ms. Do not hide those small absolute
+regressions behind the larger long-history gains.
+The second round also had a Chromium 1,000-choice regression: Back rose
+from 85.2 to 169.8 ms and Forward from 67.5 to 83.3 ms, despite pooled
+improvements at that depth. A final Chromium-only check used unchanged,
+changed, changed, unchanged order with the same publications and no rebuilds.
+All twelve cases passed. Pooling ten samples per direction/state in that
+check, 1,000-choice Back improved from 80.95 to 51.25 ms (36.7%) and Forward
+from 71.35 to 46.8 ms (34.4%). At 100 choices, completion remained approximately
+flat; at 10,000 it improved 47.0% / 38.7%. The earlier regression did not
+reproduce, but remains part of the evidence rather than being discarded.
+
+These remain exploratory measurements on a synthetic looping story, with
+tracing enabled and variable machine load. The available second-round changed
+environment logs confirm AC power but show load averages of 4.75–7.42 and
+substantial I/O wait. Environment capture was incomplete for other states;
+the comparison is not a controlled idle-host experiment or a user-story
+percentile. The >10% target improvement appears consistently at 10,000 choices
+in both rounds, supporting retaining this candidate for review, not claiming
+that every navigation becomes 30–41% faster. Native replay is unchanged and
+live/peak memory was not measured.
+
+The experiment stops here rather than layering checkpoints onto this change.
+Navigation still has significant replay and browser work; detailed WASM/DOM
+attribution and any checkpoint design remain unresolved under #146. A focused
+formatted-history regression additionally exercises Back, Forward, a changed
+chosen label after a fork, and restart; it passed in all three browsers.
+No performance CI gates were added.
 
 ## Budget status
 

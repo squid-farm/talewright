@@ -18,10 +18,11 @@
     }
     <div class="tw-columns">
         <main class="tw-transcript" aria-label="Story transcript" aria-live="polite">
-            @for (var i = 0; i < _transcript.Count; i++)
+            @{ var transcript = _transcript; }
+            @for (var i = 0; i < transcript.Count; i++)
             {
-                var entry = _transcript[i];
-                var isLatest = i == _transcript.Count - 1;
+                var entry = transcript[i];
+                var isLatest = i == transcript.Count - 1;
                 if (isLatest)
                 {
                     <section class="tw-frame tw-latest" aria-label="Current passage" tabindex="-1" @ref="_latestFrame"><StoryPassage Entry="entry" /></section>

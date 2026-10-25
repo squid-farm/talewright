@@ -10,4 +10,69 @@
 
 @code {
     [Parameter, EditorRequired] public HistoryFrame Entry { get; set; } = default!;
+
+    private HistoryFrame? _renderedEntry;
+
+    protected override bool ShouldRender() =>
+        _renderedEntry is null || !SamePresentation(_renderedEntry, Entry);
+
+    protected override void OnAfterRender(bool firstRender) => _renderedEntry = Entry;
+
+    // Replay creates new frame objects even when an earlier passage's presentation is unchanged.
+    private static bool SamePresentation(HistoryFrame previous, HistoryFrame current)
+    {
+        if (ReferenceEquals(previous, current))
+        {
+            return true;
+        }
+        if (previous.Frame.Title != current.Frame.Title ||
+            !SameInlines(previous.Chosen, current.Chosen))
+        {
+            return false;
+        }
+
+        var before = previous.Frame.Document.Blocks;
+        var after = current.Frame.Document.Blocks;
+        if (before.Count != after.Count)
+        {
+            return false;
+        }
+        for (var index = 0; index < before.Count; index++)
+        {
+            var same = (before[index], after[index]) switch
+            {
+                (RenderedParagraph left, RenderedParagraph right) => SameInlines(left.Inlines, right.Inlines),
+                (RenderedSpeech left, RenderedSpeech right) =>
+                    left.Speaker == right.Speaker && left.SpeakerName == right.SpeakerName &&
+                    SameInlines(left.Inlines, right.Inlines),
+                (RenderedNote left, RenderedNote right) => left == right,
+                _ => false,
+            };
+            if (!same)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool SameInlines(IReadOnlyList<RenderedInline>? previous, IReadOnlyList<RenderedInline>? current)
+    {
+        if (ReferenceEquals(previous, current))
+        {
+            return true;
+        }
+        if (previous is null || current is null || previous.Count != current.Count)
+        {
+            return false;
+        }
+        for (var index = 0; index < previous.Count; index++)
+        {
+            if (previous[index] != current[index])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 }
