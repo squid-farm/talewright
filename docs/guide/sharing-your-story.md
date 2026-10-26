@@ -46,26 +46,25 @@ and artwork where smaller downloads matter. Resize images for their intended dis
 than shipping camera originals. Images fit narrow windows without stretching their aspect ratio;
 provide descriptive alt text for readers and for visible failure states.
 
-Lazy display delays image stream/Blob creation until an occurrence nears the viewport. It does
-not make image bytes free: downloads, retained history, Blob data and browser-decoded bitmaps
-consume resources. Repeated occurrences share transferred data while mounted, but distinct
-images can still accumulate in history.
+Images are displayed as readers scroll them into view, but a web game can still download its
+artwork before it is shown. Large images mean longer downloads and use more memory when
+displayed. Earlier illustrations stay in the story's history, so test image-heavy stories on
+the phones and computers your readers will use.
 
-`validate` uses a source-only size estimate: UTF-8 source text and supported images, excluding the
-generated runtime and precompressed copies. `publish -a --target web` measures the **final
-extracted payload**, including those runtime and compression files. Both use one advisory check
-against recorded [itch.io HTML5 guidance](https://itch.io/docs/creators/html5):
-200 MB per extracted file, 500 MB total, and 1,000 files. Talewright compares MB conservatively
-as decimal bytes. Hosts can change their requirements; other restrictions such as filename
-length also apply. A warning never changes validation success or prevents publication, including
-with `validate --warnings-as-errors` (which applies to compiler warnings).
+For itch.io web games, the recorded limits are **200 MB per file, 500 MB total, and 1,000 files**
+after unzipping. Check [itch.io's current requirements](https://itch.io/docs/creators/html5)
+before uploading; other restrictions, such as filename length, also apply.
 
-**Current embedded-artwork caveat:** generated games still embed story assets in the program.
-Large artwork collections can therefore push one generated file over the host's per-file limit,
-even when each original image is smaller. Lazy image display does not mean a lazy download of
-that embedded program. [#271](https://github.com/squid-farm/talewright/issues/271) moves story assets
-beside the host; it is a follow-up, not shipped here.
-Choose downloadable desktop distribution when browser hosting or resource use is unsuitable.
+`talewright validate my-story` gives an early size estimate for your text and images. Publishing
+a web game checks the complete game's size, including the player. Either command warns if its
+size check exceeds the recorded hosting limits, but the warning does not stop you from
+publishing or make validation fail, even with `validate --warnings-as-errors`. A successful
+publication does not guarantee that your host will accept the upload.
+
+**For large illustrated games:** the publisher currently combines artwork into the game.
+Even if each original image is below 200 MB, the finished game can contain a file above itch.io's
+per-file limit. Reduce the artwork's size and publish again if you receive a warning. If the
+game is still too large for browser hosting, consider offering a downloadable desktop game.
 
 ## A desktop game
 

@@ -55,7 +55,10 @@ Register one as a singleton `IStoryLibrary` in the host.
 Generated hosts reuse the sample hosts' embedded-image capability and the publisher's validated
 staging; they do not introduce another image adapter or transport. Web asset URLs resolve
 relative to the page base. Embedded images may still arrive as part of the initial program
-download even though display/stream acquisition is lazy. See the author guide's
+download even though display/stream acquisition is lazy. The embedded artwork can push one
+generated program file above a host's per-file limit even when each original image is smaller.
+[#271](https://github.com/squid-farm/talewright/issues/271) tracks moving story assets beside the
+host; that layout is not shipped here. See the author guide's
 [artwork and hosting size](../../../docs/guide/sharing-your-story.md#artwork-and-hosting-size)
 for the advisory source estimate, final web-payload measurement and current embedded-artwork caveat.
 Published Windows, macOS and ARM image playback remain unverified; Linux x64 and three browser
