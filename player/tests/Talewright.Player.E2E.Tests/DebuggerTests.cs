@@ -16,7 +16,7 @@ public sealed class DebuggerTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
-                "id: native-debug\ntitle: Native Debug\nstart: scene1\nflags: [ready]\ncharacters:\n  player: {first-name: Tester}\n");
+                "game:\n  id: native-debug\n  title: Native Debug\n  start: scene1\nflags: [ready]\ncharacters:\n  player: {first-name: Tester}\n");
             var tale = Path.Combine(root, "main.tale");
             await File.WriteAllTextAsync(tale, "=== scene1\n-> missing");
             await using var driver = new NativePlayerDriver(artifacts, executable);
@@ -68,7 +68,7 @@ public sealed class DebuggerTests
         Directory.CreateDirectory(root);
         var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
             "debugger-reload", Guid.NewGuid().ToString("N"));
-        const string yaml = "id: reload\ntitle: Native reload\nstart: start\nvars: {count: 0}\ncharacters:\n  player: {first-name: Tester}\ncreation:\n  name: true\n";
+        const string yaml = "game:\n  id: reload\n  title: Native reload\n  start: start\n  creation:\n    name: true\nvars: {count: 0}\ncharacters:\n  player: {first-name: Tester}\n";
         const string original = """
                 === start
                 * [Go] -> current
@@ -154,9 +154,10 @@ public sealed class DebuggerTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"), """
-                id: live-native
-                title: Native live edits
-                start: start
+                game:
+                  id: live-native
+                  title: Native live edits
+                  start: start
                 flags: [ready]
                 vars: {count: 0}
                 characters:
@@ -221,7 +222,7 @@ public sealed class DebuggerTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
-                "id: source-native\ntitle: Native Source\nstart: first\ncharacters:\n  player: {first-name: Tester}\n");
+                "game:\n  id: source-native\n  title: Native Source\n  start: first\ncharacters:\n  player: {first-name: Tester}\n");
             var firstPath = Path.Combine(root, "first.tale");
             var latePath = Path.Combine(root, "late.tale");
             await File.WriteAllTextAsync(firstPath, first);
@@ -272,7 +273,7 @@ public sealed class DebuggerTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
-                "id: scroll\ntitle: Source Scroll\nstart: first\ncharacters:\n  player: {first-name: Tester}\n");
+                "game:\n  id: scroll\n  title: Source Scroll\n  start: first\ncharacters:\n  player: {first-name: Tester}\n");
             await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), "=== first\n"
                 + string.Join("\n", Enumerable.Range(1, 150).Select(i => $"// source line {i}"))
                 + "\n* [Stay] -> first");
@@ -333,15 +334,16 @@ public sealed class DebuggerTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(story, "story.talewright.yaml"), """
-                id: native-portable
-                title: Portable Native
-                start: scene1
+                game:
+                  id: native-portable
+                  title: Portable Native
+                  start: scene1
+                  creation:
+                    name: true
                 flags: [ready]
                 vars: {count: 0}
                 characters:
                   player: {first-name: Tester}
-                creation:
-                  name: true
                 """);
             var source = string.Join("\n", Enumerable.Range(1, 1000).Select(i => $$"""
                 === scene{{i}}

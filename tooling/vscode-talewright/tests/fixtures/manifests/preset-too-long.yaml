@@ -1,8 +1,9 @@
-id: preset-too-long
-title: Preset ID exceeds eighty characters
-start: beginning
+game:
+  id: preset-too-long
+  title: Preset ID exceeds eighty characters
+  start: beginning
+  creation:
+    presets:
+      "123456789012345678901234567890123456789012345678901234567890123456789012345678901": {}
 characters:
   player: {first-name: Ada}
-creation:
-  presets:
-    "123456789012345678901234567890123456789012345678901234567890123456789012345678901": {}

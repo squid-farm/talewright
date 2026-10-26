@@ -18,9 +18,10 @@ public sealed class AuthorScenarioTests : IDisposable
         _output = Path.Combine(_root, "author", "portable.twscenario");
         Directory.CreateDirectory(_story);
         File.WriteAllText(Path.Combine(_story, "story.talewright.yaml"), """
-            id: scenario-ui
-            title: Portable UI
-            start: start
+            game:
+              id: scenario-ui
+              title: Portable UI
+              start: start
             flags: [ready]
             vars: {count: 0}
             characters:

@@ -16,18 +16,19 @@ Create a folder named `debugger-story` with these two files:
 **story.talewright.yaml**
 
 ```yaml
-id: debugger-review
-title: Debugger Review
-version: 1.0.0
-start: scene1
+game:
+  id: debugger-review
+  title: Debugger Review
+  version: 1.0.0
+  start: scene1
+  creation:
+    name: true
 flags: [ready]
 vars: {count: 0}
 characters:
   player: {first-name: Tester}
 items:
   rope: {name: Rope}
-creation:
-  name: true
 triggers:
   - id: reward
     when: flag:ready

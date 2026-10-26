@@ -235,14 +235,15 @@ triggers:
 Let players choose their name, pronouns, a preset and some starting stats before the story begins:
 
 ```yaml
-creation:
-  name: true
-  pronouns: [they, she, he]
-  stats:
-    str: [8, 12, 16]
-  presets:
-    explorer: { label: Explorer, stats: { str: 12, hp: 15 } }
-    scholar:  { label: Scholar,  stats: { str: 8,  hp: 10 } }
+game:
+  creation:
+    name: true
+    pronouns: [they, she, he]
+    stats:
+      str: [8, 12, 16]
+    presets:
+      explorer: { label: Explorer, stats: { str: 12, hp: 15 } }
+      scholar:  { label: Scholar,  stats: { str: 8,  hp: 10 } }
 ```
 
 Without a `creation` section, the story starts with the `player` you wrote. See
@@ -250,7 +251,7 @@ Without a `creation` section, the story starts with the `player` you wrote. See
 
 ## Other options
 
-- `undo: false` in `story.talewright.yaml` hides the **Back** and **Forward** buttons. Saves still work.
+- `game.undo: false` in `story.talewright.yaml` hides the **Back** and **Forward** buttons. Saves still work.
 - `{image("path", "description")}` reserves an image at that narrative position, including in
   dialogue or a choice label. Paths are relative to `images/`; description is optional literal
   alt text. Use `\"` for an embedded quote and `\\` for a backslash. The old Markdown image

@@ -7,9 +7,10 @@ namespace Talewright.Authoring.Tests;
 public sealed class ImageCompletionTests
 {
     private const string Manifest = """
-        id: images
-        title: Images
-        start: start
+        game:
+          id: images
+          title: Images
+          start: start
         characters: { player: { first-name: Ada }, image: { first-name: Iris } }
         """;
 

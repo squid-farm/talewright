@@ -13,9 +13,10 @@ public sealed class DebuggerTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), """
-            id: debug
-            title: Debug
-            start: scene1
+            game:
+              id: debug
+              title: Debug
+              start: scene1
             flags: [ready]
             vars: {count: 0}
             items:
@@ -196,13 +197,10 @@ public sealed class DebuggerTests : IDisposable
     [Fact]
     public void Creation_selection_is_required_and_setup_overrides_only_enabled_fields()
     {
-        File.AppendAllText(Path.Combine(_root, "story.talewright.yaml"), """
-
-            creation:
-              name: true
-              stats:
-                str: [8, 12, 16]
-            """);
+        var manifestPath = Path.Combine(_root, "story.talewright.yaml");
+        var manifest = File.ReadAllText(manifestPath).Replace("  start: scene1",
+            "  start: scene1\n  creation:\n    name: true\n    stats:\n      str: [8, 12, 16]");
+        File.WriteAllText(manifestPath, manifest);
         var model = new WorkbenchModel(_root);
         model.Reload();
         model.Start();

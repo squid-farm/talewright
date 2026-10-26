@@ -1,8 +1,9 @@
-id: preset-whitespace
-title: Whitespace preset ID
-start: beginning
+game:
+  id: preset-whitespace
+  title: Whitespace preset ID
+  start: beginning
+  creation:
+    presets:
+      " \t ": {}
 characters:
   player: {first-name: Ada}
-creation:
-  presets:
-    " \t ": {}

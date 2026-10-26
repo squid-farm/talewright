@@ -23,9 +23,12 @@ and define your cast and rules in a YAML manifest. A story is just a folder of t
 
 ```text
 my-story/
-├── story.talewright.yaml      # title, start scene, characters, items, factions
+├── story.talewright.yaml      # game settings and story declarations
 └── story.tale      # your scenes (use as many .tale files and subfolders as you like)
 ```
+
+Story settings such as the ID, title, starting scene, and ruleset go under `game:`. Characters and
+other declarations stay at the root of the manifest.
 
 > **Tip:** In VS Code, install Red Hat's
 > [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) and the
