@@ -48,7 +48,7 @@ Register one as a singleton `IStoryLibrary` in the host.
 | Native desktop, command-line story folder | Supported: live safe local files |
 | Native Author Debugger, story folder | Supported: accepted-source image generations |
 | Built-in desktop/web samples | Supported: opt-in lazy embedded resource streams |
-| Desktop ZIP / browser upload | Unavailable state; archive adapter/safety remains #178 |
+| Desktop ZIP / browser upload | Retained compressed archive with lazy, bounded image reads |
 | Generated published desktop/web host | Unavailable state; published adapter/deployment remains #179 |
 | Custom library using only `LoadAsync` | Text works; images show unavailable unless it supplies a capability |
 
@@ -73,6 +73,18 @@ entries and awaits asynchronous browser URL cleanup. Sharing removes duplicate t
 it does not bound distinct images retained by history or guarantee one decoded bitmap.
 No eviction, unique-image budget, or history virtualization is introduced. No filesystem browser URL, remote
 fetch/fallback, or new author file-size limit is introduced.
+
+ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even
+when loading fails. A loaded story retains one parsed archive, not expanded image copies.
+Source discovery uses the shared configuration/narrative predicates and root mapping.
+Compressed input (including the separate 20 MiB browser upload convenience cap), expanded
+content, each expanded read, and retained stream/Blob ownership are distinct concerns.
+The existing 50 MiB defensive archive bound covers actual source text plus image content;
+metadata preflight is supplemented by bounded actual reads. Per-image high-water accounting
+means repeat and partial reads do not charge the same content twice. This is not a folder
+image limit or a history memory budget. Late read/decode failures preserve the adopted narrative
+and show the effective alt with an accessible error. Rejected candidates, accepted replacement
+and teardown release archive/input resources after image transfers drain.
 
 `LibraryEnabled=false` requires an `AutoStartStoryId` and removes Library navigation
 and upload UI during both creation and play. A failed startup shows diagnostics
@@ -123,7 +135,7 @@ one below 52rem.
 
 ## Not here yet
 
-- Archive/upload image adapters (#178), generated published-host image adapters and deployment behavior (#179).
+- Generated published-host image adapters and deployment behavior (#179).
 - Reader settings such as text size and a theme picker (unscheduled).
 - Story and host theming beyond CSS variables ([#13](https://github.com/squid-farm/talewright/issues/13)).
 

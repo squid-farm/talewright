@@ -29,6 +29,7 @@ public sealed class ImageLeaseTests
     private sealed class Browser : IJSRuntime, IJSObjectReference
     {
         public int Transfers { get; private set; }
+        private int _requests;
         public List<string> Revoked { get; } = [];
         public TaskCompletionSource? Gate { get; set; }
         public bool Fail { get; set; }
@@ -43,9 +44,10 @@ public sealed class ImageLeaseTests
             {
                 case "import": result = this; break;
                 case "createUrl":
-                    var number = ++Transfers;
+                    var number = ++_requests;
                     var reference = Assert.IsType<DotNetStreamReference>(args![0]);
                     using (var bytes = new MemoryStream()) await reference.Stream.CopyToAsync(bytes, cancellationToken);
+                    ++Transfers;
                     if (Gate is not null) await Gate.Task;
                     if (Fail) throw new JSException("Transfer failed");
                     result = "blob:test-" + number;

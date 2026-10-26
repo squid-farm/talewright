@@ -306,9 +306,11 @@ debugger refreshes image occurrences on accepted source/image changes; rejected 
 keeps the last accepted story and images. Unavailable or undecodable images show their
 effective alt and a visible, accessible failure. There is no remote fallback.
 
-Image display from ZIPs/uploads is deferred to
-[#178](https://github.com/squid-farm/talewright/issues/178); generated published hosts and
-their deployment/subpath behavior are deferred to
+ZIP stories and browser uploads retain their compressed archive for lazy image access through
+the same renderer. Untrusted archives enforce defensive expansion accounting, distinct from
+folder authoring and the browser upload convenience cap. A later image failure preserves the
+story and shows effective alt plus an accessible error.
+Generated published hosts and their deployment/subpath behavior are deferred to
 [#179](https://github.com/squid-farm/talewright/issues/179). Their existing exports retain
 the real assets/catalogue, but their unadapted image occurrences show the unavailable state.
 Text-only stories continue to work in those hosts.

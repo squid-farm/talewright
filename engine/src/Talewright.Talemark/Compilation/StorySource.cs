@@ -13,7 +13,8 @@ public sealed class StorySource
 {
     private const int MaxStoryFiles = 1_000;
     private const long MaxStoryFileBytes = 5L * 1024 * 1024;
-    private const long MaxExpandedBytes = 50L * 1024 * 1024;
+    /// <summary>Defensive expanded-content bound for externally supplied story archives, not an author image limit.</summary>
+    public const long MaxArchiveExpandedBytes = 50L * 1024 * 1024;
 
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
     public const string ManifestFileName = "story.talewright.yaml";
@@ -113,6 +114,14 @@ public sealed class StorySource
     /// Unsafe member names and duplicate normalized image paths are rejected, not silently remapped.
     /// </summary>
     public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries)
+        => FromZip(archive, out imageEntries, out _);
+
+    /// <summary>
+    /// Loads a caller-owned archive and reports actual expanded text bytes for the host's subsequent lazy-image
+    /// accounting. Repeated image reads must not charge these text bytes again. Mapping lifetime matches the archive.
+    /// </summary>
+    public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries,
+        out long expandedTextBytes)
     {
         foreach (var entry in archive.Entries)
         {
@@ -166,6 +175,7 @@ public sealed class StorySource
         }
 
         imageEntries = new ReadOnlyDictionary<string, ZipArchiveEntry>(images);
+        expandedTextBytes = totalBytes;
         return new StorySource(files, images.Keys);
     }
 
@@ -205,7 +215,7 @@ public sealed class StorySource
             }
 
             var fileRemaining = MaxStoryFileBytes - BytesRead;
-            var totalRemaining = MaxExpandedBytes - initialTotalBytes - BytesRead;
+            var totalRemaining = MaxArchiveExpandedBytes - initialTotalBytes - BytesRead;
             var requested = (int)Math.Min(buffer.Length, Math.Min(fileRemaining, totalRemaining) + 1);
             var bytesRead = input.Read(buffer[..requested]);
             if (bytesRead > fileRemaining)

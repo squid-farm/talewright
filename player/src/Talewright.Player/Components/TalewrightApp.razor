@@ -181,15 +181,22 @@
         try
         {
             // FromZip needs a seekable stream; browser streams aren't, so buffer first.
-            using var buffer = new MemoryStream();
-            await using (var upload = e.File.OpenReadStream(MaxUploadBytes))
+            var buffer = new MemoryStream();
+            try
             {
-                await upload.CopyToAsync(buffer);
-            }
+                await using (var upload = e.File.OpenReadStream(MaxUploadBytes))
+                {
+                    await upload.CopyToAsync(buffer);
+                }
 
-            buffer.Position = 0;
-            if (_disposed || generation != _openGeneration) return;
-            candidate = new LoadedStory(StorySource.FromZip(buffer));
+                buffer.Position = 0;
+                if (_disposed || generation != _openGeneration) return;
+                candidate = ArchiveStoryImages.Open(buffer);
+            }
+            finally
+            {
+                if (candidate is null) await buffer.DisposeAsync();
+            }
             await CompileAsync(candidate, e.File.Name);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)

@@ -50,5 +50,22 @@ internal sealed class ImageStoryFiles : IDisposable
             "UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA="));
     }
 
+    public byte[] Zip(string prefix = "")
+    {
+        var source = StorySource.FromDirectory(Root);
+        using var buffer = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(buffer, System.IO.Compression.ZipArchiveMode.Create,
+            leaveOpen: true))
+        {
+            foreach (var path in source.Files.Keys.Concat(source.ImagePaths))
+            {
+                using var entry = archive.CreateEntry(prefix + path).Open();
+                using var input = File.OpenRead(Path.Combine(Root, path));
+                input.CopyTo(entry);
+            }
+        }
+        return buffer.ToArray();
+    }
+
     public void Dispose() => Directory.Delete(Root, recursive: true);
 }

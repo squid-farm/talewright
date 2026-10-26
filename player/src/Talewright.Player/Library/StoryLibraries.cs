@@ -133,8 +133,9 @@ public sealed class FileSystemStoryLibrary(IEnumerable<string> paths) : IStoryLi
 
     public async Task<LoadedStory> OpenAsync(string id)
     {
+        if (!Directory.Exists(id)) return ArchiveStoryImages.Open(File.OpenRead(id));
         var source = await LoadAsync(id);
-        return new(source, Directory.Exists(id) ? StoryImages.FromDirectory(source, id) : null);
+        return new(source, StoryImages.FromDirectory(source, id));
     }
 }
 

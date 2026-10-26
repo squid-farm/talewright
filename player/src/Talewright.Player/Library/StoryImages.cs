@@ -113,14 +113,57 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!_paths.Contains(path))
             throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Lifetime);
-        var stream = await _source.OpenAsync(path, cancellation.Token);
-        if (cancellation.IsCancellationRequested)
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Lifetime);
+        try
         {
-            await stream.DisposeAsync();
-            cancellation.Token.ThrowIfCancellationRequested();
+            var stream = await _source.OpenAsync(path, cancellation.Token);
+            if (cancellation.IsCancellationRequested)
+            {
+                await stream.DisposeAsync();
+                cancellation.Token.ThrowIfCancellationRequested();
+            }
+            return new ImageReadStream(stream, cancellation);
         }
-        return stream;
+        catch
+        {
+            cancellation.Dispose();
+            throw;
+        }
+    }
+
+    private sealed class ImageReadStream(Stream input, CancellationTokenSource cancellation) : Stream
+    {
+        public override bool CanRead => input.CanRead;
+        public override bool CanSeek => input.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => input.Length;
+        public override long Position { get => input.Position; set => input.Position = value; }
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+        public override int Read(Span<byte> buffer)
+        {
+            cancellation.Token.ThrowIfCancellationRequested();
+            return input.Read(buffer);
+        }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellation.Token);
+            return await input.ReadAsync(buffer, linked.Token);
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                try { input.Dispose(); }
+                finally { cancellation.Dispose(); }
+            }
+            base.Dispose(disposing);
+        }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => input.Seek(offset, origin);
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     public static StoryImages FromDirectory(StorySource source, string root)
