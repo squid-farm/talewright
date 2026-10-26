@@ -1,5 +1,6 @@
 {
   "name": "Talewright.Talemark.Tests",
+  "implicitDependencies": ["talewright-samples"],
   "targets": {
     "test": {
       "executor": "nx:run-commands",

@@ -39,6 +39,17 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         });
         await AssertLibraryUnavailable();
         var first = await Driver.ObserveAsync();
+        if (!PlayerTarget.IsDesktop && title == "The Lost Relic")
+        {
+            Assert.Contains("Tomas", first.Passage);
+            var image = Page.GetByAltText(
+                "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.",
+                new() { Exact = true });
+            await Expect(image).ToHaveCountAsync(1);
+            await image.ScrollIntoViewIfNeededAsync();
+            await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                await image.ElementHandleAsync());
+        }
         if (creation)
         {
             Assert.Contains(Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_CHARACTER") ?? "Tester", first.Passage);

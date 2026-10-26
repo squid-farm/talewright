@@ -70,7 +70,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     private readonly Dictionary<(string File, int Line), List<(SourceText Source, int Start, int End)>> _inlineRanges = [];
     private readonly Dictionary<string, string[]> _lines = new(StringComparer.Ordinal);
     private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
-    private int[]? _manifestLineStarts;
+    private readonly Dictionary<string, int[]> _manifestLineStarts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _variableTypes = new(StringComparer.Ordinal);
     private readonly AuthoringSymbol[] _imageCandidates = StoryImageResolver.CompletionPaths(source)
         .Select(name => new AuthoringSymbol(name, AuthoringSymbolKind.Image, "image path", null)).ToArray();
@@ -196,10 +196,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
     }
 
-    internal void Scalar(YamlScalarNode node)
+    internal void Scalar(YamlScalarNode node, string file = StorySource.ManifestFileName)
     {
-        var text = source.Files[StorySource.ManifestFileName];
-        if (_manifestLineStarts is null)
+        var text = source.Files[file];
+        if (!_manifestLineStarts.TryGetValue(file, out var lineStarts))
         {
             var starts = new List<int> { 0 };
             for (var index = 0; index < text.Length; index++)
@@ -211,10 +211,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 }
                 else if (text[index] == '\n') starts.Add(index + 1);
             }
-            _manifestLineStarts = starts.ToArray();
+            _manifestLineStarts[file] = lineStarts = starts.ToArray();
         }
-        _scalars.TryAdd(new SourceLocation(StorySource.ManifestFileName, (int)node.Start.Line, (int)node.Start.Column),
-            new YamlScalarSource(text, node, _manifestLineStarts));
+        _scalars.TryAdd(new SourceLocation(file, (int)node.Start.Line, (int)node.Start.Column),
+            new YamlScalarSource(text, node, lineStarts));
     }
 
     internal void Scene(SceneId id, SourceLocation location)

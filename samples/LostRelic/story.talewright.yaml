@@ -1,5 +1,5 @@
 # The Lost Relic — Talewright sample story.
-# Every story is a folder: this manifest plus any number of .tale files (subfolders allowed).
+# This manifest, supporting *.talewright.yaml files, and .tale files form one story.
 # See docs/reference/talemark-syntax.md for the full format.
 
 game:
@@ -48,18 +48,6 @@ characters:
       perception: 2
       history: 3
     inventory: [torch, journal]
-  guide:
-    first-name: Tomas
-    last-name: Okafor
-    pronouns:
-      subject: he
-      object: him
-      possessive-pronoun:
-        determiner: his
-        independent: his
-      reflexive: himself
-      plural: false
-    stats: { survival: 4, wis: 14 }
 
 factions:
   explorers-guild: { name: "Explorers' Guild", standing: 5 }

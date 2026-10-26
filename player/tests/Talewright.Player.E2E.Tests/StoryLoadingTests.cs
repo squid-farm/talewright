@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using Microsoft.Playwright;
+using Talewright.Player.Library;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -21,6 +23,47 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         await Observe(new(null, "First file."));
         await Choose("Continue");
         await Observe(new(null, "Second file."));
+    }
+
+    [Fact]
+    public async Task Split_illustrated_archive_resolves_player_inventory_and_text_from_supporting_files()
+    {
+        using var files = new ImageStoryFiles();
+        await File.WriteAllTextAsync(files.TalePath, ImageStoryFiles.Tale.Replace("Before ", "{var:greeting} Before "));
+        using var archive = new MemoryStream();
+        ZipFile.CreateFromDirectory(files.Root, archive);
+        await UploadBytes("split-illustrated.zip", archive.ToArray());
+        await Observe(new(null, "Hello from supporting configuration."));
+        await Choose((await Driver.ObserveAsync()).Choices[0]);
+        await Observe(new(null, "Next passage."));
+    }
+
+    [Fact]
+    public async Task Lost_relic_split_configuration_and_image_inputs_survive_browser_upload()
+    {
+        var assembly = typeof(StoryLoadingTests).Assembly;
+        var source = await new EmbeddedStoryLibrary(assembly).LoadAsync("LostRelic");
+        Assert.Contains("characters/guide.talewright.yaml", source.Files.Keys);
+        using var buffer = new MemoryStream();
+        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (path, text) in source.Files)
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(path).Open());
+                writer.Write(text);
+            }
+            foreach (var path in source.ImagePaths)
+            {
+                using var image = assembly.GetManifestResourceStream("stories/LostRelic/" + path)!;
+                using var target = zip.CreateEntry(path).Open();
+                await image.CopyToAsync(target);
+            }
+        }
+        await UploadBytes("lost-relic-split.zip", buffer.ToArray());
+        await Driver.ClickAsync("Start story");
+        await Observe(new(null, "Tomas"));
+        await Choose("Continue");
+        await Observe(new(null, "The camp hums"));
     }
 
     [Theory]
