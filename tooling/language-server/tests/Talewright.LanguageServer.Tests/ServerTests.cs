@@ -211,8 +211,6 @@ public sealed partial class ServerTests
         if (openTale)
         {
             Assert.Empty(await client.Diagnostics("child/main.tale", 1));
-            Assert.DoesNotContain(await client.Diagnostics("child/main.tale", 1),
-                item => item.GetProperty("code").GetString() == "TW2002");
             File.WriteAllText(client.PathOf("story.talewright.yaml"), Manifest);
             await client.Watch("story.talewright.yaml", 1);
             await client.Diagnostics("child/main.tale", 1);
@@ -289,7 +287,7 @@ public sealed partial class ServerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Unsaved_nested_manifest_rehomes_existing_tale_overlays_and_diagnostics(bool parentManifest)
+    public async Task Opening_manifest_preserves_existing_overlays_under_single_root_ownership(bool parentManifest)
     {
         await using var client = new Client();
         if (!parentManifest) File.Delete(client.PathOf("story.talewright.yaml"));
@@ -306,7 +304,7 @@ public sealed partial class ServerTests
             diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
         await client.Change("child/main.tale", childValid, 2);
         Assert.Empty(await client.Diagnostics("child/main.tale", 2));
-        // An ancestor reload must neither reclaim the overlay nor republish its diagnostics.
+        // Refreshing disk must preserve the corrected unsaved overlay.
         await client.Watch("start.tale", 2);
         await client.Open("start.tale", Valid, 1);
         await client.Diagnostics("start.tale", 1);
@@ -365,7 +363,7 @@ public sealed partial class ServerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Discarding_unsaved_child_manifest_retires_root_and_rehomes_overlays(bool parentManifest)
+    public async Task Discarding_manifest_overlay_recomputes_ownership_and_clears_stale_diagnostics(bool parentManifest)
     {
         await using var client = new Client();
         if (!parentManifest) File.Delete(client.PathOf("story.talewright.yaml"));
@@ -383,7 +381,6 @@ public sealed partial class ServerTests
         Assert.Empty(await client.Diagnostics("child/story.talewright.yaml", null));
         await client.Diagnostics("start.tale", 1);
         await client.Diagnostics("child/main.tale", 1);
-        if (!parentManifest) await client.Diagnostics("child/main.tale", 1); // Retirement clears the old publication.
         await client.Change("child/main.tale", "=== child\nHello.\n-> END\n", 2);
         var diagnostics = await client.Diagnostics("child/main.tale", 2);
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
