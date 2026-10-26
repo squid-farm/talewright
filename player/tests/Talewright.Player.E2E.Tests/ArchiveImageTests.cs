@@ -112,6 +112,39 @@ public sealed class ArchiveImageTests
         await Assert.ThrowsAsync<ObjectDisposedException>(async () => await loaded.Images.OpenAsync("images/large.png"));
     }
 
+    [Fact]
+    public async Task Interleaved_readers_preserve_bytes_and_owner_teardown_closes_active_reads()
+    {
+        using var files = new ImageStoryFiles();
+        var input = new MemoryStream(files.Zip());
+        var loaded = ArchiveStoryImages.Open(input);
+        Assert.NotNull(loaded.Images);
+        await using var first = await loaded.Images.OpenAsync("images/photo.jpeg");
+        await using var second = await loaded.Images.OpenAsync("images/pixel.png");
+        var firstBytes = new MemoryStream();
+        var secondBytes = new MemoryStream();
+        using (firstBytes)
+        using (secondBytes)
+        {
+            var firstBlock = new byte[17];
+            var secondBlock = new byte[11];
+            while (true)
+            {
+                var a = await first.ReadAsync(firstBlock);
+                var b = await second.ReadAsync(secondBlock);
+                firstBytes.Write(firstBlock, 0, a);
+                secondBytes.Write(secondBlock, 0, b);
+                if (a == 0 && b == 0) break;
+            }
+            Assert.Equal(File.ReadAllBytes(files.ImagePath), firstBytes.ToArray());
+            Assert.Equal(File.ReadAllBytes(Path.Combine(files.Root, "images", "pixel.png")), secondBytes.ToArray());
+        }
+        await loaded.DisposeAsync();
+        Assert.False(input.CanRead);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first.ReadExactlyAsync(new byte[1]).AsTask());
+        await loaded.DisposeAsync();
+    }
+
     private static MemoryStream ImageArchive(int imageBytes)
     {
         var input = new MemoryStream();

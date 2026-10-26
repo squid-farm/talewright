@@ -10,6 +10,32 @@ public sealed class StorySourceTests : IDisposable
 
     public StorySourceTests() => Directory.CreateDirectory(_root);
 
+    [Fact]
+    public void Archive_text_accounting_includes_actual_fragment_encoding_and_bom_bytes()
+    {
+        using var buffer = new MemoryStream();
+        long expected = 0;
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var path in new[] { StorySource.ManifestFileName, "main.tale", "characters/guide.talewright.yaml" })
+            {
+                var bytes = System.Text.Encoding.Unicode.GetPreamble()
+                    .Concat(System.Text.Encoding.Unicode.GetBytes("configuration text")).ToArray();
+                using var entry = output.CreateEntry("wrapped/" + path).Open();
+                entry.Write(bytes);
+                expected += bytes.Length;
+            }
+            using var ignored = output.CreateEntry("wrapped/unrelated.yml").Open();
+            ignored.Write([1, 2, 3]);
+        }
+        buffer.Position = 0;
+        using var archive = new ZipArchive(buffer, ZipArchiveMode.Read);
+        var source = StorySource.FromZip(archive, out _, out var expandedTextBytes);
+        Assert.Equal(expected, expandedTextBytes);
+        Assert.Equal(3, source.Files.Count);
+        Assert.All(source.Files.Values, value => Assert.Equal("configuration text", value));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("wrapped/")]
