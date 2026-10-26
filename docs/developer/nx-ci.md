@@ -8,6 +8,10 @@ Non-.NET contracts are declared in their nearest `project.json`.
 All targets are uncached by default. In particular, browser/native E2E, packaging checks, and
 editor tests run their existing commands and are not restored from Nx cache.
 
+The [dependency-download reuse experiment](nx-dependency-reuse.md) records repeated local
+cold/warm measurements and historical Actions runner-minute estimates. Its initial result keeps
+existing editor npm caching but does not justify adding new download caches.
+
 ## Local setup and selection
 
 Use Node 22/npm and the SDK from `global.json`. The checked-in `./nx` wrapper installs the pinned
@@ -30,6 +34,41 @@ Preview the PR task graph using the actual base and head revisions:
 python3 .github/scripts/nx_ci.py select --base=origin/main --head=HEAD
 cat artifacts/ci/plan.json
 ```
+
+## Actions summaries
+
+Selection appends a GitHub Actions job summary with full versus affected mode, available revisions,
+and the selected projects/targets grouped by environment. An empty graph is explicitly reported as
+no impact. A conservative workspace fallback is identified from the Nx graph, not from a second
+changed-path classifier. The existing plan JSON and selection outputs keep their original shape.
+
+Each work job reports the router's target batches after execution, including Nx prerequisites:
+projects, outcome, and monotonic elapsed seconds. These are **batch**, not per-project timings;
+they exclude environment setup, queueing, and artifact upload. Parallel job timings are not summed
+as workflow wall time. Unit report validation can fail the router even after its Nx batch succeeds.
+
+The router atomically updates `artifacts/ci/execution-<group>.json`; browser records additionally
+include the browser name. Pending/running batches and missing records are incomplete, never
+zero-duration successes. Job summaries run with `always()` so ordinary failures and interruptions
+can still be described. A forced runner termination can prevent the final summary step from running;
+the aggregate job summary also exposes missing/cancelled/unexpectedly skipped job outcomes.
+It cannot reconstruct missing batch timings. Existing fail-closed gates remain authoritative.
+
+Artifact/report links come only from a successful upload step's actual artifact URL. Missing or
+failed uploads are not presented as available reports. Checks without uploaded reports show no
+invented links. Raw router records are local to the job; the rendered summary persists with the run.
+Locally, print the same execution summary with:
+
+```sh
+python3 .github/scripts/nx_ci.py summary unit
+python3 .github/scripts/nx_ci.py summary browser --browser firefox
+```
+
+Outside Actions, the explicit `summary` command prints to stdout instead of appending to
+`GITHUB_STEP_SUMMARY`. Selection stdout remains machine-readable JSON; its automatic Markdown
+summary is written only in Actions.
+
+## Execution and selection
 
 Selection invokes `nx affected --dry-run --graph=stdout`. The small CI adapter groups actual graph
 tasks by required execution environment, not by changed paths. Nx still executes each selected target
