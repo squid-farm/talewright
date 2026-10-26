@@ -103,6 +103,15 @@ public sealed class StorySource
     public static StorySource FromZip(Stream zip)
     {
         using var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true);
+        return FromZip(archive, out _);
+    }
+
+    /// <summary>
+    /// Loads source text and maps story-relative image paths to archive members in the same discovery pass.
+    /// The caller owns the archive and must keep it open while using the returned members.
+    /// </summary>
+    public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries)
+    {
         var entries = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name) && IsStoryFile(e.FullName)).ToList();
         var manifest = entries
             .Select(e => e.FullName.Replace('\\', '/'))
@@ -119,7 +128,7 @@ public sealed class StorySource
         }
 
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
-        var imagePaths = new List<string>();
+        var images = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
         foreach (var entry in archive.Entries)
         {
             if (string.IsNullOrEmpty(entry.Name) || !entry.FullName.StartsWith(root, StringComparison.Ordinal)) continue;
@@ -130,7 +139,10 @@ public sealed class StorySource
                 throw new InvalidDataException($"Story images cannot be symbolic links: '{entry.FullName}'.");
             }
 
-            imagePaths.Add(path);
+            if (!images.TryAdd(path, entry))
+            {
+                throw new InvalidDataException($"Story image '{path}' has duplicate archive entries.");
+            }
         }
 
         long totalBytes = 0;
@@ -141,7 +153,8 @@ public sealed class StorySource
             files[path[root.Length..]] = ReadText(input, path, ref totalBytes);
         }
 
-        return new StorySource(files, imagePaths);
+        imageEntries = new ReadOnlyDictionary<string, ZipArchiveEntry>(images);
+        return new StorySource(files, images.Keys);
     }
 
     private static string ReadText(Stream input, string path, ref long totalBytes)

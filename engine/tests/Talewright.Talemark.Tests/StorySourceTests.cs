@@ -11,6 +11,52 @@ public sealed class StorySourceTests : IDisposable
     public StorySourceTests() => Directory.CreateDirectory(_root);
 
     [Theory]
+    [InlineData("")]
+    [InlineData("wrapped/")]
+    public void Caller_owned_archive_maps_images_relative_to_the_same_source_root(string prefix)
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var path in new[] { StorySource.ManifestFileName, "main.tale",
+                "characters/guide.talewright.yaml", "unrelated.yaml", "unrelated.yml" })
+            {
+                using var writer = new StreamWriter(output.CreateEntry(prefix + path).Open());
+                writer.Write(path);
+            }
+            using var image = output.CreateEntry(prefix + "images/camp.png").Open();
+            image.Write([1, 2, 3]);
+        }
+        buffer.Position = 0;
+        using var archive = new ZipArchive(buffer, ZipArchiveMode.Read, leaveOpen: true);
+        var source = StorySource.FromZip(archive, out var images);
+
+        Assert.Equal(3, source.Files.Count);
+        Assert.Equal("characters/guide.talewright.yaml", source.Files["characters/guide.talewright.yaml"]);
+        Assert.Equal(["images/camp.png"], source.ImagePaths);
+        Assert.Same(archive.GetEntry(prefix + "images/camp.png"), images["images/camp.png"]);
+        using var actual = images["images/camp.png"].Open();
+        Assert.Equal(1, actual.ReadByte());
+        buffer.Position = 0;
+        var sourceOnly = StorySource.FromZip(buffer);
+        Assert.Equal(source.Files.OrderBy(pair => pair.Key), sourceOnly.Files.OrderBy(pair => pair.Key));
+        Assert.True(source.ImagePaths.SetEquals(sourceOnly.ImagePaths));
+    }
+
+    [Fact]
+    public void Duplicate_archive_image_members_are_rejected_instead_of_selecting_ambiguous_bytes()
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            output.CreateEntry("images/camp.png");
+            output.CreateEntry("images/camp.png");
+        }
+        buffer.Position = 0;
+        Assert.Contains("duplicate", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer)).Message);
+    }
+
+    [Theory]
     [InlineData(1_000)]
     [InlineData(1_001)]
     public void Directory_story_file_count_has_the_same_boundary_as_archives(int count)
