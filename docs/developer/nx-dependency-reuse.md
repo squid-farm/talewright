@@ -226,7 +226,9 @@ serialized builds, and fail-closed aggregate contracts remain unchanged.
 Validation ran the existing 47 Nx regression cases. The new script initially required adding
 its explicit infrastructure scenario; after that correction, all five infrastructure cases passed.
 The other 46 cases had passed, as did the four new measurement tests and documentation-link test.
-The separate 24-case CI contract suite has one pre-existing failing test (two host subtests):
-`test_both_hosts_embed_all_bundled_story_files` expects only tale/YAML files while the hosts also
-embed four JPEG assets. This failure was reproduced in a pristine `git archive HEAD` checkout;
-neither the hosts nor that unrelated test were changed.
+The initial separate 24-case CI contract run exposed a pre-existing failure (two host subtests):
+`test_both_hosts_embed_all_bundled_story_files` expected only tale/YAML files while the hosts also
+embed four JPEG assets. This was reproduced in a pristine baseline checkout. PR CI reproduced
+the same failure, so the exact upstream #249 assertion fix was subsequently applied: the expected
+inventory includes bundled image files as well as tale/YAML files. Host embedding behavior is
+unchanged.
