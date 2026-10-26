@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json",
-  "title": "Talewright story manifest (story.talewright.yaml)",
-  "description": "Structural validation and authoring help for a Talewright story manifest. Story-specific identifiers and Talemark expressions are checked by the Talewright compiler.",
+  "title": "Talewright story configuration (*.talewright.yaml)",
+  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler.",
   "type": "object",
   "properties": {
     "game": {

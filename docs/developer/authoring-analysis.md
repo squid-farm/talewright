@@ -70,7 +70,7 @@ hover, LSP transport, or evaluated gameplay values itself.
 ## Workspace lifecycle
 
 `Talewright.Authoring.StoryWorkspace` owns one story's disk snapshot and unsaved document overlays.
-`FindStoryRoot` finds the nearest ancestor containing `story.talewright.yaml`; a host can
+`FindStoryRoot` finds the outermost ancestor containing `story.talewright.yaml`; a host can
 instead construct a workspace explicitly for a new, unsaved story.
 
 ```csharp

@@ -73,17 +73,22 @@ edit does not color the rest of the story. A `*` or `_` with no closing
 delimiter later on the line stays plain text. Highlighting of formatting that
 spans multiple lines, and some ambiguous delimiter runs, is consequently approximate.
 
-## `story.talewright.yaml` support
+## Story configuration support
 
-Every story's manifest is named `story.talewright.yaml` at the story root; the
-engine, CLI, and player recognize no other manifest filename. With Red Hat YAML
-installed, the extension associates `*.talewright.yaml` files with the bundled
-JSON Schema. The wildcard is only an editor schema-discovery convention; it does
-not make other basenames valid story manifests. It validates manifest structure, offers known keys, and shows field
-descriptions. It does not know story-specific IDs or whether a referenced scene,
-stat, item, or faction exists. The optional language server supplies story-specific
-reference completion and compiler checks, including whole-story diagnostics for unsaved edits; use
-`talewright validate <story-folder>` for command-line validation.
+Every story's root manifest is named `story.talewright.yaml` at the story root.
+Supporting declarations may live in other `*.talewright.yaml` files in story
+subfolders; they are part of the containing story. The basename
+`story.talewright.yaml` is reserved for its single root manifest; a nested file
+with that name produces a compiler error, not a separate story or fragment.
+With Red Hat YAML installed, the extension associates every `*.talewright.yaml`
+file with the bundled JSON Schema. It validates file structure, offers known keys,
+and shows field descriptions without requiring a supporting file to repeat
+whole-story settings. It does not know story-specific IDs or whether a referenced
+scene, stat, item, or faction exists. The optional language server analyzes the
+root manifest, supporting files, and `.tale` files as one story, including unsaved
+edits, and supplies reference completion, hover, go-to-definition into the
+declaring file, and compiler checks; use `talewright validate <story-folder>` for
+command-line validation.
 
 Editors that don't use the SchemaStore catalog can use the same schema with this
 modeline at the top of `story.talewright.yaml`:

@@ -115,6 +115,13 @@ internal sealed class StoryYamlReader
             .Where(file => file.Key != StorySource.ManifestFileName && StorySource.IsConfigurationFile(file.Key))
             .OrderBy(file => file.Key, StringComparer.Ordinal))
         {
+            if (file.EndsWith("/" + StorySource.ManifestFileName, StringComparison.Ordinal))
+            {
+                diagnostics.Error("TW4002",
+                    $"'{StorySource.ManifestFileName}' is reserved for the single root story configuration; found additional manifest '{file}'.",
+                    new SourceLocation(file, 1, 1));
+                continue;
+            }
             if (!file.Contains('/'))
             {
                 diagnostics.Error("TW4002",
@@ -123,6 +130,7 @@ internal sealed class StoryYamlReader
                 continue;
             }
             if (reader.Parse(file, text) is not { } document) continue;
+            analysis?.Manifest(document, file);
             if (Get(document, "game") is { } game)
                 diagnostics.Error("TW4002", "'game:' is allowed only in the root story configuration.", reader.At(game));
             Collect(document);

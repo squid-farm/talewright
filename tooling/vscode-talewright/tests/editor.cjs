@@ -135,6 +135,17 @@ async function testYamlSchema() {
     diagnostics = await waitForDiagnostics(fallbackDocument, items =>
       items.some(item => item.range.start.line === 5 && item.message.includes('Valid values: "off"')));
     assert.ok(diagnostics.length > 0, 'Modeline schema fallback should validate another YAML filename');
+
+    await fs.mkdir(path.join(folder, 'characters'));
+    const fragmentFile = path.join(folder, 'characters', 'guide.talewright.yaml');
+    await fs.writeFile(fragmentFile, 'characters:\n  guide:\n    first-name: Bea\n    unknown-character: true\n');
+    const fragment = await vscode.workspace.openTextDocument(fragmentFile);
+    await vscode.window.showTextDocument(fragment);
+    diagnostics = await waitForDiagnostics(fragment, items => items.some(item => item.message.includes('unknown-character')));
+    assert.ok(!diagnostics.some(item => /game|required/i.test(item.message)),
+      'Supporting files must not receive whole-story schema requirements');
+    await replaceDocument(fragment, 'characters:\n  guide:\n    first-name: Bea\n');
+    await waitForDiagnostics(fragment, items => items.length === 0);
     console.log('Red Hat YAML smoke passed: schema diagnostics/clearing, key completion, hover descriptions, and modeline fallback.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
@@ -216,7 +227,33 @@ async function testLiveDiagnostics() {
     assert.ok(manifestHovers.some(hover => hover.contents.some(content =>
       content.value?.includes('scene where play begins'))), 'Canonical manifest schema help remains available');
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-    console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion and source-aware Markdown hover.');
+
+    await vscode.window.showTextDocument(document);
+    const speakerEdit = new vscode.WorkspaceEdit();
+    speakerEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n> guide: Hi.\n-> END\n');
+    assert.equal(await vscode.workspace.applyEdit(speakerEdit), true);
+    await waitForCompiler(document, items => items.length > 0);
+    await fs.mkdir(path.join(folder, 'characters'));
+    const fragmentFile = path.join(folder, 'characters', 'guide.talewright.yaml');
+    await fs.writeFile(fragmentFile, '{}\n');
+    const fragment = await vscode.workspace.openTextDocument(fragmentFile);
+    await vscode.window.showTextDocument(fragment);
+    const declaration = new vscode.WorkspaceEdit();
+    declaration.replace(fragment.uri, new vscode.Range(fragment.positionAt(0), fragment.positionAt(fragment.getText().length)),
+      'characters:\n  guide: {first-name: Bea}\n');
+    assert.equal(await vscode.workspace.applyEdit(declaration), true);
+    assert.equal(fragment.isDirty, true, 'Exercise an unsaved supporting configuration overlay');
+    await waitForCompiler(document, items => items.length === 0);
+    const definitions = await vscode.commands.executeCommand(
+      'vscode.executeDefinitionProvider', document.uri, new vscode.Position(1, 3));
+    const target = definitions?.[0];
+    assert.ok(target, 'Go to definition must resolve a supporting-file declaration');
+    assert.equal((target.uri ?? target.targetUri).fsPath, fragmentFile);
+    assert.equal((target.range ?? target.targetRange).start.line, 1);
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await waitForCompiler(document, items => items.length > 0);
+    console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion, source-aware Markdown hover and supporting-file navigation.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await fs.rm(folder, { recursive: true, force: true });
