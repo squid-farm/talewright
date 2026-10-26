@@ -16,6 +16,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 {
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private readonly List<Task> _retired = [];
+    private readonly IStoryImageSource _source;
     private Task<IJSObjectReference>? _module;
     private Task? _cleanup;
     private sealed class Entry
@@ -94,15 +95,14 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         finally { entry.Cancellation.Dispose(); }
     }
     private readonly HashSet<string> _paths;
-    private readonly Func<string, Stream> _open;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _disposed;
 
-    private StoryImages(StorySource source, Func<string, Stream> open)
+    private StoryImages(StorySource source, IStoryImageSource imageSource)
     {
         _paths = StoryImageResolver.CompletionPaths(source).Select(path => "images/" + path)
             .ToHashSet(StringComparer.Ordinal);
-        _open = open;
+        _source = imageSource;
         Lifetime = _lifetime.Token;
     }
 
@@ -113,38 +113,92 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!_paths.Contains(path))
             throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Lifetime);
-        var stream = await Task.Run(() =>
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Lifetime);
+        try
         {
-            cancellation.Token.ThrowIfCancellationRequested();
-            return _open(path);
-        }, cancellation.Token);
-        if (cancellation.IsCancellationRequested)
-        {
-            await stream.DisposeAsync();
-            cancellation.Token.ThrowIfCancellationRequested();
+            var stream = await _source.OpenAsync(path, cancellation.Token);
+            if (cancellation.IsCancellationRequested)
+            {
+                await stream.DisposeAsync();
+                cancellation.Token.ThrowIfCancellationRequested();
+            }
+            return new ImageReadStream(stream, cancellation);
         }
-        return stream;
+        catch
+        {
+            cancellation.Dispose();
+            throw;
+        }
+    }
+
+    private sealed class ImageReadStream(Stream input, CancellationTokenSource cancellation) : Stream
+    {
+        public override bool CanRead => input.CanRead;
+        public override bool CanSeek => input.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => input.Length;
+        public override long Position { get => input.Position; set => input.Position = value; }
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+        public override int Read(Span<byte> buffer)
+        {
+            cancellation.Token.ThrowIfCancellationRequested();
+            return input.Read(buffer);
+        }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellation.Token);
+            return await input.ReadAsync(buffer, linked.Token);
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                try { input.Dispose(); }
+                finally { cancellation.Dispose(); }
+            }
+            base.Dispose(disposing);
+        }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => input.Seek(offset, origin);
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     public static StoryImages FromDirectory(StorySource source, string root)
     {
         var directory = Path.GetFullPath(root);
-        return new(source, path =>
-        {
-            var current = directory;
-            for (var ancestor = new DirectoryInfo(directory); ancestor is not null; ancestor = ancestor.Parent)
-                RejectLink(ancestor.FullName);
-            foreach (var part in path.Split('/'))
-            {
-                current = Path.Combine(current, part);
-                RejectLink(current);
-            }
-            return new FileStream(current, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete,
-                4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        });
+        return new(source, new DirectoryImageSource(directory));
+    }
 
-        static void RejectLink(string path)
+    /// <summary>Creates lazy image access over a story-owned backing store; this instance takes ownership.</summary>
+    public static StoryImages FromSource(StorySource source, IStoryImageSource imageSource) =>
+        new(source, imageSource);
+
+    private sealed class DirectoryImageSource(string directory) : IStoryImageSource
+    {
+        public async ValueTask<Stream> OpenAsync(string path, CancellationToken cancellationToken)
+        {
+            return await Task.Run<Stream>(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = directory;
+                for (var ancestor = new DirectoryInfo(directory); ancestor is not null; ancestor = ancestor.Parent)
+                    RejectLink(ancestor.FullName);
+                foreach (var part in path.Split('/'))
+                {
+                    current = Path.Combine(current, part);
+                    RejectLink(current);
+                }
+                return new FileStream(current, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete,
+                    4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            }, cancellationToken);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        private static void RejectLink(string path)
         {
             if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException($"Story images cannot contain symbolic links: '{path}'.");
@@ -156,10 +210,23 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         var resources = assembly.GetManifestResourceNames()
             .Where(name => name.Replace('\\', '/').StartsWith(prefix, StringComparison.Ordinal))
             .ToDictionary(name => name.Replace('\\', '/'), StringComparer.Ordinal);
-        return new(source, path => resources.TryGetValue(prefix + path, out var name)
-            ? assembly.GetManifestResourceStream(name)
-                ?? throw new FileNotFoundException($"Image resource '{path}' is unavailable.", path)
-            : throw new FileNotFoundException($"Image resource '{path}' is unavailable.", path));
+        return new(source, new ResourceImageSource(assembly, prefix, resources));
+    }
+
+    private sealed class ResourceImageSource(Assembly assembly, string prefix, IReadOnlyDictionary<string, string> resources)
+        : IStoryImageSource
+    {
+        public ValueTask<Stream> OpenAsync(string path, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Stream stream = resources.TryGetValue(prefix + path, out var name)
+                ? assembly.GetManifestResourceStream(name)
+                    ?? throw new FileNotFoundException($"Image resource '{path}' is unavailable.", path)
+                : throw new FileNotFoundException($"Image resource '{path}' is unavailable.", path);
+            return ValueTask.FromResult(stream);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     public void Dispose()
@@ -180,7 +247,11 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             if (_module is not null) await (await _module).DisposeAsync();
         }
         catch (JSDisconnectedException) { /* The document and its URLs are already gone. */ }
-        finally { _lifetime.Dispose(); }
+        finally
+        {
+            try { await _source.DisposeAsync(); }
+            finally { _lifetime.Dispose(); }
+        }
     }
 
     public async ValueTask DisposeAsync()

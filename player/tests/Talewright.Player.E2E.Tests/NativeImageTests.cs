@@ -20,6 +20,25 @@ public sealed class NativeImageTests
     }
 
     [Fact]
+    public async Task Actual_zip_player_keeps_split_configuration_and_decodes_retained_images()
+    {
+        using var files = new ImageStoryFiles();
+        var path = Path.Combine(files.Root, "illustrated.zip");
+        await File.WriteAllBytesAsync(path, files.Zip("wrapped/"));
+        await using var driver = new NativePlayerDriver(Artifacts("archive-images"));
+        await driver.StartAsync(path);
+        await driver.ScrollToImageAsync("A camp");
+        await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "A camp" && node.Bounds.Height > 100));
+        await ActivateChoice(driver);
+        await driver.ScrollToImageAsync("Next camp");
+        var history = await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Next camp" && node.Bounds.Height > 100));
+        Assert.Contains(history.Descendants(), node => node.Role == "image" && node.Name == "A camp");
+        Assert.DoesNotContain("unavailable", history.Content);
+    }
+
+    [Fact]
     public async Task Actual_folder_player_renders_all_surfaces_formats_history_and_keyboard_choices()
     {
         using var files = new ImageStoryFiles();

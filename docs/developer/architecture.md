@@ -388,7 +388,10 @@ samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Co
    optional lazy image access. The UI owns it, not the compiler/runtime. Failed adoption preserves the
    accepted capability; successful replacement releases it. Folder assets are live, not byte snapshots.
    For an uploaded zip, `TalewrightApp` buffers
-   it into memory first (browser streams aren't seekable) and calls `StorySource.FromZip`.
+   it into memory first (browser streams aren't seekable) and transfers ownership to
+   `ArchiveStoryImages.Open`. The player retains the parsed archive and uses `StorySource.FromZip`
+   for the shared source/root/member mapping. Image reads enforce the archive expansion budget
+   without counting repeated reads as new content; no expanded image cache is retained by the adapter.
 2. **Compile.** `StoryCompiler` reads `story.talewright.yaml`:
    - `ruleset.base` picks a ruleset factory (`generic`, `none`, or one you registered); `ruleset.disable`
      removes stats; `ruleset.stats` adds or overrides them.
@@ -530,8 +533,8 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
 - **Media adapters.** Native folder player/debugger and built-in embedded samples display images.
-  ZIP/upload access and safety remain #178; generated published-host adapters, static-subpath/deployment
-  behavior and remaining warning acceptance remain #179. Those sources show an explicit unavailable
+  ZIP/upload access uses a retained archive owner with lazy bounded reads; generated published-host adapters,
+  static-subpath/deployment behavior and remaining warning acceptance remain #179. Those sources show an explicit unavailable
   image state, not silent disappearance. Existing #242 export staging is reused, not replaced.
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.

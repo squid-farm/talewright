@@ -13,7 +13,8 @@ public sealed class StorySource
 {
     private const int MaxStoryFiles = 1_000;
     private const long MaxStoryFileBytes = 5L * 1024 * 1024;
-    private const long MaxExpandedBytes = 50L * 1024 * 1024;
+    /// <summary>Defensive expanded-content bound for externally supplied story archives, not an author image limit.</summary>
+    public const long MaxArchiveExpandedBytes = 50L * 1024 * 1024;
 
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
     public const string ManifestFileName = "story.talewright.yaml";
@@ -103,6 +104,34 @@ public sealed class StorySource
     public static StorySource FromZip(Stream zip)
     {
         using var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true);
+        return FromZip(archive, out _);
+    }
+
+    /// <summary>
+    /// Loads source text and maps story-relative image paths to archive members in the same discovery pass.
+    /// The caller owns the archive and must keep it open while using the returned members. The source's text and
+    /// image catalogue are detached from the archive; only the caller-held mapping depends on its lifetime.
+    /// Unsafe member names and duplicate normalized image paths are rejected, not silently remapped.
+    /// </summary>
+    public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries)
+        => FromZip(archive, out imageEntries, out _);
+
+    /// <summary>
+    /// Loads a caller-owned archive and reports actual expanded text bytes for the host's subsequent lazy-image
+    /// accounting. Repeated image reads must not charge these text bytes again. Mapping lifetime matches the archive.
+    /// </summary>
+    public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries,
+        out long expandedTextBytes)
+    {
+        foreach (var entry in archive.Entries)
+        {
+            var path = entry.FullName.EndsWith('/') ? entry.FullName[..^1] : entry.FullName;
+            if (!StoryImageResolver.IsSafePath(path))
+            {
+                throw new InvalidDataException($"Unsafe story archive member '{entry.FullName}'. Use relative paths with / separators and no traversal or web addresses.");
+            }
+        }
+
         var entries = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name) && IsStoryFile(e.FullName)).ToList();
         var manifest = entries
             .Select(e => e.FullName.Replace('\\', '/'))
@@ -119,18 +148,22 @@ public sealed class StorySource
         }
 
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
-        var imagePaths = new List<string>();
+        var images = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
         foreach (var entry in archive.Entries)
         {
-            if (string.IsNullOrEmpty(entry.Name) || !entry.FullName.StartsWith(root, StringComparison.Ordinal)) continue;
-            var path = entry.FullName[root.Length..];
+            var normalized = entry.FullName.Replace('\\', '/');
+            if (string.IsNullOrEmpty(entry.Name) || !normalized.StartsWith(root, StringComparison.Ordinal)) continue;
+            var path = normalized[root.Length..];
             if (!IsImagePath(path)) continue;
             if (((entry.ExternalAttributes >> 16) & 0xF000) == 0xA000)
             {
                 throw new InvalidDataException($"Story images cannot be symbolic links: '{entry.FullName}'.");
             }
 
-            imagePaths.Add(path);
+            if (!images.TryAdd(path, entry))
+            {
+                throw new InvalidDataException($"Story image '{path}' has duplicate archive entries.");
+            }
         }
 
         long totalBytes = 0;
@@ -141,7 +174,9 @@ public sealed class StorySource
             files[path[root.Length..]] = ReadText(input, path, ref totalBytes);
         }
 
-        return new StorySource(files, imagePaths);
+        imageEntries = new ReadOnlyDictionary<string, ZipArchiveEntry>(images);
+        expandedTextBytes = totalBytes;
+        return new StorySource(files, images.Keys);
     }
 
     private static string ReadText(Stream input, string path, ref long totalBytes)
@@ -180,7 +215,7 @@ public sealed class StorySource
             }
 
             var fileRemaining = MaxStoryFileBytes - BytesRead;
-            var totalRemaining = MaxExpandedBytes - initialTotalBytes - BytesRead;
+            var totalRemaining = MaxArchiveExpandedBytes - initialTotalBytes - BytesRead;
             var requested = (int)Math.Min(buffer.Length, Math.Min(fileRemaining, totalRemaining) + 1);
             var bytesRead = input.Read(buffer[..requested]);
             if (bytesRead > fileRemaining)

@@ -93,7 +93,7 @@ public sealed class DebuggerTests
             await driver.ChooseAsync("Go");
             await WaitFor(driver, "Before reload.");
             await File.WriteAllTextAsync(tale, "=== start\n-> missing");
-            var snapshot = await WaitFor(driver, "Story has compiler errors");
+            var snapshot = await WaitFor(driver, "Story has compiler errors", "Before reload.");
             Assert.Contains("Before reload.", snapshot.Content);
             var temp = Path.Combine(root, "editor.tmp");
             var updated = original.Replace("Before reload.", "After reload.").Replace("count += 1", "count += 2");
@@ -106,7 +106,7 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "var:count (integer) = 2");
             Assert.Contains("current visits: 1", snapshot.Content);
             await File.WriteAllTextAsync(manifest, yaml.Replace("Native reload", "Restarted title"));
-            snapshot = await WaitFor(driver, "Restart required.");
+            snapshot = await WaitFor(driver, "Restart required.", "After reload.");
             Assert.Contains("After reload.", snapshot.Content);
             await File.WriteAllTextAsync(tale, updated.Replace("After reload.", "After YAML restart."));
             snapshot = await WaitFor(driver, "Source compiled, but explicit Restart from source is required");
