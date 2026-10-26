@@ -108,7 +108,9 @@ public sealed class StorySource
 
     /// <summary>
     /// Loads source text and maps story-relative image paths to archive members in the same discovery pass.
-    /// The caller owns the archive and must keep it open while using the returned members.
+    /// The caller owns the archive and must keep it open while using the returned members. The source's text and
+    /// image catalogue are detached from the archive; only the caller-held mapping depends on its lifetime.
+    /// Unsafe member names and duplicate normalized image paths are rejected, not silently remapped.
     /// </summary>
     public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries)
     {
@@ -131,8 +133,9 @@ public sealed class StorySource
         var images = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
         foreach (var entry in archive.Entries)
         {
-            if (string.IsNullOrEmpty(entry.Name) || !entry.FullName.StartsWith(root, StringComparison.Ordinal)) continue;
-            var path = entry.FullName[root.Length..];
+            var normalized = entry.FullName.Replace('\\', '/');
+            if (string.IsNullOrEmpty(entry.Name) || !normalized.StartsWith(root, StringComparison.Ordinal)) continue;
+            var path = normalized[root.Length..];
             if (!IsImagePath(path)) continue;
             if (((entry.ExternalAttributes >> 16) & 0xF000) == 0xA000)
             {
@@ -142,6 +145,15 @@ public sealed class StorySource
             if (!images.TryAdd(path, entry))
             {
                 throw new InvalidDataException($"Story image '{path}' has duplicate archive entries.");
+            }
+        }
+
+        foreach (var entry in archive.Entries)
+        {
+            var path = entry.FullName.EndsWith('/') ? entry.FullName[..^1] : entry.FullName;
+            if (!StoryImageResolver.IsSafePath(path))
+            {
+                throw new InvalidDataException($"Unsafe story archive member '{entry.FullName}'. Use relative paths with / separators and no traversal or web addresses.");
             }
         }
 

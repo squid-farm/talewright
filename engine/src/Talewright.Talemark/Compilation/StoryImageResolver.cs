@@ -68,7 +68,7 @@ public static partial class StoryImageResolver
         return new ResolvedStoryImage(matches[0], altText);
     }
 
-    private static bool IsSafePath(string path) =>
+    internal static bool IsSafePath(string path) =>
         !string.IsNullOrWhiteSpace(path)
         && !path.StartsWith('/')
         && !path.Any(c => c is '\\' or ':' or '?' or '#' || char.IsControl(c))

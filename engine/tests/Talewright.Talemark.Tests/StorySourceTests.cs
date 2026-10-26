@@ -35,25 +35,53 @@ public sealed class StorySourceTests : IDisposable
         Assert.Equal("characters/guide.talewright.yaml", source.Files["characters/guide.talewright.yaml"]);
         Assert.Equal(["images/camp.png"], source.ImagePaths);
         Assert.Same(archive.GetEntry(prefix + "images/camp.png"), images["images/camp.png"]);
-        using var actual = images["images/camp.png"].Open();
-        Assert.Equal(1, actual.ReadByte());
+        using (var actual = images["images/camp.png"].Open())
+            Assert.Equal(1, actual.ReadByte());
+        archive.Dispose();
         buffer.Position = 0;
         var sourceOnly = StorySource.FromZip(buffer);
         Assert.Equal(source.Files.OrderBy(pair => pair.Key), sourceOnly.Files.OrderBy(pair => pair.Key));
         Assert.True(source.ImagePaths.SetEquals(sourceOnly.ImagePaths));
+        Assert.True(buffer.CanRead);
+        Assert.Throws<ObjectDisposedException>(() => images["images/camp.png"].Open());
     }
 
-    [Fact]
-    public void Duplicate_archive_image_members_are_rejected_instead_of_selecting_ambiguous_bytes()
+    [Theory]
+    [InlineData("", "images/camp.png")]
+    [InlineData("", "images\\camp.png")]
+    [InlineData("wrapped/", "wrapped\\images\\camp.png")]
+    public void Duplicate_normalized_archive_image_members_are_rejected_instead_of_selecting_ambiguous_bytes(
+        string prefix, string duplicate)
     {
         using var buffer = new MemoryStream();
         using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
-            output.CreateEntry("images/camp.png");
-            output.CreateEntry("images/camp.png");
+            output.CreateEntry(prefix + StorySource.ManifestFileName);
+            output.CreateEntry(prefix + "images/camp.png");
+            output.CreateEntry(duplicate);
         }
         buffer.Position = 0;
         Assert.Contains("duplicate", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer)).Message);
+    }
+
+    [Theory]
+    [InlineData("images/../camp.png")]
+    [InlineData("/images/camp.png")]
+    [InlineData("images\\camp.png")]
+    [InlineData("images//camp.png")]
+    [InlineData("images/./camp.png")]
+    [InlineData("images/camp.png?query")]
+    [InlineData("https://example.test/camp.png")]
+    [InlineData("../characters/guide.talewright.yaml")]
+    public void Unsafe_archive_members_have_explicit_diagnostics(string path)
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+            output.CreateEntry(path);
+        buffer.Position = 0;
+        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer));
+        Assert.Contains("Unsafe story archive member", error.Message);
+        Assert.Contains(path, error.Message);
     }
 
     [Theory]
@@ -396,13 +424,10 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
-    public void Zip_image_names_are_not_normalized_into_safe_lookup_targets()
+    public void Zip_image_folder_case_is_not_normalized_into_safe_lookup_targets()
     {
         using var zip = new MemoryStream(Talewright.Testing.TestArchives.Create([
-            new(@"images\map.png", ""),
             new("Images/map.png", ""),
-            new("images/maps/../map.png", ""),
-            new("images//map.png", ""),
             new("images/", ""),
         ]));
         var source = StorySource.FromZip(zip);
