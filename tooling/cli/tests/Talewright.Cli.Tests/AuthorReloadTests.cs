@@ -8,9 +8,10 @@ public sealed class AuthorReloadTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "talewright-reload-" + Guid.NewGuid().ToString("N"));
     private const string Yaml = """
-        id: watched
-        title: Watched
-        start: start
+        game:
+          id: watched
+          title: Watched
+          start: start
         flags: [ready]
         vars: {count: 0}
         characters:
@@ -205,7 +206,8 @@ public sealed class AuthorReloadTests : IDisposable
     [Fact]
     public void Creation_is_retained_for_prose_reload_and_incompatible_options_are_named_on_restart()
     {
-        var yaml = Yaml + "\ncreation:\n  name: true\n  stats:\n    str: [12, 16]\n";
+        var yaml = Yaml.Replace("  start: start",
+            "  start: start\n  creation:\n    name: true\n    stats:\n      str: [12, 16]");
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), yaml);
         var model = new WorkbenchModel(_root);
         model.Reload();

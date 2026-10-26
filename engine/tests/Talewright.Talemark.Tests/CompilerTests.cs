@@ -26,11 +26,12 @@ public class CompilerTests
     }
 
     private const string Yaml = """
-        id: test
-        title: Test Story
-        version: 1.0.0
-        start: a
-        seed: 42
+        game:
+          id: test
+          title: Test Story
+          version: 1.0.0
+          start: a
+          seed: 42
         characters:
           player:
             first-name: Mara
@@ -417,9 +418,10 @@ public class CompilerTests
     public void Faction_properties_use_colons_and_dots_remain_part_of_names()
     {
         const string yaml = """
-            id: dotted-name-test
-            title: Dotted names
-            start: camp.arrival
+            game:
+              id: dotted-name-test
+              title: Dotted names
+              start: camp.arrival
             characters: { player: { first-name: Ada } }
             factions:
               guild.name: { name: Guild name }
@@ -518,13 +520,14 @@ public class CompilerTests
     public void Ruleset_can_be_customised_or_removed()
     {
         const string DatingSim = """
-            id: dating
-            title: Dating Sim
-            start: a
-            ruleset:
-              base: none
-              stats:
-                - { id: charm, name: Charm, category: attribute, min: 0, max: 10, default: 3 }
+            game:
+              id: dating
+              title: Dating Sim
+              start: a
+              ruleset:
+                base: none
+                stats:
+                  - { id: charm, name: Charm, category: attribute, min: 0, max: 10, default: 3 }
             characters:
               player: { first-name: Sam, pronouns: they, stats: { charm: 5 } }
             """;
@@ -537,10 +540,11 @@ public class CompilerTests
         Error("=== a\n{player:str}\n-> END", "TW2001", DatingSim);
 
         const string NoCharisma = """
-            id: t
-            title: T
-            start: a
-            ruleset: { base: generic, disable: [cha] }
+            game:
+              id: t
+              title: T
+              start: a
+              ruleset: { base: generic, disable: [cha] }
             characters:
               player: { first-name: Ann, pronouns: she }
             """;
@@ -553,7 +557,7 @@ public class CompilerTests
         Assert.False(Compile("=== a\n-> END", "id: x\ntitle: [").Success);
         Error("=== a\n-> END", "TW4002", "id: x\ntitle: X\nstart: a\n");
         Error("=== a\n-> END", "TW4005", Yaml.Replace("inventory: [rope]", "inventory: [sword]"));
-        Error("=== a\n-> END", "TW4004", Yaml.Replace("seed: 42", "ruleset: { base: gurps }"));
+        Error("=== a\n-> END", "TW4004", Yaml.Replace("seed: 42", "seed: 42\n  ruleset: { base: gurps }"));
         Error("=== a\n-> END", "TW4003", Yaml.Replace("pronouns: she", "pronouns: ze"));
     }
 
@@ -561,13 +565,14 @@ public class CompilerTests
     public void Rejects_custom_stats_with_minimum_greater_than_maximum()
     {
         const string yaml = """
-            id: test
-            title: Test
-            start: a
-            ruleset:
-              base: none
-              stats:
-                - { id: love, min: 10, max: 0 }
+            game:
+              id: test
+              title: Test
+              start: a
+              ruleset:
+                base: none
+                stats:
+                  - { id: love, min: 10, max: 0 }
             characters:
               player: { first-name: Mara, pronouns: she }
             """;
@@ -582,9 +587,10 @@ public class CompilerTests
     public void Rejects_duplicate_trigger_ids()
     {
         const string yaml = """
-            id: test
-            title: Test
-            start: a
+            game:
+              id: test
+              title: Test
+              start: a
             characters:
               player: { first-name: Mara, pronouns: she }
             triggers:
@@ -599,7 +605,7 @@ public class CompilerTests
         var error = Error("=== a\n-> END", "TW4007", yaml);
 
         Assert.Contains("Trigger id 'duplicate' is declared more than once", error.Message);
-        Assert.Equal(10, error.Location.Line);
+        Assert.Equal(11, error.Location.Line);
     }
 
     [Fact]
@@ -677,7 +683,7 @@ public class CompilerTests
     [InlineData("reflexive", "player:pronoun#reflexive")]
     public void Legacy_pronoun_forms_are_rejected_even_when_a_stat_has_the_same_name(string form, string replacement)
     {
-        var yaml = Yaml.Replace("seed: 42", $"seed: 42\nruleset:\n  base: generic\n  stats:\n    - {{ id: pronoun.{form}, default: 3 }}");
+        var yaml = Yaml.Replace("seed: 42", $"seed: 42\n  ruleset:\n    base: generic\n    stats:\n      - {{ id: pronoun.{form}, default: 3 }}");
         var error = Error($"=== a\n{{player:pronoun.{form}}}\n-> END", "TW2001", yaml);
         Assert.Contains($"Use '{replacement}'.", error.Message);
         Assert.Equal(new SourceLocation("main.tale", 2, 17), error.Location);
@@ -686,7 +692,7 @@ public class CompilerTests
     [Fact]
     public void Non_legacy_dotted_pronoun_stat_names_remain_valid()
     {
-        var yaml = Yaml.Replace("seed: 42", "seed: 42\nruleset:\n  base: generic\n  stats:\n    - { id: pronoun.fluency, default: 3 }");
+        var yaml = Yaml.Replace("seed: 42", "seed: 42\n  ruleset:\n    base: generic\n    stats:\n      - { id: pronoun.fluency, default: 3 }");
         var story = Ok("=== a\n{player:pronoun.fluency}\n-> END", yaml);
         Assert.Equal("3", Render(story, story.GetScene(new SceneId("a"))));
     }

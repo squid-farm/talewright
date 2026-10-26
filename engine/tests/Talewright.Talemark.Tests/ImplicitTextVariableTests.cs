@@ -8,9 +8,10 @@ namespace Talewright.Talemark.Tests;
 public class ImplicitTextVariableTests
 {
     private const string Manifest = """
-        id: implicit-text
-        title: Implicit text
-        start: a
+        game:
+          id: implicit-text
+          title: Implicit text
+          start: a
         characters:
           player: { first-name: Ada }
         """;

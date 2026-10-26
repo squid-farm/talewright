@@ -16,9 +16,10 @@ public class TextVariableTests
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                id: text-history
-                title: Text history
-                start: a
+                game:
+                  id: text-history
+                  title: Text history
+                  start: a
                 characters:
                   player: { first-name: Tester }
                 """ + (implicitDeclarations ? "" : "\nvars:\n  weather: \"\"\n  copy: \"\""),

@@ -17,10 +17,11 @@ public sealed class AuthorSessionTests
     private static readonly VarId Count = new("count");
     private static readonly FactionId Guild = new("guild");
     private const string Yaml = """
-        id: author
-        title: Author test
-        start: start
-        randomness: checks-only
+        game:
+          id: author
+          title: Author test
+          start: start
+          randomness: checks-only
         flags: [ready, fired]
         vars: {count: 0}
         characters:
@@ -224,13 +225,9 @@ public sealed class AuthorSessionTests
             === start
             {player:first-name}: {player:str}. {var:count}.
             * [Next] { var:count += 1 } -> start
-            """, Yaml + """
-
-            creation:
-              name: true
-              stats:
-                str: [8, 12, 16]
-            """);
+            """, Yaml.Replace("  start: start",
+                "  start: start\n  creation:\n    name: true\n    stats:\n      str: [8, 12, 16]",
+                StringComparison.Ordinal));
         var variables = new Dictionary<VarId, int> { [Count] = 9 };
         var stats = new List<AuthorStatValue> { new(EntityId.Player, Strength, 16) };
         var creationStats = new Dictionary<string, int> { ["str"] = 12 };

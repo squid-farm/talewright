@@ -4,53 +4,58 @@
   "title": "Talewright story manifest (story.talewright.yaml)",
   "description": "Structural validation and authoring help for a Talewright story manifest. Story-specific identifiers and Talemark expressions are checked by the Talewright compiler.",
   "type": "object",
-  "required": ["id", "title", "start", "characters"],
   "properties": {
-    "id": {
-      "$ref": "#/definitions/identifier",
-      "description": "Unique identifier for this story."
-    },
-    "title": {
-      "$ref": "#/definitions/nonEmptyString",
-      "description": "Title shown to players."
-    },
-    "version": {
-      "type": "string",
-      "default": "0.0.0",
-      "description": "Author-defined story version. Defaults to 0.0.0."
-    },
-    "start": {
-      "$ref": "#/definitions/identifier",
-      "description": "ID of the scene where play begins. The compiler checks that this scene exists."
-    },
-    "randomness": {
-      "type": "string",
-      "enum": ["off", "checks-only"],
-      "default": "checks-only",
-      "description": "Whether random rolls are disabled or used only for skill checks."
-    },
-    "seed": {
-      "type": "integer",
-      "minimum": 0,
-      "description": "Optional non-negative integer seed. The compiler additionally enforces its unsigned 64-bit limit."
-    },
-    "undo": {
-      "$ref": "#/definitions/booleanScalar",
-      "default": true,
-      "description": "Whether players can navigate backward and forward. Saves remain available when false."
-    },
-    "creation": {
-      "$ref": "#/definitions/creation",
-      "description": "Optional player character creation choices."
-    },
-    "ruleset": {
-      "$ref": "#/definitions/ruleset",
-      "description": "Optional ruleset configuration. Defaults to the generic ruleset."
+    "game": {
+      "type": "object",
+      "required": ["id", "title", "start"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/identifier",
+          "description": "Unique identifier for this story."
+        },
+        "title": {
+          "$ref": "#/definitions/nonEmptyString",
+          "description": "Title shown to players."
+        },
+        "version": {
+          "type": "string",
+          "default": "0.0.0",
+          "description": "Author-defined story version. Defaults to 0.0.0."
+        },
+        "start": {
+          "$ref": "#/definitions/identifier",
+          "description": "ID of the scene where play begins. The compiler checks that this scene exists."
+        },
+        "randomness": {
+          "type": "string",
+          "enum": ["off", "checks-only"],
+          "default": "checks-only",
+          "description": "Whether random rolls are disabled or used only for skill checks."
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional non-negative integer seed. The compiler additionally enforces its unsigned 64-bit limit."
+        },
+        "undo": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": true,
+          "description": "Whether players can navigate backward and forward. Saves remain available when false."
+        },
+        "creation": {
+          "$ref": "#/definitions/creation",
+          "description": "Optional player character creation choices."
+        },
+        "ruleset": {
+          "$ref": "#/definitions/ruleset",
+          "description": "Optional ruleset configuration. Defaults to the generic ruleset."
+        }
+      },
+      "additionalProperties": false
     },
     "characters": {
       "type": "object",
-      "required": ["player"],
-      "description": "Characters keyed by their story-specific IDs. The player character is required.",
+      "description": "Characters keyed by their story-specific IDs. The root story must declare the player character.",
       "propertyNames": {
         "$ref": "#/definitions/identifier"
       },

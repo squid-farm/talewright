@@ -3,11 +3,12 @@ namespace Talewright.Testing;
 public static class TestStories
 {
     public const string DefaultYaml = """
-        id: player-test
-        title: Player Test
-        start: start
-        randomness: off
-        seed: 42
+        game:
+          id: player-test
+          title: Player Test
+          start: start
+          randomness: off
+          seed: 42
         characters:
           player:
             first-name: Mara
@@ -143,14 +144,15 @@ public static class TestStories
         """);
 
     public static readonly StoryFixture Custom = new("custom", """
-        id: custom
-        title: Custom Player
-        start: start
-        randomness: off
-        ruleset:
-          base: none
-          stats:
-            - { id: affection, name: Affection, category: custom, default: 3 }
+        game:
+          id: custom
+          title: Custom Player
+          start: start
+          randomness: off
+          ruleset:
+            base: none
+            stats:
+              - { id: affection, name: Affection, category: custom, default: 3 }
         characters:
           player: { first-name: Alex, pronouns: they }
         """, """
@@ -163,11 +165,12 @@ public static class TestStories
         """);
 
     public static readonly StoryFixture NoStats = new("no-stats", """
-        id: no-stats
-        title: Quiet Player
-        start: start
-        randomness: off
-        ruleset: { base: none }
+        game:
+          id: no-stats
+          title: Quiet Player
+          start: start
+          randomness: off
+          ruleset: { base: none }
         characters:
           player: { first-name: Alex, pronouns: they }
         """, """

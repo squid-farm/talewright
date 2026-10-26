@@ -29,10 +29,18 @@ public sealed class AuthorScenarioTests
         StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                id: portable
-                title: Portable
-                version: 1.0.0
-                start: start
+                game:
+                  id: portable
+                  title: Portable
+                  version: 1.0.0
+                  start: start
+                  creation:
+                    name: true
+                    pronouns: [she, they]
+                    stats:
+                      str: [8, 12, 16]
+                    presets:
+                      explorer: {label: Explorer, stats: {str: 12}}
                 flags: [ready]
                 vars: {count: 0}
                 characters:
@@ -42,13 +50,6 @@ public sealed class AuthorScenarioTests
                   rope: {name: Rope}
                 factions:
                   guild: {name: Guild}
-                creation:
-                  name: true
-                  pronouns: [she, they]
-                  stats:
-                    str: [8, 12, 16]
-                  presets:
-                    explorer: {label: Explorer, stats: {str: 12}}
                 triggers:
                   - id: ready
                     when: flag:ready
@@ -302,7 +303,7 @@ public sealed class AuthorScenarioTests
         var ids = Enumerable.Range(0, 5000).Select(index => $"flag-{index:D4}-" + new string('x', 490)).ToArray();
         var compiled = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = $"id: export-limit\ntitle: Export limit\nstart: start\nflags: [{string.Join(", ", ids)}]\ncharacters:\n  player: {{first-name: Tester}}\n",
+            ["story.talewright.yaml"] = $"game:\n  id: export-limit\n  title: Export limit\n  start: start\nflags: [{string.Join(", ", ids)}]\ncharacters:\n  player: {{first-name: Tester}}\n",
             ["main.tale"] = "=== start\n* [Stay] -> start",
         }));
         Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));

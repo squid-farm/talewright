@@ -16,19 +16,20 @@ public sealed class CharacterCreationTests
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = $$"""
-                id: creation
-                title: Creation
-                start: a
+                game:
+                  id: creation
+                  title: Creation
+                  start: a
+                  creation:
+                    stats: {hp: [20, 0]}
+                    presets:
+                      healthy:
+                        label: Healthy
+                        {{preset}}
                 characters:
                   player:
                     first-name: Default
                     {{player}}
-                creation:
-                  stats: {hp: [20, 0]}
-                  presets:
-                    healthy:
-                      label: Healthy
-                      {{preset}}
                 """,
             ["main.tale"] = "=== a\n-> END",
         }));
@@ -45,15 +46,16 @@ public sealed class CharacterCreationTests
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = $$$"""
-                id: creation
-                title: Creation
-                start: a
+                game:
+                  id: creation
+                  title: Creation
+                  start: a
+                  creation:
+                    stats: {str: [8, 12, 16]}
+                    presets:
+                      healthy: {stats: {hp: 15}}
                 characters:
                   player: {first-name: Default, stats: {str: {{{strength}}}}}
-                creation:
-                  stats: {str: [8, 12, 16]}
-                  presets:
-                    healthy: {stats: {hp: 15}}
                 """,
             ["main.tale"] = "=== a\n-> END",
         }));
@@ -72,12 +74,12 @@ public sealed class CharacterCreationTests
     [InlineData("stats: {str: [999]}")]
     [InlineData("stats: {str: [1.5]}")]
     [InlineData("presets: {bad: {stats: {str: 999}}}")]
-    [InlineData("stats: {str: [8, 12]}\n  presets: {bad: {stats: {str: 10}}}")]
+    [InlineData("stats: {str: [8, 12]}\n    presets: {bad: {stats: {str: 10}}}")]
     public void Illegal_creation_configuration_is_a_compiler_error(string body)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = $"id: creation\ntitle: Creation\nstart: a\ncharacters:\n  player: {{first-name: Default}}\ncreation:\n  {body}\n",
+            ["story.talewright.yaml"] = $"game:\n  id: creation\n  title: Creation\n  start: a\n  creation:\n    {body}\ncharacters:\n  player: {{first-name: Default}}\n",
             ["main.tale"] = "=== a\n-> END",
         }));
         Assert.False(result.Success);

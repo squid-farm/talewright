@@ -10,7 +10,7 @@ public sealed class StoryLintTests
     private static StorySource Source(string id = "night-ferry", string scene = "ending.empty-handed") => new(
         new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = $"id: {id}\ntitle: Night Ferry\nversion: 1\nstart: {scene}\ncharacters:\n  player: {{first-name: Ada}}\n",
+            [StorySource.ManifestFileName] = $"game:\n  id: {id}\n  title: Night Ferry\n  version: 1\n  start: {scene}\ncharacters:\n  player: {{first-name: Ada}}\n",
             ["main.tale"] = $"=== {scene}\n-> END",
         });
 
@@ -43,8 +43,8 @@ public sealed class StoryLintTests
             {
                 Assert.Equal(StoryLintRules.StoryIdStyle, diagnostic.Code);
                 Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-                Assert.Equal(new SourceRange(new SourceLocation(StorySource.ManifestFileName, 1, 5),
-                    new SourceLocation(StorySource.ManifestFileName, 1, 16)), diagnostic.Range);
+                Assert.Equal(new SourceRange(new SourceLocation(StorySource.ManifestFileName, 2, 7),
+                    new SourceLocation(StorySource.ManifestFileName, 2, 18)), diagnostic.Range);
                 Assert.Equal("Night_Ferry", Slice(source, diagnostic.Range));
             });
     }

@@ -10,10 +10,11 @@ have those yet, the [web player](https://squid-farm.github.io/talewright/) works
 Make a folder called `night-ferry`. Inside it, create a file called `story.talewright.yaml`:
 
 ```yaml
-id: night-ferry
-title: The Night Ferry
-version: 0.1.0
-start: dock
+game:
+  id: night-ferry
+  title: The Night Ferry
+  version: 0.1.0
+  start: dock
 
 characters:
   player:
@@ -32,8 +33,8 @@ items:
 
 This is your story's **manifest**:
 
-- `id` is a short, unique name (lowercase words joined by hyphens). `title` is what players see.
-- `start` is the scene the story opens on. You'll write it next.
+- `game.id` is a short, unique name (lowercase words joined by hyphens). `game.title` is what players see.
+- `game.start` is the scene the story opens on. You'll write it next.
 - `characters` must include `player`. Every other character gets an id you choose, like `ferryman`.
 - `stats` sets starting values. Stats you leave out use the defaults (10 for attributes like `cha`,
   0 for skills like `persuasion`). See [the full stat list](writing-stories.md#stats-and-skills).

@@ -9,9 +9,10 @@ namespace Talewright.Talemark.Tests;
 public sealed class ImageSyntaxTests
 {
     private const string Manifest = """
-        id: images
-        title: Images
-        start: start
+        game:
+          id: images
+          title: Images
+          start: start
         characters:
           player: { first-name: Ada }
           image: { first-name: Iris }

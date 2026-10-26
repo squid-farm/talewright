@@ -17,12 +17,13 @@ public sealed class DottedPrefixCompletionTests
     public void Dotted_prefix_filters_names_and_replaces_the_whole_token(string line, string expected)
     {
         const string manifest = """
-            id: dotted-completion
-            title: Dotted completion
-            start: start
-            ruleset:
-              base: generic
-              stats: [{ id: weapon.knowledge, default: 1 }]
+            game:
+              id: dotted-completion
+              title: Dotted completion
+              start: start
+              ruleset:
+                base: generic
+                stats: [{ id: weapon.knowledge, default: 1 }]
             characters:
               player: { first-name: Ada }
               weapon.keeper: { first-name: Bea }

@@ -54,6 +54,25 @@ public static class StoryCompiler
             return new CompilationResult(null, diagnostics.Items);
         }
 
+        var supportingFiles = source.Files
+            .Where(file => file.Key != StorySource.ManifestFileName &&
+                file.Key.EndsWith(StorySource.ConfigurationFileExtension, StringComparison.Ordinal))
+            .OrderBy(file => file.Key, StringComparer.Ordinal)
+            .ToList();
+        foreach (var (path, text) in supportingFiles)
+        {
+            if (!path.Contains('/'))
+            {
+                diagnostics.Error("TW4002",
+                    $"Only '{StorySource.ManifestFileName}' is allowed at the story root; found extra configuration file '{path}'.",
+                    new SourceLocation(path, 1, 1));
+            }
+            else
+            {
+                StoryYamlReader.ValidateSupportingFile(path, text, diagnostics);
+            }
+        }
+
         var taleFiles = source.TaleFiles.ToList();
         if (taleFiles.Count == 0)
         {

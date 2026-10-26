@@ -18,6 +18,8 @@ public sealed class StorySource
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
     public const string ManifestFileName = "story.talewright.yaml";
 
+    internal const string ConfigurationFileExtension = ".talewright.yaml";
+
     /// <summary>Extension of narrative files.</summary>
     public const string TaleExtension = ".tale";
 
@@ -202,7 +204,7 @@ public sealed class StorySource
     }
 
     /// <summary>
-    /// Reads just <c>title</c> from story.talewright.yaml, without compiling (for story pickers). Returns null if it can't.
+    /// Reads just <c>game.title</c> from story.talewright.yaml, without compiling (for story pickers). Returns null if it can't.
     /// </summary>
     public string? ReadTitle()
     {
@@ -216,7 +218,9 @@ public sealed class StorySource
             var stream = new YamlDotNet.RepresentationModel.YamlStream();
             stream.Load(new StringReader(yaml));
             return stream.Documents.FirstOrDefault()?.RootNode is YamlDotNet.RepresentationModel.YamlMappingNode root
-                && root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("title"), out var title)
+                && root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("game"), out var gameNode)
+                && gameNode is YamlDotNet.RepresentationModel.YamlMappingNode game
+                && game.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("title"), out var title)
                 ? (title as YamlDotNet.RepresentationModel.YamlScalarNode)?.Value
                 : null;
         }
@@ -227,7 +231,8 @@ public sealed class StorySource
     }
 
     private static bool IsStoryFile(string path) =>
-        Path.GetFileName(path) == ManifestFileName || path.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase);
+        Path.GetFileName(path).EndsWith(ConfigurationFileExtension, StringComparison.Ordinal) ||
+        path.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsImagePath(string path) =>
         path.StartsWith("images/", StringComparison.Ordinal) && path.Length > "images/".Length;

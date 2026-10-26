@@ -13,7 +13,7 @@ exports.run = async () => {
   const snippets = JSON.parse(await fs.readFile(path.join(extension.extensionPath, 'snippets/tale.json'), 'utf8'));
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-editor-'));
   try {
-    await fs.writeFile(path.join(folder, 'story.talewright.yaml'), 'id: smoke\ntitle: Smoke\nstart: smoke\n');
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'), 'game:\n  id: smoke\n  title: Smoke\n  start: smoke\n');
     const file = path.join(folder, 'smoke.tale');
     await fs.writeFile(file, '=== smoke\nHello.\n-> END\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -60,10 +60,12 @@ async function testYamlSchema() {
   try {
     const file = path.join(folder, 'story.talewright.yaml');
     const invalid = [
-      'id: schema-smoke',
-      'title: Schema smoke',
-      'start: beginning',
-      'randomness: always',
+      'game:',
+      '  id: schema-smoke',
+      '  title: Schema smoke',
+      '  start: beginning',
+      '  randomness: always',
+      '  unknown-game: true',
       'unknown-root: true',
       'characters:',
       '  player:',
@@ -81,10 +83,11 @@ async function testYamlSchema() {
       'Schema should report unknown keys in nested character objects');
 
     const valid = [
-      'id: schema-smoke',
-      'title: Schema smoke',
-      'start: beginning',
-      'randomness: checks-only',
+      'game:',
+      '  id: schema-smoke',
+      '  title: Schema smoke',
+      '  start: beginning',
+      '  randomness: checks-only',
       'characters:',
       '  player:',
       '    first-name: Ada',
@@ -117,10 +120,11 @@ async function testYamlSchema() {
     const fallbackFile = path.join(folder, 'fallback.yaml');
     await fs.writeFile(fallbackFile, [
       '# yaml-language-server: $schema=./story.schema.json',
-      'id: schema-fallback',
-      'title: Schema fallback',
-      'start: beginning',
-      'randomness: always',
+      'game:',
+      '  id: schema-fallback',
+      '  title: Schema fallback',
+      '  start: beginning',
+      '  randomness: always',
       'characters:',
       '  player:',
       '    first-name: Ada',
@@ -129,7 +133,7 @@ async function testYamlSchema() {
     const fallbackDocument = await vscode.workspace.openTextDocument(fallbackFile);
     await vscode.window.showTextDocument(fallbackDocument);
     diagnostics = await waitForDiagnostics(fallbackDocument, items =>
-      items.some(item => item.range.start.line === 4 && item.message.includes('Valid values: "off"')));
+      items.some(item => item.range.start.line === 5 && item.message.includes('Valid values: "off"')));
     assert.ok(diagnostics.length > 0, 'Modeline schema fallback should validate another YAML filename');
     console.log('Red Hat YAML smoke passed: schema diagnostics/clearing, key completion, hover descriptions, and modeline fallback.');
   } finally {
@@ -161,7 +165,7 @@ async function testLiveDiagnostics() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-editor-'));
   try {
     await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
-      'id: live\ntitle: Live\nstart: start\ncharacters:\n  player: {first-name: Ada}\n');
+      'game:\n  id: live\n  title: Live\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);

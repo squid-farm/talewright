@@ -1,8 +1,9 @@
-id: preset-empty
-title: Empty preset ID
-start: beginning
+game:
+  id: preset-empty
+  title: Empty preset ID
+  start: beginning
+  creation:
+    presets:
+      "": {}
 characters:
   player: {first-name: Ada}
-creation:
-  presets:
-    "": {}
