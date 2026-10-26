@@ -72,6 +72,31 @@ public sealed class ArchiveImageTests
     }
 
     [Fact]
+    public async Task Declared_entry_size_is_enforced_on_actual_sync_and_async_reads_without_poisoning_other_images()
+    {
+        var input = ImageArchive(1024);
+        var archive = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: true);
+        var source = StorySource.FromZip(archive, out var images, out var textBytes);
+        await using var owner = new ArchiveStoryImages(input, archive, images, textBytes);
+        foreach (var asyncRead in new[] { false, true })
+        {
+            await using var stream = new ArchiveStoryImages.ImageStream(owner, "images/deceptive.png",
+                new MemoryStream([1, 2, 3]), 2, CancellationToken.None);
+            var buffer = new byte[2];
+            Assert.Equal(2, asyncRead ? await stream.ReadAsync(buffer) : stream.Read(buffer));
+            var error = asyncRead
+                ? await Assert.ThrowsAsync<InvalidDataException>(() => stream.CopyToAsync(Stream.Null))
+                : Assert.Throws<InvalidDataException>(() => stream.ReadByte());
+            Assert.Contains("declared ZIP entry size", error.Message);
+            Assert.Equal(2, stream.Position);
+        }
+        await using var valid = await owner.OpenAsync("images/large.png", CancellationToken.None);
+        await valid.CopyToAsync(Stream.Null);
+        Assert.Equal(1024, valid.Position);
+        Assert.True(StoryCompiler.Compile(source).Success);
+    }
+
+    [Fact]
     public async Task Actual_reads_enforce_remaining_content_budget_independently_of_metadata_preflight()
     {
         var input = ImageArchive(1024);

@@ -58,7 +58,7 @@ public sealed class ArchiveStoryImages : IStoryImageSource
             cancellationToken.ThrowIfCancellationRequested();
             if (!_images.TryGetValue(path, out var entry))
                 throw new FileNotFoundException($"Image '{path}' is unavailable in the story archive.", path);
-            var stream = new ImageStream(this, path, entry.Open(), cancellationToken);
+            var stream = new ImageStream(this, path, entry.Open(), entry.Length, cancellationToken);
             _streams.Add(stream);
             return ValueTask.FromResult<Stream>(stream);
         }
@@ -77,7 +77,7 @@ public sealed class ArchiveStoryImages : IStoryImageSource
         }
     }
 
-    private sealed class ImageStream(ArchiveStoryImages owner, string path, Stream input,
+    internal sealed class ImageStream(ArchiveStoryImages owner, string path, Stream input, long declaredLength,
         CancellationToken cancellationToken) : Stream
     {
         private long _position;
@@ -103,11 +103,16 @@ public sealed class ArchiveStoryImages : IStoryImageSource
                 if (buffer.IsEmpty) return 0;
                 var previous = owner._highWater.GetValueOrDefault(path);
                 var remaining = StorySource.MaxArchiveExpandedBytes - owner._expandedBytes;
-                var allowed = previous - _position + remaining;
+                var allowed = Math.Min(previous - _position + remaining, declaredLength - _position);
                 var requested = (int)Math.Min(Math.Min(buffer.Length, 64 * 1024), allowed + 1);
                 var count = input.Read(buffer[..requested]);
                 var position = _position + count;
                 var additional = Math.Max(0, position - previous);
+                if (position > declaredLength)
+                {
+                    _failed = true;
+                    throw new InvalidDataException($"Image '{path}' expands beyond its declared ZIP entry size.");
+                }
                 if (additional > remaining)
                 {
                     _failed = true;

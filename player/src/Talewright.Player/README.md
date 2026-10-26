@@ -79,8 +79,12 @@ when loading fails. A loaded story retains one parsed archive, not expanded imag
 Source discovery uses the shared configuration/narrative predicates and root mapping.
 Compressed input (including the separate 20 MiB browser upload convenience cap), expanded
 content, each expanded read, and retained stream/Blob ownership are distinct concerns.
-The existing 50 MiB defensive archive bound covers actual source text plus image content;
-metadata preflight is supplemented by bounded actual reads. Per-image high-water accounting
+ZIP loading currently has a **temporary known limitation**: 50 MiB combined expanded source
+text and image content. This is not an approved game-size budget; #196 removes it alongside
+the inherited ceilings. ZIP images remain enabled in pre-alpha: use at your own risk.
+Metadata preflight is supplemented by bounded actual reads. Each image read also stops if
+actual expansion exceeds that entry's declared size; only that image fails. This declared-size
+check remains when #196 removes the temporary combined cap. Per-image high-water accounting
 means repeat and partial reads do not charge the same content twice. This is not a folder
 image limit or a history memory budget. Late read/decode failures preserve the adopted narrative
 and show the effective alt with an accessible error. Rejected candidates, accepted replacement
