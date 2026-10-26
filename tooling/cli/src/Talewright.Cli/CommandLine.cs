@@ -165,6 +165,15 @@ public sealed class ValidateCommand : Command<ValidationSettings>
         }
 
         var result = StoryCompiler.Compile(source);
+        try
+        {
+            WebHostingSize.Estimate(source, settings.Root).WriteWarning(writers.Error, estimate: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return CommandLine.Failure("TWCLI002", $"Couldn't measure story '{settings.Root}': {ex.Message}",
+                json, writers.Output, writers.Error);
+        }
         var success = result.Success && (!settings.WarningsAsErrors || !result.Warnings.Any());
         if (json)
         {
