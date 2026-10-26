@@ -41,6 +41,44 @@ public sealed class AuthorReloadTests : IDisposable
     }
 
     [Fact]
+    public async Task Accepted_image_refresh_replaces_capability_but_rejected_source_preserves_it()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "images"));
+        var path = Path.Combine(_root, "images", "map.jpeg");
+        await File.WriteAllBytesAsync(path, [1, 2, 3]);
+        Write(Tale.Replace("Old passage.", """{image("map", "Map")}"""));
+        using var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        model.Choose("c0");
+        var first = Assert.IsType<Talewright.Player.Library.StoryImages>(model.Images);
+        Assert.False(first.Lifetime.IsCancellationRequested);
+        var session = model.Session;
+        await File.WriteAllBytesAsync(path, [4, 5]);
+        Assert.True(model.ApplySource(Load()));
+        var second = Assert.IsType<Talewright.Player.Library.StoryImages>(model.Images);
+        Assert.NotSame(first, second);
+        Assert.True(first.Lifetime.IsCancellationRequested);
+        Assert.Same(session, model.Session);
+        await using (var stream = await second.OpenAsync("images/map.jpeg"))
+            Assert.Equal(2, stream.Length);
+        Write("=== start\n-> missing");
+        Assert.False(model.ApplySource(Load()));
+        Assert.Same(second, model.Images);
+        Assert.False(second.Lifetime.IsCancellationRequested);
+        Write(Tale.Replace("Old passage.", """{image("map", "Map")}"""));
+        await File.WriteAllBytesAsync(Path.Combine(_root, "images", "map.png"), [6]);
+        Assert.True(model.ApplySource(Load()));
+        Assert.True(second.Lifetime.IsCancellationRequested);
+        var media = Assert.IsType<RenderedMedia>(
+            Assert.IsType<RenderedParagraph>(model.Session!.Current.Document.Blocks[0]).Inlines[0]);
+        Assert.Equal("images/map.png", media.MediaId);
+        var last = model.Images!;
+        model.Dispose();
+        Assert.True(last.Lifetime.IsCancellationRequested);
+    }
+
+    [Fact]
     public void Tale_adoption_preserves_current_entry_and_invalid_source_is_repairable()
     {
         var model = new WorkbenchModel(_root);

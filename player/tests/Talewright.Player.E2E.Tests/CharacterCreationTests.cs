@@ -97,7 +97,7 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Driver.ClickAsync("Start story");
         await Choose("Walk onward");
         await Driver.ClickAsync("Quick Save");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Quick Save checkpoint saved.");
+        await Expect(SaveStatus).ToContainTextAsync("Quick Save checkpoint saved.");
         await Driver.ClickAsync("Saves");
         await Expect(Page.Locator("[data-save-kind=quick]")).ToContainTextAsync("Robin Vale");
         await Page.ReloadAsync();

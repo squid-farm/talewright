@@ -23,13 +23,16 @@ public interface IStoryLibrary
 
     /// <summary>Loads the raw files of a story listed by <see cref="ListAsync"/>.</summary>
     Task<StorySource> LoadAsync(string id);
+
+    /// <summary>Opens a source with optional image access owned by the loaded UI, not the compiler.</summary>
+    async Task<LoadedStory> OpenAsync(string id) => new(await LoadAsync(id));
 }
 
 /// <summary>
 /// Stories compiled into an assembly as embedded resources named <c>{prefix}{story}/{path}</c>, e.g.
 /// <c>stories/LostRelic/chapters/01-camp.tale</c>. Works everywhere, including the browser, with no HTTP.
 /// </summary>
-public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "stories/") : IStoryLibrary
+public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "stories/", bool enableImages = false) : IStoryLibrary
 {
     private Dictionary<string, Dictionary<string, string>>? _stories;
 
@@ -50,6 +53,12 @@ public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "sto
                 .Where(name => name.StartsWith($"{prefix}{id}/images/", StringComparison.Ordinal))
                 .Select(name => name[(prefix.Length + id.Length + 1)..]))
             : throw new KeyNotFoundException($"No built-in story '{id}'."));
+
+    public async Task<LoadedStory> OpenAsync(string id)
+    {
+        var source = await LoadAsync(id);
+        return new(source, enableImages ? StoryImages.FromResources(source, assembly, $"{prefix}{id}/") : null);
+    }
 
     private Dictionary<string, Dictionary<string, string>> Scan()
     {
@@ -121,6 +130,12 @@ public sealed class FileSystemStoryLibrary(IEnumerable<string> paths) : IStoryLi
         using var stream = File.OpenRead(id);
         return Task.FromResult(StorySource.FromZip(stream));
     }
+
+    public async Task<LoadedStory> OpenAsync(string id)
+    {
+        var source = await LoadAsync(id);
+        return new(source, Directory.Exists(id) ? StoryImages.FromDirectory(source, id) : null);
+    }
 }
 
 /// <summary>Combines several libraries into one list. Ids are prefixed with the library index.</summary>
@@ -143,5 +158,11 @@ public sealed class CompositeStoryLibrary(params IStoryLibrary[] libraries) : IS
     {
         var bar = id.IndexOf('|', StringComparison.Ordinal);
         return libraries[int.Parse(id[..bar], System.Globalization.CultureInfo.InvariantCulture)].LoadAsync(id[(bar + 1)..]);
+    }
+
+    public Task<LoadedStory> OpenAsync(string id)
+    {
+        var bar = id.IndexOf('|', StringComparison.Ordinal);
+        return libraries[int.Parse(id[..bar], System.Globalization.CultureInfo.InvariantCulture)].OpenAsync(id[(bar + 1)..]);
     }
 }

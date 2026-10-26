@@ -2,7 +2,9 @@
 // Plain focus() only scrolls when the element is entirely off-screen, so a frame that starts near the bottom of
 // the window would otherwise stay mostly hidden.
 // The first frame of a playthrough scrolls the page to the very top instead, so the title bar stays visible.
-export function revealLatest(element, isFirst) {
+export function revealLatest(transcript, isFirst) {
+    // Back can make an existing keyed frame current without recapturing its element reference.
+    const element = transcript?.querySelector(".tw-latest");
     if (!element || !element.isConnected) {
         return;
     }

@@ -79,7 +79,7 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
         var restoreTimer = Stopwatch.StartNew();
         await Driver.ClickAsync("Load " + slot);
         await Driver.ClickAsync("Load save");
-        await Microsoft.Playwright.Assertions.Expect(Page.GetByRole(AriaRole.Status))
+        await Microsoft.Playwright.Assertions.Expect(SaveStatus)
             .ToHaveTextAsync($"Loaded '{slot}'.", new() { Timeout = 180_000 });
         await Microsoft.Playwright.Assertions.Expect(Page.Locator(".tw-frame"))
             .ToHaveCountAsync(tier.HistoryDepth + 1, new() { Timeout = 180_000 });

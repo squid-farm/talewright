@@ -4,12 +4,14 @@
 @inject IServiceProvider Services
 @using Microsoft.Extensions.DependencyInjection
 @using Talewright.Runtime.Saves
+@implements IAsyncDisposable
 
 <div class="tw-app">
     @if (_story is not null)
     {
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
-        <div hidden="@_showLibrary">
+        <CascadingValue Value="_loaded!.Images">
+        <div hidden="@_showLibrary" @key="_loaded">
             @if (_story.Creation is not null && _character is null)
             {
                 <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
@@ -23,6 +25,7 @@
                 <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="Services.GetService<ISaveStore>()" />
             }
         </div>
+        </CascadingValue>
     }
 
     @if (!LibraryEnabled && _story is null)
@@ -120,6 +123,9 @@
 
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
+    private LoadedStory? _loaded;
+    private long _openGeneration;
+    private bool _disposed;
     private CharacterSelection? _character;
     private bool _showLibrary;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
@@ -147,20 +153,31 @@
 
     private async Task OpenAsync(StoryEntry entry)
     {
+        var generation = ++_openGeneration;
         Reset();
+        LoadedStory? candidate = null;
         try
         {
-            await CompileAsync(await Library.LoadAsync(entry.Id), entry.Title);
+            candidate = await Library.OpenAsync(entry.Id);
+            if (_disposed || generation != _openGeneration) return;
+            await CompileAsync(candidate, entry.Title);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException)
         {
-            _error = $"Couldn't open {entry.Title}: {ex.Message}";
+            if (!_disposed && generation == _openGeneration)
+                _error = $"Couldn't open {entry.Title}: {ex.Message}";
+        }
+        finally
+        {
+            if (!ReferenceEquals(candidate, _loaded)) candidate?.Dispose();
         }
     }
 
     private async Task UploadAsync(InputFileChangeEventArgs e)
     {
+        var generation = ++_openGeneration;
         Reset();
+        LoadedStory? candidate = null;
         try
         {
             // FromZip needs a seekable stream; browser streams aren't, so buffer first.
@@ -171,24 +188,34 @@
             }
 
             buffer.Position = 0;
-            await CompileAsync(StorySource.FromZip(buffer), e.File.Name);
+            if (_disposed || generation != _openGeneration) return;
+            candidate = new LoadedStory(StorySource.FromZip(buffer));
+            await CompileAsync(candidate, e.File.Name);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
-            _error = $"Couldn't read {e.File.Name}: {ex.Message}";
+            if (!_disposed && generation == _openGeneration)
+                _error = $"Couldn't read {e.File.Name}: {ex.Message}";
+        }
+        finally
+        {
+            if (!ReferenceEquals(candidate, _loaded)) candidate?.Dispose();
         }
     }
 
-    private async Task CompileAsync(StorySource source, string title)
+    private async Task CompileAsync(LoadedStory loaded, string title)
     {
-        var result = StoryCompiler.Compile(source, Options);
+        var result = StoryCompiler.Compile(loaded.Source, Options);
         _diagnostics = result.Diagnostics;
         if (result.Success)
         {
+            var previous = _loaded;
+            _loaded = loaded;
             _story = result.Story;
             _character = null;
             _showLibrary = false;
             _diagnostics = [];
+            if (previous is not null) await previous.DisposeAsync();
             await OnTitleChanged.InvokeAsync(_story!.Title);
         }
         else
@@ -218,5 +245,12 @@
         Reset();
         _showLibrary = false;
         await OnTitleChanged.InvokeAsync(_story!.Title);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        ++_openGeneration;
+        if (_loaded is not null) await _loaded.DisposeAsync();
     }
 }

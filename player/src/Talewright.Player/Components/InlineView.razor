@@ -1,8 +1,6 @@
-@* Renders rendered inline text (styled runs and line breaks) as HTML. Media placeholders are reserved for a
-   future image layer and intentionally produce nothing yet. *@
-
-@foreach (var inline in Inlines)
+@for (var index = 0; index < Inlines.Count; index++)
 {
+    var inline = Inlines[index];
     switch (inline)
     {
         case RenderedText text:
@@ -11,6 +9,9 @@
         case RenderedLineBreak:
             <br />
             break;
+        case RenderedMedia media:
+            <MediaView @key="(index, media, Images)" Media="media" Images="Images" />
+            break;
     }
 }
 
@@ -18,6 +19,9 @@
     /// <summary>The inlines to render.</summary>
     [Parameter, EditorRequired]
     public IReadOnlyList<RenderedInline> Inlines { get; set; } = [];
+
+    [CascadingParameter]
+    public StoryImages? Images { get; set; }
 
     private static RenderFragment Styled(RenderedText text) => builder =>
     {

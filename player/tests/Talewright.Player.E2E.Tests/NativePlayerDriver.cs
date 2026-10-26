@@ -12,6 +12,18 @@ public sealed record AccessibleNode(
 
     public string Content => Regex.Replace(
         string.Join(" ", Descendants().SelectMany(node => new[] { node.Name, node.Text })), @"\s+", " ").Trim();
+
+    public string NarrativeContent
+    {
+        get
+        {
+            // AX text already includes descendant text; object markers and repeated names are not narrative.
+            var content = !string.IsNullOrEmpty(Text)
+                ? Text.Replace("\uFFFC", "", StringComparison.Ordinal)
+                : Children.Length > 0 ? string.Join(" ", Children.Select(node => node.NarrativeContent)) : Name;
+            return Regex.Replace(content, @"\s+", " ").Trim();
+        }
+    }
 }
 
 public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null) : IPlayerDriver
@@ -128,6 +140,8 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task ResizeAsync(int width, int height) => await CommandAsync("resize", new { width, height });
     public async Task FillAsync(string name, string value) => await CommandAsync("fill", new { name, value });
     public async Task ActivateAsync(string name) => await CommandAsync("activate", new { name });
+    public async Task ScrollToImageAsync(string name) => await CommandAsync("scroll", new { name, role = "image" });
+    public async Task ScrollToButtonAsync(string name) => await CommandAsync("scroll", new { name, role = "push button" });
     public async Task<int> CloseWindowAsync() => (await CommandAsync("close-window")).GetInt32();
     public async Task<AccessibleNode> SnapshotAsync() =>
         (await CommandAsync("snapshot")).Deserialize<AccessibleNode>(Json)
@@ -147,7 +161,7 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
             .Select(node => Regex.Replace(node.Name, @"^\d+\.\s*", "")).ToArray() ?? [];
         var window = nodes.FirstOrDefault(node => node.Role == "frame");
         return new(
-            passage?.Content ?? "", transcript?.Content ?? "", sheet?.Content ?? "",
+            passage?.NarrativeContent ?? "", transcript?.Content ?? "", sheet?.Content ?? "",
             passage is null ? root.Content : "", choices,
             nodes.Any(node => node.Role == "push button" && node.Name == "Play again"),
             passage is not null, passage?.Focused == true,

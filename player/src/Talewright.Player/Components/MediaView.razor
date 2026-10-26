@@ -1,0 +1,120 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<span class="tw-media @StyleClass">
+    <img @ref="_image" alt="@Media.AltText" hidden="@(_error is not null)" />
+    @if (_error is not null)
+    {
+        <span class="tw-media-error">
+            <span role="img" aria-label="@Media.AltText">@Media.AltText</span>
+            <span role="status">— @_error</span>
+        </span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
+    [Parameter] public StoryImages? Images { get; set; }
+
+    private ElementReference _image;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<MediaView>? _reference;
+    private CancellationTokenSource? _loading;
+    private StoryImages.Lease? _lease;
+    private int _handle;
+    private bool _disposed;
+    private bool _started;
+    private string? _error;
+    private Task _initializing = Task.CompletedTask;
+    private string StyleClass => string.Join(" ", new[]
+    {
+        Media.Style.HasFlag(TextStyle.Strong) ? "tw-media-strong" : "",
+        Media.Style.HasFlag(TextStyle.Emphasis) ? "tw-media-emphasis" : "",
+        Media.Style.HasFlag(TextStyle.Code) ? "tw-media-code" : "",
+    }.Where(value => value.Length > 0));
+
+    protected override void OnParametersSet()
+    {
+        if (Images is null) _error = "Images are unavailable for this story source.";
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Images is null) return Task.CompletedTask;
+        return _initializing = ObserveAsync();
+    }
+
+    private async Task ObserveAsync()
+    {
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/MediaView.razor.js");
+            if (_disposed) return;
+            _reference = DotNetObjectReference.Create(this);
+            _handle = await _module.InvokeAsync<int>("observe", _image, _reference);
+        }
+        catch (JSException ex)
+        {
+            if (!_disposed)
+            {
+                _error = "Image loading is unavailable in this host.";
+                Console.Error.WriteLine($"Image loader failed: {ex.Message}");
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task LoadAsync()
+    {
+        if (_disposed || _started || Images is null || Images.Lifetime.IsCancellationRequested || _module is null) return;
+        _started = true;
+        _loading = CancellationTokenSource.CreateLinkedTokenSource(Images.Lifetime);
+        var token = _loading.Token;
+        try
+        {
+            _lease = Images.Acquire(Media.MediaId, JS);
+            var url = await _lease.Url.WaitAsync(token);
+            if (_disposed || token.IsCancellationRequested) return;
+            var loaded = await _module.InvokeAsync<bool>("display", token, _handle, url);
+            if (!loaded && !_disposed) _error = "This image could not be displayed.";
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException
+            && (_disposed || Images.Lifetime.IsCancellationRequested))
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JSException)
+        {
+            if (!_disposed)
+            {
+                _error = "This image could not be loaded.";
+                Console.Error.WriteLine($"Image '{Media.MediaId}' failed: {ex.Message}");
+            }
+        }
+        if (!_disposed) await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _loading?.Cancel();
+        await _initializing;
+        if (_module is not null)
+        {
+            try
+            {
+                if (_handle != 0) await _module.InvokeVoidAsync("release", _handle);
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The host already destroyed this document and its object URLs.
+            }
+        }
+        _reference?.Dispose();
+        if (_lease is not null) await _lease.DisposeAsync();
+        _loading?.Dispose();
+    }
+}

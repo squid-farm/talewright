@@ -17,20 +17,16 @@
                          OnLoad="RequestLoadAsync" OnConfirmLoad="ConfirmLoadAsync" OnCancelLoad="CloseSaves" OnClose="CloseSaves" />
     }
     <div class="tw-columns">
-        <main class="tw-transcript" aria-label="Story transcript" aria-live="polite">
+        <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="_transcriptElement">
             @{ var transcript = _transcript; }
             @for (var i = 0; i < transcript.Count; i++)
             {
                 var entry = transcript[i];
                 var isLatest = i == transcript.Count - 1;
-                if (isLatest)
-                {
-                    <section class="tw-frame tw-latest" aria-label="Current passage" tabindex="-1" @ref="_latestFrame"><StoryPassage Entry="entry" /></section>
-                }
-                else
-                {
-                    <section class="tw-frame tw-past"><StoryPassage Entry="entry" /></section>
-                }
+                <section @key="(_session, i)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
+                         aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
+                    <StoryPassage Entry="entry" />
+                </section>
             }
 
             @if (_session.Current is { } current)
@@ -68,7 +64,7 @@
     public ISaveStore? SaveStore { get; set; }
 
     private IReadOnlyList<HistoryFrame> _transcript => _session.Transcript;
-    private ElementReference _latestFrame;
+    private ElementReference _transcriptElement;
     private StoryHistory _session = default!;
     private StoryDefinition? _startedStory;
     private bool _focusLatest;
@@ -296,11 +292,11 @@
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-                await _module.InvokeVoidAsync("revealLatest", _latestFrame, _transcript.Count == 1);
+                await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1);
             }
             catch (JSException)
             {
-                await FocusLatestAsync();
+                await FocusTranscriptAsync();
             }
             catch (JSDisconnectedException)
             {
@@ -312,11 +308,11 @@
         }
     }
 
-    private async Task FocusLatestAsync()
+    private async Task FocusTranscriptAsync()
     {
         try
         {
-            await _latestFrame.FocusAsync();
+            await _transcriptElement.FocusAsync();
         }
         catch (Exception ex) when (ex is InvalidOperationException or JSException)
         {

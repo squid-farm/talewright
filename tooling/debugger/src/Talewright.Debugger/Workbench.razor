@@ -1,6 +1,7 @@
 @inject WorkbenchModel Model
 @implements IAsyncDisposable
 
+<CascadingValue Value="Model.Images">
 <main class="author-workbench">
     <h1>Talewright Author Debugger</h1>
     <p>@Model.Root</p>
@@ -147,6 +148,7 @@
         </section>
     }
 </main>
+</CascadingValue>
 
 @code {
     private string _sceneSearch = "";
@@ -157,8 +159,15 @@
         await _watcher.RescanAsync(restart: true);
     }
     private Task Rescan() => _watcher.RescanAsync();
+    protected override Task OnAfterRenderAsync(bool firstRender) => Model.DrainImagesAsync();
     private Task Restart() => _watcher.RescanAsync(restart: true);
-    public ValueTask DisposeAsync() => _watcher.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await _watcher.DisposeAsync();
+        Model.Dispose();
+        if (Model.Images is not null) await Model.Images.DisposeAsync();
+        await Model.DrainImagesAsync();
+    }
     private void Start() => Model.Start();
     private void Choose(ChoiceView choice) => Model.Choose(choice.Key);
 }

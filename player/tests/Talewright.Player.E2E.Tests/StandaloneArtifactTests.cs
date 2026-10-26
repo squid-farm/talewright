@@ -62,7 +62,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         }
         else
         {
-            await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Quick Save checkpoint saved.");
+            await Expect(SaveStatus).ToContainTextAsync("Quick Save checkpoint saved.");
         }
         if (PlayerTarget.IsDesktop)
         {

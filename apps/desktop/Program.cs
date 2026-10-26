@@ -35,7 +35,7 @@ internal static class Program
 
         var builder = PhotinoBlazorAppBuilder.CreateDefault(args);
         builder.Services.AddSingleton<IStoryLibrary>(new CompositeStoryLibrary(
-            new EmbeddedStoryLibrary(typeof(Program).Assembly),
+            new EmbeddedStoryLibrary(typeof(Program).Assembly, enableImages: true),
             new FileSystemStoryLibrary(paths)));
 
         // Composite ids are "<library index>|<id>"; the file-system library is index 1 and uses full paths.

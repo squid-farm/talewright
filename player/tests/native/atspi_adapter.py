@@ -203,6 +203,10 @@ def serve(args):
                     node = app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
                     node.queryComponent().grabFocus()
                     app.key("Space")
+                elif command == "scroll":
+                    node = app.wait(lambda: app.find(**arguments), "scroll accessibility target into view")
+                    if not node.queryComponent().scrollTo(pyatspi.SCROLL_ANYWHERE):
+                        raise RuntimeError(f"Could not scroll target into view: {arguments}")
                 elif command == "fill":
                     node = app.wait(lambda: app.find(name=arguments["name"]), "editable named field")
                     node.queryComponent().grabFocus()

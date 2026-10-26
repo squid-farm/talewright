@@ -230,7 +230,7 @@ tag, context)`. Eligible = has the tag, requirements hold, and not already visit
 - **`Templates/Template.cs`**: the input AST.
   - Blocks: `ParagraphTemplate`, `SpeechTemplate` (speaker + line), `ConditionalBlockTemplate`.
   - Inlines: `TextTemplate`, `StyledTemplate` (emphasis/strong/code, nested via `TextStyle` flags),
-    `LineBreakTemplate`, `MediaTemplate` (reserved for images), `SubstitutionTemplate` (an `Expr` plus a list of
+    `LineBreakTemplate`, `MediaTemplate` (resolved images), `SubstitutionTemplate` (an `Expr` plus a list of
     text modifiers), `ConditionalInlineTemplate`.
   - Note: this is what "strongly typed, not string parsing" means in practice. `{player:first-name#possessive}`
     compiles to `SubstitutionTemplate(NameRef(player, First), [possessive])`.
@@ -323,7 +323,14 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   newest frame to the top of the viewport and focuses it (moving screen readers to it); plain `focus()` would
   not scroll a frame that is already partly visible.
 - `Components/DocumentView.razor`, `InlineView.razor`: `RenderedDocument` → HTML (`<p>`, `<em>`, `<strong>`,
-  `<code>`). `RenderedMedia` renders nothing yet.
+  `<code>`). `RenderedMedia` preserves inherited style and renders through `MediaView` on all narrative
+  surfaces, including choices and chosen-label history.
+- `Components/MediaView.razor` and its JavaScript module: viewport-lazy image streaming into a Blob URL.
+  Each mounted occurrence owns its observer, cancellation and image lease; one accepted `StoryImages`
+  generation shares a transfer/Blob URL for each resolved path. Retained history keeps leases; final
+  release retires an entry and revokes its URL, without affecting a newer entry for the same path.
+  Owner teardown drains asynchronous cleanup. This reduces duplicates, not total unique-image retention.
+  Missing, unsupported-source or undecodable assets show effective alt plus an accessible visible failure.
 - `Components/CharacterSheet.razor`: generated from ruleset metadata; whatever stats the story's ruleset has,
   grouped by `StatCategory`. Skills at 0 are hidden. Shows inventory and faction standings with tiers.
 - `Components/DiagnosticList.razor`: compiler errors/warnings with file:line:col.
@@ -332,8 +339,13 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   changes to shared static world definitions. Restart keeps the active (including restored) character.
 - `Saves/`: `FileSaveStore` uses staged atomic file replacement; `IndexedDbSaveStore` uses browser transactions.
   Failures are visible and rejected restores do not replace live history or mutate the stored save.
-- `Library/StoryLibraries.cs`: `IStoryLibrary` (List/Load) with `EmbeddedStoryLibrary` (stories compiled into
+- `Library/StoryLibraries.cs`: `IStoryLibrary` (List/Load/Open) with `EmbeddedStoryLibrary` (stories compiled into
   the host assembly), `FileSystemStoryLibrary` (folders/zips; desktop only) and `CompositeStoryLibrary`.
+- `Library/StoryImages.cs`: loaded-story-side lazy folder/embedded resource access and generation lifetime.
+  Uses the compiler's safe image catalogue, with symbolic-link rechecks for live folder opens. Discovery
+  never loads image bytes; `StorySource` and `TemplateRenderer` remain free of I/O ownership.
+  Built-in hosts explicitly opt into embedded images; generated hosts do not yet enable that adapter.
+  The folder debugger replaces this capability only on accepted refresh, including image-content edits.
 - `wwwroot/talewright.css`: all player styles, driven by CSS variables (`--tw-bg`, `--tw-accent`…), with a dark
   mode via `prefers-color-scheme`. Hosts link it as `_content/Talewright.Player/talewright.css`.
 
@@ -359,7 +371,7 @@ templates (including a relative web base path); project changes use `XDocument` 
 ## 4. Life of a story
 
 ```
-samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Compile
+samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Compile
   story.talewright.yaml           ───────►  StorySource            ──────►  CompilationResult
   chapters/*.tale                (path → text)                    ├─ Diagnostics (shown if errors)
                                                                   └─ StoryDefinition
@@ -372,7 +384,10 @@ samples/LostRelic/               IStoryLibrary.LoadAsync        StoryCompiler.Co
                                                  └── Choose(key) ◄─┘
 ```
 
-1. **Load.** The host's `IStoryLibrary` hands back a `StorySource`. For an uploaded zip, `TalewrightApp` buffers
+1. **Load.** The host's `IStoryLibrary.OpenAsync` hands back a disposable `LoadedStory`: `StorySource` plus
+   optional lazy image access. The UI owns it, not the compiler/runtime. Failed adoption preserves the
+   accepted capability; successful replacement releases it. Folder assets are live, not byte snapshots.
+   For an uploaded zip, `TalewrightApp` buffers
    it into memory first (browser streams aren't seekable) and calls `StorySource.FromZip`.
 2. **Compile.** `StoryCompiler` reads `story.talewright.yaml`:
    - `ruleset.base` picks a ruleset factory (`generic`, `none`, or one you registered); `ruleset.disable`
@@ -514,8 +529,10 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
   migration is M8, autosave is a separate follow-up.
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
-- **Media.** `MediaTemplate`/`RenderedMedia` exist and flow through every layer, but the Player renders nothing.
-  Images/sprites slot in at `InlineView.razor` and a future media resolver (M4: Presentation).
+- **Media adapters.** Native folder player/debugger and built-in embedded samples display images.
+  ZIP/upload access and safety remain #178; generated published-host adapters, static-subpath/deployment
+  behavior and remaining warning acceptance remain #179. Those sources show an explicit unavailable
+  image state, not silent disappearance. Existing #242 export staging is reused, not replaced.
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.
 - **One language.** `EnglishGrammar` only; the `IGrammar` seam is there.

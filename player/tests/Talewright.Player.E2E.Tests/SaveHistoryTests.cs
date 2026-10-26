@@ -236,7 +236,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Upload(fixture);
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'My save'.");
+        await Expect(SaveStatus).ToContainTextAsync("Saved 'My save'.");
         await Driver.ClickAsync("Close saves");
         await Choose("Walk onward");
         await Driver.ClickAsync("Saves");
@@ -412,7 +412,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Upload(fixture);
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'My save'.");
+        await Expect(SaveStatus).ToContainTextAsync("Saved 'My save'.");
         await Driver.ClickAsync("Close saves");
         await Choose("Walk onward");
         await Observe(new(null, "Second passage text."));
@@ -428,7 +428,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Confirm overwrite");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'My save'.");
+        await Expect(SaveStatus).ToContainTextAsync("Saved 'My save'.");
 
         await Page.EvaluateAsync("""
             async storyId => {
@@ -453,14 +453,14 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Saves");
         await Page.GetByLabel("Save name", new() { Exact = true }).FillAsync("Before the door");
         await Driver.ClickAsync("Save game");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'Before the door'.");
+        await Expect(SaveStatus).ToContainTextAsync("Saved 'Before the door'.");
         await Driver.ClickAsync("Save game");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Confirm overwrite", Exact = true })).ToBeVisibleAsync();
         await Page.GetByLabel("Save name", new() { Exact = true }).FillAsync("After the door");
         await Page.GetByLabel("Save name", new() { Exact = true }).BlurAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Confirm overwrite", Exact = true })).ToHaveCountAsync(0);
         await Driver.ClickAsync("Save game");
-        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved 'After the door'.");
+        await Expect(SaveStatus).ToContainTextAsync("Saved 'After the door'.");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Load Before the door", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Load After the door", Exact = true })).ToBeVisibleAsync();
     }
