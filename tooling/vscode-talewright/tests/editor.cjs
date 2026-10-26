@@ -204,15 +204,15 @@ async function testLiveDiagnostics() {
     await vscode.window.showTextDocument(manifest);
     await waitForCompiler(manifest, items => items.some(item => item.code === 'TW4003') || items.length === 0);
     const manifestEdit = new vscode.WorkspaceEdit();
-    manifestEdit.replace(manifest.uri, new vscode.Range(2, 7, 2, 12), '"sta"');
+    manifestEdit.replace(manifest.uri, new vscode.Range(3, 9, 3, 14), '"sta"');
     assert.equal(await vscode.workspace.applyEdit(manifestEdit), true);
     completions = await vscode.commands.executeCommand(
-      'vscode.executeCompletionItemProvider', manifest.uri, new vscode.Position(2, 11));
+      'vscode.executeCompletionItemProvider', manifest.uri, new vscode.Position(3, 13));
     assert.ok(completions.items.some(item => item.label === 'start' && item.detail?.startsWith('Scene:')),
       'Canonical manifest values must use shared story completion alongside Red Hat YAML');
     assert.equal(manifest.isDirty, true, 'Manifest completion must use the unsaved overlay');
     const manifestHovers = await vscode.commands.executeCommand(
-      'vscode.executeHoverProvider', manifest.uri, new vscode.Position(2, 2));
+      'vscode.executeHoverProvider', manifest.uri, new vscode.Position(3, 4));
     assert.ok(manifestHovers.some(hover => hover.contents.some(content =>
       content.value?.includes('scene where play begins'))), 'Canonical manifest schema help remains available');
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
