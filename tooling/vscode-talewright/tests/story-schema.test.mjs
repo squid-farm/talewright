@@ -43,6 +43,14 @@ function markdownYaml(source, index) {
   return blocks[index][1];
 }
 
+test('schema validates the organization guide settings and trigger examples', async () => {
+  const guide = await read('docs/guide/organizing-your-story.md');
+  for (let index = 0; index < 5; index++) {
+    const name = `organization guide YAML example ${index + 1}`;
+    assertValid(validateManifest, parsedYaml(markdownYaml(guide, index), name), name);
+  }
+});
+
 test('schema validates every shipped story configuration', async () => {
   for (const path of [
     'samples/LostRelic/story.talewright.yaml',

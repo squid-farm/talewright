@@ -16,10 +16,14 @@ use `talewright validate` to check story correctness.
 - Lines starting with `//` are comments that players never see.
 
 The [Lost Relic sample](../../samples/LostRelic) uses one file per chapter.
+Keep settings together while your story is small, or split related characters and
+items into smaller files as it grows. See [Organizing your story](organizing-your-story.md)
+for two complete layouts.
 
 ## Characters and pronouns
 
-Declare every character in `story.talewright.yaml`. The `player` character is required.
+Declare every character under `characters:` in `story.talewright.yaml` or a supporting
+settings file. The `player` character is required.
 
 ```yaml
 characters:
@@ -221,6 +225,8 @@ See [scenes](../reference/talemark-syntax.md#2-scenes).
 ## Triggers
 
 Triggers fire automatically when a condition becomes true, wherever the player is:
+Keep one `triggers:` list in `story.talewright.yaml`. **Order matters:** earlier
+triggers can change what later ones do. Don't split the list between files.
 
 ```yaml
 triggers:
