@@ -181,16 +181,15 @@ It neither contributes declarations nor establishes a nested story.
 An unsaved manifest can establish a root only when there is no containing story;
 otherwise a containing initialized workspace folder is the fallback. Separate
 non-nested story roots are analyzed independently.
-Existing Talemark overlays and diagnostic ownership move from a manifestless
-workspace to a newly established story. If a containing manifest is subsequently
-created or opened, it owns the whole scope, including the now-invalid child
-manifest. Discarding an unsaved root returns its overlays to the containing
-workspace and clears obsolete diagnostics.
-Watched manifest creation/deletion performs the same reconciliation without
-requiring a document open. Open manifest overlays survive disk deletion. Removing
-a story directory clears its old publications and rehomes any remaining Talemark
-overlays. Independently registered child directories are skipped before reading
-their files or applying the parent's file-count, size, and nesting limits.
+Document and diagnostic ownership is recalculated from the current root manifests
+when files are opened, closed, or refreshed. Creating the first manifest in a
+manifestless workspace preserves existing overlays. Creating a containing
+manifest makes any additional manifest within its scope a reserved-name error.
+Discarding an unsaved root returns its overlays to the workspace fallback and
+clears obsolete diagnostics. Open manifest overlays survive disk deletion.
+Every folder load includes all recursive content and configuration inputs; editor
+scope registration never excludes directories from loading or loader protections.
+Only the owning scope publishes diagnostics for a file.
 Closing a document discards its overlay even if the subsequent disk reload fails.
 Only file URIs are supported. Open overlays win over disk, and close reloads disk. Versions must
 be 32-bit integers and increase; invalid versions report an error without closing

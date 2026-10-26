@@ -101,7 +101,7 @@ public sealed partial class ServerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Introducing_parent_manifest_reclaims_existing_child_scope(bool saved)
+    public async Task Introducing_containing_manifest_unifies_scope_and_rejects_additional_manifest(bool saved)
     {
         await using var client = new Client();
         File.Delete(client.PathOf("story.talewright.yaml"));
@@ -127,6 +127,38 @@ public sealed partial class ServerTests
         Assert.Empty(await client.Diagnostics("characters/main.tale", 1));
         await client.Change("characters/main.tale", "=== child\n-> start\n", 2);
         Assert.Empty(await client.Diagnostics("characters/main.tale", 2));
+    }
+
+    [Fact]
+    public async Task Separate_non_nested_stories_keep_overlays_definitions_and_diagnostics_independent()
+    {
+        await using var client = new Client();
+        File.Delete(client.PathOf("story.talewright.yaml"));
+        foreach (var name in new[] { "first", "second" })
+        {
+            Directory.CreateDirectory(client.PathOf($"{name}/characters"));
+            File.WriteAllText(client.PathOf($"{name}/story.talewright.yaml"), Manifest);
+            File.WriteAllText(client.PathOf($"{name}/start.tale"), GuideTale);
+        }
+        await client.Initialize();
+        await client.Open("first/start.tale", GuideTale, 1);
+        Assert.NotEmpty(await client.Diagnostics("first/start.tale", 1));
+        await client.Open("second/start.tale", GuideTale, 1);
+        Assert.NotEmpty(await client.Diagnostics("second/start.tale", 1));
+        await client.Open("first/" + GuideFragment, GuideDeclaration, 1);
+        Assert.Empty(await client.Diagnostics("first/start.tale", 1));
+        var first = (await Definition(client, "first/start.tale", 1, 3)).GetProperty("result");
+        Assert.Equal(client.UriOf("first/" + GuideFragment), first.GetProperty("uri").GetString());
+        Assert.Equal(JsonValueKind.Null, (await Definition(client, "second/start.tale", 1, 3)).GetProperty("result").ValueKind);
+
+        await client.Open("second/" + GuideFragment, GuideDeclaration, 1);
+        Assert.Empty(await client.Diagnostics("second/start.tale", 1));
+        var second = (await Definition(client, "second/start.tale", 1, 3)).GetProperty("result");
+        Assert.Equal(client.UriOf("second/" + GuideFragment), second.GetProperty("uri").GetString());
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("first/" + GuideFragment) } });
+        Assert.NotEmpty(await client.Diagnostics("first/start.tale", 1));
+        await client.Watch("second/start.tale", 2);
+        Assert.Empty(await client.Diagnostics("second/start.tale", 1));
     }
 
     [Fact]
