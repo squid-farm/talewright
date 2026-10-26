@@ -6,6 +6,26 @@ namespace Talewright.Player.E2E.Tests;
 
 public sealed class ImageLeaseTests
 {
+    private sealed class ImageSource(string root) : IStoryImageSource
+    {
+        public int Opens { get; private set; }
+        public bool Disposed { get; private set; }
+
+        public ValueTask<Stream> OpenAsync(string path, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.False(Disposed);
+            ++Opens;
+            return ValueTask.FromResult<Stream>(File.OpenRead(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar))));
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private sealed class Browser : IJSRuntime, IJSObjectReference
     {
         public int Transfers { get; private set; }
@@ -157,5 +177,27 @@ public sealed class ImageLeaseTests
         Assert.Equal("blob:test-2", await retry.Url);
         await retry.DisposeAsync();
         Assert.Equal(["blob:test-2"], browser.Revoked);
+    }
+
+    [Fact]
+    public async Task Backing_source_is_lazy_and_owned_until_async_transfer_cleanup_completes()
+    {
+        using var files = new ImageStoryFiles();
+        var source = new ImageSource(files.Root);
+        var browser = new Browser { Gate = new() };
+        var owner = StoryImages.FromSource(StorySource.FromDirectory(files.Root), source);
+        Assert.Equal(0, source.Opens);
+
+        var lease = owner.Acquire("images/photo.jpeg", browser);
+        while (browser.Transfers == 0) await Task.Delay(1);
+        var disposing = owner.DisposeAsync().AsTask();
+        Assert.False(source.Disposed);
+        browser.Gate.SetResult();
+        await disposing;
+
+        Assert.True(source.Disposed);
+        Assert.Equal(1, source.Opens);
+        Assert.Single(browser.Revoked);
+        await lease.DisposeAsync();
     }
 }
