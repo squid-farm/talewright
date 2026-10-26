@@ -77,7 +77,9 @@ spans multiple lines, and some ambiguous delimiter runs, is consequently approxi
 
 Every story's root manifest is named `story.talewright.yaml` at the story root.
 Supporting declarations may live in other `*.talewright.yaml` files in story
-subfolders; they are part of the story containing the nearest root manifest.
+subfolders; they are part of the containing story. The basename
+`story.talewright.yaml` is reserved for its single root manifest; a nested file
+with that name produces a compiler error, not a separate story or fragment.
 With Red Hat YAML installed, the extension associates every `*.talewright.yaml`
 file with the bundled JSON Schema. It validates file structure, offers known keys,
 and shows field descriptions without requiring a supporting file to repeat

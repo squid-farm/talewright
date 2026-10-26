@@ -158,6 +158,26 @@ public sealed class ModularConfigurationTests
     }
 
     [Theory]
+    [InlineData("characters/story.talewright.yaml", Characters)]
+    [InlineData("nested/deeper/story.talewright.yaml", "game: { id: other }\n" + Characters)]
+    [InlineData("nested/story.talewright.yaml", "invalid: [")]
+    public void Additional_reserved_manifests_are_rejected_before_assembly(string file, string text)
+    {
+        var files = Files();
+        files[file] = text;
+        var source = new StorySource(files, ["images/camp.png"]);
+        var result = StoryCompiler.Compile(source);
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("TW4002", error.Code);
+        Assert.Equal(file, error.Location.File);
+        Assert.Equal(1, error.Location.Line);
+        Assert.Equal(1, error.Location.Column);
+        Assert.Contains("reserved", error.Message);
+        Assert.Equal(result.Diagnostics, StoryAnalyzer.Analyze(source).Diagnostics);
+    }
+
+    [Theory]
     [InlineData("game: { id: forbidden }", "TW4002", 1)]
     [InlineData("characters:\n  guide: {first-name: Bea, inventory: [missing]}", "TW4005", 2)]
     [InlineData("items: [", "TW4001", 2)]

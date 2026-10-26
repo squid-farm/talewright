@@ -174,16 +174,18 @@ Required missing/invalid metadata returns `-32001`, as for hover.
 
 ### Story ownership
 
-The nearest on-disk `story.talewright.yaml` identifies each story. An unsaved `story.talewright.yaml`
-can establish its own root; otherwise a containing initialized workspace folder
-is the fallback. Multiple story roots are analyzed independently.
-An opened manifest always establishes its own directory as the root, including an
-unsaved nested manifest. Existing Talemark overlays and diagnostic ownership move
-from ancestor workspaces to the new story; ancestor refreshes exclude that story.
-Discovering an on-disk child manifest through a Talemark file open performs the same
-ownership transfer. Discarding an unsaved nested manifest retires its temporary
-root and returns its Talemark overlays to the containing story/workspace, clearing
-obsolete child diagnostics.
+The outermost ancestor `story.talewright.yaml` identifies each story. That basename
+is reserved for its single root manifest: any additional file with that basename
+inside the story produces TW4002 at the original file, whether saved or unsaved.
+It neither contributes declarations nor establishes a nested story.
+An unsaved manifest can establish a root only when there is no containing story;
+otherwise a containing initialized workspace folder is the fallback. Separate
+non-nested story roots are analyzed independently.
+Existing Talemark overlays and diagnostic ownership move from a manifestless
+workspace to a newly established story. If a containing manifest is subsequently
+created or opened, it owns the whole scope, including the now-invalid child
+manifest. Discarding an unsaved root returns its overlays to the containing
+workspace and clears obsolete diagnostics.
 Watched manifest creation/deletion performs the same reconciliation without
 requiring a document open. Open manifest overlays survive disk deletion. Removing
 a story directory clears its old publications and rehomes any remaining Talemark
@@ -197,7 +199,7 @@ cannot publish. Diagnostics for fixed or deleted files are explicitly cleared.
 Disk changes re-read the bounded shared story source loader; no project code is
 executed. File-loading errors are reported, not treated as successful analysis.
 
-Supporting configuration files belong to the story with the nearest root manifest,
+Supporting configuration files belong to the containing story's single root manifest,
 like Talemark files; they never establish a story root themselves. Opening,
 editing, creating, renaming, deleting, or closing one re-analyzes the whole story
 and clears diagnostics it no longer owns.

@@ -360,7 +360,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var story = _stories[document.Root];
         story.Workspace.Close(Relative(story.Root, path));
         _documents.Remove(path);
-        if (Path.GetFileName(path) == StorySource.ManifestFileName && !File.Exists(path) &&
+        if (PathComparer.Equals(path, Path.Combine(story.Root, StorySource.ManifestFileName)) && !File.Exists(path) &&
             _stories.Keys.Concat(_folders).Any(root => !PathComparer.Equals(root, story.Root) && IsWithin(root, story.Root)))
         {
             await RetireStoryAsync(story, cancellationToken);
@@ -426,9 +426,10 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
 
     private Story GetStory(string path, string? fallbackRoot = null)
     {
-        var root = (Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null)
-            ?? _stories.Keys.Append(StoryWorkspace.FindStoryRoot(path))
-                .OfType<string>().Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
+        var root = _stories.Keys.Where(HasManifest)
+                .Append(StoryWorkspace.FindStoryRoot(path))
+                .Append(Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null)
+                .OfType<string>().Where(root => IsWithin(root, path)).OrderBy(root => root.Length).FirstOrDefault()
             ?? _folders.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
             ?? fallbackRoot
             ?? throw new ArgumentException($"No story.talewright.yaml or workspace root found for {path}.");
@@ -438,8 +439,34 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         return story;
     }
 
+    private bool HasManifest(string root)
+    {
+        var path = Path.Combine(root, StorySource.ManifestFileName);
+        return File.Exists(path) || _documents.ContainsKey(path);
+    }
+
     private void ReconcileStory(Story story)
     {
+        if (HasManifest(story.Root))
+        {
+            var children = _stories.Values.Where(candidate => !ReferenceEquals(candidate, story) &&
+                IsWithin(story.Root, candidate.Root)).ToArray();
+            foreach (var child in children)
+            {
+                child.Generation++;
+                child.Pending?.Cancel();
+                child.Pending?.Dispose();
+                foreach (var (path, document) in _documents.Where(pair =>
+                             PathComparer.Equals(pair.Value.Root, child.Root)).ToArray())
+                {
+                    story.Workspace.Open(Relative(story.Root, path), document.Version, document.Text);
+                    _documents[path] = document with { Root = story.Root };
+                }
+                story.Published.UnionWith(child.Published);
+                _stories.Remove(child.Root);
+            }
+            if (children.Length > 0) story = Reload(story);
+        }
         foreach (var ancestor in _stories.Values.Where(candidate => !ReferenceEquals(candidate, story) &&
                      IsWithin(candidate.Root, story.Root)).ToArray())
         {

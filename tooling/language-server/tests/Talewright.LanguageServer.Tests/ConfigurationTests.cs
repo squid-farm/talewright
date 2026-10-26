@@ -73,6 +73,63 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Reserved_manifest_overlay_is_rejected_and_cannot_supply_declarations()
+    {
+        await using var client = new Client();
+        Directory.CreateDirectory(client.PathOf("characters"));
+        await client.Initialize();
+        await client.Open("start.tale", GuideTale, 1);
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
+        const string reserved = "characters/story.talewright.yaml";
+        await client.Open(reserved, GuideDeclaration, 1);
+        var error = Assert.Single(await client.Diagnostics(reserved, 1));
+        Assert.Equal("TW4002", error.GetProperty("code").GetString());
+        Assert.Contains("reserved", error.GetProperty("message").GetString());
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
+        Assert.Equal(JsonValueKind.Null, (await Definition(client, "start.tale", 1, 3)).GetProperty("result").ValueKind);
+
+        await client.Change(reserved, "game: { id: invalid }\n" + GuideDeclaration, 2);
+        Assert.Single(await client.Diagnostics(reserved, 2));
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf(reserved) } });
+        Assert.Empty(await client.Diagnostics(reserved, null));
+        Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
+        await client.Open(GuideFragment, GuideDeclaration, 1);
+        Assert.Empty(await client.Diagnostics("start.tale", 1));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Introducing_parent_manifest_reclaims_existing_child_scope(bool saved)
+    {
+        await using var client = new Client();
+        File.Delete(client.PathOf("story.talewright.yaml"));
+        Directory.CreateDirectory(client.PathOf("characters"));
+        const string childManifest = "characters/story.talewright.yaml";
+        File.WriteAllText(client.PathOf(childManifest), Manifest.Replace("start: start", "start: child"));
+        await client.Initialize();
+        await client.Open(childManifest, Manifest.Replace("start: start", "start: child"), 1);
+        await client.Diagnostics(childManifest, 1);
+        await client.Open("characters/main.tale", "=== child\n-> END\n", 1);
+        Assert.Empty(await client.Diagnostics("characters/main.tale", 1));
+        Assert.Empty(await client.Diagnostics(childManifest, 1));
+
+        if (saved)
+        {
+            File.WriteAllText(client.PathOf("story.talewright.yaml"), Manifest);
+            await client.Watch("story.talewright.yaml", 1);
+        }
+        else await client.Open("story.talewright.yaml", Manifest, 1);
+        var error = Assert.Single(await client.Diagnostics(childManifest, 1));
+        Assert.Equal("TW4002", error.GetProperty("code").GetString());
+        Assert.Contains("reserved", error.GetProperty("message").GetString());
+        Assert.Empty(await client.Diagnostics("characters/main.tale", 1));
+        await client.Change("characters/main.tale", "=== child\n-> start\n", 2);
+        Assert.Empty(await client.Diagnostics("characters/main.tale", 2));
+    }
+
+    [Fact]
     public async Task Unrelated_yaml_is_not_a_story_document()
     {
         await using var client = new Client();

@@ -107,7 +107,7 @@ public sealed partial class ServerTests
     }
 
     [Fact]
-    public async Task Independently_owned_child_story_uses_only_its_own_images()
+    public async Task Additional_manifest_does_not_create_an_independent_image_catalogue()
     {
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("images"));
@@ -121,6 +121,6 @@ public sealed partial class ServerTests
         await client.Open("start.tale", marked.Replace("|", ""), 1);
         await client.Open("child/start.tale", marked.Replace("|", ""), 1);
         Assert.Equal("parent.png", Assert.Single(Items(await Completion(client, "start.tale", marked))).GetProperty("label").GetString());
-        Assert.Equal("child.png", Assert.Single(Items(await Completion(client, "child/start.tale", marked))).GetProperty("label").GetString());
+        Assert.Equal("parent.png", Assert.Single(Items(await Completion(client, "child/start.tale", marked))).GetProperty("label").GetString());
     }
 }

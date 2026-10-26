@@ -207,7 +207,7 @@ public sealed class StorySourceTests : IDisposable
         });
 
         var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
-        Assert.Equal(new SourceLocation("chapter/story.talewright.yaml", 1, 7), diagnostic.Location);
+        Assert.Equal(new SourceLocation("chapter/story.talewright.yaml", 1, 1), diagnostic.Location);
     }
 
     [Fact]

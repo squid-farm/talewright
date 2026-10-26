@@ -513,7 +513,7 @@ public class StoryAnalysisTests
     }
 
     [Fact]
-    public async Task Root_discovery_uses_nearest_manifest_and_never_loads_project_code()
+    public async Task Root_discovery_uses_outermost_manifest_and_never_loads_project_code()
     {
         var root = Path.Combine(Path.GetTempPath(), $"talewright-analysis-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "nested", "chapters"));
@@ -526,9 +526,9 @@ public class StoryAnalysisTests
             Assert.Contains(analysis.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW5001");
             Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
             File.WriteAllText(Path.Combine(root, "nested", "story.talewright.yaml"), Manifest);
-            Assert.Equal(Path.Combine(root, "nested"), StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters")));
+            Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters")));
             File.WriteAllText(Path.Combine(root, "nested", "chapters", "story.yaml"), Manifest);
-            Assert.Equal(Path.Combine(root, "nested"), StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
+            Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
             File.Delete(Path.Combine(root, "nested", "chapters", "story.yaml"));
             new StoryWorkspace(Source()).Open("story.talewright.yaml", 1, Manifest);
             Assert.Throws<ArgumentException>(() => new StoryWorkspace(Source()).Open("story.yaml", 1, Manifest));

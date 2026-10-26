@@ -115,6 +115,13 @@ internal sealed class StoryYamlReader
             .Where(file => file.Key != StorySource.ManifestFileName && StorySource.IsConfigurationFile(file.Key))
             .OrderBy(file => file.Key, StringComparer.Ordinal))
         {
+            if (file.EndsWith("/" + StorySource.ManifestFileName, StringComparison.Ordinal))
+            {
+                diagnostics.Error("TW4002",
+                    $"'{StorySource.ManifestFileName}' is reserved for the single root story configuration; found additional manifest '{file}'.",
+                    new SourceLocation(file, 1, 1));
+                continue;
+            }
             if (!file.Contains('/'))
             {
                 diagnostics.Error("TW4002",

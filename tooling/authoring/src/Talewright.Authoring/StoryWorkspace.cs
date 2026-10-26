@@ -41,14 +41,15 @@ public sealed class StoryWorkspace
         bool requiresProjectMetadata = false) => new(StorySource.FromDirectory(directory), options,
             requiresProjectMetadata || Directory.EnumerateFiles(directory, "*.csproj").Any());
 
-    /// <summary>Finds the nearest manifest ancestor, without evaluating project files.</summary>
+    /// <summary>Finds the outermost manifest ancestor, without evaluating project files.</summary>
     public static string? FindStoryRoot(string fileOrDirectory)
     {
         var full = Path.GetFullPath(fileOrDirectory);
         var directory = Directory.Exists(full) ? new DirectoryInfo(full) : Directory.GetParent(full);
+        string? root = null;
         for (; directory is not null; directory = directory.Parent)
-            if (File.Exists(Path.Combine(directory.FullName, StorySource.ManifestFileName))) return directory.FullName;
-        return null;
+            if (File.Exists(Path.Combine(directory.FullName, StorySource.ManifestFileName))) root = directory.FullName;
+        return root;
     }
 
     /// <summary>Replaces a disk file, or removes it when text is null. Open buffers continue to win.</summary>
