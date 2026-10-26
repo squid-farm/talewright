@@ -70,10 +70,7 @@ class RepositoryLayoutTests(unittest.TestCase):
             path.resolve()
             for path in samples.rglob("*")
             if path.is_file()
-            and (
-                path.suffix in {".tale", ".yaml"}
-                or "images" in path.relative_to(samples).parts
-            )
+            and (path.suffix in {".tale", ".yaml"} or "images" in path.relative_to(samples).parts)
         }
         self.assertTrue(expected)
         for host in ("web", "desktop"):
