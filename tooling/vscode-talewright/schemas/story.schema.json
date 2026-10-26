@@ -55,7 +55,7 @@
     },
     "characters": {
       "type": "object",
-      "description": "Characters keyed by their story-specific IDs. The root story must declare the player character.",
+      "description": "Characters keyed by their story-specific IDs. The assembled story must declare the player character.",
       "propertyNames": {
         "$ref": "#/definitions/identifier"
       },
@@ -109,17 +109,6 @@
         "$ref": "#/definitions/trigger"
       },
       "description": "Optional story-wide condition/effect triggers."
-    }
-  },
-  "if": {
-    "required": ["game"]
-  },
-  "then": {
-    "required": ["characters"],
-    "properties": {
-      "characters": {
-        "required": ["player"]
-      }
     }
   },
   "additionalProperties": false,

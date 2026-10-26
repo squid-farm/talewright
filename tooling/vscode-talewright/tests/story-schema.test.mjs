@@ -43,19 +43,20 @@ function markdownYaml(source, index) {
   return blocks[index][1];
 }
 
-test('schema validates every shipped story manifest', async () => {
+test('schema validates every shipped story configuration', async () => {
   for (const path of [
     'samples/LostRelic/story.talewright.yaml',
+    'samples/LostRelic/characters/guide.talewright.yaml',
     'examples/CSharpStory/Story/Content/story.talewright.yaml',
   ]) {
     assertValid(validateManifest, parsedYaml(await read(path), path), path);
   }
 });
 
-test('root game documents require a player while game-less fragments do not', () => {
+test('player declarations may be in the root or a supporting configuration file', () => {
   const game = { id: 'root', title: 'Root', start: 'beginning' };
-  assertInvalid(validateManifest, { game }, 'root without characters', 'required');
-  assertInvalid(validateManifest, { game, characters: {} }, 'root without player', 'required');
+  assertValid(validateManifest, { game }, 'root with declarations in supporting files');
+  assertValid(validateManifest, { game, characters: {} }, 'root with player in a supporting file');
   assertValid(validateManifest, {
     game, characters: { player: { 'first-name': 'Ada' } },
   }, 'root with player');

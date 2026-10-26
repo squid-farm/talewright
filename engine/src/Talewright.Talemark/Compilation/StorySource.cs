@@ -255,8 +255,13 @@ public sealed class StorySource
         }
     }
 
-    private static bool IsStoryFile(string path) =>
-        Path.GetFileName(path).EndsWith(ConfigurationFileExtension, StringComparison.Ordinal) ||
+    /// <summary>Recognizes reserved story configuration inputs, including supporting files.</summary>
+    public static bool IsConfigurationFile(string path) =>
+        path.EndsWith(ConfigurationFileExtension, StringComparison.Ordinal);
+
+    /// <summary>Recognizes source text shared by folder, archive, embedded, and publication hosts.</summary>
+    public static bool IsStoryFile(string path) =>
+        IsConfigurationFile(path) ||
         path.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsImagePath(string path) =>

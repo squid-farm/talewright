@@ -218,7 +218,7 @@ public sealed class WorkbenchModel(string root) : IDisposable
                 return false;
             }
             if (yamlChanged || (_acceptedSource is not null && candidate.Source is { } source
-                && Manifest(source) != Manifest(_acceptedSource)))
+                && !Configuration(source).SequenceEqual(Configuration(_acceptedSource))))
             {
                 if (!Publish(RequireRestart))
                 {
@@ -405,7 +405,8 @@ public sealed class WorkbenchModel(string root) : IDisposable
         }
     }
 
-    private static string? Manifest(StorySource source) => source.Files.GetValueOrDefault(StorySource.ManifestFileName);
+    private static IEnumerable<KeyValuePair<string, string>> Configuration(StorySource source) =>
+        source.Files.Where(file => StorySource.IsConfigurationFile(file.Key)).OrderBy(file => file.Key, StringComparer.Ordinal);
     private void AdoptImages(StorySource source)
     {
         var previous = Images;

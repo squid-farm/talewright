@@ -700,6 +700,52 @@ public sealed class PublishTests : IDisposable
         Assert.True(StoryCompiler.Compile(StorySource.FromZip(stream)).Success);
     }
 
+    [Fact]
+    public void Split_configuration_and_images_survive_story_archive_and_generated_host_staging()
+    {
+        AddImages();
+        Directory.CreateDirectory(Path.Combine(Story, "people"));
+        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"),
+            "game: { id: publish, title: Publish, start: a }\n");
+        File.WriteAllText(Path.Combine(Story, "people", "player.talewright.yaml"),
+            "characters: { player: { first-name: Split } }\nvars: { greeting: \"Hello\" }\n");
+        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"),
+            "=== a\n{player:first-name}: {var:greeting}\n{image(\"maps/camp.PNG\", \"Camp\")}\n-> END");
+        var folder = StorySource.FromDirectory(Story);
+        Assert.True(StoryCompiler.Compile(folder).Success);
+        var result = Run();
+        Assert.Equal(0, result.Code);
+        using (var stream = File.OpenRead(Zip))
+        {
+            var archive = StorySource.FromZip(stream);
+            Assert.Equal(folder.Files.OrderBy(file => file.Key), archive.Files.OrderBy(file => file.Key));
+            Assert.True(StoryCompiler.Compile(archive).Success);
+            Assert.Contains("images/maps/camp.PNG", archive.ImagePaths);
+        }
+        File.Delete(Zip);
+        var builds = 0;
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, _, staged, _, _) =>
+            {
+                var source = StorySource.FromDirectory(staged);
+                Assert.Equal(folder.Files.OrderBy(file => file.Key), source.Files.OrderBy(file => file.Key));
+                Assert.True(StoryCompiler.Compile(source).Success);
+                Assert.Equal(File.ReadAllBytes(Path.Combine(Story, "images", "maps", "camp.PNG")),
+                    File.ReadAllBytes(Path.Combine(staged, "images", "maps", "camp.PNG")));
+                var output = Path.Combine(working, "output");
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output, "index.html"), "Test host");
+                builds++;
+                return output;
+            },
+        };
+        result = RunControlled(new UnreadableInput(), inputRedirected: true, publication: publication,
+            args: ["-a", "--target", "web"]);
+        Assert.Equal(0, result.Code);
+        Assert.Equal(1, builds);
+    }
+
     private byte[] AddImages()
     {
         byte[] bytes = [0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF, 0x80];

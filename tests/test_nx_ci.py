@@ -52,8 +52,10 @@ class CiRoutingTests(unittest.TestCase):
 
     def test_owned_inputs_select_only_consumer_groups(self):
         scenarios = (
-            ("samples/LostRelic/chapters/01-camp.tale", {"build", "browser", "linux-desktop"}),
-            ("samples/LostRelic/story.talewright.yaml", {"build", "browser", "linux-desktop"}),
+            ("samples/LostRelic/chapters/01-camp.tale", {"build", "unit", "editor", "browser", "linux-desktop"}),
+            ("samples/LostRelic/story.talewright.yaml", {"build", "unit", "editor", "browser", "linux-desktop"}),
+            ("samples/LostRelic/characters/guide.talewright.yaml",
+             {"build", "unit", "editor", "browser", "linux-desktop"}),
             ("player/tests/run_e2e.py", {"browser", "linux-desktop"}),
             ("player/tests/native/atspi_adapter.py", {"browser", "linux-desktop"}),
             ("examples/CSharpStory/Directory.Build.props", {"build", "editor"}),
@@ -69,7 +71,14 @@ class CiRoutingTests(unittest.TestCase):
                 ))
                 plan = make_plan(graph)
                 self.assertEqual(groups, {group for group, tasks in plan.items() if tasks})
-                self.assertEqual([], plan["unit"])
+                self.assertEqual(
+                    [{"project": "Talewright.Talemark.Tests", "target": "test"}] if "unit" in groups else [],
+                    plan["unit"],
+                )
+                if changed.startswith("samples/"):
+                    self.assertIn(
+                        {"project": "talewright-editor", "target": "compiler-contract"}, plan["editor"],
+                    )
                 if "browser" in groups:
                     self.assertEqual(
                         {"e2e-web", "e2e-published-web"},
@@ -198,6 +207,7 @@ class CiRoutingTests(unittest.TestCase):
 
 class InfrastructureSelectionTests(unittest.TestCase):
     SCENARIOS = {
+        ".github/scripts/measure_dependency_reuse.py": {"checks"},
         ".github/scripts/nx_ci.py": {"checks"},
         ".github/scripts/package_version.py": {"build", "checks"},
         ".github/scripts/publish_samples.py": {"browser", "checks"},

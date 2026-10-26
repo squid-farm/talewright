@@ -150,7 +150,7 @@ public sealed class StoryImagesTests
         using (var stream = File.Create(zip))
         using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create))
         {
-            foreach (var path in new[] { StorySource.ManifestFileName, "main.tale" })
+            foreach (var path in loaded.Source.Files.Keys)
             {
                 using var entry = archive.CreateEntry(path).Open();
                 await using var source = File.OpenRead(Path.Combine(files.Root, path));

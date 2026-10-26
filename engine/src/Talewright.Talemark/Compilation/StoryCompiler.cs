@@ -40,37 +40,18 @@ public static class StoryCompiler
         var diagnostics = new DiagnosticBag();
         analysis?.Registrations();
 
-        if (!source.Files.TryGetValue(StorySource.ManifestFileName, out var yaml))
+        if (!source.Files.ContainsKey(StorySource.ManifestFileName))
         {
             diagnostics.Error("TW4002", "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
             analysis?.DiscoverWithoutManifest();
             return new CompilationResult(null, diagnostics.Items);
         }
 
-        var manifest = StoryYamlReader.Read(StorySource.ManifestFileName, yaml, diagnostics, options, analysis);
+        var manifest = StoryYamlReader.Read(source, diagnostics, options, analysis);
         if (manifest is null)
         {
             analysis?.DiscoverWithoutManifest();
             return new CompilationResult(null, diagnostics.Items);
-        }
-
-        var supportingFiles = source.Files
-            .Where(file => file.Key != StorySource.ManifestFileName &&
-                file.Key.EndsWith(StorySource.ConfigurationFileExtension, StringComparison.Ordinal))
-            .OrderBy(file => file.Key, StringComparer.Ordinal)
-            .ToList();
-        foreach (var (path, text) in supportingFiles)
-        {
-            if (!path.Contains('/'))
-            {
-                diagnostics.Error("TW4002",
-                    $"Only '{StorySource.ManifestFileName}' is allowed at the story root; found extra configuration file '{path}'.",
-                    new SourceLocation(path, 1, 1));
-            }
-            else
-            {
-                StoryYamlReader.ValidateSupportingFile(path, text, diagnostics);
-            }
         }
 
         var taleFiles = source.TaleFiles.ToList();

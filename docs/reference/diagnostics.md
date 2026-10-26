@@ -88,7 +88,7 @@ story-root-relative path and effective alt text in each media node.
 | TW4004 | Unknown ruleset. | Use `generic` or `none`. |
 | TW4005 | Unknown stat or item in `story.talewright.yaml`. | Fix the spelling, or declare it under `game.ruleset.stats` / `items`. |
 | ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |
-| TW4007 | Two triggers have the same id. | Rename one. |
+| TW4007 | A declaration identity is repeated, two triggers have the same id, or more than one configuration file declares `triggers:`. | Remove or rename the duplicate; keep one authored trigger list. Cross-file conflicts name both sources. |
 
 ## TW5xxx: authoring integration
 
