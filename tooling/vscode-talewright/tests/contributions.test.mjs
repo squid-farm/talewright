@@ -31,7 +31,7 @@ test('package wires Talemark syntax, snippets, manifest schema, and the thin LSP
   await readFile(new URL(`../${manifest.contributes.yamlValidation[0].url}`, import.meta.url));
   const [pattern] = manifest.contributes.yamlValidation[0].fileMatch;
   const matches = name => new RegExp(`^${pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*')}$`).test(name);
-  for (const name of ['story.talewright.yaml']) assert.ok(matches(name), name);
+  for (const name of ['story.talewright.yaml', 'player.talewright.yaml']) assert.ok(matches(name), name);
   for (const name of ['story.yaml', 'story.talewright.yml', 'talewright.yaml', 'docker-compose.yaml']) {
     assert.ok(!matches(name), name);
   }

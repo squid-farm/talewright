@@ -24,6 +24,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private sealed record Document(string Root, int Version, string Text);
     private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error);
     private sealed record ProtocolError(int Code, string Message);
+    private enum Feature { Completion, Hover, Definition }
     private sealed class Story(
         string root,
         StoryWorkspace workspace,
@@ -141,6 +142,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     {
                         positionEncoding = "utf-16",
                         hoverProvider = true,
+                        definitionProvider = true,
                         completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(", "\"", "/" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
@@ -171,11 +173,15 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     break;
                 case "textDocument/completion":
                     if (!hasId) throw new ArgumentException("completion requires a request id.");
-                    await SemanticAsync(id, parameters, false, cancellationToken);
+                    await SemanticAsync(id, parameters, Feature.Completion, cancellationToken);
                     break;
                 case "textDocument/hover":
                     if (!hasId) throw new ArgumentException("hover requires a request id.");
-                    await SemanticAsync(id, parameters, true, cancellationToken);
+                    await SemanticAsync(id, parameters, Feature.Hover, cancellationToken);
+                    break;
+                case "textDocument/definition":
+                    if (!hasId) throw new ArgumentException("definition requires a request id.");
+                    await SemanticAsync(id, parameters, Feature.Definition, cancellationToken);
                     break;
                 case "textDocument/didChange":
                     Change(parameters);
@@ -240,9 +246,9 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         Schedule(story);
     }
 
-    private async Task SemanticAsync(JsonElement id, JsonElement parameters, bool hover, CancellationToken cancellationToken)
+    private async Task SemanticAsync(JsonElement id, JsonElement parameters, Feature kind, CancellationToken cancellationToken)
     {
-        var feature = hover ? "Hover" : "Completion";
+        var feature = kind.ToString();
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!_documents.TryGetValue(path, out var document))
             throw new ArgumentException($"{feature} requires an open story document.");
@@ -271,7 +277,21 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             return;
         }
         var position = new SourceLocation(Relative(story.Root, path), line + 1, character + 1);
-        if (hover)
+        if (kind == Feature.Definition)
+        {
+            var target = StoryNavigation.Definition(analysis, position);
+            await ReplyAsync(id, target is null ? null : new
+            {
+                uri = UriFromPath(Path.GetFullPath(target.Start.File, story.Root)),
+                range = new
+                {
+                    start = new { line = target.Start.Line - 1, character = target.Start.Column - 1 },
+                    end = new { line = target.End.Line - 1, character = target.End.Column - 1 }
+                }
+            }, cancellationToken);
+            return;
+        }
+        if (kind == Feature.Hover)
         {
             var result = StoryHover.Get(analysis, position);
             await ReplyAsync(id, result is null ? null : new
@@ -485,8 +505,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private static bool IsWithin(string root, string path) => !Path.IsPathRooted(Path.GetRelativePath(root, path)) &&
         Path.GetRelativePath(root, path) is var relative && relative != ".." &&
         !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
-    private static bool IsStoryFile(string path) => Path.GetFileName(path) == StorySource.ManifestFileName ||
-        path.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase);
+    private static bool IsStoryFile(string path) => StorySource.IsStoryFile(Path.GetFileName(path));
     private static string PathFromUri(string value)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || !uri.IsFile)

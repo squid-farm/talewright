@@ -49,12 +49,14 @@ diagnostics are separately identified by source `talewright`.
 
 The server supports initialize/initialized, shutdown/exit, full-text
 didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover,
-and workspace/didChangeWatchedFiles. Positions
+textDocument/definition, and workspace/didChangeWatchedFiles. Documents are the
+root `story.talewright.yaml`, supporting `*.talewright.yaml` files (case-sensitive
+suffix), and `.tale` files; other YAML is ignored. Positions
 are UTF-16 and zero-based. Compiler point locations become zero-width ranges,
 clamped to the current file; codes, messages, and error/warning severities remain
 the compiler's. Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
 returns a complete list with explicit `textEdit` replacement ranges. Hover returns
-source-aware help; signature help, inlay hints, rename, formatting, and autofixes are not advertised.
+source-aware help, and definition returns the authored declaration; signature help, inlay hints, rename, formatting, and autofixes are not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
 ### Semantic completion
@@ -79,7 +81,7 @@ string literals, and unknown namespaces do not receive story-ID suggestions.
 Identifiers replace the whole current token, including text after the cursor;
 existing `@`, `#`, quotes, and namespace colons are preserved.
 
-In canonical `story.talewright.yaml`, completion additionally resolves `game.start`,
+In `story.talewright.yaml` and supporting configuration files, completion additionally resolves `game.start`,
 `game.ruleset.base`, `game.ruleset.disable`, character inventory/stat references, item
 modifier stats, and `game.creation` stats/preset stats. Trigger conditions
 and effects use the same expression contexts as Talemark. Quoted and escaped YAML
@@ -115,7 +117,7 @@ explicit registration/ruleset provenance when there is no authored declaration.
 Scene metadata directives, conditional text, scene/choice/divert/speech/effect
 markers, and expression keywords/operators supply authoring help too.
 
-Canonical `story.talewright.yaml` keys use descriptions from the same schema
+Keys in every `*.talewright.yaml` file use descriptions from the same schema
 bundled in the VSIX, embedded as a resource in `Talewright.Authoring`. There is no
 second schema or editor-specific semantic parser. Parsed YAML key paths and
 decoded scalar mappings preserve authored UTF-16 ranges, including quoted and
@@ -158,6 +160,18 @@ save files, build projects, load assemblies, or execute game code.
 7. Neovim and other clients use the same `textDocument/hover` request. The
    headless smoke below verifies hover without the VS Code extension.
 
+### Go to definition
+
+`textDocument/definition` uses the same snapshot and lookup as hover. A
+reference, or the declaration itself, resolves to the declaring file and range:
+characters, items, factions, flags, and variables declared in a supporting
+configuration file navigate to that file, and scenes navigate to their Talemark
+header. Unsaved declarations, including those in newly created file-backed
+buffers, are used immediately. Built-in ruleset stats, registrations, unknown
+identifiers, and prose return `null`. When an identifier is declared more than
+once, navigation targets the first source cited by the duplicate diagnostic.
+Required missing/invalid metadata returns `-32001`, as for hover.
+
 ### Story ownership
 
 The nearest on-disk `story.talewright.yaml` identifies each story. An unsaved `story.talewright.yaml`
@@ -183,7 +197,12 @@ cannot publish. Diagnostics for fixed or deleted files are explicitly cleared.
 Disk changes re-read the bounded shared story source loader; no project code is
 executed. File-loading errors are reported, not treated as successful analysis.
 
-Clients must forward create/change/delete events for `**/*.tale`, `**/images/**`, `**/story.talewright.yaml`,
+Supporting configuration files belong to the story with the nearest root manifest,
+like Talemark files; they never establish a story root themselves. Opening,
+editing, creating, renaming, deleting, or closing one re-analyzes the whole story
+and clears diagnostics it no longer owns.
+
+Clients must forward create/change/delete events for `**/*.tale`, `**/images/**`, `**/*.talewright.yaml`,
 `**/talewright.lint.json`, project files, and configured authoring metadata. The VS Code client installs
 these watchers, including the lint configuration and configured metadata path. Other clients
 can use didSave for saved open documents, but need watched-file events for
@@ -235,7 +254,7 @@ Neovim 0.11 or later can launch the installed tool:
 
 ```lua
 vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
-  pattern = { "*.tale", "story.talewright.yaml" },
+  pattern = { "*.tale", "*.talewright.yaml" },
   callback = function(event)
     vim.lsp.start({
       name = "talewright",

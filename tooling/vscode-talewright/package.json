@@ -1,7 +1,7 @@
 {
   "name": "talewright",
   "displayName": "Talewright",
-  "description": "Talemark highlighting, snippets, story.talewright.yaml schema, shared completion/hover, and live compiler diagnostics.",
+  "description": "Talemark highlighting, snippets, story configuration schema, shared completion/hover/navigation, and live compiler diagnostics.",
   "version": "0.1.0",
   "publisher": "squid-farm",
   "license": "MPL-2.0",

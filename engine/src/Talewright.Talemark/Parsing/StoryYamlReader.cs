@@ -123,6 +123,7 @@ internal sealed class StoryYamlReader
                 continue;
             }
             if (reader.Parse(file, text) is not { } document) continue;
+            analysis?.Manifest(document, file);
             if (Get(document, "game") is { } game)
                 diagnostics.Error("TW4002", "'game:' is allowed only in the root story configuration.", reader.At(game));
             Collect(document);

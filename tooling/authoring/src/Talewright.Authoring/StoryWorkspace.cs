@@ -155,9 +155,8 @@ public sealed class StoryWorkspace
     {
         path = path.Replace('\\', '/');
         if (Path.IsPathRooted(path) || path.Split('/').Any(segment => segment is "" or "." or "..") ||
-            path.Contains(':') || !(path == StorySource.ManifestFileName ||
-            path.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase)))
-            throw new ArgumentException("Expected a relative story.talewright.yaml or .tale path without traversal.", nameof(path));
+            path.Contains(':') || !StorySource.IsStoryFile(path))
+            throw new ArgumentException("Expected a relative .talewright.yaml or .tale path without traversal.", nameof(path));
         return path;
     }
 }
