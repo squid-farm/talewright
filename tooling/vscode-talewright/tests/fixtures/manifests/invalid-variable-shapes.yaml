@@ -1,6 +1,7 @@
-id: invalid-vars
-title: Invalid variables
-start: beginning
+game:
+  id: invalid-vars
+  title: Invalid variables
+  start: beginning
 characters:
   player: { first-name: Ada }
 vars:

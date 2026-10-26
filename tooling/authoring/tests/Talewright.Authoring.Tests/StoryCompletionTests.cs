@@ -8,9 +8,10 @@ namespace Talewright.Authoring.Tests;
 public sealed class StoryCompletionTests
 {
     private const string Manifest = """
-        id: complete
-        title: Complete
-        start: first
+        game:
+          id: complete
+          title: Complete
+          start: first
         characters:
           player: {first-name: Ada}
           guide: {first-name: Bea}
@@ -88,33 +89,53 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
-    [InlineData("start: sec|", "second")]
-    [InlineData("start: |", "second")]
-    [InlineData("start: \"sec|ond\"", "second")]
-    [InlineData("start: \"\\u0073ec|ond\"", "second")]
-    [InlineData("ruleset: {base: gen|}", "generic")]
-    [InlineData("ruleset: {disable: [h|]}", "hp")]
+    [InlineData("game:\n  start: sec|", "second")]
+    [InlineData("game:\n  start: |", "second")]
+    [InlineData("game:\n  start: \"sec|ond\"", "second")]
+    [InlineData("game:\n  start: \"\\u0073ec|ond\"", "second")]
+    [InlineData("game:\n  ruleset: {base: gen|}", "generic")]
+    [InlineData("game:\n  ruleset: {disable: [h|]}", "hp")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    inventory: [ro|]", "rope")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    stats: {h|: 10}", "hp")]
     [InlineData("items:\n  rope:\n    name: Rope\n    modifiers: {h|: 1}", "hp")]
-    [InlineData("creation:\n  stats: {h|: [10, 15]}", "hp")]
-    [InlineData("creation:\n  presets:\n    strong:\n      stats: {h|: 15}", "hp")]
+    [InlineData("game:\n  creation:\n    stats: {h|: [10, 15]}", "hp")]
+    [InlineData("game:\n  creation:\n    presets:\n      strong:\n        stats: {h|: 15}", "hp")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    inventory: {ro|: 1}", "rope")]
     [InlineData("triggers:\n  - id: check\n    when: 'flag:re|'\n    do: set flag:ready", "ready")]
     public void Completes_manifest_story_values_and_expressions(string fragment, string expected)
     {
         // Replace duplicate top-level declarations so YAML remains parseable.
-        var key = fragment.Split(':')[0];
+        var fragmentLines = fragment.Split('\n');
         var yaml = string.Join('\n', Manifest.Split('\n').TakeWhile(line => line != ""));
         var lines = yaml.Split('\n').ToList();
-        var start = lines.FindIndex(line => line.StartsWith(key + ":", StringComparison.Ordinal));
-        if (start >= 0)
+        if (fragmentLines[0] == "game:")
         {
-            var end = start + 1;
-            while (end < lines.Count && (lines[end].StartsWith(' ') || lines[end].Length == 0)) end++;
-            lines.RemoveRange(start, end - start);
+            var property = fragmentLines[1].TrimStart().Split(':')[0];
+            var start = lines.FindIndex(line => line.StartsWith($"  {property}:", StringComparison.Ordinal));
+            if (start >= 0)
+            {
+                var end = start + 1;
+                while (end < lines.Count && (lines[end].StartsWith("    ", StringComparison.Ordinal) || lines[end].Length == 0)) end++;
+                lines.RemoveRange(start, end - start);
+            }
+            var gameEnd = lines.FindIndex(line => line == "game:") + 1;
+            while (gameEnd < lines.Count &&
+                (lines[gameEnd].StartsWith("  ", StringComparison.Ordinal) || lines[gameEnd].Length == 0)) gameEnd++;
+            lines.InsertRange(gameEnd, fragmentLines.Skip(1));
+            yaml = string.Join('\n', lines);
         }
-        yaml = string.Join('\n', lines) + "\n" + fragment;
+        else
+        {
+            var key = fragmentLines[0].Split(':')[0];
+            var start = lines.FindIndex(line => line.StartsWith(key + ":", StringComparison.Ordinal));
+            if (start >= 0)
+            {
+                var end = start + 1;
+                while (end < lines.Count && (lines[end].StartsWith(' ') || lines[end].Length == 0)) end++;
+                lines.RemoveRange(start, end - start);
+            }
+            yaml = string.Join('\n', lines) + "\n" + fragment;
+        }
         var caret = yaml.IndexOf('|');
         var text = yaml.Remove(caret, 1);
         var position = Position(StorySource.ManifestFileName, yaml[..caret]);
@@ -150,7 +171,7 @@ public sealed class StoryCompletionTests
     {
         var source = new StorySource(new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = "start: \"sec",
+            [StorySource.ManifestFileName] = "game:\n  start: \"sec",
             ["main.tale"] = "=== second\n-> END"
         });
         var analysis = StoryAnalyzer.Analyze(source);
@@ -275,14 +296,15 @@ public sealed class StoryCompletionTests
             }
         };
         var baseName = disabled == "hp" ? "generic" : "project";
-        var yaml = Manifest + $"\nruleset:\n  base: {baseName}\n  disable: [{disabled}]\n  stats:\n    - id: added\n      min: 0\n      max: 10";
+        var yaml = Manifest.Replace("  start: first", $"  start: first\n  ruleset:\n    base: {baseName}\n    disable: [{disabled}]\n    stats:\n      - id: added\n        min: 0\n        max: 10");
         var source = new StorySource(new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n{player:added}\n-> END"
         });
         var analysis = AuthoringProjectMetadata.Export(options).Analyze(source);
-        var line = Array.FindIndex(yaml.Split('\n'), value => value.Contains("disable:", StringComparison.Ordinal)) + 1;
-        var items = StoryCompletion.Complete(analysis, new(StorySource.ManifestFileName, line, 13));
+        var disabledIndex = yaml.IndexOf($"[{disabled}]", StringComparison.Ordinal) + 1;
+        var items = StoryCompletion.Complete(analysis,
+            Position(StorySource.ManifestFileName, yaml[..disabledIndex]));
         Assert.Contains(items, item => item.Label == disabled);
         Assert.DoesNotContain(items, item => item.Label == "added");
         if (baseName == "project") Assert.DoesNotContain(items, item => item.Label == "hp");
@@ -302,9 +324,10 @@ public sealed class StoryCompletionTests
     [InlineData("ruleset: {disable: [\n  |]}", "hp", "  hp]")]
     public void Empty_flow_reference_lists_offer_insertion_edits(string fragment, string label, string expectedList)
     {
-        var marked = "id: flow\ntitle: Flow\nstart: first\nitems: {rope: Rope}\n" +
-            (fragment.StartsWith("ruleset", StringComparison.Ordinal) ? "characters: {player: {first-name: Ada}}\n" : "") +
-            fragment;
+        var marked = "game:\n  id: flow\n  title: Flow\n  start: first\n" +
+            (fragment.StartsWith("ruleset", StringComparison.Ordinal)
+                ? "  " + fragment.Replace("\n", "\n  ", StringComparison.Ordinal)
+                : "items: {rope: Rope}\n" + fragment);
         var caret = marked.IndexOf('|');
         var position = Position(StorySource.ManifestFileName, marked[..caret]);
         var yaml = marked.Remove(caret, 1);
@@ -330,7 +353,8 @@ public sealed class StoryCompletionTests
                     .AddStat(new(new("focus"), "Focus", StatCategory.Custom, 0, 10, 5)).Build()
             }
         };
-        var marked = Manifest + "\nruleset:\n  base: project\n  disable: [ | ]\n  stats: [{id: added, min: 0, max: 10}]";
+        var marked = Manifest.Replace("  start: first",
+            "  start: first\n  ruleset:\n    base: project\n    disable: [ | ]\n    stats: [{id: added, min: 0, max: 10}]");
         var caret = marked.IndexOf('|');
         var analysis = AuthoringProjectMetadata.Export(options).Analyze(new StorySource(new Dictionary<string, string>
         {

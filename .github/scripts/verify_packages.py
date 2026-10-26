@@ -220,7 +220,7 @@ if (EngineApi.Compiler.Assembly.GetName().Name != "Talewright.Talemark")
     throw new Exception("Compiler assembly identity does not match the Talemark namespace.");
 var source = new StorySource(new Dictionary<string, string>
 {
-    ["story.talewright.yaml"] = "id: smoke\\ntitle: Smoke\\nstart: start\\nruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",
+    ["story.talewright.yaml"] = "game:\\n  id: smoke\\n  title: Smoke\\n  start: start\\n  ruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",
     ["main.tale"] = "=== start\\nHello **world**.\\n-> END",
 });
 var result = StoryCompiler.Compile(source);
@@ -267,7 +267,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         story = root / "tool-story"
         story.mkdir()
         (story / "story.talewright.yaml").write_text(
-            "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
+            "game:\n  id: tool-smoke\n  title: Tool smoke\n  start: a\ncharacters:\n  player: {first-name: Tester}\n")
         (story / "main.tale").write_text("=== a\nHello.\n-> translated\n")
         (story / "chapter.fr.tale").write_text("=== translated\nCulture-like chapter.\n-> END\n")
         subprocess.run([str(tool_path / "talewright"), "debug", "--help"],

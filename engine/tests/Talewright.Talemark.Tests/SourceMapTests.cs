@@ -5,7 +5,7 @@ namespace Talewright.Talemark.Tests;
 
 public sealed class SourceMapTests
 {
-    private const string Yaml = "id: source\ntitle: Source\nstart: first\ncharacters:\n  player: {first-name: Tester}\n";
+    private const string Yaml = "game:\n  id: source\n  title: Source\n  start: first\ncharacters:\n  player: {first-name: Tester}\n";
 
     private static CompilationResult Compile(string tale, string? other = null)
     {

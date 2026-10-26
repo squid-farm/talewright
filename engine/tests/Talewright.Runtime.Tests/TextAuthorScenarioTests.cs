@@ -15,9 +15,10 @@ public class TextAuthorScenarioTests
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                id: text-scenarios
-                title: Text scenarios
-                start: a
+                game:
+                  id: text-scenarios
+                  title: Text scenarios
+                  start: a
                 characters:
                   player: { first-name: Ada }
                 vars:

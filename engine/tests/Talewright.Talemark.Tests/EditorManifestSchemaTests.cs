@@ -29,9 +29,10 @@ public class EditorManifestSchemaTests
                 var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
                 {
                     ["story.talewright.yaml"] = $$"""
-                        id: identifiers
-                        title: Identifiers
-                        start: beginning
+                        game:
+                          id: identifiers
+                          title: Identifiers
+                          start: beginning
                         characters: { player: { first-name: Ada } }
                         factions: { {{JsonSerializer.Serialize(id)}}: { name: Test } }
                         """,

@@ -145,8 +145,8 @@ public sealed partial class ServerTests
         await client.Change(StorySource.ManifestFileName, marked.Replace("|", ""), 2);
         var result = (await Hover(client, StorySource.ManifestFileName, marked)).GetProperty("result");
         Assert.Contains("Scene", result.GetProperty("contents").GetProperty("value").GetString());
-        Assert.Equal(8, result.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
-        Assert.Equal(18, result.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32());
+        Assert.Equal(10, result.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
+        Assert.Equal(20, result.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32());
         await client.Change(StorySource.ManifestFileName, Manifest + "flags: [overlay]\n", 3);
         const string tale = "=== start\n@requires flag:over|lay";
         await client.Open("start.tale", tale.Replace("|", ""), 1);

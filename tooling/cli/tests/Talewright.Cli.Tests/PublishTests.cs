@@ -15,7 +15,7 @@ public sealed class PublishTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(Story, "chapters"));
         File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"),
-            "id: publish\ntitle: Publish\nstart: a\ncharacters:\n  player: {first-name: Tester}\n");
+            "game:\n  id: publish\n  title: Publish\n  start: a\ncharacters:\n  player: {first-name: Tester}\n");
         File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), "=== a\nHello.\n-> END");
         File.WriteAllText(Path.Combine(Story, "private-notes.txt"), "Not story content");
     }

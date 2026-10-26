@@ -38,9 +38,9 @@ public sealed class LintTests : IDisposable
         Assert.Equal(5, diagnostics[0].GetProperty("column").GetInt32());
         Assert.Equal(24, diagnostics[0].GetProperty("endColumn").GetInt32());
         Assert.Equal("warning", diagnostics[0].GetProperty("severity").GetString());
-        Assert.Equal(1, diagnostics[1].GetProperty("line").GetInt32());
-        Assert.Equal(5, diagnostics[1].GetProperty("column").GetInt32());
-        Assert.Equal(16, diagnostics[1].GetProperty("endColumn").GetInt32());
+        Assert.Equal(2, diagnostics[1].GetProperty("line").GetInt32());
+        Assert.Equal(7, diagnostics[1].GetProperty("column").GetInt32());
+        Assert.Equal(18, diagnostics[1].GetProperty("endColumn").GetInt32());
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public sealed class LintTests : IDisposable
     private void WriteStory(string id, string scene, string tale)
     {
         File.WriteAllText(Path.Combine(_root, StorySource.ManifestFileName),
-            $"id: {id}\ntitle: Night Ferry\nversion: 1\nstart: {scene}\ncharacters:\n  player: {{first-name: Ada}}\n");
+            $"game:\n  id: {id}\n  title: Night Ferry\n  version: 1\n  start: {scene}\ncharacters:\n  player: {{first-name: Ada}}\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"), $"=== {scene}\n{tale}");
     }
 

@@ -10,9 +10,10 @@ namespace Talewright.Talemark.Tests;
 public class TextVariableTests
 {
     private const string Yaml = """
-        id: text
-        title: Text variables
-        start: a
+        game:
+          id: text
+          title: Text variables
+          start: a
         characters:
           player: { first-name: Tester }
         vars:

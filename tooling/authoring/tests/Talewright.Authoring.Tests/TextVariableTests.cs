@@ -7,9 +7,10 @@ namespace Talewright.Authoring.Tests;
 public class TextVariableTests
 {
     private const string Manifest = """
-        id: text-editor
-        title: Text editor
-        start: a
+        game:
+          id: text-editor
+          title: Text editor
+          start: a
         characters:
           player: { first-name: Ada }
         vars:

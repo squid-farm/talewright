@@ -16,9 +16,10 @@ public class TextDebuggerTests
         var source = new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                id: text-debugger
-                title: Text debugger
-                start: a
+                game:
+                  id: text-debugger
+                  title: Text debugger
+                  start: a
                 characters:
                   player: { first-name: Ada }
                 vars:

@@ -9,7 +9,7 @@ namespace Talewright.Cli.Tests;
 
 public sealed class SourceViewTests
 {
-    private const string Yaml = "id: view\ntitle: Source View\nstart: first\ncharacters:\n  player: {first-name: Tester}\n";
+    private const string Yaml = "game:\n  id: view\n  title: Source View\n  start: first\ncharacters:\n  player: {first-name: Tester}\n";
     private const string First = "=== first\nFirst source.\n* [Go] -> second";
     private const string Second = "// second file\n=== second\nSecond source.\n* [Return] -> first";
 

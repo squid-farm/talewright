@@ -29,10 +29,11 @@ foreach (var scenes in new[] { 100, 1_000, 10_000 })
     var source = new StorySource(new Dictionary<string, string>
     {
         ["story.talewright.yaml"] = """
-            id: benchmark
-            title: Benchmark
-            start: scene.0
-            seed: 42
+            game:
+              id: benchmark
+              title: Benchmark
+              start: scene.0
+              seed: 42
             characters:
               player: {first-name: Tester}
             """,

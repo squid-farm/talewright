@@ -45,7 +45,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         string? backup = null;
         if (PlayerTarget.IsDesktop)
         {
-            var storyId = fixture.Yaml.Split('\n')[0]["id: ".Length..];
+            var storyId = fixture.Compile().Id;
             var bytes = await new FileSaveStore(FileSaveStore.DefaultRoot).ReadQuickAsync(storyId);
             path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "quick.json", SearchOption.AllDirectories)
                 .Single(file => File.ReadAllBytes(file).SequenceEqual(bytes));
@@ -231,7 +231,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         await ClickLoad("quick");
         await Driver.ClickAsync("Load save");
         await Observe(new(null, "Second passage text."));
-        var storyId = first.Yaml.Split('\n')[0]["id: ".Length..];
+        var storyId = first.Compile().Id;
         if (PlayerTarget.IsDesktop)
         {
             await new FileSaveStore(FileSaveStore.DefaultRoot).WriteQuickAsync(storyId, "{broken"u8.ToArray());
@@ -310,7 +310,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         var fixture = Fixture();
         await Upload(fixture);
         await QuickSave();
-        var storyId = fixture.Yaml.Split('\n')[0]["id: ".Length..];
+        var storyId = fixture.Compile().Id;
         var store = new FileSaveStore(FileSaveStore.DefaultRoot);
         var original = await store.ReadQuickAsync(storyId);
         var path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "quick.json", SearchOption.AllDirectories)

@@ -44,9 +44,10 @@ public class EditorSnippetTests
                 -> END
                 """;
             var yaml = $"""
-                id: editor-snippets
-                title: Editor snippets
-                start: {(isScene ? "scene.id" : "snippet.start")}
+                game:
+                  id: editor-snippets
+                  title: Editor snippets
+                  start: {(isScene ? "scene.id" : "snippet.start")}
                 characters:
                   player:
                     first-name: Mara

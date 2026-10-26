@@ -15,10 +15,11 @@ public sealed class AuthorInspectionTests
     private static readonly StatId Strength = new("str");
     private static readonly VarId Count = new("count");
     private const string Yaml = """
-        id: inspection
-        title: Inspection
-        start: start
-        randomness: checks-only
+        game:
+          id: inspection
+          title: Inspection
+          start: start
+          randomness: checks-only
         flags: [ready, unused]
         vars: {count: 0, untouched: 0}
         characters:

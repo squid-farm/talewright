@@ -12,10 +12,10 @@ using Talewright.Talemark.Analysis;
 
 namespace Talewright.Talemark.Parsing;
 
-/// <summary>An expression or effect list written in story.talewright.yaml, parsed later once all symbols are known.</summary>
+/// <summary>An expression or effect list written in story configuration, parsed later once all symbols are known.</summary>
 internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once);
 
-/// <summary>Everything read from story.talewright.yaml.</summary>
+/// <summary>Everything read from the root story configuration.</summary>
 internal sealed class StoryManifest
 {
     public string Id { get; set; } = string.Empty;
@@ -35,7 +35,7 @@ internal sealed class StoryManifest
 }
 
 /// <summary>
-/// Reads story.talewright.yaml with the YamlDotNet representation model (no reflection, so it is trim/WASM safe and keeps
+/// Reads story configuration with the YamlDotNet representation model (no reflection, so it is trim/WASM safe and keeps
 /// line numbers for diagnostics). Codes are <c>TW4xxx</c>.
 /// </summary>
 internal sealed class StoryYamlReader
@@ -56,6 +56,30 @@ internal sealed class StoryYamlReader
         AnalysisCollector? analysis = null) =>
         new StoryYamlReader(file, diagnostics, options) { _analysis = analysis }.Read(text);
 
+    public static void ValidateSupportingFile(string file, string text, DiagnosticBag diagnostics)
+    {
+        var stream = new YamlStream();
+        try
+        {
+            stream.Load(new StringReader(text));
+        }
+        catch (YamlException ex)
+        {
+            diagnostics.Error("TW4001", $"Invalid YAML: {ex.InnerException?.Message ?? ex.Message}",
+                new SourceLocation(file, (int)ex.Start.Line, (int)ex.Start.Column));
+            return;
+        }
+
+        foreach (var document in stream.Documents)
+        {
+            if (document.RootNode is YamlMappingNode root && Get(root, "game") is { } game)
+            {
+                diagnostics.Error("TW4002", "'game:' is allowed only in the root story configuration.",
+                    new SourceLocation(file, (int)game.Start.Line, (int)game.Start.Column));
+            }
+        }
+    }
+
     private SourceLocation At(YamlNode node) => new(_file, (int)node.Start.Line, (int)node.Start.Column);
 
     private StoryManifest? Read(string text)
@@ -73,14 +97,22 @@ internal sealed class StoryYamlReader
 
         if (stream.Documents.Count == 0 || stream.Documents[0].RootNode is not YamlMappingNode root)
         {
-            _diagnostics.Error("TW4001", "story.talewright.yaml must be a mapping (key: value pairs).", new SourceLocation(_file, 1, 1));
+            _diagnostics.Error("TW4001", "The root story configuration must be a mapping (key: value pairs).", new SourceLocation(_file, 1, 1));
             return null;
         }
 
-        CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "undo", "creation", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
+        CheckKeys(root, "game", "characters", "factions", "items", "flags", "vars", "triggers");
         _analysis?.Manifest(root);
 
-        var ruleset = ReadRuleset(Get(root, "ruleset"));
+        var gameNode = Get(root, "game");
+        if (gameNode is null)
+        {
+            _diagnostics.Error("TW4002", "The root story configuration must declare a 'game:' mapping.", At(root));
+        }
+        var game = gameNode is null ? new YamlMappingNode() : Mapping(gameNode, "game") ?? new YamlMappingNode();
+        CheckKeys(game, "id", "title", "version", "start", "randomness", "seed", "undo", "ruleset", "creation");
+
+        var ruleset = ReadRuleset(Get(game, "ruleset"));
         var items = ReadItems(Get(root, "items"), ruleset);
         var factions = ReadFactions(Get(root, "factions"));
         var characters = ReadCharacters(Get(root, "characters"), root, ruleset, items);
@@ -90,14 +122,14 @@ internal sealed class StoryYamlReader
         var manifest = new StoryManifest
         {
             World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, numericVars, textVars),
-            Id = RequiredIdentifier(root, "id") ?? string.Empty,
-            Title = RequiredScalar(root, "title") ?? string.Empty,
-            Version = Scalar(Get(root, "version")) ?? "0.0.0",
-            Start = RequiredIdentifier(root, "start") ?? string.Empty,
-            StartLocation = Get(root, "start") is { } startNode ? At(startNode) : new SourceLocation(_file, 1, 1),
+            Id = RequiredIdentifier(game, "id") ?? string.Empty,
+            Title = RequiredScalar(game, "title") ?? string.Empty,
+            Version = Scalar(Get(game, "version")) ?? "0.0.0",
+            Start = RequiredIdentifier(game, "start") ?? string.Empty,
+            StartLocation = Get(game, "start") is { } startNode ? At(startNode) : At(game),
         };
 
-        if (Get(root, "randomness") is { } randomness)
+        if (Get(game, "randomness") is { } randomness)
         {
             manifest.Randomness = Scalar(randomness) switch
             {
@@ -107,14 +139,14 @@ internal sealed class StoryYamlReader
             };
         }
 
-        if (Get(root, "seed") is { } seed)
+        if (Get(game, "seed") is { } seed)
         {
             manifest.Seed = ulong.TryParse(Scalar(seed), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
                 ? value
                 : Error<ulong?>(seed, "TW4003", "seed must be a non-negative whole number.", null);
         }
 
-        if (Get(root, "undo") is { } undo)
+        if (Get(game, "undo") is { } undo)
         {
             manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
                 ? enabled
@@ -122,7 +154,7 @@ internal sealed class StoryYamlReader
         }
 
         ReadTriggers(Get(root, "triggers"), manifest.Triggers);
-        manifest.Creation = ReadCreation(Get(root, "creation"), ruleset);
+        manifest.Creation = ReadCreation(Get(game, "creation"), ruleset);
         return manifest;
     }
 

@@ -8,7 +8,7 @@ public sealed class RicherHubTests
     {
         var source = new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = "id: hubs\ntitle: Hubs\nstart: hub\ncharacters:\n  player: {first-name: Tester}\n",
+            ["story.talewright.yaml"] = "game:\n  id: hubs\n  title: Hubs\n  start: hub\ncharacters:\n  player: {first-name: Tester}\n",
             ["main.tale"] = $$"""
                 === hub
                 @hub {{hub}}

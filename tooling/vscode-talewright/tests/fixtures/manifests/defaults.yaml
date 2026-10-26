@@ -1,6 +1,10 @@
-id: defaults
-title: Defaults
-start: beginning
+game:
+  id: defaults
+  title: Defaults
+  start: beginning
+  creation:
+    presets:
+      explorer: {}
 characters:
   player:
     first-name: Ada
@@ -8,6 +12,3 @@ items:
   coin: {}
 factions:
   guild: {}
-creation:
-  presets:
-    explorer: {}

@@ -13,7 +13,7 @@ public sealed class ValidationTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
-            "id: cli\ntitle: CLI\nversion: 1\nstart: a\ncharacters:\n  player: { first-name: Tester }\n");
+            "game:\n  id: cli\n  title: CLI\n  version: 1\n  start: a\ncharacters:\n  player: { first-name: Tester }\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"), "=== a\nHello.\n-> END");
     }
 

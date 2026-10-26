@@ -309,17 +309,17 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 {
                     if (key is not YamlScalarNode { Value: { } name }) continue;
                     var next = path.Append(name).ToArray();
-                    if (next is ["start"]) ReferenceNode(value, AuthoringSymbolKind.Scene);
-                    else if (next is ["ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset);
+                    if (next is ["game", "start"]) ReferenceNode(value, AuthoringSymbolKind.Scene);
+                    else if (next is ["game", "ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset);
                     else if (path is ["characters", _, "inventory"]) ReferenceNode(key, AuthoringSymbolKind.Item);
                     else if (next is ["characters", _, "inventory"] && value is YamlSequenceNode)
                         ReferenceNode(value, AuthoringSymbolKind.Item);
-                    else if (path is ["characters", _, "stats"] or ["items", _, "modifiers"] or ["creation", "stats"]
-                        or ["creation", "presets", _, "stats"]) ReferenceNode(key, AuthoringSymbolKind.Stat);
-                    if (next is ["characters"] or ["characters", _] or ["characters", _, "inventory"]
+                    else if (path is ["characters", _, "stats"] or ["items", _, "modifiers"] or ["game", "creation", "stats"]
+                        or ["game", "creation", "presets", _, "stats"]) ReferenceNode(key, AuthoringSymbolKind.Stat);
+                    if (next is ["game"] or ["characters"] or ["characters", _] or ["characters", _, "inventory"]
                         or ["characters", _, "stats"] or ["items"] or ["items", _] or ["items", _, "modifiers"]
-                        or ["ruleset"] or ["creation"] or ["creation", "stats"] or ["creation", "presets"]
-                        or ["creation", "presets", _] or ["creation", "presets", _, "stats"])
+                        or ["game", "ruleset"] or ["game", "creation"] or ["game", "creation", "stats"] or ["game", "creation", "presets"]
+                        or ["game", "creation", "presets", _] or ["game", "creation", "presets", _, "stats"])
                         Walk(value, next);
                 }
             }
@@ -339,7 +339,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 Symbols.Add(new(name, kind, type, _scalars[location].Range(0, name.Length)));
             }
         }
-        if (Get(root, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
+        if (Get(root, "game") is YamlMappingNode game &&
+            Get(game, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
         {
             Scalar(idNode);
             var location = new SourceLocation(StorySource.ManifestFileName, (int)idNode.Start.Line, (int)idNode.Start.Column);
@@ -359,7 +360,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
         if (Get(root, "flags") is YamlSequenceNode flags)
             foreach (var flag in flags.Children) Add(flag, AuthoringSymbolKind.Flag, "boolean");
-        if (Get(root, "ruleset") is YamlMappingNode ruleset && Get(ruleset, "stats") is YamlSequenceNode stats)
+        if (Get(root, "game") is YamlMappingNode gameConfig &&
+            Get(gameConfig, "ruleset") is YamlMappingNode ruleset &&
+            Get(ruleset, "stats") is YamlSequenceNode stats)
             foreach (var stat in stats.Children.OfType<YamlMappingNode>())
                 if (Get(stat, "id") is { } id) Add(id, AuthoringSymbolKind.Stat, "integer");
     }

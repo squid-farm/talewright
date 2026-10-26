@@ -25,24 +25,24 @@ and the current and decided quoting rules. Formatting design is tracked in
 ## 1. `story.talewright.yaml`
 
 ```yaml
-id: lost-relic # kebab-case, unique
-title: The Lost Relic
-version: 0.1.0
-start: camp.arrival # first scene id
-randomness: checks-only # off | checks-only (default)
-seed: 1234 # optional; omitted = random per playthrough
-undo: true # default; false hides Back/Forward without disabling saves
-
-ruleset:
-  base: generic # generic | none
-  disable: [cha] # remove stats from the base ruleset
-  stats: # add stats
-    - id: courage
-      name: Courage
-      category: attribute # attribute | skill | resource | progression | custom
-      min: 0
-      max: 10
-      default: 0
+game:
+  id: lost-relic # kebab-case, unique
+  title: The Lost Relic
+  version: 0.1.0
+  start: camp.arrival # first scene id
+  randomness: checks-only # off | checks-only (default)
+  seed: 1234 # optional; omitted = random per playthrough
+  undo: true # default; false hides Back/Forward without disabling saves
+  ruleset:
+    base: generic # generic | none
+    disable: [cha] # remove stats from the base ruleset
+    stats: # add stats
+      - id: courage
+        name: Courage
+        category: attribute # attribute | skill | resource | progression | custom
+        min: 0
+        max: 10
+        default: 0
 
 characters:
   player: # the id "player" is required
@@ -94,18 +94,19 @@ player requires a legal selection before play. The `player` declaration remains
 required and provides identity, inventory and other stat defaults.
 
 ```yaml
-creation:
-  name: true
-  pronouns: [they, she, he]
-  stats:
-    str: [8, 12, 16]
-  presets:
-    explorer:
-      label: Explorer
-      stats: {str: 12, hp: 15}
-    scholar:
-      label: Scholar
-      stats: {str: 8, hp: 10}
+game:
+  creation:
+    name: true
+    pronouns: [they, she, he]
+    stats:
+      str: [8, 12, 16]
+    presets:
+      explorer:
+        label: Explorer
+        stats: {str: 12, hp: 15}
+      scholar:
+        label: Scholar
+        stats: {str: 8, hp: 10}
 ```
 
 All fields are optional. The first listed pronoun and preset are the defaults.

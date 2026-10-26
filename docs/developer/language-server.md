@@ -79,14 +79,14 @@ string literals, and unknown namespaces do not receive story-ID suggestions.
 Identifiers replace the whole current token, including text after the cursor;
 existing `@`, `#`, quotes, and namespace colons are preserved.
 
-In canonical `story.talewright.yaml`, completion additionally resolves `start`,
-`ruleset.base`, `ruleset.disable`, character inventory/stat references, item
-modifier stats, and character-creation stats/preset stats. Trigger conditions
+In canonical `story.talewright.yaml`, completion additionally resolves `game.start`,
+`game.ruleset.base`, `game.ruleset.disable`, character inventory/stat references, item
+modifier stats, and `game.creation` stats/preset stats. Trigger conditions
 and effects use the same expression contexts as Talemark. Quoted and escaped YAML
 scalars map decoded prefixes back to authored replacement ranges. Red Hat YAML
 continues to provide structural key/schema suggestions independently.
 
-`ruleset.disable` uses the selected base ruleset's stat IDs before disables and
+`game.ruleset.disable` uses the selected base ruleset's stat IDs before disables and
 YAML additions; ordinary stat references use the final story stat table.
 Empty inventory/disabled-stat flow lists offer insertion edits inside the
 brackets, including when there is whitespace between them.

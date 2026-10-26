@@ -10,9 +10,10 @@ namespace Talewright.Runtime.Tests;
 public sealed class AuthorReloadTests
 {
     private const string Yaml = """
-        id: reload
-        title: Reload
-        start: start
+        game:
+          id: reload
+          title: Reload
+          start: start
         flags: [ready, rewarded]
         vars: {count: 0}
         characters:

@@ -10,7 +10,7 @@ namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
-    private const string Manifest = "id: lsp-test\ntitle: LSP test\nstart: start\ncharacters:\n  player: {first-name: Ada}\n";
+    private const string Manifest = "game:\n  id: lsp-test\n  title: LSP test\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
     private const string Valid = "=== start\nHello.\n-> END\n";
     private const string Invalid = "=== start\nHello.\n* [Missing] -> missing\n";
 

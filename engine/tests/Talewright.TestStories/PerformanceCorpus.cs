@@ -185,13 +185,14 @@ public sealed class PerformanceCorpus : IDisposable
     }
 
     private static string CreateManifest(string tierName) => $$"""
-        id: performance-{{tierName.ToLowerInvariant()}}
-        title: {{tierName}} performance corpus
-        version: 1.0.0
-        start: scene.0
-        seed: {{SeedValue}}
-        ruleset:
-          base: generic
+        game:
+          id: performance-{{tierName.ToLowerInvariant()}}
+          title: {{tierName}} performance corpus
+          version: 1.0.0
+          start: scene.0
+          seed: {{SeedValue}}
+          ruleset:
+            base: generic
         vars: {visits: 0}
         characters:
           player: {first-name: Tester}

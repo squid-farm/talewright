@@ -1,6 +1,7 @@
-id: text-schema
-title: Text schema
-start: beginning
+game:
+  id: text-schema
+  title: Text schema
+  start: beginning
 characters:
   player: { first-name: Ada }
 vars:

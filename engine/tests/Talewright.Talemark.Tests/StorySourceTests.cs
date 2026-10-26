@@ -36,7 +36,8 @@ public sealed class StorySourceTests : IDisposable
         var text = new string('x', 5 * 1024 * 1024);
         for (var i = 0; i < 10; i++)
         {
-            File.WriteAllText(Path.Combine(_root, $"{i}.tale"), text);
+            var name = i == 9 ? "shared.talewright.yaml" : $"{i}.tale";
+            File.WriteAllText(Path.Combine(_root, name), text);
         }
 
         Assert.Equal(10, StorySource.FromDirectory(_root).Files.Count);
@@ -87,7 +88,7 @@ public sealed class StorySourceTests : IDisposable
         using var oversizedFile = new MemoryStream();
         using (var archive = new ZipArchive(oversizedFile, ZipArchiveMode.Create, leaveOpen: true))
         {
-            using var entry = archive.CreateEntry("large.tale").Open();
+            using var entry = archive.CreateEntry("nested/large.talewright.yaml").Open();
             WriteBytes(entry, 5L * 1024 * 1024 + 1);
         }
 
@@ -99,7 +100,8 @@ public sealed class StorySourceTests : IDisposable
         {
             for (var index = 0; index < 11; index++)
             {
-                using var entry = archive.CreateEntry($"{index}.tale").Open();
+                var name = index == 10 ? "nested/config.talewright.yaml" : $"{index}.tale";
+                using var entry = archive.CreateEntry(name).Open();
                 WriteBytes(entry, index == 10 ? 1 : 5L * 1024 * 1024);
             }
         }
@@ -140,7 +142,7 @@ public sealed class StorySourceTests : IDisposable
         Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root, [child])).Message);
     }
 
-    private const string Manifest = "id: canonical\ntitle: Canonical\nstart: start\nruleset: { base: none }\ncharacters:\n  player:\n    first-name: Tester\n";
+    private const string Manifest = "game:\n  id: canonical\n  title: Canonical\n  start: start\n  ruleset: { base: none }\ncharacters:\n  player:\n    first-name: Tester\n";
     private const string Tale = "=== start\nHello.\n-> END\n";
 
     [Fact]
@@ -148,19 +150,64 @@ public sealed class StorySourceTests : IDisposable
         Assert.Equal("story.talewright.yaml", StorySource.ManifestFileName);
 
     [Fact]
-    public void Directory_loads_canonical_manifest_and_ignores_other_yaml()
+    public void Title_extraction_uses_game_title_without_a_legacy_root_fallback()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "title: Legacy title\n",
+        });
+
+        Assert.Null(source.ReadTitle());
+    }
+
+    [Fact]
+    public void Directory_loads_canonical_manifest_and_reports_extra_root_configuration()
     {
         Directory.CreateDirectory(Path.Combine(_root, "chapters"));
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Manifest);
         File.WriteAllText(Path.Combine(_root, "chapters", "main.tale"), Tale);
+        File.WriteAllText(Path.Combine(_root, "chapters", "characters.talewright.yaml"), "characters: {guide: {first-name: Guide}}\n");
         File.WriteAllText(Path.Combine(_root, "story.yaml"), "title: Unrelated\n");
         File.WriteAllText(Path.Combine(_root, "other.talewright.yaml"), "title: Not a manifest\n");
 
         var source = StorySource.FromDirectory(_root);
 
-        Assert.Equal(["chapters/main.tale", "story.talewright.yaml"], source.Files.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["chapters/characters.talewright.yaml", "chapters/main.tale", "other.talewright.yaml", "story.talewright.yaml"],
+            source.Files.Keys.Order(StringComparer.Ordinal));
         Assert.Equal("Canonical", source.ReadTitle());
-        Assert.True(StoryCompiler.Compile(source).Success);
+        var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+        Assert.Equal(new SourceLocation("other.talewright.yaml", 1, 1), diagnostic.Location);
+    }
+
+    [Fact]
+    public void Zip_loads_extra_root_configuration_and_reports_it()
+    {
+        using var zip = new MemoryStream(Talewright.Testing.TestArchives.Create([
+            new("story.talewright.yaml", Manifest),
+            new("extra.talewright.yaml", "title: Extra\n"),
+            new("chapters/characters.talewright.yaml", "characters: {guide: {first-name: Guide}}\n"),
+            new("main.tale", Tale),
+        ]));
+
+        var source = StorySource.FromZip(zip);
+        Assert.Contains("extra.talewright.yaml", source.Files.Keys);
+        Assert.Contains("chapters/characters.talewright.yaml", source.Files.Keys);
+        var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+        Assert.Equal(new SourceLocation("extra.talewright.yaml", 1, 1), diagnostic.Location);
+    }
+
+    [Fact]
+    public void Nested_story_manifest_cannot_declare_game_or_establish_a_second_story()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["chapter/story.talewright.yaml"] = "game: {id: nested, title: Nested, start: nested}\n",
+            ["chapters/main.tale"] = Tale,
+        });
+
+        var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+        Assert.Equal(new SourceLocation("chapter/story.talewright.yaml", 1, 7), diagnostic.Location);
     }
 
     [Fact]
