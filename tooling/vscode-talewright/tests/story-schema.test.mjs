@@ -52,6 +52,17 @@ test('schema validates every shipped story manifest', async () => {
   }
 });
 
+test('root game documents require a player while game-less fragments do not', () => {
+  const game = { id: 'root', title: 'Root', start: 'beginning' };
+  assertInvalid(validateManifest, { game }, 'root without characters', 'required');
+  assertInvalid(validateManifest, { game, characters: {} }, 'root without player', 'required');
+  assertValid(validateManifest, {
+    game, characters: { player: { 'first-name': 'Ada' } },
+  }, 'root with player');
+  assertValid(validateManifest, { characters: { guide: { 'first-name': 'Bea' } } }, 'character fragment');
+  assertValid(validateManifest, { items: { coin: 'Coin' } }, 'item fragment');
+});
+
 test('compiler, schema, and editor grammar accept the same identifiers', async () => {
   const pattern = schema.definitions.identifier.pattern;
   assert.ok(pattern.startsWith('^') && pattern.endsWith('$'), 'schema identifier pattern must be anchored');

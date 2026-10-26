@@ -10,17 +10,18 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
     private static StoryFixture Fixture() => TestStories.Linear with
     {
         Tale = TestStories.Linear.Tale.Replace("Mara's", "{player:first-name#possessive}"),
-        Yaml = TestStories.DefaultYaml.Replace("id: player-test", $"id: creation-{Guid.NewGuid():N}") + """
-
-            creation:
-              name: true
-              pronouns: [they, she]
-              stats:
-                str: [8, 12, 16]
-              presets:
-                explorer: {label: Explorer, stats: {str: 12}}
-                scholar: {label: Scholar, stats: {str: 8}}
-            """,
+        Yaml = TestStories.DefaultYaml.Replace("id: player-test", $"id: creation-{Guid.NewGuid():N}")
+            .Replace("  start: start", """
+              start: start
+              creation:
+                name: true
+                pronouns: [they, she]
+                stats:
+                  str: [8, 12, 16]
+                presets:
+                  explorer: {label: Explorer, stats: {str: 12}}
+                  scholar: {label: Scholar, stats: {str: 8}}
+            """),
     };
 
     [Theory]

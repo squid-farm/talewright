@@ -30,10 +30,11 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
     {
         const int samples = 5;
         var fixture = new StoryFixture("history-navigation", """
-            id: history-navigation
-            title: History navigation
-            start: loop
-            seed: 42
+            game:
+              id: history-navigation
+              title: History navigation
+              start: loop
+              seed: 42
             characters:
               player: {first-name: Tester}
             """, """

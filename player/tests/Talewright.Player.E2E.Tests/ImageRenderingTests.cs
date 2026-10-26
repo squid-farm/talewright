@@ -43,14 +43,14 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Expect(image).ToHaveAttributeAsync("src", url!);
         await Library();
         Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
-        var invalid = new StoryFixture("bad-images", "id: bad\ntitle: Bad\nstart: missing\n", "=== start\n-> END");
+        var invalid = new StoryFixture("bad-images", "game:\n  id: bad\n  title: Bad\n  start: missing\n", "=== start\n-> END");
         await Upload(invalid);
         await Expect(Page.Locator(".tw-library .tw-diagnostics")).ToBeVisibleAsync();
         await Page.Locator(".tw-resume").ClickAsync();
         await Expect(image).ToHaveAttributeAsync("src", url!);
         await Library();
         var text = new StoryFixture("replacement",
-            "id: replacement\ntitle: Replacement\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "game:\n  id: replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             "=== start\nReplacement text.\n-> END");
         await Upload(text);
         await Expect(Latest).ToContainTextAsync("Replacement text.");
@@ -94,7 +94,7 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Expect(images.Last).ToHaveAttributeAsync("src", url!);
         await Library();
         var replacement = new StoryFixture("image-replacement",
-            "id: image-replacement\ntitle: Replacement\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "game:\n  id: image-replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             "=== start\nReplacement.\n-> END");
         await Upload(replacement);
         await Expect(Latest).ToContainTextAsync("Replacement.");
@@ -105,7 +105,7 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
     public async Task Unsupported_archive_images_keep_effective_alt_and_visible_accessible_failure()
     {
         var fixture = new StoryFixture("archive-images",
-            "id: archive-images\ntitle: Archive images\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "game:\n  id: archive-images\n  title: Archive images\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             """
             === start
             Before **{image("map", "A useful map")}** after.

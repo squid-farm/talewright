@@ -111,6 +111,17 @@
       "description": "Optional story-wide condition/effect triggers."
     }
   },
+  "if": {
+    "required": ["game"]
+  },
+  "then": {
+    "required": ["characters"],
+    "properties": {
+      "characters": {
+        "required": ["player"]
+      }
+    }
+  },
   "additionalProperties": false,
   "definitions": {
     "nonEmptyString": {
