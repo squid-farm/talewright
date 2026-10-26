@@ -177,6 +177,9 @@ public sealed class PublishCommand : Command<PublishSettings>
                 File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime));
             }
 
+            if (allInOne && target == "web")
+                WebHostingSize.FromDirectory(content).WriteWarning(error, estimate: false);
+
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);
             temporaryZip = Path.Combine(Path.GetDirectoryName(final)!, $".talewright-{Guid.NewGuid():N}.zip.tmp");
             publication.CreateZip(content, temporaryZip, universalDesktop);

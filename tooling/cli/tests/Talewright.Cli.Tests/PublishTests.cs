@@ -99,6 +99,35 @@ public sealed class PublishTests : IDisposable
     }
 
     [Fact]
+    public void Final_web_payload_warning_counts_runtime_and_compressed_files_without_blocking_publication()
+    {
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, _, _, _, _) =>
+            {
+                var output = Path.Combine(working, "output");
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output, "index.html"), "<html></html>");
+                for (var i = 0; i < 500; ++i)
+                {
+                    File.WriteAllText(Path.Combine(output, $"runtime-{i}.wasm"), "runtime");
+                    File.WriteAllText(Path.Combine(output, $"runtime-{i}.wasm.br"), "compressed");
+                }
+                return output;
+            },
+        };
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["-a", "--target", "web"]);
+        Assert.Equal(0, result.Code);
+        Assert.Contains("final extracted web payload", result.Error);
+        Assert.Contains("1003 files", result.Error);
+        Assert.Contains("Advisory only", result.Error);
+        Assert.DoesNotContain("source-only estimate", result.Error);
+        using var zip = ZipFile.OpenRead(Zip);
+        Assert.Equal(1003, zip.Entries.Count);
+    }
+
+    [Fact]
     public void Universal_desktop_publication_keeps_all_runtime_folders_and_launchers()
     {
         var builds = new List<string>();

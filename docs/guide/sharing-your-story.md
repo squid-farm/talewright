@@ -22,7 +22,7 @@ talewright publish my-story --output my-story.zip
 The zip contains `story.talewright.yaml`, your `.tale` files and supported image files
 from `images/`, preserving their folders. Private notes and unsupported image formats
 are left out. Anyone can open it with **Open a story file** in the web player.
-Images are included so their references pass validation; they are not displayed yet.
+Images display lazily when opened in the desktop or web player, including ZIP uploads.
 
 ## A web game
 
@@ -38,6 +38,33 @@ during character creation; save/load, history, and Restart remain available duri
   *This file will be played in the browser*.
 - **Your own site:** extract the zip anywhere that serves static files: GitHub Pages, Netlify, a
   folder on your web server. It also works from a subfolder.
+
+### Artwork and hosting size
+
+Use PNG for graphics that need lossless detail or transparency, and JPEG or WebP for photographs
+and artwork where smaller downloads matter. Resize images for their intended display rather
+than shipping camera originals. Images fit narrow windows without stretching their aspect ratio;
+provide descriptive alt text for readers and for visible failure states.
+
+Lazy display delays image stream/Blob creation until an occurrence nears the viewport. It does
+not make image bytes free: downloads, retained history, Blob data and browser-decoded bitmaps
+consume resources. Repeated occurrences share transferred data while mounted, but distinct
+images can still accumulate in history.
+
+`validate` uses a source-only size estimate: UTF-8 source text and supported images, excluding the
+generated runtime and precompressed copies. `publish -a --target web` measures the **final
+extracted payload**, including those runtime and compression files. Both use one advisory check
+against [itch.io's HTML5 guidance](https://itch.io/docs/creators/html5), checked October 2026:
+200 MB per extracted file, 500 MB total, and 1,000 files. Talewright compares MB conservatively
+as decimal bytes. Hosts can change their requirements; other restrictions such as filename
+length also apply. A warning never changes validation success or prevents publication, including
+with `validate --warnings-as-errors` (which applies to compiler warnings).
+
+**Current embedded-artwork caveat:** generated games still embed story assets in the program.
+Large artwork collections can therefore push one generated file over the host's per-file limit,
+even when each original image is smaller. Lazy image display does not mean a lazy download of
+that embedded program. #271 moves story assets beside the host; it is a follow-up, not shipped here.
+Choose downloadable desktop distribution when browser hosting or resource use is unsuitable.
 
 ## A desktop game
 
