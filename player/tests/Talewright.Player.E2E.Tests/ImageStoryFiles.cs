@@ -10,7 +10,7 @@ internal sealed class ImageStoryFiles : IDisposable
     public string ImagePath => Path.Combine(Root, "images", "photo.jpeg");
     public const string Tale = """
         === start
-        Before {image("photo.jpeg", "A camp")} after.
+        Before {image("photo.jpeg", "A camp")} after. {var:greeting}
 
         > player: Dialogue {image("pixel.png", "A pixel")}.
 

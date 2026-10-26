@@ -76,6 +76,26 @@ public sealed class ValidationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Hosting_advisory_is_stderr_only_and_does_not_fail_warnings_as_errors(bool json)
+    {
+        var images = Directory.CreateDirectory(Path.Combine(_root, "images")).FullName;
+        for (var index = 0; index < 1001; index++)
+            File.WriteAllBytes(Path.Combine(images, $"image-{index}.png"), []);
+
+        var result = json ? Run("--format", "json", "--warnings-as-errors") : Run("--warnings-as-errors");
+        Assert.Equal(0, result.Code);
+        Assert.Contains("source-only estimate", result.Error);
+        Assert.Contains("1003 files", result.Error);
+        Assert.Contains("Advisory only", result.Error);
+        if (json)
+            Assert.Equal("""{"schemaVersion":1,"success":true,"diagnostics":[]}""", result.Output.Trim());
+        else
+            Assert.DoesNotContain("hosting", result.Output);
+    }
+
+    [Theory]
     [InlineData("""{image("maps/old_map-v2.png", "Map")}""", null, 0)]
     [InlineData("""{image("maps/old_map-v2", "Map")}""", "TW2013", 0)]
     [InlineData("""{image("maps/old_map-v2")}""", "TW2013,TW2014", 0)]

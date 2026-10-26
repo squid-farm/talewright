@@ -49,8 +49,17 @@ Register one as a singleton `IStoryLibrary` in the host.
 | Native Author Debugger, story folder | Supported: accepted-source image generations |
 | Built-in desktop/web samples | Supported: opt-in lazy embedded resource streams |
 | Desktop ZIP / browser upload | Retained compressed archive with lazy, bounded image reads |
-| Generated published desktop/web host | Unavailable state; published adapter/deployment remains #179 |
+| Generated published desktop/web host | Supported: same opt-in embedded resource streams, including static web subpaths |
 | Custom library using only `LoadAsync` | Text works; images show unavailable unless it supplies a capability |
+
+Generated hosts reuse the sample hosts' embedded-image capability and the publisher's validated
+staging; they do not introduce another image adapter or transport. Web asset URLs resolve
+relative to the page base. Embedded images may still arrive as part of the initial program
+download even though display/stream acquisition is lazy. See the author guide's
+[artwork and hosting size](../../../docs/guide/sharing-your-story.md#artwork-and-hosting-size)
+for the advisory source estimate, final web-payload measurement and current embedded-artwork caveat.
+Published Windows, macOS and ARM image playback remain unverified; Linux x64 and three browser
+engines have extracted-artifact coverage.
 
 `TalewrightApp` cascades the accepted `StoryImages`. Direct `StoryPlayer`/`DocumentView`
 consumers can supply a `CascadingValue<StoryImages>` with `StoryImages.FromDirectory` or

@@ -125,6 +125,8 @@ public sealed class PublishTests : IDisposable
         Assert.DoesNotContain("source-only estimate", result.Error);
         using var zip = ZipFile.OpenRead(Zip);
         Assert.Equal(1003, zip.Entries.Count);
+        Assert.Contains($"total {zip.Entries.Sum(entry => entry.Length)} bytes", result.Error);
+        Assert.Contains($"largest file {zip.Entries.Max(entry => entry.Length)} bytes", result.Error);
     }
 
     [Fact]

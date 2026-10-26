@@ -323,6 +323,7 @@ dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- \
   publish samples/LostRelic -a --target web --output artifacts/game-web.zip
 unzip artifacts/game-web.zip -d artifacts/game-web
 TALEWRIGHT_STANDALONE=1 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/game-web" \
+  TALEWRIGHT_STANDALONE_CREATION=1 TALEWRIGHT_PUBLISHED_CHARACTER=Mara \
   TALEWRIGHT_WEB_BASE_PATH=/games/published BROWSER=chromium \
   dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --filter Artifact=Standalone
 
@@ -330,6 +331,7 @@ dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- \
   publish samples/LostRelic -a --target desktop --output artifacts/game-desktop.zip
 unzip artifacts/game-desktop.zip -d artifacts/game-desktop
 TALEWRIGHT_STANDALONE=1 TALEWRIGHT_DESKTOP_EXECUTABLE="$PWD/artifacts/game-desktop/start.sh" \
+  TALEWRIGHT_STANDALONE_CREATION=1 TALEWRIGHT_PUBLISHED_CHARACTER=Mara \
   python3 player/tests/run_e2e.py linux --filter Artifact=Standalone
 ```
 
@@ -338,6 +340,33 @@ universal ZIP's actual launcher and selected self-contained Linux binary.
 `--runtime linux-x64` instead creates a flat single-runtime archive; point
 `TALEWRIGHT_DESKTOP_EXECUTABLE` at its `Talewright.Host.Desktop` binary.
 `TALEWRIGHT_PUBLISHED_TITLE` overrides the expected title for another story.
+The Lost Relic case also requires a decoded camp image with its effective alt
+(native geometry/browser natural dimensions), and uses Tomas from supporting configuration.
+Repeat browser runs with `BROWSER=firefox` and `BROWSER=webkit`. Do not use the web
+runner for extracted artifacts: it republishes the development host instead.
+
+Additional illustrated-artifact cases use the same opt-in harness:
+
+- Publish a folder matching [ImageStoryFiles](../player/tests/Talewright.Player.E2E.Tests/ImageStoryFiles.cs),
+  with its split configuration and JPEG/PNG/WebP files. Set `TALEWRIGHT_PUBLISHED_TITLE="Folder images"`
+  and filter `FullyQualifiedName~PublishedImageTests`. The case checks source-fragment text,
+  actual decoding across narrative surfaces, keyboard choice/history, and browser Blob sharing
+  and narrow layout. It runs on browser and native hosts.
+- For `FullyQualifiedName~PublishedImageFailureTests`, publish a story titled `Broken images`
+  whose first passage contains `Before`, an undecodable PNG with alt `Broken map`, and a valid
+  large JPEG with alt `Working camp`. A `Continue` choice must lead to a passage containing
+  `Next passage.`. The test requires visible accessible failure, successful decoding of the
+  other image and continued narrative play. Invalid image *references* and unsafe files are
+  rejected before host build by the CLI publication tests.
+- Publish a two-passage text-only story with a choice in each passage and run
+  `StandaloneArtifactTests`, setting its title and leaving creation disabled. This retains the
+  play/save/reload/Back/Restart contract without requiring artwork.
+
+Publish each fixture afresh for web and `--runtime linux-x64`, extract each ZIP and point
+the harness at that output, not at a source folder or previously published development host.
+The illustrated-format and failure tests are explicitly skipped unless their matching title
+is supplied; a skipped case is not acceptance evidence.
+
 For a story with opt-in character creation, set `TALEWRIGHT_STANDALONE_CREATION=1`;
 the same extracted-artifact test must complete creation before initial play and
 after process/browser restart. Its initial passage must contain

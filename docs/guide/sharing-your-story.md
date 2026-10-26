@@ -54,7 +54,7 @@ images can still accumulate in history.
 `validate` uses a source-only size estimate: UTF-8 source text and supported images, excluding the
 generated runtime and precompressed copies. `publish -a --target web` measures the **final
 extracted payload**, including those runtime and compression files. Both use one advisory check
-against [itch.io's HTML5 guidance](https://itch.io/docs/creators/html5), checked October 2026:
+against recorded [itch.io HTML5 guidance](https://itch.io/docs/creators/html5):
 200 MB per extracted file, 500 MB total, and 1,000 files. Talewright compares MB conservatively
 as decimal bytes. Hosts can change their requirements; other restrictions such as filename
 length also apply. A warning never changes validation success or prevents publication, including
@@ -63,7 +63,8 @@ with `validate --warnings-as-errors` (which applies to compiler warnings).
 **Current embedded-artwork caveat:** generated games still embed story assets in the program.
 Large artwork collections can therefore push one generated file over the host's per-file limit,
 even when each original image is smaller. Lazy image display does not mean a lazy download of
-that embedded program. #271 moves story assets beside the host; it is a follow-up, not shipped here.
+that embedded program. [#271](https://github.com/squid-farm/talewright/issues/271) moves story assets
+beside the host; it is a follow-up, not shipped here.
 Choose downloadable desktop distribution when browser hosting or resource use is unsuitable.
 
 ## A desktop game
