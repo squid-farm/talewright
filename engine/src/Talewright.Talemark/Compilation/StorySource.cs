@@ -114,6 +114,15 @@ public sealed class StorySource
     /// </summary>
     public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries)
     {
+        foreach (var entry in archive.Entries)
+        {
+            var path = entry.FullName.EndsWith('/') ? entry.FullName[..^1] : entry.FullName;
+            if (!StoryImageResolver.IsSafePath(path))
+            {
+                throw new InvalidDataException($"Unsafe story archive member '{entry.FullName}'. Use relative paths with / separators and no traversal or web addresses.");
+            }
+        }
+
         var entries = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name) && IsStoryFile(e.FullName)).ToList();
         var manifest = entries
             .Select(e => e.FullName.Replace('\\', '/'))
@@ -145,15 +154,6 @@ public sealed class StorySource
             if (!images.TryAdd(path, entry))
             {
                 throw new InvalidDataException($"Story image '{path}' has duplicate archive entries.");
-            }
-        }
-
-        foreach (var entry in archive.Entries)
-        {
-            var path = entry.FullName.EndsWith('/') ? entry.FullName[..^1] : entry.FullName;
-            if (!StoryImageResolver.IsSafePath(path))
-            {
-                throw new InvalidDataException($"Unsafe story archive member '{entry.FullName}'. Use relative paths with / separators and no traversal or web addresses.");
             }
         }
 

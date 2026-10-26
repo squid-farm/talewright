@@ -48,8 +48,7 @@ public sealed class StorySourceTests : IDisposable
 
     [Theory]
     [InlineData("", "images/camp.png")]
-    [InlineData("", "images\\camp.png")]
-    [InlineData("wrapped/", "wrapped\\images\\camp.png")]
+    [InlineData("wrapped/", "wrapped/images/camp.png")]
     public void Duplicate_normalized_archive_image_members_are_rejected_instead_of_selecting_ambiguous_bytes(
         string prefix, string duplicate)
     {
@@ -73,6 +72,9 @@ public sealed class StorySourceTests : IDisposable
     [InlineData("images/camp.png?query")]
     [InlineData("https://example.test/camp.png")]
     [InlineData("../characters/guide.talewright.yaml")]
+    [InlineData("images//")]
+    [InlineData("/")]
+    [InlineData("wrapped\\images\\camp.png")]
     public void Unsafe_archive_members_have_explicit_diagnostics(string path)
     {
         using var buffer = new MemoryStream();
@@ -82,6 +84,19 @@ public sealed class StorySourceTests : IDisposable
         var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer));
         Assert.Contains("Unsafe story archive member", error.Message);
         Assert.Contains(path, error.Message);
+    }
+
+    [Fact]
+    public void Unsafe_raw_alias_is_rejected_before_normalized_duplicate_detection()
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            output.CreateEntry("images/camp.png");
+            output.CreateEntry("images\\camp.png");
+        }
+        buffer.Position = 0;
+        Assert.Contains("Unsafe story archive member", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer)).Message);
     }
 
     [Theory]
