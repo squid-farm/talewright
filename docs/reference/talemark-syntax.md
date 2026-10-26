@@ -33,6 +33,10 @@ in a different file. The required `player` character may also be in a supporting
 
 Configuration filenames end in case-sensitive `.talewright.yaml`; unrelated YAML and `.yml` files
 are ignored. No additional configuration file is allowed beside the root manifest.
+The basename `story.talewright.yaml` is reserved for that single root manifest;
+using it in a subfolder is an error, not a nested story.
+Reserve the `.talewright.yaml` ending for story configuration rather than unrelated tool files.
+For practical layouts, see [Organizing your story](../guide/organizing-your-story.md).
 Supporting files cannot contain `game:`. Duplicate identities are errors naming both sources;
 there are no includes, overrides, or filename ordering rules. Only one file may declare `triggers:`,
 and its list runs in authored order. **Trigger order affects behavior**; keep the list in the root

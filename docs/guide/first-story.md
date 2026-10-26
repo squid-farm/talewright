@@ -221,6 +221,7 @@ The ferryman pushes off without you. Maybe tomorrow.
 ## Where next
 
 - **[Writing stories](writing-stories.md):** factions, hubs, triggers, character creation and more.
+- **[Organizing your story](organizing-your-story.md):** keep this simple layout or split related settings into smaller files.
 - **[The Lost Relic](../../samples/LostRelic):** a bigger sample that uses almost every feature.
   [Its README](../../samples/README.md) maps each feature to where it's used.
 - **[Testing your story](testing-your-story.md):** check your story without playing it, and jump to any scene.
