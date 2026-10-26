@@ -33,7 +33,13 @@ internal sealed class ImageStoryFiles : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(Root, "images"));
         File.WriteAllText(Path.Combine(Root, StorySource.ManifestFileName),
-            "game:\n  id: image-test\n  title: Folder images\n  start: start\n  undo: true\ncharacters:\n  player: {first-name: Tester}\n");
+            "game:\n  id: image-test\n  title: Folder images\n  start: start\n  undo: true\n");
+        Directory.CreateDirectory(Path.Combine(Root, "characters"));
+        File.WriteAllText(Path.Combine(Root, "characters", "player.talewright.yaml"),
+            "characters:\n  player: {first-name: Tester, inventory: [camera]}\n");
+        Directory.CreateDirectory(Path.Combine(Root, "world"));
+        File.WriteAllText(Path.Combine(Root, "world", "equipment.talewright.yaml"),
+            "items: {camera: {name: Camera}}\nvars: {greeting: \"Hello from supporting configuration.\"}\n");
         File.WriteAllText(TalePath, Tale);
         using var photo = Assembly.GetExecutingAssembly().GetManifestResourceStream("stories/LostRelic/images/camp-art.jpeg")
             ?? throw new InvalidOperationException("Missing real image test resource.");

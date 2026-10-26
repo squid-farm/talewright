@@ -78,7 +78,7 @@ public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "sto
             }
 
             var story = path[prefix.Length..slash];
-            if (path[(slash + 1)..].StartsWith("images/", StringComparison.Ordinal)) continue;
+            if (!StorySource.IsStoryFile(path[(slash + 1)..])) continue;
             using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
             if (!stories.TryGetValue(story, out var files))
             {

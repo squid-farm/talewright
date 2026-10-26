@@ -1,6 +1,7 @@
 # Talemark syntax reference
 
-A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
+A story is a **folder** containing one `story.talewright.yaml`, optional supporting `*.talewright.yaml` files
+in subfolders, and any number of `*.tale` files.
 **Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
 It combines prose with bold, italic and code formatting with dialogue, choices, conditions, and RPG effects
 through a small set of line-level directives and inline expressions. The YAML manifest defines
@@ -23,6 +24,24 @@ and the current and decided quoting rules. Formatting design is tracked in
 ---
 
 ## 1. `story.talewright.yaml`
+
+The root manifest owns `game:`. Supporting configuration files may declare `characters`, `items`,
+`factions`, `flags`, and numeric or text `vars`, using the same section shapes as the root.
+Each declaration kind has one story-wide namespace: paths do not assign scope, ownership, or precedence.
+All declarations are collected before references resolve, so a character can use an item declared
+in a different file. The required `player` character may also be in a supporting file.
+
+Configuration filenames end in case-sensitive `.talewright.yaml`; unrelated YAML and `.yml` files
+are ignored. No additional configuration file is allowed beside the root manifest.
+Supporting files cannot contain `game:`. Duplicate identities are errors naming both sources;
+there are no includes, overrides, or filename ordering rules. Only one file may declare `triggers:`,
+and its list runs in authored order. **Trigger order affects behavior**; keep the list in the root
+manifest unless there is a specific reason to move it. Each configuration file contains one YAML mapping document.
+Folder, ZIP, embedded, and published stories use the same inputs.
+
+Moving declarations preserves their meaning, but paths and text remain part of the source fingerprint.
+Reorganization is a source change, not a guarantee of compatibility with existing saves.
+The debugger requires an explicit restart after configuration additions, edits, renames, or deletions.
 
 ```yaml
 game:
