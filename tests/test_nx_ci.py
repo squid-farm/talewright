@@ -207,6 +207,7 @@ class CiRoutingTests(unittest.TestCase):
 
 class InfrastructureSelectionTests(unittest.TestCase):
     SCENARIOS = {
+        ".github/scripts/measure_dependency_reuse.py": {"checks"},
         ".github/scripts/nx_ci.py": {"checks"},
         ".github/scripts/package_version.py": {"build", "checks"},
         ".github/scripts/publish_samples.py": {"browser", "checks"},
