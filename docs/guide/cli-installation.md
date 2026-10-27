@@ -4,8 +4,8 @@ Talewright has an optional tool that checks your story for mistakes and makes a 
 with friends. It also opens the **Author Debugger**, a window where you can jump to a scene and try
 different choices without playing from the beginning.
 
-You may see this tool called the **CLI**. That means you give it short, typed instructions.
-You do not need to know how to program, and you do not need VS Code to use it.
+The command-line tool, or **CLI**, runs commands you enter in a terminal.
+The tool works with any text editor; VS Code is optional.
 
 **You can skip this setup.** Write your story in a text editor, zip its folder, and open the ZIP in
 the [web player](https://squid-farm.github.io/talewright/). It checks your story when you open it.
@@ -57,12 +57,12 @@ Moving just `Talewright.Cli` to your desktop will stop it working.
 Your computer may warn that it does not recognize this download. Stop if you are unsure;
 do not turn off your computer's security protection to make it run. The
 [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
-explain how to check a download if you or someone helping you wants to do that.
+cover download verification and operating-system security warnings.
 
 ## 3. Check that the tool opens
 
-This tool does not open by double-clicking it. Use a **terminal**: a window where you type an
-instruction and press **Enter**.
+Run the tool from a **terminal** rather than opening it by double-clicking. A terminal is a
+window where you enter a command and press **Enter**.
 
 Open a terminal in the folder containing `Talewright.Cli`:
 
@@ -86,7 +86,7 @@ Copy the line for your computer, paste it into that window, and press **Enter**:
 ./Talewright.Cli --help
 ```
 
-You should see a list of things the tool can do. You do not need to understand the whole list.
+A list of available commands should appear. This confirms the tool is ready to use.
 If you see an error instead, keep its exact wording and check **If something goes wrong** below.
 
 ## 4. Check your story
@@ -95,25 +95,26 @@ Find the folder that contains your story's `story.talewright.yaml` file. Copy th
 location from your file manager. Keep the quotation marks in the examples below: they let folder
 names contain spaces.
 
-In the same terminal window, use the line for your computer, replacing the example location with
-your own story folder:
+In the same terminal window, use the line for your computer. Replace `<your user>` with your
+computer's username, or replace the entire example path with your story folder's location.
+Keep the quotation marks around the path.
 
 **Windows:**
 
 ```powershell
-.\Talewright.Cli.exe validate "C:\Users\Mary\Documents\My Story"
+.\Talewright.Cli.exe validate "C:\Users\<your user>\Documents\My Story"
 ```
 
 **Mac:**
 
 ```bash
-./Talewright.Cli validate "/Users/Mary/Documents/My Story"
+./Talewright.Cli validate "/Users/<your user>/Documents/My Story"
 ```
 
 **Linux:**
 
 ```bash
-./Talewright.Cli validate "/home/mary/Documents/My Story"
+./Talewright.Cli validate "/home/<your user>/Documents/My Story"
 ```
 
 The tool reports mistakes with the file and line to look at. Start with the first message, fix it
@@ -137,14 +138,13 @@ With the Talewright extension installed, open **Settings**, search for
 
 ## If something goes wrong
 
-- **No download for your computer?** Use the web player. You do not have to build Talewright
-  yourself to write a story.
+- **No download for your computer?** You can continue writing and testing stories with the web player.
 - **The tool cannot find your story?** Give it the folder containing `story.talewright.yaml`,
   not the `.tale` file or the ZIP. Keep quotation marks around the folder's location.
 - **The tool will not open, or mentions a missing library?** Your computer may need an extra
   supporting component. Do not delete the other files from the download. The
   [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
-  list what each computer needs. If someone is helping you, show them the exact error message.
+  list what each computer needs.
 - **The Author Debugger will not open?** It needs a desktop window and your computer's web-viewing
   components. Windows may need **Microsoft Edge WebView2**; Linux needs additional packages.
   You can still check and share your story without the debugger.
@@ -152,6 +152,10 @@ With the Talewright extension installed, open **Settings**, search for
 Checking a story and making a story ZIP do **not** require installing .NET developer tools.
 Making a separate website or desktop game still needs extra developer setup; a ZIP for the web
 player is the simpler way to share.
+
+Still stuck? [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
+Include your operating system, the Talewright version, what you tried, and the exact error message.
+A GitHub account is required. Don't include private story files or personal information.
 
 ## Update or remove the tools
 
