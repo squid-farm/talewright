@@ -31,7 +31,8 @@
     "commands": [
       { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
       { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
-      { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" }
+      { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" },
+      { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" }
     ],
     "taskDefinitions": [{
       "type": "talewright",
@@ -44,7 +45,7 @@
     "configuration": {
       "title": "Talewright",
       "properties": {
-        "talewright.cli.executablePath": { "type": "string", "default": "", "scope": "resource", "description": "Absolute path to the separately installed Talewright CLI executable. Leave empty to use talewright on PATH; never uses the bundled language server." },
+        "talewright.cli.executablePath": { "type": "string", "default": "", "scope": "resource", "description": "Absolute path to the separately installed Talewright CLI executable. Leave empty to use talewright on PATH or in ~/.dotnet/tools. Use Talewright: Set Up CLI for explicit installation guidance; never uses the bundled language server." },
         "talewright.languageServer.enabled": { "type": "boolean", "default": true, "description": "Enable shared live diagnostics, completion, and hover. Reload the window after changing settings." },
         "talewright.languageServer.command": { "type": "string", "default": "", "description": "Leave empty to use the bundled Linux x64 server. Set an executable explicitly only for development; never installed or built automatically." },
         "talewright.languageServer.args": { "type": "array", "items": { "type": "string" }, "default": ["--stdio"], "description": "Server arguments; for a local build use dotnet with the server DLL followed by --stdio." },

@@ -5,20 +5,22 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../author-actions.cjs', import.meta.url), 'utf8');
+const toolsSource = await readFile(new URL('../cli-tools.cjs', import.meta.url), 'utf8');
 
 function host(options = {}) {
   const uri = file => ({ scheme: 'file', fsPath: file });
-  const calls = { tasks: [], errors: [], picks: [], dialogs: [], commands: new Map() };
+  const calls = { tasks: [], errors: [], picks: [], dialogs: [], messages: [], warnings: [], updates: [], urls: [], fetches: [], sdk: [], commands: new Map() };
   const roots = options.roots ?? ['/workspace/My Story'];
   const documents = options.documents ?? [];
   const vscode = {
-    Uri: { file: uri },
+    Uri: { file: uri, parse: url => url },
     RelativePattern: class { constructor(folder, pattern) { this.folder = folder; this.pattern = pattern; } },
     ProcessExecution: class { constructor(executable, args, settings) { Object.assign(this, { executable, args, settings }); } },
     Task: class { constructor(definition, scope, name, source, execution, problemMatchers) {
       Object.assign(this, { definition, scope, name, source, execution, problemMatchers });
     } },
     TaskRevealKind: { Always: 1 }, TaskPanelKind: { Dedicated: 2 }, TaskScope: { Global: 1, Workspace: 2 },
+    env: { openExternal: async url => { calls.urls.push(url); return true; } },
     workspace: {
       isTrusted: options.trusted ?? true,
       workspaceFolders: (options.folders ?? ['/workspace']).map(folder => ({ uri: uri(folder) })),
@@ -27,35 +29,90 @@ function host(options = {}) {
         const relative = path.relative(pattern.folder.uri.fsPath, root);
         return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
       }).map(root => uri(`${root}/story.talewright.yaml`)),
-      getConfiguration: () => ({ get: () => options.executable ?? '' }),
-      getWorkspaceFolder: () => ({ uri: uri('/workspace') }),
+      getConfiguration: (section, resource) => {
+        calls.configurationResource = resource;
+        return {
+          get: () => options.executable ?? '',
+          update: async (key, value) => { calls.updates.push([key, value]); options.executable = value; },
+        };
+      },
+      getWorkspaceFolder: resource => vscode.workspace.workspaceFolders.find(folder => {
+        const relative = path.relative(folder.uri.fsPath, resource.fsPath);
+        return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+      }),
     },
     window: {
       activeTextEditor: options.active ? { document: { uri: uri(options.active) } } : undefined,
-      showErrorMessage: async message => calls.errors.push(message),
-      showQuickPick: async choices => { calls.picks.push(choices); return choices[options.pick]; },
-      showWarningMessage: async () => options.saveChoice,
+      showErrorMessage: async (message, ...actions) => { calls.errors.push(message); calls.errorActions = actions; return options.errorChoice; },
+      showInformationMessage: async message => { calls.messages.push(message); return options.infoChoice; },
+      showQuickPick: async (choices, settings) => { calls.picks.push(choices); calls.pickSettings = settings; return choices[options.pick]; },
+      showWarningMessage: async message => { calls.warnings.push(message); options.onConsent?.(vscode); return options.saveChoice; },
+      showOpenDialog: async () => options.selected ? [uri(options.selected)] : undefined,
       showSaveDialog: async settings => { calls.dialogs.push(settings); return options.output ? uri(options.output) : undefined; },
     },
-    commands: { registerCommand: (id, handler) => { calls.commands.set(id, handler); return {}; } },
+    commands: {
+      registerCommand: (id, handler) => { calls.commands.set(id, handler); return {}; },
+      executeCommand: async id => calls.commands.get(id)(),
+    },
     tasks: {
       registerTaskProvider: (type, provider) => { calls.provider = provider; return {}; },
-      executeTask: async task => { calls.tasks.push(task); if (options.launchError) throw new Error(options.launchError); },
+      executeTask: async task => {
+        calls.tasks.push(task);
+        if (options.launchError) throw new Error(options.launchError);
+        calls.execution = { task };
+        if (options.installSuccess) files.push('/home/author/.dotnet/tools/talewright');
+        if (!options.noProcess) {
+          calls.endHandler?.({ execution: calls.execution, exitCode: options.cancelledInstall ? undefined : options.exitCode ?? 0 });
+        }
+        calls.taskEndHandler?.({ execution: calls.execution });
+        return calls.execution;
+      },
+      onDidEndTaskProcess: handler => {
+        calls.endHandler = handler;
+        return { dispose() {} };
+      },
+      onDidEndTask: handler => {
+        calls.taskEndHandler = handler;
+        return { dispose() {} };
+      },
     },
   };
   const files = options.files ?? ['/bin/talewright'];
   const module = { exports: {} };
-  vm.runInNewContext(source, {
-    require: name => ({
-      vscode, 'node:path': path, 'node:fs': { constants: { X_OK: 1, F_OK: 0 } },
-      'node:fs/promises': {
-        access: async file => { if (!files.includes(file)) throw Object.assign(new Error('missing'), { code: 'ENOENT' }); },
-        stat: async () => ({ isFile: () => true }),
-      },
-    })[name],
-    process: { platform: 'linux', env: { PATH: '/bin' } }, module,
-  });
-  module.exports.registerAuthorActions({ subscriptions: [] });
+  const dependencies = {
+    vscode, 'node:path': path, 'node:fs': { constants: { X_OK: 1, F_OK: 0 } },
+    'node:os': { homedir: () => '/home/author' },
+    'node:child_process': { execFile: {} },
+    'node:util': { promisify: () => async (...args) => {
+      calls.sdk.push(args);
+      if (options.sdkError) throw Object.assign(new Error(options.sdkError), { code: options.sdkError });
+      return { stdout: options.sdks ?? '' };
+    } },
+    'node:fs/promises': {
+      access: async file => { if (!files.includes(file)) throw Object.assign(new Error('missing'), { code: 'ENOENT' }); },
+      stat: async () => ({ isFile: () => true }),
+      readFile: async () => JSON.stringify({ version: options.version ?? '0.1.0-preview.1' }),
+    },
+  };
+  const globals = {
+    process: { platform: 'linux', arch: 'x64', env: { PATH: '/bin' } },
+    AbortSignal,
+    fetch: async url => {
+      calls.fetches.push(url);
+      if (options.networkError) throw new Error(options.networkError);
+      return {
+        status: options.httpStatus ?? 200, ok: !options.httpStatus || options.httpStatus === 200,
+        json: async () => url.includes('nuget.org') ? { versions: options.versions ?? ['0.1.0-preview.1'] }
+          : { assets: (options.assets ?? ['talewright-cli-0.1.0-preview.1-linux-x64.tar.gz',
+            'talewright-cli-0.1.0-preview.1-linux-x64.tar.gz.sha256']).map(name => ({ name })) },
+      };
+    },
+  };
+  const tools = { exports: {} };
+  vm.runInNewContext(toolsSource, { ...globals, require: name => dependencies[name], module: tools });
+  dependencies['./cli-tools.cjs'] = tools.exports;
+  vm.runInNewContext(source, { ...globals, require: name => dependencies[name], module });
+  module.exports.registerAuthorActions({ subscriptions: [], extensionPath: '/extension' });
   const run = name => calls.commands.get(`talewright.${name}`)();
   return { calls, run };
 }
@@ -226,4 +283,146 @@ test('debug action and reusable task share selection, executable, trust and save
     definition, scope: { uri: { scheme: 'file', fsPath: '/workspace' } },
   }), undefined);
   assert.match(untrusted.calls.errors[0], /Trust this workspace/);
+});
+
+test('setup is invocation-only and preserves existing custom, PATH and global tool installations', async () => {
+  for (const options of [{}, { executable: '/tools/My CLI', files: ['/tools/My CLI'] },
+    { files: ['/home/author/.dotnet/tools/talewright'] }]) {
+    const { calls, run } = host(options);
+    assert.equal(calls.sdk.length, 0);
+    assert.equal(calls.messages.length, 0);
+    await run('setUpCli');
+    assert.match(calls.messages[0], /existing.*No installation or upgrade/);
+    assert.equal(calls.sdk.length, 0);
+    assert.equal(calls.tasks.length, 0);
+    await run('validateStory');
+    assert.equal(calls.tasks.length, 1);
+  }
+});
+
+test('setup respects trust and broken custom paths; missing CLI action offers explicit setup', async () => {
+  for (const options of [{ trusted: false }, { executable: '/missing/custom', files: [] }]) {
+    const { calls, run } = host(options);
+    await run('setUpCli');
+    assert.equal(calls.errors.length, 1);
+    assert.equal(calls.sdk.length, 0);
+    assert.equal(calls.tasks.length, 0);
+    assert.equal(calls.updates.length, 0);
+  }
+  const missing = host({ files: [], errorChoice: 'Set Up CLI' });
+  await missing.run('validateStory');
+  assert.equal(missing.calls.sdk.length, 1);
+  assert.equal(missing.calls.tasks.length, 0);
+  const outside = host({ active: '/outside/file.txt' });
+  await outside.run('setUpCli');
+  assert.equal(outside.calls.configurationResource.fsPath, '/workspace');
+});
+
+test('only a stable .NET 10 SDK offers tool installation, and cancellation installs nothing', async () => {
+  for (const options of [{ sdks: '9.0.100 [/sdk]\n11.0.100 [/sdk]' }, { sdkError: 'ENOENT' },
+    { sdks: '10.0.100-rc.1 [/sdk]' }]) {
+    const { calls, run } = host({ files: [], ...options });
+    await run('setUpCli');
+    assert.equal(calls.picks[0][0], 'Use standalone download');
+    assert.match(calls.pickSettings.placeHolder, /No compatible/);
+    assert.equal(calls.fetches.length, 0);
+  }
+  const cancelled = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 0 });
+  await cancelled.run('setUpCli');
+  assert.equal(cancelled.calls.warnings.length, 1);
+  assert.equal(cancelled.calls.tasks.length, 0);
+});
+
+test('approved installation pins the published version and discovers the new shim without PATH refresh', async () => {
+  const { calls, run } = host({
+    files: [], sdks: '10.0.113 [/sdk]', pick: 0, saveChoice: 'Install CLI', installSuccess: true,
+  });
+  await run('setUpCli');
+  const task = calls.tasks[0];
+  assert.equal(task.execution.executable, 'dotnet');
+  assert.deepEqual(Array.from(task.execution.args), [
+    'tool', 'install', '--global', 'Talewright.Cli', '--version', '0.1.0-preview.1',
+    '--source', 'https://api.nuget.org/v3/index.json',
+  ]);
+  assert.equal(task.presentationOptions.focus, true);
+  assert.equal(calls.updates.length, 0);
+  assert.equal(calls.errors.length, 0);
+  await run('validateStory');
+  assert.equal(calls.tasks[1].execution.executable, '/home/author/.dotnet/tools/talewright');
+  for (const version of ['0.1.0-preview.2', '0.1.0']) {
+    const other = host({ files: [], version, versions: [version], sdks: '10.0.113 [/sdk]',
+      pick: 0, saveChoice: 'Install CLI', installSuccess: true });
+    await other.run('setUpCli');
+    assert.equal(other.calls.tasks[0].execution.args[5], version);
+  }
+});
+
+test('unavailable version, feed/network/SDK failures and revoked trust never install', async () => {
+  for (const [options, expected] of [
+    [{ versions: [] }, /not published/], [{ httpStatus: 404 }, /not published/],
+    [{ httpStatus: 401 }, /HTTP 401/], [{ networkError: 'offline' }, /offline/],
+    [{ sdkError: 'EACCES' }, /Could not inspect/],
+    [{ version: '0.1.0-preview.2', versions: ['0.1.0-preview.1'] }, /0.1.0-preview.2 is not published/],
+    [{ version: '../bad' }, /no supported CLI version/],
+    [{ onConsent: vscode => { vscode.workspace.isTrusted = false; }, saveChoice: 'Install CLI' }, /Trust/],
+  ]) {
+    const { calls, run } = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 0, ...options });
+    await run('setUpCli');
+    assert.match(calls.errors[0], expected);
+    assert.equal(calls.tasks.length, 0);
+    assert.equal(calls.updates.length, 0);
+  }
+});
+
+test('failed installation reports failure; standalone requires a separate explicit choice', async () => {
+  const options = { files: [], sdks: '10.0.113 [/sdk]', pick: 0, saveChoice: 'Install CLI', exitCode: 1 };
+  const failed = host(options);
+  await failed.run('setUpCli');
+  assert.match(failed.calls.errors[0], /failed or was cancelled.*exit 1/);
+  assert.equal(failed.calls.messages.length, 0);
+  assert.equal(failed.calls.urls.length, 0);
+  assert.ok(failed.calls.errorActions.includes('Use standalone instead'));
+  const explicit = host({ ...options, errorChoice: 'Use standalone instead' });
+  await explicit.run('setUpCli');
+  assert.deepEqual(explicit.calls.urls, ['https://github.com/squid-farm/talewright/releases/tag/v0.1.0-preview.1']);
+  const launch = host({ ...options, launchError: 'permission denied' });
+  await launch.run('setUpCli');
+  assert.match(launch.calls.errors[0], /permission denied/);
+  const cancelled = host({ ...options, cancelledInstall: true });
+  await cancelled.run('setUpCli');
+  assert.match(cancelled.calls.errors[0], /failed or was cancelled.*unknown/);
+  assert.equal(cancelled.calls.messages.length, 0);
+  const noProcess = host({ ...options, noProcess: true });
+  await noProcess.run('setUpCli');
+  assert.match(noProcess.calls.errors[0], /failed or was cancelled.*unknown/);
+  assert.equal(noProcess.calls.messages.length, 0);
+  await noProcess.run('setUpCli');
+  assert.equal(noProcess.calls.tasks.length, 2, 'A terminated task must not leave the installation lock held');
+  const noShim = host({ ...options, exitCode: 0 });
+  await noShim.run('setUpCli');
+  assert.match(noShim.calls.errors[0], /CLI not found/);
+  assert.equal(noShim.calls.messages.length, 0, 'Exit zero without a discoverable CLI is not setup success');
+});
+
+test('standalone opens only an existing release with archive/checksum; selection is space-safe', async () => {
+  const unavailable = host({ files: [], pick: 0, assets: [] });
+  await unavailable.run('setUpCli');
+  assert.match(unavailable.calls.errors[0], /does not supply/);
+  assert.equal(unavailable.calls.urls.length, 0);
+  const missing = host({ files: [], pick: 0, httpStatus: 404 });
+  await missing.run('setUpCli');
+  assert.equal(missing.calls.urls.length, 0);
+  const executable = '/downloads/My CLI/Talewright.Cli';
+  const selected = host({ files: [executable], pick: 0, selected: executable, infoChoice: 'Select Executable' });
+  await selected.run('setUpCli');
+  assert.deepEqual(selected.calls.updates, [['cli.executablePath', executable]]);
+  await selected.run('validateStory');
+  assert.equal(selected.calls.tasks[0].execution.executable, executable);
+  const cancelled = host({ files: [], pick: 1 });
+  await cancelled.run('setUpCli');
+  assert.equal(cancelled.calls.updates.length, 0);
+  const invalid = host({ files: ['/downloads/CLI.dll'], pick: 1, selected: '/downloads/CLI.dll' });
+  await invalid.run('setUpCli');
+  assert.match(invalid.calls.errors[0], /not its DLL/);
+  assert.equal(invalid.calls.updates.length, 0);
 });

@@ -128,9 +128,14 @@ setup; checking your story does not require opening the debugger.
 The Talewright extension's writing help and these tools are separate. Installing the extension
 does not install the CLI.
 
-With the Talewright extension installed, open **Settings**, search for
-**Talewright CLI Executable Path**, and enter the full location of `Talewright.Cli.exe` or
-`Talewright.Cli` in your unpacked folder. Then open your story folder and use the Command Palette:
+With the Talewright extension installed, open your story folder and run **Talewright: Set Up CLI**
+from the Command Palette. It uses an existing installation when available. Otherwise, it offers
+a download for your computer or, if the required .NET tools are installed, asks for approval to
+install the CLI. Nothing is installed just by opening your story.
+
+For a download you have already unpacked, choose **Select Existing Executable** and select
+`Talewright.Cli.exe` or `Talewright.Cli` from that folder. You can also enter its full location in
+**Settings > Talewright CLI Executable Path**. Then use the Command Palette:
 
 - **Talewright: Validate Story** checks for mistakes.
 - **Talewright: Publish Story ZIP** lets you choose where to save a ZIP for the web player.
@@ -139,6 +144,9 @@ With the Talewright extension installed, open **Settings**, search for
 ## If something goes wrong
 
 - **No download for your computer?** You can continue writing and testing stories with the web player.
+- **Setup says a version or download is unavailable?** That version has not been published yet.
+  You can select an existing installation or use the web player. Setup will not install a different
+  version or switch installation methods without your choice.
 - **The tool cannot find your story?** Give it the folder containing `story.talewright.yaml`,
   not the `.tale` file or the ZIP. Keep quotation marks around the folder's location.
 - **The tool will not open, or mentions a missing library?** Your computer may need an extra

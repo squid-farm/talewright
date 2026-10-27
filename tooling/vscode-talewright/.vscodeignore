@@ -7,6 +7,7 @@ artifacts/**
 package-lock.json
 extension.cjs
 author-actions.cjs
+cli-tools.cjs
 server/**/*.pdb
 server/**/*.xml
 **/project.json

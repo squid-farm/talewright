@@ -78,6 +78,10 @@ async function testAuthorActions(extension) {
   const document = await vscode.workspace.openTextDocument(path.join(root, 'start.tale'));
   await vscode.window.showTextDocument(document);
   await extension.activate();
+  const configuredCli = vscode.workspace.getConfiguration('talewright', document.uri).get('cli.executablePath');
+  await vscode.commands.executeCommand('talewright.setUpCli');
+  assert.equal(vscode.workspace.getConfiguration('talewright', document.uri).get('cli.executablePath'), configuredCli,
+    'Setup must preserve an existing configured CLI');
   const run = async (command, stopDebugger = false) => {
     let execution;
     let pid;
