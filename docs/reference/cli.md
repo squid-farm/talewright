@@ -1,8 +1,10 @@
 # CLI reference
 
-The `talewright` command validates, lints, debugs and publishes stories. See
-[Getting started](../guide/getting-started.md#install-the-desktop-tools) to install it. Until
-ready-made downloads arrive, use `dotnet run --project tooling/cli/src/Talewright.Cli --` in place of `talewright`.
+The `talewright` command validates, lints, debugs and publishes stories. It is an optional tool for
+authors who want to make a standalone web or desktop game; you do not need it to share a story zip
+with friends. See [Getting started](../guide/getting-started.md#optional-install-the-desktop-tools)
+to install it. Until ready-made downloads arrive, use
+`dotnet run --project tooling/cli/src/Talewright.Cli --` in place of `talewright`.
 
 | Command | Does |
 |---|---|
@@ -12,6 +14,8 @@ ready-made downloads arrive, use `dotnet run --project tooling/cli/src/Talewrigh
 | `talewright publish <story>` | Builds a story zip, web game or desktop game. |
 
 `talewright --help` and `talewright <command> --help` list every option. Unknown options are rejected.
+For the usual one-file web game, start with the [sharing guide](../guide/sharing-your-story.md#a-web-game).
+The less common desktop split-build and file-replacement details are covered below.
 
 ## Options shared by all commands
 
@@ -161,7 +165,7 @@ Validates first, then builds. For a walkthrough, see [Sharing your story](../gui
 | `--split` | With `-a --target desktop`, write one self-contained ZIP per supported runtime into the `--output` directory. Cannot be combined with `--runtime`; it is not supported for story-only or web output. Filenames are `<story-id>-<rid>.zip`. |
 | `--force` | Authorize replacement without asking, independently of `--non-interactive`. |
 
-### Split desktop output
+### Advanced: split desktop output
 
 ```bash
 talewright publish path/to/story -a --target desktop --split --output desktop-builds/
@@ -186,7 +190,7 @@ trigger best-effort rollback, retaining recovery backups if rollback itself fail
 publishers targeting the same directory are not locked out. Do not rely on cross-file atomicity or
 crash durability. Each ZIP independently retains the published-output limits.
 
-### Replacing an existing archive
+### Advanced: replacing an existing archive
 
 For a new output path, publication never asks a question. For an existing file, an interactive
 terminal shows the full destination path and asks `Replace it? [y/N]` **before** compiling or building.
@@ -206,7 +210,7 @@ talewright publish path/to/story --output story.zip --non-interactive --force
 `--force` also works on its own in an interactive terminal without asking. It never bypasses story
 validation or build errors.
 
-**Overlapping publications.** Without force, a file that appears while publishing is not overwritten.
+**Advanced safety detail: overlapping publications.** Without force, a file that appears while publishing is not overwritten.
 For an approved existing file, publish compares its content fingerprint, size, timestamps and link
 target again just before replacement. If it has observably changed or disappeared, publish fails
 instead of using the earlier approval. Retry to approve the current file, choose a new path, or

@@ -48,11 +48,12 @@ Its `.tale` files combine bold, italic and code formatting with dialogue, choice
 Open the **[web player](https://squid-farm.github.io/talewright/)** and pick *The Lost Relic*. Nothing
 to install.
 
-## Install the desktop tools
+## Optional: install the desktop tools
 
-The web player is enough to start. For serious writing, install the desktop tools: the `talewright`
-command checks your story in seconds and publishes finished games, and the **Author Debugger** jumps
-to any scene with any game state.
+The web player is enough to start and share a story zip with friends. For a faster authoring loop or
+to publish a standalone website or desktop game, install the desktop tools: the `talewright` command
+checks your story and publishes finished games, and the **Author Debugger** jumps to any scene with
+any game state. This setup currently requires developer tools.
 
 1. Install the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 2. Download [Talewright as a zip](https://github.com/squid-farm/talewright/archive/refs/heads/main.zip),
@@ -63,20 +64,22 @@ The docs write commands as `talewright ...`. Until downloads are ready, read tha
 `dotnet run --project tooling/cli/src/Talewright.Cli -- ...`, run from the extracted folder.
 
 Ready-made downloads are planned ([#33](https://github.com/squid-farm/talewright/issues/33)).
-[Getting started](docs/guide/getting-started.md#install-the-desktop-tools) has the details, including
+[Getting started](docs/guide/getting-started.md#optional-install-the-desktop-tools) has the details, including
 Linux notes and Git instructions.
 
 ## Write your first story
 
-1. Create a folder with a `story.talewright.yaml` (title, start scene, characters) and a `story.tale` (your scenes).
+1. Create a folder with a `story.talewright.yaml` (game settings and character declarations) and a `story.tale` (your scenes).
    You can also copy the [sample story](samples/LostRelic) and edit it.
-2. Check it: `talewright validate my-story` lists every problem with its file and line.
+2. Check it: `talewright validate my-story` lists every problem with its file and line. Without the
+   desktop tools, zip the folder and open it in the web player to check it.
 3. Play it in the desktop player, which opens the folder directly. Or zip the folder and choose
    **Open a story file** in the [web player](https://squid-farm.github.io/talewright/).
 4. Fix, check again, and replay.
 
 The **[first story tutorial](docs/guide/first-story.md)** walks through this with a complete example.
-Keep the **[Talemark syntax reference](docs/reference/talemark-syntax.md)** handy while you write.
+The [Talemark syntax reference](docs/reference/talemark-syntax.md) starts with basic examples and
+continues into the full language details.
 
 ## Share your story
 
