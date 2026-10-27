@@ -3,6 +3,11 @@
 Story authors don't need any of this. Packages are for C# extensions (custom predicates, rulesets,
 effects) and for apps that embed Talewright.
 
+Extensions run as executable code in your host, not in a Talewright sandbox.
+Custom hosts and registrations can change or bypass framework boundaries; see
+[distribution and runtime safety](../reference/safety.md) before making safety
+claims about a customized game.
+
 ## Which package?
 
 | Package | Use |
