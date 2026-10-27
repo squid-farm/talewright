@@ -142,8 +142,9 @@ never publishes, even when run against a tag.
 - Version tags additionally build self-contained CLI/debugger archives for the six existing RIDs.
   The existing release gate requires their build/asset checks and six SHA-256 files; the GitHub job
   attaches those archives/checksums alongside the VSIX without rebuilding them after approval.
-  See [CLI installation](../guide/cli-installation.md) for per-command prerequisites and verification
-  limits. Cross-building Windows/macOS/ARM does not verify execution on those platforms.
+  See the [author setup guide](../guide/cli-installation.md) for download instructions and
+  [technical CLI setup](cli-setup.md) for per-command prerequisites and verification limits.
+  Cross-building Windows/macOS/ARM does not verify execution on those platforms.
 - Player release downloads, installers, package managers and Open VSX remain separate follow-ups.
 
 ## Offline validation

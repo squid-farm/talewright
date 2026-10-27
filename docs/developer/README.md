@@ -13,6 +13,7 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [Decision records](adr) | The big design decisions in long form |
 | [Issue tracking](issues.md) | Full claim/status workflow for people and agents |
 | [Releasing and CI](releasing.md) | Workflows, GitHub Pages, version tags, package publication |
+| [CLI setup details](cli-setup.md) | Download verification, system dependencies, .NET tools and source builds |
 | [UI test container image](ui-test-image.md) | Build/publish process and CI image rollout for browser/Linux player tests |
 | [Nx CI orchestration](nx-ci.md) | Affected selection, task graph, developer commands, and verification matrix |
 | [Performance](performance.md) | Recorded benchmark results and how they were measured |

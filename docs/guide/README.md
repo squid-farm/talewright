@@ -4,6 +4,7 @@ Everything you need to write in **Talemark**, then test and share your story wit
 Talemark is the story-authoring language in your `.tale` files. No programming required.
 
 1. **[Getting started](getting-started.md):** play in your browser and choose the simple no-install path or optional desktop tools.
+   **[Get the story-checking tools](cli-installation.md):** optional downloads, explained step by step.
 2. **[Your first story](first-story.md):** build a small, complete story step by step.
 3. **[Writing stories](writing-stories.md):** characters, stats, items, factions, skill checks, hubs and conditional text.
    **[Organizing your story](organizing-your-story.md):** start with two files, then split things up when you need to.

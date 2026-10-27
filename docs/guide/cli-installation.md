@@ -1,86 +1,163 @@
-# Install the Talewright CLI
+# Get the story-checking tools
 
-The CLI is independent of VS Code. The extension's bundled language server does not install
-`talewright` or the native Author Debugger.
+Talewright has an optional tool that checks your story for mistakes and makes a ZIP file to share
+with friends. It also opens the **Author Debugger**, a window where you can jump to a scene and try
+different choices without playing from the beginning.
 
-## Portable downloads
+You may see this tool called the **CLI**. That means you give it short, typed instructions.
+You do not need to know how to program, and you do not need VS Code to use it.
 
-Release automation builds versioned archives; **no public release/download is available yet**.
-After a release is published, open [GitHub Releases](https://github.com/squid-farm/talewright/releases)
-(including previews) and select `talewright-cli-VERSION-RUNTIME.zip` on Windows or
-`talewright-cli-VERSION-RUNTIME.tar.gz` on macOS/Linux. Choose your OS and CPU:
-`win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`, or `linux-arm64`.
-Linux uses glibc; Alpine/musl is not supported. Cross-building is not runtime verification:
-Linux x64 is verified locally; Windows, macOS and ARM archives are build-checked only.
+**You can skip this setup.** Write your story in a text editor, zip its folder, and open the ZIP in
+the [web player](https://squid-farm.github.io/talewright/). It checks your story when you open it.
+After making changes, make a fresh ZIP and open it again.
 
-Download the matching `.sha256` file. On Linux/macOS, verify with `sha256sum -c FILE.sha256`
-(macOS: `shasum -a 256 -c FILE.sha256`). On Windows, compare
-`Get-FileHash FILE.zip -Algorithm SHA256` with the checksum text.
-Checksums detect corruption; archives are not signed or notarized.
+## 1. Find the download for your computer
 
-Extract **the entire archive** into a new versioned directory. Do not copy just the executable.
+Open [Talewright downloads](https://github.com/squid-farm/talewright/releases) and choose a release.
+A release marked **Pre-release** is an early version: some things may not work yet.
+Open its **Assets** list to see the files you can download.
 
-```bash
-# Linux/macOS, from the extracted directory:
-./Talewright.Cli --help
-./Talewright.Cli validate /path/to/story
-./Talewright.Cli publish /path/to/story --output /path/to/story.zip
-./Talewright.Cli debug /path/to/story
-```
+Look for a file whose name starts with **`talewright-cli-`**. The rest of the name includes the
+version and the kind of computer it is for:
+
+| Your computer | Look for this ending |
+|---|---|
+| Windows with an Intel or AMD processor | `win-x64.zip` |
+| Windows with an ARM processor | `win-arm64.zip` |
+| Mac with an Apple M-series chip | `osx-arm64.tar.gz` |
+| Mac with an Intel processor | `osx-x64.tar.gz` |
+| Linux with an Intel or AMD processor | `linux-x64.tar.gz` |
+| Linux with an ARM processor | `linux-arm64.tar.gz` |
+
+Not sure which you have? On Windows, open **Settings > System > About** and look at **System type**.
+On a Mac, open the Apple menu and choose **About This Mac**. On Linux, look in your system's
+**About** settings for the processor information.
+
+**If there is no `talewright-cli-` file, the tools are not available in that release.**
+The first preview release did not include these downloads. **Source code (zip)** is not the
+ready-to-use tool; you do not need to download it. Use the web player for now.
+
+These are early downloads. They have been tried on Ubuntu 24.04 Linux computers with Intel or AMD
+processors. The Windows, Mac and ARM downloads have been built, but have not yet been tried on
+those computers. Linux downloads do not work on Alpine Linux.
+
+## 2. Unpack the download
+
+1. Download the file for your computer.
+2. Make a folder somewhere easy to find, such as **Documents > Talewright Tools**.
+3. Unpack the download into that folder. On Windows, right-click the ZIP and choose
+   **Extract All**. On a Mac, double-click the downloaded file. On Linux, open it with your
+   archive manager and choose **Extract**.
+4. Open the unpacked folder. Find **`Talewright.Cli.exe`** on Windows or **`Talewright.Cli`** on
+   Mac/Linux. If you see another folder instead, open that folder first.
+
+**Keep everything in the unpacked folder together.** The other files are part of the tool.
+Moving just `Talewright.Cli` to your desktop will stop it working.
+
+Your computer may warn that it does not recognize this download. Stop if you are unsure;
+do not turn off your computer's security protection to make it run. The
+[technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
+explain how to check a download if you or someone helping you wants to do that.
+
+## 3. Check that the tool opens
+
+This tool does not open by double-clicking it. Use a **terminal**: a window where you type an
+instruction and press **Enter**.
+
+Open a terminal in the folder containing `Talewright.Cli`:
+
+- **Windows:** right-click an empty space in the folder and choose **Open in Terminal**.
+  Use the **PowerShell** tab.
+- **Mac:** in Finder, select the folder, open the **Finder > Services** menu, and choose
+  **New Terminal at Folder**.
+- **Linux:** right-click an empty space in the folder and choose **Open in Terminal**, if offered.
+
+Copy the line for your computer, paste it into that window, and press **Enter**:
+
+**Windows:**
 
 ```powershell
-# Windows PowerShell, from the extracted directory:
 .\Talewright.Cli.exe --help
-.\Talewright.Cli.exe validate C:\Stories\MyStory
-.\Talewright.Cli.exe publish C:\Stories\MyStory --output C:\Exports\MyStory.zip
 ```
 
-Use the full executable path from any other directory; quote paths containing spaces.
-To use the editor actions, select this executable in `talewright.cli.executablePath`.
-Optionally add the extracted directory to PATH through your OS settings, and restart terminals/
-VS Code. The portable executable is named `Talewright.Cli` (`.exe` on Windows), not `talewright`;
-use that name on PATH, or deliberately create your own alias named `talewright`. No shell
-profile or system setting is changed automatically.
-
-Update by extracting a new version into a different directory and changing the path/setting.
-Keep the old directory if you need rollback. Remove by deleting the exact extracted directory
-and removing any PATH entry/alias you added. There is no background updater.
-
-Windows SmartScreen or macOS Gatekeeper may warn about unsigned downloads. Verify the source
-and checksum before using your OS's explicit approval procedure; do not disable platform security
-globally. macOS approval/notarization behavior is not verified by Linux cross-compilation.
-
-## Requirements by command
-
-| Command | Portable archive requirements |
-|---|---|
-| `--help`, `validate`, `lint` | No SDK or installed .NET runtime; OS runtime libraries still required. |
-| `publish STORY --output FILE.zip` | No SDK/runtime; outputs story files for a Talewright player, not a standalone game. |
-| `debug STORY` | No installed .NET with the portable debugger host; graphical desktop and native webview libraries required. |
-| `publish -a --target web` or `desktop` | **.NET 10 SDK**, restore/network access and applicable runtime/workload packs are still required by the existing build-based publisher. Portable does not mean SDK-free standalone-game publishing. |
-
-Ubuntu 24.04 x64 requires `libc6`, `libgcc-s1`, `libstdc++6`, `libicu74`, `libssl3t64` and `zlib1g`.
-Native debugging additionally requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), `libnotify4`, and a graphical
-desktop (`DISPLAY`). Windows needs WebView2; macOS uses WKWebView. Other OS versions/architectures
-are not claimed runtime-tested. Launch failures are reported, not silently redirected to another tool.
-
-## Alternative: .NET tool
-
-With the .NET 10 SDK installed, and **after the version is published to nuget.org**:
+**Mac or Linux:**
 
 ```bash
-dotnet tool install --global Talewright.Cli --version 0.1.0-preview.1
-talewright --help
+./Talewright.Cli --help
 ```
 
-The global tool requires the matching installed .NET runtime and the native debugging prerequisites.
-Use an explicit compatible published version; do not assume the preview exists before publication.
-If PATH has not refreshed, the global shim is normally at `~/.dotnet/tools/talewright`
-(`%USERPROFILE%\.dotnet\tools\talewright.exe` on Windows). Use/select that absolute path.
-Update explicitly with `dotnet tool update --global Talewright.Cli --version VERSION`;
-remove with `dotnet tool uninstall --global Talewright.Cli`.
+You should see a list of things the tool can do. You do not need to understand the whole list.
+If you see an error instead, keep its exact wording and check **If something goes wrong** below.
 
-Until release artifacts/packages exist, source users need the .NET 10 SDK:
-`dotnet build tooling/cli/src/Talewright.Cli -c Release`, then run the apphost under
-`tooling/cli/src/Talewright.Cli/bin/Release/net10.0/`, or use
-`dotnet run --project tooling/cli/src/Talewright.Cli -- validate STORY`.
+## 4. Check your story
+
+Find the folder that contains your story's `story.talewright.yaml` file. Copy that folder's full
+location from your file manager. Keep the quotation marks in the examples below: they let folder
+names contain spaces.
+
+In the same terminal window, use the line for your computer, replacing the example location with
+your own story folder:
+
+**Windows:**
+
+```powershell
+.\Talewright.Cli.exe validate "C:\Users\Mary\Documents\My Story"
+```
+
+**Mac:**
+
+```bash
+./Talewright.Cli validate "/Users/Mary/Documents/My Story"
+```
+
+**Linux:**
+
+```bash
+./Talewright.Cli validate "/home/mary/Documents/My Story"
+```
+
+The tool reports mistakes with the file and line to look at. Start with the first message, fix it
+in your text editor, save the file, and run the same instruction again.
+
+You can use `debug` instead of `validate` to open the Author Debugger. It may need extra computer
+setup; checking your story does not require opening the debugger.
+
+### If you use VS Code
+
+The Talewright extension's writing help and these tools are separate. Installing the extension
+does not install the CLI.
+
+With the Talewright extension installed, open **Settings**, search for
+**Talewright CLI Executable Path**, and enter the full location of `Talewright.Cli.exe` or
+`Talewright.Cli` in your unpacked folder. Then open your story folder and use the Command Palette:
+
+- **Talewright: Validate Story** checks for mistakes.
+- **Talewright: Publish Story ZIP** lets you choose where to save a ZIP for the web player.
+- **Talewright: Open Author Debugger** opens the testing window.
+
+## If something goes wrong
+
+- **No download for your computer?** Use the web player. You do not have to build Talewright
+  yourself to write a story.
+- **The tool cannot find your story?** Give it the folder containing `story.talewright.yaml`,
+  not the `.tale` file or the ZIP. Keep quotation marks around the folder's location.
+- **The tool will not open, or mentions a missing library?** Your computer may need an extra
+  supporting component. Do not delete the other files from the download. The
+  [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
+  list what each computer needs. If someone is helping you, show them the exact error message.
+- **The Author Debugger will not open?** It needs a desktop window and your computer's web-viewing
+  components. Windows may need **Microsoft Edge WebView2**; Linux needs additional packages.
+  You can still check and share your story without the debugger.
+
+Checking a story and making a story ZIP do **not** require installing .NET developer tools.
+Making a separate website or desktop game still needs extra developer setup; a ZIP for the web
+player is the simpler way to share.
+
+## Update or remove the tools
+
+To update, unpack a newer download into a different folder. Try it before deleting the old folder.
+If you use VS Code, change **Talewright CLI Executable Path** to the new location.
+There are no automatic updates.
+
+To remove the tools, delete the folder where you unpacked them. This does not delete your stories
+if you kept them in their own folders.
