@@ -238,11 +238,11 @@ WKWebView). Output isn't an installer, signed, notarized or a macOS `.app` bundl
 templates, binaries, UI assets and the engine license, so no source checkout is needed. The generated
 host uses precompiled Player binaries and copies their JS modules as static assets.
 
-All export formats preserve actual supported image files and their catalogue so the
-exported story passes the same compiler lookup as the source. Standalone hosts embed
-these files under the published story's resource prefix. Catalogue discovery reads
-resource names, not image bytes. This preserves compilation; image rendering and its
-deployment behavior remain separate work under #179.
+All export formats preserve supported image files so the exported story passes the
+same compiler lookup as the source. Standalone hosts keep story text and images in
+an external `story/` directory; universal desktop bundles share one copy across runtimes.
+Web hosts fetch individual images when needed. Deploy the complete extracted web
+archive, including its `story/` directory.
 
 **Failures.** Compiler or build errors exit 1. Invalid invocation, input, output or missing tools exit 2.
 A failed build leaves any existing output unchanged and never writes a partial zip. `publish` prints
@@ -254,8 +254,16 @@ human-readable diagnostics only (`--format json` is for `validate`).
 |---|---|
 | Story folders | No authored file-count or byte ceiling; folder depth 64 |
 | Symbolic links inside the story | Rejected |
-| Output (before compression) | 20,000 files and 512 MiB (1 GiB for the universal desktop zip) |
+| Published output | No Talewright file-count or byte ceiling |
 
 Staging preserves the root manifest, supporting `.talewright.yaml` fragments, `.tale` files and
-supported images. Other files are not bundled automatically. Hosting-size warnings are advisory;
-they are separate from the current generated-output limits above.
+supported images. Other files are not bundled automatically. Large publications still need
+enough disk space and time to build and write. A disk or write failure is reported without
+replacing an existing good output with a partial archive.
+
+Hosting-size warnings are advisory and do not prevent publication. Check your chosen host's
+limits before uploading. Publication does not relax the separate protections on ZIPs opened
+by the player: source text is limited to 1,000 files, 5 MiB per file and 50 MiB total expanded
+text, and browser uploads have a 20 MiB compressed-input limit. A successfully published
+large story ZIP may exceed those import limits; use an all-in-one publication to distribute
+a standalone game instead.

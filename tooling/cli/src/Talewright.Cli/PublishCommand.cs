@@ -77,7 +77,7 @@ public sealed class PublishCommand : Command<PublishSettings>
 
     internal sealed record Operations(
         Func<string, string, string?, string, TextWriter, TextWriter, string> BuildHost,
-        Action<string, string, bool> CreateZip,
+        Action<string, string> CreateZip,
         Func<string, DestinationState> CaptureDestination,
         Action<string, string> MoveFile)
     {
@@ -182,7 +182,7 @@ public sealed class PublishCommand : Command<PublishSettings>
 
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);
             temporaryZip = Path.Combine(Path.GetDirectoryName(final)!, $".talewright-{Guid.NewGuid():N}.zip.tmp");
-            publication.CreateZip(content, temporaryZip, universalDesktop);
+            publication.CreateZip(content, temporaryZip);
             if (approved is not null && approved != DestinationState.Capture(final))
             {
                 throw new IOException($"Output '{final}' changed after approval. No archive was published. Retry to approve the current file, choose a new --output path, or use --force.");
@@ -285,7 +285,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime));
                 var temporary = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.zip.tmp");
                 staged.Add((runtime, temporary, targets[runtime]));
-                publication.CreateZip(built, temporary, false);
+                publication.CreateZip(built, temporary);
             }
 
             if (!settings.Force)
@@ -611,20 +611,11 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private static void CreateZip(string directory, string path, bool universalDesktop)
+    private static void CreateZip(string directory, string path)
     {
         using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
-        long totalBytes = 0;
-        var count = 0;
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
         {
-            totalBytes += new FileInfo(file).Length;
-            var maxMiB = universalDesktop ? 1024 : 512;
-            if (++count > 20_000 || totalBytes > (long)maxMiB * 1024 * 1024)
-            {
-                throw new InvalidDataException($"Published output exceeds 20,000 files or {maxMiB} MiB.");
-            }
-
             var entry = zip.CreateEntryFromFile(file, Path.GetRelativePath(directory, file).Replace('\\', '/'));
             var mode = OperatingSystem.IsWindows()
                 ? UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead
