@@ -6,7 +6,7 @@ import vm from 'node:vm';
 
 const source = await readFile(new URL('../extension.cjs', import.meta.url), 'utf8');
 
-function host(settings = {}, trusted = true, failStart = false) {
+function host(settings = {}, trusted = true, failStart = false, platform = 'linux', arch = 'x64', missing = false) {
   const calls = { clients: [], errors: [], watchers: [], stops: 0 };
   class LanguageClient {
     constructor(id, name, server, options) {
@@ -44,15 +44,20 @@ function host(settings = {}, trusted = true, failStart = false) {
     require: name => {
       if (name === 'vscode') return vscode;
       if (name === 'node:path') return path;
+      if (name === 'node:fs') return {
+        constants: { X_OK: 1 },
+        accessSync: () => { if (missing) throw new Error('Bundled executable is missing'); },
+      };
       assert.equal(name, 'vscode-languageclient/node');
       return { LanguageClient };
     },
     module,
+    process: { platform, arch },
   });
-  return { extension: module.exports, calls, context: { subscriptions: [] } };
+  return { extension: module.exports, calls, context: { subscriptions: [], extensionPath: '/installed/talewright' } };
 }
 
-test('thin client launches one stdio executable and forwards source/watch configuration', async () => {
+test('explicit development override launches one executable and forwards source/watch configuration', async () => {
   const { extension, calls, context } = host({
     'languageServer.command': 'dotnet',
     'languageServer.args': ['/server.dll', '--stdio'],
@@ -89,9 +94,31 @@ test('untrusted or explicitly disabled workspaces never launch a process', async
 test('launch failures are actionable and do not cause stop failures', async () => {
   const { extension, calls, context } = host({}, true, true);
   await extension.activate(context);
-  assert.ok(calls.errors.some(message => message.includes('Install Talewright.LanguageServer')));
+  assert.ok(calls.errors.some(message => message.includes('executable not found') && message.includes('reinstall the VSIX')));
   await extension.deactivate();
   assert.equal(calls.stops, 0);
+});
+
+test('default server is the bundled executable, not a PATH lookup', async () => {
+  const { extension, calls, context } = host();
+  await extension.activate(context);
+  assert.equal(calls.clients[0].server.command, '/installed/talewright/server/Talewright.LanguageServer');
+  assert.deepEqual(Array.from(calls.clients[0].server.args), ['--stdio']);
+  await extension.deactivate();
+});
+
+test('unsupported platforms and missing bundled assets fail clearly without fallback', async () => {
+  for (const instance of [host({}, true, false, 'win32'), host({}, true, false, 'linux', 'arm64'),
+    host({}, true, false, 'linux', 'x64', true)]) {
+    await instance.extension.activate(instance.context);
+    assert.equal(instance.calls.clients.length, 0);
+    assert.equal(instance.calls.errors.length, 1);
+    assert.match(instance.calls.errors[0], /Linux x64|missing/);
+  }
+  const override = host({ 'languageServer.command': 'custom-lsp' }, true, false, 'darwin', 'arm64');
+  await override.extension.activate(override.context);
+  assert.equal(override.calls.clients[0].server.command, 'custom-lsp');
+  await override.extension.deactivate();
 });
 
 test('explicit absolute metadata files receive their own watcher', async () => {

@@ -34,6 +34,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Validate public release tag
+        if: github.ref_type == 'tag'
+        run: python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME" --release-json
       - name: Select verification from the Nx task graph
         id: select
         env:
@@ -140,12 +143,95 @@ jobs:
       id-token: write
     uses: ./.github/workflows/publish-samples.yml
 
-  publish-nuget:
+  release-ready:
     needs: [build, tests, verification]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      prerelease: ${{ steps.identity.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve release identity
+        id: identity
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, ".github/scripts")
+          from package_version import release_identity
+          identity = release_identity(os.environ["GITHUB_REF_NAME"])
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"prerelease={str(identity['prerelease']).lower()}\n")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: talewright-vscode
+          path: artifacts/extension
+      - name: Verify the exact release artifacts
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          test "$(python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME")" = "$VERSION"
+          python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION"
+          python3 .github/scripts/verify_release_vsix.py artifacts/extension/talewright.vsix "$GITHUB_REF_NAME"
+
+  publish-nuget:
+    needs: [build, release-ready]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
-      packages: write
+      id-token: write
     uses: ./.github/workflows/publish-nuget.yml
     with:
       version: ${{ needs.build.outputs.version }}
+
+  publish-marketplace:
+    needs: release-ready
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tooling/vscode-talewright/package-lock.json
+      - run: npm ci --prefix tooling/vscode-talewright
+      - uses: actions/download-artifact@v4
+        with:
+          name: talewright-vscode
+          path: artifacts/extension
+      - name: Verify and publish the tested VSIX (never rebuild)
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          PRERELEASE: ${{ needs.release-ready.outputs.prerelease }}
+        run: |
+          python3 .github/scripts/verify_release_vsix.py artifacts/extension/talewright.vsix "$GITHUB_REF_NAME"
+          args=(--packagePath "$GITHUB_WORKSPACE/artifacts/extension/talewright.vsix" --skip-duplicate)
+          if [[ "$PRERELEASE" == true ]]; then args+=(--pre-release); fi
+          tooling/vscode-talewright/node_modules/.bin/vsce publish "${args[@]}"
+
+  github-release:
+    needs: [release-ready, publish-nuget, publish-marketplace]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: talewright-vscode
+          path: artifacts/extension
+      - name: Create or resume the release with generated notes and the tested VSIX
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/github_release.py artifacts/extension/talewright.vsix

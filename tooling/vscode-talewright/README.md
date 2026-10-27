@@ -6,34 +6,64 @@ running your story.
 
 ## Install
 
-**Optional, advanced setup:** You do not need this extension to write a story. A plain-text editor
-and the browser player are enough. This extension is distributed as a VSIX (an installable extension
-file), not through the Marketplace. Getting it currently requires downloading a build artifact or
-building it yourself. Live story checks need an additional .NET tool and more setup; highlighting and
-basic manifest help work without that separate language server.
+**Optional:** You do not need this extension to write a story. A plain-text editor
+and the browser player are enough. The Linux x64 VSIX includes a compatible self-contained
+language server: no separate Talewright tool, .NET SDK/runtime, server-path setting or build is needed.
+The Marketplace publishing pipeline is configured, but a live listing is not yet verified.
 
-Use VS Code 1.100 or later.
+Use VS Code 1.100 or later on a supported Linux x64 extension host.
 
 1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
    from the VS Code Marketplace. It provides the YAML editor features used by the schema.
-2. Obtain `talewright.vsix` from the **Editor tooling** workflow artifact, or build
-   it using the commands below.
+2. After the first public publication, install **Talewright** by **squid-farm** from
+   [the Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright).
+   For a preview, choose **Switch to Pre-Release Version**.
+   Until then, or as a fallback, obtain the Linux x64 VSIX from
+   [GitHub Releases](https://github.com/squid-farm/talewright/releases) or the
+   **talewright-vscode** artifact of a successful **Build** run. Contributors can build it below.
 3. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
    select the file. Reload VS Code if prompted.
 4. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
    The language ID remains `tale`.
-5. To add live compiler diagnostics and story-aware completion, install the separate `Talewright.LanguageServer`
-   .NET tool (requires .NET 10) from the Talewright package feed. The extension
-   launches `talewright-lsp --stdio`; it never installs or builds it automatically.
-   See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
-   Configure `talewright.languageServer.command`/`args` for a local build, or set
+5. Trust the story folder to enable live compiler diagnostics and story-aware completion/hover.
+   The extension launches its bundled server using stdio; it never downloads tools, builds a story
+   project, discovers assemblies or executes story-project code automatically.
+   Leave `talewright.languageServer.command` empty for normal installation.
+   Configure `talewright.languageServer.command`/`args` only for a development override, or set
    `talewright.languageServer.enabled` to `false` for schema/syntax-only use.
    Reload the window after changing settings. Launch errors appear in the
    **Talewright Language Server** output channel. Untrusted workspaces never
    launch a process.
 
-This package identifier is `squid-farm.talewright`; it does not imply a registered
-Marketplace publisher or a published Marketplace extension.
+This package identifier is `squid-farm.talewright`. Only `linux-x64` is packaged; Windows, macOS,
+Linux ARM, Alpine/musl, browser-hosted VS Code and universal fallback packages are not supplied.
+Remote development needs a supported Linux x64 extension host.
+
+### Supported Linux environment
+
+The CI packaging and installed-editor checks run on **Ubuntu 24.04 x64**; local installed-editor
+checks also run on Linux Mint 22.3 (Ubuntu 24.04-based). This is not a claim of support for every
+Linux distribution. The bundled .NET runtime still requires OS libraries:
+`libc6`, `libgcc-s1`, `libstdc++6`, `libicu74`, `libssl3t64` and `zlib1g` on Ubuntu 24.04,
+in addition to [VS Code's native Linux prerequisites](https://code.visualstudio.com/docs/supporting/requirements).
+Install missing system libraries with your distribution's package manager. No .NET installation
+is required. Missing executable/runtime/system-library failures produce a notification and details in
+**Talewright Language Server** output; no external-server fallback is attempted.
+
+### Development server override
+
+To run a local server build instead of the bundled version:
+
+```json
+{
+  "talewright.languageServer.command": "dotnet",
+  "talewright.languageServer.args": ["/absolute/path/to/Talewright.LanguageServer.dll", "--stdio"]
+}
+```
+
+Only this override requires your own matching runtime/server. Clear the command and restore args to
+`["--stdio"]` to return to the bundled server. Reload VS Code after changing settings or granting
+workspace trust. See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
 
 ## Write a scene
 
@@ -186,7 +216,7 @@ for supported syntax.
 
 ## Build and test
 
-Contributors need Node.js 22 or later, npm, the .NET 10 SDK, and `unzip` for package
+Contributors packaging on Linux x64 need Node.js 22 or later, npm, the .NET 10 SDK, Python 3 and `unzip` for package
 inspection. Linux editor smoke tests need a display (or `xvfb-run`) and the normal
 VS Code native prerequisites.
 
@@ -196,7 +226,6 @@ From this directory:
 npm ci
 npm test
 dotnet test ../../engine/tests/Talewright.Talemark.Tests -c Release
-dotnet build ../language-server/src/Talewright.LanguageServer -c Release
 npm run package
 npm run test:package
 npm run test:editor
@@ -217,13 +246,19 @@ and `StoryCompiler`; compiler tests assert diagnostics and materialized values
 and defaults, including documented schema/compiler differences.
 
 `npm run package` bundles the repository MPL-2.0 license and produces
-`artifacts/talewright.vsix`, including the bundled thin LSP client but no .NET
-server binaries or test tooling.
-`npm run test:package` verifies the exact archive contents.
+`artifacts/talewright.vsix`, with Linux x64 target metadata, the bundled client and a matching
+self-contained server/runtime plus .NET license/notices. It runs `dotnet publish` for the
+language server within the existing package target, never a story project.
+Pinned dependency license texts in `tests/server-notices.txt` are included in the VSIX notices;
+updating a shipped server dependency requires reviewing/updating its corresponding notice.
+`npm run test:package` verifies client assets, server/runtime files, native architecture,
+executable permissions, target metadata and the self-contained runtime configuration.
 `npm run test:editor` installs that VSIX into a temporary isolated profile,
 verifies file association, actual snippet expansion/Tab navigation, prose typing
 and comment toggling, then exercises compiler diagnostics and clearing on an
-unsaved edit using the local Release server build, and
+unsaved edit using the installed bundled server, with an external `dotnet` sentinel and runtime
+lookup disabled. A separate restricted-mode pass in the same runner proves that the bundled
+server does not start in an untrusted workspace. The runner
 removes the profile. It does not install anything into your normal VS Code
 profile. Run packaging first.
 

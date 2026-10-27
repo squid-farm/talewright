@@ -38,25 +38,21 @@ Individual API names such as `TaleParser` and `TaleFiles` are unchanged. So are 
 The rename does not change story syntax, runtime behavior, or the save format; existing saves
 retain the same story/source compatibility requirements.
 
-## Install from GitHub Packages
+## Install from nuget.org
 
-The registry is GitHub Packages, **not nuget.org**, and it requires authentication even for public
-packages. Create a classic personal access token with `read:packages` (authorize it for SSO if your
-organization requires it), then:
+Public releases publish to **nuget.org**; consuming them does not require a GitHub PAT or a
+GitHub Packages feed. After the first public release:
 
 ```bash
-dotnet nuget add source https://nuget.pkg.github.com/squid-farm/index.json --name talewright
-
-# Keep the token out of the repository. This POSIX-shell example passes credentials through the environment.
-export GITHUB_PACKAGES_TOKEN=...   # your PAT
-export NuGetPackageSourceCredentials_talewright="Username=YOUR_GITHUB_USER;Password=$GITHUB_PACKAGES_TOKEN"
-
 dotnet add package Talewright.Player --version VERSION
 # or, engine only:
 dotnet add package Talewright --version VERSION
 ```
 
-Replace `VERSION` with a published version. Prereleases must be requested explicitly.
+Replace `VERSION` with a published version, such as `0.1.0-preview.1`.
+Prereleases must be requested explicitly. If nuget.org is not enabled in your NuGet configuration,
+add `https://api.nuget.org/v3/index.json` as a source. Old GitHub Packages versions do not migrate
+automatically; choose a version published by the new public pipeline.
 
 ## Writing extensions
 

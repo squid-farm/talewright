@@ -10,6 +10,8 @@ jobs:
   syntax:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      TALEWRIGHT_RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
     steps:
       - uses: actions/checkout@v4
         with:

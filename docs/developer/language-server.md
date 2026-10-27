@@ -9,9 +9,12 @@ build, assembly discovery, or gameplay execution is involved.
 
 ## Install and launch
 
-Requires the .NET 10 runtime. Packages are released to the same authenticated
-GitHub Packages feed as the CLI; configure that feed as described in the
-[CLI reference](../reference/cli.md). Install a matching release:
+The Linux x64 VS Code extension bundles a compatible self-contained server; normal VS Code
+installation does **not** require .NET or a separate tool. See the
+[extension README](../../tooling/vscode-talewright/README.md) for supported system libraries.
+
+Other editors and explicit development overrides can use the separate .NET tool, which requires
+the .NET 10 runtime. Public release packages are published to nuget.org. Install a matching release:
 
 ```sh
 dotnet tool install --global Talewright.LanguageServer --version <version>
@@ -28,7 +31,7 @@ dotnet tooling/language-server/src/Talewright.LanguageServer/bin/Release/net10.0
 ```
 
 Install the VSIX as described in its [README](../../tooling/vscode-talewright/README.md).
-The client defaults to `talewright-lsp --stdio`. Alternatively configure:
+The Linux x64 client defaults to its bundled server. To explicitly use a development build, configure:
 
 ```json
 {
