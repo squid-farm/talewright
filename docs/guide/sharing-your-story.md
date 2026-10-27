@@ -5,6 +5,11 @@ it in the [web player](https://squid-farm.github.io/talewright/) using **Open a 
 [first-story tutorial's zip instructions](first-story.md#no-desktop-tools-use-the-web-player). This
 does not make a standalone website or app.
 
+Opening story data in an existing player is different from running an author's
+website, desktop app or launcher. Talewright does not certify either as harmless.
+See [distribution and runtime safety](../reference/safety.md) for what the
+framework handles and what authors and players decide.
+
 The publishing commands below make a story zip or a standalone game. They need the optional
 [desktop tools](getting-started.md#optional-install-the-desktop-tools), which currently require
 installing Talewright from source. Until ready-made downloads arrive, write
