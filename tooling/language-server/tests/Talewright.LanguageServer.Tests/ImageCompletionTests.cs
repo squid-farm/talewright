@@ -107,7 +107,28 @@ public sealed partial class ServerTests
     }
 
     [Fact]
-    public async Task Independently_owned_child_story_uses_only_its_own_images()
+    public async Task Separate_non_nested_stories_have_independent_image_catalogues()
+    {
+        await using var client = new Client();
+        File.Delete(client.PathOf("story.talewright.yaml"));
+        foreach (var name in new[] { "first", "second" })
+        {
+            Directory.CreateDirectory(client.PathOf($"{name}/images"));
+            File.WriteAllText(client.PathOf($"{name}/story.talewright.yaml"), Manifest);
+            File.WriteAllBytes(client.PathOf($"{name}/images/{name}.png"), []);
+        }
+        await client.Initialize();
+        const string marked = "=== start\n{image(\"|\", \"Alt\")}\n-> END";
+        foreach (var name in new[] { "first", "second" })
+        {
+            await client.Open($"{name}/start.tale", marked.Replace("|", ""), 1);
+            Assert.Equal($"{name}.png", Assert.Single(Items(await Completion(client, $"{name}/start.tale", marked)))
+                .GetProperty("label").GetString());
+        }
+    }
+
+    [Fact]
+    public async Task Additional_manifest_does_not_create_an_independent_image_catalogue()
     {
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("images"));
@@ -121,6 +142,6 @@ public sealed partial class ServerTests
         await client.Open("start.tale", marked.Replace("|", ""), 1);
         await client.Open("child/start.tale", marked.Replace("|", ""), 1);
         Assert.Equal("parent.png", Assert.Single(Items(await Completion(client, "start.tale", marked))).GetProperty("label").GetString());
-        Assert.Equal("child.png", Assert.Single(Items(await Completion(client, "child/start.tale", marked))).GetProperty("label").GetString());
+        Assert.Equal("parent.png", Assert.Single(Items(await Completion(client, "child/start.tale", marked))).GetProperty("label").GetString());
     }
 }

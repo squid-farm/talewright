@@ -29,7 +29,7 @@ talewright publish my-story --output my-story.zip
 The zip contains `story.talewright.yaml`, your `.tale` files and supported image files
 from `images/`, preserving their folders. Private notes and unsupported image formats
 are left out. Anyone can open it with **Open a story file** in the web player.
-Images are included so their references pass validation; they are not displayed yet.
+Images display lazily when opened in the desktop or web player, including ZIP uploads.
 
 ## A web game
 
@@ -45,6 +45,33 @@ during character creation; save/load, history, and Restart remain available duri
   *This file will be played in the browser*.
 - **Your own site:** extract the zip anywhere that serves static files: GitHub Pages, Netlify, a
   folder on your web server. It also works from a subfolder.
+
+### Artwork and hosting size
+
+Use PNG for graphics that need lossless detail or transparency, and JPEG or WebP for photographs
+and artwork where smaller downloads matter. Resize images for their intended display rather
+than shipping camera originals. Images fit narrow windows without stretching their aspect ratio;
+provide descriptive alt text for readers and for visible failure states.
+
+Images are displayed as readers scroll them into view, but a web game can still download its
+artwork before it is shown. Large images mean longer downloads and use more memory when
+displayed. Earlier illustrations stay in the story's history, so test image-heavy stories on
+the phones and computers your readers will use.
+
+For itch.io web games, the recorded limits are **200 MB per file, 500 MB total, and 1,000 files**
+after unzipping. Check [itch.io's current requirements](https://itch.io/docs/creators/html5)
+before uploading; other restrictions, such as filename length, also apply.
+
+`talewright validate my-story` gives an early size estimate for your text and images. Publishing
+a web game checks the complete game's size, including the player. Either command warns if its
+size check exceeds the recorded hosting limits, but the warning does not stop you from
+publishing or make validation fail, even with `validate --warnings-as-errors`. A successful
+publication does not guarantee that your host will accept the upload.
+
+**For large illustrated games:** the publisher currently combines artwork into the game.
+Even if each original image is below 200 MB, the finished game can contain a file above itch.io's
+per-file limit. Reduce the artwork's size and publish again if you receive a warning. If the
+game is still too large for browser hosting, consider offering a downloadable desktop game.
 
 ## A desktop game
 

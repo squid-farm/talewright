@@ -113,7 +113,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Latest.Locator("br")).ToHaveCountAsync(1);
         await Expect(Latest.Locator("img")).ToBeHiddenAsync();
         await Expect(Latest.GetByRole(AriaRole.Img, new() { Name = "Reserved artwork", Exact = true })).ToBeVisibleAsync();
-        await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync("Images are unavailable for this story source.");
+        await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync("This image could not be displayed.");
         await Expect(Latest.Locator(".tw-speaker")).ToHaveTextAsync("Tomas");
         await Choose("Walk onward");
         await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(1);

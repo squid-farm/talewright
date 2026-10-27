@@ -12,7 +12,7 @@ public sealed partial class ServerTests
     {
         await using var client = new Client();
         await client.Initialize();
-        var marked = Manifest.Replace("start: start", "start: \"sta\\\n  |rt\"");
+        var marked = Manifest.Replace("start: start", "start: \"sta\\\n    |rt\"");
         var text = marked.Replace("|", "");
         var source = new StorySource(new Dictionary<string, string>
         {
@@ -154,7 +154,8 @@ public sealed partial class ServerTests
         await client.Initialize();
         var marked = list.StartsWith("inventory", StringComparison.Ordinal)
             ? Manifest.Replace("player: {first-name: Ada}", "player: {first-name: Ada, " + list + "}") + "items: {rope: Rope}\n"
-            : Manifest + "ruleset: {" + list + "}\n";
+            : Manifest.Replace("  start: start",
+                "  start: start\n  ruleset: {" + list.Replace("\n", "\n    ", StringComparison.Ordinal) + "}\n");
         await client.Open(StorySource.ManifestFileName, marked.Replace("|", ""), 1);
         var item = Assert.Single(Items(await Completion(client, StorySource.ManifestFileName, marked)), HasLabel(label));
         var range = item.GetProperty("textEdit").GetProperty("range");
@@ -209,8 +210,8 @@ public sealed partial class ServerTests
         await client.Open("story.talewright.yaml", marked.Replace("|", ""), 1);
         var item = Assert.Single(Items(await Completion(client, "story.talewright.yaml", marked)), HasLabel("start"));
         var range = item.GetProperty("textEdit").GetProperty("range");
-        Assert.Equal(8, range.GetProperty("start").GetProperty("character").GetInt32());
-        Assert.Equal(18, range.GetProperty("end").GetProperty("character").GetInt32());
+        Assert.Equal(10, range.GetProperty("start").GetProperty("character").GetInt32());
+        Assert.Equal(20, range.GetProperty("end").GetProperty("character").GetInt32());
         await client.Change("story.talewright.yaml", Manifest + "flags: [overlay]\n", 2);
         await client.Change("start.tale", "=== start\n@requires flag:ove", 2);
         Assert.Contains(Items(await Completion(client, "start.tale", "=== start\n@requires flag:ove|")), HasLabel("overlay"));

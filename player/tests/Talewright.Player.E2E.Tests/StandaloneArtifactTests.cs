@@ -39,6 +39,31 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         });
         await AssertLibraryUnavailable();
         var first = await Driver.ObserveAsync();
+        if (title == "The Lost Relic")
+        {
+            Assert.Contains("Tomas", first.Passage);
+            const string alt = "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.";
+            if (Driver is NativePlayerDriver imageDriver)
+            {
+                await imageDriver.ScrollToImageAsync(alt);
+                var timer = Stopwatch.StartNew();
+                while (!(await imageDriver.SnapshotAsync()).Descendants().Any(node =>
+                    node.Role == "image" && node.Name == alt && node.Bounds.Width > 100 && node.Bounds.Height > 100))
+                {
+                    Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "Published image decoded in the native host.");
+                    await Task.Delay(100);
+                }
+            }
+            else
+            {
+                var image = Page.GetByAltText(alt, new() { Exact = true });
+                await Expect(image).ToHaveCountAsync(1);
+                await image.ScrollIntoViewIfNeededAsync();
+                await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                    await image.ElementHandleAsync());
+                Assert.StartsWith("blob:", await image.GetAttributeAsync("src"));
+            }
+        }
         if (creation)
         {
             Assert.Contains(Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_CHARACTER") ?? "Tester", first.Passage);

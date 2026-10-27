@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
@@ -9,6 +10,66 @@ namespace Talewright.Talemark.Tests;
 
 public class EditorManifestSchemaTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Organization_guide_layouts_compile_with_the_same_characters_items_and_trigger_order(bool withTriggers)
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var guide = File.ReadAllText(Path.Combine(root.FullName, "docs", "guide", "organizing-your-story.md"));
+        var yaml = Regex.Matches(guide, @"```yaml\r?\n([\s\S]*?)\r?\n```")
+            .Select(match => match.Groups[1].Value).ToArray();
+        Assert.Equal(5, yaml.Length);
+        var tale = Assert.Single(Regex.Matches(guide, @"```tale\r?\n([\s\S]*?)\r?\n```")).Groups[1].Value;
+        var triggers = withTriggers ? "\n" + yaml[4] : "";
+        var small = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml[0] + triggers,
+            ["story.tale"] = tale,
+        }));
+        var split = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml[1] + triggers,
+            ["characters/player.talewright.yaml"] = yaml[2],
+            ["harbour/ferry.talewright.yaml"] = yaml[3],
+            ["chapters/story.tale"] = tale,
+        }));
+        foreach (var result in new[] { small, split })
+        {
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            Assert.Empty(result.Diagnostics);
+            var story = result.Story!;
+            Assert.Equal("dock", story.Start.Value);
+            Assert.Equal("Ada", story.World.Characters[EntityId.Player].FirstName);
+            Assert.Equal(1, story.World.Characters[EntityId.Player].Inventory[new ItemId("coin")]);
+            Assert.Equal("Wick", story.World.Characters[new EntityId("ferryman")].FirstName);
+            Assert.Equal("silver coin", story.World.Items[new ItemId("coin")].Name);
+            Assert.Equal(withTriggers ? ["notice-payment", "count-payment"] : Array.Empty<string>(),
+                story.Triggers.Select(trigger => trigger.Id));
+        }
+        Assert.Equal(small.Story!.Scenes.Select(scene => scene.Id), split.Story!.Scenes.Select(scene => scene.Id));
+    }
+
+    [Fact]
+    public void First_story_guide_starter_compiles_with_its_finished_story()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var guide = File.ReadAllText(Path.Combine(root.FullName, "docs", "guide", "first-story.md"));
+        var yaml = Assert.Single(Regex.Matches(guide, @"```yaml\r?\n([\s\S]*?)\r?\n```")).Groups[1].Value;
+        var tale = Regex.Matches(guide, @"```tale\r?\n([\s\S]*?)\r?\n```").Last().Groups[1].Value;
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml,
+            ["story.tale"] = tale,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Fact]
     public void Shared_identifier_fixture_matches_compiler_rule()
     {
@@ -29,9 +90,10 @@ public class EditorManifestSchemaTests
                 var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
                 {
                     ["story.talewright.yaml"] = $$"""
-                        id: identifiers
-                        title: Identifiers
-                        start: beginning
+                        game:
+                          id: identifiers
+                          title: Identifiers
+                          start: beginning
                         characters: { player: { first-name: Ada } }
                         factions: { {{JsonSerializer.Serialize(id)}}: { name: Test } }
                         """,

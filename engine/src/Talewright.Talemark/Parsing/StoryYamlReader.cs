@@ -12,10 +12,10 @@ using Talewright.Talemark.Analysis;
 
 namespace Talewright.Talemark.Parsing;
 
-/// <summary>An expression or effect list written in story.talewright.yaml, parsed later once all symbols are known.</summary>
+/// <summary>An expression or effect list written in story configuration, parsed later once all symbols are known.</summary>
 internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once);
 
-/// <summary>Everything read from story.talewright.yaml.</summary>
+/// <summary>Core settings and declarations assembled from the story's configuration inputs.</summary>
 internal sealed class StoryManifest
 {
     public string Id { get; set; } = string.Empty;
@@ -35,7 +35,7 @@ internal sealed class StoryManifest
 }
 
 /// <summary>
-/// Reads story.talewright.yaml with the YamlDotNet representation model (no reflection, so it is trim/WASM safe and keeps
+/// Reads story configuration with the YamlDotNet representation model (no reflection, so it is trim/WASM safe and keeps
 /// line numbers for diagnostics). Codes are <c>TW4xxx</c>.
 /// </summary>
 internal sealed class StoryYamlReader
@@ -43,6 +43,7 @@ internal sealed class StoryYamlReader
     private readonly string _file;
     private readonly DiagnosticBag _diagnostics;
     private readonly CompilerOptions _options;
+    private readonly Dictionary<YamlNode, string> _files = new(ReferenceEqualityComparer.Instance);
     private AnalysisCollector? _analysis;
 
     private StoryYamlReader(string file, DiagnosticBag diagnostics, CompilerOptions options)
@@ -52,13 +53,100 @@ internal sealed class StoryYamlReader
         _options = options;
     }
 
-    public static StoryManifest? Read(string file, string text, DiagnosticBag diagnostics, CompilerOptions options,
-        AnalysisCollector? analysis = null) =>
-        new StoryYamlReader(file, diagnostics, options) { _analysis = analysis }.Read(text);
+    public static StoryManifest? Read(StorySource source, DiagnosticBag diagnostics, CompilerOptions options,
+        AnalysisCollector? analysis = null)
+    {
+        var reader = new StoryYamlReader(StorySource.ManifestFileName, diagnostics, options) { _analysis = analysis };
+        var root = reader.Parse(StorySource.ManifestFileName, source.Files[StorySource.ManifestFileName]);
+        if (root is null) return null;
+        analysis?.Manifest(root);
+        var sections = new Dictionary<string, YamlMappingNode>(StringComparer.Ordinal);
+        var declarations = new Dictionary<string, Dictionary<string, SourceLocation>>(StringComparer.Ordinal);
+        var flags = new YamlSequenceNode();
+        var flagLocations = new Dictionary<string, SourceLocation>(StringComparer.Ordinal);
+        YamlNode? triggers = null;
+        SourceLocation? triggerLocation = null;
+        void Duplicate(string kind, string id, YamlNode node, SourceLocation first) =>
+            diagnostics.Error("TW4007", $"{kind} '{id}' is declared more than once (first at {first}).", reader.At(node));
+        void Collect(YamlMappingNode document)
+        {
+            reader.CheckKeys(document, "game", "characters", "factions", "items", "flags", "vars", "triggers");
+            foreach (var name in new[] { "characters", "factions", "items", "vars" })
+            {
+                if (Get(document, name) is not { } node || reader.Mapping(node, name) is not { } map) continue;
+                if (!sections.TryGetValue(name, out var combined))
+                {
+                    sections.Add(name, combined = new YamlMappingNode());
+                    declarations.Add(name, new(StringComparer.Ordinal));
+                }
+                foreach (var (key, value) in map.Children)
+                {
+                    var id = Scalar(key);
+                    if (id is not null && !declarations[name].TryAdd(id, reader.At(key)))
+                        Duplicate(name, id, key, declarations[name][id]);
+                    else
+                        combined.Add(key, value);
+                }
+            }
+            if (Get(document, "flags") is { } flagNode)
+            {
+                foreach (var flag in reader.Sequence(flagNode, "flags"))
+                {
+                    var id = Scalar(flag);
+                    if (id is not null && !flagLocations.TryAdd(id, reader.At(flag)))
+                        Duplicate("Flag", id, flag, flagLocations[id]);
+                    else
+                        flags.Add(flag);
+                }
+            }
+            if (Get(document, "triggers") is { } triggerNode)
+            {
+                if (triggerLocation is { } first)
+                    diagnostics.Error("TW4007", $"Only one 'triggers' section is allowed (first at {first}).", reader.At(triggerNode));
+                else
+                {
+                    triggers = triggerNode;
+                    triggerLocation = reader.At(triggerNode);
+                }
+            }
+        }
+        Collect(root);
+        foreach (var (file, text) in source.Files
+            .Where(file => file.Key != StorySource.ManifestFileName && StorySource.IsConfigurationFile(file.Key))
+            .OrderBy(file => file.Key, StringComparer.Ordinal))
+        {
+            if (file.EndsWith("/" + StorySource.ManifestFileName, StringComparison.Ordinal))
+            {
+                diagnostics.Error("TW4002",
+                    $"'{StorySource.ManifestFileName}' is reserved for the single root story configuration; found additional manifest '{file}'.",
+                    new SourceLocation(file, 1, 1));
+                continue;
+            }
+            if (!file.Contains('/'))
+            {
+                diagnostics.Error("TW4002",
+                    $"Only '{StorySource.ManifestFileName}' is allowed at the story root; found extra configuration file '{file}'.",
+                    new SourceLocation(file, 1, 1));
+                continue;
+            }
+            if (reader.Parse(file, text) is not { } document) continue;
+            analysis?.Manifest(document, file);
+            if (Get(document, "game") is { } game)
+                diagnostics.Error("TW4002", "'game:' is allowed only in the root story configuration.", reader.At(game));
+            Collect(document);
+        }
+        var assembled = new YamlMappingNode();
+        if (Get(root, "game") is { } rootGame) assembled.Add("game", rootGame);
+        foreach (var (name, map) in sections) assembled.Add(name, map);
+        assembled.Add("flags", flags);
+        if (triggers is not null) assembled.Add("triggers", triggers);
+        return reader.Read(assembled);
+    }
 
-    private SourceLocation At(YamlNode node) => new(_file, (int)node.Start.Line, (int)node.Start.Column);
+    private SourceLocation At(YamlNode node) => new(_files.GetValueOrDefault(node, _file),
+        Math.Max(1, (int)node.Start.Line), Math.Max(1, (int)node.Start.Column));
 
-    private StoryManifest? Read(string text)
+    private YamlMappingNode? Parse(string file, string text)
     {
         var stream = new YamlStream();
         try
@@ -67,20 +155,38 @@ internal sealed class StoryYamlReader
         }
         catch (YamlException ex)
         {
-            _diagnostics.Error("TW4001", $"Invalid YAML: {ex.InnerException?.Message ?? ex.Message}", new SourceLocation(_file, (int)ex.Start.Line, (int)ex.Start.Column));
+            _diagnostics.Error("TW4001", $"Invalid YAML: {ex.InnerException?.Message ?? ex.Message}", new SourceLocation(file, (int)ex.Start.Line, (int)ex.Start.Column));
             return null;
         }
 
-        if (stream.Documents.Count == 0 || stream.Documents[0].RootNode is not YamlMappingNode root)
+        if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
         {
-            _diagnostics.Error("TW4001", "story.talewright.yaml must be a mapping (key: value pairs).", new SourceLocation(_file, 1, 1));
+            _diagnostics.Error("TW4001", "A story configuration file must contain one mapping (key: value pairs).", new SourceLocation(file, 1, 1));
             return null;
         }
+        void Register(YamlNode node)
+        {
+            if (!_files.TryAdd(node, file)) return;
+            if (node is YamlMappingNode map)
+                foreach (var (key, value) in map.Children) { Register(key); Register(value); }
+            else if (node is YamlSequenceNode sequence)
+                foreach (var child in sequence.Children) Register(child);
+        }
+        Register(root);
+        return root;
+    }
 
-        CheckKeys(root, "id", "title", "version", "start", "randomness", "seed", "undo", "creation", "ruleset", "characters", "factions", "items", "flags", "vars", "triggers");
-        _analysis?.Manifest(root);
+    private StoryManifest Read(YamlMappingNode root)
+    {
+        var gameNode = Get(root, "game");
+        if (gameNode is null)
+        {
+            _diagnostics.Error("TW4002", "The root story configuration must declare a 'game:' mapping.", At(root));
+        }
+        var game = gameNode is null ? new YamlMappingNode() : Mapping(gameNode, "game") ?? new YamlMappingNode();
+        CheckKeys(game, "id", "title", "version", "start", "randomness", "seed", "undo", "ruleset", "creation");
 
-        var ruleset = ReadRuleset(Get(root, "ruleset"));
+        var ruleset = ReadRuleset(Get(game, "ruleset"));
         var items = ReadItems(Get(root, "items"), ruleset);
         var factions = ReadFactions(Get(root, "factions"));
         var characters = ReadCharacters(Get(root, "characters"), root, ruleset, items);
@@ -90,14 +196,14 @@ internal sealed class StoryYamlReader
         var manifest = new StoryManifest
         {
             World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, numericVars, textVars),
-            Id = RequiredIdentifier(root, "id") ?? string.Empty,
-            Title = RequiredScalar(root, "title") ?? string.Empty,
-            Version = Scalar(Get(root, "version")) ?? "0.0.0",
-            Start = RequiredIdentifier(root, "start") ?? string.Empty,
-            StartLocation = Get(root, "start") is { } startNode ? At(startNode) : new SourceLocation(_file, 1, 1),
+            Id = RequiredIdentifier(game, "id") ?? string.Empty,
+            Title = RequiredScalar(game, "title") ?? string.Empty,
+            Version = Scalar(Get(game, "version")) ?? "0.0.0",
+            Start = RequiredIdentifier(game, "start") ?? string.Empty,
+            StartLocation = Get(game, "start") is { } startNode ? At(startNode) : At(game),
         };
 
-        if (Get(root, "randomness") is { } randomness)
+        if (Get(game, "randomness") is { } randomness)
         {
             manifest.Randomness = Scalar(randomness) switch
             {
@@ -107,14 +213,14 @@ internal sealed class StoryYamlReader
             };
         }
 
-        if (Get(root, "seed") is { } seed)
+        if (Get(game, "seed") is { } seed)
         {
             manifest.Seed = ulong.TryParse(Scalar(seed), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
                 ? value
                 : Error<ulong?>(seed, "TW4003", "seed must be a non-negative whole number.", null);
         }
 
-        if (Get(root, "undo") is { } undo)
+        if (Get(game, "undo") is { } undo)
         {
             manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
                 ? enabled
@@ -122,7 +228,7 @@ internal sealed class StoryYamlReader
         }
 
         ReadTriggers(Get(root, "triggers"), manifest.Triggers);
-        manifest.Creation = ReadCreation(Get(root, "creation"), ruleset);
+        manifest.Creation = ReadCreation(Get(game, "creation"), ruleset);
         return manifest;
     }
 
@@ -396,7 +502,7 @@ internal sealed class StoryYamlReader
         var map = node is null ? null : Mapping(node, "characters");
         if (map is null || !map.Children.Any(c => Scalar(c.Key) == EntityId.Player.Value))
         {
-            _diagnostics.Error("TW4002", "story.talewright.yaml must declare the protagonist under 'characters: player:'.", node is null ? At(root) : At(node));
+            _diagnostics.Error("TW4002", "The story configuration must declare the protagonist under 'characters: player:'.", node is null ? At(root) : At(node));
         }
 
         foreach (var (key, value) in map?.Children ?? Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>())
@@ -593,7 +699,7 @@ internal sealed class StoryYamlReader
                 foreach (var (key, kind) in new[] { ("when", ExpressionContextKind.Condition), ("do", ExpressionContextKind.Effects) })
                 {
                     if (Get(map, key) is not YamlScalarNode scalar) continue;
-                    _analysis.Scalar(scalar);
+                    _analysis.Scalar(scalar, At(scalar).File);
                     _analysis.Expression(kind, scalar.Value ?? string.Empty, At(scalar));
                 }
             }

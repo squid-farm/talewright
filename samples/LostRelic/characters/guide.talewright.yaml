@@ -1,0 +1,13 @@
+characters:
+  guide:
+    first-name: Tomas
+    last-name: Okafor
+    pronouns:
+      subject: he
+      object: him
+      possessive-pronoun:
+        determiner: his
+        independent: his
+      reflexive: himself
+      plural: false
+    stats: { survival: 4, wis: 14 }

@@ -7,9 +7,10 @@ namespace Talewright.Authoring.Tests;
 public sealed class StoryHoverTests
 {
     private const string Manifest = """
-        id: hover
-        title: Hover
-        start: first
+        game:
+          id: hover
+          title: Hover
+          start: first
         characters:
           player: {first-name: Ada}
         items: {rope: Rope}
@@ -105,9 +106,8 @@ public sealed class StoryHoverTests
     [InlineData("inv|entory", "List of item IDs")]
     public void Manifest_help_comes_from_the_bundled_schema(string marked, string description)
     {
-        var yaml = Manifest + "\nruleset: {disable: []}";
+        var yaml = Manifest.Replace("  start: first", "  start: first\n  ruleset: {disable: []}");
         var name = marked.Replace("|", "");
-        if (name == "inventory") yaml += "\ncreation: {name: true}\n";
         if (name == "inventory") yaml = yaml.Replace("first-name: Ada", "first-name: Ada, inventory: []");
         var index = yaml.IndexOf(name, StringComparison.Ordinal) + marked.IndexOf('|');
         var analysis = Source("=== first\n-> END", yaml);
@@ -124,7 +124,7 @@ public sealed class StoryHoverTests
         var yaml = marked.Remove(caret, 1);
         var analysis = Source("=== first\n-> END", yaml);
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, Position(StorySource.ManifestFileName, marked[..caret])));
-        var line = yaml.Split('\n')[2];
+        var line = yaml.Split('\n')[3];
         Assert.Equal("\\u0073econd", line[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
         yaml = Manifest.Replace("player:", "\"player\":");
         analysis = Source("=== first\n-> END", yaml);
@@ -204,15 +204,22 @@ public sealed class StoryHoverTests
     public void Unknown_syntax_properties_have_no_schema_hover()
     {
         var analysis = Source("=== first\n-> END", Manifest + "\nunknown: value");
-        Assert.Null(StoryHover.Get(analysis, new(StorySource.ManifestFileName, 10, 3)));
+        var unknown = analysis.Source.Files[StorySource.ManifestFileName].IndexOf("unknown", StringComparison.Ordinal);
+        Assert.Null(StoryHover.Get(analysis, Position(StorySource.ManifestFileName,
+            analysis.Source.Files[StorySource.ManifestFileName][..(unknown + 2)])));
     }
 
     [Fact]
     public void Ruleset_and_story_ids_have_typed_help()
     {
-        var analysis = Source("=== first\n-> END", Manifest + "\nruleset: {base: generic}");
-        Assert.Contains("Story", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new(StorySource.ManifestFileName, 1, 6))).PlainText);
-        Assert.Contains("Ruleset", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new(StorySource.ManifestFileName, 10, 18))).PlainText);
+        var yaml = Manifest.Replace("  start: first", "  start: first\n  ruleset: {base: generic}");
+        var analysis = Source("=== first\n-> END", yaml);
+        var id = yaml.IndexOf("hover", StringComparison.Ordinal);
+        var ruleset = yaml.IndexOf("generic", StringComparison.Ordinal);
+        Assert.Contains("Story", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis,
+            Position(StorySource.ManifestFileName, yaml[..id]))).PlainText);
+        Assert.Contains("Ruleset", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis,
+            Position(StorySource.ManifestFileName, yaml[..ruleset]))).PlainText);
     }
 
     private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked, string yaml = Manifest,

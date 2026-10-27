@@ -1,6 +1,7 @@
 # Talemark syntax reference
 
-A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
+A story is a **folder** containing one `story.talewright.yaml`, optional supporting `*.talewright.yaml` files
+in subfolders, and any number of `*.tale` files.
 **Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
 It lets you mix prose with bold, italic and code formatting, dialogue, choices and story rules. The
 YAML manifest is a separate settings file for the story's characters and world; it is not Talemark
@@ -22,10 +23,11 @@ A story uses two kinds of files:
 For example, the manifest can start like this:
 
 ```yaml
-id: my-story
-title: My Story
-version: 0.1.0
-start: crossroads
+game:
+  id: my-story
+  title: My Story
+  version: 0.1.0
+  start: crossroads
 characters:
   player:
     first-name: Alex
@@ -82,25 +84,47 @@ calculation order and quoting rules. Most authors will not need it for a first s
 
 ## 1. `story.talewright.yaml`
 
-```yaml
-id: lost-relic # kebab-case, unique
-title: The Lost Relic
-version: 0.1.0
-start: camp.arrival # first scene id
-randomness: checks-only # off | checks-only (default)
-seed: 1234 # optional; omitted = random per playthrough
-undo: true # default; false hides Back/Forward without disabling saves
+The root manifest owns `game:`. Supporting configuration files may declare `characters`, `items`,
+`factions`, `flags`, and numeric or text `vars`, using the same section shapes as the root.
+Each declaration kind has one story-wide namespace: paths do not assign scope, ownership, or precedence.
+All declarations are collected before references resolve, so a character can use an item declared
+in a different file. The required `player` character may also be in a supporting file.
 
-ruleset:
-  base: generic # generic | none
-  disable: [cha] # remove stats from the base ruleset
-  stats: # add stats
-    - id: courage
-      name: Courage
-      category: attribute # attribute | skill | resource | progression | custom
-      min: 0
-      max: 10
-      default: 0
+Configuration filenames end in case-sensitive `.talewright.yaml`; unrelated YAML and `.yml` files
+are ignored. No additional configuration file is allowed beside the root manifest.
+The basename `story.talewright.yaml` is reserved for that single root manifest;
+using it in a subfolder is an error, not a nested story.
+Reserve the `.talewright.yaml` ending for story configuration rather than unrelated tool files.
+For practical layouts, see [Organizing your story](../guide/organizing-your-story.md).
+Supporting files cannot contain `game:`. Duplicate identities are errors naming both sources;
+there are no includes, overrides, or filename ordering rules. Only one file may declare `triggers:`,
+and its list runs in authored order. **Trigger order affects behavior**; keep the list in the root
+manifest unless there is a specific reason to move it. Each configuration file contains one YAML mapping document.
+Folder, ZIP, embedded, and published stories use the same inputs.
+
+Moving declarations preserves their meaning, but paths and text remain part of the source fingerprint.
+Reorganization is a source change, not a guarantee of compatibility with existing saves.
+The debugger requires an explicit restart after configuration additions, edits, renames, or deletions.
+
+```yaml
+game:
+  id: lost-relic # kebab-case, unique
+  title: The Lost Relic
+  version: 0.1.0
+  start: camp.arrival # first scene id
+  randomness: checks-only # off | checks-only (default)
+  seed: 1234 # optional; omitted = random per playthrough
+  undo: true # default; false hides Back/Forward without disabling saves
+  ruleset:
+    base: generic # generic | none
+    disable: [cha] # remove stats from the base ruleset
+    stats: # add stats
+      - id: courage
+        name: Courage
+        category: attribute # attribute | skill | resource | progression | custom
+        min: 0
+        max: 10
+        default: 0
 
 characters:
   player: # the id "player" is required
@@ -152,18 +176,19 @@ player requires a legal selection before play. The `player` declaration remains
 required and provides identity, inventory and other stat defaults.
 
 ```yaml
-creation:
-  name: true
-  pronouns: [they, she, he]
-  stats:
-    str: [8, 12, 16]
-  presets:
-    explorer:
-      label: Explorer
-      stats: {str: 12, hp: 15}
-    scholar:
-      label: Scholar
-      stats: {str: 8, hp: 10}
+game:
+  creation:
+    name: true
+    pronouns: [they, she, he]
+    stats:
+      str: [8, 12, 16]
+    presets:
+      explorer:
+        label: Explorer
+        stats: {str: 12, hp: 15}
+      scholar:
+        label: Scholar
+        stats: {str: 8, hp: 10}
 ```
 
 All fields are optional. The first listed pronoun and preset are the defaults.
@@ -348,9 +373,11 @@ debugger refreshes image occurrences on accepted source/image changes; rejected 
 keeps the last accepted story and images. Unavailable or undecodable images show their
 effective alt and a visible, accessible failure. There is no remote fallback.
 
-Image display from ZIPs/uploads is deferred to
-[#178](https://github.com/squid-farm/talewright/issues/178); generated published hosts and
-their deployment/subpath behavior are deferred to
+ZIP stories and browser uploads retain their compressed archive for lazy image access through
+the same renderer. Untrusted archives enforce defensive expansion accounting, distinct from
+folder authoring and the browser upload convenience cap. A later image failure preserves the
+story and shows effective alt plus an accessible error.
+Generated published hosts and their deployment/subpath behavior are deferred to
 [#179](https://github.com/squid-farm/talewright/issues/179). Their existing exports retain
 the real assets/catalogue, but their unadapted image occurrences show the unavailable state.
 Text-only stories continue to work in those hosts.

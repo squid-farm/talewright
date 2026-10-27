@@ -58,7 +58,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     {
         var fixture = TestStories.Linear with
         {
-            Yaml = TestStories.DefaultYaml + "\ncreation:\n  name: true\n",
+            Yaml = TestStories.DefaultYaml.Replace("  start: start", "  start: start\n  creation:\n    name: true"),
         };
         var path = await WriteArchive("creation.zip", fixture.Zip());
         await Driver.StartAsync("--no-library", path);

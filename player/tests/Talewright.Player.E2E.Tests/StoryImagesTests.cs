@@ -140,7 +140,7 @@ public sealed class StoryImagesTests
     }
 
     [Fact]
-    public async Task Text_only_folder_and_deferred_zip_remain_compilable()
+    public async Task Text_only_folder_and_archive_remain_compilable()
     {
         using var files = new ImageStoryFiles();
         await File.WriteAllTextAsync(files.TalePath, "=== start\nText only.\n-> END");
@@ -150,7 +150,7 @@ public sealed class StoryImagesTests
         using (var stream = File.Create(zip))
         using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create))
         {
-            foreach (var path in new[] { StorySource.ManifestFileName, "main.tale" })
+            foreach (var path in loaded.Source.Files.Keys)
             {
                 using var entry = archive.CreateEntry(path).Open();
                 await using var source = File.OpenRead(Path.Combine(files.Root, path));
@@ -159,6 +159,6 @@ public sealed class StoryImagesTests
         }
         using var archived = await new FileSystemStoryLibrary([zip]).OpenAsync(zip);
         Assert.True(StoryCompiler.Compile(archived.Source).Success);
-        Assert.Null(archived.Images);
+        Assert.NotNull(archived.Images);
     }
 }

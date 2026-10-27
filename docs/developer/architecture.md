@@ -279,7 +279,7 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     hosts, preserving the same catalogue and lookup after export. Image rendering
     and the remaining deployment acceptance under #179 stay separate.
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
-    `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `ruleset: base:`). Tier 1 extension in M2 means
+    `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `game.ruleset.base:`). Tier 1 extension in M2 means
     "pass your own options".
   - `StoryCompiler`: orchestrates. Order: read `story.talewright.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
     every `.tale` for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
@@ -388,7 +388,10 @@ samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Co
    optional lazy image access. The UI owns it, not the compiler/runtime. Failed adoption preserves the
    accepted capability; successful replacement releases it. Folder assets are live, not byte snapshots.
    For an uploaded zip, `TalewrightApp` buffers
-   it into memory first (browser streams aren't seekable) and calls `StorySource.FromZip`.
+   it into memory first (browser streams aren't seekable) and transfers ownership to
+   `ArchiveStoryImages.Open`. The player retains the parsed archive and uses `StorySource.FromZip`
+   for the shared source/root/member mapping. Image reads enforce the archive expansion budget
+   without counting repeated reads as new content; no expanded image cache is retained by the adapter.
 2. **Compile.** `StoryCompiler` reads `story.talewright.yaml`:
    - `ruleset.base` picks a ruleset factory (`generic`, `none`, or one you registered); `ruleset.disable`
      removes stats; `ruleset.stats` adds or overrides them.
@@ -454,9 +457,9 @@ This is how the "dating sim doesn't want strength" requirement is met, and where
 
 | I want to…                                        | Today (no code, story.talewright.yaml)                                                              | With C# (Tier 1, polished in M2)                                           |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Remove default stats                              | `ruleset: { base: generic, disable: [str, con] }`                                        | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
-| Start from nothing                                | `ruleset: { base: none }`                                                                | `new RulesetBuilder("mine")`                                               |
-| Add stats (affection, sanity…)                    | `ruleset: { stats: [ { id: affection, name: Affection, category: custom, max: 100 } ] }` | `builder.AddStat(new StatDefinition(...))`                                 |
+| Remove default stats                              | `game: { ruleset: { base: generic, disable: [str, con] } }`                              | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
+| Start from nothing                                | `game: { ruleset: { base: none } }`                                                      | `new RulesetBuilder("mine")`                                               |
+| Add stats (affection, sanity…)                    | `game: { ruleset: { stats: [ { id: affection, name: Affection, category: custom, max: 100 } ] } }` | `builder.AddStat(new StatDefinition(...))`                                 |
 | Change how checks work (2d6, percentile, no dice) | pick a ruleset that has the rule                                                         | implement `ISkillCheckRule`, `WithSkillCheckRule`                          |
 | Change levelling                                  | —                                                                                        | implement `ILevelingRule`                                                  |
 | Derived stats, conditions, auras                  | items with `modifiers`                                                                   | implement `IStatModifier`, `AddModifier`                                   |
@@ -530,8 +533,8 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
 - **Media adapters.** Native folder player/debugger and built-in embedded samples display images.
-  ZIP/upload access and safety remain #178; generated published-host adapters, static-subpath/deployment
-  behavior and remaining warning acceptance remain #179. Those sources show an explicit unavailable
+  ZIP/upload access uses a retained archive owner with lazy bounded reads; generated published-host adapters,
+  static-subpath/deployment behavior and remaining warning acceptance remain #179. Those sources show an explicit unavailable
   image state, not silent disappearance. Existing #242 export staging is reused, not replaced.
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.

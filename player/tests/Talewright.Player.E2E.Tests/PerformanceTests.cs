@@ -26,10 +26,11 @@ public sealed class PerformanceTests : PlayerTest
             tale.AppendLine($"* [Next] -> scene.{(i + 1) % scenes}");
         }
         var fixture = new StoryFixture("performance", """
-            id: performance
-            title: Performance
-            start: scene.0
-            seed: 42
+            game:
+              id: performance
+              title: Performance
+              start: scene.0
+              seed: 42
             characters:
               player: {first-name: Tester}
             """, tale.ToString());

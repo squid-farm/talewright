@@ -10,7 +10,7 @@ internal sealed class ImageStoryFiles : IDisposable
     public string ImagePath => Path.Combine(Root, "images", "photo.jpeg");
     public const string Tale = """
         === start
-        Before {image("photo.jpeg", "A camp")} after.
+        Before {image("photo.jpeg", "A camp")} after. {var:greeting}
 
         > player: Dialogue {image("pixel.png", "A pixel")}.
 
@@ -33,7 +33,13 @@ internal sealed class ImageStoryFiles : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(Root, "images"));
         File.WriteAllText(Path.Combine(Root, StorySource.ManifestFileName),
-            "id: image-test\ntitle: Folder images\nstart: start\nundo: true\ncharacters:\n  player: {first-name: Tester}\n");
+            "game:\n  id: image-test\n  title: Folder images\n  start: start\n  undo: true\n");
+        Directory.CreateDirectory(Path.Combine(Root, "characters"));
+        File.WriteAllText(Path.Combine(Root, "characters", "player.talewright.yaml"),
+            "characters:\n  player: {first-name: Tester, inventory: [camera]}\n");
+        Directory.CreateDirectory(Path.Combine(Root, "world"));
+        File.WriteAllText(Path.Combine(Root, "world", "equipment.talewright.yaml"),
+            "items: {camera: {name: Camera}}\nvars: {greeting: \"Hello from supporting configuration.\"}\n");
         File.WriteAllText(TalePath, Tale);
         using var photo = Assembly.GetExecutingAssembly().GetManifestResourceStream("stories/LostRelic/images/camp-art.jpeg")
             ?? throw new InvalidOperationException("Missing real image test resource.");
@@ -42,6 +48,23 @@ internal sealed class ImageStoryFiles : IDisposable
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
         File.WriteAllBytes(Path.Combine(Root, "images", "pixel.webp"), Convert.FromBase64String(
             "UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA="));
+    }
+
+    public byte[] Zip(string prefix = "")
+    {
+        var source = StorySource.FromDirectory(Root);
+        using var buffer = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(buffer, System.IO.Compression.ZipArchiveMode.Create,
+            leaveOpen: true))
+        {
+            foreach (var path in source.Files.Keys.Concat(source.ImagePaths))
+            {
+                using var entry = archive.CreateEntry(prefix + path).Open();
+                using var input = File.OpenRead(Path.Combine(Root, path));
+                input.CopyTo(entry);
+            }
+        }
+        return buffer.ToArray();
     }
 
     public void Dispose() => Directory.Delete(Root, recursive: true);

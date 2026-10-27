@@ -11,6 +11,7 @@ public sealed class EmbeddedStoryLibraryTests
         var assembly = typeof(EmbeddedStoryLibraryTests).Assembly;
         var library = new EmbeddedStoryLibrary(assembly);
         var source = await library.LoadAsync("LostRelic");
+        Assert.Contains("characters/guide.talewright.yaml", source.Files.Keys);
         var expected = new[]
         {
             "images/camp-art.jpeg",
@@ -28,6 +29,7 @@ public sealed class EmbeddedStoryLibraryTests
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Empty(result.Diagnostics);
+        Assert.Equal("Tomas Okafor", result.Story!.World.Characters[new("guide")].FullName);
         Assert.Contains(await library.ListAsync(), story => story.Id == "LostRelic");
     }
 }

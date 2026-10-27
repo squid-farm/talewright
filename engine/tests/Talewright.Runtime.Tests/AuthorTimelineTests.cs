@@ -9,10 +9,11 @@ namespace Talewright.Runtime.Tests;
 public sealed class AuthorTimelineTests
 {
     private const string Yaml = """
-        id: timeline
-        title: Timeline
-        start: start
-        undo: false
+        game:
+          id: timeline
+          title: Timeline
+          start: start
+          undo: false
         flags: [ready, fired]
         vars: {count: 0}
         characters:

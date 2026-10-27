@@ -10,10 +10,11 @@ namespace Talewright.Runtime.Tests;
 public class StoryHistoryTests
 {
     private const string Yaml = """
-        id: history
-        title: History
-        version: 1
-        start: a
+        game:
+          id: history
+          title: History
+          version: 1
+          start: a
         characters:
           player: { first-name: Tester, stats: { athletics: 2 } }
         triggers:
@@ -405,7 +406,7 @@ public class StoryHistoryTests
     [Fact]
     public void Undo_can_be_disabled_without_disabling_saves()
     {
-        var history = new StoryHistory(Compile(Yaml + "\nundo: false"), 7);
+        var history = new StoryHistory(Compile(Yaml.Replace("  start: a", "  start: a\n  undo: false")), 7);
         history.Choose("c0");
         Assert.False(history.CanBack);
         Assert.Throws<InvalidOperationException>(() => history.Back());

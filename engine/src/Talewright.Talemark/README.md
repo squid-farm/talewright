@@ -18,6 +18,7 @@ if (!result.Success)
 var session = new StorySession(result.Story!);
 ```
 
+The root `story.talewright.yaml` keeps core settings under `game:`; world declarations remain at the root.
 Folder and ZIP loaders both accept at most 1,000 story files, 5 MiB per file and
 50 MiB total expanded text. Folder traversal rejects symbolic links inside the
 story and paths deeper than 64 directories. Only `story.talewright.yaml` and `.tale` files

@@ -69,7 +69,7 @@ Linux notes and Git instructions.
 
 ## Write your first story
 
-1. Create a folder with a `story.talewright.yaml` (title, start scene, characters) and a `story.tale` (your scenes).
+1. Create a folder with a `story.talewright.yaml` (game settings and character declarations) and a `story.tale` (your scenes).
    You can also copy the [sample story](samples/LostRelic) and edit it.
 2. Check it: `talewright validate my-story` lists every problem with its file and line. Without the
    desktop tools, zip the folder and open it in the web player to check it.

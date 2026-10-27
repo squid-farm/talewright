@@ -44,7 +44,7 @@ proves the story is well formed; it doesn't play every possible path.
 
 | Option | Effect |
 |---|---|
-| `--warnings-as-errors` | Fail if there are any warnings. Warnings pass by default. |
+| `--warnings-as-errors` | Fail if there are compiler warnings. Warnings pass by default. |
 | `--format json` | Machine-readable output (below). |
 
 ### Output contract
@@ -57,6 +57,12 @@ proves the story is well formed; it doesn't play every possible path.
 
 Human output prints `file:line:column: severity CODE: message` per diagnostic, then a final status.
 Operational errors go to stderr.
+
+An advisory hosting-size warning also goes to stderr when the source-only estimate
+exceeds recorded itch.io guidance. It does not change the exit code, compiler diagnostics,
+JSON schema, or `--warnings-as-errors` policy. Generated runtime and precompressed files
+are excluded from this estimate; `publish -a --target web` measures the final extracted
+payload instead. See [artwork and hosting size](../guide/sharing-your-story.md#artwork-and-hosting-size).
 
 `--format json` writes exactly one JSON object to stdout, with no progress or help text:
 

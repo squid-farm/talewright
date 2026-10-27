@@ -14,7 +14,7 @@ async function activate(context) {
   const fileEvents = [
     '**/*.tale',
     '**/images/**',
-    '**/story.talewright.yaml',
+    '**/*.talewright.yaml',
     '**/talewright.lint.json',
     '**/*.csproj',
     '**/*.authoring.json',
@@ -34,7 +34,7 @@ async function activate(context) {
   }, {
     documentSelector: [
       { scheme: 'file', language: 'tale' },
-      { scheme: 'file', pattern: '**/story.talewright.yaml' },
+      { scheme: 'file', pattern: '**/*.talewright.yaml' },
     ],
     initializationOptions: {
       metadataPath,

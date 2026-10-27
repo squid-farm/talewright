@@ -13,7 +13,7 @@ public sealed class ValidationTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
-            "id: cli\ntitle: CLI\nversion: 1\nstart: a\ncharacters:\n  player: { first-name: Tester }\n");
+            "game:\n  id: cli\n  title: CLI\n  version: 1\n  start: a\ncharacters:\n  player: { first-name: Tester }\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"), "=== a\nHello.\n-> END");
     }
 
@@ -73,6 +73,26 @@ public sealed class ValidationTests : IDisposable
         var result = Run("--format", "json", "--warnings-as-errors");
         Assert.Equal(1, result.Code);
         Assert.Contains("\"severity\":\"warning\"", result.Output);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Hosting_advisory_is_stderr_only_and_does_not_fail_warnings_as_errors(bool json)
+    {
+        var images = Directory.CreateDirectory(Path.Combine(_root, "images")).FullName;
+        for (var index = 0; index < 1001; index++)
+            File.WriteAllBytes(Path.Combine(images, $"image-{index}.png"), []);
+
+        var result = json ? Run("--format", "json", "--warnings-as-errors") : Run("--warnings-as-errors");
+        Assert.Equal(0, result.Code);
+        Assert.Contains("source-only estimate", result.Error);
+        Assert.Contains("1003 files", result.Error);
+        Assert.Contains("Advisory only", result.Error);
+        if (json)
+            Assert.Equal("""{"schemaVersion":1,"success":true,"diagnostics":[]}""", result.Output.Trim());
+        else
+            Assert.DoesNotContain("hosting", result.Output);
     }
 
     [Theory]

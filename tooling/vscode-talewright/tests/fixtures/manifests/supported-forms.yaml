@@ -1,16 +1,24 @@
-id: supported-forms
-title: Supported forms
-version: 1.2.3
-start: beginning
-randomness: off
-seed: 42
-undo: false
-ruleset:
-  base: none
-  stats:
-    - id: focus
-      min: 0
-      max: 8
+game:
+  id: supported-forms
+  title: Supported forms
+  version: 1.2.3
+  start: beginning
+  randomness: off
+  seed: 42
+  undo: false
+  ruleset:
+    base: none
+    stats:
+      - id: focus
+        min: 0
+        max: 8
+  creation:
+    name: true
+    pronouns: [they, she]
+    stats: {focus: [4, 8]}
+    presets:
+      explorer:
+        stats: {focus: 8}
 characters:
   player:
     first-name: Ada
@@ -43,10 +51,3 @@ triggers:
     when: flag:ready
     do: set flag:done
     once: true
-creation:
-  name: true
-  pronouns: [they, she]
-  stats: {focus: [4, 8]}
-  presets:
-    explorer:
-      stats: {focus: 8}

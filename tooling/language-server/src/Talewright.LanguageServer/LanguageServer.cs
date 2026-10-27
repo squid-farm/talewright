@@ -24,6 +24,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private sealed record Document(string Root, int Version, string Text);
     private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error);
     private sealed record ProtocolError(int Code, string Message);
+    private enum Feature { Completion, Hover, Definition }
     private sealed class Story(
         string root,
         StoryWorkspace workspace,
@@ -141,6 +142,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     {
                         positionEncoding = "utf-16",
                         hoverProvider = true,
+                        definitionProvider = true,
                         completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(", "\"", "/" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
@@ -171,24 +173,28 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     break;
                 case "textDocument/completion":
                     if (!hasId) throw new ArgumentException("completion requires a request id.");
-                    await SemanticAsync(id, parameters, false, cancellationToken);
+                    await SemanticAsync(id, parameters, Feature.Completion, cancellationToken);
                     break;
                 case "textDocument/hover":
                     if (!hasId) throw new ArgumentException("hover requires a request id.");
-                    await SemanticAsync(id, parameters, true, cancellationToken);
+                    await SemanticAsync(id, parameters, Feature.Hover, cancellationToken);
+                    break;
+                case "textDocument/definition":
+                    if (!hasId) throw new ArgumentException("definition requires a request id.");
+                    await SemanticAsync(id, parameters, Feature.Definition, cancellationToken);
                     break;
                 case "textDocument/didChange":
                     Change(parameters);
                     break;
                 case "textDocument/didClose":
-                    await CloseAsync(parameters, cancellationToken);
+                    Close(parameters);
                     break;
                 case "textDocument/didSave":
-                    await RefreshAsync([PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!)], cancellationToken);
+                    Refresh([PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!)]);
                     break;
                 case "workspace/didChangeWatchedFiles":
-                    await RefreshAsync(parameters.GetProperty("changes").EnumerateArray()
-                        .Select(change => PathFromUri(change.GetProperty("uri").GetString()!)).ToArray(), cancellationToken);
+                    Refresh(parameters.GetProperty("changes").EnumerateArray()
+                        .Select(change => PathFromUri(change.GetProperty("uri").GetString()!)).ToArray());
                     break;
                 default:
                     if (hasId) await ErrorAsync(id, -32601, $"Method not supported: {method}", cancellationToken);
@@ -233,16 +239,15 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         if (_documents.ContainsKey(path)) throw new InvalidOperationException($"Document already open: {path}");
         var version = DocumentVersion(document);
         var text = document.GetProperty("text").GetString()!;
-        var story = GetStory(path);
+        var story = GetStory(path, opening: true);
         story.Workspace.Open(Relative(story.Root, path), version, text);
         _documents.Add(path, new(story.Root, version, text));
-        ReconcileStory(story);
-        Schedule(story);
+        Refresh([path]);
     }
 
-    private async Task SemanticAsync(JsonElement id, JsonElement parameters, bool hover, CancellationToken cancellationToken)
+    private async Task SemanticAsync(JsonElement id, JsonElement parameters, Feature kind, CancellationToken cancellationToken)
     {
-        var feature = hover ? "Hover" : "Completion";
+        var feature = kind.ToString();
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!_documents.TryGetValue(path, out var document))
             throw new ArgumentException($"{feature} requires an open story document.");
@@ -271,7 +276,21 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             return;
         }
         var position = new SourceLocation(Relative(story.Root, path), line + 1, character + 1);
-        if (hover)
+        if (kind == Feature.Definition)
+        {
+            var target = StoryNavigation.Definition(analysis, position);
+            await ReplyAsync(id, target is null ? null : new
+            {
+                uri = UriFromPath(Path.GetFullPath(target.Start.File, story.Root)),
+                range = new
+                {
+                    start = new { line = target.Start.Line - 1, character = target.Start.Column - 1 },
+                    end = new { line = target.End.Line - 1, character = target.End.Column - 1 }
+                }
+            }, cancellationToken);
+            return;
+        }
+        if (kind == Feature.Hover)
         {
             var result = StoryHover.Get(analysis, position);
             await ReplyAsync(id, result is null ? null : new
@@ -332,7 +351,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         return value;
     }
 
-    private async Task CloseAsync(JsonElement parameters, CancellationToken cancellationToken)
+    private void Close(JsonElement parameters)
     {
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!IsStoryFile(path)) return;
@@ -340,62 +359,50 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var story = _stories[document.Root];
         story.Workspace.Close(Relative(story.Root, path));
         _documents.Remove(path);
-        if (Path.GetFileName(path) == StorySource.ManifestFileName && !File.Exists(path) &&
-            _stories.Keys.Concat(_folders).Any(root => !PathComparer.Equals(root, story.Root) && IsWithin(root, story.Root)))
-        {
-            await RetireStoryAsync(story, cancellationToken);
-            return;
-        }
         // Closing must discard the overlay even when reloading disk fails.
         // Disk may have changed without a watcher event while the overlay was open.
-        story = Reload(story);
-        Schedule(story);
+        Refresh([path]);
     }
 
-    private async Task RetireStoryAsync(Story story, CancellationToken cancellationToken)
+    private HashSet<string> ReconcileOwnership()
     {
-        story.Generation++;
-        story.Pending?.Cancel();
-        story.Pending?.Dispose();
-        _stories.Remove(story.Root);
-        foreach (var path in story.Published)
-        {
-            await NotifyAsync("textDocument/publishDiagnostics", new
-            {
-                uri = UriFromPath(path),
-                version = _documents.TryGetValue(path, out var document) ? (int?)document.Version : null,
-                diagnostics = Array.Empty<object>()
-            }, cancellationToken);
-        }
         var affected = new HashSet<string>(PathComparer);
-        foreach (var (path, document) in _documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).ToArray())
+        foreach (var (path, document) in _documents.ToArray())
         {
-            var destination = GetStory(path, story.Root);
-            destination.Workspace.Open(Relative(destination.Root, path), document.Version, document.Text);
-            _documents[path] = document with { Root = destination.Root };
+            var destination = GetStory(path, document.Root);
+            if (PathComparer.Equals(destination.Root, document.Root)) continue;
+            affected.Add(document.Root);
             affected.Add(destination.Root);
+            _documents[path] = document with { Root = destination.Root };
         }
-        foreach (var root in _stories.Keys.Where(root => IsWithin(root, story.Root)).ToArray())
-            affected.Add(root);
-        foreach (var root in affected)
+        foreach (var story in _stories.Values.ToArray())
         {
-            Reload(_stories[root]);
-            Schedule(_stories[root]);
+            foreach (var path in story.Published.ToArray())
+            {
+                var destination = GetStory(path, story.Root);
+                if (PathComparer.Equals(destination.Root, story.Root)) continue;
+                story.Published.Remove(path);
+                destination.Published.Add(path);
+                affected.Add(story.Root);
+                affected.Add(destination.Root);
+            }
+            if (PathComparer.Equals(FindRoot(Path.Combine(story.Root, StorySource.ManifestFileName), story.Root), story.Root))
+                continue;
+            story.Generation++;
+            story.Pending?.Cancel();
+            story.Pending?.Dispose();
+            _stories.Remove(story.Root);
         }
+        return affected;
     }
 
-    private async Task RefreshAsync(string[] paths, CancellationToken cancellationToken)
+    private void Refresh(string[] paths)
     {
-        foreach (var story in _stories.Values.OrderByDescending(story => story.Root.Length).ToArray())
-        {
-            var manifest = Path.Combine(story.Root, StorySource.ManifestFileName);
-            if (!_documents.ContainsKey(manifest) && !File.Exists(manifest) &&
-                (!Directory.Exists(story.Root) || !_folders.Contains(story.Root, PathComparer)))
-                await RetireStoryAsync(story, cancellationToken);
-        }
         foreach (var path in paths.Where(path => Path.GetFileName(path) == StorySource.ManifestFileName && File.Exists(path)))
-            ReconcileStory(GetStory(path));
-        foreach (var story in _stories.Values.Where(story => paths.Any(path => IsWithin(story.Root, path) ||
+            GetStory(path);
+        var affected = ReconcileOwnership();
+        foreach (var story in _stories.Values.Where(story => affected.Contains(story.Root) ||
+                     paths.Any(path => IsWithin(story.Root, path) ||
                      IsWithin(path, story.Root) ||
                      (_metadataPath is not null && PathComparer.Equals(path, Path.GetFullPath(_metadataPath, story.Root))))).ToArray())
         {
@@ -404,46 +411,29 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         }
     }
 
-    private Story GetStory(string path, string? fallbackRoot = null)
+    private Story GetStory(string path, string? fallbackRoot = null, bool opening = false)
     {
-        var root = (Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null)
-            ?? _stories.Keys.Append(StoryWorkspace.FindStoryRoot(path))
-                .OfType<string>().Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
-            ?? _folders.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
-            ?? fallbackRoot
-            ?? throw new ArgumentException($"No story.talewright.yaml or workspace root found for {path}.");
+        var root = FindRoot(path, fallbackRoot,
+            opening && Path.GetFileName(path) == StorySource.ManifestFileName ? Path.GetDirectoryName(path) : null);
         if (_stories.TryGetValue(root, out var existing)) return existing;
         var story = LoadStory(root);
         _stories.Add(root, story);
         return story;
     }
 
-    private void ReconcileStory(Story story)
-    {
-        foreach (var ancestor in _stories.Values.Where(candidate => !ReferenceEquals(candidate, story) &&
-                     IsWithin(candidate.Root, story.Root)).ToArray())
-        {
-            foreach (var (path, document) in _documents.Where(pair =>
-                         PathComparer.Equals(pair.Value.Root, ancestor.Root) && IsWithin(story.Root, pair.Key)).ToArray())
-            {
-                ancestor.Workspace.Close(Relative(ancestor.Root, path));
-                story.Workspace.Open(Relative(story.Root, path), document.Version, document.Text);
-                _documents[path] = document with { Root = story.Root };
-            }
-            foreach (var path in ancestor.Published.Where(path => IsWithin(story.Root, path)).ToArray())
-            {
-                ancestor.Published.Remove(path);
-                story.Published.Add(path);
-            }
-            Reload(ancestor);
-            Schedule(ancestor);
-        }
-    }
+    private string FindRoot(string path, string? fallbackRoot = null, string? openingManifestRoot = null) =>
+        _documents.Keys.Where(path => Path.GetFileName(path) == StorySource.ManifestFileName)
+                .Select(Path.GetDirectoryName)
+                .Append(StoryWorkspace.FindStoryRoot(path))
+                .Append(openingManifestRoot)
+                .OfType<string>().Where(root => IsWithin(root, path)).OrderBy(root => root.Length).FirstOrDefault()
+            ?? _folders.Where(root => IsWithin(root, path)).OrderByDescending(root => root.Length).FirstOrDefault()
+            ?? fallbackRoot
+            ?? throw new ArgumentException($"No story.talewright.yaml or workspace root found for {path}.");
 
     private Story LoadStory(string root)
     {
-        var children = _stories.Keys.Where(candidate => !PathComparer.Equals(candidate, root) && IsWithin(root, candidate)).ToArray();
-        var source = Directory.Exists(root) ? StorySource.FromDirectory(root, children) : new StorySource(new Dictionary<string, string>());
+        var source = Directory.Exists(root) ? StorySource.FromDirectory(root) : new StorySource(new Dictionary<string, string>());
         var lintConfiguration = LintConfiguration.Defaults;
         Exception? lintConfigurationError = null;
         try
@@ -485,8 +475,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private static bool IsWithin(string root, string path) => !Path.IsPathRooted(Path.GetRelativePath(root, path)) &&
         Path.GetRelativePath(root, path) is var relative && relative != ".." &&
         !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
-    private static bool IsStoryFile(string path) => Path.GetFileName(path) == StorySource.ManifestFileName ||
-        path.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase);
+    private static bool IsStoryFile(string path) => StorySource.IsStoryFile(Path.GetFileName(path));
     private static string PathFromUri(string value)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || !uri.IsFile)
@@ -554,7 +543,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             var lintConfiguration = Path.Combine(story.Root, LintConfiguration.FileName);
             var errorPaths = story.Published.Append(manifest);
             if (story.LintConfigurationError is not null) errorPaths = errorPaths.Append(lintConfiguration);
-            foreach (var path in errorPaths.Distinct(PathComparer).ToArray())
+            foreach (var path in errorPaths.Distinct(PathComparer).Where(Owns).ToArray())
             {
                 var diagnostics = PathComparer.Equals(path, manifest)
                     ? new[] { ToDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5002",
@@ -596,7 +585,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
 
         var paths = groups.Keys.Concat(story.Published)
             .Concat(_documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).Select(pair => pair.Key))
-            .Distinct(PathComparer).Order(PathComparer).ToArray();
+            .Distinct(PathComparer).Where(Owns).Order(PathComparer).ToArray();
         foreach (var path in paths)
         {
             var diagnostics = groups.TryGetValue(path, out var found) ? found : [];
@@ -613,9 +602,12 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         void Add(string relativeFile, object diagnostic)
         {
             var path = Path.GetFullPath(relativeFile, story.Root);
+            if (!Owns(path)) return;
             if (!groups.TryGetValue(path, out var diagnostics)) groups.Add(path, diagnostics = []);
             diagnostics.Add(diagnostic);
         }
+
+        bool Owns(string path) => PathComparer.Equals(FindRoot(path, story.Root), story.Root);
     }
 
     private static object ToDiagnostic(Diagnostic diagnostic, string text)

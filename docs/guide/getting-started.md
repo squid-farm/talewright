@@ -27,15 +27,18 @@ and define your cast and rules in a YAML manifest. A story is just a folder of t
 
 ```text
 my-story/
-├── story.talewright.yaml      # title, start scene, characters, items, factions
+├── story.talewright.yaml      # game settings and story declarations
 └── story.tale      # your scenes (use as many .tale files and subfolders as you like)
 ```
+
+Story settings such as the ID, title, starting scene, and ruleset go under `game:`. Characters and
+other declarations stay at the root of the manifest.
 
 > **Optional editor help:** In VS Code, Red Hat's
 > [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) can help
 > with the manifest. The [Talewright VS Code extension](../../tooling/vscode-talewright/README.md)
-> adds Talemark highlighting, but is currently installed from a downloaded package rather than the
-> Marketplace; its live checks need extra setup. You can skip both and use any plain-text editor.
+> adds Talemark highlighting. It is currently installed from a downloaded package rather than the
+> Marketplace, and live story checks need extra setup. You can skip both and use any plain-text editor.
 
 ## What can I share without the desktop tools?
 

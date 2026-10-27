@@ -70,7 +70,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     private readonly Dictionary<(string File, int Line), List<(SourceText Source, int Start, int End)>> _inlineRanges = [];
     private readonly Dictionary<string, string[]> _lines = new(StringComparer.Ordinal);
     private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
-    private int[]? _manifestLineStarts;
+    private readonly Dictionary<string, int[]> _manifestLineStarts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _variableTypes = new(StringComparer.Ordinal);
     private readonly AuthoringSymbol[] _imageCandidates = StoryImageResolver.CompletionPaths(source)
         .Select(name => new AuthoringSymbol(name, AuthoringSymbolKind.Image, "image path", null)).ToArray();
@@ -173,7 +173,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             return new(boundaries[offset], boundaries[offset + length]);
         }
         var completionText = text;
-        if (location.File != StorySource.ManifestFileName && source.Files.TryGetValue(location.File, out var content))
+        if (!StorySource.IsConfigurationFile(location.File) && source.Files.TryGetValue(location.File, out var content))
         {
             if (!_lines.TryGetValue(location.File, out var sourceLines))
                 _lines.Add(location.File, sourceLines = content.ReplaceLineEndings("\n").Split('\n'));
@@ -196,10 +196,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
     }
 
-    internal void Scalar(YamlScalarNode node)
+    internal void Scalar(YamlScalarNode node, string file = StorySource.ManifestFileName)
     {
-        var text = source.Files[StorySource.ManifestFileName];
-        if (_manifestLineStarts is null)
+        var text = source.Files[file];
+        if (!_manifestLineStarts.TryGetValue(file, out var lineStarts))
         {
             var starts = new List<int> { 0 };
             for (var index = 0; index < text.Length; index++)
@@ -211,10 +211,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 }
                 else if (text[index] == '\n') starts.Add(index + 1);
             }
-            _manifestLineStarts = starts.ToArray();
+            _manifestLineStarts[file] = lineStarts = starts.ToArray();
         }
-        _scalars.TryAdd(new SourceLocation(StorySource.ManifestFileName, (int)node.Start.Line, (int)node.Start.Column),
-            new YamlScalarSource(text, node, _manifestLineStarts));
+        _scalars.TryAdd(new SourceLocation(file, (int)node.Start.Line, (int)node.Start.Column),
+            new YamlScalarSource(file, text, node, lineStarts));
     }
 
     internal void Scene(SceneId id, SourceLocation location)
@@ -232,15 +232,15 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats.Select(stat =>
             new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null)).ToArray());
 
-    private void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null)
+    private void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null,
+        string file = StorySource.ManifestFileName)
     {
         if (node is YamlSequenceNode sequence)
         {
             if (sequence.Children.Count == 0)
             {
-                if (!_lines.TryGetValue(StorySource.ManifestFileName, out var lines))
-                    _lines.Add(StorySource.ManifestFileName,
-                        lines = source.Files[StorySource.ManifestFileName].ReplaceLineEndings("\n").Split('\n'));
+                if (!_lines.TryGetValue(file, out var lines))
+                    _lines.Add(file, lines = source.Files[file].ReplaceLineEndings("\n").Split('\n'));
                 var opened = false;
                 // Empty sequence end marks can equal their start; inspect only its authored whitespace and brackets.
                 for (var line = (int)sequence.Start.Line; line <= lines.Length; line++)
@@ -252,7 +252,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                         var character = column <= lines[line - 1].Length ? lines[line - 1][column - 1] : '\n';
                         if (opened && (char.IsWhiteSpace(character) || character == ']'))
                         {
-                            var point = new SourceLocation(StorySource.ManifestFileName, line, column);
+                            var point = new SourceLocation(file, line, column);
                             CompletionSites.Add(new("", new(point, point), [kind], [], [point], Candidates: candidates));
                         }
                         if (character == ']') return;
@@ -261,12 +261,12 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     }
                 }
             }
-            foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind, candidates);
+            foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind, candidates, file);
             return;
         }
         if (node is not YamlScalarNode scalar) return;
-        Scalar(scalar);
-        var location = new SourceLocation(StorySource.ManifestFileName, (int)scalar.Start.Line, (int)scalar.Start.Column);
+        Scalar(scalar, file);
+        var location = new SourceLocation(file, (int)scalar.Start.Line, (int)scalar.Start.Column);
         var mapping = _scalars[location];
         var text = scalar.Value ?? "";
         if (text.Length == 0)
@@ -279,7 +279,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             Candidates: candidates));
     }
 
-    internal void Manifest(YamlMappingNode root)
+    /// <summary>Collects authoring data from one configuration file; earlier files keep duplicate declarations.</summary>
+    internal void Manifest(YamlMappingNode root, string file = StorySource.ManifestFileName)
     {
         void Properties(YamlNode node, string[] path, HashSet<YamlNode> ancestors)
         {
@@ -290,8 +291,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 {
                     if (key is not YamlScalarNode { Value: { } name } scalar) continue;
                     var next = path.Append(name).ToArray();
-                    Scalar(scalar);
-                    var location = new SourceLocation(StorySource.ManifestFileName, (int)key.Start.Line, (int)key.Start.Column);
+                    Scalar(scalar, file);
+                    var location = new SourceLocation(file, (int)key.Start.Line, (int)key.Start.Column);
                     Tokens.Add(new(name, _scalars[location].Range(0, name.Length), next));
                     Properties(value, next, ancestors);
                 }
@@ -309,40 +310,42 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 {
                     if (key is not YamlScalarNode { Value: { } name }) continue;
                     var next = path.Append(name).ToArray();
-                    if (next is ["start"]) ReferenceNode(value, AuthoringSymbolKind.Scene);
-                    else if (next is ["ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset);
-                    else if (path is ["characters", _, "inventory"]) ReferenceNode(key, AuthoringSymbolKind.Item);
+                    if (next is ["game", "start"]) ReferenceNode(value, AuthoringSymbolKind.Scene, file: file);
+                    else if (next is ["game", "ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset, file: file);
+                    else if (path is ["characters", _, "inventory"]) ReferenceNode(key, AuthoringSymbolKind.Item, file: file);
                     else if (next is ["characters", _, "inventory"] && value is YamlSequenceNode)
-                        ReferenceNode(value, AuthoringSymbolKind.Item);
-                    else if (path is ["characters", _, "stats"] or ["items", _, "modifiers"] or ["creation", "stats"]
-                        or ["creation", "presets", _, "stats"]) ReferenceNode(key, AuthoringSymbolKind.Stat);
-                    if (next is ["characters"] or ["characters", _] or ["characters", _, "inventory"]
+                        ReferenceNode(value, AuthoringSymbolKind.Item, file: file);
+                    else if (path is ["characters", _, "stats"] or ["items", _, "modifiers"] or ["game", "creation", "stats"]
+                        or ["game", "creation", "presets", _, "stats"]) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
+                    if (next is ["game"] or ["characters"] or ["characters", _] or ["characters", _, "inventory"]
                         or ["characters", _, "stats"] or ["items"] or ["items", _] or ["items", _, "modifiers"]
-                        or ["ruleset"] or ["creation"] or ["creation", "stats"] or ["creation", "presets"]
-                        or ["creation", "presets", _] or ["creation", "presets", _, "stats"])
+                        or ["game", "ruleset"] or ["game", "creation"] or ["game", "creation", "stats"] or ["game", "creation", "presets"]
+                        or ["game", "creation", "presets", _] or ["game", "creation", "presets", _, "stats"])
                         Walk(value, next);
                 }
             }
         }
         Walk(root, []);
         SourceRange At(YamlNode node) => new(
-            new SourceLocation(StorySource.ManifestFileName, (int)node.Start.Line, (int)node.Start.Column),
-            new SourceLocation(StorySource.ManifestFileName, (int)node.End.Line, (int)node.End.Column));
+            new SourceLocation(file, (int)node.Start.Line, (int)node.Start.Column),
+            new SourceLocation(file, (int)node.End.Line, (int)node.End.Column));
         static YamlNode? Get(YamlMappingNode map, string name) =>
             map.Children.TryGetValue(new YamlScalarNode(name), out var value) ? value : null;
         void Add(YamlNode key, AuthoringSymbolKind kind, string type)
         {
-            if (key is YamlScalarNode { Value: { Length: > 0 } name } scalar)
+            if (key is YamlScalarNode { Value: { Length: > 0 } name } scalar &&
+                !Symbols.Any(symbol => symbol.Kind == kind && symbol.Name == name && symbol.Declaration is not null))
             {
-                Scalar(scalar);
+                Scalar(scalar, file);
                 var location = At(key).Start;
                 Symbols.Add(new(name, kind, type, _scalars[location].Range(0, name.Length)));
             }
         }
-        if (Get(root, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
+        if (file == StorySource.ManifestFileName && Get(root, "game") is YamlMappingNode game &&
+            Get(game, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
         {
             Scalar(idNode);
-            var location = new SourceLocation(StorySource.ManifestFileName, (int)idNode.Start.Line, (int)idNode.Start.Column);
+            var location = new SourceLocation(file, (int)idNode.Start.Line, (int)idNode.Start.Column);
             Symbols.Add(new(storyId, AuthoringSymbolKind.Story, "story",
                 _scalars[location].Range(0, storyId.Length)));
         }
@@ -359,7 +362,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
         if (Get(root, "flags") is YamlSequenceNode flags)
             foreach (var flag in flags.Children) Add(flag, AuthoringSymbolKind.Flag, "boolean");
-        if (Get(root, "ruleset") is YamlMappingNode ruleset && Get(ruleset, "stats") is YamlSequenceNode stats)
+        if (file == StorySource.ManifestFileName && Get(root, "game") is YamlMappingNode gameConfig &&
+            Get(gameConfig, "ruleset") is YamlMappingNode ruleset &&
+            Get(ruleset, "stats") is YamlSequenceNode stats)
             foreach (var stat in stats.Children.OfType<YamlMappingNode>())
                 if (Get(stat, "id") is { } id) Add(id, AuthoringSymbolKind.Stat, "integer");
     }

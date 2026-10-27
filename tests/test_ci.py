@@ -65,10 +65,12 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertEqual(6, len(ENGINE_ASSEMBLIES))
 
     def test_both_hosts_embed_all_bundled_story_files(self):
+        samples = self.ROOT / "samples"
         expected = {
             path.resolve()
-            for extension in ("*.tale", "*.yaml")
-            for path in (self.ROOT / "samples").rglob(extension)
+            for path in samples.rglob("*")
+            if path.is_file()
+            and (path.suffix in {".tale", ".yaml"} or "images" in path.relative_to(samples).parts)
         }
         self.assertTrue(expected)
         for host in ("web", "desktop"):

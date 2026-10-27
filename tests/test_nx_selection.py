@@ -168,6 +168,66 @@ class NxSelectionTests(unittest.TestCase):
                 self.assert_selected(graph, "talewright-packaging:package-check")
                 self.assertNotIn("talewright-workspace:package-check", graph["tasks"]["tasks"])
 
+    def test_supporting_character_fragment_lifecycle_selects_consumers_and_publication(self):
+        # Nx's changed-file graph receives both paths of a rename and deleted paths, too.
+        changes = {
+            "addition": ("samples/LostRelic/characters/new.talewright.yaml",),
+            "edit": ("samples/LostRelic/characters/guide.talewright.yaml",),
+            "rename": ("samples/LostRelic/characters/guide.talewright.yaml",
+                       "samples/LostRelic/people/guide.talewright.yaml"),
+            "deletion": ("samples/LostRelic/people/deleted.talewright.yaml",),
+        }
+        for operation, files in changes.items():
+            with self.subTest(operation=operation):
+                graph = affected_graph(*files)
+                selected = self.assert_selected(
+                    graph, "Talewright.Talemark.Tests:test",
+                    "talewright-editor:compiler-contract",
+                    "talewright-packaging:package-check",
+                    "Talewright.Player.E2E.Tests:e2e-web",
+                    "Talewright.Player.E2E.Tests:e2e-published-web",
+                    "Talewright.Player.E2E.Tests:e2e-published-linux",
+                )
+                self.assertEqual(selected, set(affected_graph(*NO_IMPACT_FILES, *files)["tasks"]["tasks"]))
+                self.assertFalse(any(task.startswith("talewright-workspace:") for task in selected))
+
+    def test_configuration_loader_changes_select_archive_and_generated_publication_checks(self):
+        for path in (
+            "engine/src/Talewright.Talemark/Compilation/StorySource.cs",
+            "engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs",
+            "player/src/Talewright.Player/Library/StoryLibraries.cs",
+        ):
+            with self.subTest(path=path):
+                self.assert_selected(
+                    affected_graph(path),
+                    "Talewright.Player.E2E.Tests:e2e-web",
+                    "Talewright.Player.E2E.Tests:e2e-published-web",
+                    "Talewright.Player.E2E.Tests:e2e-published-linux",
+                    "talewright-packaging:package-check",
+                )
+
+    def test_distributed_authoring_inputs_select_editor_and_compiler_verification(self):
+        editor = ("talewright-editor:test", "talewright-editor:compiler-contract", "talewright-editor:editor-smoke")
+        semantic = ("Talewright.Authoring.Tests:test", "Talewright.LanguageServer.Tests:test")
+        changes = {
+            "schema": (("tooling/vscode-talewright/schemas/story.schema.json",), editor + semantic),
+            "client": (("tooling/vscode-talewright/extension.cjs",), editor),
+            "analysis": (("engine/src/Talewright.Talemark/Analysis/StoryAnalysis.cs",),
+                         editor + semantic + ("Talewright.Talemark.Tests:test",)),
+            "authoring": (("tooling/authoring/src/Talewright.Authoring/StoryNavigation.cs",), editor + semantic),
+            "server": (("tooling/language-server/src/Talewright.LanguageServer/LanguageServer.cs",),
+                       editor + ("Talewright.LanguageServer.Tests:test",)),
+            "fixture addition": (("tooling/vscode-talewright/tests/fixtures/new.talewright.yaml",), editor),
+            "fixture rename": (("tooling/vscode-talewright/tests/fixtures/new.talewright.yaml",
+                                "tooling/vscode-talewright/tests/fixtures/renamed.talewright.yaml"), editor),
+            "fixture deletion": (("tooling/vscode-talewright/tests/fixtures/deleted.talewright.yaml",), editor),
+        }
+        for name, (files, tasks) in changes.items():
+            with self.subTest(change=name):
+                selected = self.assert_selected(affected_graph(*files), *tasks)
+                self.assertEqual(selected, set(affected_graph(*NO_IMPACT_FILES, *files)["tasks"]["tasks"]))
+                self.assertFalse(any(task.startswith("talewright-workspace:") for task in selected))
+
     def test_inferred_leaf_project_selects_release_compilation(self):
         graph = affected_graph("benchmarks/Talewright.BenchmarkDotNet/Program.cs")
         self.assert_selected(graph, "Talewright.BenchmarkDotNet:build:release")

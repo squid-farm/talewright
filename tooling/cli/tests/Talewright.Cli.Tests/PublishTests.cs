@@ -15,7 +15,7 @@ public sealed class PublishTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(Story, "chapters"));
         File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"),
-            "id: publish\ntitle: Publish\nstart: a\ncharacters:\n  player: {first-name: Tester}\n");
+            "game:\n  id: publish\n  title: Publish\n  start: a\ncharacters:\n  player: {first-name: Tester}\n");
         File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), "=== a\nHello.\n-> END");
         File.WriteAllText(Path.Combine(Story, "private-notes.txt"), "Not story content");
     }
@@ -96,6 +96,37 @@ public sealed class PublishTests : IDisposable
             using var reader = new StreamReader(archive.GetEntry(executable)!.Open());
             Assert.Equal(runtime, reader.ReadToEnd());
         }
+    }
+
+    [Fact]
+    public void Final_web_payload_warning_counts_runtime_and_compressed_files_without_blocking_publication()
+    {
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, _, _, _, _) =>
+            {
+                var output = Path.Combine(working, "output");
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output, "index.html"), "<html></html>");
+                for (var i = 0; i < 500; ++i)
+                {
+                    File.WriteAllText(Path.Combine(output, $"runtime-{i}.wasm"), "runtime");
+                    File.WriteAllText(Path.Combine(output, $"runtime-{i}.wasm.br"), "compressed");
+                }
+                return output;
+            },
+        };
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["-a", "--target", "web"]);
+        Assert.Equal(0, result.Code);
+        Assert.Contains("final extracted web payload", result.Error);
+        Assert.Contains("1003 files", result.Error);
+        Assert.Contains("Advisory only", result.Error);
+        Assert.DoesNotContain("source-only estimate", result.Error);
+        using var zip = ZipFile.OpenRead(Zip);
+        Assert.Equal(1003, zip.Entries.Count);
+        Assert.Contains($"total {zip.Entries.Sum(entry => entry.Length)} bytes", result.Error);
+        Assert.Contains($"largest file {zip.Entries.Max(entry => entry.Length)} bytes", result.Error);
     }
 
     [Fact]
@@ -698,6 +729,52 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(["chapters/main.tale", "story.talewright.yaml"], zip.Entries.Select(e => e.FullName).Order());
         using var stream = File.OpenRead(Zip);
         Assert.True(StoryCompiler.Compile(StorySource.FromZip(stream)).Success);
+    }
+
+    [Fact]
+    public void Split_configuration_and_images_survive_story_archive_and_generated_host_staging()
+    {
+        AddImages();
+        Directory.CreateDirectory(Path.Combine(Story, "people"));
+        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"),
+            "game: { id: publish, title: Publish, start: a }\n");
+        File.WriteAllText(Path.Combine(Story, "people", "player.talewright.yaml"),
+            "characters: { player: { first-name: Split } }\nvars: { greeting: \"Hello\" }\n");
+        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"),
+            "=== a\n{player:first-name}: {var:greeting}\n{image(\"maps/camp.PNG\", \"Camp\")}\n-> END");
+        var folder = StorySource.FromDirectory(Story);
+        Assert.True(StoryCompiler.Compile(folder).Success);
+        var result = Run();
+        Assert.Equal(0, result.Code);
+        using (var stream = File.OpenRead(Zip))
+        {
+            var archive = StorySource.FromZip(stream);
+            Assert.Equal(folder.Files.OrderBy(file => file.Key), archive.Files.OrderBy(file => file.Key));
+            Assert.True(StoryCompiler.Compile(archive).Success);
+            Assert.Contains("images/maps/camp.PNG", archive.ImagePaths);
+        }
+        File.Delete(Zip);
+        var builds = 0;
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, _, staged, _, _) =>
+            {
+                var source = StorySource.FromDirectory(staged);
+                Assert.Equal(folder.Files.OrderBy(file => file.Key), source.Files.OrderBy(file => file.Key));
+                Assert.True(StoryCompiler.Compile(source).Success);
+                Assert.Equal(File.ReadAllBytes(Path.Combine(Story, "images", "maps", "camp.PNG")),
+                    File.ReadAllBytes(Path.Combine(staged, "images", "maps", "camp.PNG")));
+                var output = Path.Combine(working, "output");
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output, "index.html"), "Test host");
+                builds++;
+                return output;
+            },
+        };
+        result = RunControlled(new UnreadableInput(), inputRedirected: true, publication: publication,
+            args: ["-a", "--target", "web"]);
+        Assert.Equal(0, result.Code);
+        Assert.Equal(1, builds);
     }
 
     private byte[] AddImages()

@@ -11,10 +11,11 @@ need a text editor. You can check and play your story in the
 Make a folder called `night-ferry`. Inside it, create a file called `story.talewright.yaml`:
 
 ```yaml
-id: night-ferry
-title: The Night Ferry
-version: 0.1.0
-start: dock
+game:
+  id: night-ferry
+  title: The Night Ferry
+  version: 0.1.0
+  start: dock
 
 characters:
   player:
@@ -34,8 +35,8 @@ items:
 This is your story's **manifest**, the settings file that tells Talewright about your story and its
 characters:
 
-- `id` is a short, unique name (lowercase words joined by hyphens). `title` is what players see.
-- `start` is the scene the story opens on. You'll write it next.
+- `game.id` is a short, unique name (lowercase words joined by hyphens). `game.title` is what players see.
+- `game.start` is the scene the story opens on. You'll write it next.
 - `characters` must include `player`. Every other character gets an id you choose, like `ferryman`.
 - `stats` sets starting values. Stats you leave out use the defaults (10 for attributes like `cha`,
   0 for skills like `persuasion`). See [the full stat list](writing-stories.md#stats-and-skills).
@@ -233,6 +234,7 @@ The ferryman pushes off without you. Maybe tomorrow.
 ## Where next
 
 - **[Writing stories](writing-stories.md):** factions, hubs, triggers, character creation and more.
+- **[Organizing your story](organizing-your-story.md):** keep this simple layout or split related settings into smaller files.
 - **[The Lost Relic](../../samples/LostRelic):** a bigger sample that uses almost every feature.
   [Its README](../../samples/README.md) maps each feature to where it's used.
 - **[Testing your story](testing-your-story.md):** check your story without playing it, and jump to any scene.

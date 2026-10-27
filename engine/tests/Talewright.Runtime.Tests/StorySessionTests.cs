@@ -9,10 +9,11 @@ namespace Talewright.Runtime.Tests;
 public class StorySessionTests
 {
     private const string Yaml = """
-        id: test
-        title: Test
-        start: camp
-        randomness: off
+        game:
+          id: test
+          title: Test
+          start: camp
+          randomness: off
         characters:
           player:
             first-name: Mara
@@ -262,10 +263,11 @@ public class StorySessionTests
     public void Level_triggers_fire_after_the_level_up_in_the_same_choice()
     {
         const string yaml = """
-            id: test
-            title: Test
-            start: camp
-            randomness: off
+            game:
+              id: test
+              title: Test
+              start: camp
+              randomness: off
             characters:
               player: { first-name: Mara, pronouns: she }
             triggers:

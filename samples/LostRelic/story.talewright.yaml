@@ -1,25 +1,38 @@
 # The Lost Relic — Talewright sample story.
-# Every story is a folder: this manifest plus any number of .tale files (subfolders allowed).
+# This manifest, supporting *.talewright.yaml files, and .tale files form one story.
 # See docs/reference/talemark-syntax.md for the full format.
 
-id: lost-relic
-title: The Lost Relic
-version: 0.3.0
-start: camp.arrival
-randomness: checks-only # dice are rolled only for skill-check directives
-# seed: 1234            # uncomment for the same rolls every playthrough
-undo: true
-
-ruleset:
-  base: generic # d20-style attributes, skills, hp, xp and levels
-  disable: [performance] # no stage performances on this expedition
-  stats:
-    - id: courage
-      name: Courage
-      category: custom
-      min: 0
-      max: 10
-      default: 0
+game:
+  id: lost-relic
+  title: The Lost Relic
+  version: 0.3.0
+  start: camp.arrival
+  randomness: checks-only # dice are rolled only for skill-check directives
+  # seed: 1234            # uncomment for the same rolls every playthrough
+  undo: true
+  ruleset:
+    base: generic # d20-style attributes, skills, hp, xp and levels
+    disable: [performance] # no stage performances on this expedition
+    stats:
+      - id: courage
+        name: Courage
+        category: custom
+        min: 0
+        max: 10
+        default: 0
+  creation:
+    name: true
+    pronouns: [she, they, he]
+    stats:
+      str: [8, 12, 16]
+      courage: [3, 0, 6]
+    presets:
+      explorer:
+        label: Explorer
+        stats: {str: 12, athletics: 2, hp: 15}
+      scholar:
+        label: Scholar
+        stats: {str: 8, history: 5, hp: 10}
 
 characters:
   player:
@@ -35,32 +48,6 @@ characters:
       perception: 2
       history: 3
     inventory: [torch, journal]
-  guide:
-    first-name: Tomas
-    last-name: Okafor
-    pronouns:
-      subject: he
-      object: him
-      possessive-pronoun:
-        determiner: his
-        independent: his
-      reflexive: himself
-      plural: false
-    stats: { survival: 4, wis: 14 }
-
-creation:
-  name: true
-  pronouns: [she, they, he]
-  stats:
-    str: [8, 12, 16]
-    courage: [3, 0, 6]
-  presets:
-    explorer:
-      label: Explorer
-      stats: {str: 12, athletics: 2, hp: 15}
-    scholar:
-      label: Scholar
-      stats: {str: 8, history: 5, hp: 10}
 
 factions:
   explorers-guild: { name: "Explorers' Guild", standing: 5 }

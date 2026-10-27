@@ -11,9 +11,10 @@ namespace Talewright.Authoring.Tests;
 public class StoryAnalysisTests
 {
     private const string Manifest = """
-        id: analysis
-        title: Analysis
-        start: first
+        game:
+          id: analysis
+          title: Analysis
+          start: first
         characters:
           player: {first-name: Ada}
         """;
@@ -54,7 +55,7 @@ public class StoryAnalysisTests
     [Theory]
     [InlineData(null, "missing unknown")]
     [InlineData("characters: [", "missing unknown")]
-    [InlineData("ruleset: {base: none}", "missing unknown")]
+    [InlineData("game: {id: analysis, title: Analysis, start: first, ruleset: {base: none}}\ncharacters:\n  player: {first-name: Ada}", "missing unknown")]
     [InlineData("", "missing unknown")]
     [InlineData("", "player unknown")]
     public void Difficulty_context_precedes_ruleset_actor_and_stat_validation(string? manifest, string check)
@@ -87,7 +88,7 @@ public class StoryAnalysisTests
         Assert.Equal("ready", Slice(source, flag.Declaration!));
         var effects = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Effects);
         Assert.StartsWith("set", Slice(source, effects.Range));
-        Assert.Equal(9, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
+        Assert.Equal(10, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
     }
 
     [Theory]
@@ -196,7 +197,7 @@ public class StoryAnalysisTests
             Rulesets = new Dictionary<string, Func<Ruleset>> { ["custom"] = () => new RulesetBuilder("custom").Build() },
         };
         var metadata = AuthoringProjectMetadata.FromJson(AuthoringProjectMetadata.Export(options).ToJson());
-        var source = Source(yaml: Manifest + "\nruleset: {base: custom}");
+        var source = Source(yaml: Manifest.Replace("  start: first", "  start: first\n  ruleset: {base: custom}"));
         Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics, metadata.Analyze(source).Diagnostics);
         Assert.DoesNotContain(metadata.Analyze(source).Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
@@ -285,8 +286,8 @@ public class StoryAnalysisTests
         Assert.Equal(new SourceLocation("main.tale", 1, 7), scene.Declaration!.Start);
         Assert.Equal(new SourceLocation("main.tale", 1, 12), scene.Declaration.End);
         var player = Assert.Single(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Character);
-        Assert.Equal(new SourceLocation("story.talewright.yaml", 5, 3), player.Declaration!.Start);
-        Assert.Equal(new SourceLocation("story.talewright.yaml", 5, 9), player.Declaration.End);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 6, 3), player.Declaration!.Start);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 6, 9), player.Declaration.End);
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Item && symbol.Name == "coin");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Faction && symbol.Name == "guild");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == "str");
@@ -335,7 +336,8 @@ public class StoryAnalysisTests
         }));
         Assert.Contains(missing.Symbols, symbol => symbol.Name == "first");
         Assert.Contains(missing.Diagnostics, diagnostic => diagnostic.Code == "TW4002");
-        var invalid = StoryAnalyzer.Analyze(Source(yaml: Manifest + "\nruleset:\n  stats:\n    - id: focus\n      min: 8\n      max: 2"));
+        var invalid = StoryAnalyzer.Analyze(Source(yaml: Manifest.Replace("  start: first",
+            "  start: first\n  ruleset:\n    stats:\n      - id: focus\n        min: 8\n        max: 2")));
         Assert.Contains(invalid.Symbols, symbol => symbol.Name == "focus" && symbol.Declaration is not null);
         Assert.Contains(invalid.Diagnostics, diagnostic => diagnostic.Code == "TW4003");
     }
@@ -451,7 +453,7 @@ public class StoryAnalysisTests
         };
         var metadata = AuthoringProjectMetadata.FromJson(AuthoringProjectMetadata.Export(options).ToJson());
         var source = Source("=== first\n@requires @Ready\n{player:first-name#greeting}\n-> END",
-            Manifest + "\nruleset: {base: project}");
+            Manifest.Replace("  start: first", "  start: first\n  ruleset: {base: project}"));
         var analysis = metadata.Analyze(source);
         Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics, analysis.Diagnostics);
         Assert.Empty(analysis.Diagnostics);
@@ -492,7 +494,8 @@ public class StoryAnalysisTests
             },
         };
         var metadata = AuthoringProjectMetadata.FromJson(AuthoringProjectMetadata.Export(options).ToJson());
-        var source = Source(yaml: Manifest + "\nruleset: {base: alias}\nitems: {charm: {modifiers: {unknown: 1}}}");
+        var source = Source(yaml: Manifest.Replace("  start: first", "  start: first\n  ruleset: {base: alias}") +
+            "\nitems: {charm: {modifiers: {unknown: 1}}}");
         Assert.Equal(StoryCompiler.Compile(source, options).Diagnostics,
             metadata.Analyze(source).Diagnostics);
     }
@@ -510,7 +513,7 @@ public class StoryAnalysisTests
     }
 
     [Fact]
-    public async Task Root_discovery_uses_nearest_manifest_and_never_loads_project_code()
+    public async Task Root_discovery_uses_outermost_manifest_and_never_loads_project_code()
     {
         var root = Path.Combine(Path.GetTempPath(), $"talewright-analysis-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "nested", "chapters"));
@@ -523,9 +526,9 @@ public class StoryAnalysisTests
             Assert.Contains(analysis.Analysis.Diagnostics, diagnostic => diagnostic.Code == "TW5001");
             Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
             File.WriteAllText(Path.Combine(root, "nested", "story.talewright.yaml"), Manifest);
-            Assert.Equal(Path.Combine(root, "nested"), StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters")));
+            Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters")));
             File.WriteAllText(Path.Combine(root, "nested", "chapters", "story.yaml"), Manifest);
-            Assert.Equal(Path.Combine(root, "nested"), StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
+            Assert.Equal(root, StoryWorkspace.FindStoryRoot(Path.Combine(root, "nested", "chapters", "file.tale")));
             File.Delete(Path.Combine(root, "nested", "chapters", "story.yaml"));
             new StoryWorkspace(Source()).Open("story.talewright.yaml", 1, Manifest);
             Assert.Throws<ArgumentException>(() => new StoryWorkspace(Source()).Open("story.yaml", 1, Manifest));

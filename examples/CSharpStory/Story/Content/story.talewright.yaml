@@ -1,8 +1,9 @@
-id: csharp-story
-title: CSharp Story
-start: beginning
-ruleset:
-  base: custom
+game:
+  id: csharp-story
+  title: CSharp Story
+  start: beginning
+  ruleset:
+    base: custom
 characters:
   player:
     first-name: Author

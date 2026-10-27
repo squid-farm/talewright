@@ -43,14 +43,14 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Expect(image).ToHaveAttributeAsync("src", url!);
         await Library();
         Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
-        var invalid = new StoryFixture("bad-images", "id: bad\ntitle: Bad\nstart: missing\n", "=== start\n-> END");
+        var invalid = new StoryFixture("bad-images", "game:\n  id: bad\n  title: Bad\n  start: missing\n", "=== start\n-> END");
         await Upload(invalid);
         await Expect(Page.Locator(".tw-library .tw-diagnostics")).ToBeVisibleAsync();
         await Page.Locator(".tw-resume").ClickAsync();
         await Expect(image).ToHaveAttributeAsync("src", url!);
         await Library();
         var text = new StoryFixture("replacement",
-            "id: replacement\ntitle: Replacement\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "game:\n  id: replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             "=== start\nReplacement text.\n-> END");
         await Upload(text);
         await Expect(Latest).ToContainTextAsync("Replacement text.");
@@ -94,7 +94,7 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Expect(images.Last).ToHaveAttributeAsync("src", url!);
         await Library();
         var replacement = new StoryFixture("image-replacement",
-            "id: image-replacement\ntitle: Replacement\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "game:\n  id: image-replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             "=== start\nReplacement.\n-> END");
         await Upload(replacement);
         await Expect(Latest).ToContainTextAsync("Replacement.");
@@ -102,10 +102,10 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
-    public async Task Unsupported_archive_images_keep_effective_alt_and_visible_accessible_failure()
+    public async Task Undecodable_archive_images_keep_effective_alt_and_visible_accessible_failure()
     {
         var fixture = new StoryFixture("archive-images",
-            "id: archive-images\ntitle: Archive images\nstart: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "game:\n  id: archive-images\n  title: Archive images\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             """
             === start
             Before **{image("map", "A useful map")}** after.
@@ -119,10 +119,51 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Page.Locator(".tw-media-emphasis")).ToHaveCSSAsync("font-style", "italic");
         await Expect(Page.Locator(".tw-media-code")).ToHaveCSSAsync("font-family", "monospace");
         await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync(
-            ["Images are unavailable for this story source.", "Images are unavailable for this story source."]);
+            ["This image could not be displayed.", "This image could not be displayed."]);
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Space");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Play again", Exact = true })).ToBeVisibleAsync();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("wrapped/")]
+    public async Task Split_configuration_archive_images_decode_share_history_and_release_on_replacement(string prefix)
+    {
+        using var files = new ImageStoryFiles();
+        await Page.EvaluateAsync("""
+            () => {
+                window.archiveRevoked = [];
+                const revoke = URL.revokeObjectURL.bind(URL);
+                URL.revokeObjectURL = url => { window.archiveRevoked.push(url); revoke(url); };
+            }
+            """);
+        await UploadBytes("illustrated-split.zip", files.Zip(prefix));
+        await Expect(Latest).ToContainTextAsync("Before");
+        var image = Page.GetByAltText("A camp", new() { Exact = true });
+        await image.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await image.ElementHandleAsync());
+        var url = await image.GetAttributeAsync("src");
+        await Choices.First.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(Latest).ToContainTextAsync("Next passage.");
+        var next = Page.GetByAltText("Next camp", new() { Exact = true });
+        await next.ScrollIntoViewIfNeededAsync();
+        await Expect(next).ToHaveAttributeAsync("src", url!);
+        await Driver.ClickAsync("Back");
+        await Expect(image).ToHaveAttributeAsync("src", url!);
+        await Library();
+        await UploadBytes("bad.zip", [1, 2, 3]);
+        await Expect(Page.Locator(".tw-library")).ToContainTextAsync("Couldn't read");
+        await Page.Locator(".tw-resume").ClickAsync();
+        await Expect(image).ToHaveAttributeAsync("src", url!);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.archiveRevoked.includes(url)", url));
+        await Library();
+        await Upload(new StoryFixture("text-replacement",
+            "game:\n  id: replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
+            "=== start\nReplacement text.\n-> END"));
+        await Expect(Latest).ToContainTextAsync("Replacement text.");
+        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.archiveRevoked.filter(value => value === url).length", url));
     }
 
     [Fact]

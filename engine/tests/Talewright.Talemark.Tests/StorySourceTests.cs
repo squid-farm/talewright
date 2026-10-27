@@ -10,6 +10,121 @@ public sealed class StorySourceTests : IDisposable
 
     public StorySourceTests() => Directory.CreateDirectory(_root);
 
+    [Fact]
+    public void Archive_text_accounting_includes_actual_fragment_encoding_and_bom_bytes()
+    {
+        using var buffer = new MemoryStream();
+        long expected = 0;
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var path in new[] { StorySource.ManifestFileName, "main.tale", "characters/guide.talewright.yaml" })
+            {
+                var bytes = System.Text.Encoding.Unicode.GetPreamble()
+                    .Concat(System.Text.Encoding.Unicode.GetBytes("configuration text")).ToArray();
+                using var entry = output.CreateEntry("wrapped/" + path).Open();
+                entry.Write(bytes);
+                expected += bytes.Length;
+            }
+            using var ignored = output.CreateEntry("wrapped/unrelated.yml").Open();
+            ignored.Write([1, 2, 3]);
+        }
+        buffer.Position = 0;
+        using var archive = new ZipArchive(buffer, ZipArchiveMode.Read);
+        var source = StorySource.FromZip(archive, out _, out var expandedTextBytes);
+        Assert.Equal(expected, expandedTextBytes);
+        Assert.Equal(3, source.Files.Count);
+        Assert.All(source.Files.Values, value => Assert.Equal("configuration text", value));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("wrapped/")]
+    public void Caller_owned_archive_maps_images_relative_to_the_same_source_root(string prefix)
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var path in new[] { StorySource.ManifestFileName, "main.tale",
+                "characters/guide.talewright.yaml", "unrelated.yaml", "unrelated.yml" })
+            {
+                using var writer = new StreamWriter(output.CreateEntry(prefix + path).Open());
+                writer.Write(path);
+            }
+            using var image = output.CreateEntry(prefix + "images/camp.png").Open();
+            image.Write([1, 2, 3]);
+        }
+        buffer.Position = 0;
+        using var archive = new ZipArchive(buffer, ZipArchiveMode.Read, leaveOpen: true);
+        var source = StorySource.FromZip(archive, out var images);
+
+        Assert.Equal(3, source.Files.Count);
+        Assert.Equal("characters/guide.talewright.yaml", source.Files["characters/guide.talewright.yaml"]);
+        Assert.Equal(["images/camp.png"], source.ImagePaths);
+        Assert.Same(archive.GetEntry(prefix + "images/camp.png"), images["images/camp.png"]);
+        using (var actual = images["images/camp.png"].Open())
+            Assert.Equal(1, actual.ReadByte());
+        archive.Dispose();
+        buffer.Position = 0;
+        var sourceOnly = StorySource.FromZip(buffer);
+        Assert.Equal(source.Files.OrderBy(pair => pair.Key), sourceOnly.Files.OrderBy(pair => pair.Key));
+        Assert.True(source.ImagePaths.SetEquals(sourceOnly.ImagePaths));
+        Assert.True(buffer.CanRead);
+        Assert.Throws<ObjectDisposedException>(() => images["images/camp.png"].Open());
+    }
+
+    [Theory]
+    [InlineData("", "images/camp.png")]
+    [InlineData("wrapped/", "wrapped/images/camp.png")]
+    public void Duplicate_normalized_archive_image_members_are_rejected_instead_of_selecting_ambiguous_bytes(
+        string prefix, string duplicate)
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            output.CreateEntry(prefix + StorySource.ManifestFileName);
+            output.CreateEntry(prefix + "images/camp.png");
+            output.CreateEntry(duplicate);
+        }
+        buffer.Position = 0;
+        Assert.Contains("duplicate", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer)).Message);
+    }
+
+    [Theory]
+    [InlineData("images/../camp.png")]
+    [InlineData("/images/camp.png")]
+    [InlineData("images\\camp.png")]
+    [InlineData("images//camp.png")]
+    [InlineData("images/./camp.png")]
+    [InlineData("images/camp.png?query")]
+    [InlineData("https://example.test/camp.png")]
+    [InlineData("../characters/guide.talewright.yaml")]
+    [InlineData("images//")]
+    [InlineData("/")]
+    [InlineData("wrapped\\images\\camp.png")]
+    public void Unsafe_archive_members_have_explicit_diagnostics(string path)
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+            output.CreateEntry(path);
+        buffer.Position = 0;
+        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer));
+        Assert.Contains("Unsafe story archive member", error.Message);
+        Assert.Contains(path, error.Message);
+    }
+
+    [Fact]
+    public void Unsafe_raw_alias_is_rejected_before_normalized_duplicate_detection()
+    {
+        using var buffer = new MemoryStream();
+        using (var output = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            output.CreateEntry("images/camp.png");
+            output.CreateEntry("images\\camp.png");
+        }
+        buffer.Position = 0;
+        Assert.Contains("Unsafe story archive member", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(buffer)).Message);
+    }
+
     [Theory]
     [InlineData(1_000)]
     [InlineData(1_001)]
@@ -36,7 +151,8 @@ public sealed class StorySourceTests : IDisposable
         var text = new string('x', 5 * 1024 * 1024);
         for (var i = 0; i < 10; i++)
         {
-            File.WriteAllText(Path.Combine(_root, $"{i}.tale"), text);
+            var name = i == 9 ? "shared.talewright.yaml" : $"{i}.tale";
+            File.WriteAllText(Path.Combine(_root, name), text);
         }
 
         Assert.Equal(10, StorySource.FromDirectory(_root).Files.Count);
@@ -87,7 +203,7 @@ public sealed class StorySourceTests : IDisposable
         using var oversizedFile = new MemoryStream();
         using (var archive = new ZipArchive(oversizedFile, ZipArchiveMode.Create, leaveOpen: true))
         {
-            using var entry = archive.CreateEntry("large.tale").Open();
+            using var entry = archive.CreateEntry("nested/large.talewright.yaml").Open();
             WriteBytes(entry, 5L * 1024 * 1024 + 1);
         }
 
@@ -99,7 +215,8 @@ public sealed class StorySourceTests : IDisposable
         {
             for (var index = 0; index < 11; index++)
             {
-                using var entry = archive.CreateEntry($"{index}.tale").Open();
+                var name = index == 10 ? "nested/config.talewright.yaml" : $"{index}.tale";
+                using var entry = archive.CreateEntry(name).Open();
                 WriteBytes(entry, index == 10 ? 1 : 5L * 1024 * 1024);
             }
         }
@@ -125,22 +242,26 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
-    public void Excluded_child_is_not_read_or_counted_against_parent_limits()
+    public void Recursive_loading_retains_all_content_and_configuration_in_one_scope()
     {
-        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== parent\n-> END\n");
-        var child = Path.Combine(_root, "child");
-        Directory.CreateDirectory(child);
-        File.WriteAllText(Path.Combine(child, "large.tale"), new string('x', 5 * 1024 * 1024 + 1));
-        for (var index = 0; index < 1_000; index++)
-            File.WriteAllText(Path.Combine(child, $"{index}.tale"), "");
-        var source = StorySource.FromDirectory(_root, [child]);
-        Assert.Equal("main.tale", Assert.Single(source.Files).Key);
-        Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root));
-        File.WriteAllText(Path.Combine(_root, "large.tale"), new string('x', 5 * 1024 * 1024 + 1));
-        Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root, [child])).Message);
+        File.WriteAllText(Path.Combine(_root, StorySource.ManifestFileName), Manifest);
+        var chapter = Path.Combine(_root, "chapter");
+        Directory.CreateDirectory(chapter);
+        File.WriteAllText(Path.Combine(chapter, "main.tale"), Tale);
+        File.WriteAllText(Path.Combine(chapter, "people.talewright.yaml"), "characters: { guide: { first-name: Bea } }");
+        File.WriteAllText(Path.Combine(chapter, StorySource.ManifestFileName), "characters: { hidden: { first-name: Invalid } }");
+        var source = StorySource.FromDirectory(_root);
+        Assert.Equal(4, source.Files.Count);
+        Assert.Contains("chapter/main.tale", source.Files.Keys);
+        Assert.Contains("chapter/people.talewright.yaml", source.Files.Keys);
+        Assert.Contains("chapter/story.talewright.yaml", source.Files.Keys);
+        var error = Assert.Single(StoryCompiler.Compile(source).Diagnostics, diagnostic => diagnostic.Code == "TW4002");
+        Assert.Equal(new SourceLocation("chapter/story.talewright.yaml", 1, 1), error.Location);
+        File.Delete(Path.Combine(chapter, StorySource.ManifestFileName));
+        Assert.True(StoryCompiler.Compile(StorySource.FromDirectory(_root)).Success);
     }
 
-    private const string Manifest = "id: canonical\ntitle: Canonical\nstart: start\nruleset: { base: none }\ncharacters:\n  player:\n    first-name: Tester\n";
+    private const string Manifest = "game:\n  id: canonical\n  title: Canonical\n  start: start\n  ruleset: { base: none }\ncharacters:\n  player:\n    first-name: Tester\n";
     private const string Tale = "=== start\nHello.\n-> END\n";
 
     [Fact]
@@ -148,19 +269,64 @@ public sealed class StorySourceTests : IDisposable
         Assert.Equal("story.talewright.yaml", StorySource.ManifestFileName);
 
     [Fact]
-    public void Directory_loads_canonical_manifest_and_ignores_other_yaml()
+    public void Title_extraction_uses_game_title_without_a_legacy_root_fallback()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "title: Legacy title\n",
+        });
+
+        Assert.Null(source.ReadTitle());
+    }
+
+    [Fact]
+    public void Directory_loads_canonical_manifest_and_reports_extra_root_configuration()
     {
         Directory.CreateDirectory(Path.Combine(_root, "chapters"));
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Manifest);
         File.WriteAllText(Path.Combine(_root, "chapters", "main.tale"), Tale);
+        File.WriteAllText(Path.Combine(_root, "chapters", "characters.talewright.yaml"), "characters: {guide: {first-name: Guide}}\n");
         File.WriteAllText(Path.Combine(_root, "story.yaml"), "title: Unrelated\n");
         File.WriteAllText(Path.Combine(_root, "other.talewright.yaml"), "title: Not a manifest\n");
 
         var source = StorySource.FromDirectory(_root);
 
-        Assert.Equal(["chapters/main.tale", "story.talewright.yaml"], source.Files.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["chapters/characters.talewright.yaml", "chapters/main.tale", "other.talewright.yaml", "story.talewright.yaml"],
+            source.Files.Keys.Order(StringComparer.Ordinal));
         Assert.Equal("Canonical", source.ReadTitle());
-        Assert.True(StoryCompiler.Compile(source).Success);
+        var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+        Assert.Equal(new SourceLocation("other.talewright.yaml", 1, 1), diagnostic.Location);
+    }
+
+    [Fact]
+    public void Zip_loads_extra_root_configuration_and_reports_it()
+    {
+        using var zip = new MemoryStream(Talewright.Testing.TestArchives.Create([
+            new("story.talewright.yaml", Manifest),
+            new("extra.talewright.yaml", "title: Extra\n"),
+            new("chapters/characters.talewright.yaml", "characters: {guide: {first-name: Guide}}\n"),
+            new("main.tale", Tale),
+        ]));
+
+        var source = StorySource.FromZip(zip);
+        Assert.Contains("extra.talewright.yaml", source.Files.Keys);
+        Assert.Contains("chapters/characters.talewright.yaml", source.Files.Keys);
+        var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+        Assert.Equal(new SourceLocation("extra.talewright.yaml", 1, 1), diagnostic.Location);
+    }
+
+    [Fact]
+    public void Nested_story_manifest_cannot_declare_game_or_establish_a_second_story()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["chapter/story.talewright.yaml"] = "game: {id: nested, title: Nested, start: nested}\n",
+            ["chapters/main.tale"] = Tale,
+        });
+
+        var diagnostic = Assert.Single(StoryCompiler.Compile(source).Diagnostics, d => d.Code == "TW4002");
+        Assert.Equal(new SourceLocation("chapter/story.talewright.yaml", 1, 1), diagnostic.Location);
     }
 
     [Fact]
@@ -268,12 +434,12 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
-    public void Excluded_image_directory_is_not_catalogued()
+    public void Recursive_image_directories_remain_in_the_story_catalogue()
     {
-        var excluded = Path.Combine(_root, "images", "excluded");
-        Directory.CreateDirectory(excluded);
-        File.WriteAllBytes(Path.Combine(excluded, "map.png"), [0, 255, 0]);
-        Assert.Empty(StorySource.FromDirectory(_root, [excluded]).ImagePaths);
+        var directory = Path.Combine(_root, "images", "maps");
+        Directory.CreateDirectory(directory);
+        File.WriteAllBytes(Path.Combine(directory, "map.png"), [0, 255, 0]);
+        Assert.Equal(["images/maps/map.png"], StorySource.FromDirectory(_root).ImagePaths);
     }
 
     [Fact]
@@ -303,13 +469,10 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
-    public void Zip_image_names_are_not_normalized_into_safe_lookup_targets()
+    public void Zip_image_folder_case_is_not_normalized_into_safe_lookup_targets()
     {
         using var zip = new MemoryStream(Talewright.Testing.TestArchives.Create([
-            new(@"images\map.png", ""),
             new("Images/map.png", ""),
-            new("images/maps/../map.png", ""),
-            new("images//map.png", ""),
             new("images/", ""),
         ]));
         var source = StorySource.FromZip(zip);

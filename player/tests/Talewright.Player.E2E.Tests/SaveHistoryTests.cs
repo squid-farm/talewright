@@ -287,7 +287,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
                 });
                 db.close();
             }
-            """, fixture.Yaml.Split('\n')[0]["id: ".Length..]);
+            """, fixture.Compile().Id);
 
         await Driver.ClickAsync("Saves");
         await AssertDialogText(text =>
@@ -312,7 +312,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Close saves");
         await Choose("Walk onward");
         var store = new FileSaveStore(FileSaveStore.DefaultRoot);
-        var storyId = fixture.Yaml.Split('\n')[0]["id: ".Length..];
+        var storyId = fixture.Compile().Id;
         var original = await store.ReadAsync(storyId, "My save");
         var path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "*.json", SearchOption.AllDirectories)
             .Single(file => File.ReadAllBytes(file).SequenceEqual(original));
@@ -435,7 +435,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
                 const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
                 await module.write(storyId, 'My save', new TextEncoder().encode('{broken'), true);
             }
-            """, fixture.Yaml.Split('\n')[0]["id: ".Length..]);
+            """, fixture.Compile().Id);
         await Driver.ClickAsync("Load My save");
         await Driver.ClickAsync("Load save");
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("malformed");

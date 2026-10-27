@@ -40,14 +40,14 @@ public static class StoryCompiler
         var diagnostics = new DiagnosticBag();
         analysis?.Registrations();
 
-        if (!source.Files.TryGetValue(StorySource.ManifestFileName, out var yaml))
+        if (!source.Files.ContainsKey(StorySource.ManifestFileName))
         {
             diagnostics.Error("TW4002", "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
             analysis?.DiscoverWithoutManifest();
             return new CompilationResult(null, diagnostics.Items);
         }
 
-        var manifest = StoryYamlReader.Read(StorySource.ManifestFileName, yaml, diagnostics, options, analysis);
+        var manifest = StoryYamlReader.Read(source, diagnostics, options, analysis);
         if (manifest is null)
         {
             analysis?.DiscoverWithoutManifest();

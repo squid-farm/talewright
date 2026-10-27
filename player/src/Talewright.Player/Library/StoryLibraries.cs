@@ -78,7 +78,7 @@ public sealed class EmbeddedStoryLibrary(Assembly assembly, string prefix = "sto
             }
 
             var story = path[prefix.Length..slash];
-            if (path[(slash + 1)..].StartsWith("images/", StringComparison.Ordinal)) continue;
+            if (!StorySource.IsStoryFile(path[(slash + 1)..])) continue;
             using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
             if (!stories.TryGetValue(story, out var files))
             {
@@ -133,8 +133,9 @@ public sealed class FileSystemStoryLibrary(IEnumerable<string> paths) : IStoryLi
 
     public async Task<LoadedStory> OpenAsync(string id)
     {
+        if (!Directory.Exists(id)) return ArchiveStoryImages.Open(File.OpenRead(id));
         var source = await LoadAsync(id);
-        return new(source, Directory.Exists(id) ? StoryImages.FromDirectory(source, id) : null);
+        return new(source, StoryImages.FromDirectory(source, id));
     }
 }
 

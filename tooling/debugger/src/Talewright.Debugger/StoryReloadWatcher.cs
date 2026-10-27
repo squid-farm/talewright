@@ -1,3 +1,5 @@
+using Talewright.Talemark.Compilation;
+
 namespace Talewright.Debugger;
 
 /// <summary>
@@ -65,9 +67,7 @@ public sealed class StoryReloadWatcher : IAsyncDisposable
     private void OnChange(object sender, FileSystemEventArgs args)
     {
         if (args.ChangeType != WatcherChangeTypes.Changed
-            || args.FullPath.EndsWith(".tale", StringComparison.OrdinalIgnoreCase)
-            || args.FullPath.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
-            || args.FullPath.EndsWith(".yml", StringComparison.OrdinalIgnoreCase)
+            || StorySource.IsStoryFile(args.FullPath)
             || Path.GetRelativePath(_model.Root, args.FullPath).Replace('\\', '/')
                 .StartsWith("images/", StringComparison.Ordinal))
         {
@@ -88,8 +88,7 @@ public sealed class StoryReloadWatcher : IAsyncDisposable
             {
                 return;
             }
-            if (path.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))
+            if (StorySource.IsConfigurationFile(path))
             {
                 _yamlDirty = true;
             }

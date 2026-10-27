@@ -20,7 +20,7 @@ The web player, the desktop player and published games all share the same screen
 
 | Button | What it does |
 |---|---|
-| **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `undo: false`. |
+| **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `game.undo: false`. |
 | **Quick Save** | Write or replace this story's one quick checkpoint, without an overwrite prompt. Named saves are never replaced by this action. |
 | **Saves** | Open the Saves dialog to create or load a named save. Saving over an existing slot asks you to confirm. |
 | **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |

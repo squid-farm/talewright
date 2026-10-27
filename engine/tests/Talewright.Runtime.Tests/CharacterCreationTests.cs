@@ -10,19 +10,21 @@ namespace Talewright.Runtime.Tests;
 public sealed class CharacterCreationTests
 {
     private static StoryDefinition Story(string creation = """
-        creation:
-          name: true
-          pronouns: [they, she, he]
-          stats:
-            str: [8, 12, 16]
-          presets:
-            explorer: {label: Explorer, stats: {str: 12, hp: 15}}
-            scholar: {label: Scholar, stats: {str: 8, hp: 10}}
+        name: true
+        pronouns: [they, she, he]
+        stats:
+          str: [8, 12, 16]
+        presets:
+          explorer: {label: Explorer, stats: {str: 12, hp: 15}}
+          scholar: {label: Scholar, stats: {str: 8, hp: 10}}
         """)
     {
+        var creationSection = creation.Length == 0 ? "" : "  creation:\n" +
+            string.Join('\n', creation.Split('\n').Select(line => "    " + line)) + "\n";
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = "id: creation\ntitle: Creation\nstart: a\ncharacters:\n  player: {first-name: Default}\n" + creation,
+            ["story.talewright.yaml"] = "game:\n  id: creation\n  title: Creation\n  start: a\n" + creationSection +
+                "characters:\n  player: {first-name: Default}\n",
             ["main.tale"] = "=== a\n{player:first-name} {player:pronoun} {player:str}.\n* [Next] -> b\n=== b\nDone.\n-> END\n",
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

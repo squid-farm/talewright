@@ -48,9 +48,21 @@ Register one as a singleton `IStoryLibrary` in the host.
 | Native desktop, command-line story folder | Supported: live safe local files |
 | Native Author Debugger, story folder | Supported: accepted-source image generations |
 | Built-in desktop/web samples | Supported: opt-in lazy embedded resource streams |
-| Desktop ZIP / browser upload | Unavailable state; archive adapter/safety remains #178 |
-| Generated published desktop/web host | Unavailable state; published adapter/deployment remains #179 |
+| Desktop ZIP / browser upload | Retained compressed archive with lazy, bounded image reads |
+| Generated published desktop/web host | Supported: same opt-in embedded resource streams, including static web subpaths |
 | Custom library using only `LoadAsync` | Text works; images show unavailable unless it supplies a capability |
+
+Generated hosts reuse the sample hosts' embedded-image capability and the publisher's validated
+staging; they do not introduce another image adapter or transport. Web asset URLs resolve
+relative to the page base. Embedded images may still arrive as part of the initial program
+download even though display/stream acquisition is lazy. The embedded artwork can push one
+generated program file above a host's per-file limit even when each original image is smaller.
+[#271](https://github.com/squid-farm/talewright/issues/271) tracks moving story assets beside the
+host; that layout is not shipped here. See the author guide's
+[artwork and hosting size](../../../docs/guide/sharing-your-story.md#artwork-and-hosting-size)
+for the advisory source estimate, final web-payload measurement and current embedded-artwork caveat.
+Published Windows, macOS and ARM image playback remain unverified; Linux x64 and three browser
+engines have extracted-artifact coverage.
 
 `TalewrightApp` cascades the accepted `StoryImages`. Direct `StoryPlayer`/`DocumentView`
 consumers can supply a `CascadingValue<StoryImages>` with `StoryImages.FromDirectory` or
@@ -73,6 +85,22 @@ entries and awaits asynchronous browser URL cleanup. Sharing removes duplicate t
 it does not bound distinct images retained by history or guarantee one decoded bitmap.
 No eviction, unique-image budget, or history virtualization is introduced. No filesystem browser URL, remote
 fetch/fallback, or new author file-size limit is introduced.
+
+ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even
+when loading fails. A loaded story retains one parsed archive, not expanded image copies.
+Source discovery uses the shared configuration/narrative predicates and root mapping.
+Compressed input (including the separate 20 MiB browser upload convenience cap), expanded
+content, each expanded read, and retained stream/Blob ownership are distinct concerns.
+ZIP loading currently has a **temporary known limitation**: 50 MiB combined expanded source
+text and image content. This is not an approved game-size budget; #196 removes it alongside
+the inherited ceilings. ZIP images remain enabled in pre-alpha: use at your own risk.
+Metadata preflight is supplemented by bounded actual reads. Each image read also stops if
+actual expansion exceeds that entry's declared size; only that image fails. This declared-size
+check remains when #196 removes the temporary combined cap. Per-image high-water accounting
+means repeat and partial reads do not charge the same content twice. This is not a folder
+image limit or a history memory budget. Late read/decode failures preserve the adopted narrative
+and show the effective alt with an accessible error. Rejected candidates, accepted replacement
+and teardown release archive/input resources after image transfers drain.
 
 `LibraryEnabled=false` requires an `AutoStartStoryId` and removes Library navigation
 and upload UI during both creation and play. A failed startup shows diagnostics
@@ -123,7 +151,7 @@ one below 52rem.
 
 ## Not here yet
 
-- Archive/upload image adapters (#178), generated published-host image adapters and deployment behavior (#179).
+- Generated published-host image adapters and deployment behavior (#179).
 - Reader settings such as text size and a theme picker (unscheduled).
 - Story and host theming beyond CSS variables ([#13](https://github.com/squid-farm/talewright/issues/13)).
 

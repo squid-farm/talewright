@@ -8,9 +8,10 @@ public sealed class AuthorReloadTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "talewright-reload-" + Guid.NewGuid().ToString("N"));
     private const string Yaml = """
-        id: watched
-        title: Watched
-        start: start
+        game:
+          id: watched
+          title: Watched
+          start: start
         flags: [ready]
         vars: {count: 0}
         characters:
@@ -38,6 +39,80 @@ public sealed class AuthorReloadTests : IDisposable
     {
         var source = new StorySource(new Dictionary<string, string> { ["story.talewright.yaml"] = yaml, ["main.tale"] = tale });
         return new(source, StoryCompiler.Compile(source), null);
+    }
+
+    [Theory]
+    [InlineData("add")]
+    [InlineData("edit")]
+    [InlineData("rename")]
+    [InlineData("delete")]
+    public void Supporting_configuration_changes_require_restart_and_rejected_candidates_preserve_the_run(string change)
+    {
+        var directory = Path.Combine(_root, "characters");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "guide.talewright.yaml");
+        const string fragment = "characters: { guide: {first-name: Guide} }\n";
+        if (change != "add") File.WriteAllText(path, fragment);
+        using var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        var original = model.Session;
+        switch (change)
+        {
+            case "add": File.WriteAllText(path, fragment); break;
+            case "edit": File.AppendAllText(path, "# Edited\n"); break;
+            case "rename": File.Move(path, Path.Combine(directory, "renamed.talewright.yaml")); break;
+            case "delete": File.Delete(path); break;
+        }
+        Write("=== start\n-> missing");
+        Assert.False(model.ApplySource(Load()));
+        Assert.Same(original, model.Session);
+        Assert.True(model.RestartRequired);
+        Assert.True(model.SourceRejected);
+        Write(Tale);
+        Assert.False(model.ApplySource(Load()));
+        Assert.Same(original, model.Session);
+        model.Reload();
+        Assert.Null(model.Error);
+        Assert.False(model.RestartRequired);
+        Assert.False(model.SourceRejected);
+        Assert.Null(model.Session);
+        Assert.Equal(change != "delete", model.Story!.World.Characters.ContainsKey(new("guide")));
+    }
+
+    [Fact]
+    public async Task Watcher_observes_supporting_configuration_add_edit_rename_delete_and_recovery()
+    {
+        using var model = new WorkbenchModel(_root);
+        using var ui = new SemaphoreSlim(1);
+        async Task Dispatch(Action action)
+        {
+            await ui.WaitAsync();
+            try { action(); } finally { ui.Release(); }
+        }
+        await using var watcher = new StoryReloadWatcher(model, Dispatch, () => { });
+        await watcher.RescanAsync(restart: true);
+        Directory.CreateDirectory(Path.Combine(_root, "people"));
+        var path = Path.Combine(_root, "people", "guide.talewright.yaml");
+        await File.WriteAllTextAsync(path, "characters: { guide: {first-name: Guide} }");
+        await Until(Dispatch, () => model.RestartRequired && !model.SourcePending);
+        await watcher.RescanAsync(restart: true);
+        Assert.True(model.Story!.World.Characters.ContainsKey(new("guide")));
+        await File.WriteAllTextAsync(path, "characters: { guide: {first-name: Revised} }");
+        await Until(Dispatch, () => model.RestartRequired && !model.SourcePending);
+        await watcher.RescanAsync(restart: true);
+        Assert.Equal("Revised", model.Story!.World.Characters[new("guide")].FirstName);
+        var renamed = Path.Combine(_root, "people", "renamed.talewright.yaml");
+        File.Move(path, renamed);
+        await Until(Dispatch, () => model.RestartRequired && !model.SourcePending);
+        await watcher.RescanAsync(restart: true);
+        await File.WriteAllTextAsync(renamed, "characters: [");
+        await Until(Dispatch, () => model.SourceRejected && model.Diagnostics.Any(d => d.Location.File == "people/renamed.talewright.yaml"));
+        Assert.True(model.Story!.World.Characters.ContainsKey(new("guide")));
+        File.Delete(renamed);
+        await watcher.RescanAsync(restart: true);
+        Assert.False(model.SourceRejected);
+        Assert.False(model.Story!.World.Characters.ContainsKey(new("guide")));
     }
 
     [Fact]
@@ -205,7 +280,8 @@ public sealed class AuthorReloadTests : IDisposable
     [Fact]
     public void Creation_is_retained_for_prose_reload_and_incompatible_options_are_named_on_restart()
     {
-        var yaml = Yaml + "\ncreation:\n  name: true\n  stats:\n    str: [12, 16]\n";
+        var yaml = Yaml.Replace("  start: start",
+            "  start: start\n  creation:\n    name: true\n    stats:\n      str: [12, 16]");
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), yaml);
         var model = new WorkbenchModel(_root);
         model.Reload();

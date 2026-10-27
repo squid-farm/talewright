@@ -212,6 +212,11 @@ if (args.Length == 1)
     using var reader = new System.IO.StreamReader(stream);
     if (!reader.ReadToEnd().Contains("Culture-like chapter"))
         throw new Exception("Culture-like chapter resource has incorrect content.");
+    using var fragment = assembly.GetManifestResourceStream("stories/Published/characters/player.talewright.yaml")
+        ?? throw new Exception("Supporting configuration is missing from the main host assembly.");
+    using var fragmentReader = new System.IO.StreamReader(fragment);
+    if (!fragmentReader.ReadToEnd().Contains("first-name: Tester"))
+        throw new Exception("Supporting configuration resource has incorrect content.");
     return;
 }
 if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
@@ -220,8 +225,9 @@ if (EngineApi.Compiler.Assembly.GetName().Name != "Talewright.Talemark")
     throw new Exception("Compiler assembly identity does not match the Talemark namespace.");
 var source = new StorySource(new Dictionary<string, string>
 {
-    ["story.talewright.yaml"] = "id: smoke\\ntitle: Smoke\\nstart: start\\nruleset: { base: none }\\ncharacters:\\n  player:\\n    first-name: Tester\\n",
-    ["main.tale"] = "=== start\\nHello **world**.\\n-> END",
+    ["story.talewright.yaml"] = "game:\\n  id: smoke\\n  title: Smoke\\n  start: start\\n  ruleset: { base: none }\\n",
+    ["characters/player.talewright.yaml"] = "characters:\\n  player:\\n    first-name: Tester\\nvars: { greeting: \\"world\\" }\\n",
+    ["main.tale"] = "=== start\\nHello **{var:greeting}**.\\n-> END",
 });
 var result = StoryCompiler.Compile(source);
 if (!result.Success)
@@ -267,8 +273,10 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         story = root / "tool-story"
         story.mkdir()
         (story / "story.talewright.yaml").write_text(
-            "id: tool-smoke\ntitle: Tool smoke\nstart: a\ncharacters:\n  player: {first-name: Tester}\n")
-        (story / "main.tale").write_text("=== a\nHello.\n-> translated\n")
+            "game:\n  id: tool-smoke\n  title: Tool smoke\n  start: a\n")
+        (story / "characters").mkdir()
+        (story / "characters/player.talewright.yaml").write_text("characters:\n  player: {first-name: Tester}\n")
+        (story / "main.tale").write_text("=== a\nHello, {player:first-name}.\n-> translated\n")
         (story / "chapter.fr.tale").write_text("=== translated\nCulture-like chapter.\n-> END\n")
         subprocess.run([str(tool_path / "talewright"), "debug", "--help"],
                        cwd=root, env=environment, check=True, capture_output=True)
@@ -286,7 +294,8 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "--output", str(archive)],
                        cwd=root, env=environment, check=True)
         with ZipFile(archive) as published:
-            if set(published.namelist()) != {"story.talewright.yaml", "main.tale", "chapter.fr.tale"}:
+            if set(published.namelist()) != {
+                    "story.talewright.yaml", "characters/player.talewright.yaml", "main.tale", "chapter.fr.tale"}:
                 raise ValueError("Installed CLI did not produce a story-only archive")
         web = root / "web.zip"
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",

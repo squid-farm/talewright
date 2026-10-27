@@ -1,4 +1,3 @@
-using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
@@ -12,9 +11,11 @@ internal sealed class YamlScalarSource
     private readonly int[] _lines;
     private readonly (int Start, int End)[] _characters;
     private readonly int _start;
+    private readonly string _file;
 
-    internal YamlScalarSource(string source, YamlScalarNode scalar, int[] lineStarts)
+    internal YamlScalarSource(string file, string source, YamlScalarNode scalar, int[] lineStarts)
     {
+        _file = file;
         _source = source;
         _lines = lineStarts;
         var start = _lines[(int)scalar.Start.Line - 1] + (int)scalar.Start.Column - 1;
@@ -115,6 +116,6 @@ internal sealed class YamlScalarSource
         // CRLF occupies two UTF-16 code units; source columns include neither line-ending character.
         var column = offset - _lines[line] + 1;
         if (offset < _source.Length && _source[offset] == '\n' && offset > 0 && _source[offset - 1] == '\r') column--;
-        return new(StorySource.ManifestFileName, line + 1, column);
+        return new(_file, line + 1, column);
     }
 }

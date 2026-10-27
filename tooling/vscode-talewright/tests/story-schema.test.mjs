@@ -43,13 +43,33 @@ function markdownYaml(source, index) {
   return blocks[index][1];
 }
 
-test('schema validates every shipped story manifest', async () => {
+test('schema validates the organization guide settings and trigger examples', async () => {
+  const guide = await read('docs/guide/organizing-your-story.md');
+  for (let index = 0; index < 5; index++) {
+    const name = `organization guide YAML example ${index + 1}`;
+    assertValid(validateManifest, parsedYaml(markdownYaml(guide, index), name), name);
+  }
+});
+
+test('schema validates every shipped story configuration', async () => {
   for (const path of [
     'samples/LostRelic/story.talewright.yaml',
+    'samples/LostRelic/characters/guide.talewright.yaml',
     'examples/CSharpStory/Story/Content/story.talewright.yaml',
   ]) {
     assertValid(validateManifest, parsedYaml(await read(path), path), path);
   }
+});
+
+test('player declarations may be in the root or a supporting configuration file', () => {
+  const game = { id: 'root', title: 'Root', start: 'beginning' };
+  assertValid(validateManifest, { game }, 'root with declarations in supporting files');
+  assertValid(validateManifest, { game, characters: {} }, 'root with player in a supporting file');
+  assertValid(validateManifest, {
+    game, characters: { player: { 'first-name': 'Ada' } },
+  }, 'root with player');
+  assertValid(validateManifest, { characters: { guide: { 'first-name': 'Bea' } } }, 'character fragment');
+  assertValid(validateManifest, { items: { coin: 'Coin' } }, 'item fragment');
 });
 
 test('compiler, schema, and editor grammar accept the same identifiers', async () => {
@@ -62,9 +82,11 @@ test('compiler, schema, and editor grammar accept the same identifiers', async (
   // EditorManifestSchemaTests runs the same fixture through the compiler.
   const fixture = JSON.parse(await read('tooling/vscode-talewright/tests/fixtures/identifiers.json'));
   const manifest = id => ({
-    id: 'identifier-test',
-    title: 'Identifier test',
-    start: 'beginning',
+    game: {
+      id: 'identifier-test',
+      title: 'Identifier test',
+      start: 'beginning',
+    },
     characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
   });
   for (const id of fixture.valid) {
@@ -105,19 +127,22 @@ test('schema validates complete and contextual documented manifest examples', as
   for (const [path, index, property] of fragmentExamples) {
     const name = `${path} YAML example ${index + 1} (${property})`;
     const fragment = parsedYaml(markdownYaml(await read(path), index), name);
-    const value = property === 'pronouns' ? fragment.pronouns : fragment[property];
+    const value = property === 'pronouns' ? fragment.pronouns
+      : property === 'creation' ? fragment.game.creation
+        : fragment[property];
     assert.ok(value !== undefined, `${name} must include ${property}`);
     const story = {
-      id: 'documented-fragment',
-      title: 'Documented fragment',
-      start: 'beginning',
+      game: {
+        id: 'documented-fragment',
+        title: 'Documented fragment',
+        start: 'beginning',
+      },
       characters: { player: { 'first-name': 'Ada' } },
-      [property]: value,
     };
     if (property === 'pronouns') {
-      delete story.pronouns;
       story.characters.player.pronouns = value;
-    }
+    } else if (property === 'creation') story.game.creation = value;
+    else story[property] = value;
     assertValid(validateManifest, story, name);
   }
 
@@ -128,9 +153,11 @@ test('schema validates complete and contextual documented manifest examples', as
   ]) {
     const value = parsedYaml(`${property}: ${snippet}`, `documented ${property} shorthand`)[property];
     assertValid(validateManifest, {
-      id: 'documented-shorthand',
-      title: 'Documented shorthand',
-      start: 'beginning',
+      game: {
+        id: 'documented-shorthand',
+        title: 'Documented shorthand',
+        start: 'beginning',
+      },
       characters: { player: { 'first-name': 'Ada' } },
       [property]: value,
     }, `documented ${property} shorthand`);
@@ -164,7 +191,8 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
   assert.ok(readerSets.length > 0, 'reader CheckKeys lists should be discoverable');
 
   const closed = [
-    ['root', schema, { id: 'test', title: 'Test', start: 'beginning', characters: { player: { 'first-name': 'Ada' } } }],
+    ['root', schema, { game: { id: 'test', title: 'Test', start: 'beginning' }, characters: { player: { 'first-name': 'Ada' } } }],
+    ['game', schema.properties.game, { id: 'test', title: 'Test', start: 'beginning' }],
     ['ruleset', schema.definitions.ruleset, {}],
     ['statDefinition', schema.definitions.statDefinition, { id: 'courage' }],
     ['character', schema.definitions.character, { 'first-name': 'Ada' }],
@@ -219,7 +247,7 @@ test('shared compiler/schema manifest fixtures cover supported forms and diagnos
 test('schema permits custom ruleset IDs without hard-coding registrations', async () => {
   const story = parsedYaml(await read(
     'tooling/vscode-talewright/tests/fixtures/manifests/supported-forms.yaml'), 'supported forms');
-  story.ruleset.base = 'project-rules';
+  story.game.ruleset = { base: 'project-rules' };
   assertValid(validateManifest, story, 'custom ruleset ID');
 });
 
@@ -234,32 +262,40 @@ test('preset IDs use the shared identifier rule and retain the existing 80-chara
 });
 
 test('schema rejects missing required fields, wrong types, and invalid closed enums', () => {
-  assertInvalid(validateManifest, { id: 'missing-fields' }, 'missing root fields', 'required');
-  assertInvalid(validateManifest, {
-    id: 'missing-player',
-    title: 'Missing player',
-    start: 'beginning',
+  assertValid(validateManifest, {
     characters: { guide: { 'first-name': 'Wick' } },
-  }, 'missing player character', 'required');
+  }, 'individual fragment without game or player');
+  assertInvalid(validateManifest, { game: { id: 'missing-fields' } }, 'missing game fields', 'required');
   assertInvalid(validateManifest, {
-    id: 'wrong-types',
-    title: 'Wrong types',
+    id: 'old-format',
+    title: 'Old format',
     start: 'beginning',
-    randomness: 'always',
+  }, 'old top-level game settings', 'additionalProperties');
+  assertInvalid(validateManifest, {
+    game: {
+      id: 'wrong-types',
+      title: 'Wrong types',
+      start: 'beginning',
+      randomness: 'always',
+    },
     characters: { player: { 'first-name': 'Ada', inventory: 12 } },
   }, 'wrong types and randomness enum');
   assertInvalid(validateManifest, {
-    id: 'wrong-trigger',
-    title: 'Wrong trigger',
-    start: 'beginning',
+    game: {
+      id: 'wrong-trigger',
+      title: 'Wrong trigger',
+      start: 'beginning',
+    },
     characters: { player: { 'first-name': 'Ada' } },
     triggers: [{ id: 'bad', when: 'true', do: 'set flag:ready', once: 'sometimes' }],
   }, 'wrong trigger scalar');
   assertInvalid(validateManifest, {
-    id: 'wrong-creation',
-    title: 'Wrong creation',
-    start: 'beginning',
+    game: {
+      id: 'wrong-creation',
+      title: 'Wrong creation',
+      start: 'beginning',
+      creation: { pronouns: ['they', 'they'], stats: { str: [] } },
+    },
     characters: { player: { 'first-name': 'Ada' } },
-    creation: { pronouns: ['they', 'they'], stats: { str: [] } },
   }, 'creation value constraints');
 });
