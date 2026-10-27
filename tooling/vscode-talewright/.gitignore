@@ -3,3 +3,4 @@ artifacts/
 LICENSE.txt
 THIRD-PARTY-NOTICES.txt
 dist/
+server/

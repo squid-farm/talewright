@@ -10,7 +10,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Live validation launches a configured local executable only in trusted workspaces.",
+      "description": "Live validation launches the bundled language server (or an explicit development override) only in trusted workspaces.",
       "restrictedConfigurations": ["talewright.languageServer.command", "talewright.languageServer.args"]
     }
   },
@@ -32,7 +32,7 @@
       "title": "Talewright",
       "properties": {
         "talewright.languageServer.enabled": { "type": "boolean", "default": true, "description": "Enable shared live diagnostics, completion, and hover. Reload the window after changing settings." },
-        "talewright.languageServer.command": { "type": "string", "default": "talewright-lsp", "description": "Installed language-server executable. Never installed or built automatically." },
+        "talewright.languageServer.command": { "type": "string", "default": "", "description": "Leave empty to use the bundled Linux x64 server. Set an executable explicitly only for development; never installed or built automatically." },
         "talewright.languageServer.args": { "type": "array", "items": { "type": "string" }, "default": ["--stdio"], "description": "Server arguments; for a local build use dotnet with the server DLL followed by --stdio." },
         "talewright.languageServer.metadataPath": { "type": "string", "default": "", "description": "Explicit data-only authoring metadata file, absolute or relative to each story root." },
         "talewright.languageServer.requiresProjectMetadata": { "type": "boolean", "default": false, "description": "Require exported project registrations, including for external/nested C# projects. Missing metadata produces TW5001." }

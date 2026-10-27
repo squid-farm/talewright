@@ -78,13 +78,17 @@
     ],
     "editorWorkflow": [
       "testWorkflow",
-      "{workspaceRoot}/.github/workflows/editor-tooling.yml"
+      "{workspaceRoot}/.github/workflows/editor-tooling.yml",
+      "{workspaceRoot}/.github/scripts/package_version.py",
+      "{workspaceRoot}/.github/scripts/verify_release_vsix.py"
     ],
     "packageInfrastructure": [
       "{workspaceRoot}/.github/workflows/build.yml",
       "{workspaceRoot}/.github/workflows/publish-nuget.yml",
       "{workspaceRoot}/.github/scripts/package_version.py",
-      "{workspaceRoot}/.github/scripts/verify_packages.py"
+      "{workspaceRoot}/.github/scripts/verify_packages.py",
+      "{workspaceRoot}/.github/scripts/verify_release_vsix.py",
+      "{workspaceRoot}/.github/scripts/github_release.py"
     ],
     "browserInfrastructure": [
       "testWorkflow",

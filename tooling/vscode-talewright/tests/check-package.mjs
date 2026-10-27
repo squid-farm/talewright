@@ -3,11 +3,13 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { releaseIdentity } from './release-identity.mjs';
 
 test('VSIX contains exactly the distributable assets', async () => {
   const archive = fileURLToPath(new URL('../artifacts/talewright.vsix', import.meta.url));
   const entries = execFileSync('unzip', ['-Z1', archive], { encoding: 'utf8' }).trim().split('\n').sort();
-  assert.deepEqual(entries, [
+  const release = releaseIdentity();
+  assert.deepEqual(entries.filter(entry => !entry.startsWith('extension/server/')), [
     '[Content_Types].xml',
     'extension.vsixmanifest',
     'extension/LICENSE.txt',
@@ -27,9 +29,21 @@ test('VSIX contains exactly the distributable assets', async () => {
     'snippets/tale.json',
     'syntaxes/tale.tmLanguage.json',
   ]) {
-    assert.equal(execFileSync('unzip', ['-p', archive, `extension/${file}`], { encoding: 'utf8' }),
-      await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
+    const actual = execFileSync('unzip', ['-p', archive, `extension/${file}`], { encoding: 'utf8' });
+    const expected = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+    if (file === 'package.json' && release) {
+      assert.deepEqual(JSON.parse(actual), { ...JSON.parse(expected), version: release.vscode });
+    } else {
+      assert.equal(actual, expected);
+    }
   }
+  const vsixManifest = execFileSync('unzip', ['-p', archive, 'extension.vsixmanifest'], { encoding: 'utf8' });
+  assert.ok(vsixManifest.includes('TargetPlatform="linux-x64"'));
+  assert.equal(vsixManifest.includes('Id="Microsoft.VisualStudio.Code.PreRelease" Value="true"'),
+    release?.prerelease ?? false);
+  const verifier = fileURLToPath(new URL('../../../.github/scripts/verify_release_vsix.py', import.meta.url));
+  execFileSync('python3', [verifier, archive, ...(release ? [process.env.TALEWRIGHT_RELEASE_TAG] : ['--bundle-only'])], { stdio: 'inherit' });
+  assert.ok(!entries.some(entry => /\.(pdb|csproj|cs)$/.test(entry)), 'No build sources or debug symbols in VSIX');
   assert.equal(execFileSync('unzip', ['-p', archive, 'extension/LICENSE.txt'], { encoding: 'utf8' }),
     await readFile(new URL('../../../LICENSE', import.meta.url), 'utf8'));
   const notices = execFileSync('unzip', ['-p', archive, 'extension/THIRD-PARTY-NOTICES.txt'], { encoding: 'utf8' });

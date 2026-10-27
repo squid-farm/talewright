@@ -15,9 +15,10 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: release
     permissions:
       contents: read
-      packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -31,14 +32,20 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
+          python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME" --release-json
           test "$(python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME")" = "$VERSION"
           python3 .github/scripts/verify_packages.py artifacts/packages "$VERSION"
+      - name: Exchange GitHub OIDC identity for a short-lived nuget.org key
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
       - name: Push engine, player, CLI, and language server
         env:
           VERSION: ${{ inputs.version }}
-          NUGET_AUTH_TOKEN: ${{ github.token }}
+          NUGET_AUTH_TOKEN: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
-          source="https://nuget.pkg.github.com/${GITHUB_REPOSITORY_OWNER,,}/index.json"
+          source="https://api.nuget.org/v3/index.json"
           dotnet nuget push "artifacts/packages/Talewright.$VERSION.nupkg" \
             --source "$source" --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate
           dotnet nuget push "artifacts/packages/Talewright.Player.$VERSION.nupkg" \

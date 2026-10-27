@@ -6,4 +6,6 @@ artifacts/**
 .vscodeignore
 package-lock.json
 extension.cjs
+server/**/*.pdb
+server/**/*.xml
 **/project.json

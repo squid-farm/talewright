@@ -10,6 +10,22 @@ exports.run = async () => {
   assert.ok(extension.extensionPath.includes(`${path.sep}extensions${path.sep}`),
     'Exercise the installed VSIX, not the development source');
   assert.equal(extension.packageJSON.main, './dist/extension.cjs');
+  assert.equal(vscode.workspace.getConfiguration('talewright').get('languageServer.command'), '',
+    'Installed tests must exercise the bundled default, not a development override');
+  if (process.env.TALEWRIGHT_TEST_UNTRUSTED === 'true') {
+    assert.equal(vscode.workspace.isTrusted, false, 'Exercise real restricted mode');
+    const file = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, 'start.tale');
+    const document = await vscode.workspace.openTextDocument(file);
+    await vscode.window.showTextDocument(document);
+    await extension.activate();
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    assert.equal((await bundledServerProcesses(extension)).length, 0, 'Untrusted workspaces must not launch the server');
+    assert.equal(vscode.languages.getDiagnostics(document.uri).filter(item => item.source === 'talewright').length, 0);
+    assert.equal(document.languageId, 'tale', 'Syntax support remains available in restricted mode');
+    console.log('Installed VSIX restricted-mode smoke passed: no server process or compiler execution.');
+    return;
+  }
+  assert.equal(vscode.workspace.isTrusted, true);
   const snippets = JSON.parse(await fs.readFile(path.join(extension.extensionPath, 'snippets/tale.json'), 'utf8'));
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-editor-'));
   try {
@@ -49,7 +65,25 @@ exports.run = async () => {
   }
   await testYamlSchema();
   await testLiveDiagnostics();
+  assert.equal((await bundledServerProcesses(extension)).length, 1,
+    'The installed extension must run exactly its own bundled server executable');
 };
+
+async function bundledServerProcesses(extension) {
+  const children = await fs.readFile(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8');
+  const matches = [];
+  for (const pid of children.trim().split(/\s+/).filter(Boolean)) {
+    let executable;
+    try {
+      executable = await fs.readlink(`/proc/${pid}/exe`);
+    } catch (error) {
+      if (error.code === 'ENOENT') continue;
+      throw error;
+    }
+    if (executable === path.join(extension.extensionPath, 'server/Talewright.LanguageServer')) matches.push(pid);
+  }
+  return matches;
+}
 
 async function testYamlSchema() {
   const extension = vscode.extensions.getExtension('redhat.vscode-yaml');

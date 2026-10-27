@@ -56,7 +56,8 @@ checks your story and publishes finished games, and the **Author Debugger** jump
 any game state. This setup currently requires developer tools.
 
 1. Install the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
-2. Download [Talewright as a zip](https://github.com/squid-farm/talewright/archive/refs/heads/main.zip),
+2. Open [Talewright releases](https://github.com/squid-farm/talewright/releases) and download a
+   version's **Source code (zip)** (preview releases are included),
    extract it, and open a terminal in the extracted folder.
 3. Check that it works: `dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostRelic`
 

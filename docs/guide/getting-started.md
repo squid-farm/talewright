@@ -37,8 +37,9 @@ other declarations stay at the root of the manifest.
 > **Optional editor help:** In VS Code, Red Hat's
 > [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) can help
 > with the manifest. The [Talewright VS Code extension](../../tooling/vscode-talewright/README.md)
-> adds Talemark highlighting. It is currently installed from a downloaded package rather than the
-> Marketplace, and live story checks need extra setup. You can skip both and use any plain-text editor.
+> adds Talemark highlighting and live story checks with a bundled Linux x64 language server.
+> Its README explains supported Linux environments, preview Marketplace installation and the
+> VSIX fallback. You can skip both and use any plain-text editor.
 
 ## What can I share without the desktop tools?
 
@@ -57,13 +58,13 @@ The desktop tools are useful for longer stories, but are not required. They add:
 - a desktop player that opens story folders directly, without zipping.
 
 For now they run from Talewright's source code, so setup is intended for authors comfortable with a
-terminal and developer tools. Versioned downloads
-([#86](https://github.com/squid-farm/talewright/issues/86)) and ready-made apps
-([#33](https://github.com/squid-farm/talewright/issues/33)) are planned.
+terminal and developer tools. Releases provide versioned source archives; ready-made apps
+([#33](https://github.com/squid-farm/talewright/issues/33)) are a separate follow-up.
 
 1. Install the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
-2. Download [Talewright as a zip](https://github.com/squid-farm/talewright/archive/refs/heads/main.zip)
-   and extract it somewhere handy. Open a terminal in the extracted `talewright-main` folder.
+2. Open [Talewright releases](https://github.com/squid-farm/talewright/releases), choose a version
+   (including previews), and download **Source code (zip)**.
+   Extract it somewhere handy and open a terminal in the extracted Talewright folder.
 3. **Linux only:** install WebKitGTK, e.g. `sudo apt install libwebkit2gtk-4.1-0`. Windows and macOS
    already include what's needed.
 
