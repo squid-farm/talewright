@@ -34,7 +34,7 @@ def request(method, url, payload=None, *, binary=False, missing_ok=False):
     return body if binary else json.loads(body)
 
 
-def publish(vsix, tag, sha, repository):
+def publish(vsix, tag, sha, repository, additional_assets=()):
     identity = verify_vsix(vsix, tag)
     base = f"{API}/repos/{repository}"
     commit = request("GET", f"{base}/commits/{quote(tag, safe='')}")
@@ -53,7 +53,8 @@ def publish(vsix, tag, sha, repository):
             + ". NuGet packages use version `" + identity["nuget"] + "`; the extension uses `"
             + identity["vscode"] + "`.\n\n"
             "GitHub's **Source code (zip)** and **Source code (tar.gz)** downloads below are "
-            "the tagged source, not ready-made CLI/player binaries. See "
+            "the tagged source. Self-contained CLI archives and checksums are attached separately; "
+            "player binaries are not included. See "
             f"[getting started](https://github.com/{repository}/blob/{tag}/docs/guide/getting-started.md).\n\n"
             "**Before 1.0, story syntax, APIs and save formats may change without compatibility "
             "guarantees. Back up stories and saves before upgrading.** Review the changes below "
@@ -66,17 +67,18 @@ def publish(vsix, tag, sha, repository):
         })
     if release["tag_name"] != tag or release["prerelease"] != identity["prerelease"]:
         raise ValueError("Existing release tag or pre-release channel differs; inspect it manually")
-    name = "talewright-linux-x64.vsix"
-    assets = [asset for asset in release["assets"] if asset["name"] == name]
-    contents = Path(vsix).read_bytes()
-    if assets:
-        if len(assets) != 1 or request("GET", assets[0]["url"], binary=True) != contents:
-            raise ValueError("Existing VSIX asset differs; never overwrite a published version")
-        print(f"Identical {name} already attached; keeping it.")
-    else:
-        upload = release["upload_url"].split("{", 1)[0]
-        request("POST", f"{upload}?name={quote(name)}", contents, binary=True)
-        print(f"Attached {name}.")
+    for path, name in [(Path(vsix), "talewright-linux-x64.vsix"),
+                       *((Path(path), Path(path).name) for path in additional_assets)]:
+        assets = [asset for asset in release["assets"] if asset["name"] == name]
+        contents = path.read_bytes()
+        if assets:
+            if len(assets) != 1 or request("GET", assets[0]["url"], binary=True) != contents:
+                raise ValueError("Existing release asset differs; never overwrite a published version")
+            print(f"Identical {name} already attached; keeping it.")
+        else:
+            upload = release["upload_url"].split("{", 1)[0]
+            request("POST", f"{upload}?name={quote(name)}", contents, binary=True)
+            print(f"Attached {name}.")
     if release["draft"]:
         request("PATCH", f"{base}/releases/{release['id']}", {
             "draft": False, "prerelease": identity["prerelease"], "make_latest": "false",
@@ -89,11 +91,12 @@ def publish(vsix, tag, sha, repository):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("vsix", type=Path)
+    parser.add_argument("--assets", nargs="+", type=Path, default=[])
     args = parser.parse_args()
     if os.environ.get("GITHUB_EVENT_NAME") != "push" or os.environ.get("GITHUB_REF_TYPE") != "tag":
         parser.error("GitHub releases are only created by a tag push")
     publish(args.vsix, os.environ["GITHUB_REF_NAME"], os.environ["GITHUB_SHA"],
-            os.environ["GITHUB_REPOSITORY"])
+            os.environ["GITHUB_REPOSITORY"], args.assets)
 
 
 if __name__ == "__main__":

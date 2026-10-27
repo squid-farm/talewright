@@ -211,6 +211,7 @@ class InfrastructureSelectionTests(unittest.TestCase):
         ".github/scripts/nx_ci.py": {"checks"},
         ".github/scripts/package_version.py": {"build", "editor", "checks"},
         ".github/scripts/github_release.py": {"build", "checks"},
+        ".github/scripts/package_cli.sh": {"build", "checks"},
         ".github/scripts/verify_release_vsix.py": {"build", "editor", "checks"},
         ".github/scripts/publish_samples.py": {"browser", "checks"},
         ".github/scripts/ui_test_image_plan.py": {"checks"},

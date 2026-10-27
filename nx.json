@@ -88,7 +88,8 @@
       "{workspaceRoot}/.github/scripts/package_version.py",
       "{workspaceRoot}/.github/scripts/verify_packages.py",
       "{workspaceRoot}/.github/scripts/verify_release_vsix.py",
-      "{workspaceRoot}/.github/scripts/github_release.py"
+      "{workspaceRoot}/.github/scripts/github_release.py",
+      "{workspaceRoot}/.github/scripts/package_cli.sh"
     ],
     "browserInfrastructure": [
       "testWorkflow",

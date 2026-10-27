@@ -146,8 +146,13 @@ never publishes, even when run against a tag.
 - **Never move or reuse a release tag.** Fix mistakes with a new version. Version-tag runs are not
   cancelled by newer CI runs. If artifacts expire before a retry, rerun full validation on the
   unchanged tag; never substitute locally built artifacts.
-- Self-contained CLI/player release downloads, installers, package managers and Open VSX remain
-  separate follow-ups. This pipeline does not claim to supply them.
+- Version tags additionally build self-contained CLI/debugger archives for the six existing RIDs.
+  The existing release gate requires their build/asset checks and six SHA-256 files; the GitHub job
+  attaches those archives/checksums alongside the VSIX without rebuilding them after approval.
+  See the [author setup guide](../guide/cli-installation.md) for download instructions and
+  [technical CLI setup](cli-setup.md) for per-command prerequisites and verification limits.
+  Cross-building Windows/macOS/ARM does not verify execution on those platforms.
+- Player release downloads, installers, package managers and Open VSX remain separate follow-ups.
 
 ## Offline validation
 

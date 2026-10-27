@@ -51,5 +51,7 @@ runtime), then open a new terminal.
 
 ## Still stuck?
 
-[Open an issue](https://github.com/squid-farm/talewright/issues/new) with what you tried, what you
-expected, and the error text. Attach the smallest story that shows the problem.
+[Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
+Include your operating system, the Talewright version, what you tried, and the exact error message.
+A GitHub account is required. Don't include private story files or personal information.
+If useful, you can attach a small example that shows the problem, but story files are optional.

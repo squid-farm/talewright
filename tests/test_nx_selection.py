@@ -343,7 +343,7 @@ class NxSelectionTests(unittest.TestCase):
         expected = set()
         projects = 0
         for project_file in ROOT.rglob("*.csproj"):
-            if {"bin", "obj", "node_modules"}.intersection(project_file.parts):
+            if {"bin", "obj", "node_modules", "artifacts"}.intersection(project_file.parts):
                 continue
             project_root = project_file.parent.relative_to(ROOT).as_posix()
             source = roots.get(project_root)
