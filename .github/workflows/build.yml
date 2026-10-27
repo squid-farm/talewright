@@ -143,8 +143,40 @@ jobs:
       id-token: write
     uses: ./.github/workflows/publish-samples.yml
 
+  cli-archives:
+    needs: [build]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64, linux-arm64, win-x64, win-arm64, osx-x64, osx-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Publish and inspect self-contained CLI and debugger
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          RID: ${{ matrix.rid }}
+        run: bash .github/scripts/package_cli.sh "$VERSION" "$RID"
+      - name: Smoke-test Linux x64 CLI
+        if: matrix.rid == 'linux-x64'
+        run: |
+          artifacts/cli/linux-x64/Talewright.Cli --help
+          artifacts/cli/linux-x64/Talewright.Cli validate samples/LostRelic --non-interactive
+          artifacts/cli/linux-x64/Talewright.Cli publish samples/LostRelic --output artifacts/cli-smoke.zip --non-interactive
+          unzip -tq artifacts/cli-smoke.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.rid }}
+          path: artifacts/cli-archives/*
+          if-no-files-found: error
+
   release-ready:
-    needs: [build, tests, verification]
+    needs: [build, tests, verification, cli-archives]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -171,6 +203,16 @@ jobs:
         with:
           name: talewright-vscode
           path: artifacts/extension
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: artifacts/cli-archives
+      - name: Verify CLI archive checksums
+        run: |
+          cd artifacts/cli-archives
+          test "$(find . -name '*.sha256' | wc -l)" -eq 6
+          for checksum in *.sha256; do sha256sum --check "$checksum"; done
       - name: Verify the exact release artifacts
         env:
           VERSION: ${{ needs.build.outputs.version }}
@@ -231,7 +273,12 @@ jobs:
         with:
           name: talewright-vscode
           path: artifacts/extension
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: artifacts/cli-archives
       - name: Create or resume the release with generated notes and the tested VSIX
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/github_release.py artifacts/extension/talewright.vsix
+        run: python3 .github/scripts/github_release.py artifacts/extension/talewright.vsix --assets artifacts/cli-archives/*

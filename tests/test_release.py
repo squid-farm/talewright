@@ -167,6 +167,20 @@ class ReleaseArtifactTests(unittest.TestCase):
         api = self.run_publish([{"sha": "abc123"}, self.release(draft=True), {"id": 9}, {}])
         self.assertEqual(api.call_args_list[-1].args[0], "PATCH")
 
+    def test_cli_archives_and_checksums_are_uploaded_before_publishing(self):
+        archive = self.vsix.parent / "talewright-cli-0.1.0-preview.1-linux-x64.tar.gz"
+        checksum = archive.with_name(archive.name + ".sha256")
+        archive.write_bytes(b"archive")
+        checksum.write_bytes(b"checksum")
+        with patch.object(github_release, "request", side_effect=[
+            {"sha": "abc123"}, self.release(draft=True), {}, {}, {}, {},
+        ]) as api:
+            github_release.publish(self.vsix, "v0.1.0-preview.1", "abc123",
+                                   "squid-farm/talewright", [archive, checksum])
+        self.assertEqual(api.call_args_list[3].args[2], b"archive")
+        self.assertEqual(api.call_args_list[4].args[2], b"checksum")
+        self.assertEqual(api.call_args_list[-1].args[0], "PATCH")
+
     def test_publication_failures_are_not_success_shaped(self):
         asset = {"name": "talewright-linux-x64.vsix", "url": "https://api.github.com/asset"}
         for responses in [
@@ -205,12 +219,14 @@ class PublicationWorkflowTests(unittest.TestCase):
 
     def test_existing_validation_gates_every_publication(self):
         ready = self.build.split("\n  release-ready:\n", 1)[1].split("\n  publish-nuget:", 1)[0]
-        self.assertIn("needs: [build, tests, verification]", ready)
+        self.assertIn("needs: [build, tests, verification, cli-archives]", ready)
         self.assertIn("github.event_name == 'push'", ready)
         self.assertIn("startsWith(github.ref, 'refs/tags/v')", ready)
         self.assertIn("name: nuget-packages", ready)
         self.assertIn("name: talewright-vscode", ready)
         self.assertIn("verify_release_vsix.py", ready)
+        self.assertIn("Verify CLI archive checksums", ready)
+        self.assertIn("test \"$(find . -name '*.sha256' | wc -l)\" -eq 6", ready)
         self.assertNotIn("exit 1", ready)
         self.assertIn("needs: [build, release-ready]", self.build)
         self.assertIn("needs: release-ready", self.build)

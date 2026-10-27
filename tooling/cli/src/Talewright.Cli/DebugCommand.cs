@@ -50,13 +50,18 @@ public sealed class DebugCommand : Command<DebugSettings>
                     throw new FileNotFoundException($"Installed debugger asset '{file}' is missing. Reinstall the Talewright CLI.");
                 }
             }
-            var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+            var bundledHost = Path.Combine(binaries, "debug-host",
+                "Talewright.Debugger" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+            var standalone = File.Exists(bundledHost);
+            var start = new ProcessStartInfo(standalone ? bundledHost
+                : Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
             {
                 WorkingDirectory = binaries, UseShellExecute = false,
                 RedirectStandardOutput = true, RedirectStandardError = true,
             };
-            foreach (var argument in new[] { "exec", "--runtimeconfig", Path.Combine(binaries, "Talewright.Cli.runtimeconfig.json"),
-                "--depsfile", Path.Combine(binaries, "Talewright.Cli.deps.json"), Path.Combine(binaries, "Talewright.Debugger.dll"), root })
+            var arguments = standalone ? new[] { root } : new[] { "exec", "--runtimeconfig", Path.Combine(binaries, "Talewright.Cli.runtimeconfig.json"),
+                "--depsfile", Path.Combine(binaries, "Talewright.Cli.deps.json"), Path.Combine(binaries, "Talewright.Debugger.dll"), root };
+            foreach (var argument in arguments)
             {
                 start.ArgumentList.Add(argument);
             }
