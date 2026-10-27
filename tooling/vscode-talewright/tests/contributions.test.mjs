@@ -8,10 +8,14 @@ test('package wires Talemark syntax, snippets, manifest schema, and the thin LSP
   const manifest = await json('package.json');
   assert.equal(manifest.main, './dist/extension.cjs');
   assert.equal(manifest.browser, undefined);
-  assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.talewright.yaml']);
+  assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.talewright.yaml', 'onTaskType:talewright']);
+  assert.deepEqual(manifest.contributes.commands.map(command => command.command), [
+    'talewright.validateStory', 'talewright.publishStoryZip', 'talewright.openAuthorDebugger',
+  ]);
+  assert.ok(manifest.capabilities.untrustedWorkspaces.restrictedConfigurations.includes('talewright.cli.executablePath'));
   assert.ok(manifest.dependencies['vscode-languageclient']);
   assert.deepEqual(Object.keys(manifest.contributes).sort(),
-    ['configuration', 'configurationDefaults', 'grammars', 'languages', 'snippets', 'yamlValidation']);
+    ['commands', 'configuration', 'configurationDefaults', 'grammars', 'languages', 'snippets', 'taskDefinitions', 'yamlValidation']);
   assert.deepEqual(manifest.contributes.configurationDefaults['[tale]'], {
     'editor.autoClosingBrackets': 'never',
     'editor.autoClosingQuotes': 'never',

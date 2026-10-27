@@ -6,12 +6,12 @@
   "publisher": "squid-farm",
   "license": "MPL-2.0",
   "main": "./dist/extension.cjs",
-  "activationEvents": ["onLanguage:tale", "onLanguage:yaml", "workspaceContains:**/story.talewright.yaml"],
+  "activationEvents": ["onLanguage:tale", "onLanguage:yaml", "workspaceContains:**/story.talewright.yaml", "onTaskType:talewright"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
       "description": "Live validation launches the bundled language server (or an explicit development override) only in trusted workspaces.",
-      "restrictedConfigurations": ["talewright.languageServer.command", "talewright.languageServer.args"]
+      "restrictedConfigurations": ["talewright.languageServer.command", "talewright.languageServer.args", "talewright.cli.executablePath"]
     }
   },
   "repository": {
@@ -28,9 +28,23 @@
     "Snippets"
   ],
   "contributes": {
+    "commands": [
+      { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
+      { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
+      { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" }
+    ],
+    "taskDefinitions": [{
+      "type": "talewright",
+      "required": ["command", "story"],
+      "properties": {
+        "command": { "type": "string", "enum": ["debug"], "description": "Open the native Author Debugger; not a VS Code debug adapter." },
+        "story": { "type": "string", "description": "Canonical story-root path, relative to the workspace folder or absolute within it." }
+      }
+    }],
     "configuration": {
       "title": "Talewright",
       "properties": {
+        "talewright.cli.executablePath": { "type": "string", "default": "", "scope": "resource", "description": "Absolute path to the separately installed Talewright CLI executable. Leave empty to use talewright on PATH; never uses the bundled language server." },
         "talewright.languageServer.enabled": { "type": "boolean", "default": true, "description": "Enable shared live diagnostics, completion, and hover. Reload the window after changing settings." },
         "talewright.languageServer.command": { "type": "string", "default": "", "description": "Leave empty to use the bundled Linux x64 server. Set an executable explicitly only for development; never installed or built automatically." },
         "talewright.languageServer.args": { "type": "array", "items": { "type": "string" }, "default": ["--stdio"], "description": "Server arguments; for a local build use dotnet with the server DLL followed by --stdio." },
