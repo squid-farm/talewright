@@ -85,7 +85,7 @@ async function saveStory(root) {
   return true;
 }
 
-async function createTask(command, requested, definition) {
+async function createTask(command, requested, definition, scope) {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
   const root = await selectStory(requested);
   if (!root) return undefined;
@@ -109,7 +109,7 @@ async function createTask(command, requested, definition) {
   const names = { validate: 'Validate Story', publish: 'Publish Story ZIP', debug: 'Open Author Debugger' };
   const task = new vscode.Task(
     definition ?? { type: 'talewright', command, story: root },
-    folder, names[command], 'Talewright',
+    scope ?? folder, names[command], 'Talewright',
     new vscode.ProcessExecution(executable, args, { cwd: root }), [],
   );
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, focus: true };
@@ -134,11 +134,30 @@ function registerAuthorActions(context) {
     provideTasks: () => [],
     resolveTask: async task => {
       try {
+        if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
+        const workspaceScope = task.scope === vscode.TaskScope.Workspace;
         if (task.definition.command !== 'debug' || typeof task.definition.story !== 'string'
-            || !task.scope?.uri || task.scope.uri.scheme !== 'file') {
-          throw new Error('A Talewright task requires command "debug", a story path, and a workspace-folder scope.');
+            || (!workspaceScope && task.scope?.uri?.scheme !== 'file')) {
+          throw new Error('A Talewright task requires command "debug", a story path, and a workspace or workspace-folder scope.');
         }
-        return await createTask('debug', path.resolve(task.scope.uri.fsPath, task.definition.story), task.definition);
+        let requested;
+        if (workspaceScope) {
+          const roots = await storyRoots();
+          const candidates = new Set((vscode.workspace.workspaceFolders ?? [])
+            .filter(folder => folder.uri.scheme === 'file')
+            .map(folder => path.resolve(folder.uri.fsPath, task.definition.story))
+            .filter(root => roots.includes(root)));
+          if (candidates.size > 1) {
+            throw new Error('The task story is ambiguous across workspace folders. Use an absolute canonical story-root path.');
+          }
+          if (candidates.size === 0) {
+            throw new Error('The task story must be a canonical story root inside an open workspace folder.');
+          }
+          [requested] = candidates;
+        } else {
+          requested = path.resolve(task.scope.uri.fsPath, task.definition.story);
+        }
+        return await createTask('debug', requested, task.definition, task.scope);
       } catch (error) {
         await report(error);
         return undefined;

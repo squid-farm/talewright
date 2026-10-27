@@ -18,12 +18,15 @@ function host(options = {}) {
     Task: class { constructor(definition, scope, name, source, execution, problemMatchers) {
       Object.assign(this, { definition, scope, name, source, execution, problemMatchers });
     } },
-    TaskRevealKind: { Always: 1 }, TaskPanelKind: { Dedicated: 2 },
+    TaskRevealKind: { Always: 1 }, TaskPanelKind: { Dedicated: 2 }, TaskScope: { Global: 1, Workspace: 2 },
     workspace: {
       isTrusted: options.trusted ?? true,
-      workspaceFolders: [{ uri: uri('/workspace') }],
+      workspaceFolders: (options.folders ?? ['/workspace']).map(folder => ({ uri: uri(folder) })),
       textDocuments: documents,
-      findFiles: async () => roots.map(root => uri(`${root}/story.talewright.yaml`)),
+      findFiles: async pattern => roots.filter(root => {
+        const relative = path.relative(pattern.folder.uri.fsPath, root);
+        return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+      }).map(root => uri(`${root}/story.talewright.yaml`)),
       getConfiguration: () => ({ get: () => options.executable ?? '' }),
       getWorkspaceFolder: () => ({ uri: uri('/workspace') }),
     },
@@ -56,6 +59,52 @@ function host(options = {}) {
   const run = name => calls.commands.get(`talewright.${name}`)();
   return { calls, run };
 }
+
+test('workspace-scoped debugger tasks resolve relative or absolute stories across open folders', async () => {
+  for (const [options, story] of [
+    [{ folders: ['/workspace', '/other'], roots: ['/other/My Story'] }, 'My Story'],
+    [{ folders: ['/workspace', '/other'], roots: ['/workspace/My Story', '/other/My Story'] }, '/other/My Story'],
+    [{ folders: ['/other', '/other/My Story'], roots: ['/other/My Story'] }, '.'],
+  ]) {
+    const { calls } = host(options);
+    const definition = { type: 'talewright', command: 'debug', story };
+    const task = await calls.provider.resolveTask({ definition, scope: 2 });
+    assert.ok(task);
+    assert.equal(task.definition, definition);
+    assert.equal(task.scope, 2);
+    assert.deepEqual(Array.from(task.execution.args), ['debug', '/other/My Story']);
+    assert.equal(calls.errors.length, 0);
+  }
+});
+
+test('workspace-scoped debugger tasks reject ambiguous, missing, nested and outside stories', async () => {
+  for (const [options, story, message] of [
+    [{ folders: ['/workspace', '/other'], roots: ['/workspace/Story', '/other/Story'] }, 'Story', /ambiguous.*absolute/i],
+    [{}, 'missing', /canonical story root/],
+    [{}, 'My Story/nested', /canonical story root/],
+    [{ roots: ['/outside/Story'] }, '/outside/Story', /canonical story root/],
+    [{ folders: [] }, '/workspace/My Story', /canonical story root/],
+    [{ trusted: false }, 'My Story', /Trust this workspace/],
+  ]) {
+    const { calls } = host(options);
+    const task = await calls.provider.resolveTask({
+      definition: { type: 'talewright', command: 'debug', story }, scope: 2,
+    });
+    assert.equal(task, undefined);
+    assert.match(calls.errors[0], message);
+    assert.equal(calls.tasks.length, 0);
+  }
+});
+
+test('debugger tasks reject global, missing and non-file folder scopes explicitly', async () => {
+  for (const scope of [1, undefined, { uri: { scheme: 'vscode-remote', fsPath: '/workspace' } }]) {
+    const { calls } = host();
+    assert.equal(await calls.provider.resolveTask({
+      definition: { type: 'talewright', command: 'debug', story: 'My Story' }, scope,
+    }), undefined);
+    assert.match(calls.errors[0], /workspace.*scope/);
+  }
+});
 
 test('validation runs the CLI in a visible process task with separate space-safe arguments', async () => {
   const { calls, run } = host();

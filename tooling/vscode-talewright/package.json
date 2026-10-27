@@ -38,7 +38,7 @@
       "required": ["command", "story"],
       "properties": {
         "command": { "type": "string", "enum": ["debug"], "description": "Open the native Author Debugger; not a VS Code debug adapter." },
-        "story": { "type": "string", "description": "Canonical story-root path, relative to the workspace folder or absolute within it." }
+        "story": { "type": "string", "description": "Canonical story-root path within an open workspace folder. Relative paths in workspace-scoped tasks must identify exactly one story across the open folders." }
       }
     }],
     "configuration": {

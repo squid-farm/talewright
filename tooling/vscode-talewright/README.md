@@ -115,7 +115,10 @@ the extension never creates or edits that file:
 ```
 
 `story` is relative to that workspace folder (or an absolute canonical story-root path within the
-workspace). Run it using **Tasks: Run Task**. The same trust, CLI and save checks apply.
+workspace). Tasks in a multi-root `.code-workspace` file are also supported: a relative `story`
+must identify exactly one canonical story root across the open folders. If it matches more than
+one, use an absolute path to disambiguate. Global/user tasks are not supported.
+Run it using **Tasks: Run Task**. The same trust, CLI and save checks apply.
 
 ## Write a scene
 
