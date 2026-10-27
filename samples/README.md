@@ -87,7 +87,7 @@ be rejected visibly without replacing your active playthrough or saved bytes.
 - Media rendering, autosave, save migration and point-buy are not implemented
   features and are not claimed by this sample.
 
-**Play it** in the [web player](https://squid-farm.github.io/talewright/), or with the [desktop tools](../docs/guide/getting-started.md#install-the-desktop-tools):
+**Play it** in the [web player](https://squid-farm.github.io/talewright/), or with the [desktop tools](../docs/guide/getting-started.md#optional-install-the-desktop-tools):
 `dotnet run --project apps/desktop -- samples/LostRelic`.
 
 ## Use a sample as a starting point

@@ -6,7 +6,12 @@ running your story.
 
 ## Install
 
-This extension is distributed as a local VSIX, not through the Marketplace.
+**Optional, advanced setup:** You do not need this extension to write a story. A plain-text editor
+and the browser player are enough. This extension is distributed as a VSIX (an installable extension
+file), not through the Marketplace. Getting it currently requires downloading a build artifact or
+building it yourself. Live story checks need an additional .NET tool and more setup; highlighting and
+basic manifest help work without that separate language server.
+
 Use VS Code 1.100 or later.
 
 1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
@@ -17,7 +22,7 @@ Use VS Code 1.100 or later.
    select the file. Reload VS Code if prompted.
 4. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
    The language ID remains `tale`.
-5. For live compiler diagnostics and semantic completion, install the separate `Talewright.LanguageServer`
+5. To add live compiler diagnostics and story-aware completion, install the separate `Talewright.LanguageServer`
    .NET tool (requires .NET 10) from the Talewright package feed. The extension
    launches `talewright-lsp --stdio`; it never installs or builds it automatically.
    See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).

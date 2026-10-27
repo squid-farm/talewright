@@ -2,23 +2,81 @@
 
 A story is a **folder** containing one `story.talewright.yaml` and any number of `*.tale` files (subfolders allowed).
 **Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
-It combines prose with bold, italic and code formatting with dialogue, choices, conditions, and RPG effects
-through a small set of line-level directives and inline expressions. The YAML manifest defines
-the story's configuration and world; it is not Talemark source.
-It is not a general Markdown document format.
+It lets you mix prose with bold, italic and code formatting, dialogue, choices and story rules. The
+YAML manifest is a separate settings file for the story's characters and world; it is not Talemark
+source. Talemark supports some Markdown-style formatting, but a `.tale` file is not a general
+Markdown document.
 
-The whole story is checked when it loads (or at build time for [C# story projects](../developer/csharp-extensions.md)).
-Every reference is validated, and mistakes are reported with `file:line:column` and an
-[error code](diagnostics.md) rather than surfacing during play.
+New to Talewright? Start with the [author guide](../guide/README.md). The examples below are a quick
+start; the rest of this page is the full reference. You can use the examples as patterns and look up
+individual features when you need them.
 
-Identifiers use ASCII letters and `_`: they start with a letter or `_`, then contain letters,
-digits, or `_`, with optional single `.` or `-` separators between groups. Dots group words
-inside one name, such as `weapon.knife` or `camp.arrival`; they never read properties.
+## Quick start: the shape of a story
 
-New to Talewright? Start with the [author guide](../guide/README.md). This page is the complete reference.
-The [Talemark operator registry](talemark-operators.md) defines each marker, expression precedence,
-and the current and decided quoting rules. Formatting design is tracked in
-[#200](https://github.com/squid-farm/talewright/issues/200).
+A story uses two kinds of files:
+
+- `story.talewright.yaml` is the settings file (also called the **manifest**). It gives your story a
+  title, tells Talewright which scene to start with, and names the player character.
+- A `.tale` file holds the scenes: the words, dialogue and choices the player sees.
+
+For example, the manifest can start like this:
+
+```yaml
+id: my-story
+title: My Story
+version: 0.1.0
+start: crossroads
+characters:
+  player:
+    first-name: Alex
+```
+
+Create a `.tale` file beside the manifest, then write a scene like this:
+
+```tale
+=== crossroads
+@title The Crossroads
+
+Two paths leave the village.
+
+* [Take the forest path] -> forest
+* [Go home] -> END
+
+=== forest
+@title The Forest
+
+The trees close behind you.
+
+-> END
+```
+
+`=== crossroads` starts a **scene** (one part or place in your story); its name is the scene ID.
+`@title` is the heading players see. Write ordinary story text on its own lines. A line beginning
+with `*` makes a **choice**; the words in brackets are what players click, and `->` says where that
+choice goes. `-> END` finishes the story.
+
+To check or play your story without installing the desktop tools, zip its folder and open the zip in
+the [web player](https://squid-farm.github.io/talewright/). For the full walkthrough, see
+[Your first story](../guide/first-story.md).
+
+## How to use this reference
+
+The sections below cover all settings and Talemark features, including optional advanced features.
+If you are writing a straightforward story, you can start with the example above and the
+[writing guide](../guide/writing-stories.md). You do not need hubs, custom C# rules, or every setting
+in this reference to write or share a story.
+
+The whole story is checked when it loads. Mistakes are reported with a file name, line and column,
+plus an [error code](diagnostics.md), so you can fix them before playing. C# story projects are an
+optional developer feature; see [C# extensions](../developer/csharp-extensions.md).
+
+Identifiers are names for scenes, characters, items and other story parts. Use letters, numbers,
+underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
+`temple.entrance` and `hidden-door` are valid names. A dot groups words in a name; it does not mean
+"look inside" another value.
+
+The [Talemark operator registry](talemark-operators.md) is a deeper technical reference for symbols,
+calculation order and quoting rules. Most authors will not need it for a first story.
 
 ---
 
@@ -152,13 +210,13 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Display title (used for hub choices).                                                          |
-| `@requires expr`                                   | Eligibility predicate (storylets / hubs).                                                      |
+| `@requires expr`                                   | A rule that decides whether a scene is available when using a hub.                             |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
-| `@once`                                            | Storylet is ineligible after it was visited once.                                              |
-| `@hub tag`                                         | At this scene, offer every eligible scene tagged `tag` as a choice.                            |
-| `@hub all(tag, tag)`                               | Offer storylets carrying every listed tag.                                                   |
-| `@hub any(tag, tag)`                               | Offer storylets carrying at least one listed tag.                                             |
+| `@once`                                            | A scene offered by a hub disappears after the player visits it once.                          |
+| `@hub tag`                                         | At this scene, offer each available scene with the tag as a choice.                            |
+| `@hub all(tag, tag)`                               | Offer scenes that have every listed tag.                                                      |
+| `@hub any(tag, tag)`                               | Offer scenes that have at least one listed tag.                                               |
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (bold, italic and code formatting).                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
@@ -171,17 +229,21 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 Metadata lines are only recognized directly after the `===` header. Lines starting with `//` are comments.
 
 **Where a scene goes next.** A choice with its own `-> target` (or a skill check) goes there. A choice with
-_no_ target — e.g. `* [Take the torch] { give player torch }` — **falls through** to the scene's own
-`-> target` lines (like an ink "gather"), and so does a check outcome without `-> target`. A scene must have
-at least one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise it's a compile error.
+_no_ target — e.g. `* [Take the torch] { give player torch }` — uses the scene's own `-> target` line
+as its destination. A check outcome without `-> target` works the same way. A scene must have at least
+one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise Talewright reports an error.
 
-Hub tags must be distinct and nonempty. A scene may have only one `@hub` and one
-`@hub-limit`. The selector excludes the hub itself, applies requirements and
-`@once`, then sorts by descending priority and stable declaration order before
-limiting. Multiple matching tags never duplicate a choice. Explicit choices are
-not capped. A fallback `->` applies only when no explicit or generated choices
-are available. Reachability conservatively considers all tag matches, not just
-the current capped selection, because state changes may alter eligibility.
+**Advanced: hub selection.** A scene may have only one `@hub` and one
+`@hub-limit`. A hub checks tags, requirements and `@once`, then sorts matching scenes by priority
+before applying its limit. Multiple matching tags never duplicate a choice. Explicit choices are
+not capped. A fallback `->` applies only when no explicit or hub choices are available. These details
+matter when building a story around hubs; you can skip them when using direct choices.
+
+For exact selection behavior: tags must be distinct and nonempty; the hub scene itself is never
+offered. Higher `@priority` scenes come first, with ties kept in declaration order. The limit applies
+only to generated hub choices, not choices written directly in the scene. When checking whether a
+scene can ever be reached, Talewright considers all matching tag scenes, even if the current limit
+would hide some; their requirements may change later.
 
 **Conditional structure.** Choices, `~` effects and `->` diverts inside a block `{if}` only apply when the
 condition holds (a choice's own `requires` is combined with it using `and`). With several `->` lines, the

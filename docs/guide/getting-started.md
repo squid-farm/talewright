@@ -12,8 +12,12 @@ browser with nothing to install.
   shows how to make one.
 
 Your files stay on your computer: the player reads the zip inside your browser and doesn't upload it
-anywhere. The web player is enough to write and play stories, but once you're writing regularly, the
-[desktop tools](#install-the-desktop-tools) make it much quicker to check and test them.
+anywhere. The web player does not edit your files; you write them in a text editor. See below for
+the no-install way to check and share your story.
+
+Want a game that opens as its own website or desktop app, or a faster way to check and test while
+writing? The [desktop tools](#optional-install-the-desktop-tools) can do more, but they require
+installing developer tools. You do not need them to write or share a simple story file.
 
 ## What you need to write stories
 
@@ -27,21 +31,30 @@ my-story/
 └── story.tale      # your scenes (use as many .tale files and subfolders as you like)
 ```
 
-> **Tip:** In VS Code, install Red Hat's
-> [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) and the
-> [Talewright extension](../../tooling/vscode-talewright/README.md). Together they provide Talemark
-> highlighting and structural key completion/validation for `story.talewright.yaml`. Run
-> `talewright validate` for story-specific checks such as whether your starting scene exists.
+> **Optional editor help:** In VS Code, Red Hat's
+> [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) can help
+> with the manifest. The [Talewright VS Code extension](../../tooling/vscode-talewright/README.md)
+> adds Talemark highlighting, but is currently installed from a downloaded package rather than the
+> Marketplace; its live checks need extra setup. You can skip both and use any plain-text editor.
 
-## Install the desktop tools
+## What can I share without the desktop tools?
 
-Recommended for anyone writing more than a short story. The desktop tools add:
+Zip your story folder and send the zip to your friends. They can open it in the
+[web player](https://squid-farm.github.io/talewright/) by choosing **Open a story file**. This shares
+only the story files, not a standalone website or app; the web player checks the story when it opens
+it. After you edit the story, make a fresh zip and open it again. See the
+[first-story tutorial's zip instructions](first-story.md#no-desktop-tools-use-the-web-player).
+
+## Optional: install the desktop tools
+
+The desktop tools are useful for longer stories, but are not required. They add:
 
 - the `talewright` command, which checks your story for mistakes and publishes finished games;
 - the **Author Debugger**, which jumps to any scene with any game state;
 - a desktop player that opens story folders directly, without zipping.
 
-For now they run from Talewright's source code. Versioned downloads
+For now they run from Talewright's source code, so setup is intended for authors comfortable with a
+terminal and developer tools. Versioned downloads
 ([#86](https://github.com/squid-farm/talewright/issues/86)) and ready-made apps
 ([#33](https://github.com/squid-farm/talewright/issues/33)) are planned.
 

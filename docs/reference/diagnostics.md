@@ -11,14 +11,6 @@ chapters/02-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 **Errors** stop the story from loading. **Warnings** (marked ⚠) don't, but usually point at a mistake.
 When you see several errors, fix the first one and check again: one mistake can cause others.
 
-## Editor project configuration
-
-| Code | Meaning | Usual fix |
-|---|---|---|
-| TW5001 | Required C# authoring registrations are missing. | Explicitly export and configure data-only project metadata; editors never build or execute project code automatically. |
-| TW5002 | The language server cannot analyze the story with its configured metadata. | Fix the reported metadata file/data error and refresh it. See [language-server configuration](../developer/language-server.md). |
-| TWLSP004 | The language server cannot read or parse `talewright.lint.json`. | Fix the reported configuration error; live analysis continues with default rule settings until the file is valid. |
-
 ## TW1xxx: writing mistakes in `.tale` files
 
 | Code | Meaning | Usual fix |
@@ -90,12 +82,6 @@ story-root-relative path and effective alt text in each media node.
 | ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |
 | TW4007 | Two triggers have the same id. | Rename one. |
 
-## TW5xxx: authoring integration
-
-| Code | Meaning | Usual fix |
-|---|---|---|
-| TW5001 | Project authoring metadata is required but missing. Built-in-only analysis cannot fully represent the project. | Explicitly supply the project's compiler options or exported [authoring metadata](../developer/authoring-analysis.md#c-project-registrations). Editors never automatically execute project code. |
-
 ## Lint rule codes
 
 Lint rules use stable `TWL` IDs, separate from compiler diagnostic codes. They run on shared source-aware
@@ -117,3 +103,14 @@ the story. See the [CLI reference](cli.md#output-contract).
 | TWCLI001 | Invalid command or options. |
 | TWCLI002 | An input/output operation failed, an existing publish destination needs `--force` in noninteractive use, the destination changed during publication, or a required file, tool or desktop component is missing. |
 | TWCLI003 | `talewright lint` configuration is invalid. |
+
+## Editor and C# project messages
+
+These messages are for authors setting up editor integration or building C# extensions. If you are
+writing a regular `.tale` story with the built-in rules, you can skip this section.
+
+| Code | Meaning | Usual fix |
+|---|---|---|
+| TW5001 | A C# project uses custom story rules or features that the editor has not been told about. | Configure compiler options or export [authoring metadata](../developer/authoring-analysis.md#c-project-registrations). Editors do not automatically build or run C# project code. |
+| TW5002 | The language server cannot analyze the story with its configured metadata. | Fix the reported metadata file/data error and refresh it. See [language-server configuration](../developer/language-server.md). |
+| TWLSP004 | The language server cannot read or parse `talewright.lint.json`. | Fix the reported configuration error; live analysis continues with default rule settings until the file is valid. |

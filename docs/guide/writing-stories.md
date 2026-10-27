@@ -129,8 +129,12 @@ Standing is a number. Its tier name is what players see and what you'll usually 
 | `allied` | 50 or higher |
 
 Standing has no upper or lower limit; these tiers just label the ranges. They come from the built-in
-ruleset and can't be changed in `story.talewright.yaml` yet. A developer can change them with a
-[custom C# ruleset](../developer/csharp-extensions.md).
+ruleset and can't be changed in `story.talewright.yaml` yet. The built-in tiers are ready to use as
+they are; you do not need to change them to write or publish a story.
+
+> **For developers:** Changing the tiers requires a
+> [custom C# ruleset](../developer/csharp-extensions.md). This is optional and is not part of the
+> no-code authoring path.
 
 ```tale
 * [Shove the door] { faction:explorers-guild -= 10 } -> hall
@@ -196,7 +200,7 @@ Or as a block, which can also contain choices, effects and `->` lines:
 ## Hubs and storylets
 
 Instead of wiring every option by hand, tag scenes and let a **hub** offer whichever ones are currently
-available:
+available. Scenes offered this way are sometimes called **storylets**:
 
 ```tale
 === camp

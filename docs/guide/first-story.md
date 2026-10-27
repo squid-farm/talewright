@@ -2,8 +2,9 @@
 
 In this tutorial you'll build *The Night Ferry*: a three-scene story with dialogue, an item, a skill
 check and text that changes depending on what the player did. It takes about fifteen minutes. You
-need a text editor and the [desktop tools](getting-started.md#install-the-desktop-tools); if you don't
-have those yet, the [web player](https://squid-farm.github.io/talewright/) works too.
+need a text editor. You can check and play your story in the
+[web player](https://squid-farm.github.io/talewright/) without installing anything; the optional
+[desktop tools](getting-started.md#optional-install-the-desktop-tools) make repeated checks quicker.
 
 ## 1. Create the story folder
 
@@ -30,7 +31,8 @@ items:
   coin: { name: silver coin }
 ```
 
-This is your story's **manifest**:
+This is your story's **manifest**, the settings file that tells Talewright about your story and its
+characters:
 
 - `id` is a short, unique name (lowercase words joined by hyphens). `title` is what players see.
 - `start` is the scene the story opens on. You'll write it next.
@@ -66,8 +68,18 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 ## 3. Check it and fix your first error
 
 Before you play, have Talewright check the story. It finds mistakes in seconds, so it's worth making a
-habit of it. The same tool also runs the [Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger),
-which lets you jump straight to any scene.
+habit of it. You can check it in the web player without installing anything, or use the optional
+desktop command-line tool. The desktop tools also include the
+[Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger), which lets
+you jump straight to any scene.
+
+### Check in the web player (no install)
+
+Zip the `night-ferry` folder using the instructions in
+[No desktop tools? Use the web player](#no-desktop-tools-use-the-web-player) below. Open the zip in
+the web player. It checks the story and shows errors instead of opening a story that has mistakes.
+
+### Or, check with the desktop tools
 
 Open a terminal in the Talewright folder and run this, replacing `path/to/night-ferry` with
 wherever you made the folder:
@@ -76,10 +88,9 @@ wherever you made the folder:
 talewright validate path/to/night-ferry
 ```
 
-> Need the tool? [Install the desktop tools](getting-started.md#install-the-desktop-tools) first; it
-> takes a few minutes. Until ready-made downloads arrive, type `dotnet run --project tooling/cli/src/Talewright.Cli --`
-> in place of `talewright`. Not ready for that yet? [Use the web player](#no-desktop-tools-use-the-web-player)
-> instead.
+> This command needs the [desktop tools](getting-started.md#optional-install-the-desktop-tools).
+> Until ready-made downloads arrive, type `dotnet run --project tooling/cli/src/Talewright.Cli --`
+> in place of `talewright`.
 
 The check fails, because the choice points at a `crossing` scene that doesn't exist. Talewright lists
 every problem with its file, line and column, so you can go straight to it:
@@ -108,15 +119,17 @@ The boat slides into the dark.
 A `->` line on its own moves on to that scene. When a scene has no choices, the player gets a
 **Continue** button, or **The End** when it leads to `END`.
 
-Check again, and this time you'll see `Validation succeeded.` Now play it. The desktop player opens the
-folder directly, with no zipping:
+Check again with the same method. The command-line tool prints `Validation succeeded.` when there are
+no errors; in the web player, the story opens when it passes its checks. Now play it. If you have the
+desktop tools, the desktop player opens the folder directly, with no zipping:
 
 ```bash
 dotnet run --project apps/desktop -- path/to/night-ferry
 ```
 
-You can play from start to finish. After each change, choose **Library** and open the story again; it
-reads your files fresh each time.
+You can play from start to finish. In the desktop player, after each change choose **Library** and
+open the story again; it reads your files fresh each time. In the web player, make a fresh zip and
+open it again after each change.
 
 ### No desktop tools? Use the web player
 

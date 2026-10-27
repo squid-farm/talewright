@@ -3,7 +3,7 @@
 Talewright checks your whole story every time it loads, so most mistakes show up before anyone plays.
 There are three ways to test, from quickest to most thorough.
 
-> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools).
+> The command-line checks and Author Debugger need the [optional desktop tools](getting-started.md#optional-install-the-desktop-tools).
 > Until ready-made downloads arrive, write `dotnet run --project tooling/cli/src/Talewright.Cli --` instead of `talewright`.
 
 ## 1. Open it in a player

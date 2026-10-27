@@ -1,7 +1,14 @@
 # Sharing your story
 
-> These commands need the [desktop tools](getting-started.md#install-the-desktop-tools).
-> Until ready-made downloads arrive, write `dotnet run --project tooling/cli/src/Talewright.Cli --` instead of `talewright`.
+The simplest way to share a story is to zip its folder and send the zip to your players. They can open
+it in the [web player](https://squid-farm.github.io/talewright/) using **Open a story file**. See the
+[first-story tutorial's zip instructions](first-story.md#no-desktop-tools-use-the-web-player). This
+does not make a standalone website or app.
+
+The publishing commands below make a story zip or a standalone game. They need the optional
+[desktop tools](getting-started.md#optional-install-the-desktop-tools), which currently require
+installing Talewright from source. Until ready-made downloads arrive, write
+`dotnet run --project tooling/cli/src/Talewright.Cli --` instead of `talewright`.
 
 Every `publish` checks your story first and stops if there are errors.
 
@@ -113,7 +120,7 @@ to replace an existing file.
 
 Avoid publishing two builds to the same path at once. Without force, publish stops if another file
 appears or an approved file observably changes during the build. This is a safety check, not a lock
-against every possible filesystem race; see the [replacement policy](../reference/cli.md#replacing-an-existing-archive).
+against every possible filesystem race; see the [replacement policy](../reference/cli.md#advanced-replacing-an-existing-archive).
 
 If you publish an update, existing saves won't load in the new version
 (see [saves](playing-and-saving.md#updating-a-story-with-existing-saves)).
