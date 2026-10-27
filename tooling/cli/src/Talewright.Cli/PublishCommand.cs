@@ -173,6 +173,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 content = universalDesktop
                     ? BuildUniversalDesktop(working, story, output, error, publication)
                     : publication.BuildHost(working, target, runtime, story, output, error);
+                if (!universalDesktop) StageExternalStory(story, content, target);
                 File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(content, "ENGINE-LICENSE.txt"));
                 File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime));
             }
@@ -280,6 +281,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             foreach (var runtime in DesktopRuntimes)
             {
                 var built = BuildDesktopRuntime(working, runtime, story, output, error, publication);
+                StageExternalStory(story, built, "desktop");
                 File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(built, "ENGINE-LICENSE.txt"));
                 File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime));
                 var temporary = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.zip.tmp");
@@ -510,6 +512,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             Directory.Move(built, Path.Combine(bundle, runtime));
         }
 
+        CopyDirectory(story, Path.Combine(bundle, "story"));
         CopyDirectory(Path.Combine(AssetsRoot, "launchers"), bundle);
         return bundle;
     }
@@ -545,10 +548,6 @@ public sealed class PublishCommand : Command<PublishSettings>
 
         references.Add(new XElement("PackageReference", new XAttribute("Include", "Microsoft.AspNetCore.Components.Web"),
             new XAttribute("Version", ComponentsVersion)));
-        references.Add(new XElement("EmbeddedResource",
-            new XAttribute("Include", Path.Combine(story, "**", "*")),
-            new XAttribute("LogicalName", "stories/Published/%(RecursiveDir)%(Filename)%(Extension)"),
-            new XAttribute("WithCulture", "false")));
         xml.Root!.Add(references);
         xml.Root.Add(new XElement("PropertyGroup", new XElement("TreatWarningsAsErrors", "true"),
             new XElement("LangVersion", "latest"), new XElement("JSModulesEnabled", "false")));
@@ -584,6 +583,23 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
 
         return target == "web" ? Path.Combine(published, "wwwroot") : published;
+    }
+
+    private static void StageExternalStory(string story, string content, string target)
+    {
+        var externalStory = Path.Combine(content, "story");
+        CopyDirectory(story, externalStory);
+        if (target == "web")
+        {
+            var index = Directory.EnumerateFiles(externalStory, "*", SearchOption.AllDirectories)
+                .Order(StringComparer.Ordinal)
+                .ToDictionary(file => Path.GetRelativePath(externalStory, file).Replace('\\', '/'), file =>
+                {
+                    using var stream = File.OpenRead(file);
+                    return Convert.ToHexString(SHA256.HashData(stream));
+                }, StringComparer.Ordinal);
+            File.WriteAllText(Path.Combine(externalStory, "index.json"), System.Text.Json.JsonSerializer.Serialize(index));
+        }
     }
 
     private static void CopyDirectory(string source, string destination, bool overwrite = false)

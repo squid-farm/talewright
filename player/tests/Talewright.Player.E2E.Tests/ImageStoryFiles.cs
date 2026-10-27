@@ -48,6 +48,7 @@ internal sealed class ImageStoryFiles : IDisposable
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
         File.WriteAllBytes(Path.Combine(Root, "images", "pixel.webp"), Convert.FromBase64String(
             "UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA="));
+        File.Copy(Path.Combine(Root, "images", "pixel.png"), Path.Combine(Root, "images", "unvisited.png"));
     }
 
     public byte[] Zip(string prefix = "")

@@ -84,6 +84,10 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         {
             string url;
             try { url = await entry.Url; }
+            catch (OperationCanceledException) when (entry.Cancellation.IsCancellationRequested)
+            {
+                return;
+            }
             catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException
                 or InvalidDataException or ObjectDisposedException or JSException)
             {

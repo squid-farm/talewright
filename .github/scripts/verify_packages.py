@@ -90,8 +90,10 @@ def verify(directory, version):
                                   "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
                                   "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
                                   "tools/net10.0/any/publish-assets/standalone/web/App.razor",
+                                  "tools/net10.0/any/publish-assets/standalone/web/Program.cs",
                                   "tools/net10.0/any/publish-assets/standalone/web/wwwroot/index.html",
                                   "tools/net10.0/any/publish-assets/standalone/desktop/App.razor",
+                                  "tools/net10.0/any/publish-assets/standalone/desktop/Program.cs",
                                   "tools/net10.0/any/publish-assets/player/talewright.css",
                                   "tools/net10.0/any/publish-assets/player/Components/StoryPlayer.razor.js",
                                   "tools/net10.0/any/publish-assets/player/Saves/IndexedDbSaveStore.js",
@@ -207,16 +209,9 @@ using Talewright.Runtime;
 if (args.Length == 1)
 {
     var assembly = System.Reflection.Assembly.LoadFile(System.IO.Path.GetFullPath(args[0]));
-    using var stream = assembly.GetManifestResourceStream("stories/Published/chapter.fr.tale")
-        ?? throw new Exception("Culture-like chapter is missing from the main host assembly.");
-    using var reader = new System.IO.StreamReader(stream);
-    if (!reader.ReadToEnd().Contains("Culture-like chapter"))
-        throw new Exception("Culture-like chapter resource has incorrect content.");
-    using var fragment = assembly.GetManifestResourceStream("stories/Published/characters/player.talewright.yaml")
-        ?? throw new Exception("Supporting configuration is missing from the main host assembly.");
-    using var fragmentReader = new System.IO.StreamReader(fragment);
-    if (!fragmentReader.ReadToEnd().Contains("first-name: Tester"))
-        throw new Exception("Supporting configuration resource has incorrect content.");
+    foreach (var name in assembly.GetManifestResourceNames())
+        if (name.StartsWith("stories/"))
+            throw new Exception("Published story content is still embedded in the host assembly.");
     return;
 }
 if (EngineApi.NarrativeAssembly != "Talewright.Narrative")
@@ -306,11 +301,22 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
             if "index.html" not in published.namelist() or not any(
                     name.startswith("_framework/") for name in published.namelist()):
                 raise ValueError("Installed CLI did not publish a complete standalone web site")
+            index = json.loads(published.read("story/index.json"))
+            for name in ["chapter.fr.tale", "characters/player.talewright.yaml"]:
+                if name not in index or published.read("story/" + name) != (story / name).read_bytes():
+                    raise ValueError(f"Published web story lost source file {name}")
         desktop = root / "desktop.zip"
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
                         "--target", "desktop", "--output", str(desktop)], cwd=root, env=environment, check=True)
         verify_desktop_archive(desktop)
         with ZipFile(desktop) as published:
+            for name in ["chapter.fr.tale", "characters/player.talewright.yaml"]:
+                if published.read("story/" + name) != (story / name).read_bytes():
+                    raise ValueError(f"Published desktop story lost source file {name}")
+            if any(name.startswith(tuple(f"{rid}/story/" for rid in
+                       ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]))
+                   for name in published.namelist()):
+                raise ValueError("Universal desktop repeats story files per runtime")
             host = root / "PublishedHost.dll"
             host.write_bytes(published.read("linux-x64/Talewright.Host.Desktop.dll"))
         subprocess.run(["dotnet", "run", "--project", str(root / "EngineConsumer"), "-c", "Release",
