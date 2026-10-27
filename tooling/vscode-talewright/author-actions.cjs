@@ -1,7 +1,6 @@
 const vscode = require('vscode');
 const path = require('node:path');
-const { access, stat } = require('node:fs/promises');
-const { constants } = require('node:fs');
+const { cliExecutable, registerCliSetup } = require('./cli-tools.cjs');
 
 function contains(root, file) {
   const relative = path.relative(root, file);
@@ -36,32 +35,6 @@ async function selectStory(requested) {
     roots.map(root => ({ label: path.basename(root), description: root, root })),
     { placeHolder: 'Choose a Talewright story' },
   ))?.root;
-}
-
-async function executableExists(file) {
-  try {
-    await access(file, process.platform === 'win32' ? constants.F_OK : constants.X_OK);
-    return (await stat(file)).isFile();
-  } catch (error) {
-    if (error.code === 'ENOENT' || error.code === 'ENOTDIR' || error.code === 'EACCES') return false;
-    throw error;
-  }
-}
-
-async function cliExecutable(root) {
-  const configured = vscode.workspace.getConfiguration('talewright', vscode.Uri.file(root)).get('cli.executablePath', '');
-  if (configured) {
-    if (!path.isAbsolute(configured) || !await executableExists(configured)) {
-      throw new Error('talewright.cli.executablePath must name an existing executable using an absolute path. Fix it in Settings; no fallback was used.');
-    }
-    return configured;
-  }
-  const name = process.platform === 'win32' ? 'talewright.exe' : 'talewright';
-  for (const directory of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
-    const candidate = path.join(directory, name);
-    if (path.isAbsolute(candidate) && await executableExists(candidate)) return candidate;
-  }
-  throw new Error('Talewright CLI not found on PATH. Install the separate Talewright CLI or set talewright.cli.executablePath. The bundled language server is not the CLI.');
 }
 
 async function saveStory(root) {
@@ -117,7 +90,12 @@ async function createTask(command, requested, definition, scope) {
 }
 
 function registerAuthorActions(context) {
-  const report = error => vscode.window.showErrorMessage(`Talewright: ${error.message}`);
+  registerCliSetup(context);
+  const report = async error => {
+    const choice = await vscode.window.showErrorMessage(`Talewright: ${error.message}`,
+      ...(error.code === 'CLI_NOT_FOUND' ? ['Set Up CLI'] : []));
+    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli');
+  };
   for (const [id, command] of [
     ['validateStory', 'validate'], ['publishStoryZip', 'publish'], ['openAuthorDebugger', 'debug'],
   ]) {

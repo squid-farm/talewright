@@ -72,12 +72,41 @@ and **Talewright: Open Author Debugger**. These run the existing `talewright` CL
 interactive task terminal. The bundled language server provides live editor help; it is **not**
 the CLI and does not include the native debugger.
 
-Install the CLI separately and put `talewright` on PATH, or set `talewright.cli.executablePath`
+Run **Talewright: Set Up CLI**, install the CLI separately and put `talewright` on PATH, or set `talewright.cli.executablePath`
 to its absolute executable path (paths with spaces are supported). No source builds, downloads
-or installation run automatically. Until a public CLI release is available, source users need the
-.NET 10 SDK: `dotnet build tooling/cli/src/Talewright.Cli -c Release`, then select the generated
-`Talewright.Cli` executable (`Talewright.Cli.exe` on Windows), not its DLL, under
-`tooling/cli/src/Talewright.Cli/bin/Release/net10.0/`.
+or installation run automatically. See the [author setup guide](https://github.com/squid-farm/talewright/blob/main/docs/guide/cli-installation.md)
+for download instructions and [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
+for system requirements and source builds.
+
+### Guided CLI setup
+
+Setup runs only when invoked, or when you choose **Set Up CLI** after a missing-CLI action.
+Opening a story never installs or prompts for tools. A trusted workspace is required.
+
+- A configured executable, `talewright` on PATH, or the global shim in `~/.dotnet/tools`
+  (`%USERPROFILE%\.dotnet\tools` on Windows) is used unchanged, without upgrading.
+  A broken explicit path is an error, not permission to use another tool.
+- With a stable .NET 10 SDK, setup recommends the global tool, checks nuget.org for the
+  exact compatible version recorded in this VSIX's bundled build metadata, then asks for explicit
+  installation approval. Tagged builds use the NuGet/tag version, not the numeric VSIX version;
+  setup never selects an arbitrary latest preview.
+  The visible **Install CLI** task runs `dotnet tool install --global Talewright.Cli --version
+  VERSION --source https://api.nuget.org/v3/index.json`. Cancellation/failure is not success;
+  inspect the task terminal and explicitly choose **Use standalone instead** if wanted.
+  Setup never installs the SDK, elevates, changes profiles/PATH or updates an existing tool.
+- Without a compatible SDK, setup offers a portable download or executable selection, not
+  a known-invalid tool installation. It checks that the pinned GitHub release has an archive
+  **and checksum** for your host before opening its page. Extract the entire archive and use
+  **Select Executable** to configure `Talewright.Cli` (`.exe` on Windows). No binary is downloaded,
+  extracted, stored or updated by the extension.
+- **Neither public acquisition path is available until publication.** Missing versions/assets,
+  feed/network failures and permission errors are reported explicitly. No guessed download link
+  or automatic fallback is used. **Select Existing Executable** also supports local source builds.
+
+The bundled Linux x64 language server works independently of this setup. CLI portability does
+not remove native debugger webview prerequisites or the SDK requirement for standalone-game output.
+
+### Run CLI actions
 
 Open the story folder in VS Code. Actions prefer the active file's containing story, use the only
 story in the workspace otherwise, or ask you to choose. Nested `story.talewright.yaml` manifests
