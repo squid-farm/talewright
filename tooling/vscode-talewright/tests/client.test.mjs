@@ -44,6 +44,7 @@ function host(settings = {}, trusted = true, failStart = false, platform = 'linu
     require: name => {
       if (name === 'vscode') return vscode;
       if (name === 'node:path') return path;
+      if (name === './author-actions.cjs') return { registerAuthorActions: () => {} };
       if (name === 'node:fs') return {
         constants: { X_OK: 1 },
         accessSync: () => { if (missing) throw new Error('Bundled executable is missing'); },

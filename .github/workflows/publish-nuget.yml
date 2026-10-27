@@ -6,6 +6,9 @@ on:
       version:
         required: true
         type: string
+    secrets:
+      NUGET_USER:
+        required: true
 
 permissions:
   contents: read

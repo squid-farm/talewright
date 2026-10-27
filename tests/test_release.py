@@ -216,6 +216,14 @@ class PublicationWorkflowTests(unittest.TestCase):
         self.assertIn("needs: release-ready", self.build)
         self.assertIn("needs: [release-ready, publish-nuget, publish-marketplace]", self.build)
 
+    def test_nuget_caller_explicitly_forwards_required_environment_secret(self):
+        caller = self.build.split("\n  publish-nuget:\n", 1)[1].split("\n  publish-marketplace:", 1)[0]
+        self.assertIn("uses: ./.github/workflows/publish-nuget.yml", caller)
+        self.assertIn("    secrets:\n      NUGET_USER: ${{ secrets.NUGET_USER }}", caller)
+        self.assertNotIn("secrets: inherit", caller)
+        contract = self.nuget.split("\npermissions:", 1)[0]
+        self.assertIn("    secrets:\n      NUGET_USER:\n        required: true", contract)
+
     def test_scoped_environment_and_oidc_not_github_packages(self):
         self.assertIn("environment: release", self.nuget)
         self.assertIn("id-token: write", self.nuget)

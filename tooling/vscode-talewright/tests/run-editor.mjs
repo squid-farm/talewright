@@ -35,7 +35,8 @@ try {
   ], { stdio: 'inherit', shell: process.platform === 'win32' });
   const untrusted = path.join(profile, 'untrusted-story');
   await mkdir(untrusted);
-  await writeFile(path.join(untrusted, 'story.talewright.yaml'), 'game:\n  id: untrusted\n  title: Untrusted\n  start: start\n');
+  await writeFile(path.join(untrusted, 'story.talewright.yaml'),
+    'game:\n  id: untrusted\n  title: Untrusted\n  start: start\ncharacters:\n  player: {first-name: Tester}\n');
   await writeFile(path.join(untrusted, 'start.tale'), '=== start\n* [Go] -> missing\n');
   for (const restricted of [true, false]) {
     const options = {
@@ -81,6 +82,19 @@ try {
     }
   }
   await assertAbsent(dotnetMarker);
+  if (process.env.TALEWRIGHT_TEST_CLI) {
+    await writeFile(path.join(profile, 'user', 'User', 'settings.json'), JSON.stringify({
+      'talewright.cli.executablePath': process.env.TALEWRIGHT_TEST_CLI,
+      'talewright.languageServer.enabled': false,
+    }));
+    await runTests({
+      vscodeExecutablePath: executable,
+      extensionDevelopmentPath: path.join(root, 'tests/host'),
+      extensionTestsPath: path.join(root, 'tests/editor.cjs'),
+      extensionTestsEnv: { TALEWRIGHT_TEST_ACTIONS: 'true' },
+      launchArgs: [...profileArgs, untrusted, '--disable-workspace-trust', '--disable-gpu', '--no-sandbox'],
+    });
+  }
 } catch (error) {
   for (const entry of await readdir(profile, { recursive: true })) {
     if (entry.endsWith('.log') && (entry.includes('output') || entry.includes('exthost'))) {

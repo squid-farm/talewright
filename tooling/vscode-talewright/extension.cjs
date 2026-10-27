@@ -2,10 +2,12 @@ const vscode = require('vscode');
 const path = require('node:path');
 const { accessSync, constants } = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
+const { registerAuthorActions } = require('./author-actions.cjs');
 
 let client;
 
 async function activate(context) {
+  registerAuthorActions(context);
   if (!vscode.workspace.isTrusted) return;
   const configuration = vscode.workspace.getConfiguration('talewright');
   if (!configuration.get('languageServer.enabled', true)) return;

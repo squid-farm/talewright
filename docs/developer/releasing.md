@@ -26,8 +26,10 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
 2. Keep the **release** environment's reviewer approval and `v*` tag deployment restriction.
    Store `VSCE_PAT` (Marketplace publisher `squid-farm`, **Marketplace > Manage** scope) and
    `NUGET_USER` (nuget.org username) as **environment secrets**, not repository secrets.
-   The reusable NuGet job reads `NUGET_USER` from its own `environment: release`; the caller
-   does not forward environment secrets. Never add a long-lived NuGet API key.
+   The caller explicitly forwards only `NUGET_USER`, declared as a required secret in the reusable
+   workflow. The called job's `environment: release` supplies its environment-secret value after
+   approval. Without that explicit forwarding, the secret resolves to an empty string in the
+   reusable workflow. Do not use blanket secret inheritance or add a long-lived NuGet API key.
    Approve the publishing deployments only after reviewing the validated tag/run.
 3. For the UI test image package, keep GHCR visibility public so fork PRs can pull it without credentials.
    The first publish may default to private, so confirm and adjust package visibility explicitly.
@@ -117,6 +119,11 @@ never publishes, even when run against a tag.
 
 ## Releases, retries and author downloads
 
+- A rerun uses the original tag's workflow definitions, not fixes subsequently merged to `main`.
+  The `v0.1.0-preview.1` run failed before NuGet authentication because its reusable-workflow call
+  did not forward `NUGET_USER`; Marketplace publication succeeded independently. Rerunning that
+  unchanged tag will not pick up the forwarding fix. After merging the correction, cut a new
+  reviewed preview tag (for example `v0.1.0-preview.2`); do not move the already-published tag.
 - Publication is not atomic. NuGet pushes `Talewright`, `Talewright.Player`, `Talewright.Cli`, then
   `Talewright.LanguageServer`; Marketplace can run in parallel. The separate NuGet language-server
   tool is never a dependency of shipped games.

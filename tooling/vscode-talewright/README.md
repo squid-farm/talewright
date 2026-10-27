@@ -65,6 +65,61 @@ Only this override requires your own matching runtime/server. Clear the command 
 `["--stdio"]` to return to the bundled server. Reload VS Code after changing settings or granting
 workspace trust. See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
 
+## CLI actions (separate CLI installation required)
+
+The Command Palette provides **Talewright: Validate Story**, **Talewright: Publish Story ZIP**
+and **Talewright: Open Author Debugger**. These run the existing `talewright` CLI in a visible,
+interactive task terminal. The bundled language server provides live editor help; it is **not**
+the CLI and does not include the native debugger.
+
+Install the CLI separately and put `talewright` on PATH, or set `talewright.cli.executablePath`
+to its absolute executable path (paths with spaces are supported). No source builds, downloads
+or installation run automatically. Until a public CLI release is available, source users need the
+.NET 10 SDK: `dotnet build tooling/cli/src/Talewright.Cli -c Release`, then select the generated
+`Talewright.Cli` executable (`Talewright.Cli.exe` on Windows), not its DLL, under
+`tooling/cli/src/Talewright.Cli/bin/Release/net10.0/`.
+
+Open the story folder in VS Code. Actions prefer the active file's containing story, use the only
+story in the workspace otherwise, or ask you to choose. Nested `story.talewright.yaml` manifests
+remain errors inside the parent story, not separate selectable stories. Dirty documents inside
+the chosen story must be saved with your approval; cancellation or a failed save starts nothing.
+Untrusted workspaces cannot run CLI actions or custom executables. CLI output and exit status
+remain in the task terminal; a started task is not a success notification.
+
+- **Validate Story** runs `talewright validate <story>`, using the CLI's compiler diagnostics.
+- **Publish Story ZIP** asks for a ZIP destination, then runs
+  `talewright publish <story> --output <file.zip>`. This contains story files for a Talewright
+  player, **not** a standalone website or desktop game. The terminal asks whether to replace an
+  existing ZIP; answer there. The extension never adds `--force`.
+- **Open Author Debugger** runs `talewright debug <story>`. This opens the native Author Debugger,
+  not VS Code breakpoints, a debug adapter, or F5 support. The task stays running while the window
+  is open; use **Tasks: Terminate Task** to stop it. A graphical desktop and platform webview
+  prerequisites are required: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.
+  Linux x64 is the installed-extension verification platform; other hosts are not verified here.
+  See [CLI/debugger prerequisites](https://github.com/squid-farm/talewright/blob/main/docs/reference/cli.md).
+
+For repeated debugging, manually add this task to your workspace's `.vscode/tasks.json`;
+the extension never creates or edits that file:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [{
+    "label": "Debug my story",
+    "type": "talewright",
+    "command": "debug",
+    "story": ".",
+    "problemMatcher": []
+  }]
+}
+```
+
+`story` is relative to that workspace folder (or an absolute canonical story-root path within the
+workspace). Tasks in a multi-root `.code-workspace` file are also supported: a relative `story`
+must identify exactly one canonical story root across the open folders. If it matches more than
+one, use an absolute path to disambiguate. Global/user tasks are not supported.
+Run it using **Tasks: Run Task**. The same trust, CLI and save checks apply.
+
 ## Write a scene
 
 Type a prefix, then select its suggestion using **Insert Snippet** in the Command

@@ -10,6 +10,10 @@ exports.run = async () => {
   assert.ok(extension.extensionPath.includes(`${path.sep}extensions${path.sep}`),
     'Exercise the installed VSIX, not the development source');
   assert.equal(extension.packageJSON.main, './dist/extension.cjs');
+  if (process.env.TALEWRIGHT_TEST_ACTIONS === 'true') {
+    await testAuthorActions(extension);
+    return;
+  }
   assert.equal(vscode.workspace.getConfiguration('talewright').get('languageServer.command'), '',
     'Installed tests must exercise the bundled default, not a development override');
   if (process.env.TALEWRIGHT_TEST_UNTRUSTED === 'true') {
@@ -68,6 +72,63 @@ exports.run = async () => {
   assert.equal((await bundledServerProcesses(extension)).length, 1,
     'The installed extension must run exactly its own bundled server executable');
 };
+
+async function testAuthorActions(extension) {
+  const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  const document = await vscode.workspace.openTextDocument(path.join(root, 'start.tale'));
+  await vscode.window.showTextDocument(document);
+  await extension.activate();
+  const run = async (command, stopDebugger = false) => {
+    let execution;
+    let pid;
+    let cancelled = false;
+    let children = [];
+    const finished = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`${command} task timed out`)), 30000);
+      const start = vscode.tasks.onDidStartTaskProcess(async event => {
+        if (event.execution.task.source !== 'Talewright') return;
+        execution = event.execution;
+        pid = event.processId;
+        if (stopDebugger) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          try {
+            children = (await fs.readFile(`/proc/${pid}/task/${pid}/children`, 'utf8')).trim().split(/\s+/).filter(Boolean);
+            assert.ok(children.length > 0, 'CLI must have launched the native debugger before cancellation');
+          } catch (error) {
+            reject(error);
+            return;
+          }
+          cancelled = true;
+          execution.terminate();
+        }
+      });
+      const end = vscode.tasks.onDidEndTaskProcess(event => {
+        if (event.execution !== execution) return;
+        clearTimeout(timeout);
+        start.dispose();
+        end.dispose();
+        resolve(event.exitCode);
+      });
+    });
+    await vscode.commands.executeCommand(`talewright.${command}`);
+    const code = await finished;
+    if (stopDebugger) {
+      assert.equal(cancelled, true, 'Debugger must remain running until task cancellation');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      for (const child of children) {
+        await assert.rejects(fs.access(`/proc/${child}/exe`), { code: 'ENOENT' },
+          'Task cancellation must not leave the native debugger running');
+      }
+    }
+    return { code, pid };
+  };
+  assert.notEqual((await run('validateStory')).code, 0, 'Invalid story must retain CLI failure status');
+  await fs.writeFile(path.join(root, 'start.tale'), '=== start\nHello.\n-> END\n');
+  assert.equal((await run('validateStory')).code, 0, 'Valid story must return CLI success');
+  const debug = await run('openAuthorDebugger', true);
+  assert.notEqual(debug.code, 0, 'Task cancellation must not report debugger success');
+  console.log('Installed CLI action smoke passed: real validation success/failure, visible debugger task and termination.');
+}
 
 async function bundledServerProcesses(extension) {
   const children = await fs.readFile(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8');
