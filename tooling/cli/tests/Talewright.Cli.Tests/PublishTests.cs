@@ -43,9 +43,9 @@ public sealed class PublishTests : IDisposable
 
     private PublishCommand.Operations DuringArchive(Action action) => PublishCommand.Operations.Default with
     {
-        CreateZip = (content, path, universal) =>
+        CreateZip = (content, path) =>
         {
-            PublishCommand.Operations.Default.CreateZip(content, path, universal);
+            PublishCommand.Operations.Default.CreateZip(content, path);
             action();
         },
     };
@@ -159,6 +159,72 @@ public sealed class PublishTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Generated_output_above_former_count_or_byte_ceiling_is_published(bool universal, bool fileCount)
+    {
+        var files = fileCount ? 20_001 : 1;
+        var bytes = fileCount ? 1L : (universal ? 1024L : 512L) * 1024 * 1024 + 1;
+        void AddPayload(string output)
+        {
+            for (var index = 0; index < files; index++)
+            {
+                using var file = File.Create(Path.Combine(output, $"payload-{index}.bin"));
+                file.SetLength(bytes);
+                file.Position = bytes - 1;
+                file.WriteByte(0x7f);
+            }
+        }
+
+        var publication = universal
+            ? SplitBuilds((runtime, output) =>
+            {
+                if (runtime == PublishCommand.DesktopRuntimes[0]) AddPayload(output);
+            })
+            : PublishCommand.Operations.Default with
+            {
+                BuildHost = (working, _, _, _, _, _) =>
+                {
+                    var output = Path.Combine(working, "output");
+                    Directory.CreateDirectory(output);
+                    File.WriteAllText(Path.Combine(output, "index.html"), "<html></html>");
+                    AddPayload(output);
+                    return output;
+                },
+            };
+        File.WriteAllText(Zip, "previous good output");
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true, publication: publication,
+            args: ["-a", "--target", universal ? "desktop" : "web", "--force"]);
+        Assert.Equal(0, result.Code);
+        Assert.Contains("Published", result.Output);
+        if (universal)
+            Assert.Empty(result.Error);
+        else
+            Assert.Contains("Advisory only", result.Error);
+        using var archive = ZipFile.OpenRead(Zip);
+        var prefix = universal ? PublishCommand.DesktopRuntimes[0] + "/" : "";
+        var payload = archive.Entries.Where(entry => entry.FullName.StartsWith(prefix + "payload-", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(files, payload.Length);
+        Assert.All(payload, entry => Assert.Equal(bytes, entry.Length));
+        using var stream = archive.GetEntry(prefix + "payload-0.bin")!.Open();
+        var buffer = new byte[81920];
+        long read = 0;
+        var last = -1;
+        int count;
+        while ((count = stream.Read(buffer)) > 0)
+        {
+            read += count;
+            last = buffer[count - 1];
+        }
+        Assert.Equal(bytes, read);
+        Assert.Equal(0x7f, last);
+        Assert.NotNull(archive.GetEntry("story/story.talewright.yaml"));
+        Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
+    }
+
     [Fact]
     public void Web_index_versions_each_staged_file_independently_of_text_only_edits()
     {
@@ -242,11 +308,10 @@ public sealed class PublishTests : IDisposable
         var archives = 0;
         var publication = SplitBuilds((runtime, _) => builds.Add(runtime)) with
         {
-            CreateZip = (content, path, universal) =>
+            CreateZip = (content, path) =>
             {
-                Assert.False(universal);
                 archives++;
-                PublishCommand.Operations.Default.CreateZip(content, path, universal);
+                PublishCommand.Operations.Default.CreateZip(content, path);
             },
         };
 
@@ -346,7 +411,7 @@ public sealed class PublishTests : IDisposable
         var archives = 0;
         var publication = SplitBuilds((_, _) => builds++) with
         {
-            CreateZip = (content, path, universal) =>
+            CreateZip = (content, path) =>
             {
                 if (failArchive && ++archives == 4)
                 {
@@ -354,7 +419,7 @@ public sealed class PublishTests : IDisposable
                     throw new IOException("controlled split archive failure");
                 }
 
-                PublishCommand.Operations.Default.CreateZip(content, path, universal);
+                PublishCommand.Operations.Default.CreateZip(content, path);
             },
         };
         var result = RunSplitControlled(failArchive ? new StringReader("yes\n") : new StringReader("n\n"),
@@ -517,7 +582,7 @@ public sealed class PublishTests : IDisposable
         var publication = PublishCommand.Operations.Default with
         {
             BuildHost = (_, _, _, _, _, _) => { calls++; throw new InvalidOperationException("Unexpected build"); },
-            CreateZip = (_, _, _) => { calls++; throw new InvalidOperationException("Unexpected archive"); },
+            CreateZip = (_, _) => { calls++; throw new InvalidOperationException("Unexpected archive"); },
         };
         var result = RunControlled(new StringReader(answer), publication: publication, args: ["-a"]);
         Assert.Equal(2, result.Code);
@@ -642,7 +707,7 @@ public sealed class PublishTests : IDisposable
         File.WriteAllText(Zip, "original");
         var publication = PublishCommand.Operations.Default with
         {
-            CreateZip = (_, path, _) =>
+            CreateZip = (_, path) =>
             {
                 File.WriteAllText(path, "partial archive");
                 throw new IOException("controlled write failure");
@@ -769,9 +834,9 @@ public sealed class PublishTests : IDisposable
         File.WriteAllText(Zip, "original");
         var publication = PublishCommand.Operations.Default with
         {
-            CreateZip = (content, path, universal) =>
+            CreateZip = (content, path) =>
             {
-                PublishCommand.Operations.Default.CreateZip(content, path, universal);
+                PublishCommand.Operations.Default.CreateZip(content, path);
                 File.Delete(path);
             },
         };
