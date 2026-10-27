@@ -23,10 +23,10 @@
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
                     disabled="@(Busy || ReadingHistory || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
-                <button type="button" class="tw-link" disabled="@Busy" @onclick="ConfirmRestart">Restart</button>
+                <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
                 {
-                    <button type="button" class="tw-link" disabled="@Busy" @onclick="Exit">Library</button>
+                    <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="Exit">Library</button>
                 }
             </div>
         </div>
@@ -70,6 +70,15 @@
     private bool _menuOpen;
     private bool _initialized;
     private bool _focusMenu;
+
+    protected override void OnParametersSet()
+    {
+        if (ReadingHistory)
+        {
+            _menuOpen = false;
+            _focusMenu = false;
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

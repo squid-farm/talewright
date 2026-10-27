@@ -79,7 +79,6 @@
     private bool _showSaves;
     private bool _showHistory;
     private bool _restoreReadingPosition;
-    private double _readingPosition;
     private IReadOnlyList<HistoryFrame> _historyFrames = [];
     private bool _saveError;
     private int _generation;
@@ -307,7 +306,7 @@
         {
             _restoreReadingPosition = false;
             _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-            await _module.InvokeVoidAsync("restoreReadingPosition", _transcriptElement, _readingPosition);
+            await _module.InvokeVoidAsync("restoreReadingPosition", _transcriptElement);
         }
         if (_focusLatest && Visible && !_showHistory)
         {
@@ -342,7 +341,7 @@
             return;
         }
         _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-        _readingPosition = await _module.InvokeAsync<double>("readingPosition");
+        await _module.InvokeVoidAsync("captureReadingPosition", _transcriptElement);
         _historyFrames = _transcript;
         _showHistory = true;
     }

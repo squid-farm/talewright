@@ -38,6 +38,9 @@ transition 120 URLs had been created and 100 revoked, before the newest picture'
 explicit decode wait. The same-environment comparison target is no more than twice
 the baseline's worst observed choice-to-DOM sample (162.9 ms), alongside the exact
 mount/lifecycle bounds. This is a local regression target, not a universal SLA.
+The final same-environment check observed 54.5-65.8 ms for text and 54.9-64.0 ms
+for illustrated play, all below that target. After the last explicit image decode,
+21 passages remained mounted with 121 URLs created and 100 revoked (21 retained).
 
 The reported lifecycle counts do not measure retained browser memory or prove
 immediate bitmap reclamation. This work does not introduce runtime checkpoints,

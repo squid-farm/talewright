@@ -93,7 +93,7 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-columns { display: grid; grid-template-columns: minmax(0, 1fr) 16rem; gap: 2rem; align-items: start; }
 .tw-columns[hidden] { display: none; }
 .tw-history { max-width: 52rem; }
-.tw-history-heading { scroll-margin-top: 6rem; }
+.tw-history-heading { outline: none; }
 .tw-history-frame { border-top: 1px solid var(--tw-border); margin-top: 1rem; padding-top: 1rem; }
 .tw-history-media { display: inline-block; max-width: 100%; vertical-align: middle; }
 .tw-history-image { display: block; height: 18rem; max-width: 100%; overflow: auto; overflow-anchor: none; }

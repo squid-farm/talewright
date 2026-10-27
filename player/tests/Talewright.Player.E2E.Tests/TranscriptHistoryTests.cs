@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Playwright;
+using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
 
@@ -27,8 +28,11 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(SaveStatus).ToContainTextAsync("Quick");
         var before = await SavedProgress();
         var sheet = await Sheet.InnerTextAsync();
+        var anchor = Page.Locator(".tw-frame").Nth(5);
+        await anchor.ScrollIntoViewIfNeededAsync();
         var trigger = Page.GetByRole(AriaRole.Button, new() { Name = "History", Exact = true });
         await trigger.FocusAsync();
+        var anchorTop = (await anchor.BoundingBoxAsync())!.Y;
         await Page.Keyboard.PressAsync("Enter");
         await Expect(History.GetByRole(AriaRole.Heading, new() { Name = "History", Exact = true })).ToBeFocusedAsync();
         await Expect(Page.Locator(".tw-columns")).ToBeHiddenAsync();
@@ -60,9 +64,11 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Page.Keyboard.PressAsync("Enter");
         await Expect(trigger).ToBeFocusedAsync();
         await Expect(History).ToHaveCountAsync(0);
+        Assert.InRange(Math.Abs((await anchor.BoundingBoxAsync())!.Y - anchorTop), 0, 3);
         await Expect(Latest).ToContainTextAsync("Recorded visit 45.");
         Assert.Equal(sheet, await Sheet.InnerTextAsync());
         await Driver.ClickAsync("Quick Save");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Quick Save", Exact = true })).ToBeEnabledAsync();
         Assert.Equal(before, await SavedProgress());
         await Driver.ClickAsync("Back");
         await Expect(Latest).ToContainTextAsync("Recorded visit 44.");
@@ -85,6 +91,12 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
                 const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
                 URL.createObjectURL = blob => { const url = create(blob); window.historyUrls.created.push(url); return url; };
                 URL.revokeObjectURL = url => { window.historyUrls.revoked.push(url); revoke(url); };
+                const Observer = window.IntersectionObserver;
+                window.historyObservers = new Set();
+                window.IntersectionObserver = class extends Observer {
+                    observe(target) { window.historyObservers.add(this); super.observe(target); }
+                    disconnect() { window.historyObservers.delete(this); super.disconnect(); }
+                };
             }
             """);
         using var files = CreateStory(images: true);
@@ -126,8 +138,18 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         Assert.False(await IsRevoked(shared!));
         for (var cycle = 0; cycle < 3; cycle++)
         {
+            var earlier = History.GetByRole(AriaRole.Button, new() { Name = "Earlier passages" });
+            while (await earlier.IsEnabledAsync()) await earlier.ClickAsync();
+            await History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Camp 0", Exact = true }).ClickAsync();
+            var cycleImage = History.GetByAltText("Camp 0", new() { Exact = true });
+            await cycleImage.ScrollIntoViewIfNeededAsync();
+            await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await cycleImage.ElementHandleAsync());
+            var cycleUrl = await cycleImage.GetAttributeAsync("src");
             await Driver.ClickAsync("Return to play");
             await Expect(History).ToHaveCountAsync(0);
+            await Page.WaitForFunctionAsync("url => window.historyUrls.revoked.includes(url)", cycleUrl);
+            Assert.InRange(await Page.EvaluateAsync<int>("() => window.historyObservers.size"), 0, 21);
+            Assert.InRange(await Page.EvaluateAsync<int>("() => window.historyUrls.created.length - window.historyUrls.revoked.length"), 0, 21);
             await Driver.ClickAsync("History");
             Assert.Equal(0, await History.Locator("img").CountAsync());
             Assert.InRange(await Page.Locator(".tw-frame, .tw-history-frame").CountAsync(), 1, 42);
@@ -140,6 +162,39 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
 
     private async Task<bool> IsRevoked(string url) =>
         await Page.EvaluateAsync<bool>("url => window.historyUrls.revoked.includes(url)", url);
+
+    [Fact]
+    public async Task History_remains_available_when_the_author_disables_undo()
+    {
+        using var files = CreateStory();
+        var manifest = Path.Combine(files.Root, "story.talewright.yaml");
+        File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("undo: true", "undo: false"));
+        await UploadBytes("history-without-undo.zip", files.Zip());
+        await Choose("Next");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Back", Exact = true })).ToHaveCountAsync(0);
+        await Driver.ClickAsync("History");
+        await Expect(History).ToContainTextAsync("Recorded visit 0.");
+        await Expect(History).ToContainTextAsync("Recorded visit 1.");
+        await Expect(History.Locator(".tw-chosen")).ToHaveCountAsync(1);
+        await Driver.ClickAsync("Return to play");
+        await Expect(Latest).ToContainTextAsync("Runtime visits 2.");
+    }
+
+    [Fact]
+    public async Task Opening_history_closes_the_overflow_and_keeps_story_actions_unavailable()
+    {
+        await Upload(TestStories.Linear);
+        await Driver.ClickAsync("More actions");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeVisibleAsync();
+        await Driver.ClickAsync("History");
+        await Expect(History).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToHaveCountAsync(0);
+        foreach (var name in new[] { "Back", "Forward", "Quick Save", "Saves", "More actions" })
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true })).ToBeDisabledAsync();
+        await Driver.ClickAsync("History");
+        await Expect(History).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "More actions", Exact = true })).ToBeEnabledAsync();
+    }
 
     [Theory]
     [InlineData(false, false)]
@@ -207,6 +262,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         if (!close) await Driver.ClickAsync("Return to play");
         await Choices.First.ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Play again", Exact = true })).ToBeVisibleAsync();
+        await Expect(Latest).ToContainTextAsync("Runtime visits 46.");
     }
 
     private async Task<string> SavedProgress() => await Page.EvaluateAsync<string>("""
@@ -228,14 +284,17 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         for (var index = 0; index <= 45; index++)
         {
             tale.AppendLine($"=== passage{index}");
+            tale.AppendLine("~ var:visits += 1");
             tale.AppendLine($"Recorded visit {index}.");
+            tale.AppendLine("Runtime visits {var:visits}.");
             if (images)
             {
                 File.Copy(Path.Combine(files.Root, "images", "pixel.png"), Path.Combine(files.Root, "images", $"camp-{index}.png"));
                 tale.AppendLine($"{{image(\"camp-{index}.png\", \"Camp {index}\")}}");
             }
-            tale.AppendLine(index == 45 ? "* [Finish] -> END" : $"* [Next] -> passage{index + 1}");
+            tale.AppendLine(index == 45 ? "* [Finish] -> done" : $"* [Next] -> passage{index + 1}");
         }
+        tale.AppendLine("=== done\nRuntime visits {var:visits}.\n-> END");
         File.WriteAllText(files.TalePath, tale.ToString());
         return files;
     }

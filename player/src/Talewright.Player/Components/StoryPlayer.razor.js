@@ -20,14 +20,32 @@ export function revealLatest(transcript, isFirst) {
     element.focus({ preventScroll: true });
 }
 
-export function readingPosition() { return window.scrollY; }
+const readingPositions = new WeakMap();
 
-export function restoreReadingPosition(transcript, position) {
-    window.scrollTo({ top: position, behavior: "instant" });
+export function captureReadingPosition(transcript) {
+    const toolbar = transcript.closest(".tw-player")?.querySelector(".tw-bar");
+    const top = toolbar?.getBoundingClientRect().bottom ?? 0;
+    const anchor = [...transcript.querySelectorAll(".tw-frame")]
+        .find(frame => frame.getBoundingClientRect().bottom > top);
+    readingPositions.set(transcript, {
+        anchor, top: anchor?.getBoundingClientRect().top, scroll: window.scrollY
+    });
+}
+
+export function restoreReadingPosition(transcript) {
+    const position = readingPositions.get(transcript);
+    readingPositions.delete(transcript);
+    if (position) {
+        const top = position.anchor?.isConnected
+            ? window.scrollY + position.anchor.getBoundingClientRect().top - position.top
+            : position.scroll;
+        window.scrollTo({ top, behavior: "instant" });
+    }
     transcript.closest(".tw-player")?.querySelector(".tw-history-trigger")?.focus({ preventScroll: true });
 }
 
 export function focusHistoryPage(history) {
+    if (!history?.isConnected) return;
     const heading = history.querySelector(".tw-history-heading");
     heading.scrollIntoView({ block: "start", behavior: "instant" });
     heading.focus({ preventScroll: true });
