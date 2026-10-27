@@ -188,6 +188,8 @@ jobs:
     uses: ./.github/workflows/publish-nuget.yml
     with:
       version: ${{ needs.build.outputs.version }}
+    secrets:
+      NUGET_USER: ${{ secrets.NUGET_USER }}
 
   publish-marketplace:
     needs: release-ready
