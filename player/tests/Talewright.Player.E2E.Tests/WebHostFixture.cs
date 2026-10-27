@@ -78,6 +78,8 @@ public sealed class WebHostFixture : IAsyncLifetime
             var types = new FileExtensionContentTypeProvider();
             types.Mappings[".wasm"] = "application/wasm";
             types.Mappings[".dat"] = "application/octet-stream";
+            types.Mappings[".tale"] = "text/plain";
+            types.Mappings[".yaml"] = "text/plain";
             _server.UseDefaultFiles();
             _server.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = types });
             await _server.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));

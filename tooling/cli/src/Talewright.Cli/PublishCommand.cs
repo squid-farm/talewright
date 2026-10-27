@@ -596,7 +596,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 .ToDictionary(file => Path.GetRelativePath(externalStory, file).Replace('\\', '/'), file =>
                 {
                     using var stream = File.OpenRead(file);
-                    return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
+                    return Convert.ToHexString(SHA256.HashData(stream));
                 }, StringComparer.Ordinal);
             File.WriteAllText(Path.Combine(externalStory, "index.json"), System.Text.Json.JsonSerializer.Serialize(index));
         }

@@ -33,6 +33,7 @@ talewright publish my-story -a --target web --output my-game-web.zip
 `-a` (short for `--all-in-one`) bundles the player with your story. The game opens straight into your
 story, with no library screen, Library navigation, or samples. This also applies
 during character creation; save/load, history, and Restart remain available during play.
+Keep the whole extracted game together, including its `story/` folder.
 
 - **itch.io:** create a project, set *Kind of project* to **HTML**, upload the zip and tick
   *This file will be played in the browser*.
@@ -46,9 +47,9 @@ and artwork where smaller downloads matter. Resize images for their intended dis
 than shipping camera originals. Images fit narrow windows without stretching their aspect ratio;
 provide descriptive alt text for readers and for visible failure states.
 
-Images are displayed as readers scroll them into view, but a web game can still download its
-artwork before it is shown. Large images mean longer downloads and use more memory when
-displayed. Earlier illustrations stay in the story's history, so test image-heavy stories on
+Web games download illustrations as readers scroll them into view, rather than downloading the
+whole artwork collection before play. Large images still mean longer downloads and use more
+memory when displayed. Earlier illustrations stay in the story's history, so test image-heavy stories on
 the phones and computers your readers will use.
 
 For itch.io web games, the recorded limits are **200 MB per file, 500 MB total, and 1,000 files**
@@ -61,10 +62,11 @@ size check exceeds the recorded hosting limits, but the warning does not stop yo
 publishing or make validation fail, even with `validate --warnings-as-errors`. A successful
 publication does not guarantee that your host will accept the upload.
 
-**For large illustrated games:** the publisher currently combines artwork into the game.
-Even if each original image is below 200 MB, the finished game can contain a file above itch.io's
-per-file limit. Reduce the artwork's size and publish again if you receive a warning. If the
-game is still too large for browser hosting, consider offering a downloadable desktop game.
+Artwork is kept as separate files in the game's `story/images/` folder. This avoids combining
+your whole artwork collection into one large program file, but each image, the complete game's
+size, and its file count still need to fit your host's requirements. Reduce the artwork's size
+and publish again if you receive a warning. If the game is still too large for browser hosting,
+consider offering a downloadable desktop game.
 
 ## A desktop game
 
@@ -80,6 +82,9 @@ zip** and run:
 | Windows | `start.cmd` |
 | macOS | `start.command` |
 | Linux | `start.sh` (or `sh start.sh`) |
+
+The `story/` folder is shared by all six versions of the app. Keep it beside the platform
+folders and launchers; do not extract just the executable.
 
 Like a web game, the published app stays in your story and does not expose Library
 navigation. The general-purpose desktop player still has a library by default;

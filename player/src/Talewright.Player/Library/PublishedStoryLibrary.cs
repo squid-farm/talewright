@@ -10,11 +10,8 @@ public sealed class PublishedStoryLibrary(HttpClient client) : IStoryLibrary
     private sealed record Catalog(StorySource Source, IReadOnlyDictionary<string, string> Versions);
     private Task<Catalog>? _catalog;
 
-    public async Task<IReadOnlyList<StoryEntry>> ListAsync()
-    {
-        var catalog = await GetCatalogAsync();
-        return [new("Published", catalog.Source.ReadTitle() ?? "Published", "Published")];
-    }
+    public Task<IReadOnlyList<StoryEntry>> ListAsync() =>
+        Task.FromResult<IReadOnlyList<StoryEntry>>([new("Published", "Published", "Published")]);
 
     public async Task<StorySource> LoadAsync(string id)
     {
@@ -78,6 +75,10 @@ public sealed class PublishedStoryLibrary(HttpClient client) : IStoryLibrary
         {
             throw new IOException($"Couldn't load the published story: {ex.Message}", ex);
         }
+        catch (OperationCanceledException ex)
+        {
+            throw new IOException($"Loading the published story timed out: {ex.Message}", ex);
+        }
         catch (JsonException ex)
         {
             throw new InvalidDataException($"Invalid published story index: {ex.Message}", ex);
@@ -95,6 +96,10 @@ public sealed class PublishedStoryLibrary(HttpClient client) : IStoryLibrary
             catch (HttpRequestException ex)
             {
                 throw new IOException($"Couldn't load published image '{path}': {ex.Message}", ex);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new IOException($"Loading published image '{path}' timed out: {ex.Message}", ex);
             }
         }
 

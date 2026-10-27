@@ -22,6 +22,17 @@ public sealed class PublishedImageTests(WebHostFixture host, ITestOutputHelper o
     [PublishedImagesFact]
     public async Task Published_image_formats_and_narrative_surfaces_decode_at_the_page_base()
     {
+        var imageRequests = new System.Collections.Concurrent.ConcurrentQueue<Uri>();
+        var external = Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_EXTERNAL_STORY") == "1";
+        if (external && !PlayerTarget.IsDesktop)
+        {
+            Page.Request += (_, request) =>
+            {
+                var uri = new Uri(request.Url);
+                if (uri.AbsolutePath.Contains("/story/images/", StringComparison.Ordinal)) imageRequests.Enqueue(uri);
+            };
+            await Page.ReloadAsync();
+        }
         await AssertState(state => Assert.Contains("Before", state.Passage));
         await AssertState(state => Assert.Contains("Hello from supporting configuration.", state.Passage));
         var decoded = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -58,6 +69,18 @@ public sealed class PublishedImageTests(WebHostFixture host, ITestOutputHelper o
         }
         Assert.Equal(decoded["A camp"], decoded["Strong camp"]);
         Assert.Equal(decoded["A camp"], decoded["Conditional camp"]);
+        if (external)
+        {
+            var requests = imageRequests.ToArray();
+            Assert.NotEmpty(requests);
+            var prefix = new Uri(new Uri(Page.Url), "story/images/").AbsoluteUri;
+            Assert.All(requests, uri => Assert.StartsWith(prefix, uri.AbsoluteUri));
+            Assert.Contains(requests, uri => uri.AbsolutePath.EndsWith("photo.jpeg", StringComparison.Ordinal));
+            Assert.Contains(requests, uri => uri.AbsolutePath.EndsWith("pixel.png", StringComparison.Ordinal));
+            Assert.Contains(requests, uri => uri.AbsolutePath.EndsWith("pixel.webp", StringComparison.Ordinal));
+            Assert.DoesNotContain(requests, uri => uri.AbsolutePath.EndsWith("unvisited.png", StringComparison.Ordinal));
+            Assert.All(requests, uri => Assert.Matches(@"^\?v=[0-9A-F]{64}$", uri.Query));
+        }
         await Page.SetViewportSizeAsync(390, 844);
         var camp = Page.GetByAltText("A camp", new() { Exact = true });
         await camp.ScrollIntoViewIfNeededAsync();

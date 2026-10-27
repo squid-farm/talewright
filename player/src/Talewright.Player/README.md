@@ -49,18 +49,26 @@ Register one as a singleton `IStoryLibrary` in the host.
 | Native Author Debugger, story folder | Supported: accepted-source image generations |
 | Built-in desktop/web samples | Supported: opt-in lazy embedded resource streams |
 | Desktop ZIP / browser upload | Retained compressed archive with lazy, bounded image reads |
-| Generated published desktop/web host | Supported: same opt-in embedded resource streams, including static web subpaths |
+| Generated published desktop/web host | Supported: external `story/` directory; native safe file streams or viewport-lazy HTTP, including static web subpaths |
 | Custom library using only `LoadAsync` | Text works; images show unavailable unless it supplies a capability |
 
-Generated hosts reuse the sample hosts' embedded-image capability and the publisher's validated
-staging; they do not introduce another image adapter or transport. Web asset URLs resolve
-relative to the page base. Embedded images may still arrive as part of the initial program
-download even though display/stream acquisition is lazy. The embedded artwork can push one
-generated program file above a host's per-file limit even when each original image is smaller.
-[#271](https://github.com/squid-farm/talewright/issues/271) tracks moving story assets beside the
-host; that layout is not shipped here. See the author guide's
+Generated hosts reuse the publisher's validated staging and shared image presentation. They
+do not embed story text or images in program files. Desktop uses `FileSystemStoryLibrary` over
+the adjacent `story/` directory (one directory shared above the universal runtime folders).
+The standalone web overlay registers `PublishedStoryLibrary` with a page-base-relative
+`story/` HTTP client. Its `index.json` lists staged paths and individual SHA-256 versions,
+so static hosts need no directory listing. Discovery is refreshed per page load; text is
+loaded before compilation, while image HTTP streams open only when an occurrence acquires
+its existing viewport-lazy lease. Every content URL carries its own hash: a text-only update
+leaves image URLs unchanged, and changed images have new URLs. Failed text/index requests
+surface as story-open errors; failed image requests preserve narrative and effective alt.
+Host-owned HTTP clients outlive individual loaded stories. Development-host samples remain
+embedded and unchanged. See the author guide's
 [artwork and hosting size](../../../docs/guide/sharing-your-story.md#artwork-and-hosting-size)
-for the advisory source estimate, final web-payload measurement and current embedded-artwork caveat.
+for the advisory source estimate and final web-payload measurement.
+Static hosts must serve the story's `.tale` and `.yaml` files as well as JSON and supported
+images. ASP.NET Core's extension allowlist needs explicit `text/plain` mappings for story
+text, as used by the extracted-artifact test host.
 Published Windows, macOS and ARM image playback remain unverified; Linux x64 and three browser
 engines have extracted-artifact coverage.
 

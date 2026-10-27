@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Text;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli.Tests;
@@ -127,6 +129,69 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(1006, zip.Entries.Count);
         Assert.Contains($"total {zip.Entries.Sum(entry => entry.Length)} bytes", result.Error);
         Assert.Contains($"largest file {zip.Entries.Max(entry => entry.Length)} bytes", result.Error);
+    }
+
+    [Fact]
+    public void Universal_desktop_has_one_shared_story_and_each_split_runtime_is_self_contained()
+    {
+        var image = AddImages();
+        var publication = SplitBuilds();
+        Assert.Equal(0, RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["-a", "--target", "desktop"]).Code);
+        using (var zip = ZipFile.OpenRead(Zip))
+        {
+            Assert.Single(zip.Entries, entry => entry.FullName.EndsWith("story.talewright.yaml", StringComparison.Ordinal));
+            Assert.NotNull(zip.GetEntry("story/story.talewright.yaml"));
+            Assert.NotNull(zip.GetEntry("story/chapters/main.tale"));
+            Assert.DoesNotContain(zip.Entries, entry => PublishCommand.DesktopRuntimes.Any(runtime =>
+                entry.FullName.StartsWith(runtime + "/story/", StringComparison.Ordinal)));
+            using var stream = zip.GetEntry("story/images/maps/camp.PNG")!.Open();
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            Assert.Equal(image, buffer.ToArray());
+        }
+        Assert.Equal(0, RunSplitControlled(new UnreadableInput(), inputRedirected: true, publication: publication).Code);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            using var zip = ZipFile.OpenRead(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"));
+            Assert.NotNull(zip.GetEntry("story/story.talewright.yaml"));
+            Assert.NotNull(zip.GetEntry("story/images/maps/camp.PNG"));
+        }
+    }
+
+    [Fact]
+    public void Web_index_versions_each_staged_file_independently_of_text_only_edits()
+    {
+        var image = AddImages();
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, _, _, _, _) =>
+            {
+                var output = Path.Combine(working, "host-output");
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output, "index.html"), "Host");
+                return output;
+            },
+        };
+        Dictionary<string, string> Publish()
+        {
+            Assert.Equal(0, RunControlled(new UnreadableInput(), inputRedirected: true,
+                publication: publication, args: ["-a", "--target", "web", "--force"]).Code);
+            using var zip = ZipFile.OpenRead(Zip);
+            using var indexStream = zip.GetEntry("story/index.json")!.Open();
+            var index = JsonSerializer.Deserialize<Dictionary<string, string>>(indexStream)!;
+            Assert.Equal(index.Keys.Order(), zip.Entries.Where(entry => entry.FullName.StartsWith("story/", StringComparison.Ordinal) &&
+                entry.FullName != "story/index.json").Select(entry => entry.FullName["story/".Length..]).Order());
+            Assert.Equal(Convert.ToHexString(SHA256.HashData(image)), index["images/maps/camp.PNG"]);
+            return index;
+        }
+        var original = Publish();
+        File.AppendAllText(Path.Combine(Story, "chapters", "main.tale"), "\n// Text-only update\n");
+        var changed = Publish();
+        Assert.Equal(original["images/maps/camp.PNG"], changed["images/maps/camp.PNG"]);
+        Assert.NotEqual(original["chapters/main.tale"], changed["chapters/main.tale"]);
+        Assert.DoesNotContain("images/notes.txt", changed.Keys);
+        Assert.DoesNotContain("private-notes.txt", changed.Keys);
     }
 
     [Fact]
