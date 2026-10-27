@@ -252,10 +252,10 @@ human-readable diagnostics only (`--format json` is for `validate`).
 
 | Input | Limit |
 |---|---|
-| Story files | 1,000 files, 5 MiB each, 50 MiB total, folder depth 64 |
+| Story folders | No authored file-count or byte ceiling; folder depth 64 |
 | Symbolic links inside the story | Rejected |
 | Output (before compression) | 20,000 files and 512 MiB (1 GiB for the universal desktop zip) |
 
-Files are rechecked after UTF-8 staging, because UTF-16 input can grow when rewritten. Only
-`story.talewright.yaml` and `.tale` files are included. Media support will extend this deliberately; other files
-are never bundled automatically.
+Staging preserves the root manifest, supporting `.talewright.yaml` fragments, `.tale` files and
+supported images. Other files are not bundled automatically. Hosting-size warnings are advisory;
+they are separate from the current generated-output limits above.

@@ -13,7 +13,7 @@ public sealed class StorySource
 {
     private const int MaxStoryFiles = 1_000;
     private const long MaxStoryFileBytes = 5L * 1024 * 1024;
-    /// <summary>Defensive expanded-content bound for externally supplied story archives, not an author image limit.</summary>
+    /// <summary>Defensive expanded-text bound for story archives; not a folder or archive-image budget.</summary>
     public const long MaxArchiveExpandedBytes = 50L * 1024 * 1024;
 
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
@@ -40,12 +40,11 @@ public sealed class StorySource
     public IEnumerable<KeyValuePair<string, string>> TaleFiles =>
         Files.Where(f => f.Key.EndsWith(TaleExtension, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.Key, StringComparer.Ordinal);
 
-    /// <summary>Loads story files with the same count/size bounds as ZIP loading. Symbolic links are rejected.</summary>
+    /// <summary>Loads story files without authoring size ceilings. Symbolic links and excessive nesting are rejected.</summary>
     public static StorySource FromDirectory(string directory)
     {
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
         var imagePaths = new List<string>();
-        long totalBytes = 0;
         var pending = new Stack<(string Path, int Depth)>();
         pending.Push((directory, 0));
         while (pending.TryPop(out var current))
@@ -76,13 +75,8 @@ public sealed class StorySource
                     }
 
                     if (!IsStoryFile(path)) continue;
-                    if (files.Count >= MaxStoryFiles)
-                    {
-                        throw new InvalidDataException("A story may contain at most 1,000 story files.");
-                    }
-
-                    using var input = File.OpenRead(path);
-                    files[relativePath] = ReadText(input, path, ref totalBytes);
+                    using var reader = new StreamReader(path);
+                    files[relativePath] = reader.ReadToEnd();
                 }
             }
         }
@@ -111,8 +105,8 @@ public sealed class StorySource
         => FromZip(archive, out imageEntries, out _);
 
     /// <summary>
-    /// Loads a caller-owned archive and reports actual expanded text bytes for the host's subsequent lazy-image
-    /// accounting. Repeated image reads must not charge these text bytes again. Mapping lifetime matches the archive.
+    /// Loads a caller-owned archive and reports actual expanded text bytes, including BOMs and configuration.
+    /// This count is not a combined text/image budget. Mapping lifetime matches the archive.
     /// </summary>
     public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries,
         out long expandedTextBytes)

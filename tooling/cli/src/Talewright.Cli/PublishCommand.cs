@@ -165,7 +165,6 @@ public sealed class PublishCommand : Command<PublishSettings>
             Directory.CreateDirectory(working);
             var story = Path.Combine(working, "story");
             WriteStory(source, root, story);
-            // Text may expand when a BOM-detected input is rewritten as UTF-8.
             _ = StorySource.FromDirectory(story);
             var content = story;
             if (allInOne)

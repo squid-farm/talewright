@@ -99,14 +99,12 @@ when loading fails. A loaded story retains one parsed archive, not expanded imag
 Source discovery uses the shared configuration/narrative predicates and root mapping.
 Compressed input (including the separate 20 MiB browser upload convenience cap), expanded
 content, each expanded read, and retained stream/Blob ownership are distinct concerns.
-ZIP loading currently has a **temporary known limitation**: 50 MiB combined expanded source
-text and image content. This is not an approved game-size budget; #196 removes it alongside
-the inherited ceilings. ZIP images remain enabled in pre-alpha: use at your own risk.
-Metadata preflight is supplemented by bounded actual reads. Each image read also stops if
-actual expansion exceeds that entry's declared size; only that image fails. This declared-size
-check remains when #196 removes the temporary combined cap. Per-image high-water accounting
-means repeat and partial reads do not charge the same content twice. This is not a folder
-image limit or a history memory budget. Late read/decode failures preserve the adopted narrative
+ZIP images have no combined expanded text/image budget. Each image read is chunked and stops if
+actual expansion exceeds that entry's declared size; only that image fails. Text archives retain
+their separate 1,000-source-file, 5 MiB per-file and 50 MiB total actual-read defenses, including
+configuration text and BOM bytes. These archive-text defenses are not folder authoring limits.
+Folders have no authored source-count or byte ceilings; path/link/depth checks remain. None of
+these protections certifies a story or bounds retained history memory. Late read/decode failures preserve the adopted narrative
 and show the effective alt with an accessible error. Rejected candidates, accepted replacement
 and teardown release archive/input resources after image transfers drain.
 

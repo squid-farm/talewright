@@ -128,25 +128,18 @@ public sealed class StorySourceTests : IDisposable
     [Theory]
     [InlineData(1_000)]
     [InlineData(1_001)]
-    public void Directory_story_file_count_has_the_same_boundary_as_archives(int count)
+    public void Directory_story_file_count_is_not_an_authoring_ceiling(int count)
     {
         for (var i = 0; i < count; i++)
         {
             File.WriteAllText(Path.Combine(_root, $"{i}.tale"), "");
         }
 
-        if (count == 1_000)
-        {
-            Assert.Equal(count, StorySource.FromDirectory(_root).Files.Count);
-        }
-        else
-        {
-            Assert.Contains("1,000", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root)).Message);
-        }
+        Assert.Equal(count, StorySource.FromDirectory(_root).Files.Count);
     }
 
     [Fact]
-    public void Directory_accepts_exact_file_and_total_bounds_but_rejects_one_extra_byte()
+    public void Directory_accepts_files_and_total_text_above_former_authoring_bounds()
     {
         var text = new string('x', 5 * 1024 * 1024);
         for (var i = 0; i < 10; i++)
@@ -157,10 +150,9 @@ public sealed class StorySourceTests : IDisposable
 
         Assert.Equal(10, StorySource.FromDirectory(_root).Files.Count);
         File.WriteAllText(Path.Combine(_root, "extra.tale"), "x");
-        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root)).Message);
-        File.Delete(Path.Combine(_root, "extra.tale"));
+        Assert.Equal(11, StorySource.FromDirectory(_root).Files.Count);
         File.AppendAllText(Path.Combine(_root, "0.tale"), "x");
-        Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromDirectory(_root)).Message);
+        Assert.Equal(text.Length + 1, StorySource.FromDirectory(_root).Files["0.tale"].Length);
     }
 
     [Fact]

@@ -1002,26 +1002,24 @@ public sealed class PublishTests : IDisposable
     }
 
     [Fact]
-    public void Oversized_story_file_fails_before_publication()
+    public void Story_file_above_former_authoring_limit_can_be_published()
     {
-        using (var stream = File.OpenWrite(Path.Combine(Story, "chapters", "main.tale")))
-        {
-            stream.SetLength(5 * 1024 * 1024 + 1);
-        }
+        File.AppendAllText(Path.Combine(Story, "chapters", "main.tale"),
+            "\n// " + new string('x', 5 * 1024 * 1024));
 
         var result = Run();
-        Assert.Equal(2, result.Code);
-        Assert.Contains("5 MiB", result.Error);
-        Assert.False(File.Exists(Zip));
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        using var zip = ZipFile.OpenRead(Zip);
+        Assert.True(zip.GetEntry("chapters/main.tale")!.Length > 5 * 1024 * 1024);
     }
 
     [Theory]
-    [InlineData(1, 1_800_000, "5 MiB")]
-    [InlineData(12, 1_500_000, "50 MiB")]
-    public void Utf16_input_that_expands_beyond_utf8_limits_preserves_existing_output(int files, int characters, string limit)
+    [InlineData(1, 1_800_000)]
+    [InlineData(12, 1_500_000)]
+    public void Utf16_input_can_be_published_when_staged_utf8_exceeds_former_authoring_limits(int files, int characters)
     {
         Assert.Equal(0, Run().Code);
-        var original = File.ReadAllBytes(Zip);
         for (var i = 0; i < files; i++)
         {
             File.WriteAllText(Path.Combine(Story, $"comment-{i}.tale"),
@@ -1029,9 +1027,10 @@ public sealed class PublishTests : IDisposable
         }
         Assert.True(StoryCompiler.Compile(StorySource.FromDirectory(Story)).Success);
         var result = Run("--force");
-        Assert.Equal(2, result.Code);
-        Assert.Contains(limit, result.Error);
-        Assert.Equal(original, File.ReadAllBytes(Zip));
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        using var archive = ZipFile.OpenRead(Zip);
+        Assert.True(archive.GetEntry("comment-0.tale")!.Length > characters * 2);
         Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
     }
 
