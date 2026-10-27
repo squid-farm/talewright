@@ -14,7 +14,7 @@
             </p>
             break;
         case RenderedNote note:
-            <p class="tw-note tw-note-@note.Kind.ToString().ToLowerInvariant()" role="status">@note.Text</p>
+            <p class="tw-note tw-note-@note.Kind.ToString().ToLowerInvariant()" role="@(HistoryReading ? null : "status")">@note.Text</p>
             break;
     }
 }
@@ -23,4 +23,7 @@
     /// <summary>The document to render.</summary>
     [Parameter, EditorRequired]
     public RenderedDocument Document { get; set; } = RenderedDocument.Empty;
+
+    [CascadingParameter(Name = "HistoryReading")]
+    public bool HistoryReading { get; set; }
 }

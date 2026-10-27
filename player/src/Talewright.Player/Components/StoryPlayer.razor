@@ -1,4 +1,4 @@
-@* Plays one compiled story: transcript of everything so far, current choices, and a character sheet. *@
+@* Plays one compiled story with bounded transcript presentation and a character sheet. *@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @using Talewright.Runtime.Saves
@@ -7,6 +7,7 @@
     <PlayerToolbar Title="@Story.Title" Busy="_busy" UndoEnabled="Story.UndoEnabled"
                    CanBack="_session.CanBack" CanForward="_session.CanForward" CanSave="@(SaveStore is not null)"
                    Message="@(_showSaves ? null : _saveMessage)" Error="_saveError"
+                   ReadingHistory="_showHistory" OnHistory="ToggleHistory"
                    OnBack="Back" OnForward="Forward" OnQuickSave="QuickSaveAsync" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit" />
 
     @if (SaveStore is not null)
@@ -16,10 +17,14 @@
                          OnSave="SaveAsync" OnRetry="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
                          OnLoad="RequestLoadAsync" OnConfirmLoad="ConfirmLoadAsync" OnCancelLoad="CloseSaves" OnClose="CloseSaves" />
     }
-    <div class="tw-columns">
+    @if (_showHistory)
+    {
+        <TranscriptHistory @key="_session" Frames="_historyFrames" OnClose="CloseHistory" />
+    }
+    <div class="tw-columns" hidden="@_showHistory">
         <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="_transcriptElement">
             @{ var transcript = _transcript; }
-            @for (var i = 0; i < transcript.Count; i++)
+            @for (var i = Math.Max(0, transcript.Count - TranscriptPresentation.PassageWindow); i < transcript.Count; i++)
             {
                 var entry = transcript[i];
                 var isLatest = i == transcript.Count - 1;
@@ -72,6 +77,10 @@
     private IJSObjectReference? _module;
     private bool _busy;
     private bool _showSaves;
+    private bool _showHistory;
+    private bool _restoreReadingPosition;
+    private double _readingPosition;
+    private IReadOnlyList<HistoryFrame> _historyFrames = [];
     private bool _saveError;
     private int _generation;
     private string _slot = "My save";
@@ -93,6 +102,7 @@
         }
 
         _wasVisible = Visible;
+        if (!Visible) CloseHistory();
     }
 
     private void Restart()
@@ -103,6 +113,9 @@
         _generation++;
         _busy = false;
         _showSaves = false;
+        _showHistory = false;
+        _historyFrames = [];
+        _restoreReadingPosition = false;
         _pendingOverwrite = null;
         _pendingLoad = null;
         _saveMessage = null;
@@ -122,18 +135,21 @@
 
     private void Back()
     {
+        CloseHistory();
         _session.Back();
         _focusLatest = true;
     }
 
     private void Forward()
     {
+        CloseHistory();
         _session.Forward();
         _focusLatest = true;
     }
 
     private async Task ShowSavesAsync()
     {
+        CloseHistory();
         _showSaves = true;
         _pendingLoad = null;
         await RefreshSlotsAsync();
@@ -232,6 +248,9 @@
         if (generation == _generation)
         {
             _session = candidate;
+            _showHistory = false;
+            _historyFrames = [];
+            _restoreReadingPosition = false;
             _pendingOverwrite = null;
             _pendingLoad = null;
             _showSaves = false;
@@ -284,7 +303,13 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusLatest && Visible)
+        if (_restoreReadingPosition && Visible)
+        {
+            _restoreReadingPosition = false;
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
+            await _module.InvokeVoidAsync("restoreReadingPosition", _transcriptElement, _readingPosition);
+        }
+        if (_focusLatest && Visible && !_showHistory)
         {
             _focusLatest = false;
 
@@ -294,6 +319,7 @@
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
                 await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1);
             }
+
             catch (JSException)
             {
                 await FocusTranscriptAsync();
@@ -306,6 +332,27 @@
                 // The element can disappear if the player restarts mid-render; nothing to reveal then.
             }
         }
+    }
+
+    private async Task ToggleHistory()
+    {
+        if (_showHistory)
+        {
+            CloseHistory();
+            return;
+        }
+        _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
+        _readingPosition = await _module.InvokeAsync<double>("readingPosition");
+        _historyFrames = _transcript;
+        _showHistory = true;
+    }
+
+    private void CloseHistory()
+    {
+        if (!_showHistory) return;
+        _showHistory = false;
+        _historyFrames = [];
+        _restoreReadingPosition = true;
     }
 
     private async Task FocusTranscriptAsync()

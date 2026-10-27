@@ -19,3 +19,16 @@ export function revealLatest(transcript, isFirst) {
 
     element.focus({ preventScroll: true });
 }
+
+export function readingPosition() { return window.scrollY; }
+
+export function restoreReadingPosition(transcript, position) {
+    window.scrollTo({ top: position, behavior: "instant" });
+    transcript.closest(".tw-player")?.querySelector(".tw-history-trigger")?.focus({ preventScroll: true });
+}
+
+export function focusHistoryPage(history) {
+    const heading = history.querySelector(".tw-history-heading");
+    heading.scrollIntoView({ block: "start", behavior: "instant" });
+    heading.focus({ preventScroll: true });
+}

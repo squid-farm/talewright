@@ -10,7 +10,14 @@
             <br />
             break;
         case RenderedMedia media:
-            <MediaView @key="(index, media, Images)" Media="media" Images="Images" />
+            @if (HistoryReading)
+            {
+                <HistoryMediaView @key="(index, media, Images)" Media="media" Images="Images" />
+            }
+            else
+            {
+                <MediaView @key="(index, media, Images)" Media="media" Images="Images" />
+            }
             break;
     }
 }
@@ -22,6 +29,9 @@
 
     [CascadingParameter]
     public StoryImages? Images { get; set; }
+
+    [CascadingParameter(Name = "HistoryReading")]
+    public bool HistoryReading { get; set; }
 
     private static RenderFragment Styled(RenderedText text) => builder =>
     {

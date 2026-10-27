@@ -4,19 +4,24 @@
 <header class="tw-bar" aria-label="Player toolbar" @ref="_bar">
     <h1>@Title</h1>
     <div class="tw-bar-actions">
+        @if (OnHistory.HasDelegate)
+        {
+            <button type="button" class="tw-link tw-history-trigger" disabled="@Busy"
+                    aria-expanded="@(ReadingHistory ? "true" : "false")" @onclick="OnHistory">History</button>
+        }
         @if (UndoEnabled)
         {
-            <button type="button" class="tw-link" disabled="@(Busy || !CanBack)" @onclick="OnBack">Back</button>
-            <button type="button" class="tw-link" disabled="@(Busy || !CanForward)" @onclick="OnForward">Forward</button>
+            <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory || !CanBack)" @onclick="OnBack">Back</button>
+            <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory || !CanForward)" @onclick="OnForward">Forward</button>
         }
         @if (CanSave)
         {
-            <button type="button" class="tw-link tw-quick-save" disabled="@Busy" @onclick="OnQuickSave">Quick Save</button>
-            <button type="button" class="tw-link tw-saves-trigger" disabled="@Busy" @onclick="OnSavedGames">Saves</button>
+            <button type="button" class="tw-link tw-quick-save" disabled="@(Busy || ReadingHistory)" @onclick="OnQuickSave">Quick Save</button>
+            <button type="button" class="tw-link tw-saves-trigger" disabled="@(Busy || ReadingHistory)" @onclick="OnSavedGames">Saves</button>
         }
         <div class="tw-overflow">
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
-                    disabled="@(Busy || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
+                    disabled="@(Busy || ReadingHistory || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
                 <button type="button" class="tw-link" disabled="@Busy" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
@@ -57,6 +62,8 @@
     [Parameter] public EventCallback OnQuickSave { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
     [Parameter] public EventCallback OnExit { get; set; }
+    [Parameter] public bool ReadingHistory { get; set; }
+    [Parameter] public EventCallback OnHistory { get; set; }
 
     private ElementReference _bar, _toggle, _menu, _confirmation;
     private IJSObjectReference? _module;

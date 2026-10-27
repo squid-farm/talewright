@@ -1,0 +1,19 @@
+<span class="tw-history-media">
+    <button type="button" class="tw-link" aria-expanded="@(_revealed ? "true" : "false")" @onclick="Toggle">
+        @(_revealed ? "Hide image: " : "Reveal image: ")@Media.AltText
+    </button>
+    @if (_revealed)
+    {
+        <span class="tw-history-image">
+            <MediaView Media="Media" Images="Images" />
+        </span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
+    [Parameter] public StoryImages? Images { get; set; }
+    private bool _revealed;
+
+    private void Toggle() => _revealed = !_revealed;
+}
