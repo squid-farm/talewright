@@ -64,8 +64,8 @@ def publish(vsix, tag, sha, repository):
             "tag_name": tag, "target_commitish": sha, "name": tag, "body": body,
             "draft": True, "prerelease": identity["prerelease"], "make_latest": "false",
         })
-    if release["target_commitish"] != sha or release["prerelease"] != identity["prerelease"]:
-        raise ValueError("Existing release commit or pre-release channel differs; inspect it manually")
+    if release["tag_name"] != tag or release["prerelease"] != identity["prerelease"]:
+        raise ValueError("Existing release tag or pre-release channel differs; inspect it manually")
     name = "talewright-linux-x64.vsix"
     assets = [asset for asset in release["assets"] if asset["name"] == name]
     contents = Path(vsix).read_bytes()

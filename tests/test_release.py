@@ -129,7 +129,8 @@ class ReleaseArtifactTests(unittest.TestCase):
 
     def release(self, *, draft=False, assets=None):
         return {
-            "id": 42, "target_commitish": "abc123", "prerelease": True, "draft": draft,
+            "id": 42, "tag_name": "v0.1.0-preview.1", "target_commitish": "main",
+            "prerelease": True, "draft": draft,
             "assets": assets or [], "upload_url": "https://uploads.github.com/example{?name,label}",
         }
 
@@ -171,7 +172,7 @@ class ReleaseArtifactTests(unittest.TestCase):
         for responses in [
             [{"sha": "moved"}],
             [{"sha": "abc123"}, {**self.release(), "prerelease": False}],
-            [{"sha": "abc123"}, {**self.release(), "target_commitish": "wrong"}],
+            [{"sha": "abc123"}, {**self.release(), "tag_name": "v0.1.0-preview.2"}],
             [{"sha": "abc123"}, self.release(assets=[asset]), b"different"],
         ]:
             with self.subTest(responses=responses), self.assertRaises(ValueError):
