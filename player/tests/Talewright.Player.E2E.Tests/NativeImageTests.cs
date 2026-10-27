@@ -19,10 +19,13 @@ public sealed class NativeImageTests
             node.Role == "image" && node.Name == alt && node.Bounds.Width > 100 && node.Bounds.Height > 100));
     }
 
-    [Fact]
-    public async Task Actual_zip_player_keeps_split_configuration_and_decodes_retained_images()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Actual_zip_player_keeps_split_configuration_and_decodes_retained_images(bool aboveFormerLimit)
     {
         using var files = new ImageStoryFiles();
+        if (aboveFormerLimit) files.EnlargeIllustrationAboveFormerArchiveLimit();
         var path = Path.Combine(files.Root, "illustrated.zip");
         await File.WriteAllBytesAsync(path, files.Zip("wrapped/"));
         await using var driver = new NativePlayerDriver(Artifacts("archive-images"));
@@ -36,6 +39,22 @@ public sealed class NativeImageTests
             node.Role == "image" && node.Name == "Next camp" && node.Bounds.Height > 100));
         Assert.Contains(history.Descendants(), node => node.Role == "image" && node.Name == "A camp");
         Assert.DoesNotContain("unavailable", history.Content);
+    }
+
+    [Fact]
+    public async Task Folder_above_former_count_file_and_total_limits_compiles_and_plays()
+    {
+        using var files = new ImageStoryFiles();
+        files.AddSourceAboveFormerFolderLimits();
+        var source = Talewright.Talemark.Compilation.StorySource.FromDirectory(files.Root);
+        Assert.True(source.Files.Count > 1_000);
+        Assert.True(source.Files.Values.Sum(text => (long)System.Text.Encoding.UTF8.GetByteCount(text)) > 50L * 1024 * 1024);
+        Assert.Contains(source.Files.Values, text => System.Text.Encoding.UTF8.GetByteCount(text) > 5 * 1024 * 1024);
+        await using var driver = new NativePlayerDriver(Artifacts("large-folder"));
+        await driver.StartAsync(files.Root);
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("Hello from supporting configuration.", StringComparison.Ordinal));
+        await ActivateChoice(driver);
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("Next passage.", StringComparison.Ordinal));
     }
 
     [Fact]

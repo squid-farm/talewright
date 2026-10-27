@@ -19,10 +19,14 @@ var session = new StorySession(result.Story!);
 ```
 
 The root `story.talewright.yaml` keeps core settings under `game:`; world declarations remain at the root.
-Folder and ZIP loaders both accept at most 1,000 story files, 5 MiB per file and
-50 MiB total expanded text. Folder traversal rejects symbolic links inside the
-story and paths deeper than 64 directories. Only `story.talewright.yaml` and `.tale` files
-are loaded; unrelated files are not published as story content.
+Folder loading has no authored file-count, per-file or total-text ceiling. It still rejects
+symbolic links inside the story and paths deeper than 64 directories. ZIP text loading retains
+its separate defenses: at most 1,000 source files, 5 MiB per file and 50 MiB total expanded text,
+enforced while reading actual bytes. These archive-text bounds do not include images.
+The retained image owner enforces declared entry sizes during lazy reads, without a combined
+text/image budget. Neither source kind is certified or trusted.
+The root manifest, supporting `.talewright.yaml` fragments and `.tale` files are loaded as text;
+images have a separate path catalogue. Unrelated files are not published as story content.
 
 ## Pipeline (`StoryCompiler.Compile`)
 

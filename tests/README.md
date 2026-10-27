@@ -129,8 +129,8 @@ startup/first frame, directory and ZIP loading, compilation, choices, serializat
 real `FileSaveStore` write/read, restore, Back/Forward and story-only CLI publication.
 The warmed hub-choice case separately measures selection from the generated bounded
 hub, which offers at most 20 storylets. `BoundaryInputBenchmarks` times exact and
-immediately-over directory and ZIP file-size, expanded-size and file-count limits,
-plus directory nesting depth. The runtime suite also verifies a valid save
+immediately-over former directory ceilings (now accepted) and retained ZIP text file-size,
+expanded-size and file-count defenses, plus directory nesting depth. The runtime suite also verifies a valid save
 at exactly 2 MiB with legal 512-character choice keys; the first additional choice
 crosses the byte cap. Existing compiler/runtime/CLI/player tests provide matching
 ZIP, UTF-16/BOM, upload, save-store, 10,000-choice and failed-publication safety
@@ -571,6 +571,8 @@ and deliberate DCs. A dedicated seeded fixture tests replay; no test retries unt
 | Multi-file/root/wrapped ZIPs and errors/recovery | Yes | Yes | Generated fixtures and native chooser/CLI |
 | 20 MiB upload acceptance/rejection | N/A | Exact boundary and +1 byte | Same boundary and invalid uploads |
 | ZIP 1,000-file / 5 MiB-file / 50 MiB-total limits | Exact boundaries and rejection | Visible rejection/recovery | Visible rejection/recovery |
+| Folder above former count/file/total ceilings | CLI validates and publishes | Not a browser folder source | Compiles and plays |
+| ZIP image above former combined 50 MiB budget | Declared-size reads, repeat reads, cancellation | Real 51 MiB JPEG decodes and plays | Real 51 MiB JPEG decodes and plays |
 | Keyboard, latest-frame focus, long-transcript scroll | N/A | Yes | Yes |
 | Responsive layout | N/A | Narrow and breakpoint-adjacent viewports | Actual native window resize |
 | Light/dark palette and reduced-motion preference | N/A | Browser media emulation | Not automatically asserted; OS-specific preference integration remains a native manual check |

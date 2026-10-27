@@ -43,9 +43,9 @@ public sealed class ArchiveImageTests
     }
 
     [Fact]
-    public async Task Repeated_and_partial_reads_do_not_charge_archive_content_twice()
+    public async Task Images_above_former_combined_cap_allow_full_repeated_and_partial_reads()
     {
-        using var input = ImageArchive(30 * 1024 * 1024);
+        using var input = ImageArchive(51 * 1024 * 1024);
         await using var loaded = ArchiveStoryImages.Open(input);
         Assert.NotNull(loaded.Images);
         await using (var partial = await loaded.Images.OpenAsync("images/large.png"))
@@ -54,7 +54,7 @@ public sealed class ArchiveImageTests
         {
             await using var stream = await loaded.Images.OpenAsync("images/large.png");
             await stream.CopyToAsync(Stream.Null);
-            Assert.Equal(30 * 1024 * 1024, stream.Position);
+            Assert.Equal(51 * 1024 * 1024, stream.Position);
         }
     }
 
@@ -76,8 +76,8 @@ public sealed class ArchiveImageTests
     {
         var input = ImageArchive(1024);
         var archive = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: true);
-        var source = StorySource.FromZip(archive, out var images, out var textBytes);
-        await using var owner = new ArchiveStoryImages(input, archive, images, textBytes);
+        var source = StorySource.FromZip(archive, out var images);
+        await using var owner = new ArchiveStoryImages(input, archive, images);
         foreach (var asyncRead in new[] { false, true })
         {
             await using var stream = new ArchiveStoryImages.ImageStream(owner, "images/deceptive.png",
@@ -97,26 +97,8 @@ public sealed class ArchiveImageTests
     }
 
     [Fact]
-    public async Task Actual_reads_enforce_remaining_content_budget_independently_of_metadata_preflight()
+    public void Malformed_archive_releases_input()
     {
-        var input = ImageArchive(1024);
-        var archive = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: true);
-        StorySource.FromZip(archive, out var images);
-        await using var owner = new ArchiveStoryImages(input, archive, images,
-            StorySource.MaxArchiveExpandedBytes - 1);
-        await using var stream = await owner.OpenAsync("images/large.png", CancellationToken.None);
-        Assert.Equal(1, await stream.ReadAsync(new byte[1]));
-        var error = await Assert.ThrowsAsync<InvalidDataException>(() => stream.CopyToAsync(Stream.Null));
-        Assert.Contains("50 MiB", error.Message);
-        Assert.Equal(1, stream.Position);
-    }
-
-    [Fact]
-    public void Declared_expansion_violation_and_malformed_archive_release_input()
-    {
-        var excessive = ImageArchive(51 * 1024 * 1024);
-        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => ArchiveStoryImages.Open(excessive)).Message);
-        Assert.False(excessive.CanRead);
         var malformed = new MemoryStream([1, 2, 3]);
         Assert.Throws<InvalidDataException>(() => ArchiveStoryImages.Open(malformed));
         Assert.False(malformed.CanRead);

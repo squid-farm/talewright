@@ -10,18 +10,15 @@ public sealed class ArchiveStoryImages : IStoryImageSource
     private readonly Stream _input;
     private readonly ZipArchive _archive;
     private readonly IReadOnlyDictionary<string, ZipArchiveEntry> _images;
-    private readonly Dictionary<string, long> _highWater = new(StringComparer.Ordinal);
     private readonly HashSet<ImageStream> _streams = [];
-    private long _expandedBytes;
     private bool _disposed;
 
     internal ArchiveStoryImages(Stream input, ZipArchive archive,
-        IReadOnlyDictionary<string, ZipArchiveEntry> images, long expandedTextBytes)
+        IReadOnlyDictionary<string, ZipArchiveEntry> images)
     {
         _input = input;
         _archive = archive;
         _images = images;
-        _expandedBytes = expandedTextBytes;
     }
 
     /// <summary>Takes ownership of a readable, seekable ZIP stream, including on failure.</summary>
@@ -31,15 +28,8 @@ public sealed class ArchiveStoryImages : IStoryImageSource
         try
         {
             archive = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: true);
-            var source = StorySource.FromZip(archive, out var images, out var expandedTextBytes);
-            var remaining = StorySource.MaxArchiveExpandedBytes - expandedTextBytes;
-            foreach (var entry in images.Values)
-            {
-                if (entry.Length > remaining)
-                    throw new InvalidDataException("The story archive exceeds the 50 MiB total expanded-content limit.");
-                remaining -= entry.Length;
-            }
-            var owner = new ArchiveStoryImages(input, archive, images, expandedTextBytes);
+            var source = StorySource.FromZip(archive, out var images);
+            var owner = new ArchiveStoryImages(input, archive, images);
             return new(source, StoryImages.FromSource(source, owner));
         }
         catch
@@ -101,29 +91,17 @@ public sealed class ArchiveStoryImages : IStoryImageSource
                 cancellationToken.ThrowIfCancellationRequested();
                 if (_failed) throw new InvalidDataException($"Image '{path}' exceeded the archive expansion bound.");
                 if (buffer.IsEmpty) return 0;
-                var previous = owner._highWater.GetValueOrDefault(path);
-                var remaining = StorySource.MaxArchiveExpandedBytes - owner._expandedBytes;
-                var allowed = Math.Min(previous - _position + remaining, declaredLength - _position);
-                var requested = (int)Math.Min(Math.Min(buffer.Length, 64 * 1024), allowed + 1);
+                var remaining = declaredLength - _position;
+                var requested = (int)Math.Min(Math.Min(buffer.Length, 64 * 1024),
+                    remaining < 64 * 1024 ? remaining + 1 : 64 * 1024);
                 var count = input.Read(buffer[..requested]);
                 var position = _position + count;
-                var additional = Math.Max(0, position - previous);
                 if (position > declaredLength)
                 {
                     _failed = true;
                     throw new InvalidDataException($"Image '{path}' expands beyond its declared ZIP entry size.");
                 }
-                if (additional > remaining)
-                {
-                    _failed = true;
-                    throw new InvalidDataException("The story archive exceeds the 50 MiB total expanded-content limit.");
-                }
                 _position = position;
-                if (additional > 0)
-                {
-                    owner._highWater[path] = position;
-                    owner._expandedBytes += additional;
-                }
                 return count;
             }
         }

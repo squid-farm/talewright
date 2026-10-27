@@ -223,7 +223,7 @@ public sealed partial class ServerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Additional_manifest_does_not_hide_nested_files_from_loader_limits(bool fileCount)
+    public async Task Additional_manifest_does_not_reintroduce_authoring_size_ceilings(bool fileCount)
     {
         await using var client = new Client();
         Directory.CreateDirectory(client.PathOf("child"));
@@ -237,11 +237,14 @@ public sealed partial class ServerTests
             for (var index = 0; index < 998; index++)
                 File.WriteAllText(client.PathOf($"child/scene{index}.tale"), $"=== scene{index}\n-> END\n");
         }
-        else File.WriteAllText(client.PathOf("child/oversized.tale"), new string('x', 5 * 1024 * 1024 + 1));
+        else File.WriteAllText(client.PathOf("child/oversized.tale"), "// " + new string('x', 5 * 1024 * 1024 + 1));
         await client.Watch("child/main.tale", 2);
-        var error = await client.Next(message => message.TryGetProperty("method", out var method) &&
-            method.GetString() == "window/showMessage");
-        Assert.Contains(fileCount ? "1,000" : "5 MiB", error.GetProperty("params").GetProperty("message").GetString());
+        Assert.Empty(await client.Diagnostics("child/main.tale", 1));
+        Assert.Contains(await client.Diagnostics("child/story.talewright.yaml", null),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW4002");
+        await client.Change("child/main.tale", "=== child\n* [Go] -> absent\n", 2);
+        Assert.Contains(await client.Diagnostics("child/main.tale", 2),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
     }
 
     [Fact]
@@ -270,13 +273,16 @@ public sealed partial class ServerTests
         await client.Initialize();
         await client.Open("start.tale", Invalid, 1);
         Assert.NotEmpty(await client.Diagnostics("start.tale", 1));
-        File.WriteAllText(client.PathOf("oversized.tale"), new string('x', 5 * 1024 * 1024 + 1));
+        var nested = client.PathOf("deep");
+        for (var depth = 0; depth < 65; depth++)
+            nested = Path.Combine(nested, "nested");
+        Directory.CreateDirectory(nested);
         await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("start.tale") } });
         var error = await client.Next(message => message.TryGetProperty("method", out var method) &&
             method.GetString() == "window/showMessage");
-        Assert.Contains("5 MiB", error.GetProperty("params").GetProperty("message").GetString());
-        File.Delete(client.PathOf("oversized.tale"));
-        await client.Watch("oversized.tale", 3);
+        Assert.Contains("64 levels", error.GetProperty("params").GetProperty("message").GetString());
+        Directory.Delete(client.PathOf("deep"), recursive: true);
+        await client.Watch("deep", 3);
         Assert.Empty(await client.Diagnostics("start.tale", null));
         await client.Open("start.tale", Valid, 1);
         Assert.Empty(await client.Diagnostics("start.tale", 1));

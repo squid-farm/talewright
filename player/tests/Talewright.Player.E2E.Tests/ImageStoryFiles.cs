@@ -68,5 +68,21 @@ internal sealed class ImageStoryFiles : IDisposable
         return buffer.ToArray();
     }
 
+    public void AddSourceAboveFormerFolderLimits()
+    {
+        var comment = "// " + new string('x', 5 * 1024 * 1024) + "\n";
+        for (var index = 0; index < 10; index++)
+            File.WriteAllText(Path.Combine(Root, $"large-{index}.tale"), comment);
+        for (var index = 0; index < 1_000; index++)
+            File.WriteAllText(Path.Combine(Root, $"empty-{index}.tale"), "");
+    }
+
+    public void EnlargeIllustrationAboveFormerArchiveLimit()
+    {
+        // JPEG decoders ignore bytes after the end marker; the ZIP still expands the entire member.
+        using var image = File.OpenWrite(ImagePath);
+        image.SetLength(51L * 1024 * 1024);
+    }
+
     public void Dispose() => Directory.Delete(Root, recursive: true);
 }

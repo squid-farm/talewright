@@ -1,8 +1,8 @@
 namespace Talewright.Player.Library;
 
 /// <summary>
-/// Opens one catalogued image from a story-owned backing store. Archive-backed implementations must enforce the
-/// archive policy during actual reads and must not charge repeated reads of the same archive member as new content.
+/// Opens one catalogued image from a story-owned backing store. Archive-backed implementations must enforce
+/// declared entry sizes during actual reads without imposing a combined story/image size budget.
 /// The instance owns its backing resources until <see cref="IAsyncDisposable.DisposeAsync"/> completes.
 /// </summary>
 public interface IStoryImageSource : IAsyncDisposable

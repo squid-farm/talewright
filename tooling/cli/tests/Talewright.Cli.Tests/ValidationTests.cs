@@ -35,6 +35,27 @@ public sealed class ValidationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Folder_above_former_source_count_file_and_total_limits_validates(bool json)
+    {
+        var comment = "// " + new string('x', 5 * 1024 * 1024) + "\n";
+        for (var index = 0; index < 10; index++)
+            File.WriteAllText(Path.Combine(_root, $"large-{index}.tale"), comment);
+        for (var index = 0; index < 1_000; index++)
+            File.WriteAllText(Path.Combine(_root, $"empty-{index}.tale"), "");
+        var source = StorySource.FromDirectory(_root);
+        Assert.True(source.Files.Count > 1_000);
+        Assert.True(source.Files.Values.Sum(text => (long)System.Text.Encoding.UTF8.GetByteCount(text)) > 50L * 1024 * 1024);
+        Assert.True(StoryCompiler.Compile(source).Success);
+        var result = json ? Run("--format", "json", "--warnings-as-errors") : Run("--warnings-as-errors");
+        Assert.Equal(0, result.Code);
+        Assert.Contains("source-only estimate", result.Error);
+        if (json)
+            Assert.Equal("""{"schemaVersion":1,"success":true,"diagnostics":[]}""", result.Output.Trim());
+    }
+
+    [Theory]
     [InlineData("=== a\n-> unknown", "TW2002")]
     [InlineData("=== a\n{if player:hp}No.{/if}\n-> END", "TW2003")]
     [InlineData("=== a\n* missing label\n-> END", "TW1011")]

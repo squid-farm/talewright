@@ -167,6 +167,28 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Illustrated_zip_above_former_expanded_limit_decodes_and_remains_playable()
+    {
+        using var files = new ImageStoryFiles();
+        files.EnlargeIllustrationAboveFormerArchiveLimit();
+        Assert.True(new FileInfo(files.ImagePath).Length > 50L * 1024 * 1024);
+        var archive = files.Zip("wrapped/");
+        Assert.True(archive.Length < 20 * 1024 * 1024, "Compressed upload and expanded image size are separate.");
+        await UploadBytes("above-former-limit.zip", archive);
+        await Expect(Latest).ToContainTextAsync("Hello from supporting configuration.");
+        var image = Page.GetByAltText("A camp", new() { Exact = true });
+        await image.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth === 1376 && image.naturalHeight === 768",
+            await image.ElementHandleAsync());
+        Assert.StartsWith("blob:", await image.GetAttributeAsync("src"));
+        await Choose((await Driver.ObserveAsync()).Choices[0]);
+        await Expect(Latest).ToContainTextAsync("Next passage.");
+        var next = Page.GetByAltText("Next camp", new() { Exact = true });
+        await next.ScrollIntoViewIfNeededAsync();
+        await Expect(next).ToHaveAttributeAsync("src", (await image.GetAttributeAsync("src"))!);
+    }
+
+    [Fact]
     public async Task Browser_transport_is_viewport_lazy_and_decodes_png_jpeg_and_webp()
     {
         using var files = new ImageStoryFiles();
