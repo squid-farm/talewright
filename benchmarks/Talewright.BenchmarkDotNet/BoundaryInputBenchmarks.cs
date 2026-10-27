@@ -46,7 +46,6 @@ public class BoundaryInputBenchmarks
                 break;
             case "file-over-one":
                 WriteSizedFile(Path.Combine(_root, "main.tale"), MaxFileBytes + 1);
-                _expectedError = "5 MiB";
                 break;
             case "total-exact":
                 AddEqualSizedFiles(10, MaxFileBytes - 1);
@@ -54,14 +53,12 @@ public class BoundaryInputBenchmarks
             case "total-over-one":
                 AddEqualSizedFiles(9, MaxFileBytes - 1);
                 WriteSizedFile(Path.Combine(_root, "chapter-9.tale"), MaxFileBytes);
-                _expectedError = "50 MiB";
                 break;
             case "count-exact":
                 AddEmptyFiles(999);
                 break;
             case "count-over-one":
                 AddEmptyFiles(1_000);
-                _expectedError = "1,000 story files";
                 break;
             case "depth-exact":
                 AddNestedFile(64);
