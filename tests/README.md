@@ -353,7 +353,7 @@ Additional illustrated-artifact cases use the same opt-in harness:
   actual decoding across narrative surfaces, keyboard choice/history, and browser Blob sharing
   and narrow layout. It runs on browser and native hosts.
   For external-layout artifacts, also set `TALEWRIGHT_PUBLISHED_EXTERNAL_STORY=1`;
-  the browser case reloads with request observation, requires versioned image requests
+  the browser case inspects resource timing, requires versioned image requests
   under the page's `story/images/` path, and rejects fetching the catalogued `unvisited.png`.
 - For `FullyQualifiedName~PublishedImageFailureTests`, publish a story titled `Broken images`
   whose first passage contains `Before`, an undecodable PNG with alt `Broken map`, and a valid

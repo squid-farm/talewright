@@ -22,17 +22,7 @@ public sealed class PublishedImageTests(WebHostFixture host, ITestOutputHelper o
     [PublishedImagesFact]
     public async Task Published_image_formats_and_narrative_surfaces_decode_at_the_page_base()
     {
-        var imageRequests = new System.Collections.Concurrent.ConcurrentQueue<Uri>();
         var external = Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_EXTERNAL_STORY") == "1";
-        if (external && !PlayerTarget.IsDesktop)
-        {
-            Page.Request += (_, request) =>
-            {
-                var uri = new Uri(request.Url);
-                if (uri.AbsolutePath.Contains("/story/images/", StringComparison.Ordinal)) imageRequests.Enqueue(uri);
-            };
-            await Page.ReloadAsync();
-        }
         await AssertState(state => Assert.Contains("Before", state.Passage));
         await AssertState(state => Assert.Contains("Hello from supporting configuration.", state.Passage));
         var decoded = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -71,7 +61,10 @@ public sealed class PublishedImageTests(WebHostFixture host, ITestOutputHelper o
         Assert.Equal(decoded["A camp"], decoded["Conditional camp"]);
         if (external)
         {
-            var requests = imageRequests.ToArray();
+            var resources = await Page.EvaluateAsync<string[]>(
+                "() => performance.getEntriesByType('resource').map(entry => entry.name)");
+            var requests = resources.Select(url => new Uri(url))
+                .Where(uri => uri.AbsolutePath.Contains("/story/images/", StringComparison.Ordinal)).ToArray();
             Assert.NotEmpty(requests);
             var prefix = new Uri(new Uri(Page.Url), "story/images/").AbsoluteUri;
             Assert.All(requests, uri => Assert.StartsWith(prefix, uri.AbsoluteUri));

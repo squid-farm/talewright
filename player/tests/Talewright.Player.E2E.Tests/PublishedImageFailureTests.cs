@@ -45,7 +45,8 @@ public sealed class PublishedImageFailureTests(WebHostFixture host, ITestOutputH
         else
         {
             var broken = Page.GetByRole(AriaRole.Img, new() { Name = "Broken map", Exact = true });
-            await broken.ScrollIntoViewIfNeededAsync();
+            await Page.Locator(".tw-media").Filter(new() { Has = Page.GetByAltText("Broken map", new() { Exact = true }) })
+                .ScrollIntoViewIfNeededAsync();
             await Expect(broken).ToBeVisibleAsync();
             await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync("This image could not be displayed.");
             var working = Page.GetByAltText("Working camp", new() { Exact = true });
