@@ -20,6 +20,7 @@ The web player, the desktop player and published games all share the same screen
 
 | Button | What it does |
 |---|---|
+| **History** | Read earlier recorded passages and choices without changing your playthrough. |
 | **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `game.undo: false`. |
 | **Quick Save** | Write or replace this story's one quick checkpoint, without an overwrite prompt. Named saves are never replaced by this action. |
 | **Saves** | Open the Saves dialog to create or load a named save. Saving over an existing slot asks you to confirm. |
@@ -33,6 +34,27 @@ Each new save shows its name, scene title, save time in your local time zone and
 If saved details cannot be read, the dialog marks them unavailable rather than inventing a timestamp.
 Each story has its own Quick Save checkpoint. Saving again replaces only that checkpoint; use named
 saves to keep multiple points in the story.
+
+### Reading earlier passages
+
+Main play keeps only a recent window of passages on screen. Earlier text and your
+recorded choices are still available through **History**, even when the author
+has disabled Back/Forward. History opens on the newest page; use **Earlier passages**
+and **Later passages** to read the rest. Historical choices are text, not buttons.
+Reading does not undo choices, reroll checks or run story effects.
+
+History pictures stay unloaded until you activate **Reveal image**, which includes
+the image description. **Hide image**, changing pages and leaving History release
+that occurrence. A picture still used in main play remains available there.
+Revealing an image again can read its file again; edited or missing files may
+therefore look different or show a failure message.
+
+Use **Return to play**, or press **History** again, to return to your prior reading
+position with focus on the History button. Story-changing controls are unavailable
+while History is open; return to play before choosing, saving, loading or restarting.
+History pages are not remembered across restart, load, or leaving for the Library.
+This limits on-screen content and image lifetimes, not the complete playthrough or
+all browser memory. Saves and undo/redo history are not shortened.
 
 Loading asks **Load save** or **Keep playing** only if your current progress is not safely saved.
 This includes undo/redo history and your character, not just the visible passage.

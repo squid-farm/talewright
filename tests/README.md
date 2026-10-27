@@ -5,6 +5,47 @@ their areas in `engine/tests`, `player/tests`, and `tooling/*/tests`; root `test
 contains Python CI/Nx contracts. Performance workloads and report tools live in
 `benchmarks`.
 
+## Bounded transcript and History evidence
+
+`TranscriptHistoryTests` covers bounded main/History mounts, non-actionable
+recorded choices, unchanged save identity, keyboard focus, shared image URLs,
+opt-in acquisition and page/close during transfer or decode. Delayed-media tests
+insert a gate in the existing browser module after actual stream reading or image
+load; the normal module is used by the remaining cases. Native accessibility
+coverage is in `NativeTranscriptHistoryTests`. Existing Back/Forward, choice-limit,
+toolbar, image-lease and save tests remain independent regressions.
+
+The opt-in `RealCorpusTranscriptPresentationTests` follows 120 choices through
+four paragraphs per passage, both text-only and with distinct image paths holding
+real camp artwork resized to 320x180 JPEGs. Run with:
+
+```bash
+python3 player/tests/run_e2e.py web --browser chromium --filter 'FullyQualifiedName~RealCorpusTranscriptPresentationTests'
+```
+
+The initial Chromium 153.0.8010.12 baseline on main `31e4d30`, using the standard
+tracing harness and reduced motion, mounted 21/51/101/121 passages at the sampled
+depths. Illustrated URL creation was 21/51/101/121 with zero revocations. Text
+choice-to-DOM samples were 52.5-60.0 ms; illustrated samples were 67.3-81.4 ms.
+These are four single-run observations, not percentiles or device budgets.
+
+The initial internal window is 20 prior passages plus the current one (21),
+matching the smallest sampled window rather than retaining the entire transcript.
+History pages use the same bound: at most 42 passage components coexist, including
+the hidden main-play window. In the first after run, mounts stayed at 21; text
+samples were 37.7-51.8 ms and illustrated samples 46.8-64.5 ms. At the final sampled
+transition 120 URLs had been created and 100 revoked, before the newest picture's
+explicit decode wait. The same-environment comparison target is no more than twice
+the baseline's worst observed choice-to-DOM sample (162.9 ms), alongside the exact
+mount/lifecycle bounds. This is a local regression target, not a universal SLA.
+The final same-environment check observed 54.5-65.8 ms for text and 54.9-64.0 ms
+for illustrated play, all below that target. After the last explicit image decode,
+21 passages remained mounted with 121 URLs created and 100 revoked (21 retained).
+
+The reported lifecycle counts do not measure retained browser memory or prove
+immediate bitmap reclamation. This work does not introduce runtime checkpoints,
+change save/replay, or activate the broader deferred attribution/device work.
+
 ## Fast .NET tests
 
 ```bash

@@ -73,7 +73,7 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
         await Driver.ClickAsync("Load Navigation");
         await Driver.ClickAsync("Load save");
         await Expect(SaveStatus).ToHaveTextAsync("Loaded 'Navigation'.");
-        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(depth + 1);
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(Math.Min(depth + 1, 21));
         // Normalize focus after the setup dialog closes, before measuring navigation.
         await Latest.FocusAsync();
         await Page.EvaluateAsync("""
@@ -143,7 +143,7 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
                         let readyFrames = 0;
                         const observe = () => {
                             const latest = transcript.querySelector('.tw-latest');
-                            const ready = transcript.querySelectorAll('.tw-frame').length === frames &&
+                            const ready = transcript.querySelectorAll('.tw-frame').length === Math.min(frames, 21) &&
                                 latest?.textContent.includes(`Visit ${frames}.`);
                             if (ready && domObservedMs === null)
                                 domObservedMs = performance.now() - start;
@@ -176,11 +176,11 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
             await Page.GetByRole(AriaRole.Button, new() { Name = direction, Exact = true }).ClickAsync();
             await using var ready = await Page.WaitForFunctionAsync("() => window.__historyNavigation !== null");
             var result = await Page.EvaluateAsync<JsonElement>("() => window.__historyNavigation");
-            await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(frames);
+            await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(Math.Min(frames, 21));
             await Expect(Latest).ToContainTextAsync($"Visit {frames}.");
             await Expect(Latest).ToBeFocusedAsync();
-            await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(frames - 1);
-            Assert.Equal("Visit 1.", await Page.EvaluateAsync<string>("() => getSelection().toString()"));
+            await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(Math.Min(frames, 21) - 1);
+            Assert.Equal($"Visit {depth - 19}.", await Page.EvaluateAsync<string>("() => getSelection().toString()"));
             if (iteration >= 0)
             {
                 browser.Add(result);

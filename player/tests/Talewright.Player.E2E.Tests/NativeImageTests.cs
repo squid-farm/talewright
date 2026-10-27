@@ -130,6 +130,43 @@ public sealed class NativeImageTests
     }
 
     [Fact]
+    public async Task Folder_history_reveal_releases_its_final_lease_and_reports_later_file_deletion()
+    {
+        using var files = new ImageStoryFiles();
+        var tale = new System.Text.StringBuilder();
+        for (var index = 0; index < 25; index++)
+        {
+            tale.AppendLine(index == 0 ? "=== start" : $"=== passage{index}");
+            tale.AppendLine($"History folder visit {index}.");
+            if (index == 0) tale.AppendLine("{image(\"photo.jpeg\", \"Earlier camp\")}");
+            tale.AppendLine(index == 24 ? "* [Finish] -> END" : $"* [Next] -> passage{index + 1}");
+        }
+        await File.WriteAllTextAsync(files.TalePath, tale.ToString());
+        await using var driver = new NativePlayerDriver(Artifacts("history-folder-images"));
+        await driver.StartAsync(files.Root);
+        await driver.ScrollToImageAsync("Earlier camp");
+        await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Earlier camp" && node.Bounds.Height > 100));
+        for (var index = 1; index < 25; index++)
+        {
+            await ActivateChoice(driver);
+            await WaitFor(driver, snapshot => snapshot.Content.Contains($"History folder visit {index}."));
+        }
+        await driver.ClickAsync("History");
+        await driver.ClickAsync("Earlier passages");
+        await driver.ClickAsync("Reveal image: Earlier camp");
+        await driver.ScrollToImageAsync("Earlier camp");
+        await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Earlier camp" && node.Bounds.Height > 100));
+        await driver.ClickAsync("Hide image: Earlier camp");
+        File.Delete(files.ImagePath);
+        await driver.ClickAsync("Reveal image: Earlier camp");
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("This image could not be loaded."));
+        await driver.ClickAsync("Return to play");
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("History folder visit 24."));
+    }
+
+    [Fact]
     public async Task Actual_folder_debugger_refreshes_images_and_preserves_rejected_source()
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")

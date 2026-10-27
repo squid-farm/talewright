@@ -61,8 +61,9 @@ provide descriptive alt text for readers and for visible failure states.
 
 Web games download illustrations as readers scroll them into view, rather than downloading the
 whole artwork collection before play. Large images still mean longer downloads and use more
-memory when displayed. Earlier illustrations stay in the story's history, so test image-heavy stories on
-the phones and computers your readers will use.
+memory when displayed. Main play keeps a recent window of passages; readers can
+reveal earlier illustrations in [History](playing-and-saving.md#reading-earlier-passages).
+Test image-heavy stories on the phones and computers your readers will use.
 
 For itch.io web games, the recorded limits are **200 MB per file, 500 MB total, and 1,000 files**
 after unzipping. Check [itch.io's current requirements](https://itch.io/docs/creators/html5)
