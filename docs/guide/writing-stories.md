@@ -4,15 +4,16 @@ A tour of writing stories in **Talemark**, with a short example for each feature
 The [Talemark syntax reference](../reference/talemark-syntax.md)
 has every rule and option.
 
-For VS Code highlighting and scene/choice snippets, install the local
-[Talewright extension](../../tooling/vscode-talewright/README.md). It helps you edit;
-use `talewright validate` to check story correctness.
+For highlighting, suggestions and live checks on Linux x64, install the
+[Talewright extension](../../tooling/vscode-talewright/README.md).
+Use **Talewright: Validate Story** after CLI setup, or check a ZIP in the browser player.
+See [Getting started](getting-started.md) for both paths.
 
 ## Organizing your files
 
 - Put scenes in as many `.tale` files and subfolders as you like. Talewright reads them all.
-- Scene ids can use dots to group them, such as `camp.hub` or `temple.entrance`. Ids are lowercase words
-  joined by hyphens.
+- Scene ids can use dots to group them, such as `camp.hub` or `temple.entrance`. Lowercase words
+  joined by hyphens are the recommended style, not the only accepted spelling.
 - Lines starting with `//` are comments that players never see.
 
 The [Lost Relic sample](../../samples/LostRelic) uses one file per chapter.
@@ -43,6 +44,7 @@ Use them in prose, and Talewright takes care of the grammar:
 Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/talemark-syntax.md#1-storytalewrightyaml).
 See [substitutions](../reference/talemark-syntax.md#3-substitutions) for everything you can insert and the
 `#modifiers` you can apply.
+For a complete two-branch example, see [change a name in one place](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
 
 ## Stats and skills
 
@@ -57,6 +59,7 @@ By default, stories use a familiar d20-style ruleset:
 
 You can add your own stats (`courage`, `sanity`, ...), remove ones you don't want, or start from an
 empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
+For a complete declaration and check, see [add a skill for your setting](authoring-recipes.md#add-a-skill-for-your-setting).
 
 Change stats with effects: `~ player:hp -= 2` on its own line when a scene starts, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
@@ -114,6 +117,8 @@ YAML declaration. It is available throughout the story and starts as empty text
 until that effect executes. Its type stays fixed, and assignments copy values
 rather than link variables. For declaration order and forward references, see
 [declaring variables in Talemark](../reference/talemark-syntax.md#declaring-variables-in-talemark).
+Use a text variable for details such as a ship name that appears in several branches:
+[the recurring-name recipe](authoring-recipes.md#change-a-character-or-ship-name-in-one-place) shows how.
 
 ## Factions
 
@@ -259,11 +264,39 @@ game:
 Without a `creation` section, the story starts with the `player` you wrote. See
 [character creation](../reference/talemark-syntax.md#optional-character-creation) for the limits and defaults.
 
+## Images
+
+Put artwork in an `images/` folder inside your story folder. PNG, JPEG (`.jpg` or `.jpeg`) and
+WebP are supported. For example, with a file at `images/places/harbour.png`, write:
+
+```tale
+{image("places/harbour.png", "Sailing boats at a foggy harbour")}
+```
+
+The path starts **inside** `images/`, so do not include `images/` in the call.
+Match the filename's letter case and use `/` between folders. Images work in prose, dialogue,
+choice labels, formatting and conditional text. They display in browser and desktop players,
+including story ZIPs and published games.
+
+The second argument is **alt text**: a description for readers who cannot see the image and for
+cases where the image cannot load. It is literal text, not a substitution:
+`"{player:first-name}"` would display those exact characters rather than the player's name.
+Use `\"` for a quote inside an argument and `\\` for a backslash.
+
+Checking your story catches missing image files, unsupported formats and unsafe paths.
+It warns if alt text is missing or blank; the fallback is a description based on the filename.
+Use an explicit extension when possible: without one, Talewright tries `.png`, `.jpg`, `.jpeg`,
+then `.webp`, and warns if several files match.
+The check does not inspect whether the image's contents can actually be displayed, so play the
+story to check the artwork as well.
+
+Images load as they approach the visible part of the story and fit the available width.
+An image that fails to load shows its alt text and an error rather than stopping the story.
+Use reasonably sized artwork for your readers' devices; see
+[artwork and hosting size](sharing-your-story.md#artwork-and-hosting-size) before sharing.
+The old Markdown form `![description](path)` is not supported.
+See [image syntax](../reference/talemark-syntax.md#images) for the complete rules.
+
 ## Other options
 
 - `game.undo: false` in `story.talewright.yaml` hides the **Back** and **Forward** buttons. Saves still work.
-- `{image("path", "description")}` reserves an image at that narrative position, including in
-  dialogue or a choice label. Paths are relative to `images/`; description is optional literal
-  alt text. Use `\"` for an embedded quote and `\\` for a backslash. The old Markdown image
-  form is an error. Images aren't displayed or checked against files yet; see
-  [image syntax and current limits](../reference/talemark-syntax.md#images).

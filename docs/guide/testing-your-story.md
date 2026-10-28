@@ -3,12 +3,17 @@
 Talewright checks your whole story every time it loads, so most mistakes show up before anyone plays.
 There are three ways to test, from quickest to most thorough.
 
-> The command-line checks and Author Debugger need the [optional desktop tools](getting-started.md#optional-install-the-desktop-tools).
-> Until ready-made downloads arrive, write `dotnet run --project tooling/cli/src/Talewright.Cli --` instead of `talewright`.
+In VS Code, use **Talewright: Validate Story** and **Talewright: Open Author Debugger** from the
+Command Palette. Run **Talewright: Set Up CLI** if needed; the extension's live diagnostics and the
+CLI are separate. See [tool setup](cli-installation.md) for portable downloads and prerequisites.
+The examples below use `talewright`, the .NET-tool command. From a portable tools folder, use
+`.\Talewright.Cli.exe` on Windows or `./Talewright.Cli` on Mac/Linux instead, and quote story paths
+that contain spaces.
 
 ## 1. Open it in a player
 
-Open your story in the web or desktop player. If there are errors, you'll see a list instead of the
+Make a story ZIP using **Talewright: Publish Story ZIP** or your file manager, then open it in the
+[web player](https://squid-farm.github.io/talewright/). If there are errors, you'll see a list instead of the
 story. Each line gives the file, line and column, an error code and a description:
 
 ```text
@@ -16,6 +21,8 @@ intro.tale:4:41  TW2001  Unknown item 'lantern'.
 ```
 
 Look up any code in the [error code reference](../reference/diagnostics.md).
+After changing source files, save, make a fresh ZIP and open it again; browser play does not refresh
+automatically. If you already use a desktop player, it can also open a story folder.
 
 ## 2. Check it from the command line
 
@@ -39,6 +46,10 @@ with whatever game state you need:
 ```bash
 talewright debug my-story
 ```
+
+The editor action opens this same native testing window, not a VS Code debug adapter or F5 session.
+The portable CLI includes the debugger, but its window still needs the system components listed
+in the [setup guide](cli-installation.md#if-something-goes-wrong).
 
 1. **Search scenes** by id or title and pick one.
 2. Optionally set a **seed** (for repeatable dice) and create the player character.

@@ -9,20 +9,20 @@ running your story.
 **Optional:** You do not need this extension to write a story. A plain-text editor
 and the browser player are enough. The Linux x64 VSIX includes a compatible self-contained
 language server: no separate Talewright tool, .NET SDK/runtime, server-path setting or build is needed.
-The Marketplace publishing pipeline is configured, but a live listing is not yet verified.
+The extension is available on the Marketplace.
 
 Use VS Code 1.100 or later on a supported Linux x64 extension host.
 
 1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
    from the VS Code Marketplace. It provides the YAML editor features used by the schema.
-2. After the first public publication, install **Talewright** by **squid-farm** from
+2. Install **Talewright** by **squid-farm** from
    [the Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright).
    For a preview, choose **Switch to Pre-Release Version**.
-   Until then, or as a fallback, obtain the Linux x64 VSIX from
+   As a download-and-install alternative, obtain the Linux x64 VSIX from
    [GitHub Releases](https://github.com/squid-farm/talewright/releases) or the
    **talewright-vscode** artifact of a successful **Build** run. Contributors can build it below.
-3. In VS Code, open **Extensions**, choose **... > Install from VSIX...**, and
-   select the file. Reload VS Code if prompted.
+3. If you downloaded a VSIX, open **Extensions**, choose **... > Install from VSIX...**, and
+   select the file. Marketplace installations do not need this step. Reload VS Code if prompted.
 4. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
    The language ID remains `tale`.
 5. Trust the story folder to enable live compiler diagnostics and story-aware completion/hover.

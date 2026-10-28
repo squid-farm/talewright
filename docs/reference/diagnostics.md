@@ -56,6 +56,10 @@ diagnostics when files change. Lookup reads paths, not image bytes; it does not
 validate file contents or render images. Successful compilation stores the selected
 story-root-relative path and effective alt text in each media node.
 
+For an unknown skill, check the id's spelling and its declaration under `game.ruleset.stats`.
+Giving a character a value does not declare the skill. See the complete
+[custom skill recipe](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
+
 ## TW3xxx: story structure
 
 | Code | Meaning | Usual fix |
