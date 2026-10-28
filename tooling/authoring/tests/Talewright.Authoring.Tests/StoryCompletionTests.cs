@@ -227,6 +227,20 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("{player:pronoun#|}", true)]
+    [InlineData("{player:pronoun#one-|}", true)]
+    [InlineData("{player:pronoun#object#|}", true)]
+    [InlineData("{player:first-name#|}", false)]
+    [InlineData("{item:rope#|}", false)]
+    public void One_many_completion_is_pronoun_only(string line, bool offered)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line);
+        var matches = StoryCompletion.Complete(analysis, position).Where(item => item.Label == "one-many").ToArray();
+        Assert.Equal(offered ? 1 : 0, matches.Length);
+        if (offered) Assert.Contains("singular", matches[0].Detail);
+    }
+
+    [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:h|p+=3", "hp", "~ player:hp+=3")]
     [InlineData("{player:pronoun#|}", "object", "{player:pronoun#object}")]

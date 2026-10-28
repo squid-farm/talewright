@@ -26,6 +26,13 @@ public sealed class DelegateTextModifier(string name, Func<string, ModifierConte
     public override string ToString() => "#" + name;
 }
 
+public sealed record OneManyTextModifier(string Singular, string Plural) : ITextModifier
+{
+    public string Name => "one-many";
+
+    public string Apply(string text, ModifierContext context) => context.IsPlural ? Plural : Singular;
+}
+
 /// <summary>The set of modifiers available to a story. <see cref="CreateDefault"/> contains the built-ins.</summary>
 public sealed class TextModifierRegistry
 {
@@ -50,9 +57,9 @@ public sealed class TextModifierRegistry
         return registry;
     }
 
-    /// <summary>Checks engine-owned instance provenance, not the modifier's name or wrapper type.</summary>
+    /// <summary>Recognizes sealed engine selectors and engine-owned modifier instances, never names alone.</summary>
     public static bool IsBuiltIn(ITextModifier modifier) =>
-        BuiltIns.Any(builtIn => ReferenceEquals(builtIn, modifier));
+        modifier is OneManyTextModifier || BuiltIns.Any(builtIn => ReferenceEquals(builtIn, modifier));
 
     public TextModifierRegistry Register(ITextModifier modifier)
     {

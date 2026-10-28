@@ -40,7 +40,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW2003 | Wrong kind of value, e.g. assigning text to a number, comparing text with a number, or arithmetic on text. | Keep each variable's declared type. Text uses `=` and text-to-text `==` / `!=`; numbers retain arithmetic. Declare text with a quoted initial value under `vars:`. |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |
 | TW2005 | Unknown `@predicate`. | Named predicates come from C# extensions; check the name or register it. |
-| TW2006 | Unknown `#modifier`. | Use `#possessive`, `#capitalize`, `#upper`, `#lower` or `#a`. |
+| TW2006 | Unknown or invalid `#modifier`, unsupported target or malformed modifier arguments. | Follow the modifier's documented arguments. `#one-many("singular", "plural")` requires exactly two quoted strings on a pronoun reference, with singular first. It does not work on names, items or counts. |
 | TW2007 | A variable's integer or text type cannot be inferred, e.g. a circular assignment chain without a known type. | Declare an initial value under `vars:` in the manifest, or fix the unresolved expression. Types are fixed; discovery never executes assignments. |
 | TW2010 | Unsafe image path. | Use a relative path inside `images/`, with `/` separators and no parent traversal, absolute path, web address, query string or fragment. |
 | TW2011 | Unsupported image format. | Use PNG (`.png`), JPEG (`.jpg` or `.jpeg`), or WebP (`.webp`). |

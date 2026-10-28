@@ -48,6 +48,7 @@ public sealed partial class ServerTests
     [InlineData("@requires @IsH|", "IsHero")]
     [InlineData("@requires flag:door-|", "door-open")]
     [InlineData("{player:pronoun#|}", "reflexive")]
+    [InlineData("{player:pronoun#one-|}", "one-many")]
     [InlineData("{player:pronoun#possessive(|)}", "\"independent\"")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)

@@ -138,6 +138,20 @@ internal sealed class ExpressionParser
             for (var index = 0; index < calls.Count; index++)
             {
                 var call = calls[index];
+                if (call.Name == "one-many")
+                {
+                    if (value is not PronounRef || call.Argument is null || call.PluralArgument is null)
+                    {
+                        diagnostics.Error("TW2006",
+                            "Use '<character>:pronoun#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on pronoun references only.",
+                            location.Offset(call.Offset));
+                        return null;
+                    }
+
+                    modifiers.Add(new OneManyTextModifier(call.Argument, call.PluralArgument));
+                    continue;
+                }
+
                 if (value is PronounRef pronoun)
                 {
                     if (index == 0 && PronounModifierForm(call, pronoun, location, diagnostics) is { } form)
@@ -233,8 +247,8 @@ internal sealed class ExpressionParser
         }
     }
 
-    /// <summary>One <c>#name</c> or <c>#name("argument")</c> in a substitution's modifier chain.</summary>
-    private sealed record ModifierCall(string Name, int Offset, string? Argument, int ArgumentOffset)
+    /// <summary>A modifier call, with a second string supported only for <c>#one-many</c>.</summary>
+    private sealed record ModifierCall(string Name, int Offset, string? Argument, int ArgumentOffset, string? PluralArgument)
     {
         /// <summary>Scans the modifier chain starting at the first <c>#</c>. Returns null after reporting a diagnostic.</summary>
         public static List<ModifierCall>? Scan(string text, int start, SourceLocation location, DiagnosticBag diagnostics)
@@ -253,6 +267,7 @@ internal sealed class ExpressionParser
 
                 var name = text[nameStart..i].Trim();
                 string? argument = null;
+                string? pluralArgument = null;
                 var argumentOffset = i;
                 if (i < text.Length && text[i] == '(')
                 {
@@ -271,6 +286,28 @@ internal sealed class ExpressionParser
 
                     argument = text[(i + 1)..close];
                     i = SkipSpace(text, close + 1);
+                    if (name == "one-many")
+                    {
+                        if (i >= text.Length || text[i] != ',')
+                        {
+                            return Error("'#one-many' requires exactly two quoted strings: #one-many(\"singular\", \"plural\").", i);
+                        }
+
+                        i = SkipSpace(text, i + 1);
+                        if (i >= text.Length || text[i] != '"')
+                        {
+                            return Error("Write the plural (second) argument to '#one-many' in double quotes.", i);
+                        }
+
+                        close = text.IndexOf('"', i + 1);
+                        if (close < 0)
+                        {
+                            return Error("The plural argument to '#one-many' is missing its closing '\"'.", i);
+                        }
+
+                        pluralArgument = text[(i + 1)..close];
+                        i = SkipSpace(text, close + 1);
+                    }
                     if (i >= text.Length || text[i] != ')')
                     {
                         return Error($"Expected ')' after the argument to '#{name}'.", i);
@@ -283,7 +320,7 @@ internal sealed class ExpressionParser
                     }
                 }
 
-                calls.Add(new ModifierCall(name, offset, argument, argumentOffset));
+                calls.Add(new ModifierCall(name, offset, argument, argumentOffset, pluralArgument));
             }
 
             return calls;

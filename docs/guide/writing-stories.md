@@ -46,6 +46,11 @@ See [substitutions](../reference/talemark-syntax.md#3-substitutions) for everyth
 `#modifiers` you can apply.
 For a complete two-branch example, see [change a name in one place](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
 
+For wording that changes with a character's chosen pronouns, supply both forms:
+`{player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} arrived.`
+The first form is singular agreement; the second is plural agreement, including
+singular they. This selector works on pronouns only, not names or items.
+
 ## Stats and skills
 
 By default, stories use a familiar d20-style ruleset:

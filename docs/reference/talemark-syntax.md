@@ -353,6 +353,31 @@ The older `player:pronoun:object` and `player:pronoun.object` spellings are erro
 The dotted forms `pronoun.subject`, `pronoun.object`, `pronoun.possessive`,
 `pronoun.possessive-pronoun` and `pronoun.reflexive` are rejected even if a custom stat has the same name.
 
+**Pronoun agreement.** Supply two wordings with `#one-many("singular", "plural")`:
+
+```tale
+{player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} to admit it.
+{guide:pronoun#one-many("was", "were")#capitalize} it worth the journey?
+```
+
+The first quoted string is selected for singular agreement; the second for plural
+agreement. Selection reads the character's effective pronouns at render time,
+including the player's character-creation choice. Built-in `she`, `he` and `it`
+select the first string; `they` selects the second, including singular they.
+Custom sets use their required `agreement` setting.
+
+The selector outputs only the chosen text, not the pronoun. Both strings are
+required (empty strings are allowed); authors control the wording, including
+nonstandard grammar. Other text modifiers can follow it, as with `#capitalize`.
+Like the possessive argument, these quoted arguments do not decode backslash
+escapes. Commas, apostrophes, braces and `#` inside a quoted string are text.
+
+This selector is **pronoun-only**. Names, character-root `name-agreement`,
+population, item quantities and item names never select a branch. Unsupported
+targets, missing arguments and extra arguments produce TW2006; an unclosed quote
+can leave the substitution unclosed (TW1004). This adds no general multi-argument
+modifier support or grammar inference.
+
 ### Images
 
 ```tale

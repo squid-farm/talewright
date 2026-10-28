@@ -54,6 +54,20 @@ public sealed class AuthorReloadTests
     }
 
     [Fact]
+    public void One_many_is_engine_owned_and_its_arguments_are_compared_during_reload()
+    {
+        var tale = Tale.Replace("[Travel]", "[{player:pronoun#one-many(\"Travel\", \"Travel together\")}]")
+            .Replace("Old passage.", "{player:pronoun#one-many(\"has\", \"have\")} arrived.");
+        var original = AuthorSession.Create(Compile(tale), new("start"), seed: 42);
+        original.Choose("c0");
+        var candidate = original.Reload(Compile(tale.Replace("arrived.", "returned.")));
+        Assert.Contains("have returned.", candidate.Current.Document.ToPlainText());
+        var error = Assert.Throws<AuthorReloadException>(() =>
+            original.Reload(Compile(tale.Replace("\"Travel together\"", "\"Leave together\""))));
+        Assert.Contains("previously consumed", error.Message);
+    }
+
+    [Fact]
     public void Reload_replaces_current_prose_without_duplicating_entry_visits_dice_or_triggers()
     {
         var original = AuthorSession.Create(Compile(), new("start"), captureDecisions: true, seed: 42);

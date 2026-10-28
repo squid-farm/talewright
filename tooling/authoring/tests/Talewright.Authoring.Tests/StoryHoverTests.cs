@@ -37,6 +37,7 @@ public sealed class StoryHoverTests
     [InlineData("~ player:hp +|= 1", "Adds a numeric", "+=")]
     [InlineData("{player:pronoun#ob|ject}", "Pronoun form: object", "object")]
     [InlineData("{player:pronoun#posse|ssive}", "Pronoun form: possessive", "possessive")]
+    [InlineData("{player:pronoun#one-|many(\"has\", \"have\")}", "effective pronoun agreement", "one-many")]
     [InlineData("{player:pro|noun}", "Gives the subject form", "pronoun")]
     [InlineData("{im|age(\"maps/camp\", \"Camp\")}", "inserts image media", "image")]
     [InlineData("-> E|ND", "Ends the story", "END")]

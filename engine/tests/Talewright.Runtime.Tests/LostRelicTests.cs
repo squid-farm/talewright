@@ -34,6 +34,26 @@ public class LostRelicTests
     [Fact]
     public void Shipped_sample_compiles_without_errors_or_warnings() => Story();
 
+    [Fact]
+    public void Opening_agreement_is_correct_for_every_offered_pronoun_and_survives_restore()
+    {
+        var story = Story();
+        Assert.Equal(["she", "they", "he"], story.Creation!.Pronouns);
+        foreach (var pronouns in story.Creation.Pronouns)
+        {
+            var selection = story.Creation.Default(story.World.Characters[EntityId.Player]) with { Pronouns = pronouns };
+            var history = new StoryHistory(story, 42, selection);
+            var expected = $"{pronouns} {(pronouns == "they" ? "have" : "has")} to admit";
+            Assert.Contains(expected, history.Current.Document.ToPlainText());
+            Assert.DoesNotContain("they has", history.Current.Document.ToPlainText());
+            var restored = StoryHistory.Restore(story, history.Save());
+            Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+            Choose(history, "Continue");
+            history.Back();
+            Assert.Contains(expected, history.Current.Document.ToPlainText());
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]

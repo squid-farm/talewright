@@ -11,7 +11,7 @@ one season to find the **Relic of Ysh** before they hand the expedition to someo
 
 > guide: {player:first-name} {player:last-name}. You're later than your letter promised. I'm Tomas — the guild sent me.
 
-{player:last-name#possessive} reputation for punctuality is, {player:pronoun} has to admit, deserved.
+{player:last-name#possessive} reputation for punctuality is, {player:pronoun} {player:pronoun#one-many("has", "have")} to admit, deserved.
 
 -> camp.hub
 
