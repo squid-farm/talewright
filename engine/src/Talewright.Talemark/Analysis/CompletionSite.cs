@@ -19,6 +19,7 @@ internal static class ExpressionCompletion
         ["object"] = "Pronoun form: object, such as her, him or them.",
         ["possessive"] = "Pronoun form: possessive. Defaults to the determiner (her, their); use #possessive(\"independent\") for hers or theirs.",
         ["reflexive"] = "Pronoun form: reflexive, such as herself or themselves.",
+        ["one-many"] = "Pronoun agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement only; singular they uses the second form.",
     };
 
     private static readonly IReadOnlyDictionary<string, string> PossessiveArgumentDetails = new Dictionary<string, string>
@@ -69,11 +70,16 @@ internal static class ExpressionCompletion
                     kinds = [AuthoringSymbolKind.Modifier];
                     if (tokenIndex == 4 && IsPronounReference(tokens, symbols))
                     {
-                        keywords = ExpressionParser.PronounFormModifiers;
+                        keywords = [.. ExpressionParser.PronounFormModifiers, "one-many"];
                         details = PronounFormDetails;
                         // On a pronoun, #possessive selects a form, so the text modifier of that name is not offered.
                         candidates = symbols.Where(symbol =>
                             !(symbol.Kind == AuthoringSymbolKind.Modifier && keywords.Contains(symbol.Name))).ToArray();
+                    }
+                    else if (IsPronounReference(tokens, symbols))
+                    {
+                        keywords = ["one-many"];
+                        details = PronounFormDetails;
                     }
                 }
             }

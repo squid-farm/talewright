@@ -707,6 +707,90 @@ public class CompilerTests
     }
 
     [Fact]
+    public void One_many_reads_effective_pronouns_on_each_render_not_name_agreement()
+    {
+        var story = Ok("=== a\n{player:pronoun#one-many(\"has\", \"have\")#capitalize}\n-> END");
+        var state = GameState.CreateInitial(story.World, 1);
+        var scene = story.GetScene(new SceneId("a"));
+        Assert.Equal("Has", Render(story, scene, state));
+        state.Apply(new CharacterIdentityChanged(EntityId.Player, "the goblins", "", Pronouns.They));
+        Assert.Equal("Have", Render(story, scene, state));
+        state.Apply(new CharacterIdentityChanged(EntityId.Player, "the pack", "", Pronouns.It));
+        Assert.Equal("Has", Render(story, scene, state));
+    }
+
+    [Theory]
+    [InlineData("she", "has")]
+    [InlineData("he", "has")]
+    [InlineData("they", "have")]
+    [InlineData("it", "has")]
+    public void One_many_selects_singular_first_plural_second_for_built_ins(string pronouns, string expected)
+    {
+        var story = Ok("=== a\n{player:pronoun#one-many(\"has\", \"have\")}\n-> END",
+            Yaml.Replace("pronouns: she", $"pronouns: {pronouns}\n    name-agreement: plural"));
+        Assert.Equal(expected, Render(story, story.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
+    [InlineData("singular", "author's singular, {form} (#one-many)")]
+    [InlineData("plural", "author's plural, {form} (#one-many)")]
+    public void One_many_uses_explicit_custom_agreement_and_preserves_authored_text(string agreement, string expected)
+    {
+        var yaml = Yaml.Replace("pronouns: she",
+            $"pronouns: {{ subject: xe, object: xem, possessive-pronoun: {{ determiner: xyr, independent: xyrs }}, reflexive: xemself, agreement: {agreement} }}");
+        var story = Ok("""
+            === a
+            {player:pronoun#one-many("author's singular, {form} (#one-many)", "author's plural, {form} (#one-many)")}
+            -> END
+            """, yaml);
+        Assert.Equal(expected, Render(story, story.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
+    [InlineData("she")]
+    [InlineData("they")]
+    public void One_many_accepts_empty_strings_and_surrounding_argument_whitespace(string pronouns)
+    {
+        var story = Ok("=== a\nbefore{player:pronoun#one-many( \"\" , \"\" )}after\n-> END",
+            Yaml.Replace("pronouns: she", $"pronouns: {pronouns}"));
+        Assert.Equal("beforeafter", Render(story, story.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
+    [InlineData("player:first-name#one-many(\"has\", \"have\")", "pronoun references only")]
+    [InlineData("player:name#one-many(\"has\", \"have\")", "pronoun references only")]
+    [InlineData("item:rope#one-many(\"has\", \"have\")", "pronoun references only")]
+    [InlineData("player:hp#one-many(\"has\", \"have\")", "pronoun references only")]
+    [InlineData("var:torches#one-many(\"has\", \"have\")", "pronoun references only")]
+    [InlineData("player:pronoun#one-many", "two quoted strings")]
+    [InlineData("player:pronoun#one-many()", "double quotes")]
+    [InlineData("player:pronoun#one-many(\"has\")", "exactly two")]
+    [InlineData("player:pronoun#one-many(has, \"have\")", "double quotes")]
+    [InlineData("player:pronoun#one-many(\"has\", have)", "double quotes")]
+    [InlineData("player:pronoun#one-many(\"has\", 2)", "double quotes")]
+    [InlineData("player:pronoun#one-many(\"has\" \"have\")", "exactly two")]
+    [InlineData("player:pronoun#one-many(\"has\", \"have\", \"third\")", "Expected ')'")]
+    [InlineData("player:pronoun#one-many(\"has\", \"have\"", "Expected ')'")]
+    [InlineData("player:pronoun#one-many(\"has\", \"have\") extra", "Expected '#' or the end")]
+    [InlineData("player:pronoun#possessive(\"determiner\", \"independent\")", "Expected ')'")]
+    public void Unsupported_one_many_forms_report_modifier_diagnostics(string expression, string message)
+    {
+        var error = Error($"=== a\n{{{expression}}}\n-> END", "TW2006");
+        Assert.Contains(message, error.Message);
+        Assert.Equal("main.tale", error.Location.File);
+        Assert.Equal(2, error.Location.Line);
+        Assert.InRange(error.Location.Column, 2, expression.Length + 2);
+    }
+
+    [Fact]
+    public void Unclosed_one_many_quote_reports_an_unclosed_substitution() =>
+        Error("=== a\n{player:pronoun#one-many(\"has\", \"have)}\n-> END", "TW1004");
+
+    [Fact]
+    public void One_many_does_not_make_bare_character_references_valid() =>
+        Error("=== a\n{player#one-many(\"has\", \"have\")}\n-> END", "TW2001");
+
+    [Fact]
     public void Custom_pronouns_and_named_predicates()
     {
         var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself, agreement: singular }");

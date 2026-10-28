@@ -15,9 +15,9 @@ RenderedParagraph[ RenderedText("Mara's", None), RenderedText(" torch", Strong) 
 | File | Contents |
 |---|---|
 | `Templates/Template.cs` | Input AST. Blocks: `ParagraphTemplate`, `SpeechTemplate`, `ConditionalBlockTemplate`. Inlines: `TextTemplate`, `StyledTemplate`, `LineBreakTemplate`, `MediaTemplate`, `SubstitutionTemplate`, `ConditionalInlineTemplate`. `TextStyle` flags (Emphasis, Strong, Code) nest. |
-| `Templates/TextModifiers.cs` | `ITextModifier`, `DelegateTextModifier`, `TextModifierRegistry`. Defaults: `#possessive`, `#capitalize`, `#upper`, `#lower`, `#a` (adds a/an). Modifiers chain left to right. |
+| `Templates/TextModifiers.cs` | `ITextModifier`, `DelegateTextModifier`, `TextModifierRegistry`. Defaults: `#possessive`, `#capitalize`, `#upper`, `#lower`, `#a` (adds a/an). The compiler creates `OneManyTextModifier` for the pronoun-only two-string selector. Modifiers chain left to right. |
 | `Grammar/EnglishGrammar.cs` | `IGrammar` + `EnglishGrammar`: Chicago-style possessives (`Burns's`, `the guards'`, `the children's`), indefinite articles (`an hour`, `a unicorn`), capitalisation. |
-| `Rendering/TemplateRenderer.cs` | `Render(blocks, state)` and `RenderInlines(inlines, state)`. Evaluates substitutions and conditionals, applies modifiers, merges adjacent runs, collapses whitespace left by false conditionals, drops empty paragraphs. |
+| `Rendering/TemplateRenderer.cs` | `Render(blocks, state)` and `RenderInlines(inlines, state)`. Evaluates substitutions and conditionals, uses effective pronoun agreement for `#one-many`, applies modifiers, merges adjacent runs, collapses whitespace left by false conditionals, drops empty paragraphs. |
 | `Rendering/RenderedDocument.cs` | Output model: `RenderedDocument` → `RenderedParagraph`, `RenderedSpeech`, `RenderedNote` (`NoteKind` Check/Change/Info); inlines `RenderedText`, `RenderedLineBreak`, `RenderedMedia`. `ToPlainText()` for tests and logs. |
 
 ## Extending

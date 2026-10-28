@@ -69,6 +69,11 @@ internal static class AuthorReloadComparison
         }
         if (left is ITextModifier || right is ITextModifier)
         {
+            if (left is OneManyTextModifier selector)
+            {
+                return right is OneManyTextModifier other && selector == other;
+            }
+
             return left is ITextModifier modifier && TextModifierRegistry.IsBuiltIn(modifier)
                 && ReferenceEquals(left, right);
         }

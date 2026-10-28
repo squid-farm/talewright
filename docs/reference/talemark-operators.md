@@ -46,7 +46,7 @@ For example, the decided string `"She said \"Go\"."` contains `She said "Go".`.
 Image path and alt arguments implement these escapes today. These rules do not introduce a
 quoted choice-label spelling or a new formatting feature.
 
-**Today:** expression string literals and the possessive modifier argument use double quotes, but
+**Today:** expression string literals and the possessive/one-many modifier arguments use double quotes, but
 their scanners do not decode `\"` or `\\`. Unclosed strings can produce TW1001, TW2006, or TW1004
 when the enclosing brace cannot be found. Prose already supports `\{` and `\}`. Existing scene
 titles, dialogue and choice labels still use their current unquoted forms:
@@ -153,9 +153,17 @@ Argument values belong to the modifier; they are not globally reserved names.
 Each modifier validates its own supported values and reports a clear diagnostic for invalid ones.
 This shape is a contract for future modifiers, not permission to pass extra arguments to today's ones.
 
-Today, only pronoun `#possessive` accepts an argument: `"determiner"` (default, as in *her book*) or
+Pronoun `#possessive` accepts one argument: `"determiner"` (default, as in *her book*) or
 `"independent"` (as in *hers*). For example, `{player:pronoun#possessive("independent")}`.
-The compiler accepts one string, not a comma-separated list. Other built-in modifiers take no arguments:
+It does not accept a comma-separated list. The pronoun-only selector
+`{player:pronoun#one-many("has", "have")}` requires exactly two quoted strings,
+singular first and plural second. It returns the authored text selected by the
+effective pronoun set's `agreement` at render time; singular they uses plural
+agreement. It never uses displayed-name grammar, groups, population, counts or
+items. Empty strings are allowed. Following text modifiers operate on the selected
+text, for example `#one-many("has", "have")#capitalize`.
+This is dedicated two-string selector support, not generalized multi-argument parsing.
+Other built-in modifiers take no arguments:
 `#capitalize`, `#upper`, `#lower`, `#a`, and `#possessive` on a name.
 `#object` and `#reflexive` select a pronoun form and must immediately follow `pronoun`.
 Plain `pronoun` is the subject form; `#subject` is an error.
@@ -163,6 +171,9 @@ See the [pronoun forms table](talemark-syntax.md#3-substitutions).
 
 Completion offers finite values after `#possessive(` and identifies `"determiner"` as the default.
 `"hers"` is not an alias for `"independent"`: it produces TW2006 pointing at the argument.
+Completion and hover offer `one-many` on pronoun references only, with its fixed
+argument order. Its strings are author text, not finite argument suggestions.
+Wrong targets, missing strings and extra arguments produce TW2006.
 
 ### Image syntax decision
 
@@ -211,9 +222,10 @@ The language server uses the shared authoring completion provider.
 |---|---|
 | `:` access, `.` within names, shared story-name characters | Implemented in [#191](https://github.com/squid-farm/talewright/issues/191). |
 | `#` pronoun forms, possessive values and default completion detail | Implemented in [#190](https://github.com/squid-farm/talewright/issues/190). |
+| Pronoun-only `#one-many("singular", "plural")` | Implemented in [#192](https://github.com/squid-farm/talewright/issues/192), selecting from effective pronoun `agreement`, including character-creation choices. |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197); enclosing braces and choice labels respect quoted delimiters. Expression and modifier string decoding remains separate work under [#184](https://github.com/squid-farm/talewright/issues/184). Prose `\{` and `\}` already work. |
-| Comma-separated multi-argument modifiers | Decided contract; today's modifier parser accepts at most one argument. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
+| Comma-separated multi-argument modifiers | Only the pronoun `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts; alt is optional and literal, never a substitution template. Quoted paths are asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |

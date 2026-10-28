@@ -1,5 +1,6 @@
 using System.Text;
 using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Narrative.Grammar;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
@@ -101,7 +102,10 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     private string Substitute(SubstitutionTemplate substitution, EvaluationContext context)
     {
         var text = ExpressionEvaluator.Evaluate(substitution.Value, context).ToString();
-        var modifierContext = new ModifierContext(grammar, substitution.IsPlural);
+        var isPlural = substitution.Value is PronounRef pronoun
+            ? context.State.GetCharacterDefinition(pronoun.Character).Pronouns.Agreement == GrammaticalNumber.Plural
+            : substitution.IsPlural;
+        var modifierContext = new ModifierContext(grammar, isPlural);
         foreach (var modifier in substitution.Modifiers)
         {
             text = modifier.Apply(text, modifierContext);
