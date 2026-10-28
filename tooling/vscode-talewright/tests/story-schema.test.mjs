@@ -174,6 +174,7 @@ test('custom possessive pronouns require nested determiner and independent value
     object: 'xem',
     'possessive-pronoun': { determiner: 'xer', independent: 'xers' },
     reflexive: 'xemself',
+    agreement: 'singular',
   };
   assertValid(validate, pronouns, 'nested possessive forms');
   for (const forms of ['xers', null, [], {}, { determiner: 'xer' }, { independent: 'xers' },
@@ -183,6 +184,36 @@ test('custom possessive pronouns require nested determiner and independent value
   const { 'possessive-pronoun': omitted, ...missing } = pronouns;
   assertInvalid(validate, missing, 'missing possessive forms', 'required');
   assertInvalid(validate, { ...pronouns, possessive: 'xer' }, 'old flat possessive', 'additionalProperties');
+});
+
+test('pronoun and displayed-name agreement are independent, explicit grammar fields', () => {
+  const validatePronouns = compileSubschema(schema.definitions.customPronouns);
+  const validateCharacter = compileSubschema(schema.definitions.character);
+  const pronouns = {
+    subject: 'xe', object: 'xem', reflexive: 'xemself',
+    'possessive-pronoun': { determiner: 'xyr', independent: 'xyrs' },
+    agreement: 'singular',
+  };
+  const { agreement, ...missing } = pronouns;
+  assertInvalid(validatePronouns, missing, 'missing agreement', 'required');
+  for (const value of [true, false, 'yes', 'Singular', null, [], {}, '']) {
+    assertInvalid(validatePronouns, { ...pronouns, agreement: value }, 'invalid agreement');
+    assertInvalid(validateCharacter, { 'first-name': 'Ada', 'name-agreement': value }, 'invalid name agreement');
+  }
+  for (const agreement of ['singular', 'plural']) {
+    for (const nameAgreement of ['singular', 'plural']) {
+      assertValid(validateCharacter, {
+        'first-name': 'the pack', 'name-agreement': nameAgreement, pronouns: { ...pronouns, agreement },
+      }, 'independent grammatical fields');
+    }
+  }
+  for (const replacement of [false, true]) {
+    assertInvalid(validatePronouns, { ...(replacement ? pronouns : missing), plural: false },
+      'obsolete pronoun plural', 'additionalProperties');
+    assertInvalid(validateCharacter, {
+      'first-name': 'the goblins', plural: true, ...(replacement ? { 'name-agreement': 'plural' } : {}),
+    }, 'obsolete character plural', 'additionalProperties');
+  }
 });
 
 test('schema rejects unknown keys at every closed reader mapping', async () => {
@@ -202,6 +233,7 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
       object: 'xem',
       'possessive-pronoun': { determiner: 'xyr', independent: 'xyrs' },
       reflexive: 'xemself',
+      agreement: 'singular',
     }],
     ['possessivePronouns', schema.definitions.possessivePronouns, { determiner: 'xyr', independent: 'xyrs' }],
     ['item', schema.definitions.item, {}],

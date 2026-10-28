@@ -27,6 +27,7 @@ characters:
     inventory: [coin]
   guide:
     first-name: Wick
+    name-agreement: singular
     pronouns:
       subject: xe
       object: xem
@@ -34,7 +35,7 @@ characters:
         determiner: xyr
         independent: xyrs
       reflexive: xemself
-      plural: true
+      agreement: plural
     inventory: {coin: 2}
 items:
   coin: Silver coin

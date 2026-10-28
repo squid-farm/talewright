@@ -19,7 +19,7 @@ public class NarrativeTests
             Ruleset.Empty,
             [
                 new CharacterDefinition(EntityId.Player, "Mara", "Burns", Pronouns.She, new Dictionary<StatId, int>(), new Dictionary<ItemId, int>()),
-                new CharacterDefinition(Guards, "the guards", "", Pronouns.They, new Dictionary<StatId, int>(), new Dictionary<ItemId, int>(), IsPluralName: true),
+                new CharacterDefinition(Guards, "the guards", "", Pronouns.They, new Dictionary<StatId, int>(), new Dictionary<ItemId, int>(), NameAgreement: GrammaticalNumber.Plural),
             ],
             [], [], [new FlagId("lit")], new Dictionary<VarId, int>()),
         1);

@@ -514,14 +514,16 @@ internal sealed class StoryYamlReader
                 continue;
             }
 
-            CheckKeys(body, "first-name", "last-name", "pronouns", "stats", "inventory", "plural");
+            CheckKeys(body, "first-name", "last-name", "pronouns", "stats", "inventory", "name-agreement");
             var firstName = RequiredScalar(body, "first-name") ?? id;
             var lastName = Scalar(Get(body, "last-name")) ?? string.Empty;
             var pronouns = ReadPronouns(Get(body, "pronouns"));
             var stats = ReadStatMap(Get(body, "stats"), ruleset);
             var inventory = ReadInventory(Get(body, "inventory"), items);
-            var plural = Scalar(Get(body, "plural")) is "true" or "yes";
-            characters.Add(new CharacterDefinition(new EntityId(id), firstName, lastName, pronouns, stats, inventory, plural));
+            var nameAgreement = Get(body, "name-agreement") is { } number
+                ? ReadGrammaticalNumber(number, "name-agreement")
+                : GrammaticalNumber.Singular;
+            characters.Add(new CharacterDefinition(new EntityId(id), firstName, lastName, pronouns, stats, inventory, nameAgreement));
         }
 
         if (map is not null && !characters.Any(c => c.Id == EntityId.Player))
@@ -546,7 +548,7 @@ internal sealed class StoryYamlReader
 
         if (node is YamlMappingNode map)
         {
-            CheckKeys(map, "subject", "object", "possessive-pronoun", "reflexive", "plural");
+            CheckKeys(map, "subject", "object", "possessive-pronoun", "reflexive", "agreement");
             if (Get(map, "possessive") is { } oldPossessive)
             {
                 Error(oldPossessive, "TW4003", "The flat 'possessive' field is no longer supported. Use 'possessive-pronoun: { determiner: xer, independent: xers }'.", 0);
@@ -571,13 +573,23 @@ internal sealed class StoryYamlReader
             }
 
             string Form(string key) => RequiredScalar(map, key) ?? key;
-            return new Pronouns(Form("subject"), Form("object"), determiner, independent, Form("reflexive"), Scalar(Get(map, "plural")) is "true" or "yes");
+            var agreement = Get(map, "agreement") is { } number
+                ? ReadGrammaticalNumber(number, "agreement")
+                : Error(map, "TW4002", "Custom pronoun sets require 'agreement: singular' or 'agreement: plural'. Agreement describes grammar, not population.", GrammaticalNumber.Singular);
+            return new Pronouns(Form("subject"), Form("object"), determiner, independent, Form("reflexive"), agreement);
         }
 
         var keyword = Scalar(node) ?? string.Empty;
         return Pronouns.FromKeyword(keyword)
-            ?? Error(node, "TW4003", $"Unknown pronouns '{keyword}'. Use she, he, they, it, or a mapping with subject, object, reflexive and possessive-pronoun: {{ determiner: xer, independent: xers }}.", Pronouns.They);
+            ?? Error(node, "TW4003", $"Unknown pronouns '{keyword}'. Use she, he, they, it, or a mapping with subject, object, reflexive, agreement: singular|plural and possessive-pronoun: {{ determiner: xer, independent: xers }}.", Pronouns.They);
     }
+
+    private GrammaticalNumber ReadGrammaticalNumber(YamlNode node, string field) => Scalar(node) switch
+    {
+        "singular" => GrammaticalNumber.Singular,
+        "plural" => GrammaticalNumber.Plural,
+        _ => Error(node, "TW4003", $"'{field}' must be 'singular' or 'plural'; it describes grammar, not population.", GrammaticalNumber.Singular),
+    };
 
     private Dictionary<StatId, int> ReadStatMap(YamlNode? node, Ruleset ruleset)
     {
@@ -826,6 +838,13 @@ internal sealed class StoryYamlReader
         {
             if (Scalar(key) is { } name && !allowed.Contains(name))
             {
+                if (name == "plural" && (allowed.Contains("agreement") || allowed.Contains("name-agreement")))
+                {
+                    var replacement = allowed.Contains("agreement") ? "agreement" : "name-agreement";
+                    Error(key, "TW4003", $"The obsolete 'plural' key is no longer supported. Use '{replacement}: singular' or '{replacement}: plural' for grammar, not population.", 0);
+                    continue;
+                }
+
                 _diagnostics.Warning("TW4006", $"Unknown key '{name}' (ignored). Expected one of: {string.Join(", ", allowed)}.", At(key));
             }
         }

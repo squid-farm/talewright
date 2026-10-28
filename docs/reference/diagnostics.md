@@ -79,8 +79,8 @@ Giving a character a value does not declare the skill. See the complete
 | Code | Meaning | Usual fix |
 |---|---|---|
 | TW4001 | Invalid YAML. | Check indentation (spaces, not tabs) and colons. |
-| TW4002 | Something required is missing: `story.talewright.yaml` itself, `game.id`, `game.title`, `game.start`, the `player` character, a character's `first-name`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. |
-| TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers. | Read the message for the allowed values. |
+| TW4002 | Something required is missing: `story.talewright.yaml` itself, `game.id`, `game.title`, `game.start`, the `player` character, a character's `first-name`, custom pronoun `agreement`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. Custom pronoun sets require `agreement: singular` or `agreement: plural`. |
+| TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers, invalid grammatical number and obsolete `plural` settings. | Read the message for the allowed values. Replace pronoun `plural` with `agreement: singular\|plural` and character-root `plural` with `name-agreement: singular\|plural`; both describe grammar, not population. |
 | TW4004 | Unknown ruleset. | Use `generic` or `none`. |
 | TW4005 | Unknown stat or item in `story.talewright.yaml`. | Fix the spelling, or declare it under `game.ruleset.stats` / `items`. |
 | ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |

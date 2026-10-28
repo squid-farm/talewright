@@ -396,7 +396,7 @@ GitHub instead of recreating a local board.
   - singular nouns and names always take `'s` (`Mara's`, `Burns's`);
   - plurals ending in `s` take only `'` (`the guards'`);
   - irregular plurals take `'s` (`the children's`).
-  - Names and nouns carry a `plural` flag so the renderer can tell singular from plural.
+  - Characters carry `name-agreement: singular|plural` for displayed-name grammar; pronouns carry separate `agreement: singular|plural`. Neither describes population or group composition.
   - Overrides (AP style, or invented sci-fi/fantasy forms) are a **future phase**, handled through the `IGrammar` seam.
   - Note: this makes `{player:last-name#possessive}` → `Burns's`, not the `Burns'` from the original example.
 - **Path syntax:** use `entity:path` **everywhere**, in both substitutions and expressions, for consistency (e.g. `player:dex >= 12`). Flagged in case you prefer `player.dex` in expressions.
