@@ -56,8 +56,8 @@ class CiRoutingTests(unittest.TestCase):
             ("samples/LostRelic/story.talewright.yaml", {"build", "unit", "editor", "browser", "linux-desktop"}),
             ("samples/LostRelic/characters/guide.talewright.yaml",
              {"build", "unit", "editor", "browser", "linux-desktop"}),
-            ("player/tests/run_e2e.py", {"browser", "linux-desktop"}),
-            ("player/tests/native/atspi_adapter.py", {"browser", "linux-desktop"}),
+            ("player/tests/run_e2e.py", {"browser", "linux-desktop", "checks"}),
+            ("player/tests/native/atspi_adapter.py", {"browser", "linux-desktop", "checks"}),
             ("examples/CSharpStory/Directory.Build.props", {"build", "editor"}),
             ("benchmarks/performance/publish_results.py", {"checks"}),
             ("benchmarks/performance/run_publication.py", {"checks"}),
@@ -90,7 +90,8 @@ class CiRoutingTests(unittest.TestCase):
                     )
                 if "checks" in groups:
                     self.assertEqual(
-                        [{"project": "talewright-performance-tooling", "target": "check"}],
+                        [{"project": ("talewright-e2e-runner" if changed.startswith("player/")
+                                      else "talewright-performance-tooling"), "target": "check"}],
                         plan["checks"],
                     )
 
@@ -177,6 +178,9 @@ class CiRoutingTests(unittest.TestCase):
         self.assertIn(
             {"project": "talewright-performance-tooling", "target": "check"}, full["checks"],
         )
+        self.assertIn(
+            {"project": "talewright-e2e-runner", "target": "check"}, full["checks"],
+        )
         self.assertEqual(8, len(full["unit"]))
         self.assertIn(
             {"project": "Talewright.Authoring.Tests", "target": "test"}, full["unit"],
@@ -191,6 +195,43 @@ class CiRoutingTests(unittest.TestCase):
             {"e2e-web", "e2e-published-web"},
             {task["target"] for task in full["browser"]},
         )
+
+    def test_player_javascript_suite_is_selected_for_tests_and_implementation(self):
+        for changed in (
+            "player/tests/media.test.mjs",
+            "player/tests/new.test.mjs",
+            "player/src/Talewright.Player/Components/MediaView.razor.js",
+            "player/src/Talewright.Player/Components/NewComponent.razor.js",
+        ):
+            with self.subTest(changed=changed):
+                plan = make_plan(affected_graph(changed))
+                self.assertIn(
+                    {"project": "talewright-e2e-runner", "target": "check"}, plan["checks"],
+                )
+                self.assertIn(
+                    {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"}, plan["browser"],
+                )
+
+    def test_core_grammar_changes_keep_all_regular_and_published_player_suites(self):
+        plan = make_plan(affected_graph("engine/src/Talewright.Core/World/Pronouns.cs"))
+        for group, targets in (
+            ("browser", {"e2e-web", "e2e-published-web"}),
+            ("linux-desktop", {"e2e-linux", "e2e-published-linux"}),
+        ):
+            self.assertEqual(
+                targets,
+                {task["target"] for task in plan[group]
+                 if task["project"] == "Talewright.Player.E2E.Tests"},
+            )
+        self.assertIn({"project": "Talewright.Core.Tests", "target": "test"}, plan["unit"])
+        self.assertIn({"project": "Talewright.Narrative.Tests", "target": "test"}, plan["unit"])
+
+    def test_player_javascript_target_executes_every_existing_node_test_file(self):
+        project = json.loads((ROOT / "player/tests/project.json").read_text())
+        command = project["targets"]["check"]["options"]["command"]
+        self.assertEqual("node --test player/tests/*.test.mjs", command)
+        result = nx("run", "talewright-e2e-runner:check", "--output-style=static", capture=True)
+        self.assertIn("fail 0", result.stdout)
 
     def test_bad_git_revisions_fail_selection_without_a_success_manifest(self):
         with tempfile.TemporaryDirectory() as directory:

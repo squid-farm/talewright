@@ -10,6 +10,7 @@ namespace Talewright.Player.E2E.Tests;
 public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) : IAsyncLifetime
 {
     private readonly List<string> _errors = [];
+    private bool _reloading;
     private readonly string _artifacts = Path.Combine(
         Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? Path.Combine(AppContext.BaseDirectory, "test-results"),
         PlayerTarget.IsDesktop ? "linux" : host.BrowserName, Guid.NewGuid().ToString("N"));
@@ -57,7 +58,13 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
                 _errors.Add(message.Text);
             }
         };
-        Page.RequestFailed += (_, request) => _errors.Add($"Request failed: {request.Url}: {request.Failure}");
+        Page.RequestFailed += (_, request) =>
+        {
+            if (!IsReloadCancellation(_reloading, request.ResourceType, request.Url, request.Failure))
+            {
+                _errors.Add($"Request failed: {request.Url}: {request.Failure}");
+            }
+        };
         Page.Response += (_, response) =>
         {
             if (response.Status >= 400)
@@ -81,6 +88,24 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
 
     protected async Task Choose(string label) =>
         await Driver.ChooseAsync(label);
+
+    internal static bool IsReloadCancellation(bool reloading, string resourceType, string url, string? failure) =>
+        reloading && resourceType == "image" && url.StartsWith("blob:", StringComparison.Ordinal)
+        && failure == "Load request cancelled";
+
+    protected async Task ReloadAsync()
+    {
+        // WebKit can cancel document-owned Blob image requests during an intentional reload.
+        _reloading = true;
+        try
+        {
+            await Page.ReloadAsync();
+        }
+        finally
+        {
+            _reloading = false;
+        }
+    }
 
     protected async Task Library()
     {

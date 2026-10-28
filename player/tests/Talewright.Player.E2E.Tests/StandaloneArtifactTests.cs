@@ -96,7 +96,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         }
         else
         {
-            await Page.ReloadAsync();
+            await ReloadAsync();
         }
 
         if (creation)
