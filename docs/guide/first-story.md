@@ -2,13 +2,14 @@
 
 In this tutorial you'll build *The Night Ferry*: a three-scene story with dialogue, an item, a skill
 check and text that changes depending on what the player did. It takes about fifteen minutes. You
-need a text editor. You can check and play your story in the
-[web player](https://squid-farm.github.io/talewright/) without installing anything; the optional
-[desktop tools](getting-started.md#optional-install-the-desktop-tools) make repeated checks quicker.
+need a text editor. Follow [Getting started](getting-started.md) to set up VS Code with the
+Talewright extension on Linux x64, or use another plain-text editor. Both paths can play the story
+in the [web player](https://squid-farm.github.io/talewright/).
 
 ## 1. Create the story folder
 
-Make a folder called `night-ferry`. Inside it, create a file called `story.talewright.yaml`:
+Make a folder called `night-ferry` and open it in your editor. In VS Code, use **File > Open Folder**
+and trust the folder you created. Inside it, create a file called `story.talewright.yaml`:
 
 ```yaml
 game:
@@ -35,7 +36,8 @@ items:
 This is your story's **manifest**, the settings file that tells Talewright about your story and its
 characters:
 
-- `game.id` is a short, unique name (lowercase words joined by hyphens). `game.title` is what players see.
+- `game.id` is a short, unique name. Lowercase words joined by hyphens are the recommended style.
+  `game.title` is what players see.
 - `game.start` is the scene the story opens on. You'll write it next.
 - `characters` must include `player`. Every other character gets an id you choose, like `ferryman`.
 - `stats` sets starting values. Stats you leave out use the defaults (10 for attributes like `cha`,
@@ -68,11 +70,15 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 
 ## 3. Check it and fix your first error
 
-Before you play, have Talewright check the story. It finds mistakes in seconds, so it's worth making a
-habit of it. You can check it in the web player without installing anything, or use the optional
-desktop command-line tool. The desktop tools also include the
-[Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger), which lets
-you jump straight to any scene.
+Save both files before checking. In VS Code, live diagnostics appear while you write; open
+**View > Problems** to see them together. For a check of the saved story, run
+**Talewright: Validate Story** from the Command Palette.
+If the CLI is missing, choose **Set Up CLI** and follow the
+[setup guide](cli-installation.md). The language server is already included with the extension,
+but these commands use the separate CLI.
+
+The choice you wrote points at a scene that does not exist yet. This is intentional for this step:
+you will see how to find and fix it. You can use either of the alternatives below for the same check.
 
 ### Check in the web player (no install)
 
@@ -80,18 +86,18 @@ Zip the `night-ferry` folder using the instructions in
 [No desktop tools? Use the web player](#no-desktop-tools-use-the-web-player) below. Open the zip in
 the web player. It checks the story and shows errors instead of opening a story that has mistakes.
 
-### Or, check with the desktop tools
+### Or, check from a terminal
 
-Open a terminal in the Talewright folder and run this, replacing `path/to/night-ferry` with
-wherever you made the folder:
+With the [story tools installed](cli-installation.md), check the folder's full location.
+For example, from the extracted tools folder on Windows:
 
-```bash
-talewright validate path/to/night-ferry
+```powershell
+.\Talewright.Cli.exe validate "C:\Users\<your user>\Documents\night-ferry"
 ```
 
-> This command needs the [desktop tools](getting-started.md#optional-install-the-desktop-tools).
-> Until ready-made downloads arrive, type `dotnet run --project tooling/cli/src/Talewright.Cli --`
-> in place of `talewright`.
+Replace `<your user>` or the entire path with your own folder's location. On Mac/Linux, use
+`./Talewright.Cli validate "/full/path/to/night-ferry"` from the tools folder.
+If you installed the .NET tool instead, its command is `talewright validate`.
 
 The check fails, because the choice points at a `crossing` scene that doesn't exist. Talewright lists
 every problem with its file, line and column, so you can go straight to it:
@@ -121,16 +127,18 @@ A `->` line on its own moves on to that scene. When a scene has no choices, the 
 **Continue** button, or **The End** when it leads to `END`.
 
 Check again with the same method. The command-line tool prints `Validation succeeded.` when there are
-no errors; in the web player, the story opens when it passes its checks. Now play it. If you have the
-desktop tools, the desktop player opens the folder directly, with no zipping:
+no errors; in the web player, the story opens when it passes its checks.
 
-```bash
-dotnet run --project apps/desktop -- path/to/night-ferry
-```
+Now play it. In VS Code, run **Talewright: Publish Story ZIP**, choose a destination outside the
+story folder, and open the result in the web player using **Open a story file**. This command
+makes story files for a player, not a separate website or app. Alternatively, zip the folder
+yourself using the steps below.
 
-You can play from start to finish. In the desktop player, after each change choose **Library** and
-open the story again; it reads your files fresh each time. In the web player, make a fresh zip and
-open it again after each change.
+After each edit, save, check, make a fresh ZIP and open it again in the player.
+The browser does not edit your story or automatically reload changes.
+For testing a particular scene instead of playing from the beginning, use
+**Talewright: Open Author Debugger** after CLI setup. It opens a separate window and may need
+extra system components; see [testing your story](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
 
 ### No desktop tools? Use the web player
 

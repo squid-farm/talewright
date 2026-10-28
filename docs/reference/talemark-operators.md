@@ -16,6 +16,8 @@ section separates decisions from features you can use today.
 Story identifiers start with an ASCII letter (`A`-`Z`, `a`-`z`) or `_`. The remaining characters are
 ASCII letters, digits or `_`, with optional single `.` or `-` separators between groups.
 Separators cannot be adjacent or end a name. Names are case-sensitive.
+Lowercase kebab-case is a style recommendation, not a parser restriction. The scene/story
+naming lint diagnostics TWL001 and TWL002 are warnings about that style.
 
 - Valid: `weapon.knife`, `camp.arrival`, `_guide`, `north-gate`, `act.2`.
 - Invalid: `2doors`, `camp..arrival`, `north.-gate`, `door-`, `café`.
@@ -212,7 +214,7 @@ The language server uses the shared authoring completion provider.
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197); enclosing braces and choice labels respect quoted delimiters. Expression and modifier string decoding remains separate work under [#184](https://github.com/squid-farm/talewright/issues/184). Prose `\{` and `\}` already work. |
 | Comma-separated multi-argument modifiers | Decided contract; today's modifier parser accepts at most one argument. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
-| New image syntax | [#197](https://github.com/squid-farm/talewright/issues/197) implements `{image("path", "alt")}` across narrative-template contexts; alt is optional and literal. Quoted paths are asset strings, not story identifiers. [#198](https://github.com/squid-farm/talewright/issues/198) provides shared lookup in compilation, validation and editor analysis; [#199](https://github.com/squid-farm/talewright/issues/199) adds editor path completion and live refresh. Rendering remains separate; see [image diagnostics](diagnostics.md#tw2xxx-names-and-types). |
+| New image syntax | `{image("path", "alt")}` works across narrative-template contexts; alt is optional and literal, never a substitution template. Quoted paths are asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
 

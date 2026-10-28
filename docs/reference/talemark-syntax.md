@@ -76,6 +76,9 @@ Identifiers are names for scenes, characters, items and other story parts. Use l
 underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
 `temple.entrance` and `hidden-door` are valid names. A dot groups words in a name; it does not mean
 "look inside" another value.
+Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser restriction.
+The naming lint rules TWL001/TWL002 warn about style; they do not make an otherwise valid name
+illegal.
 
 The [Talemark operator registry](talemark-operators.md) is a deeper technical reference for symbols,
 calculation order and quoting rules. Most authors will not need it for a first story.
@@ -108,7 +111,7 @@ The debugger requires an explicit restart after configuration additions, edits, 
 
 ```yaml
 game:
-  id: lost-relic # kebab-case, unique
+  id: lost-relic # unique; kebab-case is the recommended style
   title: The Lost Relic
   version: 0.1.0
   start: camp.arrival # first scene id
@@ -155,6 +158,9 @@ triggers:
     do: set flag:guild-hostile
     once: true
 ```
+
+For a complete custom skill declaration, character value and check, see
+[Add a skill for your setting](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
 
 Custom pronoun set:
 
@@ -377,10 +383,13 @@ ZIP stories and browser uploads retain their compressed archive for lazy image a
 the same renderer. Untrusted archives enforce defensive expansion accounting, distinct from
 folder authoring and the browser upload convenience cap. A later image failure preserves the
 story and shows effective alt plus an accessible error.
-Generated published hosts and their deployment/subpath behavior are deferred to
-[#179](https://github.com/squid-farm/talewright/issues/179). Their existing exports retain
-the real assets/catalogue, but their unadapted image occurrences show the unavailable state.
-Text-only stories continue to work in those hosts.
+Published web and desktop hosts also use the shared renderer and include the actual image assets
+and catalogue. Web publications keep images as external files under `story/images/`, resolved
+relative to the application's base path, including deployment in a subfolder.
+Serve a published web game through a web server rather than opening its HTML as a local file.
+Desktop publications use the adjacent story folder. Keep the complete published output together.
+See [sharing and artwork guidance](../guide/sharing-your-story.md#artwork-and-hosting-size) for
+hosting-size warnings and platform verification limits.
 
 The old `![alt](path)` form is an error with a quoted `{image("path", "alt")}` replacement.
 The proposed `@image(...)` form was not shipped and is not supported.
@@ -399,6 +408,9 @@ hostile … allied          reputation tier names (compare with faction:<id>)
 ```
 
 Types are checked at compile time (number, bool, text, tier).
+Put spaces around subtraction: `player:hp - 3` subtracts three, whereas
+`player:hp-3` refers to a stat named `hp-3`. Hyphens and dots are allowed inside identifiers.
+See the [operator registry](talemark-operators.md#names-and-values) for exact naming rules.
 
 ## 5. Effects
 

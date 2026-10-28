@@ -1,74 +1,87 @@
 # Getting started
 
-## Play in your browser
+Talewright stories are folders of text files. Write in **Talemark**, check your changes, then
+play the story and share it. We recommend VS Code with the Talewright extension for writing help.
+You can also use any plain-text editor and the browser player.
 
-Open the **[Talewright web player](https://squid-farm.github.io/talewright/)**. It works in any modern
-browser with nothing to install.
+## Set up your editor
 
-![The story library in the web player](../images/library.png)
+The current Talewright extension supports **Linux computers with Intel or AMD 64-bit processors
+(Linux x64)**. It is tested on Ubuntu 24.04 and Linux Mint 22.3. Windows, Mac, Linux ARM and
+browser-hosted VS Code are not supported by this extension release. On those systems, use a
+plain-text editor and the browser player, or the separate story tools described below.
 
-- Pick **The Lost Relic** to play the sample story.
-- Use **Open a story file** to play your own story from a `.zip` file. [Your first story](first-story.md)
-  shows how to make one.
+1. Install [VS Code](https://code.visualstudio.com/).
+2. In **Extensions**, install **Talewright** by **squid-farm** from
+   [the Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright).
+   Choose **Switch to Pre-Release Version** for preview releases.
+3. Install [YAML by Red Hat](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
+   for help with the story settings file.
+4. Open your story folder using **File > Open Folder**. It should contain
+   `story.talewright.yaml` and your `.tale` files.
+5. Trust the folder if it is your own story or you trust its source. Open a `.tale` file;
+   the language indicator should say **Talemark**.
 
-Your files stay on your computer: the player reads the zip inside your browser and doesn't upload it
-anywhere. The web player does not edit your files; you write them in a text editor. See below for
-the no-install way to check and share your story.
-
-Want a game that opens as its own website or desktop app, or a faster way to check and test while
-writing? The [optional tools](#optional-install-the-desktop-tools) can help. You do not need them
-to write or share a simple story file. Making a separate website or app needs extra setup.
-
-## What you need to write stories
-
-A text editor. Anything that saves plain text works: VS Code, Notepad++, TextEdit (in plain-text mode),
-gedit, and so on. You write scenes in **Talemark**, Talewright's story-authoring language,
-and define your cast and rules in a YAML manifest. A story is just a folder of text files:
-
-```text
-my-story/
-├── story.talewright.yaml      # game settings and story declarations
-└── story.tale      # your scenes (use as many .tale files and subfolders as you like)
-```
-
-Story settings such as the ID, title, starting scene, and ruleset go under `game:`. Characters and
-other declarations stay at the root of the manifest.
-
-> **Optional editor help:** In VS Code, Red Hat's
-> [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) can help
-> with the manifest. The [Talewright VS Code extension](../../tooling/vscode-talewright/README.md)
-> adds Talemark highlighting and live story checks with a bundled Linux x64 language server.
-> Its README explains supported Linux environments, preview Marketplace installation and the
-> VSIX fallback. You can skip both and use any plain-text editor.
-
-## What can I share without the desktop tools?
-
-Zip your story folder and send the zip to your friends. They can open it in the
-[web player](https://squid-farm.github.io/talewright/) by choosing **Open a story file**. This shares
-only the story files, not a standalone website or app; the web player checks the story when it opens
-it. After you edit the story, make a fresh zip and open it again. See the
-[first-story tutorial's zip instructions](first-story.md#no-desktop-tools-use-the-web-player).
+The extension highlights your writing, suggests story names and reports mistakes as you edit.
+Its live-checking tool, called the **language server**, is included: you do not need to install
+.NET or build Talewright. Save your changes before checking or playing the files on disk.
+The [extension guide](../../tooling/vscode-talewright/README.md) includes a download-and-install
+alternative and system requirements.
 
 ## Optional: install the desktop tools
 
-The optional story tools can:
+For checks without opening the player, making story ZIPs, or testing individual scenes, run
+**Talewright: Set Up CLI** from VS Code's Command Palette (**Ctrl+Shift+P**).
+It uses an existing installation when available. Otherwise, it offers a portable download or,
+when the required .NET tools are installed, asks for approval to install the CLI.
+Nothing is installed just by opening a story.
 
-- check your story for mistakes without making a ZIP first;
-- make a story ZIP to share with friends;
-- open the **Author Debugger**, a testing window where you can jump to a scene and try different
-  choices without starting the story again.
+The CLI is a separate command-line tool; installing the extension does not install it.
+Follow [Get the story-checking tools](cli-installation.md) to select an extracted download or
+set up the tool without VS Code. Windows, Mac and Linux downloads exist; only Linux x64 execution
+has been verified so far. The native **Author Debugger** also needs your computer's web-viewing
+components. Making a separate website or desktop game still requires the .NET 10 SDK.
 
-Follow [Get the story-checking tools](cli-installation.md) for step-by-step download instructions.
-It explains which file to choose and what to do if a download is not available for your computer.
-You do not need to build Talewright yourself.
+After setup, the Command Palette offers:
 
-You may see instructions elsewhere that start with `talewright`. That is the name of the typed
-story tool, not something you need for the browser player. The setup guide shows exactly what
-to type for your download.
+- **Talewright: Validate Story** to check saved files.
+- **Talewright: Publish Story ZIP** to choose where to save story files for a player.
+- **Talewright: Open Author Debugger** to jump to a scene and test choices and state.
 
-There is not a separate ready-to-use desktop player download in this setup. You can play in
-your browser instead. If you want help with developer-only setup, the
-[technical setup notes](../developer/cli-setup.md) keep those details separate from this guide.
+These are not a Play button or VS Code's F5 debugger. To play from the beginning, open a story
+ZIP in the browser player. The Author Debugger is a separate testing window.
+
+## What goes in a story folder?
+
+Start with two files:
+
+```text
+my-story/
+  story.talewright.yaml
+  story.tale
+```
+
+`story.talewright.yaml` holds the title, starting scene, characters and rules.
+Your `.tale` files hold scenes, dialogue and choices. As your story grows, you can add more
+files and subfolders. [Your first story](first-story.md) provides the complete starting text.
+
+## Use another editor and the browser player
+
+Any editor that saves plain text works. On Mac, use TextEdit's plain-text mode.
+Write your story, save the files, zip the story folder and open the
+**[Talewright web player](https://squid-farm.github.io/talewright/)**.
+
+![The story library in the web player](../images/library.png)
+
+- Pick **The Lost Relic** to try a sample.
+- Choose **Open a story file** to check and play your own ZIP.
+
+The player reads the ZIP on your computer; it does not upload it or edit your source files.
+After making changes, create a fresh ZIP and open it again. It does not automatically refresh
+from your editor. See the [ZIP instructions](first-story.md#no-desktop-tools-use-the-web-player).
+
+Send that same ZIP to friends to play in the browser. It contains your story, not a separate
+website or app. A ready-to-use general-purpose desktop player is not included in the CLI download.
 
 ## Next
 

@@ -3,6 +3,9 @@
 Start small. You can keep all your story settings and characters in one file,
 then split them up when scrolling starts to get in the way. Neither layout gives
 your story extra features: choose whichever is easier to write.
+To keep a name or short recurring text consistent across branches, use a character substitution
+or text variable rather than copying the value into every passage.
+See [names and recurring text](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
 
 ## A small story: two files
 

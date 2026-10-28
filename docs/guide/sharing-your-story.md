@@ -10,10 +10,16 @@ website, desktop app or launcher. Talewright does not certify either as harmless
 See [distribution and runtime safety](../reference/safety.md) for what the
 framework handles and what authors and players decide.
 
-The publishing commands below make a story zip or a standalone game. They need the optional
-[desktop tools](getting-started.md#optional-install-the-desktop-tools), which currently require
-installing Talewright from source. Until ready-made downloads arrive, write
-`dotnet run --project tooling/cli/src/Talewright.Cli --` instead of `talewright`.
+In VS Code, run **Talewright: Publish Story ZIP** to choose a destination for a story file.
+Use **Talewright: Set Up CLI** first if prompted. You can also use the separate
+[story tools](cli-installation.md) without VS Code.
+
+The commands below use the .NET-tool command `talewright`. For a portable download, run
+`.\Talewright.Cli.exe` on Windows or `./Talewright.Cli` on Mac/Linux from its extracted folder
+instead. Quote paths containing spaces.
+Making a story ZIP needs no .NET installation. **Building a standalone website or desktop game
+still requires the .NET 10 SDK**, internet access to obtain build dependencies, and any extra
+platform components described in the [technical setup notes](../developer/cli-setup.md).
 
 Every `publish` checks your story first and stops if there are errors.
 
@@ -35,6 +41,9 @@ The zip contains `story.talewright.yaml`, your `.tale` files and supported image
 from `images/`, preserving their folders. Private notes and unsupported image formats
 are left out. Anyone can open it with **Open a story file** in the web player.
 Images display lazily when opened in the desktop or web player, including ZIP uploads.
+Write references such as `{image("harbour.png", "Boats at the harbour")}` for a file at
+`images/harbour.png`. Paths and their letter case must match; alt text is a literal description,
+not a place for name substitutions. See [adding images](writing-stories.md#images).
 
 ## A web game
 
@@ -46,6 +55,8 @@ talewright publish my-story -a --target web --output my-game-web.zip
 story, with no library screen, Library navigation, or samples. This also applies
 during character creation; save/load, history, and Restart remain available during play.
 Keep the whole extracted game together, including its `story/` folder.
+Story images are included in `story/images/` and display in published web games as well as story
+ZIPs. Test a web game through a web server, not by double-clicking its HTML file.
 
 - **itch.io:** create a project, set *Kind of project* to **HTML**, upload the zip and tick
   *This file will be played in the browser*.
