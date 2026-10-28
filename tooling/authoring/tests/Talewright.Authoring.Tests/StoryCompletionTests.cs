@@ -339,7 +339,7 @@ public sealed class StoryCompletionTests
                 base: generic
                 disable: [str]
                 stats:
-                  - {id: tracking, category: skill, governingAttribute: VALUE}
+                  - {id: tracking, category: skill, governing-attribute: VALUE}
                   - {id: grit, category: attribute}
                   - {id: courage, category: custom}
             """.Replace("VALUE", markedValue));

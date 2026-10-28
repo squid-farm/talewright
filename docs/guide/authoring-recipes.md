@@ -148,7 +148,7 @@ game:
         min: 0
         max: 10
         default: 0
-        governingAttribute: grit
+        governing-attribute: grit
 characters:
   player:
     first-name: Alex
@@ -171,12 +171,12 @@ The trail fades.
 The generic check adds **skill value + floor((attribute score - 10) / 2)** to the
 die result. Grit 15 contributes `floor(2.5) = 2`, so this check totals
 `10 + 3 + 2 = 15` and succeeds. Grit 9 contributes `-1`, not zero. With
-`governingAttribute` omitted, the total is `10 + 3 = 13` and the check fails.
+`governing-attribute` omitted, the total is `10 + 3 = 13` and the check fails.
 `randomness: off` fixes the die at 10 for this example; normal checks roll a d20.
 Try the same check in the Author Debugger to inspect the recorded total.
 
-`governingAttribute` is optional and available to every `category: skill` stat,
-including replacements for built-in skills. Use exactly this camelCase spelling.
+`governing-attribute` is optional and available to every `category: skill` stat,
+including replacements for built-in skills.
 The target may appear before or after the skill, but must be an enabled attribute
 after `disable` and all replacements. Unknown, disabled and non-attribute targets
 are errors. The key is not allowed on other stat categories and accepts only one

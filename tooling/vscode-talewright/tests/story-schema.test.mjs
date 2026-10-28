@@ -285,18 +285,21 @@ test('schema permits custom ruleset IDs without hard-coding registrations', asyn
   assertValid(validateManifest, story, 'custom ruleset ID');
 });
 
-test('governingAttribute is an optional identifier restricted to explicit skill definitions', () => {
+test('governing-attribute is an optional identifier restricted to explicit skill definitions', () => {
   const validate = compileSubschema(schema.definitions.statDefinition);
-  assertValid(validate, { id: 'tracking', category: 'skill', governingAttribute: 'grit' }, 'custom attribute link');
-  assertValid(validate, { id: 'athletics', category: 'skill', governingAttribute: 'str' }, 'built-in skill override');
+  assertValid(validate, { id: 'tracking', category: 'skill', 'governing-attribute': 'grit' }, 'custom attribute link');
+  assertValid(validate, { id: 'athletics', category: 'skill', 'governing-attribute': 'str' }, 'built-in skill override');
   assertValid(validate, { id: 'tracking', category: 'skill' }, 'unlinked skill');
+  for (const link of [{ governingAttribute: 'str' }, { governingAttribute: 'str', 'governing-attribute': 'grit' }]) {
+    assertInvalid(validate, { id: 'tracking', category: 'skill', ...link }, 'camelCase key', 'additionalProperties');
+  }
   for (const category of ['attribute', 'resource', 'progression', 'custom', undefined]) {
     assertInvalid(validate, {
-      id: 'tracking', ...(category === undefined ? {} : { category }), governingAttribute: 'grit',
+      id: 'tracking', ...(category === undefined ? {} : { category }), 'governing-attribute': 'grit',
     }, `invalid link category ${category}`);
   }
   for (const target of ['', 'bad/id', null, [], {}, 3]) {
-    assertInvalid(validate, { id: 'tracking', category: 'skill', governingAttribute: target }, 'invalid attribute ID');
+    assertInvalid(validate, { id: 'tracking', category: 'skill', 'governing-attribute': target }, 'invalid attribute ID');
   }
 });
 

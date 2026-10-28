@@ -402,7 +402,7 @@ internal sealed class StoryYamlReader
                     continue;
                 }
 
-                CheckKeys(stat, "id", "name", "category", "min", "max", "default", "governingAttribute");
+                CheckKeys(stat, "id", "name", "category", "min", "max", "default", "governing-attribute");
                 var id = RequiredIdentifier(stat, "id");
                 if (id is null)
                 {
@@ -423,7 +423,7 @@ internal sealed class StoryYamlReader
                     continue;
                 }
 
-                var attributeNode = Get(stat, "governingAttribute");
+                var attributeNode = Get(stat, "governing-attribute");
                 var attribute = attributeNode is null ? null : Identifier(attributeNode, "governing attribute stat id");
                 var definition = new StatDefinition(new StatId(id), Scalar(Get(stat, "name")) ?? id, parsedCategory,
                     min, max, Int(Get(stat, "default")) ?? min, attribute is null ? null : new StatId(attribute));
@@ -432,7 +432,7 @@ internal sealed class StoryYamlReader
                 {
                     if (parsedCategory != StatCategory.Skill)
                     {
-                        Error(attributeNode, "TW4003", $"'governingAttribute' is only allowed on stats with category: skill; '{id}' is not a skill.", 0);
+                        Error(attributeNode, "TW4003", $"'governing-attribute' is only allowed on stats with category: skill; '{id}' is not a skill.", 0);
                     }
                     governingAttributes[definition.Id] = attributeNode;
                 }
@@ -455,11 +455,11 @@ internal sealed class StoryYamlReader
             if (!ruleset.StatsById.TryGetValue(target, out var attribute))
             {
                 var reason = baseRuleset.HasStat(target) ? "disabled" : "unknown";
-                Error(targetNode, "TW4005", $"Stat '{skill}' governingAttribute target '{target}' is {reason}. Reference an enabled stat with category: attribute.", 0);
+                Error(targetNode, "TW4005", $"Stat '{skill}' governing-attribute target '{target}' is {reason}. Reference an enabled stat with category: attribute.", 0);
             }
             else if (attribute.Category != StatCategory.Attribute)
             {
-                Error(targetNode, "TW4003", $"Stat '{skill}' governingAttribute target '{target}' must have category: attribute.", 0);
+                Error(targetNode, "TW4003", $"Stat '{skill}' governing-attribute target '{target}' must have category: attribute.", 0);
             }
         }
 

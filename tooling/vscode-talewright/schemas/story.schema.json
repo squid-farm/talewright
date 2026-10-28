@@ -221,14 +221,14 @@
           "$ref": "#/definitions/integer",
           "description": "Initial stat value. Defaults to min, or 0 when min is omitted."
         },
-        "governingAttribute": {
+        "governing-attribute": {
           "$ref": "#/definitions/identifier",
           "description": "For category: skill only. ID of an enabled attribute after disable and stat replacements. Generic checks add floor((attribute score - 10) / 2) to the skill value; omit for no attribute bonus. The compiler validates the target."
         }
       },
       "allOf": [
         {
-          "if": { "required": ["governingAttribute"] },
+          "if": { "required": ["governing-attribute"] },
           "then": {
             "required": ["category"],
             "properties": { "category": { "const": "skill" } }

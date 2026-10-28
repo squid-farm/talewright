@@ -3,6 +3,11 @@
 Thanks for helping. This page gets you building and testing. For how the code fits together, start with
 the [architecture tour](docs/developer/architecture.md).
 
+**Before adding settings or syntax:** read the
+[naming conventions](docs/developer/naming-conventions.md). This applies to human
+contributors and coding agents; author-facing YAML keys use lowercase kebab-case,
+not the casing of their C# implementation.
+
 ## Set up
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). On Linux the desktop

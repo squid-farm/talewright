@@ -61,7 +61,7 @@ public sealed class StoryHoverTests
     [Fact]
     public void Governing_attribute_key_hover_explains_category_target_and_formula()
     {
-        const string key = "governingAttribute";
+        const string key = "governing-attribute";
         var yaml = Manifest.Replace("  start: first",
             $"  start: first\n  ruleset:\n    stats:\n      - {{id: tracking, category: skill, {key}: str}}");
         var source = new StorySource(new Dictionary<string, string>

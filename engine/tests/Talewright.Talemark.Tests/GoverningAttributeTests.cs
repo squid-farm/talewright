@@ -34,7 +34,7 @@ public sealed class GoverningAttributeTests
     public void Custom_attribute_modifier_is_added_to_skill_value(int score, int modifier)
     {
         var result = Compile($$"""
-                      - {id: tracking, category: skill, default: 3, governingAttribute: grit}
+                      - {id: tracking, category: skill, default: 3, governing-attribute: grit}
                       - {id: grit, category: attribute, min: 1, max: 30, default: {{score}}}
             """);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -54,7 +54,7 @@ public sealed class GoverningAttributeTests
     public void Existing_skills_can_use_enabled_attributes_declared_in_either_order(string target)
     {
         var result = Compile($$"""
-                      - {id: athletics, category: skill, governingAttribute: {{target}}}
+                      - {id: athletics, category: skill, governing-attribute: {{target}}}
                       - {id: grit, category: attribute}
             """);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -65,7 +65,7 @@ public sealed class GoverningAttributeTests
     public void Disabled_attribute_redeclared_as_enabled_attribute_can_be_targeted()
     {
         var result = Compile("""
-                      - {id: tracking, category: skill, governingAttribute: str}
+                      - {id: tracking, category: skill, governing-attribute: str}
                       - {id: str, category: attribute}
             """, "[str]");
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -84,7 +84,7 @@ public sealed class GoverningAttributeTests
     [InlineData("str", "[]", "      - {id: str, category: resource}", "TW4003", "category: attribute")]
     public void Targets_are_validated_against_final_enabled_stats(string target, string disable, string replacement, string code, string message)
     {
-        var result = Compile($"      - {{id: tracking, category: skill, governingAttribute: {target}}}\n{replacement}", disable);
+        var result = Compile($"      - {{id: tracking, category: skill, governing-attribute: {target}}}\n{replacement}", disable);
         Assert.False(result.Success);
         Assert.Null(result.Story);
         var error = Assert.Single(result.Errors);
@@ -103,7 +103,7 @@ public sealed class GoverningAttributeTests
     [InlineData(null)]
     public void Only_skill_category_accepts_a_governing_attribute(string? category)
     {
-        var result = Compile($"      - {{id: tracking, {(category is null ? "" : $"category: {category}, ")}governingAttribute: str}}");
+        var result = Compile($"      - {{id: tracking, {(category is null ? "" : $"category: {category}, ")}governing-attribute: str}}");
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Code == "TW4003" && error.Message.Contains("only allowed on stats with category: skill"));
     }
@@ -115,9 +115,21 @@ public sealed class GoverningAttributeTests
     [InlineData("{}")]
     public void Invalid_target_values_are_errors(string value)
     {
-        var result = Compile($"      - {{id: tracking, category: skill, governingAttribute: {value}}}");
+        var result = Compile($"      - {{id: tracking, category: skill, governing-attribute: {value}}}");
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Code == "TW4003" && error.Message.Contains("governing attribute stat id"));
+    }
+
+    [Fact]
+    public void Camel_case_key_is_diagnosed_as_unknown_and_does_not_link_an_attribute()
+    {
+        var result = Compile("      - {id: tracking, category: skill, governingAttribute: str}");
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TW4006", diagnostic.Code);
+        Assert.Contains("Unknown key 'governingAttribute'", diagnostic.Message);
+        Assert.Contains("governing-attribute", diagnostic.Message);
+        Assert.Null(result.Story!.World.Ruleset.StatsById[new("tracking")].GoverningAttribute);
     }
 
     [Fact]
@@ -155,7 +167,7 @@ public sealed class GoverningAttributeTests
         {
             var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
             {
-                [StorySource.ManifestFileName] = linked ? yaml : yaml.Replace("        governingAttribute: grit", ""),
+                [StorySource.ManifestFileName] = linked ? yaml : yaml.Replace("        governing-attribute: grit", ""),
                 ["main.tale"] = tale,
             }));
             Assert.True(result.Success, string.Join("\n", result.Diagnostics));

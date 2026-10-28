@@ -163,8 +163,7 @@ For a complete custom skill declaration, character value and check, see
 [Add a skill for your setting](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
 
 Every stat declared with `category: skill`, including a replacement for a built-in
-skill, may set optional `governingAttribute: attribute-id`. This key is camelCase,
-matching the stat metadata field. Its target must resolve to an enabled
+skill, may set optional `governing-attribute: attribute-id`. Its target must resolve to an enabled
 `category: attribute` stat after `disable` and all stat declarations/replacements.
 Declaration order does not matter. Unknown, disabled or non-attribute targets are
 errors, as is using the key on any category other than `skill` (the default

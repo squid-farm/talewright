@@ -19,12 +19,12 @@ public sealed partial class ServerTests
                 base: generic
                 disable: [str]
                 stats:
-                  - {id: tracking, category: skill, governingAttribute: grit}
+                  - {id: tracking, category: skill, governing-attribute: grit}
                   - {id: grit, category: attribute}
             """);
         await client.Open("story.talewright.yaml", yaml, 1);
         Assert.Empty(await client.Diagnostics("story.talewright.yaml", 1));
-        var marked = yaml.Replace("governingAttribute: grit", "governingAttribute: |grit");
+        var marked = yaml.Replace("governing-attribute: grit", "governing-attribute: |grit");
         var items = Items(await Completion(client, "story.talewright.yaml", marked)).ToArray();
         Assert.Contains(items, HasLabel("grit"));
         Assert.Contains(items, HasLabel("dex"));
@@ -32,7 +32,7 @@ public sealed partial class ServerTests
         var version = 1;
         foreach (var target in new[] { "missing", "str", "hp" })
         {
-            await client.Change("story.talewright.yaml", yaml.Replace("governingAttribute: grit", $"governingAttribute: {target}"), ++version);
+            await client.Change("story.talewright.yaml", yaml.Replace("governing-attribute: grit", $"governing-attribute: {target}"), ++version);
             var error = Assert.Single(await client.Diagnostics("story.talewright.yaml", version));
             Assert.Equal(target == "hp" ? "TW4003" : "TW4005", error.GetProperty("code").GetString());
             Assert.Contains(target, error.GetProperty("message").GetString());

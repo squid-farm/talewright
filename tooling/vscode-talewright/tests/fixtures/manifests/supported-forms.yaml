@@ -14,7 +14,7 @@ game:
         max: 8
       - id: tracking
         category: skill
-        governingAttribute: grit
+        governing-attribute: grit
       - id: grit
         category: attribute
         min: 1

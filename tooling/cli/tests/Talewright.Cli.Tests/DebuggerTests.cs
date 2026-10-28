@@ -51,7 +51,7 @@ public sealed class DebuggerTests : IDisposable
                   ruleset:
                     base: generic
                     stats:
-                      - {id: tracking, category: skill, default: 3{{(linked ? ", governingAttribute: grit" : "")}}}
+                      - {id: tracking, category: skill, default: 3{{(linked ? ", governing-attribute: grit" : "")}}}
                       - {id: grit, category: attribute, min: 1, max: 30, default: 15}
                 characters:
                   player: {first-name: Ada}
