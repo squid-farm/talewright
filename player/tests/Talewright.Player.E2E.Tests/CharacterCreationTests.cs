@@ -101,7 +101,7 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Expect(SaveStatus).ToContainTextAsync("Quick Save checkpoint saved.");
         await Driver.ClickAsync("Saves");
         await Expect(Page.Locator("[data-save-kind=quick]")).ToContainTextAsync("Robin Vale");
-        await Reload();
+        await ReloadAsync();
         await Upload(fixture);
         await Driver.ClickAsync("Start story");
         await Driver.ClickAsync("Saves");
@@ -220,7 +220,7 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Load My save");
-        await Reload();
+        await ReloadAsync();
         await Upload(fixture);
         await Driver.ClickAsync("Start story");
         await Driver.ClickAsync("Saves");

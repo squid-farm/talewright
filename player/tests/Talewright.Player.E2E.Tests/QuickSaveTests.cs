@@ -201,7 +201,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         }
         else
         {
-            await Reload();
+            await ReloadAsync();
         }
         await Upload(fixture);
         await Driver.ClickAsync("Saves");

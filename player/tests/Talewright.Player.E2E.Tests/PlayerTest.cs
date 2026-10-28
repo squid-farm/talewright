@@ -93,7 +93,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         reloading && resourceType == "image" && url.StartsWith("blob:", StringComparison.Ordinal)
         && failure == "Load request cancelled";
 
-    protected async Task Reload()
+    protected async Task ReloadAsync()
     {
         // WebKit can cancel document-owned Blob image requests during an intentional reload.
         _reloading = true;
