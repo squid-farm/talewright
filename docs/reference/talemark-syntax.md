@@ -180,10 +180,10 @@ Built-ins supply this: `she`, `he` and `it` use singular agreement; `they` uses
 plural agreement, including when referring to one person ("they are").
 Omitted `pronouns` defaults to built-in `they`.
 
-Character `nameNumber: singular|plural` describes the displayed name, independently
+Character `name-agreement: singular|plural` describes the displayed name, independently
 of pronoun agreement. It defaults to `singular` and controls name possessives:
 `the pack` is singular (`the pack's`), while `the goblins` is plural (`the goblins'`).
-For example, `characters: { goblins: { first-name: the goblins, nameNumber: plural, pronouns: they } }`
+For example, `characters: { goblins: { first-name: the goblins, name-agreement: plural, pronouns: they } }`
 declares a plural displayed name. A person named Burns using `they` still has a
 singular displayed name, rendering `{player:last-name#possessive}` as `Burns's`.
 Pronoun possessives use the declared forms (`their` / `theirs`), not name grammar.
@@ -195,7 +195,7 @@ count. Group identity and composition are not modeled by these settings.
 **Breaking pre-alpha change:** both the old pronoun-set `plural` key and the
 character-root `plural` key are errors, even alongside the new fields. Replace
 the pronoun setting with an explicit `agreement: singular|plural` and the
-character setting with `nameNumber: singular|plural`, choosing each for its
+character setting with `name-agreement: singular|plural`, choosing each for its
 grammar rather than population. There are no aliases, automatic migration,
 fallback or precedence rules for old settings.
 

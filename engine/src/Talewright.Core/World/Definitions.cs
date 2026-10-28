@@ -10,7 +10,7 @@ namespace Talewright.Core.World;
 /// <param name="Pronouns">Pronoun set used by the template renderer.</param>
 /// <param name="Stats">Starting base values; stats not listed use <see cref="StatDefinition.Default"/>.</param>
 /// <param name="Inventory">Starting items and quantities.</param>
-/// <param name="NameNumber">Displayed-name grammar, not population: <c>the pack</c> is singular, <c>the goblins</c> plural. Controls name possessives.</param>
+/// <param name="NameAgreement">Displayed-name grammar, not population: <c>the pack</c> is singular, <c>the goblins</c> plural. Controls name possessives.</param>
 public sealed record CharacterDefinition(
     EntityId Id,
     string FirstName,
@@ -18,7 +18,7 @@ public sealed record CharacterDefinition(
     Pronouns Pronouns,
     IReadOnlyDictionary<StatId, int> Stats,
     IReadOnlyDictionary<ItemId, int> Inventory,
-    GrammaticalNumber NameNumber = GrammaticalNumber.Singular)
+    GrammaticalNumber NameAgreement = GrammaticalNumber.Singular)
 {
     public string FullName => string.IsNullOrEmpty(LastName) ? FirstName : $"{FirstName} {LastName}";
 }

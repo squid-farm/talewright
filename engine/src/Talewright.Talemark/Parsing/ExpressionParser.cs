@@ -179,7 +179,7 @@ internal sealed class ExpressionParser
 
             var isPlural = value switch
             {
-                NameRef n => symbols.World.Characters[n.Character].NameNumber == GrammaticalNumber.Plural,
+                NameRef n => symbols.World.Characters[n.Character].NameAgreement == GrammaticalNumber.Plural,
                 PronounRef p => symbols.World.Characters[p.Character].Pronouns.Agreement == GrammaticalNumber.Plural,
                 _ => false,
             };

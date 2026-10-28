@@ -27,7 +27,7 @@ characters:
     inventory: [coin]
   guide:
     first-name: Wick
-    nameNumber: singular
+    name-agreement: singular
     pronouns:
       subject: xe
       object: xem

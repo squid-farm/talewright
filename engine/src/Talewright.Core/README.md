@@ -22,7 +22,7 @@ See [architecture §3.1](../../../docs/developer/architecture.md#31-talewrightco
 | `Rulesets/RuleInterfaces.cs` | `ISkillCheckRule` (+ `SkillCheckRequest`/`SkillCheckResult`), `ILevelingRule`, `IStatModifier`. Implement these to change game mechanics. |
 | `Rulesets/Ruleset.cs` | Immutable ruleset: stats, tiers, rules. `TierFor(standing)`, `FindTier(id)`, `ToBuilder()`. `Ruleset.Empty`. |
 | `Rulesets/RulesetBuilder.cs` | Fluent builder: `AddStat`, `RemoveStat`, `ReplaceStat`, `WithTiers`, `WithSkillCheckRule`, `WithLevelingRule`, `AddModifier`, `Build`. Removing the level stat also drops the leveling rule. |
-| `World/Definitions.cs` | `CharacterDefinition` with `NameNumber` for displayed-name grammar/possessives (default singular), `ItemDefinition` (stat modifiers while held), `FactionDefinition`, `WorldDefinition` (everything static + the ruleset). |
+| `World/Definitions.cs` | `CharacterDefinition` with `NameAgreement` for displayed-name grammar/possessives (default singular), `ItemDefinition` (stat modifiers while held), `FactionDefinition`, `WorldDefinition` (everything static + the ruleset). |
 | `World/Pronouns.cs` | Pronoun sets (`She`, `He`, `They`, `It`, custom) with subject/object/possessive/possessive-pronoun/reflexive and required `Agreement`. `They` uses plural agreement, including singular they. |
 | `World/GrammaticalNumber.cs` | `Singular` / `Plural` grammar shared by pronoun agreement and displayed-name number. Neither models population or group composition. |
 | `Events/GameEvents.cs` | Every state change as a record. Values are absolute (`OldValue`, `NewValue`), so a log is readable on its own. |

@@ -514,16 +514,16 @@ internal sealed class StoryYamlReader
                 continue;
             }
 
-            CheckKeys(body, "first-name", "last-name", "pronouns", "stats", "inventory", "nameNumber");
+            CheckKeys(body, "first-name", "last-name", "pronouns", "stats", "inventory", "name-agreement");
             var firstName = RequiredScalar(body, "first-name") ?? id;
             var lastName = Scalar(Get(body, "last-name")) ?? string.Empty;
             var pronouns = ReadPronouns(Get(body, "pronouns"));
             var stats = ReadStatMap(Get(body, "stats"), ruleset);
             var inventory = ReadInventory(Get(body, "inventory"), items);
-            var nameNumber = Get(body, "nameNumber") is { } number
-                ? ReadGrammaticalNumber(number, "nameNumber")
+            var nameAgreement = Get(body, "name-agreement") is { } number
+                ? ReadGrammaticalNumber(number, "name-agreement")
                 : GrammaticalNumber.Singular;
-            characters.Add(new CharacterDefinition(new EntityId(id), firstName, lastName, pronouns, stats, inventory, nameNumber));
+            characters.Add(new CharacterDefinition(new EntityId(id), firstName, lastName, pronouns, stats, inventory, nameAgreement));
         }
 
         if (map is not null && !characters.Any(c => c.Id == EntityId.Player))
@@ -838,9 +838,9 @@ internal sealed class StoryYamlReader
         {
             if (Scalar(key) is { } name && !allowed.Contains(name))
             {
-                if (name == "plural" && (allowed.Contains("agreement") || allowed.Contains("nameNumber")))
+                if (name == "plural" && (allowed.Contains("agreement") || allowed.Contains("name-agreement")))
                 {
-                    var replacement = allowed.Contains("agreement") ? "agreement" : "nameNumber";
+                    var replacement = allowed.Contains("agreement") ? "agreement" : "name-agreement";
                     Error(key, "TW4003", $"The obsolete 'plural' key is no longer supported. Use '{replacement}: singular' or '{replacement}: plural' for grammar, not population.", 0);
                     continue;
                 }

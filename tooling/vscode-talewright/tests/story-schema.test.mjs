@@ -186,7 +186,7 @@ test('custom possessive pronouns require nested determiner and independent value
   assertInvalid(validate, { ...pronouns, possessive: 'xer' }, 'old flat possessive', 'additionalProperties');
 });
 
-test('pronoun agreement and displayed-name number are independent, explicit grammar fields', () => {
+test('pronoun and displayed-name agreement are independent, explicit grammar fields', () => {
   const validatePronouns = compileSubschema(schema.definitions.customPronouns);
   const validateCharacter = compileSubschema(schema.definitions.character);
   const pronouns = {
@@ -198,12 +198,12 @@ test('pronoun agreement and displayed-name number are independent, explicit gram
   assertInvalid(validatePronouns, missing, 'missing agreement', 'required');
   for (const value of [true, false, 'yes', 'Singular', null, [], {}, '']) {
     assertInvalid(validatePronouns, { ...pronouns, agreement: value }, 'invalid agreement');
-    assertInvalid(validateCharacter, { 'first-name': 'Ada', nameNumber: value }, 'invalid name number');
+    assertInvalid(validateCharacter, { 'first-name': 'Ada', 'name-agreement': value }, 'invalid name agreement');
   }
   for (const agreement of ['singular', 'plural']) {
-    for (const nameNumber of ['singular', 'plural']) {
+    for (const nameAgreement of ['singular', 'plural']) {
       assertValid(validateCharacter, {
-        'first-name': 'the pack', nameNumber, pronouns: { ...pronouns, agreement },
+        'first-name': 'the pack', 'name-agreement': nameAgreement, pronouns: { ...pronouns, agreement },
       }, 'independent grammatical fields');
     }
   }
@@ -211,7 +211,7 @@ test('pronoun agreement and displayed-name number are independent, explicit gram
     assertInvalid(validatePronouns, { ...(replacement ? pronouns : missing), plural: false },
       'obsolete pronoun plural', 'additionalProperties');
     assertInvalid(validateCharacter, {
-      'first-name': 'the goblins', plural: true, ...(replacement ? { nameNumber: 'plural' } : {}),
+      'first-name': 'the goblins', plural: true, ...(replacement ? { 'name-agreement': 'plural' } : {}),
     }, 'obsolete character plural', 'additionalProperties');
   }
 });
