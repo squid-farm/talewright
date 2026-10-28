@@ -328,6 +328,35 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("|")]
+    [InlineData("gr|")]
+    [InlineData("\"gr|\"")]
+    public void Governing_attribute_completion_uses_only_final_enabled_attributes(string markedValue)
+    {
+        var marked = Manifest.Replace("  start: first", """
+              start: first
+              ruleset:
+                base: generic
+                disable: [str]
+                stats:
+                  - {id: tracking, category: skill, governingAttribute: VALUE}
+                  - {id: grit, category: attribute}
+                  - {id: courage, category: custom}
+            """.Replace("VALUE", markedValue));
+        var caret = marked.IndexOf('|');
+        var analysis = StoryAnalyzer.Analyze(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = marked.Remove(caret, 1),
+            ["main.tale"] = "=== first\n-> END",
+        }));
+        var items = StoryCompletion.Complete(analysis, Position(StorySource.ManifestFileName, marked[..caret]));
+        var grit = Assert.Single(items, item => item.Label == "grit");
+        Assert.Contains("attribute", grit.Detail);
+        Assert.DoesNotContain(items, item => item.Label is "str" or "tracking" or "courage" or "hp");
+        if (markedValue == "|") Assert.Contains(items, item => item.Label == "dex");
+    }
+
+    [Theory]
     [InlineData("characters:\n  player: {first-name: Ada, inventory: [|]}", "rope", "[rope]")]
     [InlineData("characters:\n  player: {first-name: Ada, inventory: [ | ]}", "rope", "[ rope ]")]
     [InlineData("characters:\n  player: {first-name: Ada, inventory: [  |]}", "rope", "[  rope]")]

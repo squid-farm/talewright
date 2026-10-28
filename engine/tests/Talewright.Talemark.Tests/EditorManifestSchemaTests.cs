@@ -190,6 +190,7 @@ public class EditorManifestSchemaTests
                     Assert.Equal(StatCategory.Custom, stat.Category);
                     Assert.Equal(0, stat.Default);
                     Assert.Equal(8, stat.Max);
+                    Assert.Equal(new StatId("grit"), story.World.Ruleset.StatsById[new("tracking")].GoverningAttribute);
                     Assert.Contains(new FlagId("ready"), story.World.Flags);
                     Assert.Contains(new FlagId("done"), story.World.Flags);
                     Assert.Equal(0, story.World.Variables[new VarId("attempts")]);
