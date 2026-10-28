@@ -4,7 +4,7 @@ In this tutorial you'll build *The Night Ferry*: a three-scene story with dialog
 check and text that changes depending on what the player did. It takes about fifteen minutes. You
 need a text editor. Follow [Getting started](getting-started.md) to set up VS Code with the
 Talewright extension on Linux x64, or use another plain-text editor. Both paths can play the story
-in the [web player](https://squid-farm.github.io/talewright/).
+in the [web player](https://play.trytalewright.com/).
 
 ## 1. Create the story folder
 
@@ -148,7 +148,7 @@ Zip the `night-ferry` folder:
 - **macOS:** right-click the folder → **Compress**.
 - **Linux:** right-click → **Compress**, or run `zip -r night-ferry.zip night-ferry`.
 
-Open the [web player](https://squid-farm.github.io/talewright/), choose **Open a story file** and pick
+Open the [web player](https://play.trytalewright.com/), choose **Open a story file** and pick
 `night-ferry.zip`. The player runs the same checks, so the story won't open while there are errors.
 Instead, you'll see the same list of problems:
 

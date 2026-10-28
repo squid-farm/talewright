@@ -11,7 +11,7 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 
 | Trigger | What happens |
 |---|---|
-| Push to `main` | **Publish Samples** builds the web player, checks that a sample opens and a choice works at the Pages base path, then deploys to [GitHub Pages](https://squid-farm.github.io/talewright/). |
+| Push to `main` | **Publish Samples** builds the web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). |
 | Valid version-tag push | **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes the tested Linux x64 VSIX; then the GitHub release job attaches it and publishes generated notes. All publishing jobs use environment `release`. |
 | PR / manual | Validation only. |
 
@@ -22,7 +22,7 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
 ## Repository settings
 
 1. **Settings > Pages > Source:** GitHub Actions, and allow `main` in the `github-pages` environment's
-   deployment rules. A custom domain is optional; the workflow reads the base path from Pages.
+   deployment rules. The custom domain is `play.trytalewright.com`; the workflow publishes at the site root (`/`).
 2. Keep the **release** environment's reviewer approval and `v*` tag deployment restriction.
    Store `VSCE_PAT` (Marketplace publisher `squid-farm`, **Marketplace > Manage** scope) and
    `NUGET_USER` (nuget.org username) as **environment secrets**, not repository secrets.

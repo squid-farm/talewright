@@ -58,7 +58,7 @@ with `*` makes a **choice**; the words in brackets are what players click, and `
 choice goes. `-> END` finishes the story.
 
 To check or play your story without installing the desktop tools, zip its folder and open the zip in
-the [web player](https://squid-farm.github.io/talewright/). For the full walkthrough, see
+the [web player](https://play.trytalewright.com/). For the full walkthrough, see
 [Your first story](../guide/first-story.md).
 
 ## How to use this reference

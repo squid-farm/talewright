@@ -5,7 +5,7 @@ Keep scenes in `.tale` files and define your cast and rules in `story.talewright
 
 ## Writing stories
 
-New here? Play the [web player](https://squid-farm.github.io/talewright/), then follow
+New here? Play the [web player](https://play.trytalewright.com/), then follow
 **[Your first story](guide/first-story.md)**.
 
 | Guide | |

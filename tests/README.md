@@ -287,8 +287,10 @@ unexpected/duplicate packages instead of accidentally publishing stale files.
 Pack the three projects sequentially: solution-wide packing can evaluate the
 CLI's publish graph concurrently with RCL packing and omit static assets.
 
-Pages publishing also checks the real static output under the configured base
-path. To reproduce a project-subpath deployment after installing Chromium:
+Pages publishing also checks the real static output at the site root, where
+`play.trytalewright.com` serves it. Use `--base-path /` and
+`TALEWRIGHT_WEB_BASE_PATH=/` to reproduce CI exactly; the commands below check a
+project-subpath deployment after installing Chromium:
 
 ```bash
 python3 player/tests/run_e2e.py install-browsers --browser chromium
