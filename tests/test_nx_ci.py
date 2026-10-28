@@ -230,7 +230,7 @@ class CiRoutingTests(unittest.TestCase):
         project = json.loads((ROOT / "player/tests/project.json").read_text())
         command = project["targets"]["check"]["options"]["command"]
         self.assertEqual("node --test player/tests/*.test.mjs", command)
-        result = nx("run", "talewright-e2e-runner:check", capture=True)
+        result = nx("run", "talewright-e2e-runner:check", "--output-style=static", capture=True)
         self.assertIn("fail 0", result.stdout)
 
     def test_bad_git_revisions_fail_selection_without_a_success_manifest(self):
