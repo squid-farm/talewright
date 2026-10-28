@@ -2,9 +2,8 @@
 
 The `talewright` command validates, lints, debugs and publishes stories. It is an optional tool for
 authors who want to make a standalone web or desktop game; you do not need it to share a story zip
-with friends. See [Getting started](../guide/getting-started.md#optional-install-the-desktop-tools)
-to install it. Until ready-made downloads arrive, use
-`dotnet run --project tooling/cli/src/Talewright.Cli --` in place of `talewright`.
+with friends. See [Get the story-checking tools](../guide/cli-installation.md) to install a
+standalone download or the .NET tool.
 
 | Command | Does |
 |---|---|
