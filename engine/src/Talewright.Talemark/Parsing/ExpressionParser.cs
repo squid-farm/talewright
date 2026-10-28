@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
@@ -178,8 +179,8 @@ internal sealed class ExpressionParser
 
             var isPlural = value switch
             {
-                NameRef n => symbols.World.Characters[n.Character].IsPluralName,
-                PronounRef p => symbols.World.Characters[p.Character].Pronouns.IsPlural,
+                NameRef n => symbols.World.Characters[n.Character].NameNumber == GrammaticalNumber.Plural,
+                PronounRef p => symbols.World.Characters[p.Character].Pronouns.Agreement == GrammaticalNumber.Plural,
                 _ => false,
             };
             return new SubstitutionTemplate(value, modifiers, isPlural);

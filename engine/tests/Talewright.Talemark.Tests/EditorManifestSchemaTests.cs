@@ -175,7 +175,8 @@ public class EditorManifestSchemaTests
                     Assert.Equal(4, player.Stats[new StatId("focus")]);
                     Assert.Equal(1, player.Inventory[new ItemId("coin")]);
                     var guide = story.World.Characters[new EntityId("guide")];
-                    Assert.Equal(new Pronouns("xe", "xem", "xyr", "xyrs", "xemself", true), guide.Pronouns);
+                    Assert.Equal(new Pronouns("xe", "xem", "xyr", "xyrs", "xemself", GrammaticalNumber.Plural), guide.Pronouns);
+                    Assert.Equal(GrammaticalNumber.Singular, guide.NameNumber);
                     Assert.Equal(2, guide.Inventory[new ItemId("coin")]);
                     Assert.Equal("Silver coin", story.World.Items[new ItemId("coin")].Name);
                     Assert.Equal("Jade charm", story.World.Items[new ItemId("charm")].Name);

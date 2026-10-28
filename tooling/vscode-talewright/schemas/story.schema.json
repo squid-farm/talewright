@@ -243,10 +243,11 @@
         "inventory": {
           "$ref": "#/definitions/inventory"
         },
-        "plural": {
-          "$ref": "#/definitions/booleanOrYesNoScalar",
-          "default": false,
-          "description": "Whether this character uses plural grammar."
+        "nameNumber": {
+          "type": "string",
+          "enum": ["singular", "plural"],
+          "default": "singular",
+          "description": "Displayed-name grammar for possessives, not population: the pack is singular; the goblins is plural. Replaces the obsolete character plural key."
         }
       },
       "additionalProperties": false
@@ -256,7 +257,7 @@
         {
           "type": "string",
           "enum": ["she", "he", "they", "it"],
-          "description": "A built-in pronoun set."
+          "description": "A built-in pronoun set with grammatical agreement: they is plural agreement (including singular they); she, he and it are singular agreement."
         },
         {
           "$ref": "#/definitions/customPronouns"
@@ -265,7 +266,7 @@
     },
     "customPronouns": {
       "type": "object",
-      "required": ["subject", "object", "possessive-pronoun", "reflexive"],
+      "required": ["subject", "object", "possessive-pronoun", "reflexive", "agreement"],
       "properties": {
         "subject": {
           "$ref": "#/definitions/nonEmptyString"
@@ -279,9 +280,10 @@
         "reflexive": {
           "$ref": "#/definitions/nonEmptyString"
         },
-        "plural": {
-          "$ref": "#/definitions/booleanOrYesNoScalar",
-          "default": false
+        "agreement": {
+          "type": "string",
+          "enum": ["singular", "plural"],
+          "description": "Required grammatical agreement, not population. Singular they uses plural agreement. Replaces the obsolete pronoun plural key."
         }
       },
       "additionalProperties": false

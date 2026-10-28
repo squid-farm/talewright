@@ -171,9 +171,33 @@ pronouns:
     object: xem,
     possessive-pronoun: { determiner: xyr, independent: xyrs },
     reflexive: xemself,
-    plural: false,
+    agreement: singular,
   }
 ```
+
+Custom pronoun sets must declare `agreement: singular` or `agreement: plural`.
+Built-ins supply this: `she`, `he` and `it` use singular agreement; `they` uses
+plural agreement, including when referring to one person ("they are").
+Omitted `pronouns` defaults to built-in `they`.
+
+Character `nameNumber: singular|plural` describes the displayed name, independently
+of pronoun agreement. It defaults to `singular` and controls name possessives:
+`the pack` is singular (`the pack's`), while `the goblins` is plural (`the goblins'`).
+For example, `characters: { goblins: { first-name: the goblins, nameNumber: plural, pronouns: they } }`
+declares a plural displayed name. A person named Burns using `they` still has a
+singular displayed name, rendering `{player:last-name#possessive}` as `Burns's`.
+Pronoun possessives use the declared forms (`their` / `theirs`), not name grammar.
+
+Neither field says how many people a character represents. Singular-agreement
+pronouns can describe one or more people; plural agreement is not a population
+count. Group identity and composition are not modeled by these settings.
+
+**Breaking pre-alpha change:** both the old pronoun-set `plural` key and the
+character-root `plural` key are errors, even alongside the new fields. Replace
+the pronoun setting with an explicit `agreement: singular|plural` and the
+character setting with `nameNumber: singular|plural`, choosing each for its
+grammar rather than population. There are no aliases, automatic migration,
+fallback or precedence rules for old settings.
 
 ### Optional character creation
 

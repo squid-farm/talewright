@@ -1,6 +1,7 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
@@ -42,7 +43,7 @@ public class CompilerTests
           guards:
             first-name: the guards
             pronouns: they
-            plural: true
+            nameNumber: plural
         factions:
           guild: { name: "Explorers' Guild", standing: 0 }
         items:
@@ -139,7 +140,7 @@ public class CompilerTests
         Assert.Equal("Mara Burns", player.FullName);
         Assert.Equal(14, player.Stats[new StatId("dex")]);
         Assert.Equal(1, player.Inventory[new ItemId("rope")]);
-        Assert.True(story.World.Characters[new EntityId("guards")].IsPluralName);
+        Assert.Equal(GrammaticalNumber.Plural, story.World.Characters[new EntityId("guards")].NameNumber);
         Assert.Equal(2, story.World.Items[new ItemId("relic")].Modifiers[new StatId("wis")]);
 
         // The trigger's "set flag:outcast" auto-declares the flag.
@@ -609,9 +610,106 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Default_pronouns_and_name_number_use_singular_they_without_a_plural_name()
+    {
+        var story = Ok("=== a\n{player:first-name#possessive}/{player:last-name#possessive}/{player:pronoun#possessive(\"independent\")}\n-> END",
+            Yaml.Replace("pronouns: she", ""));
+        var player = story.World.Characters[EntityId.Player];
+        Assert.Equal(Pronouns.They, player.Pronouns);
+        Assert.Equal(GrammaticalNumber.Plural, player.Pronouns.Agreement);
+        Assert.Equal(GrammaticalNumber.Singular, player.NameNumber);
+        Assert.Equal("Mara's/Burns's/theirs", Render(story, story.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
+    [InlineData("she", GrammaticalNumber.Singular)]
+    [InlineData("he", GrammaticalNumber.Singular)]
+    [InlineData("they", GrammaticalNumber.Plural)]
+    [InlineData("it", GrammaticalNumber.Singular)]
+    public void Built_in_pronouns_supply_agreement_independently_of_name_number(string keyword, GrammaticalNumber agreement)
+    {
+        foreach (var nameNumber in new[] { "singular", "plural" })
+        {
+            var story = Ok("=== a\n-> END", Yaml.Replace("pronouns: she", $"pronouns: {keyword}\n    nameNumber: {nameNumber}"));
+            Assert.Equal(agreement, story.World.Characters[EntityId.Player].Pronouns.Agreement);
+        }
+    }
+
+    [Theory]
+    [InlineData("the pack", "singular", "singular", "the pack's")]
+    [InlineData("the pack", "singular", "plural", "the pack's")]
+    [InlineData("the goblins", "plural", "singular", "the goblins'")]
+    [InlineData("the goblins", "plural", "plural", "the goblins'")]
+    [InlineData("Burns", "singular", "plural", "Burns's")]
+    public void Custom_agreement_and_displayed_name_number_are_independent(
+        string name, string nameNumber, string agreement, string possessive)
+    {
+        var yaml = Yaml.Replace("first-name: Mara", $"first-name: {name}\n    nameNumber: {nameNumber}")
+            .Replace("pronouns: she", $"pronouns: {{ subject: xe, object: xem, possessive-pronoun: {{ determiner: xyr, independent: xyrs }}, reflexive: xemself, agreement: {agreement} }}");
+        var story = Ok("""
+            === a
+            {player:first-name}/{player:first-name#possessive}/{player:pronoun#possessive}/{player:pronoun#possessive("independent")}
+            -> END
+            """, yaml);
+        var player = story.World.Characters[EntityId.Player];
+        Assert.Equal(agreement == "plural" ? GrammaticalNumber.Plural : GrammaticalNumber.Singular, player.Pronouns.Agreement);
+        Assert.Equal(nameNumber == "plural" ? GrammaticalNumber.Plural : GrammaticalNumber.Singular, player.NameNumber);
+        Assert.Equal($"{name}/{possessive}/xyr/xyrs", Render(story, story.GetScene(new SceneId("a"))));
+    }
+
+    [Theory]
+    [InlineData("", "TW4002", "require 'agreement: singular'")]
+    [InlineData(", agreement: true", "TW4003", "'agreement' must be 'singular' or 'plural'")]
+    [InlineData(", agreement: yes", "TW4003", "'agreement' must be 'singular' or 'plural'")]
+    [InlineData(", agreement: Singular", "TW4003", "'agreement' must be 'singular' or 'plural'")]
+    [InlineData(", agreement: null", "TW4003", "'agreement' must be 'singular' or 'plural'")]
+    [InlineData(", agreement: []", "TW4003", "'agreement' must be 'singular' or 'plural'")]
+    [InlineData(", agreement: {}", "TW4003", "'agreement' must be 'singular' or 'plural'")]
+    public void Custom_pronouns_require_explicit_valid_agreement(string setting, string code, string message)
+    {
+        var yaml = Yaml.Replace("pronouns: she",
+            $"pronouns: {{ subject: xe, object: xem, possessive-pronoun: {{ determiner: xyr, independent: xyrs }}, reflexive: xemself{setting} }}");
+        Assert.Contains(message, Error("=== a\n-> END", code, yaml).Message);
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("yes")]
+    [InlineData("Singular")]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{}")]
+    public void Name_number_rejects_invalid_values(string value)
+    {
+        var error = Error("=== a\n-> END", "TW4003", Yaml.Replace("nameNumber: plural", $"nameNumber: {value}"));
+        Assert.Contains("'nameNumber' must be 'singular' or 'plural'", error.Message);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Obsolete_plural_is_an_error_even_with_a_replacement(bool pronounLevel, bool withReplacement)
+    {
+        var yaml = pronounLevel
+            ? Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself, plural: false"
+                + (withReplacement ? ", agreement: singular" : "") + " }")
+            : Yaml.Replace("nameNumber: plural", "plural: true" + (withReplacement ? "\n    nameNumber: plural" : ""));
+        var result = Compile("=== a\n-> END", yaml);
+        Assert.False(result.Success);
+        Assert.Null(result.Story);
+        var error = Assert.Single(result.Errors, d => d.Message.Contains("obsolete 'plural'"));
+        Assert.Equal("TW4003", error.Code);
+        Assert.Equal("story.talewright.yaml", error.Location.File);
+        Assert.Contains(pronounLevel ? "agreement: singular" : "nameNumber: singular", error.Message);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "TW4006");
+    }
+
+    [Fact]
     public void Custom_pronouns_and_named_predicates()
     {
-        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself }");
+        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself, agreement: singular }");
         var options = new CompilerOptions { Predicates = new NamedPredicateRegistry().Register("Lucky", _ => true) };
         var result = Compile("=== a\n{if @Lucky}{player:pronoun#capitalize} wins.{/if}\n-> END", yaml, options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -636,7 +734,7 @@ public class CompilerTests
     [Fact]
     public void Custom_pronoun_sets_use_their_declared_forms()
     {
-        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself }");
+        var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself, agreement: singular }");
         var result = Compile("""
             === a
             {player:pronoun}/{player:pronoun#object}/{player:pronoun#possessive}/{player:pronoun#possessive("determiner")}/{player:pronoun#possessive("independent")}/{player:pronoun#reflexive#upper}
@@ -659,7 +757,7 @@ public class CompilerTests
     [InlineData("possessive-pronoun: { determiner: xyr, independent: [] }", "TW4003", "'independent' must be a single value")]
     public void Invalid_custom_possessive_forms_are_reported(string forms, string code, string message)
     {
-        var yaml = Yaml.Replace("pronouns: she", $"pronouns: {{ subject: xe, object: xem, reflexive: xemself{(forms.Length > 0 ? ", " + forms : "")} }}");
+        var yaml = Yaml.Replace("pronouns: she", $"pronouns: {{ subject: xe, object: xem, reflexive: xemself, agreement: singular{(forms.Length > 0 ? ", " + forms : "")} }}");
         var error = Error("=== a\n-> END", code, yaml);
         Assert.Contains(message, error.Message);
     }
@@ -668,7 +766,7 @@ public class CompilerTests
     public void Unknown_custom_possessive_keys_are_reported()
     {
         var yaml = Yaml.Replace("pronouns: she",
-            "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs, other: xer }, reflexive: xemself }");
+            "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs, other: xer }, reflexive: xemself, agreement: singular }");
         var result = Compile("=== a\n-> END", yaml);
         var warning = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "TW4006");
         Assert.Contains("Unknown key 'other'", warning.Message);

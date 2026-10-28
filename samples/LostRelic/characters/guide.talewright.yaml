@@ -9,5 +9,5 @@ characters:
         determiner: his
         independent: his
       reflexive: himself
-      plural: false
+      agreement: singular
     stats: { survival: 4, wis: 14 }
