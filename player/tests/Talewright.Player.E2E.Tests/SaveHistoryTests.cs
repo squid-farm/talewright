@@ -390,7 +390,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         }
         else
         {
-            await Page.ReloadAsync();
+            await Reload();
         }
 
         await Upload(fixture);
