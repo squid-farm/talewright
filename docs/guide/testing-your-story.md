@@ -13,7 +13,7 @@ that contain spaces.
 ## 1. Open it in a player
 
 Make a story ZIP using **Talewright: Publish Story ZIP** or your file manager, then open it in the
-[web player](https://squid-farm.github.io/talewright/). If there are errors, you'll see a list instead of the
+[web player](https://play.trytalewright.com/). If there are errors, you'll see a list instead of the
 story. Each line gives the file, line and column, an error code and a description:
 
 ```text

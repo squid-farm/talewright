@@ -8,7 +8,7 @@ The command-line tool, or **CLI**, runs commands you enter in a terminal.
 The tool works with any text editor; VS Code is optional.
 
 **You can skip this setup.** Write your story in a text editor, zip its folder, and open the ZIP in
-the [web player](https://squid-farm.github.io/talewright/). It checks your story when you open it.
+the [web player](https://play.trytalewright.com/). It checks your story when you open it.
 After making changes, make a fresh ZIP and open it again.
 
 ## 1. Find the download for your computer

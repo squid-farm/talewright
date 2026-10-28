@@ -69,7 +69,7 @@ files and subfolders. [Your first story](first-story.md) provides the complete s
 
 Any editor that saves plain text works. On Mac, use TextEdit's plain-text mode.
 Write your story, save the files, zip the story folder and open the
-**[Talewright web player](https://squid-farm.github.io/talewright/)**.
+**[Talewright web player](https://play.trytalewright.com/)**.
 
 ![The story library in the web player](../images/library.png)
 

@@ -29,11 +29,12 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 ### GitHub Pages
 
 Every `main` push that passes Build publishes this host, with all bundled samples, to
-[GitHub Pages](https://squid-farm.github.io/talewright/). The workflow reads the base path from Pages,
-applies it before publishing, smoke-tests the result at that path and uploads only `wwwroot`. See
+GitHub Pages at the root of the custom domain, <https://play.trytalewright.com/>. The workflow
+publishes with base path `/`, smoke-tests the result at the root and uploads only `wwwroot`. See
 [releasing and CI](../../docs/developer/releasing.md) for repository settings.
 
-Reproduce a subpath publish locally, then serve it under `/talewright/`:
+The publish script also supports subpath hosting. Reproduce one locally, then serve it under
+`/talewright/`:
 
 ```bash
 python3 .github/scripts/publish_samples.py --base-path /talewright --output artifacts/pages

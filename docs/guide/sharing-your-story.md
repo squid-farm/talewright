@@ -1,7 +1,7 @@
 # Sharing your story
 
 The simplest way to share a story is to zip its folder and send the zip to your players. They can open
-it in the [web player](https://squid-farm.github.io/talewright/) using **Open a story file**. See the
+it in the [web player](https://play.trytalewright.com/) using **Open a story file**. See the
 [first-story tutorial's zip instructions](first-story.md#no-desktop-tools-use-the-web-player). This
 does not make a standalone website or app.
 
@@ -27,7 +27,7 @@ Every `publish` checks your story first and stops if there are errors.
 
 | You want to… | Publish | Players need |
 |---|---|---|
-| Send the story to someone who already has a Talewright player | A story file | The [web player](https://squid-farm.github.io/talewright/) or any Talewright player |
+| Send the story to someone who already has a Talewright player | A story file | The [web player](https://play.trytalewright.com/) or any Talewright player |
 | Put a playable game on the web or itch.io | A web game | A web browser |
 | Give players a downloadable app | A desktop game | Nothing on macOS. WebView2 on Windows (built into Windows 11 and up-to-date Windows 10). WebKitGTK 4.1 on Linux. |
 

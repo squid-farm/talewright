@@ -45,7 +45,7 @@ Its `.tale` files combine bold, italic and code formatting with dialogue, choice
 
 ## Try it now
 
-Open the **[web player](https://squid-farm.github.io/talewright/)** and pick *The Lost Relic*. Nothing
+Open the **[web player](https://play.trytalewright.com/)** and pick *The Lost Relic*. Nothing
 to install.
 
 ## Set up your writing space
@@ -70,7 +70,7 @@ and play it, without installing the extension or CLI.
    You can also copy the [sample story](samples/LostRelic) and edit it.
 2. Save your changes and run **Talewright: Validate Story**, or check a ZIP in the web player.
 3. Use **Talewright: Publish Story ZIP**, or zip the folder yourself, then choose
-   **Open a story file** in the [web player](https://squid-farm.github.io/talewright/).
+   **Open a story file** in the [web player](https://play.trytalewright.com/).
 4. Fix, check again, and replay.
 
 The **[first story tutorial](docs/guide/first-story.md)** walks through this with a complete example.
