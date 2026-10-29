@@ -24,6 +24,32 @@ samples and test helpers are not packaged.
 Rulesets.Generic, Talemark, Runtime). They keep their own namespaces and assembly names, but they are not
 published as separate packages.
 
+## Older-runtime compatibility spike
+
+The six engine libraries and aggregate `Talewright` NuGet package target **net8.0, net9.0
+and net10.0**. .NET 8 is the compatibility floor; .NET 5/6 and .NET Standard are not targets.
+The package includes all six assemblies and their XML documentation in every framework group.
+
+This is for developers embedding the headless engine, not a prerequisite for Talemark authors
+or players. The repository SDK, supplied Blazor Player, hosts, CLI, debugger, language server
+and C# examples remain on .NET 10. Browser builds and self-contained downloads carry their runtime;
+users do not need a matching .NET installation. Building standalone games still requires SDK 10.
+
+No compatibility polyfills, legacy collection implementations, old test adapters or extra JSON
+package are needed at this floor. Frozen collections, generated regular expressions, deterministic
+dice and strict save/scenario serialization retain their original implementations.
+Three test calls use explicit `Enumerable.Reverse` to avoid array/span overload binding differences
+when the current compiler targets an older framework.
+
+CI runs the normal .NET 10 suite and separately builds/runs the five engine suites for .NET 8.
+See [Contributing](../../CONTRIBUTING.md#set-up) for commands. Release verification checks every
+engine framework's assembly assets and dependency groups; clean package-consumer checks compile
+against all three targets. These checks do not certify every operating system or architecture.
+
+Compatibility is not a vendor-support extension. Microsoft support for .NET 8 ends November 10,
+2026; prefer .NET 10 for new deployments. See the
+[.NET lifecycle table](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
+
 ## Compiler identity migration
 
 [Issue #231](https://github.com/squid-farm/talewright/issues/231) renames the compiler's namespace,

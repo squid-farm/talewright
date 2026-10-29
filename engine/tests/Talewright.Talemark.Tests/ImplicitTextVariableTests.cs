@@ -75,7 +75,7 @@ public class ImplicitTextVariableTests
             ("a.tale", "=== a\n~ var:weather = \"stormy\"\n-> END"),
         };
         var forward = Compile(files);
-        var reversed = Compile(files.Reverse().ToArray());
+        var reversed = Compile(Enumerable.Reverse(files).ToArray());
         Assert.False(forward.Success);
         Assert.Equal(forward.Diagnostics, reversed.Diagnostics);
         Assert.Contains(forward.Errors, diagnostic => diagnostic.Code == "TW2003" &&

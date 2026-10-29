@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <TargetFramework />
+    <TargetFrameworks>$(TalewrightLibraryTargetFrameworks)</TargetFrameworks>
     <IsPackable>true</IsPackable>
     <Description>The headless Talewright engine: story compilation, rules, narrative rendering, and runtime.</Description>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeEngineAssemblies</TargetsForTfmSpecificBuildOutput>

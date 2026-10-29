@@ -18,6 +18,7 @@ from package_version import version_from_tag
 PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli", "Talewright.LanguageServer"}
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
+ENGINE_FRAMEWORKS = ("net8.0", "net9.0", "net10.0")
 
 
 def verify_desktop_archive(path):
@@ -149,11 +150,16 @@ def verify(directory, version):
                 if any(name.startswith(("Talewright.", "Microsoft.AspNetCore."))
                        for name in dependencies):
                     raise ValueError(f"{path}: headless engine has a UI/component dependency")
-                for assembly in ENGINE_ASSEMBLIES:
-                    for extension in ("dll", "xml"):
-                        required = f"lib/net10.0/{assembly}.{extension}"
-                        if required not in names:
-                            raise ValueError(f"{path}: missing engine assembly asset {required}")
+                groups = {group.attrib["targetFramework"]: group
+                          for group in metadata.findall(".//{*}group")}
+                if set(groups) != set(ENGINE_FRAMEWORKS):
+                    raise ValueError(f"{path}: engine framework dependency groups do not match {ENGINE_FRAMEWORKS}")
+                for framework in ENGINE_FRAMEWORKS:
+                    for assembly in ENGINE_ASSEMBLIES | {"Talewright"}:
+                        for extension in ("dll", "xml"):
+                            required = f"lib/{framework}/{assembly}.{extension}"
+                            if required not in names:
+                                raise ValueError(f"{path}: missing engine assembly asset {required}")
             found[identity] = path
     if found.keys() != PACKAGE_IDS:
         raise ValueError(f"Expected exactly {sorted(PACKAGE_IDS)}; found {sorted(found)}")
@@ -245,6 +251,10 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                     raise ValueError("Engine-only consumer unexpectedly restored Blazor dependencies")
                 subprocess.run(["dotnet", "run", "-c", "Release", "--no-build"],
                                cwd=project, env=environment, check=True)
+                for framework in ENGINE_FRAMEWORKS[:-1]:
+                    subprocess.run(["dotnet", "build", "-c", "Release",
+                                    f"-p:TargetFramework={framework}"],
+                                   cwd=project, env=environment, check=True)
             else:
                 manifest = json.loads((project / "obj/Release/net10.0/staticwebassets.build.json").read_text())
                 paths = {asset["RelativePath"] for asset in manifest["Assets"]

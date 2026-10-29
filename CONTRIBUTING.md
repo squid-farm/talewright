@@ -23,6 +23,9 @@ deterministic replay and valid current optional behavior; breaking old formats i
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). On Linux the desktop
 host and Author Debugger also need WebKitGTK 4.1 (`sudo apt install libwebkit2gtk-4.1-0`).
+SDK 10 is a build requirement, not the minimum runtime for a headless engine consumer.
+The [older-runtime compatibility spike](docs/developer/csharp-extensions.md#older-runtime-compatibility-spike)
+describes the .NET 8, 9 and 10 engine targets, scope, and verification.
 
 ```bash
 dotnet build
@@ -32,6 +35,19 @@ dotnet run --project apps/desktop -- samples/LostRelic   # desktop player
 dotnet run --project apps/web                            # web player dev server
 dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostRelic   # CLI
 ```
+
+The normal test command runs on .NET 10. To compile the five engine test projects and their
+shared fixtures for the oldest runtime, without retargeting the hosts or tooling:
+
+```bash
+dotnet build Talewright.slnx -c Release -p:TalewrightTestTargetFrameworks=net8.0
+dotnet vstest engine/tests/*.Tests/bin/Release/net8.0/*.Tests.dll
+```
+
+Install the .NET 8 runtime for this check; SDK 10 alone does not include it.
+CI runs this check after the normal unit suite.
+`TalewrightTestTargetFrameworks` can also select another engine test target, such as `net9.0`.
+Running those tests requires the selected runtime, not just SDK 10.
 
 ## Player UI tests (opt-in)
 
