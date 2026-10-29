@@ -4,7 +4,12 @@
     "ci-check": {
       "executor": "nx:run-commands",
       "cache": false,
-      "inputs": ["default", "{workspaceRoot}/.github/**/*"],
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.github/**/*",
+        "{workspaceRoot}/tooling/vscode-talewright/project.json",
+        "{workspaceRoot}/tooling/vscode-talewright/tests/story-schema.test.mjs"
+      ],
       "options": {
         "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_release.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
       }

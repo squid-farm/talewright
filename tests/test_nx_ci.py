@@ -149,6 +149,22 @@ class CiRoutingTests(unittest.TestCase):
                     "Talewright.Talemark.Tests:build:release", graph["tasks"]["tasks"],
                 )
 
+    def test_schema_manifest_contract_inputs_select_the_ci_suite_before_merge(self):
+        for changed in (
+            "tooling/vscode-talewright/project.json",
+            "tooling/vscode-talewright/tests/story-schema.test.mjs",
+        ):
+            with self.subTest(changed=changed):
+                plan = make_plan(affected_graph(changed))
+                self.assertIn(
+                    {"project": "talewright-ci-tests", "target": "ci-check"},
+                    plan["checks"],
+                )
+                self.assertIn(
+                    {"project": "talewright-editor", "target": "test"},
+                    plan["editor"],
+                )
+
     def test_general_docs_do_not_hide_mixed_source_verification(self):
         for source in (
             "tooling/vscode-talewright/extension.cjs",
