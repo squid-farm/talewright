@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile, ZipInfo
 
@@ -13,7 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
 sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
 from publish_samples import normalize_base_path
-from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, verify, verify_desktop_archive
+from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, smoke, verify, verify_desktop_archive
 import ui_test_image_plan
 
 
@@ -108,6 +109,40 @@ class RepositoryLayoutTests(unittest.TestCase):
 
 
 class PackageBoundaryTests(unittest.TestCase):
+    def test_engine_consumer_restores_each_framework_before_building(self):
+        class EngineConsumerChecked(Exception):
+            pass
+
+        calls = []
+
+        def run(command, *, cwd, env, check):
+            self.assertTrue(check)
+            if cwd.name == "PlayerConsumer":
+                raise EngineConsumerChecked()
+            command = list(map(str, command))
+            calls.append(command)
+            if command[:2] == ["dotnet", "restore"]:
+                assets = cwd / "obj/project.assets.json"
+                assets.parent.mkdir(exist_ok=True)
+                assets.write_text(json.dumps({"libraries": {"Talewright/1.2.3": {}}}))
+
+        with tempfile.TemporaryDirectory() as temporary, patch("verify_packages.subprocess.run", side_effect=run):
+            with self.assertRaises(EngineConsumerChecked):
+                smoke(Path(temporary), "1.2.3")
+
+        for framework in ENGINE_FRAMEWORKS[:-1]:
+            property_argument = f"-p:TargetFramework={framework}"
+            builds = [i for i, command in enumerate(calls)
+                      if command[:2] == ["dotnet", "build"] and property_argument in command]
+            self.assertEqual(len(builds), 1)
+            index = builds[0]
+            self.assertIn("--no-restore", calls[index])
+            restore = calls[index - 1]
+            self.assertEqual(restore[:2], ["dotnet", "restore"])
+            self.assertIn(property_argument, restore)
+            self.assertIn("--configfile", restore)
+            self.assertIn("--no-http-cache", restore)
+
     def write_package(self, directory, identity, version="1.2.3", dependency="1.2.3"):
         path = directory / f"{identity}.{version}.nupkg"
         dependencies = (f'<dependencies><group><dependency id="Talewright" version="{dependency}" />'

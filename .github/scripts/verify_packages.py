@@ -252,9 +252,13 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                 subprocess.run(["dotnet", "run", "-c", "Release", "--no-build"],
                                cwd=project, env=environment, check=True)
                 for framework in ENGINE_FRAMEWORKS[:-1]:
-                    subprocess.run(["dotnet", "build", "-c", "Release",
-                                    f"-p:TargetFramework={framework}"],
-                                   cwd=project, env=environment, check=True)
+                    for command in [
+                        ["dotnet", "restore", "--configfile", str(config), "--no-http-cache",
+                         f"-p:TargetFramework={framework}"],
+                        ["dotnet", "build", "-c", "Release", "--no-restore",
+                         f"-p:TargetFramework={framework}"],
+                    ]:
+                        subprocess.run(command, cwd=project, env=environment, check=True)
             else:
                 manifest = json.loads((project / "obj/Release/net10.0/staticwebassets.build.json").read_text())
                 paths = {asset["RelativePath"] for asset in manifest["Assets"]
