@@ -224,15 +224,37 @@ class PublishResultsTests(unittest.TestCase):
             self.assertIn("(reports/42-2.md)", index)
             self.assertIn("(runs/42-2.json)", index)
 
-    def test_unsupported_record_versions_collections_and_job_shapes_are_archived(self):
-        for field, value in (
+    def test_unsupported_record_fields_are_archived(self):
+        cases = [
             ("schemaVersion", 99),
+            ("schemaVersion", True),
+            ("schemaVersion", 1.0),
             ("benchmarks", None),
             ("integrations", {}),
             ("publications", "unreadable"),
             ("jobResults", None),
             ("jobResults", {}),
-        ):
+        ]
+        cases.extend(
+            (field, value)
+            for field in ("createdAt", "runId", "commit", "workflowRunUrl")
+            for value in (None, 42, True, [], {})
+        )
+        cases.extend(
+            ("runAttempt", value)
+            for value in (None, "1", True, 1.0, [], {})
+        )
+        cases.extend(
+            ("jobResults", {
+                "benchmarksAndPublication": "success",
+                "browserPlayer": "success",
+                "linuxPhotino": "success",
+                field: value,
+            })
+            for field in ("benchmarksAndPublication", "browserPlayer", "linuxPhotino")
+            for value in (None, 42, True, [], {})
+        )
+        for field, value in cases:
             with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 inputs = root / "input"
@@ -251,6 +273,7 @@ class PublishResultsTests(unittest.TestCase):
                 self.assertIn("Unsupported archived records", index)
                 self.assertIn("[unsupported](runs/unsupported.json)", index)
                 self.assertIn("(runs/current-1.json)", index)
+                self.assertNotIn("(reports/unsupported.md)", index)
                 self.assertEqual(original, path.read_text(encoding="utf-8"))
 
 

@@ -234,14 +234,19 @@ def update_history(history_dir, run, report):
     current = []
     archived = []
     for path, entry in runs:
-        if isinstance(entry, dict) and entry.get("schemaVersion") == 1 and {
+        if isinstance(entry, dict) and type(entry.get("schemaVersion")) is int and entry["schemaVersion"] == 1 and {
             "createdAt", "runId", "runAttempt", "commit", "workflowRunUrl",
             "benchmarks", "integrations", "publications", "jobResults",
         }.issubset(entry) and all(
+            isinstance(entry[field], str) for field in ("createdAt", "runId", "commit", "workflowRunUrl")
+        ) and type(entry["runAttempt"]) is int and all(
             isinstance(entry[field], list) for field in ("benchmarks", "integrations", "publications")
         ) and isinstance(entry["jobResults"], dict) and {
             "benchmarksAndPublication", "browserPlayer", "linuxPhotino",
-        }.issubset(entry["jobResults"]):
+        }.issubset(entry["jobResults"]) and all(
+            isinstance(entry["jobResults"][field], str)
+            for field in ("benchmarksAndPublication", "browserPlayer", "linuxPhotino")
+        ):
             current.append((path, entry))
         else:
             archived.append(path)
