@@ -13,6 +13,9 @@ public sealed class DebugSettings : CliSettings
 
 public sealed class DebugCommand : Command<DebugSettings>
 {
+    internal static bool HasGraphicalDisplay(Func<string, string?> environment) =>
+        !string.IsNullOrEmpty(environment("DISPLAY")) || !string.IsNullOrEmpty(environment("WAYLAND_DISPLAY"));
+
     public override int Execute(CommandContext context, DebugSettings settings, CancellationToken cancellationToken)
     {
         var writers = (CommandWriters)context.Data!;
@@ -30,9 +33,9 @@ public sealed class DebugCommand : Command<DebugSettings>
             }
             if (OperatingSystem.IsLinux())
             {
-                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
+                if (!HasGraphicalDisplay(Environment.GetEnvironmentVariable))
                 {
-                    throw new NotSupportedException("Author Debugger requires a graphical desktop (DISPLAY), not a headless terminal.");
+                    throw new NotSupportedException("Author Debugger requires a graphical desktop (X11 DISPLAY or Wayland WAYLAND_DISPLAY), not a headless terminal.");
                 }
                 if (!NativeLibrary.TryLoad("libwebkit2gtk-4.1.so.0", out var handle))
                 {

@@ -43,7 +43,7 @@ If you remove the tools, also remove any PATH entry or alias you added.
 
 Ubuntu 24.04 x64 requires `libc6`, `libgcc-s1`, `libstdc++6`, `libicu74`, `libssl3t64` and `zlib1g`.
 Native debugging additionally requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), `libnotify4`, and a
-graphical desktop (`DISPLAY`). Windows needs WebView2; macOS uses WKWebView.
+graphical X11 or Wayland desktop (`DISPLAY` or `WAYLAND_DISPLAY`). Windows needs WebView2; macOS uses WKWebView.
 Other OS versions/architectures are not claimed runtime-tested. Launch failures are reported,
 not silently redirected to another tool.
 
