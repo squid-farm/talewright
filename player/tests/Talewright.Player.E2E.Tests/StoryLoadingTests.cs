@@ -39,11 +39,12 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
     }
 
     [Fact]
-    public async Task Lost_relic_split_configuration_and_image_inputs_survive_browser_upload()
+    public async Task Lost_relic_four_chapter_configuration_and_images_survive_browser_upload()
     {
         var assembly = typeof(StoryLoadingTests).Assembly;
         var source = await new EmbeddedStoryLibrary(assembly).LoadAsync("LostRelic");
-        Assert.Contains("characters/guide.talewright.yaml", source.Files.Keys);
+        Assert.Equal(4, source.Files.Keys.Count(path => path.EndsWith(".tale")));
+        Assert.DoesNotContain("characters/guide.talewright.yaml", source.Files.Keys);
         using var buffer = new MemoryStream();
         using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
@@ -59,7 +60,7 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
                 await image.CopyToAsync(target);
             }
         }
-        await UploadBytes("lost-relic-split.zip", buffer.ToArray());
+        await UploadBytes("lost-relic.zip", buffer.ToArray());
         await Driver.ClickAsync("Start story");
         await Observe(new(null, "Tomas"));
         await Choose("Continue");

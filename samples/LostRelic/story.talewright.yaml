@@ -1,11 +1,11 @@
 # The Lost Relic — Talewright sample story.
-# This manifest, supporting *.talewright.yaml files, and .tale files form one story.
+# This manifest and the four chapter files form one story.
 # See docs/reference/talemark-syntax.md for the full format.
 
 game:
   id: lost-relic
   title: The Lost Relic
-  version: 0.3.0
+  version: 0.4.0
   start: camp.arrival
   randomness: checks-only # dice are rolled only for skill-check directives
   # seed: 1234            # uncomment for the same rolls every playthrough
@@ -17,6 +17,12 @@ game:
       - id: courage
         name: Courage
         category: custom
+        min: 0
+        max: 10
+        default: 0
+      - id: lucidity
+        name: Lucidity
+        category: skill
         min: 0
         max: 10
         default: 0
@@ -32,7 +38,7 @@ game:
         stats: {str: 12, athletics: 2, hp: 15}
       scholar:
         label: Scholar
-        stats: {str: 8, history: 5, hp: 10}
+        stats: {str: 8, history: 5, lucidity: 3, hp: 10}
 
 characters:
   player:
@@ -48,6 +54,18 @@ characters:
       perception: 2
       history: 3
     inventory: [torch, journal]
+  guide:
+    first-name: Tomas
+    last-name: Okafor
+    pronouns:
+      subject: he
+      object: him
+      possessive-pronoun:
+        determiner: his
+        independent: his
+      reflexive: himself
+      agreement: singular
+    stats: { survival: 4, wis: 14 }
 
 factions:
   explorers-guild: { name: "Explorers' Guild", standing: 5 }

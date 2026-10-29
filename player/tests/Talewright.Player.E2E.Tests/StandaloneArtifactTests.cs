@@ -111,6 +111,8 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
         await Driver.ClickAsync("Back");
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
+        await Driver.ClickAsync("Forward");
+        await AssertState(state => Assert.Equal(checkpoint.Passage, state.Passage));
         await Restart();
         await AssertState(state => Assert.Equal(first.Passage, state.Passage));
         await AssertLibraryUnavailable();

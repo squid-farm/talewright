@@ -159,5 +159,33 @@ Check and reopen your story as you normally would. If you're using the Author
 Debugger, restart the story after changing settings files. Keep the whole folder
 together when [sharing your story](sharing-your-story.md).
 
-For a larger example, browse [The Lost Relic](../../samples/LostRelic).
+## The Lost Relic: chapters before more settings files
+
+[The Lost Relic](../../samples/LostRelic) keeps shared expedition settings in
+one root file and builds features across four chapters:
+
+```text
+LostRelic/
+  story.talewright.yaml
+  chapters/
+    01-camp.tale
+    02-trail.tale
+    03-temple.tale
+    04-endings.tale
+  images/
+```
+
+The root holds the game/rules, player, Tomas, items, guild and all triggers.
+Camp introduces conversations, supplies and the register; the trail adds checks
+and an optional night watch; the temple brings routes together; endings show
+their consequences. Scene prefixes (`camp.`, `trail.`, `temple.`, `ending.`)
+match that organization because the author wrote them, not because folders
+create a namespace.
+
+This version does not need supporting settings files. The split ferry example
+above shows how to move related declarations when a story grows; moving them
+does not change their global IDs or make duplicates legal. Do not copy Tomas
+into another file while leaving the root declaration in place.
+See the [sample feature map](../../samples/README.md#feature-map) for exact locations.
+
 For all available settings, see the [syntax reference](../reference/talemark-syntax.md#1-storytalewrightyaml).

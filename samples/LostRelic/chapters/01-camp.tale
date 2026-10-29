@@ -7,9 +7,9 @@
 
 The boat leaves {player:first-name} at the edge of the jungle with a pack, a {item:torch#lower} and
 three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun#object}
-one season to find the **Relic of Ysh** before they hand the expedition to someone more *reliable*.
+one season to find the **{item:relic}** before they hand the expedition to someone more *reliable*.
 
-> guide: {player:first-name} {player:last-name}. You're later than your letter promised. I'm Tomas — the guild sent me.
+> guide: {player:name}. You're later than your letter promised. I'm {guide:first-name} — the guild sent me.
 
 {player:last-name#possessive} reputation for punctuality is, {player:pronoun} {player:pronoun#one-many("has", "have")} to admit, deserved.
 
@@ -19,34 +19,65 @@ one season to find the **Relic of Ysh** before they hand the expedition to someo
 @title The Camp
 @hub camp
 
-The camp hums with insects. Tomas sharpens a machete by the fire{if var:supplies > 0}, eyeing the supplies
+The camp hums with insects. {guide:first-name} sharpens a machete by the fire{if var:supplies > 0}, eyeing the supplies
 you bought{/if}.
 
 * [Set out for the temple] -> trail.river
-* [Visit the expedition workshop] -> workshop.hub
-* [Try the field exercises] -> field.hub
 
 === camp.supplies
 @title Haggle for supplies
 @tags camp
 @once
+@priority 10
+@hub all(camp,records)
+
+{image("expedition-workshop", "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.")}
+
+~ var:ledger = (6 + 2) * 3 / 2 - 1
+~ var:ledger -= 1
 
 A trader with a gold tooth unrolls a blanket of goods. You come away with a {item:rope#lower} and a
 {item:charm#lower} he swears keeps the river spirits polite.
+Two {item:ration}s complete the bargain. The trader checks the expedition slate:
+`((6 + 2) * 3 / 2 - 1) - 1` is **{var:ledger}** crates, enough to supply the camp.
 
 ~ give player rope
 ~ give player charm
+~ give player ration 2
+~ set flag:packing-open
 ~ var:supplies += 2
+
+{if var:ledger == 10 and var:ledger != 0}
+The accounts balance. All that remains is to check the register.
+{/if}
+
+-> camp.hub
+
+=== camp.register
+@title Sign the expedition register
+@tags camp,records
+@once
+@priority 10
+
+The clerk writes **{player:name#upper}**, then carefully corrects the entry to
+{player:name}. The margin says: "{player:pronoun#capitalize} signed
+{player:pronoun#possessive} own name; this copy is {player:pronoun#possessive("independent")}.
+Ask {player:pronoun#object} to check it {player:pronoun#reflexive}."
+
+{item:idol#a#capitalize} decorates the clerk's stamp. Its label reads \{expedition copy\}.
+
+> guide: I use {guide:pronoun}/{guide:pronoun#object}. Names matter more than the guild admits.
+
 -> camp.hub
 
 === camp.guide
-@title Ask Tomas about the temple
+@title Ask your guide about the temple
 @tags camp
 @once
 
 > guide: The old ones built it to keep something *in*, not people out. The guild knows that. They never write it down.
 
-Tomas tells you about the river crossing, and about the explorer who went in last spring and came out
+{guide:first-name} tells you about the river crossing, and about the explorer who went in last spring and came out
 talking only in numbers.
 
 {if faction:explorers-guild >= friendly}
@@ -64,16 +95,16 @@ talking only in numbers.
 @once
 @priority 5
 
-You spread {player:pronoun#possessive} field journal across your knees. The glyph rubbings from the museum
+You spread {player:pronoun#possessive} {item:journal} across your knees. The glyph rubbings from the museum
 are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
 
 * [Puzzle out the glyphs] skill-check history dc 12
-  success: { set flag:knows-glyphs; player:xp += 50 } -> camp.journal-solved
+  success: { set flag:knows-glyphs; player:xp += 50; player:lucidity += 2 } -> camp.journal-solved
   failure: -> camp.journal-failed
 
 === camp.journal-solved
-It's a warning and an instruction at once: *close your eyes before the spiral, and the hand will open the way.*
-You underline it twice.
+It's a warning and an instruction at once: *follow the spiral to the hand, and the stone will open the way.*
+You underline it twice. The pattern settles into focus; your Lucidity rises to **{player:lucidity}**.
 -> camp.hub
 
 === camp.journal-failed
@@ -103,11 +134,12 @@ The watch ledger has no phrase recorded yet.
 
 ~ var:watch-note = var:watchword
 
-You write **{var:watch-note}** in the watch ledger. Tomas asks what should happen
+You write **{var:watch-note}** in the watch ledger. {guide:first-name} asks what should happen
 if a stranger overhears it.
 
 * [Change the watchword to lantern light] (requires: var:watchword == var:watch-note) { var:watchword = "lantern light" } -> camp.watchword-readback
 * [Retire the watchword without a replacement] (requires: var:watchword == var:watch-note) { var:watchword = "" } -> camp.watchword-readback
+* [Keep the recorded watchword] (requires: var:watchword == var:watch-note) -> camp.watchword-readback
 
 === camp.watchword-readback
 @title Ink Does Not Follow Orders

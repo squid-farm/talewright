@@ -40,51 +40,59 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
-    public async Task Bundled_sample_workshop_and_field_exercises_save_and_replay()
+    public async Task Bundled_sample_progresses_from_camp_to_night_watch_and_preserves_save_navigation()
     {
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
         await Choose("Continue");
-        await Choose("Visit the expedition workshop");
-        await AssertState(state => Assert.Equal(["Pack a trail lunch", "Balance the expedition ledger"], state.Choices));
-        await Choose("Pack a trail lunch");
-        await Choose("Eat one ration");
-        await Observe(new(null, "one ration left"));
-        await Choose("Continue");
-        await Choose("Balance the expedition ledger");
+        await Choose("Haggle for supplies");
         await Observe(new(null, "10"));
-        await Choose("Agree on ten crates");
         await Choose("Sign the expedition register");
         await Observe(new(null, "MARA BURNS"));
         await Choose("Continue");
+        await Choose("Set out for the temple");
+        await Choose("Tie off the rope and cross carefully");
+        await Choose("Make camp before the climb");
+        await AssertState(state => Assert.Equal(["Press on at dawn", "Eat a ration"], state.Choices));
+        await Choose("Eat a ration");
+        await Choose("Share supper by the fire");
+        await Observe(new(null, "one ration left"));
         await Choose("Continue");
-        await Choose("Try the field exercises");
         await Choose("Stand your ground");
-        await Observe(new(null, "never above its authored maximum of ten"));
+        await Observe(new(null, "Your Courage is 10"));
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Close saves");
-        await Choose("Thank Tomas for the lesson");
+        await Choose("Catch your breath");
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load My save");
         await Driver.ClickAsync("Load save");
-        await Observe(new(null, "never above its authored maximum of ten"));
+        await Observe(new(null, "Your Courage is 10"));
         await Driver.ClickAsync("Back");
-        await AssertState(state => Assert.Equal(["Stand your ground"], state.Choices));
+        await AssertState(state => Assert.Equal(["Press on at dawn", "Stand your ground"], state.Choices));
         await Driver.ClickAsync("Forward");
-        await Choose("Thank Tomas for the lesson");
+        await Choose("Catch your breath");
         await Choose("Follow the signal");
         await Choose("Continue");
-        await Observe(new(null, "Both exercises are complete"));
+        await Observe(new(null, "The ledger cannot answer for you"));
         await Choose("Continue");
-        await Choose("Test the watch bell");
+        await Choose("Check the tripwire bell");
         await Choose("Ring the bell");
         await Choose("Silence the bell");
         await Choose("Ring the bell");
         await Observe(new(null, "The watch bell has sounded 2 times."));
-        await Choose("Finish the watch drill");
+        await Choose("Return to the fire");
+        await AssertState(state => Assert.Equal(["Press on at dawn"], state.Choices));
+        await Choose("Press on at dawn");
+        await Observe(new(null, "Three glyphs"));
+        await Choose("Look for another way in");
+        await Choose("Squeeze through");
         await Choose("Continue");
-        await AssertState(state => Assert.Contains("Set out for the temple", state.Choices));
+        if ((await Driver.ObserveAsync()).Choices.Contains("Take the idol"))
+            await Choose("Take the idol");
+        await Choose("Take the relic");
+        await Choose("Keep it for yourself");
+        await Observe(new(null, "The guild's letters stop coming", Ended: true));
     }
 
     [Fact]

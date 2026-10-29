@@ -1,0 +1,133 @@
+// Chapter 2 — the trail. River checks converge before an optional night-camp hub.
+
+=== trail.river
+@title The River
+
+The trail ends at a brown river, swollen with last night's rain. On the far bank, through the trees, you
+can make out a stair of green stone.
+
+* [Tie off the rope and cross carefully] (requires: player has rope) { player:xp += 25 } -> trail.far-bank
+* [Swim for it] skill-check athletics dc 12
+  success: -> trail.far-bank
+  failure: { player:hp -= 3 } -> trail.swept
+* [Let {guide:first-name} find a ford] skill-check guide survival dc 13
+  success: -> trail.far-bank
+  failure: { player:hp -= 1 } -> trail.swept
+
+=== trail.swept
+The current takes your legs out from under you. You claw your way onto the far bank a long way downstream,
+coughing up river and dignity in equal measure.
+{if player:hp < 8}
+You are bleeding from a gash along your arm.
+{/if}
+-> trail.far-bank
+
+=== trail.far-bank
+{guide:first-name} squelches up the bank behind you and stares up at the stair.
+
+> guide: Well, {player:first-name}. It's real.
+
+* [Make camp before the climb] -> trail.night
+* [Climb straight to the temple] -> temple.door
+
+=== trail.night
+@title The Night Watch
+@hub any(night,watch)
+@hub-limit 1
+
+{image("expedition-workshop", "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.")}
+
+You shelter beneath a canvas awning at the foot of the stair. {guide:first-name}
+hangs a bell on a tripwire and spreads the expedition records across a rough table.
+Beyond the firelight, the jungle never quite falls silent.
+
+* [Press on at dawn] -> temple.door
+
+=== trail.supper
+@title Eat a ration
+@tags night
+@requires player has ration
+@priority 20
+@once
+
+You open the pack and unwrap a {item:ration} for supper.
+
+* [Share supper by the fire] { take player ration; clear flag:packing-open }
+-> trail.supper-done
+
+=== trail.supper-done
+@title A Quiet Meal
+
+{if not flag:packing-open and player has ration}
+You close the pack with one ration left, safely stowed for tomorrow.
+{/if}
+{guide:first-name} takes the empty wrappers. The fire burns low.
+
+-> trail.night
+
+=== trail.jaguar
+@title Stand your ground
+@tags night
+@requires not visited(trail.jaguar)
+@priority 10
+@once
+
+~ player:courage += 10
+
+A jaguar steps out of the brush. You hold its gaze until it turns aside,
+leaving you trembling but upright. Your Courage is **{player:courage}**.
+
+{if flag:steady}
+{guide:first-name} lowers the machete. "Steady. That's how we get home."
+{/if}
+{if player:courage >= 6}
+~ player:xp += 5
+{/if}
+
+* [Catch your breath] -> trail.night
+
+=== trail.signal
+@title Follow the signal
+@tags night
+@requires visited(trail.jaguar) and player:courage >= 6
+@priority 10
+@once
+
+Something whistles from beyond the fire. {guide:first-name} is nowhere in sight.
+The answer in your ledger is "{var:watch-note}"; tonight's watchword is "{var:watchword}".
+
+{if var:watchword != "" and var:watchword == var:watch-note}
+You call the phrase you agreed on. A familiar voice answers.
+-> trail.found
+{/if}
+-> trail.wait
+
+=== trail.found
+@title A Familiar Voice
+
+{guide:first-name} steps into the light with an armful of dry wood.
+The watchword has done its job.
+
+-> trail.night
+
+=== trail.wait
+@title Stay in the Light
+
+The ledger cannot answer for you. You stay beside the fire until {guide:first-name}
+returns, and agree not to follow a voice you cannot place.
+
+-> trail.night
+
+=== trail.bell
+@title Check the tripwire bell
+@tags trail,watch
+@requires visited(trail.signal)
+@priority -1
+@once
+
+The watch bell has sounded **{var:bell-count}** times. A low branch is caught
+in the tripwire. You can lift it clear, then check whether the line still holds.
+
+* [Ring the bell] (requires: not flag:bell-ringing) { set flag:bell-ringing } -> trail.bell
+* [Silence the bell] (requires: flag:bell-ringing) { clear flag:bell-ringing } -> trail.bell
+* [Return to the fire] { clear flag:bell-ringing } -> trail.night

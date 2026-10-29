@@ -3,7 +3,7 @@
 Every problem Talewright reports has a code and a location:
 
 ```text
-chapters/02-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
+chapters/03-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 └── file ─────────────┘ │  │         └ code ┘ └ message ──────────────┘
                      line column
 ```

@@ -5,102 +5,126 @@ Complete stories to play, read and copy. The desktop player and the
 
 ## The Lost Relic (`LostRelic/`)
 
-A playable kitchen-sink reference for the supported no-code authoring features:
-33 scenes across four chapter files, with three endings. Mara Burns (or your
-created explorer) and guide Tomas Okafor look for the Relic of Ysh while the
-Explorers' Guild watches. Optional camp encounters demonstrate mechanics without
-forcing a tutorial detour into every playthrough.
+A four-chapter adventure with three endings. Mara Burns (or your created
+explorer) and guide Tomas Okafor look for the Relic of Ysh while the Explorers'
+Guild watches. Features build from conversations and supplies at camp to checks
+on the trail, branching temple routes and consequences on the return journey.
+Optional encounters do useful work in the story rather than sending you to a
+separate workshop.
 
-**Artwork disclosure:** The images used in *The Lost Relic* sample story are AI-generated.
+**Artwork disclosure:** The images used in *The Lost Relic* are AI-generated.
+This version reuses the existing four JPEG assets.
 
-Opening the sample now presents **character creation**, including editable names,
-built-in pronoun choices, presets and bounded stat choices. **Start story** keeps
-the authored Mara defaults. The workshop and field exercises are available from
-the first camp hub; no edits or temporary copy are needed.
+Opening the sample presents **character creation**: editable names, she/they/he
+pronouns, Explorer/Scholar presets and bounded Strength/Courage choices.
+**Start story** keeps the authored Mara defaults. Scholar starts with Lucidity 3;
+solving the journal adds 2 for either preset. Lucidity is an unlinked skill here;
+its governing attribute and dream encounters belong to a later sample update.
+
+### Chapter progression and organization
+
+| Chapter | File / scene prefix | What builds on the previous chapter |
+|---|---|---|
+| 1 — Camp | `chapters/01-camp.tale` / `camp.*` | Arrival, speech, basic storylets, trader, register, journal and watchword |
+| 2 — Trail | `chapters/02-trail.tale` / `trail.*` | Player/NPC river checks and rope gate; optional night camp with one encounter offered at a time and a fixed dawn exit |
+| 3 — Temple | `chapters/03-temple.tale` / `temple.*` | Glyph/forcing/side-gap entrances converge on an arrival check, optional idol and relic decision |
+| 4 — Endings | `chapters/04-endings.tale` / `ending.*` | Guild standing, nested conditions and conditional diverts lead to three endings |
+
+`story.talewright.yaml` holds the game/rules, player, Tomas, trail items, guild
+and all triggers. The four chapter files and `images/` are the rest of the sample;
+there is no supporting character configuration or dream folder in this version.
+Folders do not add scope or prefixes: the chapter scene IDs are authored explicitly.
+See [Organizing your story](../docs/guide/organizing-your-story.md) for when to
+split settings, how global IDs work and why triggers stay together.
+
+### Feature map
 
 | Feature | Where |
 |---|---|
-| Character creation, presets, legal stat choices, restore default name | `story.talewright.yaml`; Explorer/Scholar, strength and courage. Explorer retains authored strength; omitted courage defaults to the first option, 3, not the later zero |
-| Generic ruleset extension/removal, custom bounded stat | `story.talewright.yaml`: adds Courage (0–10) and disables unused Performance; field exercise saturates courage at 10 |
-| Built-in and explicit custom pronoun sets; NPC stats | player creation and guide declaration in `story.talewright.yaml`; register prose in `workshop.identity` |
-| Hub with storylets (`@priority`, `@once`) | `camp.hub` and `camp.supplies` / `camp.guide` / `camp.journal` in `01-camp.tale` |
-| Intersection hub, cap, stable equal-priority order, empty-hub fallback | `workshop.hub`: `all(workshop,lesson)`, two offers at a time; ledger precedes register on a priority tie; completion returns to camp |
-| Union hub, eligibility changes, `not`, visits | `field.hub`: `any(field,practice)`, one offer; signal becomes eligible after resolve; completion returns to camp |
-| Skill checks on choices (player and NPC actor) | `trail.river` in `02-temple.tale` |
-| Entry skill check (resolved on arrival) | `temple.hall` |
-| Gated choices (`requires:` item, flag, faction tier), items modifying stats | rope at the river, glyph door, guild hand-over; `charm` (+2 WIS), `relic` (+2 CHA) |
-| Counted give/take inventory, set/clear flags, choice fall-through | `workshop.packing`: gives two rations; eating removes one and clears the packing flag, then follows the scene divert |
-| Explicit and auto-declared flags/variables; arithmetic and comparisons | manifest `packing-open`/`supplies`; `workshop.ledger` auto-declares `ledger`, uses `+ - * /`, assignment/subtraction, `==` and `!=` |
-| Explicit and implicit text variables, copied values, empty text, equality and inequality | manifest `watchword: "quiet river"`; `camp.watchword` declares `watch-note` in Talemark, copies the chosen phrase, then changes or clears the watchword without changing the note; text comparisons gate choices and prose |
-| Faction standing, tiers and a trigger | Explorers' Guild; trigger `guild-wary` fires at unfriendly or worse |
-| Custom-stat trigger, conditional entry effect | `courage-earned` sets `steady`; `field.resolve` grants conditional XP |
-| Repeatable edge-trigger behavior | `field.bell`: ring/silence/ring increments the alarm counter twice; `watch-bell` is not once-only |
-| Pronouns and possessives | prose throughout (`{player:last-name#possessive}` → "Burns's") |
-| Pronoun agreement selector | opening camp prose uses `{player:pronoun#one-many("has", "have")}` for all offered pronouns, including singular they |
-| All five pronoun references, full names, chained text modifiers and literal braces | `workshop.identity`: `pronoun`, `#object`, `#possessive`, `#possessive("independent")`, `#reflexive`, `#upper`, `#capitalize`, `#a#capitalize`, escaped braces; existing prose uses `#lower` and `#possessive` |
-| Inline and block `{if}` conditional prose, XP and level-up | throughout the chapters |
-| Nested `{if}` (block inside block, inline inside block), `and` / `or` with parentheses, `visited(...)` | `ending.keep` in `03-relic.tale` |
-| Conditional diverts with unconditional fallback | `field.signal`, and `ending.return` when no relic choices are available |
-| Scene titles, speech, formatting, comments, image media | one illustration per chapter, with JPEG assets in `LostRelic/images/`; image display still awaits player rendering support |
-| Save/load, deterministic Back/Forward, restart and title | available through the shared player; created identity and selected stats survive replay |
+| Character creation, presets, legal stat choices, restore default name | Root manifest; Explorer retains authored Strength, omitted Courage defaults to the first option (3), Scholar starts with Lucidity 3 |
+| Ruleset extension/removal, custom bounded stats | Root manifest adds Courage (custom, 0–10) and Lucidity (skill, 0–10); disables Performance |
+| Built-in/custom pronoun sets, NPC stats | Player creation and Tomas's explicit pronouns/stats in the root manifest |
+| Basic hub, `@once`, `@priority`, stable equal-priority order | `camp.hub`; trader and register tie at priority 10, journal follows at 5 |
+| Intersection hub and empty-hub fallback | Trader `camp.supplies` uses `all(camp,records)` to offer the unsigned register; if it is already signed, Continue returns to camp |
+| Give items, counted inventory, item stat modifiers | Trader gives rope, charm (+2 WIS) and two rations; relic adds +2 CHA |
+| Arithmetic, assignment/subtraction, numeric equality/inequality | Trader's `ledger` computes `((6 + 2) * 3 / 2 - 1) - 1 = 10`; `supplies` increments |
+| All five pronoun forms, names, chained modifiers, literal braces | `camp.register`: uppercase/full names, subject/object/possessive/independent/reflexive, `#capitalize`, `#a#capitalize`, escaped braces |
+| Pronoun agreement selector and possessives | Opening uses `{player:pronoun#one-many("has", "have")}` for singular they as well as she/he; `{player:last-name#possessive}` renders "Burns's" |
+| Recurring-name substitutions | `{guide:first-name}`, `{item:relic}`, `{item:journal}` and other references keep prose tied to settings; scene titles use neutral wording because titles are literal |
+| Text declarations, copying, empty text, equality/inequality | `camp.watchword*`: record a phrase, keep/change/retire it; `watch-note` keeps the copied value |
+| Journal check, flag gate, XP and Lucidity progression | `camp.journal*`: success gives 50 XP, `knows-glyphs` and +2 Lucidity; the flag opens the temple's glyph route |
+| Choice skill checks for player and NPC | `trail.river`: swim or ask the guide; rope offers a safe route |
+| Union hub, cap, changing eligibility, `not`, visits | `trail.night`: `any(night,watch)`, `@hub-limit 1`; supper, jaguar, signal and bell; **Press on at dawn** always remains available |
+| Counted take, clear flag, choice fall-through | `trail.supper*`: eat one of two rations, clear `packing-open`, then follow the scene divert |
+| Stat clamping, custom-stat trigger, conditional entry effect | `trail.jaguar`: Courage saturates at 10, `courage-earned` sets `steady`, Courage >=6 grants 5 XP |
+| Text comparison, conditional divert with fallback | `trail.signal`: a matching nonempty watchword reaches `trail.found`; a changed, retired or unrecorded phrase reaches `trail.wait` |
+| Repeatable edge trigger | `trail.bell`: ring/silence/ring counts two alarms; root `watch-bell` has `once: false` |
+| Item/flag/faction gates and converging routes | River rope, temple glyphs, force/side-gap alternatives and guild hand-over |
+| Entry skill check | `temple.hall`: Perception leads to the idol niche or directly to the altar |
+| Faction tiers and trigger, XP and level-up | Guild standing throughout; keeping the relic fires `guild-wary` |
+| Nested block/inline conditions, `and`/`or`, parentheses, `visited(...)` | `ending.keep` |
+| Conditional choices and unconditional fallback | `ending.return`: guild/keeper choices when carrying the relic, otherwise `ending.empty-handed` |
+| Titles, speech, formatting, comments, image media | Throughout; camp/worktable art at camp and night watch, door/altar art in the temple; images render in the player |
+| Save/load, deterministic Back/Forward, restart and title | Shared player; created identity, stats, text variables, counted items and trigger progress survive replay |
 
 ### Quick acceptance route
 
-1. Open the sample; try Scholar, change the name/pronouns, then **Use default name**.
-   Confirm it restores the name without resetting the other selections; start.
-2. Continue to camp. Visit the **expedition workshop**. Pack lunch, eat one ration,
-   balance the ledger (10), and sign the register. Finish all lessons to return.
-3. Try the **field exercises**. Courage clamps at 10; the signal appears after the
-   first exercise. Save here, advance, load, and try Back/Forward. Finish with the
-   watch bell: ring, silence, ring again, then leave the drill.
-4. Return to camp and **agree on a night watchword**. Choose a phrase and record it,
-   then change it or retire it without a replacement. The ledger retains the old
-   phrase while the dialogue reflects the current (possibly empty) watchword.
-   Save, Back, Forward and load should preserve both values.
-5. Haggle for supplies, speak to Tomas, and study the journal.
-   Cross the river, explore the temple, and choose an ending. Try keeping the relic
-   to see the negative-standing trigger; try handing it over for the guild ending.
-6. Close/reopen and load your save. Publish this same folder as a story ZIP,
-   standalone web site or universal desktop game; creation is part of each build.
+1. Try Scholar, change the name/pronouns, then **Use default name**. It restores
+   the name without resetting other selections. Start and check the opening
+   agreement; repeat with she, they and he.
+2. Continue to camp. **Haggle for supplies** gives two rations and balances the
+   ledger at 10. **Sign the expedition register** and inspect the pronoun forms.
+   Alternatively, sign first, then trade, to see the trader's empty-hub fallback.
+3. Study the journal: success gives +2 Lucidity and the glyph route; failure
+   leaves forcing and the side gap available. Ask the guide about the temple.
+4. Agree on a night watchword, record it, and keep, change or retire it. The
+   ledger retains the recorded phrase. Save, Back, Forward and load preserve both values.
+5. Set out. Cross by rope, swim, or let the guide try a ford. On the far bank,
+   make camp or climb straight to the temple. At night, eat one ration, face
+   the jaguar (Courage clamps at 10), and follow the signal. A kept watchword
+   answers correctly; other phrases fall back to waiting. Ring, silence and
+   ring the tripwire bell; the counter reaches 2. **Press on at dawn** also
+   lets you skip any remaining encounters.
+6. Enter by glyphs, force or side gap; search the hall, then take or leave the
+   relic. Try all three endings and the guild's response to keeping it.
+7. Close/reopen and load a save. Publish the folder as a story ZIP, standalone
+   web site or desktop game; creation remains part of each build.
 
-Version `0.3.0` adds the text-variable watchword exercise to the character-creation
-sample and intentionally invalidates saves from earlier sample versions. Incompatible loads should
-be rejected visibly without replacing your active playthrough or saved bytes.
+Version **`0.4.0`** restructures the sample and intentionally rejects older
+sample saves, including `0.3.0`. Incompatible loads report an error visibly
+without replacing the active playthrough or saved bytes. There is no migration.
+This version has no playable dream sequence.
 
 ### Features that cannot all be enabled in one story
 
-- `randomness: checks-only` and `undo: true` are active. A fixed `seed` is shown
-  commented in the manifest. In a **copy**, use a fixed seed or `randomness: off`
-  to compare reproducible/take-10 checks; use `undo: false` to hide history controls.
-  These are alternate settings, not additional simultaneously active mechanics.
-- `ruleset.base: none` is an alternative to Generic, not something to combine with
-  this Generic-based expedition. Custom player pronouns without a picker are
-  another alternative; the guide already demonstrates explicit pronoun fields.
+- `randomness: checks-only` and `undo: true` are active. A fixed `seed` is
+  commented in the manifest. In a **copy**, set a seed or `randomness: off`
+  for reproducible/take-10 checks; use `undo: false` to hide history controls.
+- `ruleset.base: none` is an alternative to Generic. Custom player pronouns
+  without a picker are another alternative; the guide already uses explicit fields.
 - C# named predicates, custom text modifiers, rulesets and build-time validation
-  require an explicit compiled host. The companion
-  [C# story example](../examples/CSharpStory/README.md) demonstrates those features;
-  the no-code CLI intentionally does **not** discover or run arbitrary C#.
-- CLI validation/packaging and author-debugger setup, inspection, live state
-  editing, scenario replay and guarded reload operate **on** this sample. Try
-  overriding `watchword` and `watch-note` with literal text, including empty text.
-  These are tools, not Talemark directives.
+  need a compiled host. See the [C# example](../examples/CSharpStory/README.md);
+  the no-code CLI does not discover or execute arbitrary C#.
+- CLI validation/packaging and author-debugger state inspection, editing, replay
+  and guarded reload operate **on** this sample; they are tools, not directives.
+  Try overriding `watchword` and `watch-note`, including empty text.
   See the [CLI guide](../docs/reference/cli.md).
-- Media rendering, autosave, save migration and point-buy are not implemented
-  features and are not claimed by this sample.
+- Autosave, save migration and point-buy are not implemented or claimed.
 
-**Play it** in the [web player](https://play.trytalewright.com/), or with the [desktop tools](../docs/guide/getting-started.md#optional-install-the-desktop-tools):
+**Play it** in the [web player](https://play.trytalewright.com/) or with the
+[desktop tools](../docs/guide/getting-started.md#optional-install-the-desktop-tools):
 `dotnet run --project apps/desktop -- samples/LostRelic`.
 
 ## Use a sample as a starting point
 
-Copy `LostRelic/`, change `id` and `title` in `story.talewright.yaml`, and start editing. The
-[first story tutorial](../docs/guide/first-story.md) explains the basics, and the
-[Talemark syntax reference](../docs/reference/talemark-syntax.md) covers everything else.
+Copy `LostRelic/`, change `id` and `title` in `story.talewright.yaml`, and edit.
+The [first story tutorial](../docs/guide/first-story.md) and
+[syntax reference](../docs/reference/talemark-syntax.md) explain the rest.
 
 ## For contributors
 
-Samples aren't part of the engine: engine code never references them, and they aren't included in NuGet
-packages. The desktop and web hosts embed everything under `samples/` as built-in stories, and
-[GitHub Pages](../docs/developer/releasing.md) republishes them after Build and all test jobs pass on a
-`main` push, verifying assets, sample opening and a choice at the Pages base path. Integration smoke
-tests open the sample; detailed player tests use their own stories defined in C#.
+Samples are not part of the engine or NuGet packages. The desktop/web hosts embed
+them, and [GitHub Pages](../docs/developer/releasing.md) republishes them after
+Build and tests pass on `main`, checking assets and sample opening at its base path.
+Lost Relic has targeted runtime and player acceptance tests; broader player
+regressions use their own C# story fixtures.
