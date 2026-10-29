@@ -10,9 +10,14 @@ const notices = new URL('THIRD-PARTY-NOTICES.txt', root);
 const manifestPath = new URL('package.json', root);
 const manifestSource = await readFile(manifestPath, 'utf8');
 const release = releaseIdentity();
-if (process.platform !== 'linux' || process.arch !== 'x64') {
-  throw new Error('Packaging is verified only on Linux x64; no universal or other-platform VSIX is produced.');
-}
+const target = process.env.TALEWRIGHT_VSIX_TARGET || 'linux-x64';
+const rid = {
+  'linux-x64': 'linux-x64', 'linux-arm64': 'linux-arm64',
+  'win32-x64': 'win-x64', 'win32-arm64': 'win-arm64',
+  'darwin-x64': 'osx-x64', 'darwin-arm64': 'osx-arm64',
+}[target];
+if (!rid) throw new Error(`Unsupported VSIX target: ${target}`);
+const packageName = target === 'linux-x64' ? 'talewright.vsix' : `talewright-${target}.vsix`;
 await mkdir(new URL('artifacts/', root), { recursive: true });
 await copyFile(new URL('../../LICENSE', root), license);
 try {
@@ -25,7 +30,7 @@ try {
   await rm(server, { recursive: true, force: true });
   execFileSync('dotnet', [
     'publish', fileURLToPath(new URL('../language-server/src/Talewright.LanguageServer', root)),
-    '-c', 'Release', '-r', 'linux-x64', '--self-contained', 'true',
+    '-c', 'Release', '-r', rid, '--self-contained', 'true',
     '-p:PackAsTool=false', `-p:Version=${release?.nuget ?? JSON.parse(manifestSource).version}`,
     '-o', fileURLToPath(server),
   ], { stdio: 'inherit' });
@@ -33,13 +38,13 @@ try {
   const runtimeVersion = runtime.runtimeOptions.includedFrameworks.find(framework => framework.name === 'Microsoft.NETCore.App').version;
   const cache = execFileSync('dotnet', ['nuget', 'locals', 'global-packages', '--list'], { encoding: 'utf8' })
     .trim().replace(/^global-packages:\s*/, '');
-  const runtimePackage = new URL(`microsoft.netcore.app.runtime.linux-x64/${runtimeVersion}/`, pathToFileURL(cache.replace(/\/?$/, '/')));
+  const runtimePackage = new URL(`microsoft.netcore.app.runtime.${rid}/${runtimeVersion}/`, pathToFileURL(cache.replace(/\/?$/, '/')));
   for (const name of ['LICENSE.TXT', 'THIRD-PARTY-NOTICES.TXT']) {
     await copyFile(new URL(name, runtimePackage), new URL(name, server));
   }
   await writeFile(new URL('talewright-server.json', server), JSON.stringify({
     version: release?.nuget ?? JSON.parse(manifestSource).version,
-    target: 'linux-x64',
+    target,
   }) + '\n');
   const lock = JSON.parse(await readFile(new URL('package-lock.json', root), 'utf8'));
   const serverNotices = await readFile(new URL('tests/server-notices.txt', root), 'utf8');
@@ -60,11 +65,11 @@ try {
   await writeFile(notices, sections.join('\n\n----------------------------------------\n\n'));
   await createVSIX({
     cwd: fileURLToPath(root),
-    packagePath: fileURLToPath(new URL('artifacts/talewright.vsix', root)),
+    packagePath: fileURLToPath(new URL(`artifacts/${packageName}`, root)),
     dependencies: false,
     githubBranch: 'main',
     preRelease: release?.prerelease ?? false,
-    target: 'linux-x64',
+    target,
   });
 } finally {
   if (release) await writeFile(manifestPath, manifestSource);

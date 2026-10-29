@@ -3,18 +3,51 @@
 
 import argparse
 import json
+from pathlib import Path
+import struct
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 
 from package_version import release_identity
 
+TARGETS = (
+    "linux-x64", "linux-arm64", "win32-x64", "win32-arm64",
+    "darwin-x64", "darwin-arm64",
+)
 
-def verify_bundle(archive, expected_version=None):
+
+def verify_native(stream, target, name):
+    header = stream.read(64)
+    arm = target.endswith("-arm64")
+    if target.startswith("linux-"):
+        valid = (header[:6] == b"\x7fELF\x02\x01"
+                 and header[18:20] == struct.pack("<H", 183 if arm else 62))
+    elif target.startswith("darwin-"):
+        valid = (header[:4] == b"\xcf\xfa\xed\xfe"
+                 and header[4:8] == struct.pack("<I", 0x100000c if arm else 0x1000007))
+    else:
+        valid = len(header) == 64 and header[:2] == b"MZ"
+        if valid:
+            stream.seek(struct.unpack_from("<I", header, 60)[0])
+            valid = stream.read(6) == b"PE\x00\x00" + struct.pack("<H", 0xaa64 if arm else 0x8664)
+    if not valid:
+        raise ValueError(f"{name} must be a {target} native binary")
+
+
+def verify_bundle(archive, expected_version=None, target="linux-x64"):
+    if target not in TARGETS:
+        raise ValueError(f"Unsupported VSIX target: {target}")
     prefix = "extension/server/"
+    executable = "Talewright.LanguageServer" + (".exe" if target.startswith("win32-") else "")
+    if target.startswith("win32-"):
+        native = ["coreclr.dll", "hostfxr.dll", "hostpolicy.dll"]
+    else:
+        suffix = "dylib" if target.startswith("darwin-") else "so"
+        native = [f"lib{name}.{suffix}" for name in ["coreclr", "hostfxr", "hostpolicy"]]
     required = [
-        "Talewright.LanguageServer", "Talewright.LanguageServer.dll",
+        executable, "Talewright.LanguageServer.dll",
         "Talewright.LanguageServer.deps.json", "Talewright.LanguageServer.runtimeconfig.json",
-        "Talewright.Authoring.dll", "libcoreclr.so", "libhostfxr.so", "libhostpolicy.so",
+        "Talewright.Authoring.dll", *native,
         "System.Private.CoreLib.dll", "LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT",
         "talewright-server.json",
     ]
@@ -26,15 +59,14 @@ def verify_bundle(archive, expected_version=None):
             or not any(framework["name"] == "Microsoft.NETCore.App"
                        for framework in config.get("includedFrameworks", []))):
         raise ValueError("Bundled language server requires a separately installed .NET runtime")
-    for name in ["Talewright.LanguageServer", "libcoreclr.so", "libhostfxr.so", "libhostpolicy.so"]:
+    for name in [executable, *native]:
         with archive.open(prefix + name) as stream:
-            header = stream.read(20)
-        if header[:6] != b"\x7fELF\x02\x01" or header[18:20] != b"\x3e\x00":
-            raise ValueError(f"{name} must be a Linux x64 ELF binary")
-    if not (archive.getinfo(prefix + "Talewright.LanguageServer").external_attr >> 16) & 0o111:
+            verify_native(stream, target, name)
+    if not target.startswith("win32-") and not (
+            archive.getinfo(prefix + executable).external_attr >> 16) & 0o111:
         raise ValueError("Bundled server executable permissions are missing")
     metadata = json.loads(archive.read(prefix + "talewright-server.json"))
-    if metadata.get("target") != "linux-x64" or (
+    if metadata.get("target") != target or (
             expected_version is not None and metadata.get("version") != expected_version):
         raise ValueError("Bundled server version/target does not match the client release")
     dependencies = json.loads(archive.read(prefix + "Talewright.LanguageServer.deps.json"))
@@ -53,10 +85,10 @@ def verify_vsix(path, tag):
     with ZipFile(path) as archive:
         manifest = json.loads(archive.read("extension/package.json"))
         xml = ET.fromstring(archive.read("extension.vsixmanifest"))
-        verify_bundle(archive, release["nuget"])
-    identity = xml.find(".//{*}Identity")
-    if identity is None:
-        raise ValueError("VSIX has no Identity")
+        identity = xml.find(".//{*}Identity")
+        if identity is None:
+            raise ValueError("VSIX has no Identity")
+        verify_bundle(archive, release["nuget"], identity.get("TargetPlatform"))
     for key, expected in {
         "name": "talewright", "publisher": "squid-farm", "version": release["vscode"],
     }.items():
@@ -73,10 +105,23 @@ def verify_vsix(path, tag):
     )
     if prerelease != release["prerelease"]:
         raise ValueError("VSIX pre-release channel does not match the tag")
-    if identity.get("TargetPlatform") != "linux-x64":
-        raise ValueError("Publication requires the verified all-in-one linux-x64 VSIX; "
-                         "a universal/separate-server extension must not be published")
     return release
+
+
+def verify_set(directory, tag):
+    expected = {
+        "talewright.vsix" if target == "linux-x64" else f"talewright-{target}.vsix": target
+        for target in TARGETS
+    }
+    paths = {path.name: path for path in Path(directory).glob("*.vsix")}
+    if paths.keys() != expected.keys():
+        raise ValueError(f"Release requires exactly these VSIX packages: {sorted(expected)}")
+    for name, target in expected.items():
+        verify_vsix(paths[name], tag)
+        with ZipFile(paths[name]) as archive:
+            identity = ET.fromstring(archive.read("extension.vsixmanifest")).find(".//{*}Identity")
+            if identity.get("TargetPlatform") != target:
+                raise ValueError(f"{name} must target {target}")
 
 
 def main():
@@ -84,16 +129,24 @@ def main():
     parser.add_argument("vsix")
     parser.add_argument("tag", nargs="?")
     parser.add_argument("--bundle-only", action="store_true")
+    parser.add_argument("--all", action="store_true", help="Verify a complete release VSIX directory")
     args = parser.parse_args()
-    if args.bundle_only and args.tag is None:
+    if args.all and args.tag and not args.bundle_only:
+        verify_set(args.vsix, args.tag)
+        print("Verified the complete six-platform release VSIX set.")
+    elif args.bundle_only and args.tag is None and not args.all:
         with ZipFile(args.vsix) as archive:
-            verify_bundle(archive)
-        print("Verified self-contained Linux x64 server assets and bundled launch default.")
-    elif args.tag is not None and not args.bundle_only:
+            xml = ET.fromstring(archive.read("extension.vsixmanifest"))
+            identity = xml.find(".//{*}Identity")
+            if identity is None:
+                raise ValueError("VSIX has no Identity")
+            verify_bundle(archive, target=identity.get("TargetPlatform"))
+        print("Verified self-contained platform server assets and bundled launch default.")
+    elif args.tag is not None and not args.bundle_only and not args.all:
         verify_vsix(args.vsix, args.tag)
         print("Verified release VSIX identity, version, channel, target and self-contained server.")
     else:
-        parser.error("Provide either a release tag or --bundle-only")
+        parser.error("Provide a release tag (with --all for a directory), or --bundle-only for one VSIX")
 
 
 if __name__ == "__main__":

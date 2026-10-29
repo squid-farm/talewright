@@ -12,7 +12,7 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 | Trigger | What happens |
 |---|---|
 | Push to `main` | **Publish Samples** builds the web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). |
-| Valid version-tag push | **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes the tested Linux x64 VSIX; then the GitHub release job attaches it and publishes generated notes. All publishing jobs use environment `release`. |
+| Valid version-tag push | **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. All publishing jobs use environment `release`. |
 | PR / manual | Validation only. |
 
 The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
@@ -50,7 +50,7 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
    `contents: write`. Marketplace needs only `contents: read` and the environment PAT.
    Pages and GHCR image permissions remain separate.
 
-## All-in-one extension prerequisite (#233)
+## All-in-one extension packages
 
 The existing editor `package-check` target now publishes a self-contained Linux x64 language
 server into the VSIX before running package checks; `editor-smoke` installs **that VSIX** and
@@ -58,10 +58,18 @@ uses the default bundled executable. It checks diagnostics, completion, hover an
 with external `dotnet` blocked and runtime lookup disabled, plus a real restricted-workspace
 pass proving that the server does not start. No story-project code is built or executed.
 
-The release artifact gate rejects universal/non-`linux-x64` VSIXs, missing native/runtime assets,
+Tagged builds additionally cross-package `linux-arm64`, `win32-x64`, `win32-arm64`, `darwin-x64`
+and `darwin-arm64` in the **provisional-vsix** matrix. Each package includes a self-contained
+server for its actual .NET RID (`linux-*`, `win-*` or `osx-*`). Each runs the package-content
+checks, including native PE/ELF/Mach-O architecture checks, but **not** installed-editor execution.
+These five platforms are provisionally supported; the Marketplace README and generated release
+notes explicitly disclose that they do not have Linux x64's runtime validation.
+
+The release artifact gate requires exactly one package for each of the six targets before **any**
+publication. It rejects universal/unsupported or mislabeled VSIXs, missing native/runtime assets,
 non-executable servers, externally dependent runtime configurations, mismatched server/client
 release versions, and non-bundled launch defaults before **any** publication. Changing only target
-metadata cannot satisfy the gate. There is no separate release build or universal fallback.
+metadata cannot satisfy the gate. Publication does not rebuild packages and there is no universal fallback.
 Supported environments and development overrides are documented in the
 [extension README](../../tooling/vscode-talewright/README.md).
 
@@ -94,7 +102,14 @@ installation, platform compatibility filtering and a subsequent version update b
 
 The editor's existing package target stamps the mapped version and prerelease flag **before**
 package/installed-editor validation and artifact upload. It restores the source manifest afterward.
-Publication never rebuilds or repackages the VSIX. Ordinary main/PR/manual packaging is unchanged;
+Publication never rebuilds or repackages the VSIXs. Marketplace publishing iterates all six
+verified files with the same mapped version and channel, retaining `--skip-duplicate` so a retry
+can resume after partial platform publication. GitHub Releases attaches Linux x64 as
+`talewright-linux-x64.vsix` and the others as `talewright-TARGET.vsix`.
+The original `talewright-vscode` CI artifact holds Linux x64; `talewright-vscode-TARGET`
+artifacts hold provisional targets. The release gate, Marketplace job and GitHub release job
+all download and verify the full set.
+Ordinary main/PR/manual packaging is unchanged;
 ordinary NuGet CI builds remain unpublished `0.0.0-ci.RUN_NUMBER`.
 
 ## Cutting the first preview
@@ -133,7 +148,7 @@ never publishes, even when run against a tag.
   failures. Existing NuGet/Marketplace versions are **not overwritten or content-compared**.
   Never publish differing artifacts under an existing version.
 - The GitHub job runs only after both registries succeed. It verifies the tag still points at the
-  validated commit, generates notes, creates a draft, uploads the tested VSIX, then publishes.
+  validated commit, generates notes, creates a draft, uploads all six verified VSIXs, then publishes.
   Previews are marked prerelease and never selected as `latest`. Stable releases also do not
   automatically change `latest`; maintainers can promote one after review.
   Retries preserve existing notes and identical VSIX bytes, resume incomplete drafts, and fail if
@@ -148,7 +163,7 @@ never publishes, even when run against a tag.
   unchanged tag; never substitute locally built artifacts.
 - Version tags additionally build self-contained CLI/debugger archives for the six existing RIDs.
   The existing release gate requires their build/asset checks and six SHA-256 files; the GitHub job
-  attaches those archives/checksums alongside the VSIX without rebuilding them after approval.
+  attaches those archives/checksums alongside the VSIXs without rebuilding them after approval.
   See the [author setup guide](../guide/cli-installation.md) for download instructions and
   [technical CLI setup](cli-setup.md) for per-command prerequisites and verification limits.
   Cross-building Windows/macOS/ARM does not verify execution on those platforms.
@@ -157,7 +172,8 @@ never publishes, even when run against a tag.
 ## Offline validation
 
 The existing `talewright-ci-tests:ci-check` target includes `tests/test_release.py`, covering
-version boundaries/order/collisions, VSIX identity/platform/channel/bundling, validation gating, scoped
+version boundaries/order/collisions, the complete six-platform VSIX set, native architecture,
+identity/channel/bundling, validation gating, scoped
 permissions, and release API retry/error cases without network publication:
 
 ```bash
@@ -166,6 +182,9 @@ cd tooling/vscode-talewright
 npm ci
 TALEWRIGHT_RELEASE_TAG=v0.1.0-preview.1 npm run package
 TALEWRIGHT_RELEASE_TAG=v0.1.0-preview.1 npm run test:package
+# Repeat package/test:package with TALEWRIGHT_VSIX_TARGET set to each provisional target.
+# Once all six packages exist:
+python3 ../../.github/scripts/verify_release_vsix.py artifacts v0.1.0-preview.1 --all
 ```
 
 Run `xvfb-run -a npm run test:editor` after packaging to check the installed all-in-one client/server

@@ -54,8 +54,10 @@ to install.
 ## Set up your writing space
 
 We recommend **VS Code with the [Talewright extension](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright)**:
-write Talemark with highlighting, suggestions and live checks. The current extension supports
-**Linux x64**; its language server is included, with no .NET installation or source build needed.
+write Talemark with highlighting, suggestions and live checks. **Linux x64** is runtime-tested;
+Windows x64/ARM64, macOS Intel/Apple Silicon and Linux ARM64 are available with **provisional
+support** (cross-built and inspected, not yet verified in the installed editor).
+Each package includes its language server, with no .NET installation or source build needed.
 See [Getting started](docs/guide/getting-started.md) for installation and platform details.
 
 For **Validate Story**, **Publish Story ZIP** and **Open Author Debugger**, run
@@ -123,7 +125,7 @@ contracts and the verification guide. Shared build settings and the
 ## Project status
 
 Talewright is in **preview**. Writing, playing, saving, validating, debugging and publishing all work.
-The Linux x64 VS Code extension includes completion and live errors; story images are supported
+The VS Code extension includes completion and live errors; story images are supported
 in the web and desktop players. World simulation and combat remain future work.
 Follow along on the [roadmap](docs/developer/plan.md#6-milestones) and the
 [project board](https://github.com/orgs/squid-farm/projects/1).
