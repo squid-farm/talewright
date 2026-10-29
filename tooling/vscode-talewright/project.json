@@ -7,6 +7,7 @@
     "documentedManifests": [
       "{workspaceRoot}/docs/reference/talemark-syntax.md",
       "{workspaceRoot}/docs/guide/first-story.md",
+      "{workspaceRoot}/docs/guide/authoring-recipes.md",
       "{workspaceRoot}/docs/guide/organizing-your-story.md",
       "{workspaceRoot}/docs/guide/debugger-test-plan.md",
       "{workspaceRoot}/docs/guide/writing-stories.md"
