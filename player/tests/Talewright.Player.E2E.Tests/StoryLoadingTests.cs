@@ -43,7 +43,8 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
     {
         var assembly = typeof(StoryLoadingTests).Assembly;
         var source = await new EmbeddedStoryLibrary(assembly).LoadAsync("LostRelic");
-        Assert.Equal(4, source.Files.Keys.Count(path => path.EndsWith(".tale")));
+        Assert.Equal(5, source.Files.Keys.Count(path => path.EndsWith(".tale")));
+        Assert.Contains("dream/dream.talewright.yaml", source.Files.Keys);
         Assert.DoesNotContain("characters/guide.talewright.yaml", source.Files.Keys);
         using var buffer = new MemoryStream();
         using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))

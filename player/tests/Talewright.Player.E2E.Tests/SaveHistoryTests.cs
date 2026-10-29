@@ -149,8 +149,10 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Observe(new(null, "Finished safely.", Ended: true));
     }
 
-    [Fact]
-    public async Task Bundled_sample_rejects_older_version_save_visibly_without_replacing_progress_or_bytes()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Bundled_sample_rejects_older_version_save_visibly_without_replacing_progress_or_bytes(bool olderVersion)
     {
         var source = await new EmbeddedStoryLibrary(typeof(SaveHistoryTests).Assembly).LoadAsync("LostRelic");
         var files = source.Files.ToDictionary();
@@ -159,14 +161,21 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var old = result.Story!;
         var history = new StoryHistory(old, 42, old.Creation!.Default(old.World.Characters[EntityId.Player]));
-        var bytes = history.Save();
+        var saved = JsonNode.Parse(history.Save())!;
+        if (!olderVersion)
+        {
+            saved["storyVersion"] = "0.4.0";
+            saved["contentFingerprint"] = "before-the-dream";
+        }
+        var bytes = System.Text.Encoding.UTF8.GetBytes(saved.ToJsonString());
+        var slot = olderVersion ? "Older sample" : "Pre-dream sample";
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
         await Choose("Continue");
         var before = await Driver.ObserveAsync();
-        await Persist(old.Id, "Older sample", bytes);
+        await Persist(old.Id, slot, bytes);
         await Driver.ClickAsync("Saves");
-        await Driver.ClickAsync("Load Older sample");
+        await Driver.ClickAsync("Load " + slot);
         await Driver.ClickAsync("Load save");
         await AssertDialogText(text => Assert.Contains("incompatible", text));
         await Driver.ClickAsync("Close saves");
@@ -178,16 +187,16 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         });
         if (PlayerTarget.IsDesktop)
         {
-            Assert.Equal(bytes, await new FileSaveStore(FileSaveStore.DefaultRoot).ReadAsync(old.Id, "Older sample"));
+            Assert.Equal(bytes, await new FileSaveStore(FileSaveStore.DefaultRoot).ReadAsync(old.Id, slot));
         }
         else
         {
             var stored = await Page.EvaluateAsync<string>("""
-                async storyId => {
+                async ({storyId, slot}) => {
                     const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                    return new TextDecoder().decode(await module.read(storyId, "Older sample"));
+                    return new TextDecoder().decode(await module.read(storyId, slot));
                 }
-                """, old.Id);
+                """, new { storyId = old.Id, slot });
             Assert.Equal(System.Text.Encoding.UTF8.GetString(bytes), stored);
         }
         await Choose("Sign the expedition register");

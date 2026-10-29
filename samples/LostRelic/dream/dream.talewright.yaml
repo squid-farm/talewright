@@ -1,0 +1,40 @@
+# These IDs are global; this folder does not create a namespace.
+# Rules, character creation and all triggers stay in the root manifest.
+characters:
+  ines:
+    first-name: Ines
+    last-name: Varga
+    pronouns: she
+  spiral:
+    first-name: the Spiral
+    pronouns:
+      subject: xe
+      object: xem
+      possessive-pronoun: { determiner: xyr, independent: xyrs }
+      reflexive: xemself
+      agreement: singular
+    inventory: [glyph-mark]
+  watcher:
+    first-name: the Watcher
+    pronouns: it
+    stats: { perception: 4, wis: 14 }
+    inventory: [glyph-mark]
+  hands:
+    first-name: the Hands
+    name-agreement: plural
+    pronouns: they
+    inventory: [glyph-mark]
+  archivist:
+    first-name: the Archivist
+    pronouns: they
+  sleeper:
+    first-name: the Sleeper
+    pronouns: it
+
+items:
+  glyph-mark: { name: glyph mark }
+
+vars:
+  marks: 0 # Mirror held glyph-mark count until item-count expressions are supported (#202).
+  sum: 0
+flags: [dream-promise]

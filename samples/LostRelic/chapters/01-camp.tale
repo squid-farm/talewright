@@ -33,23 +33,16 @@ you bought{/if}.
 
 {image("expedition-workshop", "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.")}
 
-~ var:ledger = (6 + 2) * 3 / 2 - 1
-~ var:ledger -= 1
-
 A trader with a gold tooth unrolls a blanket of goods. You come away with a {item:rope#lower} and a
 {item:charm#lower} he swears keeps the river spirits polite.
-Two {item:ration}s complete the bargain. The trader checks the expedition slate:
-`((6 + 2) * 3 / 2 - 1) - 1` is **{var:ledger}** crates, enough to supply the camp.
+Two {item:ration}s complete the bargain. The trader sets the expedition register
+beside your pack and points to the empty signature line.
 
 ~ give player rope
 ~ give player charm
 ~ give player ration 2
 ~ set flag:packing-open
 ~ var:supplies += 2
-
-{if var:ledger == 10 and var:ledger != 0}
-The accounts balance. All that remains is to check the register.
-{/if}
 
 -> camp.hub
 
@@ -77,8 +70,8 @@ Ask {player:pronoun#object} to check it {player:pronoun#reflexive}."
 
 > guide: The old ones built it to keep something *in*, not people out. The guild knows that. They never write it down.
 
-{guide:first-name} tells you about the river crossing, and about the explorer who went in last spring and came out
-talking only in numbers.
+{guide:first-name} tells you about the river crossing, and about {ines:name},
+the explorer who went in last spring and came out talking only in numbers.
 
 {if faction:explorers-guild >= friendly}
 > guide: The guild speaks well of you. I'll do what I can.
@@ -103,7 +96,7 @@ are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
   failure: -> camp.journal-failed
 
 === camp.journal-solved
-It's a warning and an instruction at once: *follow the spiral to the hand, and the stone will open the way.*
+It's a warning and an instruction at once: *close your eyes before the spiral, and the hand will open the way.*
 You underline it twice. The pattern settles into focus; your Lucidity rises to **{player:lucidity}**.
 -> camp.hub
 

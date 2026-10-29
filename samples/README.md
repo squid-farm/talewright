@@ -18,8 +18,9 @@ This version reuses the existing four JPEG assets.
 Opening the sample presents **character creation**: editable names, she/they/he
 pronouns, Explorer/Scholar presets and bounded Strength/Courage choices.
 **Start story** keeps the authored Mara defaults. Scholar starts with Lucidity 3;
-solving the journal adds 2 for either preset. Lucidity is an unlinked skill here;
-its governing attribute and dream encounters belong to a later sample update.
+solving the journal adds 2 for either preset. Will governs Lucidity using the
+existing generic formula: **die + Lucidity + floor((Will - 10) / 2)**.
+Scholar starts with Will 14 (+2); Explorer uses Will 10 (+0).
 
 ### Chapter progression and organization
 
@@ -27,13 +28,18 @@ its governing attribute and dream encounters belong to a later sample update.
 |---|---|---|
 | 1 — Camp | `chapters/01-camp.tale` / `camp.*` | Arrival, speech, basic storylets, trader, register, journal and watchword |
 | 2 — Trail | `chapters/02-trail.tale` / `trail.*` | Player/NPC river checks and rope gate; optional night camp with one encounter offered at a time and a fixed dawn exit |
-| 3 — Temple | `chapters/03-temple.tale` / `temple.*` | Glyph/forcing/side-gap entrances converge on an arrival check, optional idol and relic decision |
-| 4 — Endings | `chapters/04-endings.tale` / `ending.*` | Guild standing, nested conditions and conditional diverts lead to three endings |
+| 3 — Temple | `chapters/03-temple.tale` / `temple.*` | Glyph/forcing/side-gap entrances and an optional **Close your eyes** dream route converge on an arrival check, optional idol and relic decision |
+| 4 — Endings | `chapters/04-endings.tale` / `ending.*` | Guild standing, dream visits, promises and Lucidity affect three endings |
 
 `story.talewright.yaml` holds the game/rules, player, Tomas, trail items, guild
-and all triggers. The four chapter files and `images/` are the rest of the sample;
-there is no supporting character configuration or dream folder in this version.
+and all triggers, including `dream-ready`. `dream/dream.talewright.yaml` holds
+the six dream characters, glyph item, `marks`/`sum` variables and dream promise
+flag; `dream/dream.tale` holds their scenes. The four chapter files and
+`images/` complete the sample.
 Folders do not add scope or prefixes: the chapter scene IDs are authored explicitly.
+Dream IDs are global too: `{ines:name}` works at camp. Declaring the same ID in
+two settings files is an error, not an override. Keep the single trigger list in
+the root to preserve its order.
 See [Organizing your story](../docs/guide/organizing-your-story.md) for when to
 split settings, how global IDs work and why triggers stay together.
 
@@ -42,12 +48,12 @@ split settings, how global IDs work and why triggers stay together.
 | Feature | Where |
 |---|---|
 | Character creation, presets, legal stat choices, restore default name | Root manifest; Explorer retains authored Strength, omitted Courage defaults to the first option (3), Scholar starts with Lucidity 3 |
-| Ruleset extension/removal, custom bounded stats | Root manifest adds Courage (custom, 0–10) and Lucidity (skill, 0–10); disables Performance |
+| Ruleset extension/removal, custom bounded stats and governing attribute | Root manifest adds Courage (custom, 0–10), Will (attribute, 1–30) and Lucidity (skill, 0–10, `governing-attribute: will`); disables Performance |
 | Built-in/custom pronoun sets, NPC stats | Player creation and Tomas's explicit pronouns/stats in the root manifest |
 | Basic hub, `@once`, `@priority`, stable equal-priority order | `camp.hub`; trader and register tie at priority 10, journal follows at 5 |
 | Intersection hub and empty-hub fallback | Trader `camp.supplies` uses `all(camp,records)` to offer the unsigned register; if it is already signed, Continue returns to camp |
 | Give items, counted inventory, item stat modifiers | Trader gives rope, charm (+2 WIS) and two rations; relic adds +2 CHA |
-| Arithmetic, assignment/subtraction, numeric equality/inequality | Trader's `ledger` computes `((6 + 2) * 3 / 2 - 1) - 1 = 10`; `supplies` increments |
+| Arithmetic, assignment/subtraction, numeric equality/inequality | Ines in `dream.ines` computes `((6 + 2) * 3 / 2 - 1) - 1 = 10` and pays off Tomas's rumor; `supplies` still increments at camp |
 | All five pronoun forms, names, chained modifiers, literal braces | `camp.register`: uppercase/full names, subject/object/possessive/independent/reflexive, `#capitalize`, `#a#capitalize`, escaped braces |
 | Pronoun agreement selector and possessives | Opening uses `{player:pronoun#one-many("has", "have")}` for singular they as well as she/he; `{player:last-name#possessive}` renders "Burns's" |
 | Recurring-name substitutions | `{guide:first-name}`, `{item:relic}`, `{item:journal}` and other references keep prose tied to settings; scene titles use neutral wording because titles are literal |
@@ -64,6 +70,13 @@ split settings, how global IDs work and why triggers stay together.
 | Faction tiers and trigger, XP and level-up | Guild standing throughout; keeping the relic fires `guild-wary` |
 | Nested block/inline conditions, `and`/`or`, parentheses, `visited(...)` | `ending.keep` |
 | Conditional choices and unconditional fallback | `ending.return`: guild/keeper choices when carrying the relic, otherwise `ending.empty-handed` |
+| Dream intersection hub and cap | `dream.hub`: `all(dream,keeper)`, `@hub-limit 2` offers at most two eligible keepers **per visit**, not two total visits; a fixed waking choice remains |
+| Custom pronouns and watchword responses | The Spiral uses xe/xem with singular agreement; current, changed, retired and unrecorded watchwords produce distinct responses |
+| NPC check and alternate player checks | The Watcher uses it/its; its Perception roll changes prose, then player Lucidity, Stealth or Courage >=6 gets past; failed checks allow another attempt or waking |
+| Plural agreement and NPC inventory transfers | The Hands use plural name agreement and they; each keeper gives one glyph, then the Hands take one as the exit price after the Sleeper |
+| Counted glyphs, mirrored variable and trigger gate | `glyph-mark` inventory and `marks` stay equal; root `dream-ready` fires at 3; all 3 must be held to approach the Sleeper, 2 remain after paying |
+| Faction gate, standing changes, tier prose | The Archivist's friendly/neutral/hostile prose; promise requires neutral or better (+5), refusal costs 10 standing |
+| Lucidity tiers and visited ending state | The Sleeper uses <2 / 2–4 / >=5 prose; `visited(dream.sleeper)`, promise, Lucidity and guild standing change the altar and all three endings |
 | Titles, speech, formatting, comments, image media | Throughout; camp/worktable art at camp and night watch, door/altar art in the temple; images render in the player |
 | Save/load, deterministic Back/Forward, restart and title | Shared player; created identity, stats, text variables, counted items and trigger progress survive replay |
 
@@ -72,8 +85,8 @@ split settings, how global IDs work and why triggers stay together.
 1. Try Scholar, change the name/pronouns, then **Use default name**. It restores
    the name without resetting other selections. Start and check the opening
    agreement; repeat with she, they and he.
-2. Continue to camp. **Haggle for supplies** gives two rations and balances the
-   ledger at 10. **Sign the expedition register** and inspect the pronoun forms.
+2. Continue to camp. **Haggle for supplies** gives two rations.
+   **Sign the expedition register** and inspect the pronoun forms.
    Alternatively, sign first, then trade, to see the trader's empty-hub fallback.
 3. Study the journal: success gives +2 Lucidity and the glyph route; failure
    leaves forcing and the side gap available. Ask the guide about the temple.
@@ -85,15 +98,22 @@ split settings, how global IDs work and why triggers stay together.
    answers correctly; other phrases fall back to waiting. Ring, silence and
    ring the tripwire bell; the counter reaches 2. **Press on at dawn** also
    lets you skip any remaining encounters.
-6. Enter by glyphs, force or side gap; search the hall, then take or leave the
-   relic. Try all three endings and the guild's response to keeping it.
-7. Close/reopen and load a save. Publish the folder as a story ZIP, standalone
+6. Try **Close your eyes** at the temple. Speak to Ines (sum 10), answer the
+   Spiral, face the Watcher, hear the guild ghost and accept the Hands' final
+   mark. Three marks unlock the Sleeper; paying the Hands on exit leaves two.
+   Try Scholar with/without the journal and Explorer for the three Lucidity
+   tiers. Wake early to return to the still-sealed door; glyphs, force and side
+   gap remain available. No dream visit is required to finish.
+7. Search the hall, then take or leave the relic. Try all three endings with and
+   without meeting the Sleeper, and with/without the Archivist's promise.
+8. Close/reopen and load a save. Publish the folder as a story ZIP, standalone
    web site or desktop game; creation remains part of each build.
 
 Version **`0.4.0`** restructures the sample and intentionally rejects older
 sample saves, including `0.3.0`. Incompatible loads report an error visibly
 without replacing the active playthrough or saved bytes. There is no migration.
-This version has no playable dream sequence.
+The dream addition retains version `0.4.0`; its changed content fingerprint also
+rejects pre-dream `0.4.0` saves visibly. No artwork was added.
 
 ### Features that cannot all be enabled in one story
 

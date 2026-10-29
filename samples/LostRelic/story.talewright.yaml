@@ -1,5 +1,5 @@
 # The Lost Relic — Talewright sample story.
-# This manifest and the four chapter files form one story.
+# This manifest, the four chapters and dream/ form one story.
 # See docs/reference/talemark-syntax.md for the full format.
 
 game:
@@ -20,12 +20,19 @@ game:
         min: 0
         max: 10
         default: 0
+      - id: will
+        name: Will
+        category: attribute
+        min: 1
+        max: 30
+        default: 10
       - id: lucidity
         name: Lucidity
         category: skill
         min: 0
         max: 10
         default: 0
+        governing-attribute: will
   creation:
     name: true
     pronouns: [she, they, he]
@@ -38,7 +45,7 @@ game:
         stats: {str: 12, athletics: 2, hp: 15}
       scholar:
         label: Scholar
-        stats: {str: 8, history: 5, lucidity: 3, hp: 10}
+        stats: {str: 8, history: 5, will: 14, lucidity: 3, hp: 10}
 
 characters:
   player:
@@ -97,3 +104,7 @@ triggers:
     when: flag:bell-ringing
     do: var:bell-count += 1
     once: false # fires again only after the condition becomes false, then true
+  - id: dream-ready
+    when: var:marks == 3
+    do: set flag:all-marks
+    once: true

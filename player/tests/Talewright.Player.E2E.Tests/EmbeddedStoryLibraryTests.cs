@@ -11,11 +11,13 @@ public sealed class EmbeddedStoryLibraryTests
         var assembly = typeof(EmbeddedStoryLibraryTests).Assembly;
         var library = new EmbeddedStoryLibrary(assembly);
         var source = await library.LoadAsync("LostRelic");
-        Assert.Equal(StorySource.ManifestFileName, Assert.Single(source.Files.Keys, path => path.EndsWith(".yaml")));
+        Assert.Equal(new[] { "dream/dream.talewright.yaml", StorySource.ManifestFileName },
+            source.Files.Keys.Where(path => path.EndsWith(".yaml")).Order());
         Assert.Equal(new[]
         {
             "chapters/01-camp.tale", "chapters/02-trail.tale",
             "chapters/03-temple.tale", "chapters/04-endings.tale",
+            "dream/dream.tale",
         }, source.Files.Keys.Where(path => path.EndsWith(".tale")).Order());
         var expected = new[]
         {
@@ -36,6 +38,8 @@ public sealed class EmbeddedStoryLibraryTests
         Assert.Empty(result.Diagnostics);
         Assert.Equal("Tomas Okafor", result.Story!.World.Characters[new("guide")].FullName);
         Assert.Equal("0.4.0", result.Story.Version);
+        Assert.Equal(8, result.Story.World.Characters.Count);
+        Assert.Contains(result.Story.Scenes, scene => scene.Id.Value == "dream.sleeper");
         Assert.Contains(await library.ListAsync(), story => story.Id == "LostRelic");
     }
 }

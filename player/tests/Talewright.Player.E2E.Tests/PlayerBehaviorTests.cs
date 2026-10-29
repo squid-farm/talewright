@@ -46,7 +46,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Driver.ClickAsync("Start story");
         await Choose("Continue");
         await Choose("Haggle for supplies");
-        await Observe(new(null, "10"));
+        await Observe(new(null, "Two trail rations"));
         await Choose("Sign the expedition register");
         await Observe(new(null, "MARA BURNS"));
         await Choose("Continue");

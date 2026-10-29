@@ -54,6 +54,7 @@ test('schema validates the organization guide settings and trigger examples', as
 test('schema validates every shipped story configuration', async () => {
   for (const path of [
     'samples/LostRelic/story.talewright.yaml',
+    'samples/LostRelic/dream/dream.talewright.yaml',
     'examples/CSharpStory/Story/Content/story.talewright.yaml',
   ]) {
     assertValid(validateManifest, parsedYaml(await read(path), path), path);
