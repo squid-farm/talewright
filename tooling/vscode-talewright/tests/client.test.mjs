@@ -7,7 +7,7 @@ import vm from 'node:vm';
 const source = await readFile(new URL('../extension.cjs', import.meta.url), 'utf8');
 
 function host(settings = {}, trusted = true, failStart = false, platform = 'linux', arch = 'x64', missing = false) {
-  const calls = { clients: [], errors: [], watchers: [], stops: 0 };
+  const calls = { clients: [], errors: [], watchers: [], stops: 0, trustListeners: [] };
   class LanguageClient {
     constructor(id, name, server, options) {
       calls.clients.push({ id, name, server, options });
@@ -32,6 +32,10 @@ function host(settings = {}, trusted = true, failStart = false, platform = 'linu
         return watcher;
       },
       onDidChangeConfiguration: listener => ({ listener }),
+      onDidGrantWorkspaceTrust: listener => {
+        calls.trustListeners.push(listener);
+        return { listener };
+      },
     },
     window: {
       createOutputChannel: () => ({ appendLine: () => {} }),
@@ -90,6 +94,19 @@ test('untrusted or explicitly disabled workspaces never launch a process', async
     assert.equal(instance.calls.clients.length, 0);
     assert.equal(instance.calls.watchers.length, 0);
   }
+});
+
+test('granting trust after activation starts the bundled server once', async () => {
+  const { extension, calls, context } = host({}, false);
+  await extension.activate(context);
+  assert.equal(calls.clients.length, 0);
+  assert.equal(calls.trustListeners.length, 1);
+  await calls.trustListeners[0]();
+  await calls.trustListeners[0]();
+  assert.equal(calls.clients.length, 1);
+  assert.equal(calls.clients[0].server.command, '/installed/talewright/server/Talewright.LanguageServer');
+  await extension.deactivate();
+  assert.equal(calls.stops, 1);
 });
 
 test('launch failures are actionable and do not cause stop failures', async () => {
