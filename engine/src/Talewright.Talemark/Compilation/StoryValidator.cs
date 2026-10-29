@@ -43,11 +43,11 @@ internal static class StoryValidator
         foreach (var (scene, location) in scenes)
         {
             CheckExits(scene, location, diagnostics);
-            if (scene.HubLimit is not null && scene.HubSelection is null)
+            if (scene.HubLimit is not null && scene.Hub is null)
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
             }
-            if (scene.HubSelection is { } hub && !ResolveTags(hub, byTag).Any(id => id != scene.Id))
+            if (scene.Hub is { } hub && !ResolveTags(hub, byTag).Any(id => id != scene.Id))
             {
                 diagnostics.Warning("TW3008", $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
             }
@@ -85,7 +85,7 @@ internal static class StoryValidator
     private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)
     {
         var hasOwnDivert = scene.Diverts.Count > 0;
-        if (!hasOwnDivert && scene.Choices.Count == 0 && scene.EntryCheck is null && scene.HubSelection is null)
+        if (!hasOwnDivert && scene.Choices.Count == 0 && scene.EntryCheck is null && scene.Hub is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
             return;
@@ -153,7 +153,7 @@ internal static class StoryValidator
             }
         }
 
-        if (scene.HubSelection is { } hub)
+        if (scene.Hub is { } hub)
         {
             foreach (var candidate in ResolveTags(hub, byTag))
             {

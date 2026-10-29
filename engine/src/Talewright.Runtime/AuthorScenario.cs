@@ -18,8 +18,8 @@ public static class AuthorScenario
     public const int MaxBytes = 2 * 1024 * 1024;
     public const int MaxIdentifierLength = 512;
     public const int MaxFields = 10_000;
-    private const int FormatVersion = 1;
-    public static string EngineCompatibility => "author-replay-v1/"
+    private const int FormatVersion = 2;
+    public static string EngineCompatibility => "author-replay-v2/"
         + typeof(AuthorSession).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
     public static byte[] Export(AuthorSession session, string extensionIdentity)
@@ -218,10 +218,7 @@ public static class AuthorScenario
             }
             var state = session.Inspect();
             JsonSerializer.Serialize(writer, new ScenarioState(state.Characters, state.Factions, state.Flags,
-                state.Variables, state.Scenes, state.Triggers)
-            {
-                TextVariables = state.TextVariables.Count == 0 ? null : state.TextVariables,
-            }, ScenarioJsonContext.Default.ScenarioState);
+                state.Variables, state.TextVariables, state.Scenes, state.Triggers), ScenarioJsonContext.Default.ScenarioState);
             writer.WriteStartArray();
             foreach (var block in session.Current.Document.Blocks)
             {
@@ -304,11 +301,8 @@ internal sealed class ScenarioOutput : MemoryStream
 
 internal sealed record ScenarioState(IReadOnlyList<AuthorCharacterInspection> Characters,
     IReadOnlyList<AuthorFactionInspection> Factions, IReadOnlyList<KeyValuePair<FlagId, bool>> Flags,
-    IReadOnlyList<KeyValuePair<VarId, int>> Variables, IReadOnlyList<AuthorSceneInspection> Scenes,
-    IReadOnlyList<AuthorTriggerInspection> Triggers)
-{
-    public IReadOnlyList<KeyValuePair<VarId, string>>? TextVariables { get; init; }
-}
+    IReadOnlyList<KeyValuePair<VarId, int>> Variables, IReadOnlyList<KeyValuePair<VarId, string>> TextVariables,
+    IReadOnlyList<AuthorSceneInspection> Scenes, IReadOnlyList<AuthorTriggerInspection> Triggers);
 
 internal sealed record ScenarioIdentity(string StoryId, string StoryVersion, string Fingerprint, string Extensions, string Engine);
 
@@ -334,8 +328,7 @@ internal sealed class ScenarioValues
 {
     public required Dictionary<string, bool> Flags { get; init; }
     public required Dictionary<string, int> Variables { get; init; }
-    // A setter lets source-generated deserialization retain this default in legacy scenarios.
-    public Dictionary<string, string> TextVariables { get; set; } = [];
+    public required Dictionary<string, string> TextVariables { get; init; }
     public required Dictionary<string, int> Standings { get; init; }
     public required ScenarioStat[] Stats { get; init; }
     public required ScenarioItem[] Inventory { get; init; }

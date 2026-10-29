@@ -230,8 +230,27 @@ def update_history(history_dir, run, report):
     report_path = reports_dir / f"{run['runId']}-{run['runAttempt']}.md"
     report_path.write_text(report, encoding="utf-8")
 
-    runs = [read_json(path) for path in sorted(runs_dir.glob("*.json"))]
-    runs.sort(key=lambda value: (value.get("createdAt", ""), value.get("runId", "")))
+    runs = [(path, read_json(path)) for path in sorted(runs_dir.glob("*.json"))]
+    current = []
+    archived = []
+    for path, entry in runs:
+        if isinstance(entry, dict) and type(entry.get("schemaVersion")) is int and entry["schemaVersion"] == 1 and {
+            "createdAt", "runId", "runAttempt", "commit", "workflowRunUrl",
+            "benchmarks", "integrations", "publications", "jobResults",
+        }.issubset(entry) and all(
+            isinstance(entry[field], str) for field in ("createdAt", "runId", "commit", "workflowRunUrl")
+        ) and type(entry["runAttempt"]) is int and all(
+            isinstance(entry[field], list) for field in ("benchmarks", "integrations", "publications")
+        ) and isinstance(entry["jobResults"], dict) and {
+            "benchmarksAndPublication", "browserPlayer", "linuxPhotino",
+        }.issubset(entry["jobResults"]) and all(
+            isinstance(entry["jobResults"][field], str)
+            for field in ("benchmarksAndPublication", "browserPlayer", "linuxPhotino")
+        ):
+            current.append((path, entry))
+        else:
+            archived.append(path)
+    current.sort(key=lambda record: (record[1]["createdAt"], record[1]["runId"]))
     lines = [
         "# Real-file performance history",
         "",
@@ -241,26 +260,34 @@ def update_history(history_dir, run, report):
         "| Date (UTC) | Commit | Benchmarks | Player observations | Publications | Jobs | Run |",
         "|---|---|---:|---:|---:|---|---|",
     ]
-    for entry in reversed(runs):
-        filename = f"{entry.get('runId', '')}-{entry.get('runAttempt', 1)}"
-        if not (runs_dir / f"{filename}.json").is_file():
-            filename = entry.get("runId", "")
+    for path, entry in reversed(current):
+        filename = path.stem
         run_link = (
-            f"[{entry.get('runId', '')}]({entry['workflowRunUrl']})"
-            if entry.get("workflowRunUrl") else entry.get("runId", "")
+            f"[{entry['runId']}]({entry['workflowRunUrl']})"
+            if entry["workflowRunUrl"] else entry["runId"]
         )
         lines.append(
-            f"| {entry.get('createdAt', '')[:10]} | "
-            f"`{entry.get('commit', '')[:12]}` | "
-            f"{len(entry.get('benchmarks', [])) + len(entry.get('completedCoreCases', [])) + len(entry.get('completedBoundaryCases', []))} | "
-            f"{len(entry.get('integrations', []))} | {len(entry.get('publications', []))} | "
-            f"{entry.get('jobResults', {}).get('benchmarksAndPublication', '')}/"
-            f"{entry.get('jobResults', {}).get('browserPlayer', '')}/"
-            f"{entry.get('jobResults', {}).get('linuxPhotino', '')} | "
+            f"| {entry['createdAt'][:10]} | "
+            f"`{entry['commit'][:12]}` | "
+            f"{len(entry['benchmarks'])} | "
+            f"{len(entry['integrations'])} | {len(entry['publications'])} | "
+            f"{entry['jobResults']['benchmarksAndPublication']}/"
+            f"{entry['jobResults']['browserPlayer']}/"
+            f"{entry['jobResults']['linuxPhotino']} | "
             f"{run_link} · "
             f"[report](reports/{filename}.md) · "
             f"[JSON](runs/{filename}.json) |"
         )
+    if archived:
+        lines.extend([
+            "",
+            "## Unsupported archived records",
+            "",
+            "These records do not match the current run shape and are not summarized or migrated. "
+            "Their original JSON remains available.",
+            "",
+            *[f"- [{path.stem}](runs/{path.name})" for path in archived],
+        ])
     (history_dir / "index.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return run_path
 

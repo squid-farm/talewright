@@ -10,6 +10,9 @@
 >
 > Talewright is currently in public preview. Before `v1.0`, story syntax, save formats, APIs, tooling,
 > and project structure may change without notice. **Do not expect backward compatibility until v1.**
+>
+> Development targets the current format and API, not compatibility shims or migrations for older
+> versions. Any pre-v1 compatibility exception requires an explicit project-lead decision.
 
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
 and many branches. **Talemark is the story-authoring language that powers your Talewright stories.**

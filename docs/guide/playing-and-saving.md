@@ -84,8 +84,8 @@ typo, means older saves won't load.** Talewright checks before loading, shows a 
 current game untouched. Bear this in mind before releasing an update to players. Migrating old saves to
 new story versions is planned ([#39](https://github.com/squid-farm/talewright/issues/39)).
 
-Updated players can load older saves without summary details. Saves created with the new details
-need an updated player; earlier players do not recognize the additional metadata.
+Before v1, player updates may also make existing saves unsupported. There is no save migration.
+Unsupported loads report an error without replacing your current game or saved data.
 
 ## Character creation
 

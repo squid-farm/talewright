@@ -66,12 +66,6 @@ public static class StoryletSelector
         return RuleObservation.Test(storylet.Requires, context, capture, out trace) ? null : DecisionReason.ConditionFalse;
     }
 
-    /// <summary>
-    /// Eligible storylets carrying <paramref name="tag"/>, ordered by descending priority then declaration order.
-    /// </summary>
-    public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, string tag, EvaluationContext context)
-        where T : IStorylet => SelectEligible(storylets, new StoryletTags([tag]), context);
-
     /// <summary>Filters before stable ordering and limiting; excludes the hub itself and duplicate scene ids.</summary>
     public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, StoryletTags tags,
         EvaluationContext context, SceneId? exclude = null, int? limit = null)

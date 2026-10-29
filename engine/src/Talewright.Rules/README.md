@@ -41,8 +41,9 @@ already true so they don't fire on load.
 
 ### `Storylets/`
 
-`StoryletSelector.cs`: `IStorylet` (Id, Requires, Tags, Priority, Once). `SelectEligible(storylets, tag,
-context)` → those with the tag whose requirements hold and that aren't spent `Once` storylets, by descending
+`StoryletSelector.cs`: `IStorylet` (Id, Requires, Tags, Priority, Once). `SelectEligible(storylets, tags,
+context)` accepts a `StoryletTags` query, including single-tag queries. It selects matching storylets
+whose requirements hold and that aren't spent `Once` storylets, by descending
 priority then declaration order. This is the "hub" mechanism now and the open-world location mechanism later.
 
 ### Optional execution observation

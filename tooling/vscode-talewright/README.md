@@ -231,10 +231,9 @@ maintain a second copy of the schema, so the schema file must not move. Submissi
 automatic discovery is available: SchemaStore must accept and publish the entry,
 and an editor may need to refresh its catalog.
 
-Keep changes at this URL backward-compatible with supported manifests. A future
-breaking manifest change must retain the old schema at an immutable release/tag
-URL and document migration and version selection before changing the rolling
-schema. To pin validation today, replace `main` in the modeline URL with the
+The rolling schema follows the current manifest format. Before v1, breaking
+manifest and schema changes are permitted without compatibility shims or migration
+support. To pin validation, replace `main` in the modeline URL with the
 commit or release tag matching your Talewright version, or use a local copy.
 The VSIX always uses its bundled schema, independent of catalog/network access.
 

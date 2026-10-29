@@ -100,7 +100,7 @@ Player-save compatibility is never bypassed. Portable author recipes are describ
 ### Portable author scenarios
 
 For author controls, see the [scenario workflow](../../../docs/guide/testing-your-story.md#share-and-restore-a-debugging-scenario).
-`AuthorScenario.Export(session, extensionIdentity)` returns bounded version-1 UTF-8 JSON;
+`AuthorScenario.Export(session, extensionIdentity)` returns bounded version-2 UTF-8 JSON;
 `Import(story, bytes, extensionIdentity)` constructs a separate candidate and validates the full
 timeline, including redo, before restoring the requested cursor. `AuthorScenarioImport` exposes the
 candidate, whether it was adopted to different source, and replay differences. Neither API mutates
@@ -109,7 +109,7 @@ an existing session or does file I/O.
 The host supplies its trusted compiler/extension compatibility identity (for built-ins,
 `CompilerOptions.Default.CompatibilityId`); compiled stories also need a content fingerprint.
 The scenario stores story ID/version/fingerprint, the explicit extension identity, and the
-`author-replay-v1` protocol plus engine package version (informational version excluding build metadata).
+`author-replay-v2` protocol plus engine package version (informational version excluding build metadata).
 No extension is discovered or loaded from a file. Custom hosts must version extension behavior
 honestly and keep callbacks deterministic and side-effect-free.
 
@@ -125,6 +125,8 @@ prove semantic equivalence of positional choices. This is an explicit new scenar
 and full redo validation, then retains the normal start, character, seed, choices and cursor in an
 independent synthetic session. Normal save bytes, rules and slots are untouched.
 
+Value batches require every collection, including `textVariables` when empty; replay evidence includes
+empty text-variable state. Previous scenario formats are unsupported, not migrated.
 The format rejects unknown members/commands/versions, duplicate JSON keys, null collections and
 invalid character/setup/command IDs. Limits: 2 MiB, 10,000 commands, 10,000 fields per value batch,
 512-character identifiers, JSON depth 32, 32-bit integer values and unsigned 64-bit seed.
@@ -266,14 +268,13 @@ navigation, not persistence.
 
 `Save()` returns bounded UTF-8 JSON bytes. `StoryHistory.Restore(story, bytes)` creates and validates a
 separate candidate, including redo choices. Only replace an active history after this succeeds.
-The v1 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices and cursor.
-It also has an optional `character` selection for opt-in creation stories. Older
-fixed-protagonist v1 saves without it remain readable; creation stories require a
-valid selection. Schema/source changes still invalidate mismatched fingerprints.
+The version-2 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices and cursor.
+The `character` field is required: null for fixed-protagonist stories, a valid selection for
+opt-in creation stories. Previous save formats are unsupported. Schema/source changes still
+invalidate mismatched fingerprints.
 `Save(CaptureSummary(DateTimeOffset.UtcNow))` embeds optional scene/title, capture time and
-effective character-name metadata in the same atomic payload. `Save()` without metadata keeps
-its original representation. Updated players accept older saves without a summary; earlier
-players reject the new field, so new summary-bearing saves require an updated player.
+effective character-name metadata in the same atomic payload. `Save()` without metadata omits the
+summary; this is a current optional display feature, not an older-save compatibility contract.
 Malformed summary values do not prevent otherwise-valid replay restoration.
 `SaveCatalog.ListEntriesAsync` parses bounded payloads without replay, returning missing/unreadable
 details explicitly. `StoryHistory.ProgressKey` and each entry's matching key hash the canonical

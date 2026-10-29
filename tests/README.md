@@ -60,7 +60,7 @@ tests or require downloaded browsers.
 [Talewright.E2E.slnx](../player/tests/Talewright.E2E.slnx) is a separate,
 opt-in solution under `player/tests`.
 
-Save coverage includes metadata/legacy compatibility and canonical replay identity in the runtime
+Save coverage includes optional metadata, unsupported-format rejection and canonical replay identity in the runtime
 suite, plus modal focus/escape, narrow light/dark layout, summaries, redo-aware discard protection,
 failed writes, failed loads and reload/process-restart persistence in the player suite.
 Both IndexedDB and native Linux file storage are exercised; save lists never replay histories.
@@ -209,6 +209,8 @@ BenchmarkDotNet means/p95/allocations, browser/Photino observations,
 publication timings, corpus/runtime metadata, and workflow job outcomes. Raw
 artifacts remain available from each Actions run for 30 days; the compact trend
 records persist on the branch.
+The index summarizes only the current run shape. Unsupported archived records remain linked as
+original JSON, without format-specific interpretation or invented measurements.
 
 Published workload labels preserve the CSV's `TierName`, `CorpusCase`, and
 `Boundary` parameters. Player observations also retain the test outcome, so

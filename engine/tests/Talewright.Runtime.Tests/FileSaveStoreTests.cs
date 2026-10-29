@@ -56,7 +56,7 @@ public sealed class FileSaveStoreTests : IDisposable
     public async Task Catalog_lists_quick_metadata_once_and_preserves_damaged_checkpoint()
     {
         var json = """
-            {"formatVersion":1,"storyId":"story","storyVersion":"1","contentFingerprint":"fingerprint",
+            {"formatVersion":2,"storyId":"story","storyVersion":"1","contentFingerprint":"fingerprint",
              "seed":7,"choices":[],"cursor":0,"character":null,
              "summary":{"sceneTitle":"A scene","savedAt":"2026-10-23T00:00:00Z","characterName":"Mara"}}
             """;
