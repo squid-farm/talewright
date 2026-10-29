@@ -9,7 +9,10 @@ in the [web player](https://play.trytalewright.com/).
 ## 1. Create the story folder
 
 Make a folder called `night-ferry` and open it in your editor. In VS Code, use **File > Open Folder**
-and trust the folder you created. Inside it, create a file called `story.talewright.yaml`:
+and trust the folder you created. A story has two kinds of file: one `story.talewright.yaml` settings
+file and one or more `.tale` files for the scenes
+([what each file is for](getting-started.md#1-set-up-your-story-folder)).
+Inside the folder, create a file called `story.talewright.yaml`:
 
 ```yaml
 game:
@@ -72,7 +75,8 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 
 Save both files before checking. In VS Code, live diagnostics appear while you write; open
 **View > Problems** to see them together. For a check of the saved story, run
-**Talewright: Validate Story** from the Command Palette.
+**Talewright: Validate Story** from the Command Palette (**View > Command Palette**, or
+**Ctrl+Shift+P**).
 If the CLI is missing, choose **Set Up CLI** and follow the
 [setup guide](cli-installation.md). The language server is already included with the extension,
 but these commands use the separate CLI.

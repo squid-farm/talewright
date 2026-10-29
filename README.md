@@ -59,7 +59,7 @@ write Talemark with highlighting, suggestions and live checks. The current exten
 See [Getting started](docs/guide/getting-started.md) for installation and platform details.
 
 For **Validate Story**, **Publish Story ZIP** and **Open Author Debugger**, run
-**Talewright: Set Up CLI** in the Command Palette. These actions use the separate story tools,
+**Talewright: Set Up CLI** in the Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**). These actions use the separate story tools,
 which setup helps you select or install with approval. Ready-to-use CLI downloads for Windows,
 Mac and Linux are available from [Releases](https://github.com/squid-farm/talewright/releases).
 See the [setup guide](docs/guide/cli-installation.md) for choosing a download and current testing limits.
@@ -69,7 +69,8 @@ and play it, without installing the extension or CLI.
 
 ## Write your first story
 
-1. Open a story folder in your editor. Add `story.talewright.yaml` (settings and characters) and `story.tale` (scenes).
+1. Make a story folder and open it in your editor. Add `story.talewright.yaml` (YAML settings: title, characters and rules)
+   and `story.tale` (Talemark scenes, dialogue and choices).
    You can also copy the [sample story](samples/LostRelic) and edit it.
 2. Save your changes and run **Talewright: Validate Story**, or check a ZIP in the web player.
 3. Use **Talewright: Publish Story ZIP**, or zip the folder yourself, then choose

@@ -135,7 +135,7 @@ fingerprint; there is no save migration.
 - Autosave, save migration and point-buy are not implemented or claimed.
 
 **Play it** in the [web player](https://play.trytalewright.com/) or with the
-[desktop tools](../docs/guide/getting-started.md#optional-install-the-desktop-tools):
+[desktop tools](../docs/guide/getting-started.md#3-get-the-story-checking-tools-cli):
 `dotnet run --project apps/desktop -- samples/LostRelic`.
 
 ## Use a sample as a starting point
