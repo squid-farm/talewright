@@ -7,20 +7,28 @@ running your story.
 ## Install
 
 **Optional:** You do not need this extension to write a story. A plain-text editor
-and the browser player are enough. The Linux x64 VSIX includes a compatible self-contained
+and the browser player are enough. Each platform-specific VSIX includes a compatible self-contained
 language server: no separate Talewright tool, .NET SDK/runtime, server-path setting or build is needed.
 The extension is available on the Marketplace.
 
-Use VS Code 1.100 or later on a supported Linux x64 extension host.
+Use VS Code 1.100 or later on a matching extension host.
+
+**Provisional platform support:** Linux x64 is runtime-tested on Ubuntu 24.04 and Linux Mint 22.3.
+Windows x64/ARM64, macOS Intel/Apple Silicon and Linux ARM64 packages are cross-built and inspected,
+but installed-editor execution on those platforms is not yet verified. They are offered
+provisionally, not with the same validation guarantee as Linux x64. Please report platform-specific
+failures, including your OS, architecture and **Talewright Language Server** output.
 
 1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
    from the VS Code Marketplace. It provides the YAML editor features used by the schema.
 2. Install **Talewright** by **squid-farm** from
    [the Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright).
    For a preview, choose **Switch to Pre-Release Version**.
-   As a download-and-install alternative, obtain the Linux x64 VSIX from
+   The Marketplace selects the package matching your extension host automatically.
+   As a download-and-install alternative, obtain the matching platform VSIX from
    [GitHub Releases](https://github.com/squid-farm/talewright/releases) or the
-   **talewright-vscode** artifact of a successful **Build** run. Contributors can build it below.
+   **talewright-vscode** (Linux x64) or **talewright-vscode-TARGET** artifact of a successful
+   tagged **Build** run. Contributors can build it below.
 3. If you downloaded a VSIX, open **Extensions**, choose **... > Install from VSIX...**, and
    select the file. Marketplace installations do not need this step. Reload VS Code if prompted.
 4. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
@@ -35,9 +43,23 @@ Use VS Code 1.100 or later on a supported Linux x64 extension host.
    **Talewright Language Server** output channel. Untrusted workspaces never
    launch a process.
 
-This package identifier is `squid-farm.talewright`. Only `linux-x64` is packaged; Windows, macOS,
-Linux ARM, Alpine/musl, browser-hosted VS Code and universal fallback packages are not supplied.
-Remote development needs a supported Linux x64 extension host.
+This package identifier is `squid-farm.talewright`.
+
+| VSIX target | Extension host | Validation |
+|---|---|---|
+| `linux-x64` | Linux Intel/AMD 64-bit | Installed-editor/runtime tested |
+| `linux-arm64` | Linux ARM64 | Provisional; package inspection only |
+| `win32-x64` | Windows Intel/AMD 64-bit | Provisional; package inspection only |
+| `win32-arm64` | Windows ARM64 | Provisional; package inspection only |
+| `darwin-x64` | macOS Intel | Provisional; package inspection only |
+| `darwin-arm64` | macOS Apple Silicon | Provisional; package inspection only |
+
+Alpine/musl, 32-bit hosts, browser-hosted VS Code and universal fallback packages are not supplied.
+Remote development needs a matching remote extension-host package, not the local UI's package.
+Self-contained .NET removes the runtime installation requirement, not the operating system's
+native library requirements. Provisional hosts still need a
+[.NET 10-supported OS](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)
+and VS Code's system prerequisites.
 
 ### Supported Linux environment
 
@@ -103,7 +125,7 @@ Opening a story never installs or prompts for tools. A trusted workspace is requ
   feed/network failures and permission errors are reported explicitly. No guessed download link
   or automatic fallback is used. **Select Existing Executable** also supports local source builds.
 
-The bundled Linux x64 language server works independently of this setup. CLI portability does
+The bundled platform-specific language server works independently of this setup. CLI portability does
 not remove native debugger webview prerequisites or the SDK requirement for standalone-game output.
 
 ### Run CLI actions
@@ -332,6 +354,19 @@ and defaults, including documented schema/compiler differences.
 `artifacts/talewright.vsix`, with Linux x64 target metadata, the bundled client and a matching
 self-contained server/runtime plus .NET license/notices. It runs `dotnet publish` for the
 language server within the existing package target, never a story project.
+To cross-package another target on the same build host, set `TALEWRIGHT_VSIX_TARGET` for both
+commands, for example:
+
+```bash
+TALEWRIGHT_VSIX_TARGET=win32-arm64 npm run package
+TALEWRIGHT_VSIX_TARGET=win32-arm64 npm run test:package
+```
+
+Non-Linux-x64 output is `artifacts/talewright-TARGET.vsix`. The target names are those in the
+table above; Windows maps to .NET `win-*`, macOS to `osx-*`. Each invocation replaces the
+staged server, so do not package targets concurrently in the same checkout. Cross-package checks
+inspect PE/ELF/Mach-O architecture and runtime assets; they are not native execution tests.
+Repackage the default Linux x64 target before running the Linux installed-editor smoke.
 Pinned dependency license texts in `tests/server-notices.txt` are included in the VSIX notices;
 updating a shipped server dependency requires reviewing/updating its corresponding notice.
 `npm run test:package` verifies client assets, server/runtime files, native architecture,

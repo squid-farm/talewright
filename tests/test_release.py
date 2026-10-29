@@ -3,18 +3,19 @@
 import io
 import json
 import os
+import struct
 from pathlib import Path
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
-from zipfile import ZipFile, ZipInfo
+from zipfile import BadZipFile, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
 from package_version import release_identity
-from verify_release_vsix import verify_vsix
+from verify_release_vsix import TARGETS, verify_set, verify_vsix
 import github_release
 
 
@@ -64,7 +65,7 @@ class ReleaseArtifactTests(unittest.TestCase):
     def write_vsix(self, *, version="0.1.1", publisher="squid-farm",
                    target="linux-x64", prerelease=True, xml_version=None, bundled=True,
                    dotnet_required=False, executable=True, server_version="0.1.0-preview.1",
-                   dependency=None, include_notice=True):
+                   dependency=None, include_notice=True, binary_target=None, metadata_target=None):
         pre = ('<Property Id="Microsoft.VisualStudio.Code.PreRelease" Value="true" />'
                if prerelease else "")
         with ZipFile(self.vsix, "w") as archive:
@@ -91,23 +92,39 @@ class ReleaseArtifactTests(unittest.TestCase):
                                  json.dumps({"libraries": libraries}))
                 archive.writestr("extension/THIRD-PARTY-NOTICES.txt",
                                  f"\n{dependency}\n" if dependency and include_notice else "")
-                for name in ["Talewright.LanguageServer", "libcoreclr.so", "libhostfxr.so", "libhostpolicy.so"]:
+                executable_name = "Talewright.LanguageServer"
+                if target.startswith("win32-"):
+                    executable_name += ".exe"
+                    native = ["coreclr.dll", "hostfxr.dll", "hostpolicy.dll"]
+                else:
+                    suffix = "dylib" if target.startswith("darwin-") else "so"
+                    native = [f"lib{name}.{suffix}" for name in ["coreclr", "hostfxr", "hostpolicy"]]
+                binary = binary_target or target
+                arm = binary.endswith("-arm64")
+                if binary.startswith("win32-"):
+                    header = (b"MZ" + b"\x00" * 58 + struct.pack("<I", 64)
+                              + b"PE\x00\x00" + struct.pack("<H", 0xaa64 if arm else 0x8664))
+                elif binary.startswith("darwin-"):
+                    header = b"\xcf\xfa\xed\xfe" + struct.pack("<I", 0x100000c if arm else 0x1000007)
+                else:
+                    header = b"\x7fELF\x02\x01" + b"\x00" * 12 + struct.pack("<H", 183 if arm else 62)
+                for name in [executable_name, *native]:
                     info = ZipInfo(prefix + name)
                     info.external_attr = (0o100755 if executable else 0o100644) << 16
-                    archive.writestr(info, b"\x7fELF\x02\x01" + b"\x00" * 12 + b"\x3e\x00")
+                    archive.writestr(info, header)
                 framework = {"name": "Microsoft.NETCore.App", "version": "10.0.0"}
                 options = {"framework": framework} if dotnet_required else {"includedFrameworks": [framework]}
                 archive.writestr(prefix + "Talewright.LanguageServer.runtimeconfig.json",
                                  json.dumps({"runtimeOptions": options}))
                 archive.writestr(prefix + "talewright-server.json",
-                                 json.dumps({"target": "linux-x64", "version": server_version}))
+                                 json.dumps({"target": metadata_target or target, "version": server_version}))
 
     def test_identity_platform_and_channel(self):
         self.assertTrue(verify_vsix(self.vsix, "v0.1.0-preview.1")["prerelease"])
         self.write_vsix(version="0.1.999", prerelease=False, server_version="0.1.0")
         self.assertFalse(verify_vsix(self.vsix, "v0.1.0")["prerelease"])
         for values in [
-            {"target": ""}, {"target": "win32-x64"}, {"version": "0.1.0-preview.1"},
+            {"target": ""}, {"target": "alpine-x64"}, {"version": "0.1.0-preview.1"},
             {"version": "0.1.2"}, {"xml_version": "0.1.2"}, {"publisher": "other"},
             {"prerelease": False},
         ]:
@@ -115,6 +132,44 @@ class ReleaseArtifactTests(unittest.TestCase):
                 self.write_vsix(**values)
                 with self.assertRaises(ValueError):
                     verify_vsix(self.vsix, "v0.1.0-preview.1")
+
+    def test_all_platform_bundles_and_mislabeled_binaries(self):
+        for target in TARGETS:
+            with self.subTest(target=target):
+                self.write_vsix(target=target)
+                verify_vsix(self.vsix, "v0.1.0-preview.1")
+                for values in [
+                    {"binary_target": target.rsplit("-", 1)[0] + ("-x64" if target.endswith("-arm64") else "-arm64")},
+                    {"binary_target": "linux-arm64" if target == "linux-x64" else "linux-x64"},
+                    {"metadata_target": "universal"},
+                    {"dotnet_required": True},
+                    {"executable": False} if not target.startswith("win32-") else {"bundled": False},
+                ]:
+                    self.write_vsix(target=target, **values)
+                    with self.assertRaises(ValueError):
+                        verify_vsix(self.vsix, "v0.1.0-preview.1")
+
+    def test_complete_platform_set_is_required(self):
+        directory = self.vsix.parent
+        with self.assertRaises(ValueError):
+            verify_set(directory, "v0.1.0-preview.1")
+        for target in TARGETS:
+            self.write_vsix(target=target)
+            if target != "linux-x64":
+                self.vsix.rename(directory / f"talewright-{target}.vsix")
+        self.write_vsix()
+        verify_set(directory, "v0.1.0-preview.1")
+        wrong = directory / "talewright-darwin-arm64.vsix"
+        wrong.write_bytes(self.vsix.read_bytes())
+        with self.assertRaises(ValueError):
+            verify_set(directory, "v0.1.0-preview.1")
+        wrong.unlink()
+        self.write_vsix(target="darwin-arm64")
+        self.vsix.rename(wrong)
+        self.write_vsix()
+        (directory / "unexpected.vsix").write_bytes(self.vsix.read_bytes())
+        with self.assertRaises(ValueError):
+            verify_set(directory, "v0.1.0-preview.1")
 
     def test_separate_server_or_incomplete_bundle_is_rejected(self):
         for values in [
@@ -152,6 +207,7 @@ class ReleaseArtifactTests(unittest.TestCase):
         self.assertIn("Generated changes", create["body"])
         self.assertIn("save formats", create["body"])
         self.assertIn("Source code (zip)", create["body"])
+        self.assertIn("provisional", create["body"])
         self.assertEqual(calls[4].args[2], self.vsix.read_bytes())
         self.assertEqual(calls[5].args[0], "PATCH")
         self.assertFalse(calls[5].args[2]["draft"])
@@ -180,6 +236,25 @@ class ReleaseArtifactTests(unittest.TestCase):
         self.assertEqual(api.call_args_list[3].args[2], b"archive")
         self.assertEqual(api.call_args_list[4].args[2], b"checksum")
         self.assertEqual(api.call_args_list[-1].args[0], "PATCH")
+
+    def test_provisional_vsix_is_verified_and_uploaded_before_publishing(self):
+        extra = self.vsix.parent / "talewright-win32-arm64.vsix"
+        self.write_vsix(target="win32-arm64")
+        self.vsix.rename(extra)
+        self.write_vsix()
+        with patch.object(github_release, "request", side_effect=[
+            {"sha": "abc123"}, self.release(draft=True), {}, {}, {},
+        ]) as api:
+            github_release.publish(self.vsix, "v0.1.0-preview.1", "abc123",
+                                   "squid-farm/talewright", [extra])
+        self.assertIn("talewright-win32-arm64.vsix", api.call_args_list[3].args[1])
+        self.assertEqual(api.call_args_list[3].args[2], extra.read_bytes())
+        self.assertEqual(api.call_args_list[-1].args[0], "PATCH")
+        extra.write_bytes(b"not a VSIX")
+        with patch.object(github_release, "request") as api, self.assertRaises(BadZipFile):
+            github_release.publish(self.vsix, "v0.1.0-preview.1", "abc123",
+                                   "squid-farm/talewright", [extra])
+        api.assert_not_called()
 
     def test_publication_failures_are_not_success_shaped(self):
         asset = {"name": "talewright-linux-x64.vsix", "url": "https://api.github.com/asset"}
@@ -219,7 +294,7 @@ class PublicationWorkflowTests(unittest.TestCase):
 
     def test_existing_validation_gates_every_publication(self):
         ready = self.build.split("\n  release-ready:\n", 1)[1].split("\n  publish-nuget:", 1)[0]
-        self.assertIn("needs: [build, tests, verification, cli-archives]", ready)
+        self.assertIn("needs: [build, tests, verification, cli-archives, provisional-vsix]", ready)
         self.assertIn("github.event_name == 'push'", ready)
         self.assertIn("startsWith(github.ref, 'refs/tags/v')", ready)
         self.assertIn("name: nuget-packages", ready)
@@ -255,11 +330,24 @@ class PublicationWorkflowTests(unittest.TestCase):
             self.assertIn("environment: release", job)
         marketplace = self.build.split("\n  publish-marketplace:\n", 1)[1].split("\n  github-release:", 1)[0]
         self.assertIn("secrets.VSCE_PAT", marketplace)
-        self.assertIn('--packagePath "$GITHUB_WORKSPACE/artifacts/extension/talewright.vsix"', marketplace)
+        self.assertIn('for vsix in "$GITHUB_WORKSPACE"/artifacts/extension/*.vsix', marketplace)
+        self.assertIn('--packagePath "$vsix"', marketplace)
+        self.assertIn('artifacts/extension "$GITHUB_REF_NAME" --all', marketplace)
         self.assertIn("--skip-duplicate", marketplace)
         self.assertIn('if [[ "$PRERELEASE" == true ]]; then args+=(--pre-release); fi', marketplace)
         self.assertNotIn("npm run package", marketplace)
         self.assertNotIn("|| true", self.build + self.nuget)
+
+    def test_provisional_packages_are_inspected_and_attached_without_runtime_claims(self):
+        job = self.build.split("\n  provisional-vsix:\n", 1)[1].split("\n  release-ready:", 1)[0]
+        self.assertIn("TALEWRIGHT_VSIX_TARGET: ${{ matrix.target }}", job)
+        for target in TARGETS:
+            if target != "linux-x64":
+                self.assertIn(target, job)
+        self.assertIn("npm run test:package", job)
+        self.assertNotIn("npm run test:editor", job)
+        self.assertEqual(self.build.count("pattern: talewright-vscode-*"), 3)
+        self.assertIn("--assets artifacts/extension/talewright-*.vsix", self.build)
 
 
 if __name__ == "__main__":
