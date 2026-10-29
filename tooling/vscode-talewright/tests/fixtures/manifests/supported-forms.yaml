@@ -12,6 +12,14 @@ game:
       - id: focus
         min: 0
         max: 8
+      - id: tracking
+        category: skill
+        governing-attribute: grit
+      - id: grit
+        category: attribute
+        min: 1
+        max: 30
+        default: 15
   creation:
     name: true
     pronouns: [they, she]

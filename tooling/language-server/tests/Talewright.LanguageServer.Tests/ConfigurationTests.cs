@@ -9,6 +9,43 @@ public sealed partial class ServerTests
     private const string GuideTale = "=== start\n> guide: Hi.\n-> END\n";
 
     [Fact]
+    public async Task Governing_attribute_completion_and_diagnostics_use_enabled_attributes()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var yaml = Manifest.Replace("  start: start", """
+              start: start
+              ruleset:
+                base: generic
+                disable: [str]
+                stats:
+                  - {id: tracking, category: skill, governing-attribute: grit}
+                  - {id: grit, category: attribute}
+            """);
+        await client.Open("story.talewright.yaml", yaml, 1);
+        Assert.Empty(await client.Diagnostics("story.talewright.yaml", 1));
+        var marked = yaml.Replace("governing-attribute: grit", "governing-attribute: |grit");
+        var items = Items(await Completion(client, "story.talewright.yaml", marked)).ToArray();
+        Assert.Contains(items, HasLabel("grit"));
+        Assert.Contains(items, HasLabel("dex"));
+        Assert.DoesNotContain(items, item => item.GetProperty("label").GetString() is "str" or "hp" or "tracking");
+        var version = 1;
+        foreach (var target in new[] { "missing", "str", "hp" })
+        {
+            await client.Change("story.talewright.yaml", yaml.Replace("governing-attribute: grit", $"governing-attribute: {target}"), ++version);
+            var error = Assert.Single(await client.Diagnostics("story.talewright.yaml", version));
+            Assert.Equal(target == "hp" ? "TW4003" : "TW4005", error.GetProperty("code").GetString());
+            Assert.Contains(target, error.GetProperty("message").GetString());
+        }
+        await client.Change("story.talewright.yaml", yaml.Replace("category: skill", "category: resource"), ++version);
+        Assert.Contains(await client.Diagnostics("story.talewright.yaml", version),
+            error => error.GetProperty("code").GetString() == "TW4003" &&
+                error.GetProperty("message").GetString()!.Contains("category: skill"));
+        await client.Change("story.talewright.yaml", yaml, ++version);
+        Assert.Empty(await client.Diagnostics("story.talewright.yaml", version));
+    }
+
+    [Fact]
     public async Task Unsaved_supporting_configuration_drives_diagnostics_and_definition()
     {
         await using var client = new Client();

@@ -108,6 +108,7 @@ test('schema validates complete and contextual documented manifest examples', as
     ['docs/reference/talemark-syntax.md', 1],
     ['docs/guide/first-story.md', 0],
     ['docs/guide/debugger-test-plan.md', 0],
+    ['docs/guide/authoring-recipes.md', 2],
   ];
   for (const [path, index] of fullManifests) {
     const name = `${path} YAML example ${index + 1}`;
@@ -282,6 +283,24 @@ test('schema permits custom ruleset IDs without hard-coding registrations', asyn
     'tooling/vscode-talewright/tests/fixtures/manifests/supported-forms.yaml'), 'supported forms');
   story.game.ruleset = { base: 'project-rules' };
   assertValid(validateManifest, story, 'custom ruleset ID');
+});
+
+test('governing-attribute is an optional identifier restricted to explicit skill definitions', () => {
+  const validate = compileSubschema(schema.definitions.statDefinition);
+  assertValid(validate, { id: 'tracking', category: 'skill', 'governing-attribute': 'grit' }, 'custom attribute link');
+  assertValid(validate, { id: 'athletics', category: 'skill', 'governing-attribute': 'str' }, 'built-in skill override');
+  assertValid(validate, { id: 'tracking', category: 'skill' }, 'unlinked skill');
+  for (const link of [{ governingAttribute: 'str' }, { governingAttribute: 'str', 'governing-attribute': 'grit' }]) {
+    assertInvalid(validate, { id: 'tracking', category: 'skill', ...link }, 'camelCase key', 'additionalProperties');
+  }
+  for (const category of ['attribute', 'resource', 'progression', 'custom', undefined]) {
+    assertInvalid(validate, {
+      id: 'tracking', ...(category === undefined ? {} : { category }), 'governing-attribute': 'grit',
+    }, `invalid link category ${category}`);
+  }
+  for (const target of ['', 'bad/id', null, [], {}, 3]) {
+    assertInvalid(validate, { id: 'tracking', category: 'skill', 'governing-attribute': target }, 'invalid attribute ID');
+  }
 });
 
 test('preset IDs use the shared identifier rule and retain the existing 80-character bound', () => {

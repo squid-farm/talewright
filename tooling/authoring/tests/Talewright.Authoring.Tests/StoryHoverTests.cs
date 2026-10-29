@@ -58,6 +58,25 @@ public sealed class StoryHoverTests
         Assert.Equal(token, line[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }
 
+    [Fact]
+    public void Governing_attribute_key_hover_explains_category_target_and_formula()
+    {
+        const string key = "governing-attribute";
+        var yaml = Manifest.Replace("  start: first",
+            $"  start: first\n  ruleset:\n    stats:\n      - {{id: tracking, category: skill, {key}: str}}");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n-> END",
+        });
+        var analysis = StoryAnalyzer.Analyze(source);
+        var hover = StoryHover.Get(analysis, new(StorySource.ManifestFileName, 7,
+            yaml.Split('\n')[6].IndexOf(key, StringComparison.Ordinal) + 2));
+        Assert.NotNull(hover);
+        Assert.Contains("category: skill", hover.PlainText);
+        Assert.Contains("enabled attribute", hover.PlainText);
+        Assert.Contains("floor", hover.PlainText);
+    }
+
     [Theory]
     [InlineData("Ordinary sec|ond")]
     [InlineData("// -> sec|ond")]

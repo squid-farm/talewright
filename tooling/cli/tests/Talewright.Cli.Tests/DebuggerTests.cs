@@ -1,5 +1,7 @@
 using Talewright.Debugger;
 using Talewright.Core.Identity;
+using Talewright.Core.Events;
+using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
 
@@ -33,6 +35,51 @@ public sealed class DebuggerTests : IDisposable
             * [Prepared] (requires: flag:ready) -> END
             * [Wait] -> END
             """)));
+    }
+
+    [Fact]
+    public void Governing_attribute_checks_match_compiler_and_debugger_with_and_without_link()
+    {
+        foreach (var linked in new[] { false, true })
+        {
+            File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), $$"""
+                game:
+                  id: governing-debug
+                  title: Governing debug
+                  start: start
+                  randomness: off
+                  ruleset:
+                    base: generic
+                    stats:
+                      - {id: tracking, category: skill, default: 3{{(linked ? ", governing-attribute: grit" : "")}}}
+                      - {id: grit, category: attribute, min: 1, max: 30, default: 15}
+                characters:
+                  player: {first-name: Ada}
+                """);
+            File.WriteAllText(Path.Combine(_root, "main.tale"), """
+                === start
+                ::: skill-check tracking dc 14
+                success: -> END
+                failure: -> END
+                :::
+                """);
+            var compiled = SourceCompilation.Load(_root);
+            Assert.NotNull(compiled.Compilation);
+            Assert.True(compiled.Compilation.Success, string.Join("\n", compiled.Compilation.Diagnostics));
+            var story = compiled.Compilation.Story!;
+            var expected = story.World.Ruleset.SkillCheckRule!.Resolve(GameState.CreateInitial(story.World, 42),
+                new(EntityId.Player, new("tracking"), 14, null));
+            Assert.Equal(linked ? 5 : 3, expected.Modifier);
+            Assert.Equal(linked ? 15 : 13, expected.Total);
+            var model = new WorkbenchModel(_root);
+            model.Reload();
+            model.Start();
+            Assert.Null(model.Error);
+            var actual = Assert.Single(model.Inspection!.Events.OfType<SkillCheckResolved>());
+            Assert.Equal(expected.Modifier, actual.Modifier);
+            Assert.Equal(expected.Total, actual.Total);
+            Assert.Equal(expected.Success, actual.Success);
+        }
     }
 
     [Fact]

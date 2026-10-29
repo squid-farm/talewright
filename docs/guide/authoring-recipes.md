@@ -122,3 +122,63 @@ If a check reports an unknown skill, first compare the spelling with its declara
 Then check that it is under `game.ruleset.stats`, uses `category: skill`, and that the story's
 chosen ruleset includes it. Changing a character's stat value alone does not declare a new skill.
 See the [ruleset settings](../reference/talemark-syntax.md#1-storytalewrightyaml) for the full options.
+
+### Link a skill to a custom attribute
+
+For a wilderness adventure, let **Tracking** use a custom **Grit** attribute:
+
+```yaml
+game:
+  id: tracking-lesson
+  title: Follow the Trail
+  start: trail
+  randomness: off
+  ruleset:
+    base: generic
+    stats:
+      - id: grit
+        name: Grit
+        category: attribute
+        min: 1
+        max: 30
+        default: 10
+      - id: tracking
+        name: Tracking
+        category: skill
+        min: 0
+        max: 10
+        default: 0
+        governing-attribute: grit
+characters:
+  player:
+    first-name: Alex
+    stats: { grit: 15, tracking: 3 }
+```
+
+```tale
+=== trail
+* [Follow the tracks] skill-check tracking dc 14
+  success: -> found
+  failure: -> lost
+=== found
+You find the trail.
+-> END
+=== lost
+The trail fades.
+-> END
+```
+
+The generic check adds **skill value + floor((attribute score - 10) / 2)** to the
+die result. Grit 15 contributes `floor(2.5) = 2`, so this check totals
+`10 + 3 + 2 = 15` and succeeds. Grit 9 contributes `-1`, not zero. With
+`governing-attribute` omitted, the total is `10 + 3 = 13` and the check fails.
+`randomness: off` fixes the die at 10 for this example; normal checks roll a d20.
+Try the same check in the Author Debugger to inspect the recorded total.
+
+`governing-attribute` is optional and available to every `category: skill` stat,
+including replacements for built-in skills.
+The target may appear before or after the skill, but must be an enabled attribute
+after `disable` and all replacements. Unknown, disabled and non-attribute targets
+are errors. The key is not allowed on other stat categories and accepts only one
+attribute, never a list. Inventory modifiers affect the effective values used by
+the unchanged generic formula.

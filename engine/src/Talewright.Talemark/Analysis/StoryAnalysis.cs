@@ -232,6 +232,13 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats.Select(stat =>
             new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null)).ToArray());
 
+    internal void GoverningAttribute(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset) =>
+        ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats
+            .Where(stat => stat.Category == Talewright.Core.Rulesets.StatCategory.Attribute)
+            .Select(stat => new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "attribute",
+                Symbols.FirstOrDefault(symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat.Id.Value)?.Declaration))
+            .ToArray());
+
     private void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null,
         string file = StorySource.ManifestFileName)
     {

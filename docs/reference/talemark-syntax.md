@@ -162,6 +162,20 @@ triggers:
 For a complete custom skill declaration, character value and check, see
 [Add a skill for your setting](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
 
+Every stat declared with `category: skill`, including a replacement for a built-in
+skill, may set optional `governing-attribute: attribute-id`. Its target must resolve to an enabled
+`category: attribute` stat after `disable` and all stat declarations/replacements.
+Declaration order does not matter. Unknown, disabled or non-attribute targets are
+errors, as is using the key on any category other than `skill` (the default
+category is `custom`).
+
+For generic checks, the total is **die roll + skill value +
+floor((governing attribute score - 10) / 2)**. Scores and skill values include
+effective modifiers such as held items. An unlinked skill uses only its skill
+value; omitting the key on a replacement stat leaves that replacement unlinked.
+This does not change the generic formula or allow multiple governing attributes.
+With `randomness: off`, the die result is 10.
+
 Custom pronoun set:
 
 ```yaml

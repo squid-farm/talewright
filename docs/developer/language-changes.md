@@ -6,6 +6,8 @@ meanings and the difference between implemented and decided syntax.
 
 ## Before implementation
 
+- [ ] Read the [naming conventions](naming-conventions.md); keep author-facing
+  spelling consistent and resolve any conflicting issue wording before coding.
 - [ ] State the author task in plain English, with one small canonical example.
 - [ ] Check the registry. Reuse an existing sigil only for its existing meaning:
   `:` accesses properties, `#` manipulates a value into text and chains left to right,

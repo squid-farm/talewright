@@ -373,6 +373,7 @@ internal sealed class StoryYamlReader
 
         var baseRuleset = factory();
         var builder = baseRuleset.ToBuilder();
+        var governingAttributes = new Dictionary<StatId, YamlNode>();
         if (Get(map, "disable") is { } disable)
         {
             _analysis?.DisabledStats(disable, baseRuleset);
@@ -401,7 +402,7 @@ internal sealed class StoryYamlReader
                     continue;
                 }
 
-                CheckKeys(stat, "id", "name", "category", "min", "max", "default");
+                CheckKeys(stat, "id", "name", "category", "min", "max", "default", "governing-attribute");
                 var id = RequiredIdentifier(stat, "id");
                 if (id is null)
                 {
@@ -422,7 +423,19 @@ internal sealed class StoryYamlReader
                     continue;
                 }
 
-                var definition = new StatDefinition(new StatId(id), Scalar(Get(stat, "name")) ?? id, parsedCategory, min, max, Int(Get(stat, "default")) ?? min);
+                var attributeNode = Get(stat, "governing-attribute");
+                var attribute = attributeNode is null ? null : Identifier(attributeNode, "governing attribute stat id");
+                var definition = new StatDefinition(new StatId(id), Scalar(Get(stat, "name")) ?? id, parsedCategory,
+                    min, max, Int(Get(stat, "default")) ?? min, attribute is null ? null : new StatId(attribute));
+                governingAttributes.Remove(definition.Id);
+                if (attributeNode is not null)
+                {
+                    if (parsedCategory != StatCategory.Skill)
+                    {
+                        Error(attributeNode, "TW4003", $"'governing-attribute' is only allowed on stats with category: skill; '{id}' is not a skill.", 0);
+                    }
+                    governingAttributes[definition.Id] = attributeNode;
+                }
                 if (builder.HasStat(definition.Id))
                 {
                     builder.ReplaceStat(definition);
@@ -434,7 +447,23 @@ internal sealed class StoryYamlReader
             }
         }
 
-        return builder.Build();
+        var ruleset = builder.Build();
+        foreach (var (skill, targetNode) in governingAttributes)
+        {
+            _analysis?.GoverningAttribute(targetNode, ruleset);
+            if (ruleset.StatsById[skill].GoverningAttribute is not { } target) continue;
+            if (!ruleset.StatsById.TryGetValue(target, out var attribute))
+            {
+                var reason = baseRuleset.HasStat(target) ? "disabled" : "unknown";
+                Error(targetNode, "TW4005", $"Stat '{skill}' governing-attribute target '{target}' is {reason}. Reference an enabled stat with category: attribute.", 0);
+            }
+            else if (attribute.Category != StatCategory.Attribute)
+            {
+                Error(targetNode, "TW4003", $"Stat '{skill}' governing-attribute target '{target}' must have category: attribute.", 0);
+            }
+        }
+
+        return ruleset;
     }
 
     private Dictionary<ItemId, ItemDefinition> ReadItems(YamlNode? node, Ruleset ruleset)
