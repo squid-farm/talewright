@@ -155,16 +155,23 @@ public partial class LostRelicTests
     }
 
     [Theory]
-    [InlineData("explorer", false, "Only its hunger remains")]
-    [InlineData("scholar", false, "a latch, and a door that must stay shut")]
-    [InlineData("scholar", true, "Never turn it")]
-    public void Sleeper_prose_uses_low_middle_and_high_lucidity(string preset, bool journal, string expected)
+    [InlineData("explorer", false, "Only its hunger remains", "sleeper-low.jpeg")]
+    [InlineData("explorer", true, "a latch, and a door that must stay shut", "sleeper-middle.jpeg")]
+    [InlineData("scholar", false, "a latch, and a door that must stay shut", "sleeper-middle.jpeg")]
+    [InlineData("scholar", true, "Never turn it", "sleeper-high.jpeg")]
+    public void Sleeper_prose_uses_low_middle_and_high_lucidity(string preset, bool journal, string expected, string image)
     {
         var history = Dream(preset, journal);
         MeetSpiral(history);
         MeetWatcher(history, "Meet its gaze without flinching");
         MeetHandsAndSleeper(history);
         Assert.Contains(expected, history.Current.Document.ToPlainText());
+        var media = Assert.Single(history.Current.Document.Blocks.OfType<RenderedParagraph>()
+            .SelectMany(paragraph => paragraph.Inlines).OfType<RenderedMedia>());
+        Assert.EndsWith(image, media.MediaId);
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.Equal(media, Assert.Single(restored.Current.Document.Blocks.OfType<RenderedParagraph>()
+            .SelectMany(paragraph => paragraph.Inlines).OfType<RenderedMedia>()));
         AssertMarks(history, 3);
     }
 

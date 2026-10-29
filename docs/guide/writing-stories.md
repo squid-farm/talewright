@@ -311,6 +311,13 @@ then `.webp`, and warns if several files match.
 The check does not inspect whether the image's contents can actually be displayed, so play the
 story to check the artwork as well.
 
+For state-dependent artwork, put image calls inside ordinary conditions.
+Lost Relic's `dream.sleeper` uses Lucidity to show one of three views of the
+same place: obscured below 2, partially visible from 2 through 4, and clear at 5
+or higher. The image and prose use the same condition, and each variant's alt
+text describes only what that view reveals. Its dream-hall illustration appears
+once on arrival rather than repeating on every hub visit.
+
 Images load as they approach the visible part of the story and fit the available width.
 An image that fails to load shows its alt text and an error rather than stopping the story.
 Use reasonably sized artwork for your readers' devices; see

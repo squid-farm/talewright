@@ -3,6 +3,8 @@
 === trail.river
 @title The River
 
+{image("river-crossing.jpg", "A rope stretches across a swollen jungle river toward an ancient green stone stair on the opposite bank.")}
+
 The trail ends at a brown river, swollen with last night's rain. On the far bank, through the trees, you
 can make out a stair of green stone.
 
@@ -35,7 +37,7 @@ You are bleeding from a gash along your arm.
 @hub any(night,watch)
 @hub-limit 1
 
-{image("expedition-workshop", "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.")}
+{image("night-watch.jpeg", "A low fire lights an expedition awning and a brass tripwire bell at the foot of a jungle stair.")}
 
 You shelter beneath a canvas awning at the foot of the stair. {guide:first-name}
 hangs a bell on a tripwire and spreads the expedition records across a rough table.
@@ -73,6 +75,8 @@ You close the pack with one ration left, safely stowed for tomorrow.
 @once
 
 ~ player:courage += 10
+
+{image("jaguar.jpeg", "A watchful jaguar emerges from wet foliage at the edge of the campfire's light.")}
 
 A jaguar steps out of the brush. You hold its gaze until it turns aside,
 leaving you trembling but upright. Your Courage is **{player:courage}**.

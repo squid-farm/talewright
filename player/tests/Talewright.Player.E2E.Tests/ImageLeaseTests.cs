@@ -33,6 +33,8 @@ public sealed class ImageLeaseTests
         private int _requests;
         public List<string> Revoked { get; } = [];
         public TaskCompletionSource? Gate { get; set; }
+        public TaskCompletionSource? BeforeRead { get; set; }
+        public TaskCompletionSource Reading { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Fail { get; set; }
         public int ModulesDisposed { get; private set; }
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, params object?[]? args) =>
@@ -47,6 +49,8 @@ public sealed class ImageLeaseTests
                 case "createUrl":
                     var number = Interlocked.Increment(ref _requests);
                     var reference = Assert.IsType<DotNetStreamReference>(args![0]);
+                    Reading.TrySetResult();
+                    if (BeforeRead is not null) await BeforeRead.Task;
                     using (var bytes = new MemoryStream()) await reference.Stream.CopyToAsync(bytes, cancellationToken);
                     Interlocked.Increment(ref _transfers);
                     if (Gate is not null) await Gate.Task;
@@ -63,6 +67,23 @@ public sealed class ImageLeaseTests
             return result is TValue value ? value : default!;
         }
         public ValueTask DisposeAsync() { ++ModulesDisposed; return ValueTask.CompletedTask; }
+    }
+
+    [Fact]
+    public async Task Final_lease_retirement_drains_an_in_flight_stream_before_revoking_its_url()
+    {
+        using var files = new ImageStoryFiles();
+        var browser = new Browser { BeforeRead = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        await using var owner = StoryImages.FromDirectory(StorySource.FromDirectory(files.Root), files.Root);
+        var lease = owner.Acquire("images/photo.jpeg", browser);
+        await browser.Reading.Task;
+        var retiring = lease.DisposeAsync().AsTask();
+        Assert.False(retiring.IsCompleted);
+        browser.BeforeRead.SetResult();
+        Assert.Equal("blob:test-1", await lease.Url);
+        await retiring;
+        Assert.Equal(1, browser.Transfers);
+        Assert.Equal(["blob:test-1"], browser.Revoked);
     }
 
     [Fact]

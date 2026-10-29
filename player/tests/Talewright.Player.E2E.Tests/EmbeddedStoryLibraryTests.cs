@@ -22,8 +22,15 @@ public sealed class EmbeddedStoryLibraryTests
         var expected = new[]
         {
             "images/camp-art.jpeg",
+            "images/dream-hall.jpeg",
             "images/expedition-workshop.jpeg",
+            "images/jaguar.jpeg",
+            "images/night-watch.jpeg",
             "images/relic-altar.jpeg",
+            "images/river-crossing.jpg",
+            "images/sleeper-high.jpeg",
+            "images/sleeper-low.jpeg",
+            "images/sleeper-middle.jpeg",
             "images/temple-door.jpeg",
         };
         Assert.Equal(expected, source.ImagePaths.Order(StringComparer.Ordinal));

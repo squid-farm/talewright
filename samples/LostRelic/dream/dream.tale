@@ -1,6 +1,8 @@
 === dream.arrival
 @title Behind the Closed Eye
 
+{image("dream-hall.jpeg", "An expedition table and a solitary explorer stand on still dark water in a hall of mist.")}
+
 The stone vanishes beneath your hand. You stand in a hall without walls.
 {player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} crossed without moving a foot.
 
@@ -178,12 +180,18 @@ The hall stretches away. You gather yourself before trying another way.
 @once
 
 {if player:lucidity >= 5}
+{image("sleeper-high.jpeg", "Beneath an expedition table, a stone doorway is clearly visible beyond a pale-gold disc on its threshold.")}
+
 You see {sleeper:first-name} clearly: not a monster, but an opening waiting for someone to mistake it for a door.
 > sleeper: The relic is the latch. Carry it if you must. Never turn it.
 {else}
 {if player:lucidity >= 2}
+{image("sleeper-middle.jpeg", "A stone doorway, a pale disc and an indistinct dark shape emerge through mist beneath an expedition table.")}
+
 A shape stirs beneath the table. You catch a warning about the relic, a latch, and a door that must stay shut.
 {else}
+{image("sleeper-low.jpeg", "Impenetrable shadow fills the space beneath an expedition table, obscuring whatever lies beyond.")}
+
 You cannot hold the shape in mind. Only its hunger remains when you look away.
 {/if}
 {/if}

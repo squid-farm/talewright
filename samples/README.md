@@ -13,7 +13,8 @@ Optional encounters do useful work in the story rather than sending you to a
 separate workshop.
 
 **Artwork disclosure:** The images used in *The Lost Relic* are AI-generated.
-This version reuses the existing four JPEG assets.
+This version includes eleven JPEG illustrations: the original four plus river,
+night-watch, jaguar and dream-hall scenes and three Sleeper variants.
 
 Opening the sample presents **character creation**: editable names, she/they/he
 pronouns, Explorer/Scholar presets and bounded Strength/Courage choices.
@@ -77,7 +78,8 @@ split settings, how global IDs work and why triggers stay together.
 | Counted glyphs, mirrored variable and trigger gate | `glyph-mark` inventory and `marks` stay equal; root `dream-ready` fires at 3; all 3 must be held to approach the Sleeper, 2 remain after paying |
 | Faction gate, standing changes, tier prose | The Archivist's friendly/neutral/hostile prose; promise requires neutral or better (+5), refusal costs 10 standing |
 | Lucidity tiers and visited ending state | The Sleeper uses <2 / 2–4 / >=5 prose; `visited(dream.sleeper)`, promise, Lucidity and guild standing change the altar and all three endings |
-| Titles, speech, formatting, comments, image media | Throughout; camp/worktable art at camp and night watch, door/altar art in the temple; images render in the player |
+| State-dependent artwork | `dream.sleeper` selects exactly one low/middle/high Lucidity illustration alongside its prose; descriptive alt text reflects what is visible |
+| Titles, speech, formatting, comments, image media | Camp/worktable art, river crossing, night watch, jaguar, temple door/altar and dream illustrations; the dream-hall image appears on arrival, not on every hub visit |
 | Save/load, deterministic Back/Forward, restart and title | Shared player; created identity, stats, text variables, counted items and trigger progress survive replay |
 
 ### Quick acceptance route
@@ -113,7 +115,8 @@ Version **`0.4.0`** restructures the sample and intentionally rejects older
 sample saves, including `0.3.0`. Incompatible loads report an error visibly
 without replacing the active playthrough or saved bytes. There is no migration.
 The dream addition retains version `0.4.0`; its changed content fingerprint also
-rejects pre-dream `0.4.0` saves visibly. No artwork was added.
+rejects pre-dream `0.4.0` saves visibly. Artwork updates also change the content
+fingerprint; there is no save migration.
 
 ### Features that cannot all be enabled in one story
 
