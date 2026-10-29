@@ -18,6 +18,13 @@ The walk back to camp is quiet. {guide:first-name} keeps glancing at your pack.
 
 The {faction:explorers-guild:name} hangs {player:last-name#possessive} portrait in the great hall, a little
 crooked. Your standing with them is now *{faction:explorers-guild:tier#lower}*.
+{if visited(dream.sleeper)}
+{if flag:dream-promise}
+You also deliver {archivist:first-name#possessive} testimony. The guild can no longer pretend it never sent anyone inside.
+{else}
+You keep the dream out of the report. The two remaining glyph marks stay locked in your desk.
+{/if}
+{/if}
 {if player has idol}
 Nobody asks about the {item:idol} on your desk.
 {/if}
@@ -27,6 +34,17 @@ Nobody asks about the {item:idol} on your desk.
 @title The Keeper
 
 You keep the {item:relic}. It keeps you, too: you sleep less, and dream of a door with a closed eye.
+{if visited(dream.sleeper)}
+{if player:lucidity >= 5}
+You remember {sleeper:first-name#possessive} warning clearly. When the door appears, you know not to open it.
+{else}
+The warning returns in fragments. You count your two remaining glyph marks until morning.
+{/if}
+{else}
+{if visited(dream.arrival)}
+You wonder what waited beyond the dream you abandoned.
+{/if}
+{/if}
 {if flag:guild-wary}
 The guild's letters stop coming. Then the guild's people start coming instead.
 // Nested conditionals and a compound and/or test. Blocks nest to any depth; `and` binds tighter than `or`,
@@ -45,4 +63,12 @@ You start sleeping with the relic under your pillow.
 
 You return with nothing but {player:pronoun#possessive} notes and a story nobody at the guild quite
 believes. {guide:first-name}, at least, buys you a drink.
+{if visited(dream.sleeper)}
+You left the {item:relic}, but not the memory of {sleeper:first-name}.
+{if flag:dream-promise and faction:explorers-guild >= friendly}
+The guild ghost's testimony earns a hearing, even without treasure.
+{else}
+The glyph marks are proof enough for the two of you.
+{/if}
+{/if}
 -> END

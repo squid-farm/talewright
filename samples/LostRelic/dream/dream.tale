@@ -1,0 +1,216 @@
+=== dream.arrival
+@title Behind the Closed Eye
+
+{image("dream-hall.jpeg", "An expedition table and a solitary explorer stand on still dark water in a hall of mist.")}
+
+The stone vanishes beneath your hand. You stand in a hall without walls.
+{player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} crossed without moving a foot.
+
+A woman sits at a table laid for eight, counting cups.
+
+-> dream.hub
+
+=== dream.hub
+@title The Hall Without Walls
+@hub all(dream,keeper)
+@hub-limit 2
+
+The keepers wait around the table. Glyph marks held: **{var:marks}**.
+Three will let you approach the shape sleeping beneath it.
+
+* [Wake before going further] -> dream.wake
+
+=== dream.ines
+@title Speak to the lost explorer
+@tags dream,keeper
+@priority 30
+@once
+
+~ var:sum = (6 + 2) * 3 / 2 - 1
+~ var:sum -= 1
+
+> ines: Six plus two. Three times. Half. Less one, less one. {var:sum}.
+
+Her collar still bears the name **{ines:name}**.
+{if visited(camp.guide)}
+You recognize the explorer from {guide:first-name#possessive} story.
+{/if}
+
+{if var:sum == 10 and var:sum != 0}
+> ines: Ten steps in. Nine steps out. One stays. Tell {guide:first-name} I remember the river.
+{/if}
+
+* [Promise to carry her message] -> dream.hub
+
+=== dream.spiral
+@title Answer the Spiral
+@tags dream,keeper
+@priority 20
+@once
+
+{spiral:first-name#capitalize} turns without moving. {spiral:pronoun#capitalize}
+{spiral:pronoun#one-many("has", "have")} a question; the answer should be yours.
+
+> spiral: What is the watchword?
+
+{if var:watchword == ""}
+> spiral: A retired word leaves no echo. Silence is an honest answer.
+{else}
+{if var:watch-note == ""}
+> spiral: "{var:watchword}"? A suggestion, never recorded. You have not yet agreed on who should answer.
+{else}
+{if var:watchword == var:watch-note}
+> spiral: "{var:watchword}". The living voice and the written word agree. I know you.
+{else}
+> spiral: The page says "{var:watch-note}"; you say "{var:watchword}". You changed the word, not the ink.
+{/if}
+{/if}
+{/if}
+
+{spiral:pronoun#capitalize} opens {spiral:pronoun#possessive} palm.
+
+* [Accept the spiral mark] { take spiral glyph-mark; give player glyph-mark; var:marks += 1 } -> dream.hub
+
+=== dream.watcher
+@title Face the Watcher
+@tags dream,keeper
+@requires player has glyph-mark
+@priority 10
+@once
+
+{watcher:first-name#capitalize} unfolds above the table.
+{watcher:pronoun#capitalize} {watcher:pronoun#one-many("has", "have")} no eyelid.
+
+::: skill-check watcher perception dc 15
+success: { set flag:watcher-saw } -> dream.watcher-sees
+failure: -> dream.watcher-missed
+:::
+
+=== dream.watcher-sees
+@title Under the Eye
+
+> watcher: I see the waking world caught in your hair.
+
+-> dream.watcher-choice
+
+=== dream.watcher-missed
+@title Between Glances
+
+> watcher: Something crossed the threshold. Was it you?
+
+-> dream.watcher-choice
+
+=== dream.watcher-choice
+@title A Way Past the Eye
+
+{if flag:watcher-saw}
+The eye follows every movement.
+{else}
+You have a moment before its gaze returns.
+{/if}
+
+* [Remember that you are dreaming] skill-check lucidity dc 14
+  success: -> dream.eye-mark
+  failure: -> dream.watcher-failed
+* [Slip beneath its gaze] skill-check stealth dc 13
+  success: -> dream.eye-mark
+  failure: -> dream.watcher-failed
+* [Meet its gaze without flinching] (requires: player:courage >= 6) -> dream.eye-mark
+* [Wake rather than face it] -> dream.wake
+
+=== dream.watcher-failed
+@title A Fraying Thought
+
+The hall stretches away. You gather yourself before trying another way.
+
+-> dream.watcher-choice
+
+=== dream.eye-mark
+@title The Open Eye
+
+~ take watcher glyph-mark
+~ give player glyph-mark
+~ var:marks += 1
+
+{watcher:first-name#capitalize} lowers its gaze. A second glyph mark rests in your palm.
+
+-> dream.hub
+
+=== dream.archivist
+@title Hear the guild ghost
+@tags dream,keeper
+@priority 5
+@once
+
+{archivist:first-name#capitalize} wears a guild coat with no body inside it.
+
+{if faction:explorers-guild >= friendly}
+> archivist: They still put your name in the ledger. Make them write ours there too.
+{else}
+{if faction:explorers-guild >= neutral}
+> archivist: The guild sent us here, then forgot the cost.
+{else}
+> archivist: You know what it is to fall out of their favour. Do not let them erase us.
+{/if}
+{/if}
+
+* [Promise the guild an honest account] (requires: faction:explorers-guild >= neutral) { set flag:dream-promise; faction:explorers-guild += 5 } -> dream.hub
+* [Refuse to speak for the guild] { faction:explorers-guild -= 10 } -> dream.hub
+
+=== dream.hands
+@title Ask the Hands for passage
+@tags dream,keeper
+@requires visited(dream.eye-mark) and var:marks == 2
+@priority 0
+@once
+
+{hands:first-name#capitalize} {hands:pronoun#one-many("has", "have")} no owner.
+{hands:pronoun#capitalize} {hands:pronoun#one-many("offers", "offer")} the final mark.
+
+> hands: Three to reach the Sleeper. One to us when you leave. That is our price.
+
+* [Accept the hand mark and the price] { take hands glyph-mark; give player glyph-mark; var:marks += 1 } -> dream.hub
+* [Refuse and wake] -> dream.wake
+
+=== dream.sleeper
+@title Approach the Sleeper
+@tags dream,keeper
+@requires var:marks == 3 and flag:all-marks and player has glyph-mark
+@priority -10
+@once
+
+{if player:lucidity >= 5}
+{image("sleeper-high.jpeg", "Beneath an expedition table, a stone doorway is clearly visible beyond a pale-gold disc on its threshold.")}
+
+You see {sleeper:first-name} clearly: not a monster, but an opening waiting for someone to mistake it for a door.
+> sleeper: The relic is the latch. Carry it if you must. Never turn it.
+{else}
+{if player:lucidity >= 2}
+{image("sleeper-middle.jpeg", "A stone doorway, a pale disc and an indistinct dark shape emerge through mist beneath an expedition table.")}
+
+A shape stirs beneath the table. You catch a warning about the relic, a latch, and a door that must stay shut.
+{else}
+{image("sleeper-low.jpeg", "Impenetrable shadow fills the space beneath an expedition table, obscuring whatever lies beyond.")}
+
+You cannot hold the shape in mind. Only its hunger remains when you look away.
+{/if}
+{/if}
+
+* [Pay the Hands and return to the temple] (requires: var:marks == 3) { take player glyph-mark; give hands glyph-mark; var:marks -= 1; set flag:dream-opened; player:xp += 50 } -> dream.passage
+
+=== dream.passage
+@title The Price of Waking
+
+{hands:first-name#capitalize} close around the mark. Their price is paid.
+You keep **{var:marks}** marks and the memory of what sleeps inside.
+The stone door opens beneath your hand.
+
+-> temple.hall
+
+=== dream.wake
+@title The Unopened Door
+
+The cold stone is solid again. {guide:first-name} catches your arm.
+The dream has not opened the door; the other ways in remain.
+
+-> temple.door

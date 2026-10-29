@@ -5,7 +5,7 @@ using Talewright.Narrative.Rendering;
 
 namespace Talewright.Runtime.Tests;
 
-public class LostRelicTests
+public partial class LostRelicTests
 {
     private static StorySource Source()
     {
@@ -19,13 +19,16 @@ public class LostRelicTests
         return StorySource.FromDirectory(Path.Combine(directory.FullName, "samples", "LostRelic"));
     }
 
-    private static StoryDefinition Story(bool fixedRoll = false)
+    private static StoryDefinition Story(bool fixedRoll = false, int guildStanding = 5)
     {
         var source = Source();
-        if (fixedRoll)
+        if (fixedRoll || guildStanding != 5)
         {
             var files = source.Files.ToDictionary();
-            files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("randomness: checks-only", "randomness: off");
+            if (fixedRoll)
+                files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("randomness: checks-only", "randomness: off");
+            files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName]
+                .Replace("standing: 5 }", $"standing: {guildStanding} }}");
             source = new StorySource(files, source.ImagePaths);
         }
         var result = StoryCompiler.Compile(source);
@@ -61,8 +64,10 @@ public class LostRelicTests
         {
             "chapters/01-camp.tale", "chapters/02-trail.tale",
             "chapters/03-temple.tale", "chapters/04-endings.tale",
+            "dream/dream.tale",
         }, source.Files.Keys.Where(path => path.EndsWith(".tale")).Order());
-        Assert.Equal(StorySource.ManifestFileName, Assert.Single(source.Files.Keys, path => path.EndsWith(".yaml")));
+        Assert.Equal(new[] { "dream/dream.talewright.yaml", StorySource.ManifestFileName },
+            source.Files.Keys.Where(path => path.EndsWith(".yaml")).Order());
         foreach (var (file, prefix) in new[]
         {
             ("01-camp.tale", "camp."), ("02-trail.tale", "trail."),
@@ -73,7 +78,7 @@ public class LostRelicTests
                 Assert.StartsWith(prefix, line[4..].Trim());
         }
         Assert.Equal("0.4.0", Story().Version);
-        Assert.DoesNotContain(Story().Scenes, scene => scene.Id.Value.StartsWith("dream."));
+        Assert.Contains(Story().Scenes, scene => scene.Id.Value == "dream.hub");
     }
 
     [Fact]
@@ -160,7 +165,6 @@ public class LostRelicTests
         Assert.Equal(2, history.State.GetItemCount(EntityId.Player, new ItemId("ration")));
         Assert.True(history.State.GetFlag(new FlagId("packing-open")));
         Assert.Equal(2, history.State.GetVariable(new("supplies")));
-        Assert.Equal(10, history.State.GetVariable(new VarId("ledger")));
         Assert.Equal("Sign the expedition register", Assert.Single(history.Current.Choices).Text);
         Choose(history, "Sign the expedition register");
         Choose(history, "Continue");
@@ -288,7 +292,7 @@ public class LostRelicTests
     {
         var history = History(preset, fixedRoll: true);
         Assert.Equal(initial, history.State.GetBaseStat(EntityId.Player, new("lucidity")));
-        Assert.Null(history.Story.World.Ruleset.StatsById[new("lucidity")].GoverningAttribute);
+        Assert.Equal(new StatId("will"), history.Story.World.Ruleset.StatsById[new("lucidity")].GoverningAttribute);
         Choose(history, "Continue");
         Choose(history, "Study your journal");
         Choose(history, "Puzzle out the glyphs");

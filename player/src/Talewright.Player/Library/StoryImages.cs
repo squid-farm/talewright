@@ -79,10 +79,10 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 
     private async Task RetireAsync(Entry entry)
     {
-        entry.Cancellation.Cancel();
         try
         {
             string url;
+            // Blazor may still be reading the stream after its final view unmounts.
             try { url = await entry.Url; }
             catch (OperationCanceledException) when (entry.Cancellation.IsCancellationRequested)
             {
@@ -96,7 +96,11 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             }
             await (await _module!).InvokeVoidAsync("revokeUrl", url);
         }
-        finally { entry.Cancellation.Dispose(); }
+        finally
+        {
+            entry.Cancellation.Cancel();
+            entry.Cancellation.Dispose();
+        }
     }
     private readonly HashSet<string> _paths;
     private readonly CancellationTokenSource _lifetime = new();

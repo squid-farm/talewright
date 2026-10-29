@@ -127,7 +127,8 @@ public sealed class ModularConfigurationTests
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
         Assert.NotNull(root);
         var source = StorySource.FromDirectory(Path.Combine(root.FullName, "samples", "LostRelic"));
-        Assert.Equal(StorySource.ManifestFileName, Assert.Single(source.Files.Keys, path => path.EndsWith(".yaml")));
+        Assert.Equal(new[] { "dream/dream.talewright.yaml", StorySource.ManifestFileName },
+            source.Files.Keys.Where(path => path.EndsWith(".yaml")).Order());
         Assert.Contains("images/camp-art.jpeg", source.ImagePaths);
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -146,6 +147,46 @@ public sealed class ModularConfigurationTests
         Assert.Equal(result.Story.World.Characters[new("guide")].FullName, split.Story!.World.Characters[new("guide")].FullName);
         Assert.Equal(result.Story.Triggers.Select(trigger => trigger.Id), split.Story.Triggers.Select(trigger => trigger.Id));
         Assert.Equal(result.Story.Scenes.Select(scene => scene.Id), split.Story.Scenes.Select(scene => scene.Id));
+    }
+
+    [Fact]
+    public void Dream_configuration_is_global_moveable_and_rejects_duplicate_ids_and_triggers()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var source = StorySource.FromDirectory(Path.Combine(root.FullName, "samples", "LostRelic"));
+        var original = StoryCompiler.Compile(source);
+        Assert.True(original.Success, string.Join("\n", original.Diagnostics));
+        Assert.Equal(new[] { "guild-wary", "courage-earned", "watch-bell", "dream-ready" },
+            original.Story!.Triggers.Select(trigger => trigger.Id));
+        var files = source.Files.ToDictionary();
+        files["elsewhere/cast.talewright.yaml"] = files["dream/dream.talewright.yaml"];
+        files.Remove("dream/dream.talewright.yaml");
+        var moved = StoryCompiler.Compile(new StorySource(files.Reverse().ToDictionary(), source.ImagePaths));
+        Assert.True(moved.Success, string.Join("\n", moved.Diagnostics));
+        Assert.Empty(moved.Diagnostics);
+        Assert.Equal(original.Story.World.Characters.Keys.OrderBy(id => id.Value),
+            moved.Story!.World.Characters.Keys.OrderBy(id => id.Value));
+        Assert.Equal("Ines Varga", moved.Story.World.Characters[new("ines")].FullName);
+        Assert.Equal(original.Story.Scenes.Select(scene => scene.Id), moved.Story.Scenes.Select(scene => scene.Id));
+        foreach (var duplicate in new[]
+        {
+            "characters: {ines: {first-name: Other}}",
+            "items: {glyph-mark: Other}",
+            "vars: {marks: 2}",
+            "triggers: []",
+        })
+        {
+            files["dream/duplicate.talewright.yaml"] = duplicate;
+            var result = StoryCompiler.Compile(new StorySource(files, source.ImagePaths));
+            Assert.False(result.Success);
+            var error = Assert.Single(result.Errors);
+            Assert.Equal("TW4007", error.Code);
+            Assert.Contains(duplicate.StartsWith("triggers") ? StorySource.ManifestFileName : "elsewhere/cast.talewright.yaml",
+                error.Message + error.Location.File);
+            Assert.Contains("dream/duplicate.talewright.yaml", error.Message + error.Location.File);
+        }
     }
 
     [Theory]

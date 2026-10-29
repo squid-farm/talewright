@@ -17,9 +17,11 @@ See [Getting started](getting-started.md) for both paths.
 - Lines starting with `//` are comments that players never see.
 
 The [Lost Relic sample](../../samples/LostRelic) uses four progressive chapter
-files: camp, trail, temple and endings. The player, guide, items, guild and
-triggers stay in the root settings. Its optional night camp puts more advanced
-hubs and effects on the journey, not in a separate workshop.
+files: camp, trail, temple and endings. The player, guide, trail items, guild and
+all triggers stay in the root settings. The optional temple dream keeps its six
+characters and glyph settings beside its scenes in `dream/`. Those names remain
+global; duplicate IDs across settings files are errors. Its optional night camp
+and dream put advanced hubs and effects on the journey, not in a separate workshop.
 Keep settings together while your story is small, or split related characters and
 items into smaller files as it grows. See [Organizing your story](organizing-your-story.md)
 for two complete layouts.
@@ -74,8 +76,9 @@ You can add your own stats (`courage`, `sanity`, ...), remove ones you don't wan
 empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
 For a complete declaration and check, see [add a skill for your setting](authoring-recipes.md#add-a-skill-for-your-setting).
 Lost Relic adds Courage (a bounded custom stat) and Lucidity (a bounded skill).
-Scholar starts with Lucidity 3; solving the journal adds 2. In this sample version,
-Lucidity has no governing attribute. See
+Scholar starts with Lucidity 3 and Will 14; solving the journal adds 2 Lucidity.
+Lucidity uses `governing-attribute: will`: a fixed roll of 10 plus Lucidity 5 and
+Will's +2 modifier totals 17 in the dream check. See
 [link a skill to a custom attribute](authoring-recipes.md#link-a-skill-to-a-custom-attribute)
 for the optional `governing-attribute` setting.
 
@@ -307,6 +310,13 @@ Use an explicit extension when possible: without one, Talewright tries `.png`, `
 then `.webp`, and warns if several files match.
 The check does not inspect whether the image's contents can actually be displayed, so play the
 story to check the artwork as well.
+
+For state-dependent artwork, put image calls inside ordinary conditions.
+Lost Relic's `dream.sleeper` uses Lucidity to show one of three views of the
+same place: obscured below 2, partially visible from 2 through 4, and clear at 5
+or higher. The image and prose use the same condition, and each variant's alt
+text describes only what that view reveals. Its dream-hall illustration appears
+once on arrival rather than repeating on every hub visit.
 
 Images load as they approach the visible part of the story and fit the available width.
 An image that fails to load shows its alt text and an error rather than stopping the story.
