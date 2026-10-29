@@ -6,6 +6,8 @@ using Talewright.Runtime;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Testing;
+using Talewright.Player.Library;
+using Talewright.Core.Identity;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
 
@@ -145,6 +147,51 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Observe(new(null, "Second passage text."));
         await Choose("Continue");
         await Observe(new(null, "Finished safely.", Ended: true));
+    }
+
+    [Fact]
+    public async Task Bundled_sample_rejects_older_version_save_visibly_without_replacing_progress_or_bytes()
+    {
+        var source = await new EmbeddedStoryLibrary(typeof(SaveHistoryTests).Assembly).LoadAsync("LostRelic");
+        var files = source.Files.ToDictionary();
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.4.0", "version: 0.3.0");
+        var result = StoryCompiler.Compile(new StorySource(files, source.ImagePaths));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var old = result.Story!;
+        var history = new StoryHistory(old, 42, old.Creation!.Default(old.World.Characters[EntityId.Player]));
+        var bytes = history.Save();
+        await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
+        await Choose("Continue");
+        var before = await Driver.ObserveAsync();
+        await Persist(old.Id, "Older sample", bytes);
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load Older sample");
+        await Driver.ClickAsync("Load save");
+        await AssertDialogText(text => Assert.Contains("incompatible", text));
+        await Driver.ClickAsync("Close saves");
+        await AssertState(state =>
+        {
+            Assert.Equal(before.Passage, state.Passage);
+            Assert.Equal(before.Transcript, state.Transcript);
+            Assert.Equal(before.Choices, state.Choices);
+        });
+        if (PlayerTarget.IsDesktop)
+        {
+            Assert.Equal(bytes, await new FileSaveStore(FileSaveStore.DefaultRoot).ReadAsync(old.Id, "Older sample"));
+        }
+        else
+        {
+            var stored = await Page.EvaluateAsync<string>("""
+                async storyId => {
+                    const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                    return new TextDecoder().decode(await module.read(storyId, "Older sample"));
+                }
+                """, old.Id);
+            Assert.Equal(System.Text.Encoding.UTF8.GetString(bytes), stored);
+        }
+        await Choose("Sign the expedition register");
+        await Observe(new(null, "MARA BURNS"));
     }
 
     private async Task Persist(string storyId, string slot, byte[] bytes)

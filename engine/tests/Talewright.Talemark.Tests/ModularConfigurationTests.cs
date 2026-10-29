@@ -121,18 +121,31 @@ public sealed class ModularConfigurationTests
     }
 
     [Fact]
-    public void Shipped_split_illustrated_story_compiles_from_folder()
+    public void Shipped_four_chapter_story_keeps_shared_configuration_in_root_and_can_be_split()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
         Assert.NotNull(root);
         var source = StorySource.FromDirectory(Path.Combine(root.FullName, "samples", "LostRelic"));
-        Assert.Contains("characters/guide.talewright.yaml", source.Files.Keys);
+        Assert.Equal(StorySource.ManifestFileName, Assert.Single(source.Files.Keys, path => path.EndsWith(".yaml")));
         Assert.Contains("images/camp-art.jpeg", source.ImagePaths);
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Empty(result.Diagnostics);
         Assert.Equal("Tomas Okafor", result.Story!.World.Characters[new("guide")].FullName);
+        var files = source.Files.ToDictionary();
+        const string guide = "  guide:\n";
+        var manifest = files[StorySource.ManifestFileName].Replace("\r\n", "\n");
+        var start = manifest.IndexOf(guide, StringComparison.Ordinal);
+        var end = manifest.IndexOf("\nfactions:", start, StringComparison.Ordinal);
+        files[StorySource.ManifestFileName] = manifest.Remove(start, end - start);
+        files["characters/guide.talewright.yaml"] = "characters:\n" + manifest[start..end];
+        var split = StoryCompiler.Compile(new StorySource(files.Reverse().ToDictionary(), source.ImagePaths));
+        Assert.True(split.Success, string.Join("\n", split.Diagnostics));
+        Assert.Empty(split.Diagnostics);
+        Assert.Equal(result.Story.World.Characters[new("guide")].FullName, split.Story!.World.Characters[new("guide")].FullName);
+        Assert.Equal(result.Story.Triggers.Select(trigger => trigger.Id), split.Story.Triggers.Select(trigger => trigger.Id));
+        Assert.Equal(result.Story.Scenes.Select(scene => scene.Id), split.Story.Scenes.Select(scene => scene.Id));
     }
 
     [Theory]

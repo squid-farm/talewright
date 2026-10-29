@@ -16,7 +16,10 @@ See [Getting started](getting-started.md) for both paths.
   joined by hyphens are the recommended style, not the only accepted spelling.
 - Lines starting with `//` are comments that players never see.
 
-The [Lost Relic sample](../../samples/LostRelic) uses one file per chapter.
+The [Lost Relic sample](../../samples/LostRelic) uses four progressive chapter
+files: camp, trail, temple and endings. The player, guide, items, guild and
+triggers stay in the root settings. Its optional night camp puts more advanced
+hubs and effects on the journey, not in a separate workshop.
 Keep settings together while your story is small, or split related characters and
 items into smaller files as it grows. See [Organizing your story](organizing-your-story.md)
 for two complete layouts.
@@ -50,6 +53,11 @@ For wording that changes with a character's chosen pronouns, supply both forms:
 `{player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} arrived.`
 The first form is singular agreement; the second is plural agreement, including
 singular they. This selector works on pronouns only, not names or items.
+Scene titles are literal text, so use neutral titles such as "Ask your guide
+about the temple"; put `{guide:first-name}` in prose and choice labels instead.
+For recurring item names, use `{item:relic}` rather than repeating the display
+name in every passage. Authors still supply verb forms and surrounding wording;
+there is no general name/item grammar inference.
 
 ## Stats and skills
 
@@ -65,6 +73,11 @@ By default, stories use a familiar d20-style ruleset:
 You can add your own stats (`courage`, `sanity`, ...), remove ones you don't want, or start from an
 empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
 For a complete declaration and check, see [add a skill for your setting](authoring-recipes.md#add-a-skill-for-your-setting).
+Lost Relic adds Courage (a bounded custom stat) and Lucidity (a bounded skill).
+Scholar starts with Lucidity 3; solving the journal adds 2. In this sample version,
+Lucidity has no governing attribute. See
+[link a skill to a custom attribute](authoring-recipes.md#link-a-skill-to-a-custom-attribute)
+for the optional `governing-attribute` setting.
 
 Change stats with effects: `~ player:hp -= 2` on its own line when a scene starts, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
