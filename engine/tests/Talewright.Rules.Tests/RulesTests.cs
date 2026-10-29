@@ -173,7 +173,7 @@ public class RulesTests
         ];
         log.Append(new SceneEntered(new SceneId("one-shot")));
 
-        var eligible = StoryletSelector.SelectEligible(storylets, "hub", EvaluationContext.For(log.State));
+        var eligible = StoryletSelector.SelectEligible(storylets, new StoryletTags(["hub"]), EvaluationContext.For(log.State));
 
         Assert.Equal(["high", "low"], eligible.Select(s => s.Name));
     }

@@ -113,7 +113,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     }
 
     [Fact]
-    public async Task Legacy_and_unreadable_details_remain_listed_and_failed_load_preserves_session()
+    public async Task Missing_and_unreadable_details_remain_listed_and_failed_load_preserves_session()
     {
         var fixture = Fixture();
         var story = fixture.Compile();
@@ -121,7 +121,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         history.Choose("c0");
         await Upload(fixture);
         await Observe(new(null, "First passage"));
-        await Persist(story.Id, "Legacy", history.Save());
+        await Persist(story.Id, "Without details", history.Save());
         var damaged = JsonNode.Parse(history.Save())!;
         damaged["summary"] = "unreadable metadata";
         await Persist(story.Id, "Damaged details", System.Text.Encoding.UTF8.GetBytes(damaged.ToJsonString()));
@@ -129,7 +129,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Saves");
         await AssertDialogText(text =>
         {
-            Assert.Contains("Legacy", text);
+            Assert.Contains("Without details", text);
             Assert.Contains("Details unavailable", text);
             Assert.Contains("Save details are unreadable", text);
             Assert.DoesNotMatch(@"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z", text);
@@ -138,7 +138,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Load save");
         await Observe(new(null, "Second passage text."));
         await Driver.ClickAsync("Saves");
-        await Driver.ClickAsync("Load Legacy"); // Same persisted replay, despite different metadata.
+        await Driver.ClickAsync("Load Without details"); // Same persisted replay, despite different metadata.
         await Observe(new(null, "Second passage text."));
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load Broken replay");

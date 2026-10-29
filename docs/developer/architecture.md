@@ -222,8 +222,9 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
   false→true, not every frame). It loops until stable, capped at `MaxPasses = 32`; reaching the cap with
   eligible triggers remaining throws an error instead of silently skipping effects.
 - **`Storylets/StoryletSelector.cs`**: `IStorylet` (Id, Requires, Tags, Priority, Once) and `SelectEligible(…,
-tag, context)`. Eligible = has the tag, requirements hold, and not already visited if `Once`. Ordered by
-  priority (high first), then declaration order. `SceneDefinition` implements `IStorylet`.
+  StoryletTags, context)`. Eligible = matches the tag query, requirements hold, and not already visited
+  if `Once`. Ordered by priority (high first), then declaration order. `SceneDefinition` implements
+  `IStorylet`; its `Hub` is one tag-query representation for single-tag, all and any author syntax.
 
 ### 3.4 `Talewright.Narrative` — the template renderer
 
@@ -447,7 +448,8 @@ Invalid keys throw `InvalidOperationException` listing the valid ones. The UI on
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
 format/story versions and source/extension fingerprint. Unknown/corrupt/incompatible saves are rejected,
-not silently migrated. Older fixed-protagonist v1 saves may omit the optional character field.
+not silently migrated. The current save format requires a character field, null for fixed-protagonist
+stories. Pre-v1 format and replay contracts may change without support for previous versions.
 
 ---
 

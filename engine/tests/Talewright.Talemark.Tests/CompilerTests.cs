@@ -170,7 +170,8 @@ public class CompilerTests
         Assert.Equal(["camp", "start"], scene.Tags.Order());
         Assert.Equal(5, scene.Priority);
         Assert.True(scene.Once);
-        Assert.Equal("camp", scene.HubTag);
+        Assert.Equal(["camp"], scene.Hub!.Tags);
+        Assert.False(scene.Hub.MatchAll);
         Assert.Equal(new BinaryExpr(BinaryOp.GreaterOrEqual, new StatRef(EntityId.Player, new StatId("dex")), new NumberLiteral(12)), scene.Requires);
     }
 

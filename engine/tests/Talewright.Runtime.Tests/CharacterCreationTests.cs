@@ -110,13 +110,29 @@ public sealed class CharacterCreationTests
     }
 
     [Fact]
-    public void Predefined_stories_keep_old_save_shape_compatibility_and_reject_creation_input()
+    public void Predefined_stories_roundtrip_null_character_and_reject_creation_input()
     {
         var story = Story("");
         var history = new StoryHistory(story, 42);
-        var json = JsonNode.Parse(history.Save())!.AsObject();
-        json.Remove("character");
-        Assert.Equal(history.Events, StoryHistory.Restore(story, System.Text.Encoding.UTF8.GetBytes(json.ToJsonString())).Events);
+        var bytes = history.Save();
+        Assert.Null(history.Character);
+        Assert.Equal(history.Events, StoryHistory.Restore(story, bytes).Events);
         Assert.Throws<ArgumentException>(() => new StoryHistory(story, character: new CharacterSelection()));
+    }
+
+    [Fact]
+    public void Saves_require_the_character_field_even_for_predefined_stories()
+    {
+        var story = Story("");
+        var history = new StoryHistory(story, 42);
+        var bytes = history.Save();
+        var json = JsonNode.Parse(bytes)!.AsObject();
+        Assert.True(json.ContainsKey("character"));
+        Assert.Null(json["character"]);
+        json.Remove("character");
+        var error = Assert.Throws<InvalidDataException>(() =>
+            StoryHistory.Restore(story, System.Text.Encoding.UTF8.GetBytes(json.ToJsonString())));
+        Assert.Contains("malformed", error.Message);
+        Assert.Equal(bytes, history.Save());
     }
 }

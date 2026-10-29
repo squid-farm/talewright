@@ -312,7 +312,7 @@ public sealed class StorySession : IStorySession
             }
         }
 
-        if (scene.HubSelection is { } hub)
+        if (scene.Hub is { } hub)
         {
             foreach (var storylet in StoryletSelector.SelectEligible(Story.Scenes, hub, Context, scene.Id,
                 scene.HubLimit, _observer, _log.Events.Count))
@@ -495,7 +495,7 @@ public sealed class StorySession : IStorySession
         {
             ObserveSkipped(DecisionKind.Choice, choice.Key, choice.Requires, DecisionReason.EntryCheck);
         }
-        if (scene.HubSelection is not null)
+        if (scene.Hub is not null)
         {
             foreach (var storylet in Story.Scenes)
             {

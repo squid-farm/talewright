@@ -39,6 +39,19 @@ public sealed class RicherHubTests(ITestOutputHelper output)
     }
 
     [Theory]
+    [InlineData("a", false, new[] { "a" })]
+    [InlineData("all(a,b)", true, new[] { "a", "b" })]
+    [InlineData("any(a,b)", false, new[] { "a", "b" })]
+    public void Hub_forms_compile_to_one_tag_query(string query, bool matchAll, string[] tags)
+    {
+        var result = Compile($"@hub {query}");
+        Assert.True(result.Success);
+        var hub = result.Story!.GetScene(new("hub")).Hub!;
+        Assert.Equal(tags, hub.Tags);
+        Assert.Equal(matchAll, hub.MatchAll);
+    }
+
+    [Theory]
     [InlineData("all(a,b)", false, true)]
     [InlineData("any(a,b)", false, false)]
     [InlineData("all(a,missing)", true, true)]

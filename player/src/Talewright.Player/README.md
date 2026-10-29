@@ -129,7 +129,7 @@ load guard as named saves. The dialog marks it **Quick Save checkpoint**, indepe
 user-entered names; Quick Save can never overwrite a named slot. Failure keeps the previous
 checkpoint and reports advice; retry using Quick Save. This is explicit saving, not autosave.
 Use **Saves** to open the modal and automatically refresh its list. New entries show scene title,
-actual UTC save time and character name. Legacy/malformed details are explicitly unavailable;
+actual UTC save time and character name. Missing/malformed details are explicitly unavailable;
 listing never replays a story. Saving to an existing name requires **Confirm overwrite**.
 Loading asks **Load save** / **Keep playing** only when the complete current replay state
 (including seed, character, cursor and redo) is not persisted in any slot. The store is checked

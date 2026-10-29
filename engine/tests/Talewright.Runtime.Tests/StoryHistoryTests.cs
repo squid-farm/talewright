@@ -45,7 +45,7 @@ public class StoryHistoryTests
     }
 
     [Fact]
-    public void Atomic_summary_preserves_replay_and_legacy_saves_have_no_invented_details()
+    public void Optional_summary_preserves_replay_and_progress_identity()
     {
         var history = new StoryHistory(Compile(), 42);
         history.Choose("c0");
@@ -63,9 +63,9 @@ public class StoryHistoryTests
         Assert.Null(entry.Warning);
         Assert.Equal(history.ProgressKey, entry.ProgressKey);
         AssertEquivalent(history, StoryHistory.Restore(history.Story, bytes));
-        var legacy = StoryHistory.DescribeSave("Legacy", history.Save());
-        Assert.Null(legacy.Summary);
-        Assert.Equal(entry.ProgressKey, legacy.ProgressKey);
+        var withoutDetails = StoryHistory.DescribeSave("Without details", history.Save());
+        Assert.Null(withoutDetails.Summary);
+        Assert.Equal(entry.ProgressKey, withoutDetails.ProgressKey);
         Assert.DoesNotContain("summary", Encoding.UTF8.GetString(history.Save()));
     }
 
@@ -226,6 +226,7 @@ public class StoryHistoryTests
     }
 
     [Theory]
+    [InlineData("formatVersion", "1", "unsupported")]
     [InlineData("formatVersion", "99", "unsupported")]
     [InlineData("storyId", "\"other\"", "different story")]
     [InlineData("storyVersion", "\"other\"", "incompatible")]
@@ -316,7 +317,6 @@ public class StoryHistoryTests
                     Tags = scene.Tags,
                     Priority = scene.Priority,
                     Once = scene.Once,
-                    HubTag = scene.HubTag,
                     Hub = scene.Hub,
                     HubLimit = scene.HubLimit,
                     EntryEffects = scene.EntryEffects,

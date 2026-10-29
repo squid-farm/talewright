@@ -8,13 +8,13 @@ namespace Talewright.Core.Randomness;
 /// <remarks>
 /// The hash is SplitMix64 (Steele, Lea &amp; Flood, "Fast splittable pseudorandom number generators", 2014; the
 /// same mixer Java's <c>SplittableRandom</c> uses). Its constants are the published ones: changing any of them
-/// changes every roll of every saved game, so they must never be edited.
+/// changes the replay contract and requires invalidating saves and scenarios from the previous contract.
 /// </remarks>
 public static class DeterministicDice
 {
     /// <summary>
     /// Offset added to the roll index before hashing so that index 0 doesn't hash the bare seed. Any odd 64-bit
-    /// constant works; this one is arbitrary but fixed forever for save compatibility.
+    /// constant works; this one is part of the current deterministic replay contract.
     /// </summary>
     private const ulong IndexSalt = 0x632BE59BD9B4E019UL;
 

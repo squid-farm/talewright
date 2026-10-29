@@ -8,6 +8,17 @@ the [architecture tour](docs/developer/architecture.md).
 contributors and coding agents; author-facing YAML keys use lowercase kebab-case,
 not the casing of their C# implementation.
 
+## Pre-v1 compatibility
+
+Target the current syntax, APIs and file formats. Do not retain superseded properties, overloads,
+serialized shapes or replay digests solely for backward compatibility. Update callers, fixtures and
+documentation together; historical compatibility expectations do not override this policy.
+Any exception requires an explicit project-lead decision.
+
+When a persisted contract changes, version it and reject unsupported data explicitly rather than
+migrating it. Failed loads must preserve the active session and original stored bytes. Keep
+deterministic replay and valid current optional behavior; breaking old formats is not a goal by itself.
+
 ## Set up
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). On Linux the desktop

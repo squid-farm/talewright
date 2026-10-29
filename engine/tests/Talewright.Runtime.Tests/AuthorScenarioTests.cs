@@ -76,16 +76,21 @@ public sealed class AuthorScenarioTests
     private static byte[] Bytes(JsonNode data) => Encoding.UTF8.GetBytes(data.ToJsonString());
     private static JsonNode Data(AuthorSession? session = null) => JsonNode.Parse(AuthorScenario.Export(session ?? Start(), Extensions))!;
 
-    [Fact]
-    public void Legacy_integer_scenarios_without_text_fields_keep_their_replay_evidence()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Missing_text_fields_are_rejected_without_changing_the_session(bool edit)
     {
         var source = Start();
         source.Edit(new() { Variables = new Dictionary<VarId, int> { [new("count")] = 8 } });
         var data = Data(source);
-        data["setup"]!.AsObject().Remove("textVariables");
-        foreach (var command in data["commands"]!.AsArray())
-            if (command!["values"] is JsonObject values) values.Remove("textVariables");
-        Equal(source, AuthorScenario.Import(source.Story, Bytes(data), Extensions).Session);
+        var before = AuthorScenario.Export(source, Extensions);
+        var values = edit ? data["commands"]![0]!["values"]! : data["setup"]!;
+        values.AsObject().Remove("textVariables");
+        var error = Assert.Throws<InvalidDataException>(() =>
+            AuthorScenario.Import(source.Story, Bytes(data), Extensions, adoptDifferentSource: true));
+        Assert.Contains("Malformed author scenario", error.Message);
+        Assert.Equal(before, AuthorScenario.Export(source, Extensions));
     }
 
     [Theory]
@@ -187,7 +192,8 @@ public sealed class AuthorScenarioTests
     }
 
     [Theory]
-    [InlineData("formatVersion", "2")]
+    [InlineData("formatVersion", "1")]
+    [InlineData("formatVersion", "99")]
     [InlineData("formatVersion", "null")]
     [InlineData("synthetic", "false")]
     [InlineData("target", "\"missing\"")]
@@ -253,6 +259,7 @@ public sealed class AuthorScenarioTests
             data => data["character"]!["stats"]!["str"] = 999,
             data => data["character"]!["stats"] = null,
             data => data["setup"]!["flags"] = null,
+            data => data["setup"]!["textVariables"] = null,
             data => data["setup"]!["future"] = true,
             data => data["setup"]!["inventory"] = JsonNode.Parse("""[{"character":"player","item":"rope","quantity":-1}]"""),
             data => data["setup"]!["stats"] = JsonNode.Parse("""[{"character":"guide","stat":"str","value":2},{"character":"guide","stat":"str","value":3}]"""),
@@ -288,7 +295,7 @@ public sealed class AuthorScenarioTests
         {
             flags.Add($"flag{index}", true);
         }
-        data["setup"] = JsonNode.Parse("""{"flags":{},"variables":{},"standings":{},"stats":[],"inventory":[]}""");
+        data["setup"] = JsonNode.Parse("""{"flags":{},"variables":{},"textVariables":{},"standings":{},"stats":[],"inventory":[]}""");
         data["setup"]!["flags"] = flags;
         Assert.Contains("Unknown setup flag", Assert.Throws<ArgumentException>(() =>
             AuthorScenario.Import(Story(), Bytes(data), Extensions)).Message);

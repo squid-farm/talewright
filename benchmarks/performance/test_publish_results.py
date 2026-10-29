@@ -184,7 +184,8 @@ class PublishResultsTests(unittest.TestCase):
             self.assertIn("[42]", index)
             self.assertTrue((history / "reports" / "42-2.md").is_file())
 
-            legacy = {
+            unsupported = {
+                "schemaVersion": 1,
                 "runId": "local-interrupted",
                 "runAttempt": 1,
                 "createdAt": "2026-01-01T00:00:00Z",
@@ -192,13 +193,65 @@ class PublishResultsTests(unittest.TestCase):
                 "completedBoundaryCases": [{}] * 14,
             }
             (history / "runs" / "local-interrupted.json").write_text(
-                json.dumps(legacy), encoding="utf-8"
+                json.dumps(unsupported), encoding="utf-8"
             )
             update_history(history, run, report)
             index = (history / "index.md").read_text(encoding="utf-8")
-            self.assertIn("| 59 |", index)
-            self.assertIn("(reports/local-interrupted.md)", index)
+            self.assertNotIn("| 59 |", index)
+            self.assertIn("Unsupported archived records", index)
+            self.assertNotIn("(reports/local-interrupted.md)", index)
             self.assertIn("(runs/local-interrupted.json)", index)
+            self.assertEqual(unsupported, json.loads(
+                (history / "runs" / "local-interrupted.json").read_text(encoding="utf-8")))
+
+    def test_history_links_use_actual_record_filenames_and_preserve_attempts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            inputs = root / "input"
+            inputs.mkdir()
+            history = root / "history"
+            run = collect(inputs)
+            run.update(runId="42", runAttempt=1, workflowRunUrl="")
+            report = markdown_for_run(run)
+            record = update_history(history, run, report)
+            record.rename(record.with_name("recorded-run.json"))
+            (history / "reports" / "42-1.md").rename(history / "reports" / "recorded-run.md")
+            run["runAttempt"] = 2
+            update_history(history, run, report)
+            index = (history / "index.md").read_text(encoding="utf-8")
+            self.assertIn("(reports/recorded-run.md)", index)
+            self.assertIn("(runs/recorded-run.json)", index)
+            self.assertIn("(reports/42-2.md)", index)
+            self.assertIn("(runs/42-2.json)", index)
+
+    def test_unsupported_record_versions_collections_and_job_shapes_are_archived(self):
+        for field, value in (
+            ("schemaVersion", 99),
+            ("benchmarks", None),
+            ("integrations", {}),
+            ("publications", "unreadable"),
+            ("jobResults", None),
+            ("jobResults", {}),
+        ):
+            with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                inputs = root / "input"
+                inputs.mkdir()
+                history = root / "history"
+                run = collect(inputs)
+                run.update(runId="current", workflowRunUrl="")
+                runs = history / "runs"
+                runs.mkdir(parents=True)
+                unsupported = {**run, field: value}
+                path = runs / "unsupported.json"
+                original = json.dumps(unsupported)
+                path.write_text(original, encoding="utf-8")
+                update_history(history, run, markdown_for_run(run))
+                index = (history / "index.md").read_text(encoding="utf-8")
+                self.assertIn("Unsupported archived records", index)
+                self.assertIn("[unsupported](runs/unsupported.json)", index)
+                self.assertIn("(runs/current-1.json)", index)
+                self.assertEqual(original, path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

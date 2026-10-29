@@ -18,7 +18,7 @@ public sealed class StoryHistory
 {
     public const int MaxChoices = 10_000;
     public const int MaxSaveBytes = 2 * 1024 * 1024;
-    private const int FormatVersion = 1;
+    private const int FormatVersion = 2;
     private readonly List<string> _choices = [];
     private StorySession _session;
     private List<HistoryFrame> _frames;
@@ -286,7 +286,7 @@ internal sealed class SavedHistory
     public required ulong Seed { get; init; }
     public required string[] Choices { get; init; }
     public required int Cursor { get; init; }
-    public CharacterSelection? Character { get; init; }
+    public required CharacterSelection? Character { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Summary { get; set; }
 }

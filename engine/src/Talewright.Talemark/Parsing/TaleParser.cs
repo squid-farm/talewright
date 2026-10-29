@@ -324,13 +324,9 @@ internal sealed partial class TaleParser
                 {
                     _diagnostics.Error("TW1006", "@hub needs a tag or all(tag, tag)/any(tag, tag) with distinct nonempty tags.", At(indent));
                 }
-                else if (grouped)
-                {
-                    scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, value.StartsWith("all(", StringComparison.Ordinal));
-                }
                 else
                 {
-                    scene.HubTag = value;
+                    scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, value.StartsWith("all(", StringComparison.Ordinal));
                 }
                 return true;
             case "hub-limit":
@@ -923,7 +919,6 @@ internal sealed partial class TaleParser
         public HashSet<string> Tags { get; } = [];
         public int Priority { get; set; }
         public bool Once { get; set; }
-        public string? HubTag { get; set; }
         public Talewright.Rules.Storylets.StoryletTags? Hub { get; set; }
         public int? HubLimit { get; set; }
         public HashSet<string> HubDirectives { get; } = [];
@@ -951,7 +946,6 @@ internal sealed partial class TaleParser
             Tags = Tags,
             Priority = Priority,
             Once = Once,
-            HubTag = HubTag,
             Hub = Hub,
             HubLimit = HubLimit,
             EntryEffects = EntryEffects,
