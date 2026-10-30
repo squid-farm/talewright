@@ -14,7 +14,7 @@ public sealed partial class ServerTests
             Manifest.Replace("first-name: Ada", "first-name: Mara, last-name: Burns, pronouns: she"));
         var initialized = await client.Initialize();
         Assert.True(initialized.GetProperty("result").GetProperty("capabilities").GetProperty("inlayHintProvider").GetBoolean());
-        const string text = "=== start\r\n🦑 **{player:name#upper}** {player:pronoun#object#capitalize}\r\n-> END\r\n";
+        const string text = "=== start\r\n🦑 **{player:name#upper}** {player:pronoun:object#capitalize}\r\n-> END\r\n";
         await client.Open("start.tale", text, 1);
         var hints = (await Hints(client)).GetProperty("result").EnumerateArray().ToArray();
         Assert.Equal(["\"MARA BURNS\"", "\"Her\""], hints.Select(hint => hint.GetProperty("label").GetString()));
@@ -46,7 +46,7 @@ public sealed partial class ServerTests
             rootUri = new Uri(client.Root).AbsoluteUri,
             capabilities = new { workspace = new { inlayHint = new { refreshSupport = true } } },
         });
-        await client.Open("start.tale", "=== start\n{player:pronoun#object}\n-> END\n", 1);
+        await client.Open("start.tale", "=== start\n{player:pronoun:object}\n-> END\n", 1);
         var refresh = await client.Next(message => message.TryGetProperty("method", out var method) &&
             method.GetString() == "workspace/inlayHint/refresh");
         Assert.Equal("\"them\"", (await Hints(client)).GetProperty("result")[0].GetProperty("label").GetString());
