@@ -150,11 +150,13 @@ it runs normal triggers/leveling against existing rising-edge memory after the c
 field keys (`flag:`, `var:`, `faction:`, `stat:`, `inventory:`) to distinguish character IDs
 from other editable fields.
 
-Presentation refresh renders current text and reevaluates choice/storylet eligibility and
-ordinary diverts without entering the scene, duplicating visits/effects or rolling dice.
-For an entry check, the already resolved continuation is retained even if edited state would
-produce a different outcome now. Its original notes and incoming transition notes remain visible.
-An edit leaving no live continuation is explicitly rejected; use fresh-world setup instead.
+Presentation refresh does not enter the scene, duplicate visits/effects or roll dice.
+Steps up to and including the scene's last executed effect batch or entry check keep their
+recorded text, branch decisions, notes and check continuation; refresh emits no new decisions
+for them. Steps after that point reevaluate against edited state: text, block conditions,
+diverts, choices and hub storylet eligibility. Incoming transition notes remain visible.
+Refresh rejects reaching an effect or check that did not run, and an edit leaving no live
+continuation; use fresh-world setup instead.
 
 `Jump(target)` uses normal scene entry on the existing session, unlike `JumpFresh`.
 The runtime rejects ended-session edits/jumps rather than clearing `IsEnded`.

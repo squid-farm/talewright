@@ -139,7 +139,9 @@ public sealed class AuthorTimelineTests
         var originalEvents = session.Events.ToArray();
         var originalRolls = session.State.RollCount;
         session.Edit(new() { Variables = new Dictionary<VarId, int> { [new("count")] = 30 } });
-        Assert.Contains("Target 30.", session.Current.Document.ToPlainText());
+        // The text ran before the check, so the edit (after the check) does not rewrite it.
+        Assert.Contains("Target 3.", session.Current.Document.ToPlainText());
+        Assert.DoesNotContain("Target 30.", session.Current.Document.ToPlainText());
         Assert.Equal(originalRolls, session.State.RollCount);
         Assert.Equal(originalEvents, session.Events.Take(originalEvents.Length));
         Assert.Single(session.Events.OfType<DiceRolled>());
@@ -356,7 +358,7 @@ public sealed class AuthorTimelineTests
         Assert.Equal(session.Events, candidate.Events);
         Assert.Equal(session.Commands, candidate.Commands);
         Assert.Equal(session.Cursor, candidate.Cursor);
-        Assert.Contains("Updated 50.", candidate.Current.Document.ToPlainText());
+        Assert.Contains("Updated 13.", candidate.Current.Document.ToPlainText());
         Assert.Equal(1, candidate.State.RollCount);
         Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
         candidate.Back();

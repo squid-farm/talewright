@@ -294,7 +294,69 @@ public sealed class OrderedSceneTests
     }
 
     [Fact]
-    public void Live_edit_does_not_reroll_checks_and_rejects_newly_reached_checks_atomically()
+    public void Live_edit_keeps_a_guard_decided_before_its_own_effect_and_refreshes_later_text_and_choices()
+    {
+        var story = Compile("""
+            === start
+            {if not flag:ready}
+            ~ set flag:ready
+            You take the relic.
+            {/if}
+            Gold {var:gold}.
+            * [Spend] (requires: var:gold > 10) -> start
+            * [Wait] -> start
+            """);
+        var session = AuthorSession.Create(story, story.Start, captureDecisions: true);
+        Assert.Equal(["Wait"], session.Current.Choices.Select(choice => choice.Text));
+        session.Edit(new() { Variables = new Dictionary<VarId, int> { [new("gold")] = 20 } });
+        var text = Text(session.Current);
+        Assert.Contains("You take the relic.", text);
+        Assert.Contains("Gold 20.", text);
+        Assert.Equal(["Spend", "Wait"], session.Current.Choices.Select(choice => choice.Text));
+        Assert.Single(session.Decisions, decision => decision.Kind == DecisionKind.Branch);
+    }
+
+    [Fact]
+    public void Live_edit_does_not_rewrite_text_shown_before_an_effect()
+    {
+        var story = Compile("""
+            === start
+            Before {var:gold}.
+            ~ var:gold += 1
+            After {var:gold}.
+            * [Wait] -> start
+            """);
+        var session = AuthorSession.Create(story, story.Start, captureDecisions: true);
+        session.Edit(new() { Variables = new Dictionary<VarId, int> { [new("gold")] = 50 } });
+        var text = Text(session.Current);
+        Assert.StartsWith("Before 10.", text);
+        Assert.Contains("After 50.", text);
+        Assert.DoesNotContain("Before 50.", text);
+    }
+
+    [Fact]
+    public void Live_edit_rejects_newly_reached_effects_atomically()
+    {
+        var story = Compile("""
+            === start
+            {if flag:ready}
+            ~ var:gold += 5
+            {/if}
+            * [Wait] -> start
+            """);
+        var session = AuthorSession.Create(story, story.Start, captureDecisions: true);
+        var before = session.Events.ToArray();
+        var error = Assert.Throws<InvalidOperationException>(() => session.Edit(new()
+        {
+            Flags = new Dictionary<FlagId, bool> { [new("ready")] = true },
+        }));
+        Assert.Contains("did not run in this passage", error.Message);
+        Assert.Equal(before, session.Events);
+        Assert.Equal(10, session.State.GetVariable(new("gold")));
+    }
+
+    [Fact]
+    public void Live_edit_rejects_newly_reached_checks_atomically()
     {
         var story = Compile("""
             === start
@@ -313,7 +375,7 @@ public sealed class OrderedSceneTests
         {
             Flags = new Dictionary<FlagId, bool> { [new("ready")] = true },
         }));
-        Assert.Contains("unresolved entry check", error.Message);
+        Assert.Contains("did not run in this passage", error.Message);
         Assert.Equal(before, session.Events);
         Assert.Same(frame, session.Current);
         Assert.Equal(0, session.State.RollCount);

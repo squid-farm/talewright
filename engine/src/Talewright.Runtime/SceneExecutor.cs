@@ -18,17 +18,35 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 {
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _notes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DivertTarget?> _checks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _prose = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, bool> _branches = new(StringComparer.Ordinal);
+    private readonly List<string> _visits = [];
+    private readonly HashSet<string> _settled = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Runs a scene. A refresh (author live edit) keeps every step up to the scene's last executed effect batch or
+    /// check as recorded, and reevaluates only the steps after it, so an edit cannot rewrite text or branch decisions
+    /// that ran before that state existed. Reaching an effect or check that never ran is rejected.
+    /// </summary>
     public SceneExecution Run(SceneDefinition scene, bool refresh = false)
     {
         if (!refresh)
         {
             _notes.Clear();
             _checks.Clear();
+            _prose.Clear();
+            _branches.Clear();
+            _visits.Clear();
+            _settled.Clear();
         }
         var blocks = new List<RenderedBlock>();
         var choices = new List<OfferedSceneChoice>();
         var target = Execute(scene.Steps, blocks, choices, refresh, out _);
+        if (!refresh && rememberEntry)
+        {
+            var lastBatch = _visits.FindLastIndex(id => _notes.ContainsKey(id));
+            _settled.UnionWith(_visits.Take(lastBatch + 1));
+        }
         return new(blocks, choices, target);
     }
 
@@ -44,10 +62,22 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 Skip(step, stopReason);
                 continue;
             }
+            var settled = refresh && _settled.Contains(step.Id);
+            if (!refresh && rememberEntry)
+            {
+                _visits.Add(step.Id);
+            }
             switch (step)
             {
                 case ProseStep prose:
-                    blocks.AddRange(renderer.Render([prose.Block], log.State).Blocks);
+                    if (settled)
+                    {
+                        blocks.AddRange(_prose[step.Id]);
+                        break;
+                    }
+                    var rendered = renderer.Render([prose.Block], log.State).Blocks;
+                    if (!refresh && rememberEntry) _prose[step.Id] = rendered;
+                    blocks.AddRange(rendered);
                     break;
                 case EffectStep effect:
                     if (!refresh)
@@ -60,16 +90,26 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     }
                     else
                     {
-                        blocks.AddRange(_notes.GetValueOrDefault(step.Id) ?? []);
+                        RequireSettled(settled);
+                        blocks.AddRange(_notes[step.Id]);
                     }
                     break;
                 case ConditionalStep branch:
-                    var applies = Test(branch.Condition, out var trace);
-                    Observe(DecisionKind.Branch, step.Id,
-                        applies ? DecisionOutcome.Passed : DecisionOutcome.Failed,
-                        applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, log.Events.Count);
-                    foreach (var skipped in applies ? branch.Else : branch.Then)
-                        Skip(skipped, DecisionReason.ConditionFalse);
+                    bool applies;
+                    if (settled)
+                    {
+                        applies = _branches[step.Id];
+                    }
+                    else
+                    {
+                        applies = Test(branch.Condition, out var trace);
+                        if (!refresh && rememberEntry) _branches[step.Id] = applies;
+                        Observe(DecisionKind.Branch, step.Id,
+                            applies ? DecisionOutcome.Passed : DecisionOutcome.Failed,
+                            applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, log.Events.Count);
+                        foreach (var skipped in applies ? branch.Else : branch.Then)
+                            Skip(skipped, DecisionReason.ConditionFalse);
+                    }
                     target = Execute(applies ? branch.Then : branch.Else, blocks, choices, refresh, out stopReason);
                     break;
                 case ChoiceStep choice:
@@ -100,9 +140,9 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     }
                     else
                     {
-                        if (!_checks.TryGetValue(step.Id, out target))
-                            throw new InvalidOperationException("This edit reaches an unresolved entry check. Start a fresh scene with prerequisite overrides instead.");
-                        blocks.AddRange(_notes.GetValueOrDefault(step.Id) ?? []);
+                        RequireSettled(settled);
+                        target = _checks[step.Id];
+                        blocks.AddRange(_notes[step.Id]);
                     }
                     stopReason = DecisionReason.EntryCheck;
                     break;
@@ -129,6 +169,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         Observe(DecisionKind.CheckOutcome, stepId, DecisionOutcome.Applied,
             result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
         return outcome.Divert;
+    }
+
+    private static void RequireSettled(bool settled)
+    {
+        if (!settled)
+        {
+            throw new InvalidOperationException("This edit reaches an effect or check that did not run in this passage. Start a fresh scene with prerequisite overrides instead.");
+        }
     }
 
     private bool Test(Expr? expression, out ExpressionTrace? trace) =>

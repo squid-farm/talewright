@@ -83,9 +83,12 @@ viewer explains that instead of guessing a file. Source viewing is debugger-only
 Open **Live edit values**, enable the fields you want to change, and click **Apply live edit batch**.
 You can change declared flags, integer or text variables, faction standing, and every character's base stats
 and inventory. Quantities are absolute; zero removes an item. Stats use normal bounds.
-The whole batch is applied together, then normal triggers and leveling run. Text and choices refresh
-without repeating entry effects, visits or entry-check dice. An already resolved entry check keeps
-its original continuation; edits do not change that historical outcome.
+The whole batch is applied together, then normal triggers and leveling run. The edit happens at the
+passage's current point, after its lines ran. Everything up to the passage's last `~` effect line or
+entry check keeps what was shown and decided: text, `{if}` branches, effect notes and the check's
+continuation. Later text, `{if}` conditions, `->` diverts and choices refresh with the edited values,
+without repeating entry effects, visits or entry-check dice. If refreshing would reach an effect or
+check that did not run, the edit is rejected; use fresh-world prerequisite overrides instead.
 
 **Command history and consequences** shows before/actual-after values (including clamping), trigger
 firings and all other resulting events. Fields reset to actual values after success. Invalid edits
