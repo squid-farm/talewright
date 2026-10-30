@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { releaseIdentity } from './release-identity.mjs';
 
 test('VSIX contains exactly the distributable assets', async () => {
-  const archive = fileURLToPath(new URL('../artifacts/talewright.vsix', import.meta.url));
+  const target = process.env.TALEWRIGHT_VSIX_TARGET || 'linux-x64';
+  const packageName = target === 'linux-x64' ? 'talewright.vsix' : `talewright-${target}.vsix`;
+  const archive = fileURLToPath(new URL(`../artifacts/${packageName}`, import.meta.url));
   const entries = execFileSync('unzip', ['-Z1', archive], { encoding: 'utf8' }).trim().split('\n').sort();
   const release = releaseIdentity();
   assert.deepEqual(entries.filter(entry => !entry.startsWith('extension/server/')), [
@@ -38,7 +40,7 @@ test('VSIX contains exactly the distributable assets', async () => {
     }
   }
   const vsixManifest = execFileSync('unzip', ['-p', archive, 'extension.vsixmanifest'], { encoding: 'utf8' });
-  assert.ok(vsixManifest.includes('TargetPlatform="linux-x64"'));
+  assert.ok(vsixManifest.includes(`TargetPlatform="${target}"`));
   assert.equal(vsixManifest.includes('Id="Microsoft.VisualStudio.Code.PreRelease" Value="true"'),
     release?.prerelease ?? false);
   const verifier = fileURLToPath(new URL('../../../.github/scripts/verify_release_vsix.py', import.meta.url));
@@ -52,6 +54,7 @@ test('VSIX contains exactly the distributable assets', async () => {
     if (directory && !entry.dev) assert.ok(notices.includes(`${directory} @ ${entry.version}`), `Missing notice for ${directory}`);
   }
   const readme = execFileSync('unzip', ['-p', archive, 'extension/readme.md'], { encoding: 'utf8' });
+  assert.ok(readme.includes('Provisional platform support'), 'Marketplace README must disclose validation limits');
   assert.ok(readme.includes('https://github.com/squid-farm/talewright/blob/main/docs/reference/talemark-syntax.md'));
   const links = readme.match(/https?:\/\/[^\s)]+/g) ?? [];
   assert.ok(links.every(link => !link.includes('/../')), 'Packaged links must not escape the repository URL');

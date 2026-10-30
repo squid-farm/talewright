@@ -36,6 +36,9 @@ def request(method, url, payload=None, *, binary=False, missing_ok=False):
 
 def publish(vsix, tag, sha, repository, additional_assets=()):
     identity = verify_vsix(vsix, tag)
+    for path in additional_assets:
+        if Path(path).suffix == ".vsix":
+            verify_vsix(path, tag)
     base = f"{API}/repos/{repository}"
     commit = request("GET", f"{base}/commits/{quote(tag, safe='')}")
     if commit["sha"] != sha:
@@ -47,11 +50,15 @@ def publish(vsix, tag, sha, repository, additional_assets=()):
         })
         body = (
             "## For authors\n\n"
-            "Install the Linux x64 VS Code extension from the attached VSIX or the "
+            "Install the VS Code extension for your platform from the attached VSIX or the "
             "[Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright)"
             + (" (select **Switch to Pre-Release Version**)" if identity["prerelease"] else "")
             + ". NuGet packages use version `" + identity["nuget"] + "`; the extension uses `"
             + identity["vscode"] + "`.\n\n"
+            "**Platform support:** Linux x64 is runtime-tested. Windows x64/ARM64, macOS "
+            "Intel/Apple Silicon and Linux ARM64 are provisional: their self-contained packages "
+            "are cross-built and inspected, but installed-editor execution is not yet verified. "
+            "Please report platform-specific failures; these packages do not imply full support.\n\n"
             "GitHub's **Source code (zip)** and **Source code (tar.gz)** downloads below are "
             "the tagged source. Self-contained CLI archives and checksums are attached separately; "
             "player binaries are not included. See "

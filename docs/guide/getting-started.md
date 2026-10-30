@@ -29,10 +29,14 @@ text for both files.
 
 ## 2. Set up your editor
 
-The current Talewright extension supports **Linux computers with Intel or AMD 64-bit processors
-(Linux x64)**. It is tested on Ubuntu 24.04 and Linux Mint 22.3. Windows, Mac, Linux ARM and
-browser-hosted VS Code are not supported by this extension release. On those systems, use a
-plain-text editor and the browser player, or the separate story tools described below.
+The Talewright extension is runtime-tested on **Linux computers with Intel or AMD 64-bit processors
+(Linux x64)**, using Ubuntu 24.04 and Linux Mint 22.3. Packages for Windows x64/ARM64,
+Mac (Intel and Apple Silicon) and Linux ARM64 are also available with **provisional support**:
+they are built and inspected, but have not yet been verified running in the installed editor on
+those systems. Please report platform-specific failures. The Marketplace chooses the matching
+package automatically, including for a remote extension host.
+Browser-hosted VS Code and Alpine Linux are not supported; use a plain-text editor and the browser
+player instead.
 
 1. Install [VS Code](https://code.visualstudio.com/).
 2. In **Extensions**, install **Talewright** by **squid-farm** from

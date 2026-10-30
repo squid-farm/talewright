@@ -9,7 +9,7 @@ build, assembly discovery, or gameplay execution is involved.
 
 ## Install and launch
 
-The Linux x64 VS Code extension bundles a compatible self-contained server; normal VS Code
+Each platform-specific VS Code extension bundles a compatible self-contained server; normal VS Code
 installation does **not** require .NET or a separate tool. See the
 [extension README](../../tooling/vscode-talewright/README.md) for supported system libraries.
 
@@ -31,7 +31,10 @@ dotnet tooling/language-server/src/Talewright.LanguageServer/bin/Release/net10.0
 ```
 
 Install the VSIX as described in its [README](../../tooling/vscode-talewright/README.md).
-The Linux x64 client defaults to its bundled server. To explicitly use a development build, configure:
+The client defaults to its matching bundled server. Linux x64 is runtime-tested; Windows
+x64/ARM64, macOS Intel/Apple Silicon and Linux ARM64 are provisionally supported through
+cross-built, inspected packages, not installed-editor runtime verification.
+To explicitly use a development build, configure:
 
 ```json
 {

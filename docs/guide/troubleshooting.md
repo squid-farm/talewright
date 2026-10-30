@@ -15,7 +15,7 @@ top level or inside a single folder.
 - Live checks only run in a trusted folder. If VS Code shows **Restricted Mode** in the bottom-left
   corner, select it and choose **Trust**. Checking starts straight away.
 - Open **View > Output** and choose **Talewright Language Server** from the list to see why the
-  live checker did not start. The current extension supports Linux x64 only.
+  live checker did not start. Only Linux x64 is runtime-tested; please report failures on other systems.
 - **Talewright: Validate Story** in the Command Palette uses the separate CLI, not the live checker.
   Run **Talewright: Set Up CLI** first if VS Code says the CLI is missing.
 

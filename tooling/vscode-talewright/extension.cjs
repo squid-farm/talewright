@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 const path = require('node:path');
-const { accessSync, constants } = require('node:fs');
+const { accessSync, constants, readFileSync } = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { registerAuthorActions } = require('./author-actions.cjs');
 
@@ -43,10 +43,14 @@ async function startLanguageServer(context) {
   context.subscriptions.push(outputChannel);
   try {
     if (!command) {
-      if (process.platform !== 'linux' || process.arch !== 'x64') {
-        throw new Error('The bundled server supports Linux x64 only. Use a Linux x64 VS Code host or configure an explicit development server.');
+      const target = `${process.platform}-${process.arch}`;
+      const metadata = JSON.parse(readFileSync(path.join(context.extensionPath, 'server', 'talewright-server.json'), 'utf8'));
+      if (!['linux-x64', 'linux-arm64', 'win32-x64', 'win32-arm64', 'darwin-x64', 'darwin-arm64'].includes(target)
+          || metadata.target !== target) {
+        throw new Error(`The bundled server does not match this VS Code host (${target}). Install the matching platform VSIX or configure an explicit development server.`);
       }
-      command = path.join(context.extensionPath, 'server', 'Talewright.LanguageServer');
+      command = path.join(context.extensionPath, 'server',
+        `Talewright.LanguageServer${process.platform === 'win32' ? '.exe' : ''}`);
       accessSync(command, constants.X_OK);
     }
     client = new LanguageClient('talewright', 'Talewright', {
@@ -74,7 +78,7 @@ async function startLanguageServer(context) {
   } catch (error) {
     outputChannel.appendLine(String(error));
     vscode.window.showErrorMessage(
-      `Talewright language server could not start: ${error.message}. Check the Linux x64 system prerequisites and reinstall the VSIX if bundled files are missing. For development, configure talewright.languageServer.command. See the Talewright Language Server output.`);
+      `Talewright language server could not start: ${error.message}. Check your platform's system prerequisites and reinstall the VSIX if bundled files are missing. For development, configure talewright.languageServer.command. See the Talewright Language Server output.`);
   }
 }
 
