@@ -6,7 +6,8 @@ everyone here.
 ## Playtesters
 
 - **Felix**: first outside playtester, at age 11. He worked through the getting-started guide and
-  wrote _The Night Ferry_, then reported what got in his way. Because of him, the guide now:
+  wrote _The Night Ferry_, then reported what got in his way. He even made his own extra scenes!
+  Because of him, the guide now:
   - Explains story folders and file types first
   - Says where to find the Command Palette.
   - Live checking starts as soon as you trust a folder
