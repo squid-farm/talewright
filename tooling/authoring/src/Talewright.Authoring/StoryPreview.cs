@@ -69,11 +69,14 @@ public static class StoryPreview
 
         var value = ExpressionEvaluator.Evaluate(template.Value, context).ToString();
         var steps = new List<PreviewStep> { new("Input", value) };
-        var plural = template.Value is PronounRef pronoun
-            ? context.State.GetCharacterDefinition(pronoun.Character).Pronouns.Agreement ==
-              Talewright.Core.World.GrammaticalNumber.Plural
-            : template.IsPlural;
-        var modifierContext = new ModifierContext(EnglishGrammar.Instance, plural);
+        var item = template.Value is ItemNameRef itemName ? context.State.World.Items[itemName.Item] : null;
+        var plural = item is not null
+            ? item.NameAgreement == Talewright.Core.World.GrammaticalNumber.Plural
+            : template.Value is PronounRef pronoun
+                ? context.State.GetCharacterDefinition(pronoun.Character).Pronouns.Agreement ==
+                  Talewright.Core.World.GrammaticalNumber.Plural
+                : template.IsPlural;
+        var modifierContext = new ModifierContext(EnglishGrammar.Instance, plural, item?.Uncountable ?? false);
         foreach (var modifier in template.Modifiers)
         {
             value = modifier.Apply(value, modifierContext);

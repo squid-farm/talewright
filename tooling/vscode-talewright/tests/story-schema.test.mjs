@@ -72,6 +72,22 @@ test('player declarations may be in the root or a supporting configuration file'
   assertValid(validateManifest, { items: { coin: 'Coin' } }, 'item fragment');
 });
 
+test('item grammar has explicit enum/boolean values and independent defaults', () => {
+  const item = compileSubschema(schema.definitions.itemValue);
+  for (const value of ['sword', {}, { name: 'armor', uncountable: true },
+    { name: 'pants', 'name-agreement': 'plural' },
+    { name: 'pair of boots', 'name-agreement': 'singular', uncountable: false }]) {
+    assertValid(item, value, JSON.stringify(value));
+  }
+  for (const value of [{ 'name-agreement': 'many' }, { 'name-agreement': true },
+    { 'name-agreement': ['singular'] }, { uncountable: 'sometimes' },
+    { uncountable: 1 }, { uncountable: {} }]) {
+    assertInvalid(item, value, JSON.stringify(value));
+  }
+  assert.equal(schema.definitions.item.properties['name-agreement'].default, 'singular');
+  assert.equal(schema.definitions.item.properties.uncountable.default, false);
+});
+
 test('compiler, schema, and editor grammar accept the same identifiers', async () => {
   const pattern = schema.definitions.identifier.pattern;
   assert.ok(pattern.startsWith('^') && pattern.endsWith('$'), 'schema identifier pattern must be anchored');
@@ -118,7 +134,8 @@ test('schema validates complete and contextual documented manifest examples', as
   const fragmentExamples = [
     ['docs/reference/talemark-syntax.md', 2, 'pronouns'],
     ['docs/reference/talemark-syntax.md', 3, 'creation'],
-    ['docs/reference/talemark-syntax.md', 4, 'vars'],
+    ['docs/reference/talemark-syntax.md', 4, 'items'],
+    ['docs/reference/talemark-syntax.md', 5, 'vars'],
     ['docs/guide/writing-stories.md', 0, 'characters'],
     ['docs/guide/writing-stories.md', 1, 'items'],
     ['docs/guide/writing-stories.md', 2, 'vars'],

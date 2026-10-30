@@ -59,7 +59,8 @@ For a complete two-branch example, see [change a name in one place](authoring-re
 For wording that changes with a character's chosen pronouns, supply both forms:
 `{player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} arrived.`
 The first form is singular agreement; the second is plural agreement, including
-singular they. This selector works on pronouns only, not names or items.
+singular they. This selector also works on item names using their declared grammar,
+not on character names or arbitrary text.
 Scene titles are literal text, so use neutral titles such as "Ask your guide
 about the temple"; put `{guide:first-name}` in prose and choice labels instead.
 For recurring item names, use `{item:relic}` rather than repeating the display
@@ -96,6 +97,8 @@ Change stats with effects: `~ player:hp -= 2` on its own line when a scene start
 items:
   rope:  { name: coil of rope }
   charm: { name: jade charm, modifiers: { wis: 2 } }   # carrying it gives +2 Wisdom
+  pants: { name: pants, name-agreement: plural }
+  armor: { name: armor, uncountable: true }
 ```
 
 ```tale
@@ -103,6 +106,13 @@ items:
 * [Climb down] (requires: player has rope) -> cellar
 * [Trade the charm] { take player charm; give player rope } -> market
 ```
+
+For prose, `{item:pants#that#capitalize} {item:pants#one-many("is", "are")} expensive.`
+gives "Those pants are expensive." `#a` produces "some pants" or "some armor";
+`#the` always adds "the". Uncountable armor still takes "this armor is".
+The defaults are singular agreement and countable names, independent of inventory
+quantity. Copying an item's name into a text variable copies text only.
+See the [item-name grammar table](../reference/talemark-syntax.md#item-name-grammar).
 
 ## Variables and flags
 

@@ -43,7 +43,7 @@ public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInl
 /// </summary>
 /// <param name="Value">Expression producing the value.</param>
 /// <param name="Modifiers">Resolved modifiers applied left to right.</param>
-/// <param name="IsPlural">Grammatical number of the value (for possessives), decided at compile time.</param>
+/// <param name="IsPlural">Grammatical number of the value. Pronoun and item references resolve their original grammar from state at render time.</param>
 public sealed record SubstitutionTemplate(Expr Value, IReadOnlyList<ITextModifier> Modifiers, bool IsPlural = false) : TemplateInline;
 
 /// <summary>Inline conditional inside a paragraph.</summary>

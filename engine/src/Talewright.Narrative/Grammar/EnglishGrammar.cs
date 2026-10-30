@@ -35,7 +35,7 @@ public sealed class EnglishGrammar : IGrammar
             return word;
         }
 
-        return isPlural && word.EndsWith('s') ? word + "'" : word + "'s";
+        return isPlural && word.EndsWith("s", StringComparison.OrdinalIgnoreCase) ? word + "'" : word + "'s";
     }
 
     public string WithIndefiniteArticle(string phrase)

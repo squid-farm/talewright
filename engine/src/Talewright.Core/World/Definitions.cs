@@ -24,7 +24,13 @@ public sealed record CharacterDefinition(
 }
 
 /// <summary>An item that can be held. Items held by a character apply their <see cref="Modifiers"/> to that character's stats.</summary>
-public sealed record ItemDefinition(ItemId Id, string Name, IReadOnlyDictionary<StatId, int> Modifiers);
+/// <remarks>Name agreement is independent of inventory quantity. Uncountable names take some instead of a/an, without implying plural agreement.</remarks>
+public sealed record ItemDefinition(
+    ItemId Id,
+    string Name,
+    IReadOnlyDictionary<StatId, int> Modifiers,
+    GrammaticalNumber NameAgreement = GrammaticalNumber.Singular,
+    bool Uncountable = false);
 
 /// <summary>A faction the player can stand well or badly with.</summary>
 public sealed record FactionDefinition(FactionId Id, string Name, int InitialStanding);

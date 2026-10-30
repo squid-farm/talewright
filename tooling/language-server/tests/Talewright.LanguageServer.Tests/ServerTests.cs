@@ -81,6 +81,25 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Item_selector_diagnostics_clear_but_plain_text_is_not_an_item()
+    {
+        await using var client = new Client();
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "items: {rope: Rope}\n");
+        await client.Initialize();
+        await client.Open("start.tale", "=== start\n{item:rope#one-many(\"is\")}\n-> END", 1);
+        Assert.Contains(await client.Diagnostics("start.tale", 1),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2006");
+        await client.Change("start.tale",
+            "=== start\n{item:rope#that#capitalize} {item:rope#one-many(\"is\", \"are\")} here.\n-> END", 2);
+        Assert.Empty(await client.Diagnostics("start.tale", 2));
+        await client.Change("start.tale",
+            "=== start\n~ var:word = item:rope\n{var:word#one-many(\"is\", \"are\")}\n-> END", 3);
+        var error = Assert.Single(await client.Diagnostics("start.tale", 3));
+        Assert.Equal("TW2006", error.GetProperty("code").GetString());
+        Assert.Contains("pronoun or item-name references only", error.GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task Pronoun_property_diagnostics_clear_in_unsaved_text_expressions()
     {
         await using var client = new Client();

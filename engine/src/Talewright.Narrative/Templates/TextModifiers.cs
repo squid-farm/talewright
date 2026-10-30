@@ -2,8 +2,8 @@ using Talewright.Narrative.Grammar;
 
 namespace Talewright.Narrative.Templates;
 
-/// <summary>What a modifier knows besides the text it transforms.</summary>
-public sealed record ModifierContext(IGrammar Grammar, bool IsPlural);
+/// <summary>Grammar of the original substitution value, retained throughout the modifier chain.</summary>
+public sealed record ModifierContext(IGrammar Grammar, bool IsPlural, bool IsUncountable = false);
 
 /// <summary>
 /// A <c>#modifier</c> in a substitution. Register custom ones in <see cref="TextModifierRegistry"/>
@@ -44,7 +44,10 @@ public sealed class TextModifierRegistry
         new DelegateTextModifier("capitalize", (t, c) => c.Grammar.Capitalize(t)),
         new DelegateTextModifier("upper", (t, _) => t.ToUpperInvariant()),
         new DelegateTextModifier("lower", (t, _) => t.ToLowerInvariant()),
-        new DelegateTextModifier("a", (t, c) => c.Grammar.WithIndefiniteArticle(t)),
+        new DelegateTextModifier("a", (t, c) => c.IsPlural || c.IsUncountable ? "some " + t : c.Grammar.WithIndefiniteArticle(t)),
+        new DelegateTextModifier("the", (t, _) => "the " + t),
+        new DelegateTextModifier("this", (t, c) => (c.IsPlural ? "these " : "this ") + t),
+        new DelegateTextModifier("that", (t, c) => (c.IsPlural ? "those " : "that ") + t),
     ];
 
     public static TextModifierRegistry CreateDefault()

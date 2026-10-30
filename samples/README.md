@@ -55,7 +55,8 @@ split settings, how global IDs work and why triggers stay together.
 | Intersection hub and empty-hub fallback | Trader `camp.supplies` uses `all(camp,records)` to offer the unsigned register; if it is already signed, Continue returns to camp |
 | Give items, counted inventory, item stat modifiers | Trader gives rope, charm (+2 WIS) and two rations; relic adds +2 CHA |
 | Arithmetic, assignment/subtraction, numeric equality/inequality | Ines in `dream.ines` computes `((6 + 2) * 3 / 2 - 1) - 1 = 10` and pays off Tomas's rumor; `supplies` still increments at camp |
-| All five pronoun forms, names, chained modifiers, literal braces | `camp.register`: uppercase/full names, subject/object/possessive/independent/reflexive, `#capitalize`, `#a#capitalize`, escaped braces |
+| All five pronoun forms, names, chained modifiers, literal braces | `camp.register`: uppercase/full names, subject/object/possessive/independent/reflexive, `#capitalize`, escaped braces |
+| Explicit item wording helpers | Opening uses `#a` and `#the`; `camp.register` uses `#a#capitalize`, `#this` and item `#one-many`. Defaults stay singular; see the [plural/uncountable table](../docs/reference/talemark-syntax.md#item-name-grammar) for item declarations. Inventory quantity never changes name grammar. |
 | Pronoun agreement selector and possessives | Opening uses `{player:pronoun#one-many("has", "have")}` for singular they as well as she/he; `{player:last-name#possessive}` renders "Burns's" |
 | Recurring-name substitutions | `{guide:first-name}`, `{item:relic}`, `{item:journal}` and other references keep prose tied to settings; scene titles use neutral wording because titles are literal |
 | Text declarations, copying, empty text, equality/inequality | `camp.watchword*`: record a phrase, keep/change/retire it; `watch-note` keeps the copied value |

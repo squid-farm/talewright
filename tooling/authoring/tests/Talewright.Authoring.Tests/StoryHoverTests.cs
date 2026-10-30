@@ -39,6 +39,7 @@ public sealed class StoryHoverTests
     [InlineData("{player:pronoun:posse|ssive-pronoun:determiner}", "Possessive pronoun properties", "possessive-pronoun")]
     [InlineData("{player:pronoun:possessive-pronoun:in|dependent}", "stands alone", "independent")]
     [InlineData("{player:pronoun#one-|many(\"has\", \"have\")}", "effective pronoun agreement", "one-many")]
+    [InlineData("{item:rope#one-|many(\"is\", \"are\")}", "item name-agreement", "one-many")]
     [InlineData("{player:pro|noun}", "gives the subject form", "pronoun")]
     [InlineData("{im|age(\"maps/camp\", \"Camp\")}", "inserts image media", "image")]
     [InlineData("-> E|ND", "Ends the story", "END")]
@@ -57,6 +58,31 @@ public sealed class StoryHoverTests
         Assert.Contains(expected, hover.PlainText);
         var line = analysis.Source.Files["main.tale"].Split('\n')[1];
         Assert.Equal(token, line[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
+    }
+
+    [Fact]
+    public void Item_grammar_keys_explain_defaults_and_quantity_independence()
+    {
+        var yaml = Manifest.Replace("items: {rope: Rope}",
+            "items:\n  rope: {name: Rope, name-agreement: plural, uncountable: false}");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n-> END",
+        });
+        var analysis = StoryAnalyzer.Analyze(source);
+        foreach (var (key, expected) in new[]
+                 {
+                     ("name-agreement", "never inventory quantity"),
+                     ("uncountable", "Does not imply plural agreement"),
+                 })
+        {
+            var before = yaml[..yaml.IndexOf(key, StringComparison.Ordinal)];
+            var lines = before.Split('\n');
+            var hover = StoryHover.Get(analysis,
+                new(StorySource.ManifestFileName, lines.Length, lines[^1].Length + 1));
+            Assert.NotNull(hover);
+            Assert.Contains(expected, hover.PlainText);
+        }
     }
 
     [Fact]
