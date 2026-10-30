@@ -3,6 +3,7 @@ using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 using Talewright.Talemark.Parsing;
 using YamlDotNet.RepresentationModel;
 
@@ -35,6 +36,7 @@ public sealed class StoryAnalysis
         Tokens = original.Tokens;
         World = original.World;
         Substitutions = original.Substitutions;
+        Scenes = original.Scenes;
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
@@ -46,6 +48,7 @@ public sealed class StoryAnalysis
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
+        Scenes = Array.AsReadOnly(collector.SceneDefinitions.ToArray());
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
@@ -57,6 +60,9 @@ public sealed class StoryAnalysis
     public IReadOnlyList<AuthoringToken> Tokens { get; }
     public WorldDefinition? World { get; }
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
+
+    /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
+    public IReadOnlyList<SceneDefinition> Scenes { get; }
 
     /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
     public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
@@ -89,6 +95,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoringToken> Tokens { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
+    internal List<SceneDefinition> SceneDefinitions { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
 
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)
