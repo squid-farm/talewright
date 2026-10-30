@@ -31,20 +31,33 @@ internal sealed class ExpressionParser
     private static readonly string[] Keywords = ["and", "or", "not", "has", "true", "false", "visited"];
 
     private readonly List<Token> _tokens;
-    private readonly SourceLocation _location;
+    private readonly Func<int, SourceLocation> _locate;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
     private int _pos;
 
-    private ExpressionParser(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
+    private ExpressionParser(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
+        Func<int, SourceLocation>? locate = null)
     {
         _tokens = Lexer.Tokenize(text);
-        _location = location;
+        _locate = locate ?? location.Offset;
         _symbols = symbols;
         _diagnostics = diagnostics;
     }
 
     private sealed class ParseException : Exception;
+
+    internal static bool ReportStringErrors(string text, Func<int, SourceLocation> locate, DiagnosticBag diagnostics)
+    {
+        var invalid = false;
+        foreach (var token in Lexer.Tokenize(text))
+        {
+            if (token.ErrorOffset is not { } offset) continue;
+            diagnostics.Error("TW1001", token.Text, locate(offset));
+            invalid = true;
+        }
+        return invalid;
+    }
 
     internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables,
         Action<string, bool, int>? declaration = null,
@@ -95,8 +108,8 @@ internal sealed class ExpressionParser
 
     /// <summary>Parses a boolean condition. Returns null (with diagnostics) on error.</summary>
     public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
-        SourceLocation? authoringLocation = null) =>
-        ParseTyped(text, location, symbols, diagnostics, ExprType.Bool, authoringLocation);
+        SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null) =>
+        ParseTyped(text, location, symbols, diagnostics, ExprType.Bool, authoringLocation, locate);
 
     /// <summary>Parses a numeric expression. Returns null (with diagnostics) on error.</summary>
     public static Expr? ParseNumber(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics) =>
@@ -118,19 +131,20 @@ internal sealed class ExpressionParser
     }
 
     /// <summary>Parses the inside of <c>{reference#modifier…}</c>.</summary>
-    public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
+    public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
+        Func<int, SourceLocation>? locate = null)
     {
         symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location);
         var tokens = Lexer.Tokenize(text);
         var hashToken = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
         var hash = hashToken < 0 ? -1 : tokens[hashToken].Offset;
         var valueText = hash < 0 ? text : text[..hash];
-        var parser = new ExpressionParser(valueText, location, symbols, diagnostics);
+        var parser = new ExpressionParser(valueText, location, symbols, diagnostics, locate);
         try
         {
             var value = parser.ParseOr();
             parser.ExpectEnd();
-            var calls = hash < 0 ? [] : ModifierCall.Scan(text, hash, location, diagnostics);
+            var calls = hash < 0 ? [] : ModifierCall.Scan(text, hash, parser._locate, diagnostics);
             if (calls is null)
             {
                 return null;
@@ -145,7 +159,7 @@ internal sealed class ExpressionParser
                     {
                         diagnostics.Error("TW2006",
                             "Use '#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on pronoun or item-name references only.",
-                            location.Offset(call.Offset));
+                            parser._locate(call.Offset));
                         return null;
                     }
 
@@ -155,13 +169,13 @@ internal sealed class ExpressionParser
 
                 if (call.Argument is not null)
                 {
-                    diagnostics.Error("TW2006", $"Modifier '#{call.Name}' does not take an argument.", location.Offset(call.Offset));
+                    diagnostics.Error("TW2006", $"Modifier '#{call.Name}' does not take an argument.", parser._locate(call.Offset));
                     return null;
                 }
 
                 if (!symbols.Modifiers.TryGet(call.Name, out var modifier))
                 {
-                    diagnostics.Error("TW2006", $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(n => "#" + n))}.", location.Offset(call.Offset));
+                    diagnostics.Error("TW2006", $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(n => "#" + n))}.", parser._locate(call.Offset));
                     return null;
                 }
 
@@ -190,7 +204,7 @@ internal sealed class ExpressionParser
     private sealed record ModifierCall(string Name, int Offset, string? Argument, string? PluralArgument)
     {
         /// <summary>Scans the modifier chain starting at the first <c>#</c>. Returns null after reporting a diagnostic.</summary>
-        public static List<ModifierCall>? Scan(string text, int start, SourceLocation location, DiagnosticBag diagnostics)
+        public static List<ModifierCall>? Scan(string text, int start, Func<int, SourceLocation> locate, DiagnosticBag diagnostics)
         {
             var calls = new List<ModifierCall>();
             var i = start;
@@ -215,14 +229,14 @@ internal sealed class ExpressionParser
                         return Error($"Write the argument to '#{name}' in double quotes, such as #{name}(\"value\").", i);
                     }
 
-                    var close = text.IndexOf('"', i + 1);
-                    if (close < 0)
+                    var literal = QuotedStringSyntax.Read(text, i, text.Length);
+                    if (literal.Error is { } error)
                     {
-                        return Error($"The argument to '#{name}' is missing its closing '\"'.", i);
+                        return Error(error, literal.ErrorOffset);
                     }
 
-                    argument = text[(i + 1)..close];
-                    i = SkipSpace(text, close + 1);
+                    argument = literal.Value;
+                    i = SkipSpace(text, literal.End);
                     if (name == "one-many")
                     {
                         if (i >= text.Length || text[i] != ',')
@@ -236,14 +250,14 @@ internal sealed class ExpressionParser
                             return Error("Write the plural (second) argument to '#one-many' in double quotes.", i);
                         }
 
-                        close = text.IndexOf('"', i + 1);
-                        if (close < 0)
+                        literal = QuotedStringSyntax.Read(text, i, text.Length);
+                        if (literal.Error is { } pluralError)
                         {
-                            return Error("The plural argument to '#one-many' is missing its closing '\"'.", i);
+                            return Error(pluralError, literal.ErrorOffset);
                         }
 
-                        pluralArgument = text[(i + 1)..close];
-                        i = SkipSpace(text, close + 1);
+                        pluralArgument = literal.Value;
+                        i = SkipSpace(text, literal.End);
                     }
                     if (i >= text.Length || text[i] != ')')
                     {
@@ -264,7 +278,7 @@ internal sealed class ExpressionParser
 
             List<ModifierCall>? Error(string message, int at)
             {
-                diagnostics.Error("TW2006", message, location.Offset(Math.Min(at, text.Length)));
+                diagnostics.Error("TW2006", message, locate(Math.Min(at, text.Length)));
                 return null;
             }
         }
@@ -284,6 +298,7 @@ internal sealed class ExpressionParser
     public static List<Effect>? ParseEffects(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
     {
         symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location);
+        if (ReportStringErrors(text, location.Offset, diagnostics)) return null;
         var parser = new ExpressionParser(text, location, symbols, diagnostics);
         try
         {
@@ -310,11 +325,11 @@ internal sealed class ExpressionParser
     }
 
     private static Expr? ParseTyped(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics, ExprType type,
-        SourceLocation? authoringLocation = null)
+        SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null)
     {
         symbols.Analysis?.Expression(type == ExprType.Bool ? ExpressionContextKind.Condition : ExpressionContextKind.Number,
             text, authoringLocation ?? location);
-        var parser = new ExpressionParser(text, location, symbols, diagnostics);
+        var parser = new ExpressionParser(text, location, symbols, diagnostics, locate);
         try
         {
             var expr = parser.ParseOr();
@@ -332,9 +347,22 @@ internal sealed class ExpressionParser
         }
     }
 
-    private Token Peek => _tokens[_pos];
+    private Token Peek
+    {
+        get
+        {
+            var token = _tokens[_pos];
+            if (token.ErrorOffset is { } offset) Fail("TW1001", token.Text, offset);
+            return token;
+        }
+    }
 
-    private Token Next() => _tokens[_pos++];
+    private Token Next()
+    {
+        var token = Peek;
+        _pos++;
+        return token;
+    }
 
     private bool IsKeyword(string keyword) => Peek.Kind == TokenKind.Identifier && Peek.Text == keyword;
 
@@ -359,7 +387,7 @@ internal sealed class ExpressionParser
     [System.Diagnostics.CodeAnalysis.DoesNotReturn]
     private void Fail(string code, string message, int offset)
     {
-        _diagnostics.Error(code, message, _location.Offset(offset));
+        _diagnostics.Error(code, message, _locate(offset));
         throw new ParseException();
     }
 

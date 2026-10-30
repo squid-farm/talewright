@@ -113,7 +113,7 @@ public sealed partial class ExpressionViewTests
     }
 
     [Fact]
-    public async Task Host_built_nodes_without_Talemark_text_render_a_fallback_and_keep_formattable_children()
+    public async Task Host_built_quoted_text_displays_escaped_Talemark_and_recorded_results()
     {
         var quoted = new TextLiteral("say \"hi\"");
         var variable = new TextVarRef(new VarId("weather"));
@@ -125,10 +125,29 @@ public sealed partial class ExpressionViewTests
 
         var html = await RenderTrace(trace);
 
-        Assert.Equal(2, Regex.Matches(html, "Talemark text unavailable: Talemark expression strings cannot contain double quotes").Count);
-        Assert.Equal([(2, "var:weather", "\"sunny\"")], Nodes(html));
+        Assert.DoesNotContain("Talemark text unavailable", html);
+        Assert.Equal([
+            (1, """var:weather == "say \"hi\"" """.TrimEnd(), "false"),
+            (2, "var:weather", "\"sunny\""),
+            (2, "\"say \\\"hi\\\"\"", "\"say \\u0022hi\\u0022\""),
+        ], Nodes(html));
         Assert.Contains(Html("\"say \\u0022hi\\u0022\""), html);
         Assert.DoesNotContain("TextLiteral", html);
+    }
+
+    [Fact]
+    public async Task Unsupported_host_built_expression_keeps_fallback_and_formattable_children()
+    {
+        var trace = new ExpressionTrace(new UnsupportedExpr(), null,
+            [new(new BoolLiteral(true), Value.Of(true), [])]);
+        var html = await RenderTrace(trace);
+        Assert.Contains("Talemark text unavailable", html);
+        Assert.Equal([(2, "true", "true")], Nodes(html));
+    }
+
+    private sealed record UnsupportedExpr : Expr
+    {
+        public override ExprType Type => ExprType.Bool;
     }
 
     private static WorkbenchModel Start(string? tale = null, string extraYaml = "")

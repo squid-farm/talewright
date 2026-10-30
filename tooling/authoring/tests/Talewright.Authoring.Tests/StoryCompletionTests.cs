@@ -93,6 +93,28 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("""{"a \" #| literal"}""")]
+    [InlineData("""{"a \\ #| literal"}""")]
+    [InlineData("""{"a \" player:| literal"}""")]
+    [InlineData("""{"a \" player:|""")]
+    [InlineData("""{"bad\q player:|"}""")]
+    [InlineData("""{player:pronoun#one-many("a \" player:|", "other")}""")]
+    public void Escaped_string_source_extents_do_not_offer_expression_completions(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        Assert.Empty(StoryCompletion.Complete(analysis, position));
+    }
+
+    [Theory]
+    [InlineData("""{("a \" # literal")#cap|}""", "capitalize")]
+    [InlineData("""{if "a \" player:" == player:fir|}yes{/if}""", "first-name")]
+    public void Escapes_do_not_hide_completions_after_the_string(string marked, string expected)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
+    }
+
+    [Theory]
     [InlineData("game:\n  start: sec|", "second")]
     [InlineData("game:\n  start: |", "second")]
     [InlineData("game:\n  start: \"sec|ond\"", "second")]

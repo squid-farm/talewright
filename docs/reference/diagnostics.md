@@ -15,7 +15,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 
 | Code | Meaning | Usual fix |
 |---|---|---|
-| TW1001 | Something unexpected in an expression, including incomplete or extra property segments. | Check spelling and operators, e.g. `player:dex >= 12`. A possessive pronoun property needs its final `:determiner` or `:independent`. |
+| TW1001 | Something unexpected in an expression, including malformed strings and incomplete or extra property segments. | Check spelling and operators, e.g. `player:dex >= 12`. Close text strings with `"`, and use only `\"` or `\\` as string escapes. A possessive pronoun property needs its final `:determiner` or `:independent`. |
 | TW1002 | A number is too large, or `@priority` isn't a whole number. | Use a whole number. |
 | TW1003 | Malformed effect. | Stats and variables use `=`, `+=` or `-=`. Flags use `set flag:x` / `clear flag:x`. |
 | TW1004 | A `{` is never closed. | Close it, or write `\{` for a literal brace. |
@@ -40,7 +40,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW2003 | Wrong kind of value, e.g. assigning text to a number, comparing text with a number, or arithmetic on text. | Keep each variable's declared type. Text uses `=` and text-to-text `==` / `!=`; numbers retain arithmetic. Declare text with a quoted initial value under `vars:`. |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |
 | TW2005 | Unknown `@predicate`. | Named predicates come from C# extensions; check the name or register it. |
-| TW2006 | Unknown or invalid `#modifier`, unsupported target or malformed modifier arguments. | Follow the modifier's documented arguments. `#one-many("singular", "plural")` requires exactly two quoted strings on a pronoun or item-name reference, with singular first. It does not work on character names, text variables or counts. `#a`, `#the`, `#this` and `#that` take no arguments. |
+| TW2006 | Unknown or invalid `#modifier`, unsupported target or malformed modifier arguments. | Follow the modifier's documented arguments. `#one-many("singular", "plural")` requires exactly two quoted strings on a pronoun or item-name reference, with singular first. Use `\"` for a quote and `\\` for a backslash inside either string. It does not work on character names, text variables or counts. `#a`, `#the`, `#this` and `#that` take no arguments. |
 | TW2007 | A variable's integer or text type cannot be inferred, e.g. a circular assignment chain without a known type. | Declare an initial value under `vars:` in the manifest, or fix the unresolved expression. Types are fixed; discovery never executes assignments. |
 | TW2010 | Unsafe image path. | Use a relative path inside `images/`, with `/` separators and no parent traversal, absolute path, web address, query string or fragment. |
 | TW2011 | Unsupported image format. | Use PNG (`.png`), JPEG (`.jpg` or `.jpeg`), or WebP (`.webp`). |
