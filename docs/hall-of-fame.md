@@ -6,9 +6,12 @@ everyone here.
 ## Playtesters
 
 - **Felix**: first outside playtester, at age 11. He worked through the getting-started guide and
-  wrote *The Night Ferry*, then reported what got in his way. Because of him, the guide now explains
-  story folders and file types first and says where to find the Command Palette. Live checking
-  starts as soon as you trust a folder, and the Author Debugger opens on Wayland desktops.
-  Thanks for putting up with me, son.
+  wrote _The Night Ferry_, then reported what got in his way. Because of him, the guide now:
+  - Explains story folders and file types first
+  - Says where to find the Command Palette.
+  - Live checking starts as soon as you trust a folder
+  - The Author Debugger opens on Wayland desktops.
 
 Helped make Talewright better? Your name belongs here too. See [CONTRIBUTING](../CONTRIBUTING.md).
+
+_Special note to Felix_: Thanks for putting up with me son. I love you, and I couldn't be prouder of you. You're the best kid ever
