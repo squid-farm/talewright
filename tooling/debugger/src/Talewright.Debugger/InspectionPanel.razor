@@ -61,6 +61,12 @@
                 <p>Source: @source.Start.File:@source.Start.Line:@source.Start.Column</p>
             }
             <p>Events [@decision.EventStart, @decision.EventEnd). Pass: @decision.Pass. Priority: @decision.Priority. Rank: @decision.Rank. Limit: @decision.Limit.</p>
+            <p>Events [@decision.EventStart, @decision.EventEnd).
+                @if (decision.Pass is { } pass) { <text> Pass: @pass.</text> }
+                @if (decision.Priority is { } priority) { <text> Priority: @priority.</text> }
+                @if (decision.Rank is { } rank) { <text> Rank: @rank.</text> }
+                @if (decision.Limit is { } limit) { <text> Limit: @limit.</text> }
+            </p>
             @if (decision.Expression is { } expression) { <ul><ExpressionView Trace="expression" /></ul> }
             @if (decision.EventStart is { } start && decision.EventEnd is { } end && end > start)
             {

@@ -1,5 +1,6 @@
+@using Talewright.Talemark.Formatting
 <li>
-    <code>@Trace.Expression</code>:
+    @if (_talemark is { } talemark) { <code>@talemark</code> } else { <em>Talemark text unavailable: @_unavailable</em> }:
     <strong>@(Trace.Result is { Type: ExprType.Text } text ? System.Text.Json.JsonSerializer.Serialize(text.Text) : Trace.Result?.ToString() ?? "Not evaluated")</strong>
     @if (Trace.IsOpaque)
     {
@@ -18,4 +19,21 @@
 
 @code {
     [Parameter, EditorRequired] public ExpressionTrace Trace { get; set; } = default!;
+    private string? _talemark;
+    private string? _unavailable;
+
+    protected override void OnParametersSet()
+    {
+        try
+        {
+            _talemark = ExpressionFormatter.Format(Trace.Expression);
+            _unavailable = null;
+        }
+        // Parsed stories always format; host-built trees may not, and must not break inspection.
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            _talemark = null;
+            _unavailable = ex.Message;
+        }
+    }
 }
