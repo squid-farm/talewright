@@ -1,3 +1,5 @@
+using Talewright.Core.Identity;
+
 namespace Talewright.Talemark.Parsing;
 
 internal enum TokenKind
@@ -96,12 +98,15 @@ internal static class Lexer
             if (c == '@')
             {
                 i++;
-                while (i < text.Length && (char.IsLetterOrDigit(text[i]) || text[i] == '_'))
+                var nameStart = i;
+                while (i < text.Length && IdentifierRules.IsPart(text[i]))
                 {
                     i++;
                 }
 
-                tokens.Add(new Token(TokenKind.NamedPredicate, text[(start + 1)..i], start));
+                while (i > nameStart && text[i - 1] is '.' or '-') i--;
+                var name = text[nameStart..i];
+                tokens.Add(new Token(IdentifierRules.IsValid(name) ? TokenKind.NamedPredicate : TokenKind.Error, name, start));
                 continue;
             }
 
