@@ -27,7 +27,7 @@ public static class StoryHover
         ["==="] = "Declares a scene: === scene.id. Put scene metadata immediately after this header.",
         ["->"] = "Diverts to a scene ID, or END to finish the story, as soon as this line is reached. Later lines do not run.",
         ["~"] = "Effects: applies semicolon-separated effects when this line is reached, then runs triggers before the next line.",
-        ["*choice"] = "Choice: * [label] followed by optional conditions, effects, and a divert or skill check.",
+        ["*choice"] = "Choice: * [label] with optional conditions and effects, followed by a divert or skill check. Omit the label with * -> target to show Continue.",
         ["::: skill-check"] = "Entry skill-check block, rolled when this line is reached: ::: skill-check [actor] stat dc number, followed by success/failure outcomes and a closing :::.",
         ["skill-check"] = "skill-check [actor] stat dc number: resolves a check using the selected ruleset, with success/failure outcomes.",
         ["if"] = "Begins conditional text with {if condition}. Close it with {/if}; {else} is optional.",

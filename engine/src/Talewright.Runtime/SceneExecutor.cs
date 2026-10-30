@@ -121,7 +121,9 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     if (available)
                     {
                         choices.Add(new(choice, new ChoiceView(choice.Choice.Key,
-                            renderer.RenderInlines(choice.Choice.Label, log.State))));
+                            choice.Choice.Label is { } label
+                                ? renderer.RenderInlines(label, log.State)
+                                : ChoiceView.ContinueLabel)));
                     }
                     break;
                 case DivertStep divert:

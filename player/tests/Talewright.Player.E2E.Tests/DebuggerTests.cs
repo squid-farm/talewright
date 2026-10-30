@@ -5,6 +5,46 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class DebuggerTests
 {
     [Fact]
+    public async Task Native_workbench_shows_textless_choices_as_continue()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-textless-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-textless", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: textless-debug\n  title: Textless Debug\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                Textless start.
+                * [Locked] (requires: flag:ready) -> END
+                * -> next
+                === next
+                Textless destination.
+                * -> END
+                """);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Textless start.");
+            Assert.Contains("Continue", snapshot.Content);
+            await driver.ChooseAsync("Continue");
+            snapshot = await WaitFor(driver, "Textless destination.");
+            Assert.Contains("Continue", snapshot.Content);
+            await driver.ChooseAsync("Continue");
+            await WaitFor(driver, "Play again");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Native_workbench_jumps_with_setup_inspects_branches_and_recovers_from_invalid_source()
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")

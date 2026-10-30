@@ -310,6 +310,25 @@ async function testLiveDiagnostics() {
     assert.equal(semanticHover.range.start.character, 3);
     assert.equal(semanticHover.range.end.character, 8);
     assert.equal(document.isDirty, true, 'Hover must not save the buffer');
+
+    const textlessEdit = new vscode.WorkspaceEdit();
+    textlessEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n* -> sta');
+    assert.equal(await vscode.workspace.applyEdit(textlessEdit), true);
+    completions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, new vscode.Position(1, 8));
+    const textlessTarget = completions.items.find(item => item.label === 'start');
+    assert.ok(textlessTarget, 'Textless choices must offer scene completion');
+    assert.equal(textlessTarget.range.start.character, 5);
+    assert.equal(textlessTarget.range.end.character, 8);
+    const finishTextless = new vscode.WorkspaceEdit();
+    finishTextless.replace(document.uri, new vscode.Range(1, 5, 1, 8), 'start');
+    assert.equal(await vscode.workspace.applyEdit(finishTextless), true);
+    const choiceHovers = await vscode.commands.executeCommand(
+      'vscode.executeHoverProvider', document.uri, new vscode.Position(1, 0));
+    assert.ok(choiceHovers.some(hover => hover.contents.some(content => content.value?.includes('Continue'))),
+      'Textless choice hover must explain its default label');
+
     const manifest = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifest);
     await waitForCompiler(manifest, items => items.some(item => item.code === 'TW4003') || items.length === 0);

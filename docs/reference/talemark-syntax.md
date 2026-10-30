@@ -292,6 +292,7 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
+| `* (requires: expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
@@ -318,6 +319,18 @@ lines. Change notes such as "Gained:" appear at the effect line, between the sur
 its own `-> target` or `-> END`. Choices are the scene's final block: after the first choice, only
 more choices, conditions containing only choices, comments and blank lines are allowed. Choice
 requirements and enclosing conditions are evaluated when reached; choice effects run when chosen.
+
+Omit a choice's label to show **Continue**, including alongside other choices:
+
+```tale
+* [Open the door] (requires: flag:ready) -> hall
+* (requires: flag:ready) { set flag:left } -> garden
+* -> END
+```
+
+An omitted label needs an explicit `->` destination and cannot be used with a choice skill check.
+An explicitly empty `[]` is not the textless shortcut. **Continue** is currently English for both
+textless choices and automatic scene continuations.
 
 A scene-level `->` leaves immediately, showing the prose already rendered with a single **Continue**
 (or as the final frame for `-> END`). Put conditional early exits **before** the choices:

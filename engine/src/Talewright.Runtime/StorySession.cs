@@ -281,8 +281,7 @@ public sealed class StorySession : IStorySession
 
     private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> ContinueTo(DivertTarget target)
     {
-        var label = new RenderedInline[] { new RenderedText("Continue", TextStyle.None) };
-        return [(new ChoiceView(ContinueKey, label), notes =>
+        return [(new ChoiceView(ContinueKey, ChoiceView.ContinueLabel), notes =>
         {
             _log.Append(new ChoiceMade(Current!.Scene ?? Story.Start, ContinueKey));
             Enter(target, notes);

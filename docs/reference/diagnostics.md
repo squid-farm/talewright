@@ -25,7 +25,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1008 | Invalid scene id. | Use the shared ASCII identifier form: start with a letter or `_`, then use letters, digits, `_`, and single `.` or `-` separators, e.g. `temple.entrance`. |
 | TW1009 | Skill check outcomes are missing or misplaced. | Every check needs both `success:` and `failure:` lines directly below it. |
 | TW1010 | `->` without a target. | `-> scene.id` or `-> END`. |
-| TW1011 | Malformed choice. | `* [label] (requires: ...) { effects } -> target`. Check for missing `]`, `)` or `}`. |
+| TW1011 | Malformed choice. | `* [label] (requires: ...) { effects } -> target` or `* -> target` for **Continue**. A textless choice needs `->`; check for missing `]`, `)` or `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
 | TW1014 | Malformed image call or image string escape. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments, separate them with a comma, and use `\"` or `\\` for embedded quotes or backslashes. |

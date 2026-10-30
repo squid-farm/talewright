@@ -36,7 +36,7 @@ Before: {var:coins}.
 ~ var:coins += 1
 After: {var:coins}.
 * [Again] -> counter
-* [Leave] -> END
+* -> END
 ```
 
 On the first visit this shows "Before: 0" and "After: 1". A block `{if}` chooses its branch once;
@@ -46,6 +46,15 @@ Triggers run after each whole effect batch, and change notes appear where the ba
 Keep choices last. Every choice and every choice-check outcome needs its own `->` destination.
 A scene-level `->` means **leave now**, not "use this if there are no choices"; later lines do not run.
 For an early exit, put the conditional `->` before the choices. Give hubs an explicit exit choice.
+The textless `* -> END` is a choice labelled **Continue**, offered in order alongside the other
+choices. It can also use `(requires: ...)` and `{ effects }`, like a labelled choice:
+
+```tale
+* [Open the door] (requires: flag:ready) -> hall
+* { set flag:left } -> garden
+```
+
+The destination is required; write `-> scene.id` or `-> END`.
 
 ## Characters and pronouns
 

@@ -46,6 +46,7 @@ public sealed class StoryHoverTests
     [InlineData("-|> second", "Diverts to", "->")]
     [InlineData("|~ player:hp += 1", "when this line is reached", "~")]
     [InlineData("|* [Go] -> second", "Choice:", "*")]
+    [InlineData("|* -> second", "Continue", "*")]
     [InlineData("{i|f flag:ready}yes{/if}", "Begins conditional", "if")]
     [InlineData("{if flag:ready}yes{el|se}no{/if}", "Alternative text", "else")]
     [InlineData("{if flag:ready}yes{/i|f}", "Closes the current", "/if")]

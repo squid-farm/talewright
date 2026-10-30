@@ -31,7 +31,7 @@ internal static class AuthorReloadComparison
                 && (rules.LevelingRule is null or ExperienceLevelingRule)
                 && rules.Modifiers.Count == 0, "custom extensions require trusted rebuild/restart");
             Require(story.Scenes.All(scene => BuiltInBlocks(SceneSteps.Walk(scene.Steps).OfType<ProseStep>().Select(step => step.Block))
-                && scene.Choices.All(choice => BuiltInInlines(choice.Label))),
+                && scene.Choices.All(choice => choice.Label is null || BuiltInInlines(choice.Label))),
                 "custom text modifiers require trusted rebuild/restart");
         }
         Require(original.Id == candidate.Id && original.Version == candidate.Version

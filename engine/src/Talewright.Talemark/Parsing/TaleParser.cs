@@ -223,9 +223,10 @@ internal sealed partial class TaleParser
                 FlushParagraph();
                 ParseEntryEffects(line[1..], indent + 1);
                 return;
+            case ['*']:
             case ['*', ' ' or '\t' or '[', ..]:
                 _symbols.Analysis?.Tokens.Add(new("*choice", AnalysisCollector.Range(At(indent), "*")));
-                // "* [label]" is a choice; "*text*" is emphasis.
+                // "* [label]" and "* -> target" are choices; "*text*" is emphasis.
                 FlushParagraph();
                 ParseChoice(line, indent);
                 return;
@@ -543,34 +544,34 @@ internal sealed partial class TaleParser
         var start = At(indent);
         var rest = line[1..];
         var pos = SkipSpaces(rest, 0);
-        if (pos >= rest.Length || rest[pos] != '[')
+        IReadOnlyList<TemplateInline>? label = null;
+        if (pos < rest.Length && rest[pos] == '[')
         {
-            _diagnostics.Error("TW1011", "Choices look like '* [label] -> target'.", At(indent));
-            return;
-        }
-
-        var close = FindClosingBracket(rest, pos, out var unclosedBrace);
-        if (close < 0)
-        {
-            if (_discoverEffects is null && unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1)))
+            var close = FindClosingBracket(rest, pos, out var unclosedBrace);
+            if (close < 0)
             {
-                ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
-                    rest.Length, false, _diagnostics, _symbols.ImageSource, _symbols.Analysis);
+                if (_discoverEffects is null && unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1)))
+                {
+                    ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
+                        rest.Length, false, _diagnostics, _symbols.ImageSource, _symbols.Analysis);
+                }
+                _diagnostics.Error("TW1011", "Choice label is missing its closing ']'.", At(indent + 1 + pos));
+                return;
             }
-            _diagnostics.Error("TW1011", "Choice label is missing its closing ']'.", At(indent + 1 + pos));
-            return;
+
+            var labelText = rest[(pos + 1)..close];
+            label = _discoverEffects is null
+                ? InlineParser.Parse(SourceText.Single(labelText, At(indent + 1 + pos + 1)), _symbols, _diagnostics)
+                : [];
+            pos = SkipSpaces(rest, close + 1);
         }
 
-        var labelText = rest[(pos + 1)..close];
-        var label = _discoverEffects is null
-            ? InlineParser.Parse(SourceText.Single(labelText, At(indent + 1 + pos + 1)), _symbols, _diagnostics)
-            : [];
         Expr? requires = null;
         IReadOnlyList<Effect> effects = [];
         DivertTarget? divert = null;
         CheckBranch? check = null;
+        var hasDivert = false;
 
-        pos = SkipSpaces(rest, close + 1);
         while (pos < rest.Length)
         {
             var column = indent + 1 + pos;
@@ -604,11 +605,17 @@ internal sealed partial class TaleParser
             else if (remaining.StartsWith("->", StringComparison.Ordinal))
             {
                 _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(column), "->")));
+                hasDivert = true;
                 divert = ParseDivertTarget(rest[(pos + 2)..], column + 2);
                 pos = rest.Length;
             }
             else if (remaining.StartsWith("skill-check", StringComparison.Ordinal))
             {
+                if (label is null)
+                {
+                    _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
+                    return;
+                }
                 var spec = ParseCheckSpec(remaining["skill-check".Length..], column + "skill-check".Length);
                 var (success, failure) = ParseOutcomeLines(At(column), insideBlock: false);
                 if (spec is not null && success is not null && failure is not null)
@@ -620,9 +627,18 @@ internal sealed partial class TaleParser
             }
             else
             {
-                _diagnostics.Error("TW1011", $"Unexpected '{remaining}' in choice. Expected (requires: …), {{ effects }}, -> target or skill-check.", At(column));
+                var help = label is null
+                    ? "Use '* [label] ...' or a textless '* ... -> target'."
+                    : "Expected (requires: …), { effects }, -> target or skill-check.";
+                _diagnostics.Error("TW1011", $"Unexpected '{remaining}' in choice. {help}", At(column));
                 return;
             }
+        }
+
+        if (label is null && !hasDivert)
+        {
+            _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'.", At(indent));
+            return;
         }
 
         scene.CurrentSteps.Add(new ChoiceStep(StepId(start), SpanFrom(start), new ChoiceDefinition
