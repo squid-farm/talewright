@@ -49,6 +49,30 @@ public sealed class StoryPreviewTests
     }
 
     [Theory]
+    [InlineData("true", "true")]
+    [InlineData("false", "false")]
+    [InlineData("friendly", "Friendly")]
+    [InlineData("hostile", "Hostile")]
+    [InlineData("true#upper", "TRUE")]
+    [InlineData("friendly#lower", "friendly")]
+    public void Constant_literals_preview_exact_rendered_values_and_hover(string expression, string expected)
+    {
+        var analysis = StoryAnalyzer.Analyze(Source("=== start\n{" + expression + "}\n-> END"));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var substitution = Assert.Single(analysis.Substitutions);
+        var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
+        Assert.Equal(expected, preview.Value);
+        Assert.Null(preview.UnavailableReason);
+        var rendered = Assert.IsType<RenderedText>(Assert.Single(new TemplateRenderer().RenderInlines(
+            [substitution.Template], GameState.CreateInitial(analysis.World!, 0))));
+        Assert.Equal(rendered.Text, preview.Value);
+        Assert.Equal($"\"{expected}\"", StoryPreview.HintLabel(preview.Value!));
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 2)));
+        Assert.Contains($"Result: \"{expected}\" (default)", hover.PlainText);
+        Assert.DoesNotContain("Preview unavailable", hover.PlainText);
+    }
+
+    [Theory]
     [InlineData("she", "has", "her")]
     [InlineData("they", "have", "them")]
     public void Pronoun_agreement_and_builtin_chains_use_engine_implementations(string pronoun, string verb, string obj)

@@ -291,7 +291,8 @@ declarations retain symbols marked `unresolved`, not a guessed integer type.
 Talemark substitutions show editor-only inlay hints with their final text after built-in
 manipulators: `{player:name#upper}` shows `"MARA BURNS"` for an authored name of Mara Burns.
 Character names, all pronoun forms (including independent possessives), `#one-many`,
-item/faction names, and explicitly declared variable defaults are supported.
+item/faction names, constant literals (text, numbers, booleans, and reputation tiers),
+and explicitly declared variable defaults are supported.
 Hints also work in dialogue, choice labels, and styled or multiline prose.
 
 Hover a substitution for its result marked **default**, intermediate manipulator results,

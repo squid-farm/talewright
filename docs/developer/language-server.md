@@ -154,7 +154,8 @@ substitutions, positioned immediately after `}`. The request requires an open do
 and an ordered, in-bounds UTF-16 range; only hint positions within that range are returned.
 Labels are quoted/escaped and limited to 40 UTF-16 code units; plaintext tooltips include
 the full result, `default` provenance, and manipulator steps. No text edits are supplied.
-Names, pronoun forms, built-in manipulator chains/arguments, item/faction names, and
+Names, pronoun forms, built-in manipulator chains/arguments, item/faction names,
+constant literals (text, numbers, booleans, and reputation tiers), and
 explicit manifest variable defaults are supported. Implicit variable assignments and
 gameplay-dependent expressions are not evaluated. Unsupported/custom operations supply
 no hint and explain the limitation on hover.

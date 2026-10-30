@@ -61,7 +61,8 @@ public static class StoryPreview
         var declaredDefault = variable is not null && analysis.Tokens.Any(token =>
             token.ManifestPath is { Count: 2 } path && path[0] == "vars" && path[1] == variable);
         if (!declaredDefault &&
-            template.Value is not (NameRef or PronounRef or ItemNameRef or FactionNameRef or TextLiteral or NumberLiteral))
+            template.Value is not (NameRef or PronounRef or ItemNameRef or FactionNameRef or
+                TextLiteral or NumberLiteral or BoolLiteral or TierLiteral))
             return new(substitution.Range, null, [], "This value depends on gameplay state; no default example is shown.");
         if (template.Modifiers.Any(modifier => !TextModifierRegistry.IsBuiltIn(modifier)))
             return new(substitution.Range, null, [], "Custom or metadata-only manipulators are not executed while editing.");
