@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <TalewrightMultiTarget>true</TalewrightMultiTarget>
+  </PropertyGroup>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+</Project>

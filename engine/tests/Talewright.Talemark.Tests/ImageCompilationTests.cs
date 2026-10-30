@@ -63,7 +63,7 @@ public sealed class ImageCompilationTests
     public void Ambiguity_warns_once_and_compiles_the_preferred_file(params string[] extensions)
     {
         var paths = extensions.Select(extension => "images/map" + extension).ToArray();
-        var source = Source("""{image("map", "Map")}""", paths.Reverse().ToArray());
+        var source = Source("""{image("map", "Map")}""", Enumerable.Reverse(paths).ToArray());
         var result = StoryCompiler.Compile(source);
         Assert.Equal(new MediaTemplate(paths[0], "Map"), Media(result));
         var warning = Assert.Single(result.Diagnostics);

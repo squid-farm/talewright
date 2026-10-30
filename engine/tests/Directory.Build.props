@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <TargetFrameworks Condition="'$(TalewrightTestTargetFrameworks)' != ''">$(TalewrightTestTargetFrameworks)</TargetFrameworks>
+    <TalewrightMultiTarget Condition="'$(TargetFrameworks)' != ''">true</TalewrightMultiTarget>
+  </PropertyGroup>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+</Project>

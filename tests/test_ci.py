@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile, ZipInfo
 
@@ -13,7 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
 sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
 from publish_samples import normalize_base_path
-from verify_packages import ENGINE_ASSEMBLIES, verify, verify_desktop_archive
+from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, smoke, verify, verify_desktop_archive
 import ui_test_image_plan
 
 
@@ -64,6 +65,11 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertIn("Talewright.Talemark", ENGINE_ASSEMBLIES)
         self.assertEqual(6, len(ENGINE_ASSEMBLIES))
 
+    def test_engine_package_frameworks_match_the_build(self):
+        project = ET.parse(self.ROOT / "Directory.Build.props")
+        frameworks = project.find(".//TalewrightLibraryTargetFrameworks").text.split(";")
+        self.assertEqual(tuple(frameworks), ENGINE_FRAMEWORKS)
+
     def test_both_hosts_embed_all_bundled_story_files(self):
         samples = self.ROOT / "samples"
         expected = {
@@ -103,10 +109,49 @@ class RepositoryLayoutTests(unittest.TestCase):
 
 
 class PackageBoundaryTests(unittest.TestCase):
+    def test_engine_consumer_restores_each_framework_before_building(self):
+        class EngineConsumerChecked(Exception):
+            pass
+
+        calls = []
+
+        def run(command, *, cwd, env, check):
+            self.assertTrue(check)
+            if cwd.name == "PlayerConsumer":
+                raise EngineConsumerChecked()
+            command = list(map(str, command))
+            calls.append(command)
+            if command[:2] == ["dotnet", "restore"]:
+                assets = cwd / "obj/project.assets.json"
+                assets.parent.mkdir(exist_ok=True)
+                assets.write_text(json.dumps({"libraries": {"Talewright/1.2.3": {}}}))
+
+        with tempfile.TemporaryDirectory() as temporary, patch("verify_packages.subprocess.run", side_effect=run):
+            with self.assertRaises(EngineConsumerChecked):
+                smoke(Path(temporary), "1.2.3")
+
+        for framework in ENGINE_FRAMEWORKS[:-1]:
+            property_argument = f"-p:TargetFramework={framework}"
+            builds = [i for i, command in enumerate(calls)
+                      if command[:2] == ["dotnet", "build"] and property_argument in command]
+            self.assertEqual(len(builds), 1)
+            index = builds[0]
+            self.assertIn("--no-restore", calls[index])
+            restore = calls[index - 1]
+            self.assertEqual(restore[:2], ["dotnet", "restore"])
+            self.assertIn(property_argument, restore)
+            self.assertIn("--configfile", restore)
+            self.assertIn("--no-http-cache", restore)
+
     def write_package(self, directory, identity, version="1.2.3", dependency="1.2.3"):
         path = directory / f"{identity}.{version}.nupkg"
         dependencies = (f'<dependencies><group><dependency id="Talewright" version="{dependency}" />'
                         '</group></dependencies>') if identity.endswith(".Player") else ""
+        if identity == "Talewright":
+            groups = []
+            for framework in ENGINE_FRAMEWORKS:
+                groups.append(f'<group targetFramework="{framework}" />')
+            dependencies = "<dependencies>" + "".join(groups) + "</dependencies>"
         with ZipFile(path, "w") as package:
             package.writestr(f"{identity}.nuspec", f"""<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
 <metadata><id>{identity}</id><version>{version}</version>{dependencies}</metadata></package>""")
@@ -155,9 +200,12 @@ class PackageBoundaryTests(unittest.TestCase):
                 package.writestr(f"lib/net10.0/{identity}.dll", b"test placeholder")
             if identity == "Talewright":
                 package.writestr("buildTransitive/Talewright.targets", "")
-                for assembly in ENGINE_ASSEMBLIES:
-                    for extension in ("dll", "xml"):
-                        package.writestr(f"lib/net10.0/{assembly}.{extension}", b"test placeholder")
+                for framework in ENGINE_FRAMEWORKS:
+                    for assembly in ENGINE_ASSEMBLIES | {"Talewright"}:
+                        for extension in ("dll", "xml"):
+                            name = f"lib/{framework}/{assembly}.{extension}"
+                            if name not in package.namelist():
+                                package.writestr(name, b"test placeholder")
             if identity.endswith(".Player"):
                 for name in ["staticwebassets/talewright.css",
                              "staticwebassets/Components/StoryPlayer.razor.js",
@@ -265,6 +313,25 @@ class PackageBoundaryTests(unittest.TestCase):
                     package.writestr(name, content)
             with self.assertRaisesRegex(ValueError, "missing engine assembly asset"):
                 verify(directory, "1.2.3")
+
+    def test_oldest_framework_requires_assemblies_and_dependency_group(self):
+        for missing in ("lib/net8.0/Talewright.Runtime.dll", "group"):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                engine = self.write_package(directory, "Talewright")
+                with ZipFile(engine) as package:
+                    entries = {name: package.read(name) for name in package.namelist() if name != missing}
+                if missing == "group":
+                    spec = ET.fromstring(entries["Talewright.nuspec"])
+                    groups = spec.find(".//{*}dependencies")
+                    group = groups.find("{*}group[@targetFramework='net8.0']")
+                    groups.remove(group)
+                    entries["Talewright.nuspec"] = ET.tostring(spec)
+                with ZipFile(engine, "w") as package:
+                    for name, content in entries.items():
+                        package.writestr(name, content)
+                with self.assertRaisesRegex(ValueError, "missing engine assembly asset|framework dependency groups"):
+                    verify(directory, "1.2.3")
 
     def test_missing_debugger_asset_fails(self):
         prefix = "tools/net10.0/any/"

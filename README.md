@@ -95,6 +95,11 @@ These examples assume the CLI is installed as `talewright`; portable downloads u
 Building a standalone website or desktop game still requires the .NET 10 SDK on the author's
 computer; players don't need .NET. See [Sharing your story](docs/guide/sharing-your-story.md).
 
+Embedding the **headless engine** has different requirements: the
+[older-runtime compatibility spike](docs/developer/csharp-extensions.md#older-runtime-compatibility-spike)
+targets .NET 8, 9 and 10 without downgrading the supplied Blazor player or the build SDK.
+Old runtime compatibility does not imply continued Microsoft security support.
+
 ## Documentation
 
 | I want to… | Read |
