@@ -714,7 +714,8 @@ public sealed partial class ServerTests
         {
             var id = ++_id;
             await Write(new { jsonrpc = "2.0", id, method, @params = parameters });
-            return await Next(message => message.TryGetProperty("id", out var value) && value.GetInt32() == id);
+            return await Next(message => message.TryGetProperty("id", out var value) &&
+                value.ValueKind == JsonValueKind.Number && value.GetInt32() == id);
         }
         public Task Send(string method, object parameters) => Write(new { jsonrpc = "2.0", method, @params = parameters });
         private Task Write(object message) => Raw(JsonSerializer.Serialize(message));

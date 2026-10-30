@@ -174,7 +174,7 @@ public sealed class StoryHoverTests
     public void Exported_registrations_provide_help_without_evaluating_code()
     {
         var (analysis, position) = Analyze("=== first\n@requires @Cus|tom");
-        var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["Custom"], Modifiers = ["special"] };
+        var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["Custom"], Modifiers = ["special"], BuiltInModifiers = [] };
         analysis = metadata.Analyze(analysis.Source);
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
         Assert.Contains("Predicate", hover.PlainText);

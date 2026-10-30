@@ -8,7 +8,7 @@ const source = await readFile(new URL('../extension.cjs', import.meta.url), 'utf
 
 function host(settings = {}, trusted = true, failStart = false, platform = 'linux', arch = 'x64', missing = false,
   bundledTarget = `${platform}-${arch}`) {
-  const calls = { clients: [], errors: [], watchers: [], stops: 0, trustListeners: [] };
+  const calls = { clients: [], errors: [], watchers: [], stops: 0, trustListeners: [], commands: new Map(), updates: [] };
   class LanguageClient {
     constructor(id, name, server, options) {
       calls.clients.push({ id, name, server, options });
@@ -24,9 +24,15 @@ function host(settings = {}, trusted = true, failStart = false, platform = 'linu
   const vscode = {
     Uri: { file: value => value },
     RelativePattern: class { constructor(base, pattern) { this.base = base; this.pattern = pattern; } },
+    ConfigurationTarget: { Workspace: 2, Global: 1 },
+    commands: { registerCommand: (id, handler) => { calls.commands.set(id, handler); return {}; } },
     workspace: {
       isTrusted: trusted,
-      getConfiguration: () => ({ get: (key, fallback) => settings[key] ?? fallback }),
+      workspaceFolders: [{}],
+      getConfiguration: (section, resource) => ({
+        get: (key, fallback) => settings[key] ?? fallback,
+        update: async (...args) => { calls.updates.push({ section, resource, args }); },
+      }),
       createFileSystemWatcher: pattern => {
         const watcher = { pattern };
         calls.watchers.push(watcher);
@@ -63,6 +69,19 @@ function host(settings = {}, trusted = true, failStart = false, platform = 'linu
   });
   return { extension: module.exports, calls, context: { subscriptions: [], extensionPath: '/installed/talewright' } };
 }
+
+test('preview toggle changes only Talemark native inlay visibility without a reload', async () => {
+  for (const [current, expected] of [['on', 'off'], ['off', 'on'], ['onUnlessPressed', 'off']]) {
+    const { extension, calls, context } = host({ 'inlayHints.enabled': current });
+    await extension.activate(context);
+    await calls.commands.get('talewright.togglePreviewHints')();
+    assert.equal(calls.updates.length, 1);
+    assert.equal(calls.updates[0].section, 'editor');
+    assert.equal(calls.updates[0].resource.languageId, 'tale');
+    assert.deepEqual(Array.from(calls.updates[0].args), ['inlayHints.enabled', expected, 2, true]);
+    await extension.deactivate();
+  }
+});
 
 test('explicit development override launches one executable and forwards source/watch configuration', async () => {
   const { extension, calls, context } = host({

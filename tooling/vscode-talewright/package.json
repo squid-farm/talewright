@@ -1,7 +1,7 @@
 {
   "name": "talewright",
   "displayName": "Talewright",
-  "description": "Talemark highlighting, snippets, story configuration schema, shared completion/hover/navigation, and live compiler diagnostics.",
+  "description": "Talemark highlighting, substitution previews, rich hover, completion/navigation, story configuration schema, and live compiler diagnostics.",
   "version": "0.1.0",
   "publisher": "squid-farm",
   "icon": "icon.png",
@@ -33,7 +33,8 @@
       { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
       { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
       { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" },
-      { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" }
+      { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" },
+      { "command": "talewright.togglePreviewHints", "title": "Talewright: Toggle Substitution Preview Hints" }
     ],
     "taskDefinitions": [{
       "type": "talewright",

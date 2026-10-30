@@ -22,6 +22,8 @@ public sealed record AuthoringRuleset(string Id, string DefinitionId, AuthoringS
 public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predicates, string[] Modifiers,
     AuthoringRuleset[] Rulesets)
 {
+    public string[] BuiltInModifiers { get; init; } = [];
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -42,7 +44,11 @@ public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predic
             return new AuthoringRuleset(pair.Key, ruleset.Id, ruleset.Stats.Select(stat => new AuthoringStat(stat.Id.Value,
                 stat.Name, stat.Category, stat.Min, stat.Max, stat.Default, stat.GoverningAttribute?.Value)).ToArray(),
                 ruleset.Tiers.ToArray(), ruleset.SkillCheckRule is not null);
-        }).ToArray());
+        }).ToArray())
+    {
+        BuiltInModifiers = options.Modifiers.Names.Where(name =>
+            options.Modifiers.TryGet(name, out var modifier) && TextModifierRegistry.IsBuiltIn(modifier)).ToArray(),
+    };
 
     public string ToJson()
     {
@@ -72,6 +78,12 @@ public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predic
         }
         Names(Predicates);
         Names(Modifiers);
+        if (BuiltInModifiers is null)
+            throw new InvalidDataException("Built-in modifier names cannot be null.");
+        Names(BuiltInModifiers);
+        var defaults = TextModifierRegistry.CreateDefault();
+        if (BuiltInModifiers.Any(name => !Modifiers.Contains(name, StringComparer.Ordinal) || !defaults.TryGet(name, out _)))
+            throw new InvalidDataException("Built-in modifier names must identify registered engine built-ins.");
         Names(Rulesets.Select(ruleset => ruleset.Id));
         if (Rulesets.Length == 0)
             throw new InvalidDataException("Authoring metadata must include at least one ruleset.");
@@ -97,8 +109,11 @@ public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predic
         var predicates = new NamedPredicateRegistry();
         foreach (var name in Predicates) predicates.Register(name, _ => throw new InvalidOperationException("Authoring metadata cannot evaluate predicates."));
         var modifiers = new TextModifierRegistry();
+        var defaults = TextModifierRegistry.CreateDefault();
         foreach (var name in Modifiers)
-            modifiers.Register(new DelegateTextModifier(name, (_, _) => throw new InvalidOperationException("Authoring metadata cannot apply modifiers.")));
+            modifiers.Register(BuiltInModifiers.Contains(name, StringComparer.Ordinal) && defaults.TryGet(name, out var builtIn)
+                ? builtIn
+                : new DelegateTextModifier(name, (_, _) => throw new InvalidOperationException("Authoring metadata cannot apply modifiers.")));
         var rulesets = new Dictionary<string, Func<Ruleset>>(StringComparer.Ordinal);
         foreach (var metadata in Rulesets)
         {

@@ -63,6 +63,20 @@ public static class StoryHover
 
     public static AuthoringHover? Get(StoryAnalysis analysis, SourceLocation position)
     {
+        var context = GetContext(analysis, position);
+        var preview = StoryPreview.Get(analysis, position.File).FirstOrDefault(candidate => Contains(candidate.Range, position));
+        if (preview is null) return context;
+        var markdown = preview.Value is { } value
+            ? $"**Result:** {Code(StoryPreview.Quote(value))} **(default)**\n\nAuthored defaults, not current gameplay state.\n\n" +
+              string.Join("\n\n", preview.Steps.Select(step => $"{Code(step.Name)}: {Code(StoryPreview.Quote(step.Value))}"))
+            : preview.PlainText;
+        return new(context?.Range ?? preview.Range,
+            markdown + (context is null ? "" : "\n\n---\n\n" + context.Markdown),
+            preview.PlainText + (context is null ? "" : "\n\n" + context.PlainText));
+    }
+
+    private static AuthoringHover? GetContext(StoryAnalysis analysis, SourceLocation position)
+    {
         if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is "TW5001" or "TW5002"))
             throw new InvalidOperationException("Hover is unavailable until project authoring metadata is supplied and valid.");
         var declaration = analysis.Symbols.FirstOrDefault(symbol => symbol.Declaration is { } range && Contains(range, position));
@@ -112,6 +126,26 @@ public static class StoryHover
         var summary = $"{symbol.Kind}: {symbol.Name} ({symbol.Type})";
         var markdown = $"**{symbol.Kind}** {Code(symbol.Name)} ({Code(symbol.Type)})";
         var plain = summary;
+        if (symbol.Kind == AuthoringSymbolKind.Character &&
+            analysis.World?.Characters.Values.FirstOrDefault(character => character.Id.Value == symbol.Name) is { } character)
+        {
+            var pronouns = character.Pronouns;
+            var details = new[]
+            {
+                ("Name (default)", character.FullName),
+                ("Subject", pronouns.Subject),
+                ("Object", pronouns.Object),
+                ("Possessive determiner", pronouns.Possessive),
+                ("Independent possessive", pronouns.PossessivePronoun),
+                ("Reflexive", pronouns.Reflexive),
+                ("Pronoun agreement", pronouns.Agreement.ToString()),
+            };
+            foreach (var (label, value) in details)
+            {
+                markdown += $"\n\n{label}: {Code(StoryPreview.Quote(value))}";
+                plain += $"\n{label}: {StoryPreview.Quote(value)}";
+            }
+        }
         if (symbol.Declaration is { } declaration)
         {
             var location = $"{declaration.Start.File}:{declaration.Start.Line}:{declaration.Start.Column}";

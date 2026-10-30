@@ -20,11 +20,14 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
     private string? _metadataPath;
     private bool _requiresMetadata;
     private bool _hoverMarkdown;
+    private bool _inlayRefreshSupported;
+    private bool _inlayRefreshPending;
+    private const string InlayRefreshId = "talewright/inlayHintRefresh";
     private static StringComparer PathComparer => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
     private sealed record Document(string Root, int Version, string Text);
     private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error);
     private sealed record ProtocolError(int Code, string Message);
-    private enum Feature { Completion, Hover, Definition }
+    private enum Feature { Completion, Hover, Definition, InlayHints }
     private sealed class Story(
         string root,
         StoryWorkspace workspace,
@@ -118,6 +121,16 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             return;
         }
         var hasId = message.TryGetProperty("id", out var id);
+        if (hasId && id.ValueKind == JsonValueKind.String && id.GetString() == InlayRefreshId &&
+            !message.TryGetProperty("method", out _) &&
+            message.TryGetProperty("jsonrpc", out var responseVersion) &&
+            responseVersion.ValueKind == JsonValueKind.String && responseVersion.GetString() == "2.0")
+        {
+            _inlayRefreshPending = false;
+            if (message.TryGetProperty("error", out var refreshError))
+                await errors.WriteLineAsync($"TWLSP002: inlay hint refresh: {refreshError}");
+            return;
+        }
         if (!message.TryGetProperty("method", out var methodElement) ||
             methodElement.ValueKind != JsonValueKind.String ||
             !message.TryGetProperty("jsonrpc", out var version) || version.ValueKind != JsonValueKind.String || version.GetString() != "2.0" ||
@@ -143,6 +156,7 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                         positionEncoding = "utf-16",
                         hoverProvider = true,
                         definitionProvider = true,
+                        inlayHintProvider = true,
                         completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(", "\"", "/" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
@@ -183,6 +197,10 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
                     if (!hasId) throw new ArgumentException("definition requires a request id.");
                     await SemanticAsync(id, parameters, Feature.Definition, cancellationToken);
                     break;
+                case "textDocument/inlayHint":
+                    if (!hasId) throw new ArgumentException("inlayHint requires a request id.");
+                    await SemanticAsync(id, parameters, Feature.InlayHints, cancellationToken);
+                    break;
                 case "textDocument/didChange":
                     Change(parameters);
                     break;
@@ -212,6 +230,11 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
 
     private void Configure(JsonElement parameters)
     {
+        if (parameters.TryGetProperty("capabilities", out var clientCapabilities) &&
+            clientCapabilities.TryGetProperty("workspace", out var workspaceCapabilities) &&
+            workspaceCapabilities.TryGetProperty("inlayHint", out var inlayHint) &&
+            inlayHint.TryGetProperty("refreshSupport", out var refreshSupport))
+            _inlayRefreshSupported = refreshSupport.GetBoolean();
         if (parameters.TryGetProperty("capabilities", out var capabilities) &&
             capabilities.TryGetProperty("textDocument", out var textDocument) &&
             textDocument.TryGetProperty("hover", out var hover) &&
@@ -251,13 +274,20 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!_documents.TryGetValue(path, out var document))
             throw new ArgumentException($"{feature} requires an open story document.");
-        var point = parameters.GetProperty("position");
-        if (!point.GetProperty("line").TryGetInt32(out var line) || !point.GetProperty("character").TryGetInt32(out var character))
-            throw new ArgumentException($"{feature} positions must be 32-bit integers.");
         var lines = document.Text.ReplaceLineEndings("\n").Split('\n');
-        if (line < 0 || line >= lines.Length || character < 0 || character > lines[line].Length)
-            throw new ArgumentException($"{feature} position is outside the current document.");
         var story = _stories[document.Root];
+        SourceLocation Position(JsonElement point)
+        {
+            if (!point.GetProperty("line").TryGetInt32(out var line) || !point.GetProperty("character").TryGetInt32(out var character))
+                throw new ArgumentException($"{feature} positions must be 32-bit integers.");
+            if (line < 0 || line >= lines.Length || character < 0 || character > lines[line].Length)
+                throw new ArgumentException($"{feature} position is outside the current document.");
+            return new(Relative(story.Root, path), line + 1, character + 1);
+        }
+        var position = Position(kind == Feature.InlayHints
+            ? parameters.GetProperty("range").GetProperty("start") : parameters.GetProperty("position"));
+        var end = kind == Feature.InlayHints ? Position(parameters.GetProperty("range").GetProperty("end")) : position;
+        if (Compare(position, end) > 0) throw new ArgumentException($"{feature} range is reversed.");
         if (story.MetadataError is { } error)
         {
             await ErrorAsync(id, -32001, $"{feature} unavailable: {error.Message}", cancellationToken);
@@ -275,7 +305,21 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
             await ErrorAsync(id, -32001, $"{feature} unavailable: {unavailable.Message}", cancellationToken);
             return;
         }
-        var position = new SourceLocation(Relative(story.Root, path), line + 1, character + 1);
+        if (kind == Feature.InlayHints)
+        {
+            var hints = StoryPreview.Get(analysis, position.File)
+                .Where(preview => preview.Value is not null &&
+                    Compare(position, preview.Range.End) <= 0 && Compare(preview.Range.End, end) <= 0)
+                .Select(preview => new
+                {
+                    position = new { line = preview.Range.End.Line - 1, character = preview.Range.End.Column - 1 },
+                    label = StoryPreview.HintLabel(preview.Value!),
+                    paddingLeft = true,
+                    tooltip = new { kind = "plaintext", value = preview.PlainText }
+                }).ToArray();
+            await ReplyAsync(id, hints, cancellationToken);
+            return;
+        }
         if (kind == Feature.Definition)
         {
             var target = StoryNavigation.Definition(analysis, position);
@@ -598,6 +642,12 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         }
         story.Published.Clear();
         foreach (var path in groups.Keys) story.Published.Add(path);
+        if (_inlayRefreshSupported && !_inlayRefreshPending)
+        {
+            _inlayRefreshPending = true;
+            await _protocol.WriteAsync(new { jsonrpc = "2.0", id = InlayRefreshId, method = "workspace/inlayHint/refresh" },
+                cancellationToken);
+        }
 
         void Add(string relativeFile, object diagnostic)
         {
@@ -655,6 +705,9 @@ public sealed class LanguageServer(Stream input, Stream output, TextWriter error
         var line = Math.Clamp(location.Line - 1, 0, lines.Length - 1);
         return new { line, character = Math.Clamp(location.Column - 1, 0, lines[line].Length) };
     }
+
+    private static int Compare(SourceLocation left, SourceLocation right) =>
+        left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);
 
     private Task ReplyAsync(JsonElement id, object? result, CancellationToken cancellationToken) =>
         _protocol.WriteAsync(new { jsonrpc = "2.0", id, result }, cancellationToken);
