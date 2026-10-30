@@ -26,8 +26,8 @@ public sealed class StoryPreviewTests
         const string passage = """
             The clerk writes **{player:name#upper}**, then carefully corrects the entry to
             {player:name}. The margin says: "{player:pronoun#capitalize} signed
-            {player:pronoun#possessive} own name; this copy is {player:pronoun#possessive("independent")}.
-            Ask {player:pronoun#object} to check it {player:pronoun#reflexive}."
+            {player:pronoun:possessive-pronoun:determiner} own name; this copy is {player:pronoun:possessive-pronoun:independent}.
+            Ask {player:pronoun:object} to check it {player:pronoun:reflexive}."
             """;
         var source = Source("=== start\n" + passage + "\n-> END");
         var analysis = StoryAnalyzer.Analyze(source);
@@ -77,7 +77,7 @@ public sealed class StoryPreviewTests
     [InlineData("they", "have", "them")]
     public void Pronoun_agreement_and_builtin_chains_use_engine_implementations(string pronoun, string verb, string obj)
     {
-        var source = Source("=== start\n{player:pronoun#one-many(\"has\", \"have\")} {player:pronoun#object#upper#lower}",
+        var source = Source("=== start\n{player:pronoun#one-many(\"has\", \"have\")} {player:pronoun:object#upper#lower}",
             Manifest.Replace("pronouns: she", "pronouns: " + pronoun));
         var previews = StoryPreview.Get(StoryAnalyzer.Analyze(source), "main.tale");
         Assert.Equal([verb, obj], previews.Select(preview => preview.Value));
@@ -87,7 +87,7 @@ public sealed class StoryPreviewTests
     [Fact]
     public void Hints_have_utf16_ranges_after_closing_braces_in_multiline_styled_speech_and_choices()
     {
-        const string tale = "=== start\r\n🦑 **{player:name}** {player:\r\npronoun#object}\r\n> player: {player:name}\r\n* [{player:name}] -> END";
+        const string tale = "=== start\r\n🦑 **{player:name}** {player:\r\npronoun:object}\r\n> player: {player:name}\r\n* [{player:name}] -> END";
         var analysis = StoryAnalyzer.Analyze(Source(tale));
         var previews = StoryPreview.Get(analysis, "main.tale");
         Assert.Equal(4, previews.Count);
@@ -128,7 +128,7 @@ public sealed class StoryPreviewTests
     [Fact]
     public async Task Unsaved_supporting_character_changes_and_close_update_defaults_without_mutating_sources()
     {
-        var source = Source("=== start\n{player:name} {player:pronoun#object}", Manifest[..Manifest.IndexOf("characters:", StringComparison.Ordinal)]);
+        var source = Source("=== start\n{player:name} {player:pronoun:object}", Manifest[..Manifest.IndexOf("characters:", StringComparison.Ordinal)]);
         var files = source.Files.ToDictionary();
         files["characters/player.talewright.yaml"] = "characters:\n  player: {first-name: Mara, pronouns: she}";
         var workspace = new StoryWorkspace(new(files));
@@ -204,7 +204,7 @@ public sealed class StoryPreviewTests
     [Fact]
     public void Character_hover_is_a_default_card_and_expression_hover_keeps_existing_help()
     {
-        var analysis = StoryAnalyzer.Analyze(Source("=== start\n> player: {player:pronoun#object#capitalize}"));
+        var analysis = StoryAnalyzer.Analyze(Source("=== start\n> player: {player:pronoun:object#capitalize}"));
         var character = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 4)));
         Assert.Contains("Name (default): \"Mara Burns\"", character.PlainText);
         Assert.Contains("Independent possessive: \"hers\"", character.PlainText);
