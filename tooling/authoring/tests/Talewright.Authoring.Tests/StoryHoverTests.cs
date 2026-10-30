@@ -348,6 +348,12 @@ public sealed class StoryHoverTests
         hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
         Assert.DoesNotContain("Title:", hover);
         Assert.DoesNotContain("Hub", hover);
+        Assert.DoesNotContain("Priority:", hover);
+
+        (analysis, position) = Analyze("=== first\n-> sec|ond", other:
+            "=== second\n@priority 0\n-> END");
+        hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Priority: 0", hover);
     }
 
     private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked, string yaml = Manifest,

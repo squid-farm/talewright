@@ -23,6 +23,7 @@ public enum ExpressionContextKind { Condition, Number, Effects, Substitution }
 public sealed record ExpressionContext(ExpressionContextKind Kind, string Text, SourceRange Range);
 
 public sealed record AuthoredSubstitution(SourceRange Range, SubstitutionTemplate Template);
+public sealed record AuthoredScene(SceneDefinition Definition, bool HasExplicitPriority);
 
 /// <summary>Immutable, source-aware authoring data, separate from the runtime story model.</summary>
 public sealed class StoryAnalysis
@@ -48,7 +49,7 @@ public sealed class StoryAnalysis
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
-        Scenes = Array.AsReadOnly(collector.SceneDefinitions.ToArray());
+        Scenes = Array.AsReadOnly(collector.Scenes.ToArray());
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
@@ -62,7 +63,7 @@ public sealed class StoryAnalysis
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
-    public IReadOnlyList<SceneDefinition> Scenes { get; }
+    public IReadOnlyList<AuthoredScene> Scenes { get; }
 
     /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
     public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
@@ -95,7 +96,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoringToken> Tokens { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
-    internal List<SceneDefinition> SceneDefinitions { get; } = [];
+    internal List<AuthoredScene> Scenes { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
 
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)

@@ -163,7 +163,8 @@ public static class StoryHover
     private static IEnumerable<(string Label, string Value)> Facts(StoryAnalysis analysis, AuthoringSymbol symbol)
     {
         if (symbol.Kind == AuthoringSymbolKind.Scene)
-            return analysis.Scenes.FirstOrDefault(scene => scene.Id.Value == symbol.Name) is { } scene ? SceneFacts(scene) : [];
+            return analysis.Scenes.FirstOrDefault(scene => scene.Definition.Id.Value == symbol.Name) is { } scene
+                ? SceneFacts(scene) : [];
         if (analysis.World is not { } world) return [];
         return symbol.Kind switch
         {
@@ -221,11 +222,13 @@ public static class StoryHover
             yield return ("Initial tier", $"{tier.Id} ({StoryPreview.Quote(tier.Name)})");
     }
 
-    private static IEnumerable<(string, string)> SceneFacts(SceneDefinition scene)
+    private static IEnumerable<(string, string)> SceneFacts(AuthoredScene authoredScene)
     {
+        var scene = authoredScene.Definition;
         if (scene.Title is { } title) yield return ("Title", StoryPreview.Quote(title));
         if (scene.Tags.Count > 0) yield return ("Tags", string.Join(", ", scene.Tags.Order(StringComparer.Ordinal)));
-        if (scene.Priority != 0) yield return ("Priority", scene.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (authoredScene.HasExplicitPriority)
+            yield return ("Priority", scene.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture));
         if (scene.Once) yield return ("Once", "true");
         if (scene.Hub is { } hub)
             yield return ("Hub", hub.Tags.Count == 1 && !hub.MatchAll ? hub.Tags[0] : $"{(hub.MatchAll ? "all" : "any")}({string.Join(", ", hub.Tags)})");
