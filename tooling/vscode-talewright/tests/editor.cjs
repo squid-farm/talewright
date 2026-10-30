@@ -330,7 +330,7 @@ async function testLiveDiagnostics() {
     await vscode.window.showTextDocument(document);
     const previewEdit = new vscode.WorkspaceEdit();
     previewEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
-      '=== start\n{player:name#upper} {player:pronoun#object}\n-> END\n');
+      '=== start\n{player:name#upper} {player:pronoun:object}\n-> END\n');
     assert.equal(await vscode.workspace.applyEdit(previewEdit), true);
     await waitForCompiler(document, items => items.length === 0);
     const hints = await vscode.commands.executeCommand(
