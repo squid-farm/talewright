@@ -49,6 +49,7 @@ public sealed partial class ServerTests
     [InlineData("@requires flag:door-|", "door-open")]
     [InlineData("{player:pronoun:|}", "reflexive")]
     [InlineData("{player:pronoun#one-|}", "one-many")]
+    [InlineData("{item:rope#one-|}", "one-many")]
     [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
     [InlineData("{if (player:pronoun:ob| == \"them\")}yes{/if}", "object")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
@@ -74,6 +75,24 @@ public sealed partial class ServerTests
         var item = Assert.Single(Items(response), item => item.GetProperty("label").GetString() == expected);
         Assert.Equal(expected, item.GetProperty("textEdit").GetProperty("newText").GetString());
         Assert.Equal(1, item.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
+    [Fact]
+    public async Task Default_item_name_helpers_are_offered_by_the_stdio_server()
+    {
+        await using var client = new Client();
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "items: {rope: Rope}\n");
+        File.WriteAllText(client.PathOf("project.authoring.json"),
+            AuthoringProjectMetadata.Export(CompilerOptions.Default).ToJson());
+        await client.Initialize(new { metadataPath = "project.authoring.json" });
+        await client.Open("start.tale", "=== start\n{item:rope#th}\n-> END", 1);
+        var response = await Completion(client, "start.tale", "=== start\n{item:rope#th|}\n-> END");
+        Assert.True(response.TryGetProperty("result", out _), response.ToString());
+        var items = Items(response)
+            .Select(item => item.GetProperty("label").GetString()).ToArray();
+        Assert.Contains("the", items);
+        Assert.Contains("this", items);
+        Assert.Contains("that", items);
     }
 
     [Fact]
@@ -115,6 +134,8 @@ public sealed partial class ServerTests
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("{player:pronoun:|}", "object", "{player:pronoun:object}")]
+    [InlineData("{item:rope#one-|many}", "one-many", "{item:rope#one-many}")]
+    [InlineData("{item:rope#th|at}", "that", "{item:rope#that}")]
     [InlineData("{player:pronoun:possessive-pronoun:de|terminer}", "determiner", "{player:pronoun:possessive-pronoun:determiner}")]
     [InlineData("{if (player:pronoun:ob|ject == \"them\")}yes{/if}", "object", "{if (player:pronoun:object == \"them\")}yes{/if}")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|dependent)", "independent", "~ var:word = (player:pronoun:possessive-pronoun:independent)")]
@@ -132,7 +153,7 @@ public sealed partial class ServerTests
     public async Task Applying_protocol_text_edit_preserves_surrounding_syntax(string line, string label, string expected)
     {
         await using var client = new Client();
-        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "factions: {guild: {name: Guild}}\n");
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "factions: {guild: {name: Guild}}\nitems: {rope: Rope}\n");
         await client.Initialize();
         var marked = "=== start\n" + line;
         await client.Open("start.tale", marked.Replace("|", ""), 1);

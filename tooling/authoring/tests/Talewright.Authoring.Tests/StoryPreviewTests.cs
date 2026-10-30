@@ -126,6 +126,30 @@ public sealed class StoryPreviewTests
     }
 
     [Fact]
+    public void Item_name_previews_keep_plural_and_uncountable_grammar_through_modifier_chains()
+    {
+        var manifest = Manifest.Replace("items: {rope: Rope}", """
+            items:
+              rope: Rope
+              pants: {name: pants, name-agreement: plural}
+              armor: {name: armor, uncountable: true}
+            """);
+        var source = Source("""
+            === start
+            {item:pants#that#capitalize} {item:pants#one-many("is", "are")} / {item:armor#upper#a#capitalize}
+            -> END
+            """, manifest);
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var previews = StoryPreview.Get(analysis, "main.tale");
+        Assert.Equal(["Those pants", "are", "Some ARMOR"], previews.Select(preview => preview.Value));
+        var story = Assert.IsType<Talewright.Talemark.Model.StoryDefinition>(StoryCompiler.Compile(source).Story);
+        var rendered = new TemplateRenderer().Render(story.GetScene(new("start")).Body,
+            GameState.CreateInitial(story.World, 0)).ToPlainText();
+        Assert.Contains("Those pants are / Some ARMOR", rendered);
+    }
+
+    [Fact]
     public async Task Unsaved_supporting_character_changes_and_close_update_defaults_without_mutating_sources()
     {
         var source = Source("=== start\n{player:name} {player:pronoun:object}", Manifest[..Manifest.IndexOf("characters:", StringComparison.Ordinal)]);

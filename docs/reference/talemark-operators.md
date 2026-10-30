@@ -156,23 +156,30 @@ Each modifier validates its own supported values and reports a clear diagnostic 
 This shape is a contract for future modifiers, not permission to pass extra arguments to today's ones.
 
 Pronoun forms are properties, not modifiers; for example,
-`{player:pronoun:possessive-pronoun:independent}` gives *hers*. The pronoun-only selector
+`{player:pronoun:possessive-pronoun:independent}` gives *hers*. The agreement selector
 `{player:pronoun#one-many("has", "have")}` requires exactly two quoted strings,
 singular first and plural second. It returns the authored text selected by the
 effective pronoun set's `agreement` at render time; singular they uses plural
-agreement. It never uses displayed-name grammar, groups, population, counts or
-items. Empty strings are allowed. Following text modifiers operate on the selected
+agreement. On an item-name reference, `{item:pants#one-many("is", "are")}` selects
+from item `name-agreement` instead. Neither case uses groups, population, counts
+or `uncountable`. Character names and text variables are not selector targets.
+Empty strings are allowed. Following text modifiers operate on the selected
 text, for example `#one-many("has", "have")#capitalize`.
 This is dedicated two-string selector support, not generalized multi-argument parsing.
 Other built-in modifiers take no arguments:
-`#capitalize`, `#upper`, `#lower`, `#a`, and the generic text `#possessive`.
+`#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, and the generic text `#possessive`.
+`#a` uses `some` for plural/uncountable names; `#this`/`#that` use `these`/`those`
+for plural agreement. `#the` always prefixes `the`. Original item grammar stays
+attached throughout a substitution chain; assigning the name to a variable copies
+text only. See [item-name grammar](talemark-syntax.md#item-name-grammar) for defaults
+and the complete table. There is no article inference, noun inflection or count phrasing.
 Plain `pronoun` is the subject form, also accessible as `pronoun:subject`.
 See the [pronoun forms table](talemark-syntax.md#3-substitutions).
 
 Completion offers `subject`, `object`, `possessive-pronoun` and `reflexive` after
 `character:pronoun:`, then `determiner` and `independent` after
 `character:pronoun:possessive-pronoun:`. Both possessive properties are explicit; neither is a default.
-Completion and hover offer `one-many` on pronoun references only, with its fixed
+Completion and hover offer `one-many` on pronoun and item-name references only, with its fixed
 argument order. Its strings are author text, not finite argument suggestions.
 Wrong targets, missing strings and extra arguments produce TW2006.
 
@@ -223,10 +230,11 @@ The language server uses the shared authoring completion provider.
 |---|---|
 | `:` access, `.` within names, shared story-name characters | Implemented in [#191](https://github.com/squid-farm/talewright/issues/191). |
 | Pronoun forms as text-valued properties | Implemented in [#332](https://github.com/squid-farm/talewright/issues/332), replacing the earlier #190 syntax without compatibility machinery. |
-| Pronoun-only `#one-many("singular", "plural")` | Implemented in [#192](https://github.com/squid-farm/talewright/issues/192), selecting from effective pronoun `agreement`, including character-creation choices. |
+| `#one-many("singular", "plural")` | Pronoun selection implemented in [#192](https://github.com/squid-farm/talewright/issues/192); item-name selection in [#308](https://github.com/squid-farm/talewright/issues/308). Uses effective pronoun `agreement` or item `name-agreement`, never quantity. |
+| Item `name-agreement` / `uncountable`, `#a` / `#the` / `#this` / `#that` | Implemented in [#308](https://github.com/squid-farm/talewright/issues/308); explicit helpers retain original-reference grammar through chains, with no object-copy semantics. |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197); enclosing braces and choice labels respect quoted delimiters. Expression and modifier string decoding remains separate work under [#184](https://github.com/squid-farm/talewright/issues/184). Prose `\{` and `\}` already work. |
-| Comma-separated multi-argument modifiers | Only the pronoun `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
+| Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts; alt is optional and literal, never a substitution template. Quoted paths are asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |

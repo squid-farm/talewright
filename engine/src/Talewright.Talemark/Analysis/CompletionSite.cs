@@ -20,7 +20,7 @@ internal static class ExpressionCompletion
         ["object"] = "Pronoun form: object, such as her, him or them.",
         ["possessive-pronoun"] = "Possessive pronoun properties: determiner (her, their) or independent (hers, theirs).",
         ["reflexive"] = "Pronoun form: reflexive, such as herself or themselves.",
-        ["one-many"] = "Pronoun agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement only; singular they uses the second form.",
+        ["one-many"] = "Agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement (including singular they) or item name-agreement, never inventory quantity or uncountable.",
     };
 
     private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails = new Dictionary<string, string>
@@ -68,7 +68,7 @@ internal static class ExpressionCompletion
                 if (kind == ExpressionContextKind.Substitution)
                 {
                     kinds = [AuthoringSymbolKind.Modifier];
-                    if (IsPronounReference(tokens, symbols))
+                    if (IsAgreementReference(tokens, symbols))
                     {
                         keywords = ["one-many"];
                         details = PronounFormDetails;
@@ -168,11 +168,14 @@ internal static class ExpressionCompletion
         }
     }
 
-    private static bool IsPronounReference(List<Token> tokens, IReadOnlyList<AuthoringSymbol> symbols)
+    private static bool IsAgreementReference(List<Token> tokens, IReadOnlyList<AuthoringSymbol> symbols)
     {
         var hash = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
         if (hash < 0) return false;
         var reference = tokens.Take(hash).Where(token => token.Kind is not (TokenKind.LeftParen or TokenKind.RightParen)).ToArray();
+        if (reference is [{ Kind: TokenKind.Identifier, Text: "item" }, { Kind: TokenKind.Colon },
+                { Kind: TokenKind.Identifier } item])
+            return symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && symbol.Name == item.Text);
         if (reference is not [{ Kind: TokenKind.Identifier } owner, { Kind: TokenKind.Colon },
                 { Kind: TokenKind.Identifier, Text: "pronoun" }, ..] ||
             !symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text))

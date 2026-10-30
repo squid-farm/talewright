@@ -141,10 +141,10 @@ internal sealed class ExpressionParser
             {
                 if (call.Name == "one-many")
                 {
-                    if (value is not PronounRef || call.Argument is null || call.PluralArgument is null)
+                    if (value is not (PronounRef or ItemNameRef) || call.Argument is null || call.PluralArgument is null)
                     {
                         diagnostics.Error("TW2006",
-                            "Use '<character>:pronoun#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on pronoun references only.",
+                            "Use '#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on pronoun or item-name references only.",
                             location.Offset(call.Offset));
                         return null;
                     }
@@ -172,6 +172,7 @@ internal sealed class ExpressionParser
             {
                 NameRef n => symbols.World.Characters[n.Character].NameAgreement == GrammaticalNumber.Plural,
                 PronounRef p => symbols.World.Characters[p.Character].Pronouns.Agreement == GrammaticalNumber.Plural,
+                ItemNameRef i => symbols.World.Items[i.Item].NameAgreement == GrammaticalNumber.Plural,
                 _ => false,
             };
             return new SubstitutionTemplate(value, modifiers, isPlural);

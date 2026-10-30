@@ -481,18 +481,26 @@ internal sealed class StoryYamlReader
             var id = new ItemId(rawId);
             var name = id.Value;
             var modifiers = new Dictionary<StatId, int>();
+            var nameAgreement = GrammaticalNumber.Singular;
+            var uncountable = false;
             if (value is YamlMappingNode body)
             {
-                CheckKeys(body, "name", "modifiers");
+                CheckKeys(body, "name", "modifiers", "name-agreement", "uncountable");
                 name = Scalar(Get(body, "name")) ?? name;
                 modifiers = ReadStatMap(Get(body, "modifiers"), ruleset);
+                if (Get(body, "name-agreement") is { } number)
+                    nameAgreement = ReadGrammaticalNumber(number, "name-agreement");
+                if (Get(body, "uncountable") is { } mass)
+                    uncountable = bool.TryParse(Scalar(mass), out var parsed)
+                        ? parsed
+                        : Error(mass, "TW4003", "'uncountable' must be true or false.", false);
             }
             else if (Scalar(value) is { Length: > 0 } shortName)
             {
                 name = shortName;
             }
 
-            items[id] = new ItemDefinition(id, name, modifiers);
+            items[id] = new ItemDefinition(id, name, modifiers, nameAgreement, uncountable);
         }
 
         return items;
