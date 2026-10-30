@@ -81,7 +81,7 @@ public static class StoryHover
                     "first-name" or "last-name" => "Character name part used in substitutions.",
                     "name" => "Character full name or faction display name used in substitutions.",
                     "tier" => "Faction standing tier, such as hostile or friendly.",
-                    "pronoun" => "Character pronoun. Gives the subject form; add #object, #possessive or #reflexive for another form. Use #one-many(\"singular\", \"plural\") to select wording from effective pronoun agreement.",
+                    "pronoun" => "Character pronoun properties: :subject, :object, :reflexive, :possessive-pronoun:determiner or :possessive-pronoun:independent. The bare pronoun gives the subject form. Use #one-many(\"singular\", \"plural\") to select wording from effective pronoun agreement.",
                     _ => null,
                 };
                 if (description is not null) return Help(site.Text, description, site.Range);

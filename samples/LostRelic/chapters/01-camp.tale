@@ -6,7 +6,7 @@
 {image("camp-art", "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.")}
 
 The boat leaves {player:first-name} at the edge of the jungle with a pack, a {item:torch#lower} and
-three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun#object}
+three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun:object}
 one season to find the **{item:relic}** before they hand the expedition to someone more *reliable*.
 
 > guide: {player:name}. You're later than your letter promised. I'm {guide:first-name} — the guild sent me.
@@ -54,12 +54,12 @@ beside your pack and points to the empty signature line.
 
 The clerk writes **{player:name#upper}**, then carefully corrects the entry to
 {player:name}. The margin says: "{player:pronoun#capitalize} signed
-{player:pronoun#possessive} own name; this copy is {player:pronoun#possessive("independent")}.
-Ask {player:pronoun#object} to check it {player:pronoun#reflexive}."
+{player:pronoun:possessive-pronoun:determiner} own name; this copy is {player:pronoun:possessive-pronoun:independent}.
+Ask {player:pronoun:object} to check it {player:pronoun:reflexive}."
 
 {item:idol#a#capitalize} decorates the clerk's stamp. Its label reads \{expedition copy\}.
 
-> guide: I use {guide:pronoun}/{guide:pronoun#object}. Names matter more than the guild admits.
+> guide: I use {guide:pronoun}/{guide:pronoun:object}. Names matter more than the guild admits.
 
 -> camp.hub
 
@@ -88,7 +88,7 @@ the explorer who went in last spring and came out talking only in numbers.
 @once
 @priority 5
 
-You spread {player:pronoun#possessive} {item:journal} across your knees. The glyph rubbings from the museum
+You spread {player:pronoun:possessive-pronoun:determiner} {item:journal} across your knees. The glyph rubbings from the museum
 are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
 
 * [Puzzle out the glyphs] skill-check history dc 12

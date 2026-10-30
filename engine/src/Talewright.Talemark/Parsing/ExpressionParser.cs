@@ -121,7 +121,9 @@ internal sealed class ExpressionParser
     public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
     {
         symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location);
-        var hash = text.IndexOf('#');
+        var tokens = Lexer.Tokenize(text);
+        var hashToken = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
+        var hash = hashToken < 0 ? -1 : tokens[hashToken].Offset;
         var valueText = hash < 0 ? text : text[..hash];
         var parser = new ExpressionParser(valueText, location, symbols, diagnostics);
         try
@@ -135,9 +137,8 @@ internal sealed class ExpressionParser
             }
 
             var modifiers = new List<ITextModifier>();
-            for (var index = 0; index < calls.Count; index++)
+            foreach (var call in calls)
             {
-                var call = calls[index];
                 if (call.Name == "one-many")
                 {
                     if (value is not PronounRef || call.Argument is null || call.PluralArgument is null)
@@ -152,39 +153,15 @@ internal sealed class ExpressionParser
                     continue;
                 }
 
-                if (value is PronounRef pronoun)
-                {
-                    if (index == 0 && PronounModifierForm(call, pronoun, location, diagnostics) is { } form)
-                    {
-                        value = pronoun with { Form = form };
-                        continue;
-                    }
-
-                    if (call.Name is "subject" or "object" or "possessive" or "reflexive")
-                    {
-                        var hint = call.Name == "subject"
-                            ? "'<character>:pronoun' already gives the subject form; remove '#subject'."
-                            : $"Pronoun forms come straight after 'pronoun': write '<character>:pronoun#{call.Name}' and put other modifiers after it.";
-                        diagnostics.Error("TW2006", hint, location.Offset(call.Offset));
-                        return null;
-                    }
-                }
-
                 if (call.Argument is not null)
                 {
-                    var hint = call.Name == "possessive"
-                        ? " A possessive form argument is only allowed after '<character>:pronoun'."
-                        : string.Empty;
-                    diagnostics.Error("TW2006", $"Modifier '#{call.Name}' does not take an argument.{hint}", location.Offset(call.Offset));
+                    diagnostics.Error("TW2006", $"Modifier '#{call.Name}' does not take an argument.", location.Offset(call.Offset));
                     return null;
                 }
 
                 if (!symbols.Modifiers.TryGet(call.Name, out var modifier))
                 {
-                    var hint = call.Name is "subject" or "object" or "reflexive"
-                        ? $" Pronoun forms such as '#{call.Name}' only follow '<character>:pronoun'."
-                        : string.Empty;
-                    diagnostics.Error("TW2006", $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(n => "#" + n))}.{hint}", location.Offset(call.Offset));
+                    diagnostics.Error("TW2006", $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(n => "#" + n))}.", location.Offset(call.Offset));
                     return null;
                 }
 
@@ -205,50 +182,11 @@ internal sealed class ExpressionParser
         }
     }
 
-    /// <summary>Pronoun form names offered after <c>&lt;character&gt;:pronoun#</c>, in authoring order.</summary>
-    internal static readonly string[] PronounFormModifiers = ["object", "possessive", "reflexive"];
-
-    /// <summary>Values for <c>#possessive("…")</c> on a pronoun; the first is the default.</summary>
-    internal static readonly string[] PossessiveFormArguments = ["determiner", "independent"];
-
-    /// <summary>
-    /// Selects the pronoun form named by the first modifier on a pronoun reference, or returns null when the
-    /// modifier is not a form. The engine picks the form from the typed reference, not from rendered text.
-    /// </summary>
-    private static PronounForm? PronounModifierForm(ModifierCall call, PronounRef pronoun, SourceLocation location, DiagnosticBag diagnostics)
-    {
-        if (pronoun.Form != PronounForm.Subject || !PronounFormModifiers.Contains(call.Name))
-        {
-            return null;
-        }
-
-        if (call.Name != "possessive")
-        {
-            if (call.Argument is not null)
-            {
-                diagnostics.Error("TW2006", $"Modifier '#{call.Name}' does not take an argument.", location.Offset(call.Offset));
-                throw new ParseException();
-            }
-
-            return call.Name == "object" ? PronounForm.Object : PronounForm.Reflexive;
-        }
-
-        switch (call.Argument)
-        {
-            case null or "determiner":
-                return PronounForm.Possessive;
-            case "independent":
-                return PronounForm.PossessivePronoun;
-            default:
-                diagnostics.Error("TW2006",
-                    $"Unknown possessive form \"{call.Argument}\". Use \"determiner\" (the default, such as 'her') or \"independent\" (such as 'hers').",
-                    location.Offset(call.ArgumentOffset));
-                throw new ParseException();
-        }
-    }
+    internal static readonly string[] PronounProperties = ["subject", "object", "possessive-pronoun", "reflexive"];
+    internal static readonly string[] PossessiveProperties = ["determiner", "independent"];
 
     /// <summary>A modifier call, with a second string supported only for <c>#one-many</c>.</summary>
-    private sealed record ModifierCall(string Name, int Offset, string? Argument, int ArgumentOffset, string? PluralArgument)
+    private sealed record ModifierCall(string Name, int Offset, string? Argument, string? PluralArgument)
     {
         /// <summary>Scans the modifier chain starting at the first <c>#</c>. Returns null after reporting a diagnostic.</summary>
         public static List<ModifierCall>? Scan(string text, int start, SourceLocation location, DiagnosticBag diagnostics)
@@ -268,7 +206,6 @@ internal sealed class ExpressionParser
                 var name = text[nameStart..i].Trim();
                 string? argument = null;
                 string? pluralArgument = null;
-                var argumentOffset = i;
                 if (i < text.Length && text[i] == '(')
                 {
                     i = SkipSpace(text, i + 1);
@@ -277,7 +214,6 @@ internal sealed class ExpressionParser
                         return Error($"Write the argument to '#{name}' in double quotes, such as #{name}(\"value\").", i);
                     }
 
-                    argumentOffset = i;
                     var close = text.IndexOf('"', i + 1);
                     if (close < 0)
                     {
@@ -320,7 +256,7 @@ internal sealed class ExpressionParser
                     }
                 }
 
-                calls.Add(new ModifierCall(name, offset, argument, argumentOffset, pluralArgument));
+                calls.Add(new ModifierCall(name, offset, argument, pluralArgument));
             }
 
             return calls;
@@ -744,17 +680,7 @@ internal sealed class ExpressionParser
                 Fail("TW2001", $"Unknown character property '{path.Text}:{member.Value.Text}'.", member.Value.Offset);
             }
 
-            Fail("TW2001", OldPronounFormMessage(ns.Text, member.Value.Text), member.Value.Offset);
-        }
-
-        if (path.Text.StartsWith("pronoun.", StringComparison.Ordinal))
-        {
-            var form = path.Text["pronoun.".Length..];
-            if (form is "subject" or "object" or "possessive" or "possessive-pronoun" or "reflexive"
-                || !_symbols.World.Ruleset.HasStat(new StatId(path.Text)))
-            {
-                Fail("TW2001", OldPronounFormMessage(ns.Text, form), path.Offset + "pronoun.".Length);
-            }
+            return new PronounRef(character, ParsePronounForm(member.Value));
         }
 
         return path.Text switch
@@ -768,18 +694,28 @@ internal sealed class ExpressionParser
         };
     }
 
-    private static string OldPronounFormMessage(string character, string form)
+    private PronounForm ParsePronounForm(Token property)
     {
-        var replacement = form switch
+        if (property.Text == "possessive-pronoun")
         {
-            "subject" => $"{character}:pronoun",
-            "object" or "possessive" or "reflexive" => $"{character}:pronoun#{form}",
-            "possessive-pronoun" => $"{character}:pronoun#possessive(\"independent\")",
-            _ => null,
+            Expect(TokenKind.Colon, "':' after 'possessive-pronoun'");
+            var form = Expect(TokenKind.Identifier, "a possessive pronoun property");
+            return form.Text switch
+            {
+                "determiner" => PronounForm.Possessive,
+                "independent" => PronounForm.PossessivePronoun,
+                _ => Fail<PronounForm>("TW2001",
+                    $"Unknown possessive pronoun property '{form.Text}'. Use 'determiner' or 'independent'.", form.Offset),
+            };
+        }
+        return property.Text switch
+        {
+            "subject" => PronounForm.Subject,
+            "object" => PronounForm.Object,
+            "reflexive" => PronounForm.Reflexive,
+            _ => Fail<PronounForm>("TW2001",
+                $"Unknown pronoun property '{property.Text}'. Use {string.Join(", ", PronounProperties)}.", property.Offset),
         };
-        return replacement is null
-            ? $"Unknown pronoun form '{form}'. Write '{character}:pronoun' for the subject form, or add '#object', '#possessive' or '#reflexive'."
-            : $"Pronoun forms are written with '#'. Use '{replacement}'.";
     }
 
     private EntityId Character(Token token)

@@ -98,8 +98,8 @@ public enum PronounForm
 }
 
 /// <summary>
-/// <c>player:pronoun</c> (subject) and the forms chosen with <c>#object</c>, <c>#possessive</c>,
-/// <c>#possessive("independent")</c> and <c>#reflexive</c>.
+/// Character pronoun properties such as <c>player:pronoun:object</c> and
+/// <c>player:pronoun:possessive-pronoun:independent</c>; <c>player:pronoun</c> is the subject shorthand.
 /// </summary>
 public sealed record PronounRef(EntityId Character, PronounForm Form) : Expr
 {

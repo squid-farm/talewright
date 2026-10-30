@@ -307,11 +307,11 @@
       "properties": {
         "determiner": {
           "$ref": "#/definitions/nonEmptyString",
-          "description": "Used before a noun, such as her. The default for #possessive."
+          "description": "Used before a noun, such as her. Selected by character:pronoun:possessive-pronoun:determiner."
         },
         "independent": {
           "$ref": "#/definitions/nonEmptyString",
-          "description": "Stands alone, such as hers. Selected by #possessive(\"independent\")."
+          "description": "Stands alone, such as hers. Selected by character:pronoun:possessive-pronoun:independent."
         }
       },
       "additionalProperties": false

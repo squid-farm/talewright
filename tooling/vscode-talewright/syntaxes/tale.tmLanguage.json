@@ -168,6 +168,18 @@
         {"match": "\\bvisited(?=\\s*\\()", "name": "support.function.tale"},
         {"include": "#paren"},
         {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)(pronoun)(:)(possessive-pronoun)(:)(determiner|independent)\\b",
+          "captures": {
+            "1": {"name": "variable.other.owner.tale"},
+            "2": {"name": "punctuation.separator.tale"},
+            "3": {"name": "variable.other.member.tale"},
+            "4": {"name": "punctuation.separator.tale"},
+            "5": {"name": "variable.other.member.tale"},
+            "6": {"name": "punctuation.separator.tale"},
+            "7": {"name": "variable.other.member.tale"}
+          }
+        },
+        {
           "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)",
           "captures": {
             "1": {"name": "variable.other.owner.tale"},

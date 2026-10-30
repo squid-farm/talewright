@@ -30,9 +30,9 @@ The same story-name character set applies in the compiler, manifest schema and e
 Expression words such as `true`, `false`, `and`, `or`, `not`, `has` and `visited` have special meanings
 in their expression positions; a valid spelling is not a guarantee that a name is available there.
 C#-registered predicate and modifier names also depend on their registration contracts.
-The five legacy names `pronoun.subject`, `pronoun.object`, `pronoun.possessive`,
-`pronoun.possessive-pronoun` and `pronoun.reflexive` are rejected as character reads even if a stat
-has that name. The error names the replacement.
+Pronoun properties use `character:pronoun:subject`, `:object`, `:reflexive`,
+`:possessive-pronoun:determiner` and `:possessive-pronoun:independent`.
+`character:pronoun` is subject shorthand. Dots remain part of names, not property access.
 
 ### Reader text, quotes and escapes
 
@@ -46,7 +46,7 @@ For example, the decided string `"She said \"Go\"."` contains `She said "Go".`.
 Image path and alt arguments implement these escapes today. These rules do not introduce a
 quoted choice-label spelling or a new formatting feature.
 
-**Today:** expression string literals and the possessive/one-many modifier arguments use double quotes, but
+**Today:** expression string literals and the one-many modifier arguments use double quotes, but
 their scanners do not decode `\"` or `\\`. Unclosed strings can produce TW1001, TW2006, or TW1004
 when the enclosing brace cannot be found. Prose already supports `\{` and `\}`. Existing scene
 titles, dialogue and choice labels still use their current unquoted forms:
@@ -100,9 +100,9 @@ using the quoted-text rules when it is inside syntax.
 | `:` | Access a named value/property in expressions and substitutions; also select an effect target. Repeats for nested access. Never use `.` instead. | 1 | `{faction:explorers-guild:name}` | TW2001 unknown name/property or old spelling; TW2004 undeclared flag/variable. |
 | `.` | Group words within one identifier, never access a property. | Name | `{item:weapon.knife}` | Invalid identifiers produce TW1001 in expressions, TW1008 for scenes, TW4003 in YAML. |
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
-| `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. A pronoun form must come first on a pronoun reference. | After the value expression | `{player:pronoun#reflexive#capitalize}` | TW2006 unknown/misplaced modifier, bad argument syntax or value. |
+| `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value. |
 | `(` `)` | Group an expression; also bound `visited`'s scene argument, modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
-| `"` | Bound text literals, modifier string arguments and image arguments. No single-quoted Talemark string form. Only image arguments currently decode the decided escapes. | 1 | `{player:pronoun#possessive("independent")}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
+| `"` | Bound text literals, modifier string arguments and image arguments. No single-quoted Talemark string form. Only image arguments currently decode the decided escapes. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
 | `\` | Escape character, with the current/decided distinction described above. | During text scanning | `Literal \{braces\}` | Unescaped `{` can cause TW1004; not a numeric or boolean operator. |
 | `,` | Separate metadata tags, hub arguments and image arguments today; decided separator for multiple double-quoted modifier arguments. Each modifier defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; multi-argument modifiers are not implemented (TW2006). |
 | Unary `-` | Negate one number. | 2 | `{var:coins + -3}` | TW2003 non-number; TW1002 oversized literal. |
@@ -153,9 +153,8 @@ Argument values belong to the modifier; they are not globally reserved names.
 Each modifier validates its own supported values and reports a clear diagnostic for invalid ones.
 This shape is a contract for future modifiers, not permission to pass extra arguments to today's ones.
 
-Pronoun `#possessive` accepts one argument: `"determiner"` (default, as in *her book*) or
-`"independent"` (as in *hers*). For example, `{player:pronoun#possessive("independent")}`.
-It does not accept a comma-separated list. The pronoun-only selector
+Pronoun forms are properties, not modifiers; for example,
+`{player:pronoun:possessive-pronoun:independent}` gives *hers*. The pronoun-only selector
 `{player:pronoun#one-many("has", "have")}` requires exactly two quoted strings,
 singular first and plural second. It returns the authored text selected by the
 effective pronoun set's `agreement` at render time; singular they uses plural
@@ -164,13 +163,13 @@ items. Empty strings are allowed. Following text modifiers operate on the select
 text, for example `#one-many("has", "have")#capitalize`.
 This is dedicated two-string selector support, not generalized multi-argument parsing.
 Other built-in modifiers take no arguments:
-`#capitalize`, `#upper`, `#lower`, `#a`, and `#possessive` on a name.
-`#object` and `#reflexive` select a pronoun form and must immediately follow `pronoun`.
-Plain `pronoun` is the subject form; `#subject` is an error.
+`#capitalize`, `#upper`, `#lower`, `#a`, and the generic text `#possessive`.
+Plain `pronoun` is the subject form, also accessible as `pronoun:subject`.
 See the [pronoun forms table](talemark-syntax.md#3-substitutions).
 
-Completion offers finite values after `#possessive(` and identifies `"determiner"` as the default.
-`"hers"` is not an alias for `"independent"`: it produces TW2006 pointing at the argument.
+Completion offers `subject`, `object`, `possessive-pronoun` and `reflexive` after
+`character:pronoun:`, then `determiner` and `independent` after
+`character:pronoun:possessive-pronoun:`. Both possessive properties are explicit; neither is a default.
 Completion and hover offer `one-many` on pronoun references only, with its fixed
 argument order. Its strings are author text, not finite argument suggestions.
 Wrong targets, missing strings and extra arguments produce TW2006.
@@ -221,7 +220,7 @@ The language server uses the shared authoring completion provider.
 | Rule or feature | Current implementation and next owner |
 |---|---|
 | `:` access, `.` within names, shared story-name characters | Implemented in [#191](https://github.com/squid-farm/talewright/issues/191). |
-| `#` pronoun forms, possessive values and default completion detail | Implemented in [#190](https://github.com/squid-farm/talewright/issues/190). |
+| Pronoun forms as text-valued properties | Implemented in [#332](https://github.com/squid-farm/talewright/issues/332), replacing the earlier #190 syntax without compatibility machinery. |
 | Pronoun-only `#one-many("singular", "plural")` | Implemented in [#192](https://github.com/squid-farm/talewright/issues/192), selecting from effective pronoun `agreement`, including character-creation choices. |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197); enclosing braces and choice labels respect quoted delimiters. Expression and modifier string decoding remains separate work under [#184](https://github.com/squid-farm/talewright/issues/184). Prose `\{` and `\}` already work. |

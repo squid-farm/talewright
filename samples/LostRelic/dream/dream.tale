@@ -67,7 +67,7 @@ You recognize the explorer from {guide:first-name#possessive} story.
 {/if}
 {/if}
 
-{spiral:pronoun#capitalize} opens {spiral:pronoun#possessive} palm.
+{spiral:pronoun#capitalize} opens {spiral:pronoun:possessive-pronoun:determiner} palm.
 
 * [Accept the spiral mark] { take spiral glyph-mark; give player glyph-mark; var:marks += 1 } -> dream.hub
 

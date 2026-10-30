@@ -54,6 +54,33 @@ public sealed class AuthorReloadTests
     }
 
     [Fact]
+    public void Pronoun_properties_assign_text_and_preserve_values_across_save_and_replay()
+    {
+        var story = Compile("""
+            === start
+            ~ var:word = (player:pronoun:possessive-pronoun:independent)
+            {if not (var:word != player:pronoun:possessive-pronoun:independent)}
+            For {player:pronoun:object}: {var:word}.
+            {/if}
+            * [Continue] -> next
+            === next
+            {var:word}/{player:pronoun:reflexive}
+            -> END
+            """);
+        var history = new StoryHistory(story);
+        Assert.Contains("For them: theirs.", history.Current.Document.ToPlainText());
+        Assert.Equal("theirs", history.State.GetTextVariable(new("word")));
+        history.Choose("c0");
+        Assert.Contains("theirs/themselves", history.Current.Document.ToPlainText());
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(history.Events, restored.Events);
+        restored.Back();
+        Assert.Contains("For them: theirs.", restored.Current.Document.ToPlainText());
+        restored.Forward();
+        Assert.Contains("theirs/themselves", restored.Current.Document.ToPlainText());
+    }
+
+    [Fact]
     public void One_many_is_engine_owned_and_its_arguments_are_compared_during_reload()
     {
         var tale = Tale.Replace("[Travel]", "[{player:pronoun#one-many(\"Travel\", \"Travel together\")}]")

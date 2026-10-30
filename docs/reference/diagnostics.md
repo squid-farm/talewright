@@ -15,7 +15,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 
 | Code | Meaning | Usual fix |
 |---|---|---|
-| TW1001 | Something unexpected in a condition or effect. | Check spelling and operators, e.g. `player:dex >= 12`. |
+| TW1001 | Something unexpected in an expression, including incomplete or extra property segments. | Check spelling and operators, e.g. `player:dex >= 12`. A possessive pronoun property needs its final `:determiner` or `:independent`. |
 | TW1002 | A number is too large, or `@priority` isn't a whole number. | Use a whole number. |
 | TW1003 | Malformed effect. | Stats and variables use `=`, `+=` or `-=`. Flags use `set flag:x` / `clear flag:x`. |
 | TW1004 | A `{` is never closed. | Close it, or write `\{` for a literal brace. |
@@ -35,7 +35,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 
 | Code | Meaning | Usual fix |
 |---|---|---|
-| TW2001 | Unknown character, stat, item or faction. | Fix the spelling, or declare it in `story.talewright.yaml`. |
+| TW2001 | Unknown character, stat, item, faction or property. | Fix the spelling, or declare the identifier in `story.talewright.yaml`. Use the documented [pronoun properties](talemark-syntax.md#3-substitutions), including the explicit possessive leaves `:determiner` and `:independent`. |
 | TW2002 | Unknown scene. | Fix the spelling, or add the scene. |
 | TW2003 | Wrong kind of value, e.g. assigning text to a number, comparing text with a number, or arithmetic on text. | Keep each variable's declared type. Text uses `=` and text-to-text `==` / `!=`; numbers retain arithmetic. Declare text with a quoted initial value under `vars:`. |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |

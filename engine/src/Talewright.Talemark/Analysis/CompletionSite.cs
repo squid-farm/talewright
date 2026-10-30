@@ -16,16 +16,17 @@ internal static class ExpressionCompletion
 {
     private static readonly IReadOnlyDictionary<string, string> PronounFormDetails = new Dictionary<string, string>
     {
+        ["subject"] = "Pronoun form: subject, such as she, he or they.",
         ["object"] = "Pronoun form: object, such as her, him or them.",
-        ["possessive"] = "Pronoun form: possessive. Defaults to the determiner (her, their); use #possessive(\"independent\") for hers or theirs.",
+        ["possessive-pronoun"] = "Possessive pronoun properties: determiner (her, their) or independent (hers, theirs).",
         ["reflexive"] = "Pronoun form: reflexive, such as herself or themselves.",
         ["one-many"] = "Pronoun agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement only; singular they uses the second form.",
     };
 
-    private static readonly IReadOnlyDictionary<string, string> PossessiveArgumentDetails = new Dictionary<string, string>
+    private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails = new Dictionary<string, string>
     {
-        ["\"determiner\""] = "Possessive form (default): the determiner before a noun, such as her or their.",
-        ["\"independent\""] = "Possessive form: stands alone, such as hers or theirs.",
+        ["determiner"] = "Possessive determiner before a noun, such as her or their.",
+        ["independent"] = "Independent possessive that stands alone, such as hers or theirs.",
     };
 
     internal static IEnumerable<CompletionSite> Sites(string text, ExpressionContextKind kind, Func<int, int, SourceRange> map,
@@ -61,34 +62,28 @@ internal static class ExpressionCompletion
             var before = tokens.GetRange(Math.Max(0, tokenIndex - 2), Math.Min(2, tokenIndex)).ToArray();
             AuthoringSymbolKind[] kinds = [];
             string[] keywords = [];
-            IReadOnlyList<AuthoringSymbol>? candidates = null;
             IReadOnlyDictionary<string, string>? details = null;
             if (start > 0 && text[start - 1] == '#' || before is [.., { Kind: TokenKind.Error, Text: "#" }])
             {
                 if (kind == ExpressionContextKind.Substitution)
                 {
                     kinds = [AuthoringSymbolKind.Modifier];
-                    if (tokenIndex == 4 && IsPronounReference(tokens, symbols))
-                    {
-                        keywords = [.. ExpressionParser.PronounFormModifiers, "one-many"];
-                        details = PronounFormDetails;
-                        // On a pronoun, #possessive selects a form, so the text modifier of that name is not offered.
-                        candidates = symbols.Where(symbol =>
-                            !(symbol.Kind == AuthoringSymbolKind.Modifier && keywords.Contains(symbol.Name))).ToArray();
-                    }
-                    else if (IsPronounReference(tokens, symbols))
+                    if (IsPronounReference(tokens, symbols))
                     {
                         keywords = ["one-many"];
                         details = PronounFormDetails;
                     }
                 }
             }
-            else if (kind == ExpressionContextKind.Substitution && tokenIndex == 6 && IsPronounReference(tokens, symbols) &&
-                     tokens[4] is { Kind: TokenKind.Identifier, Text: "possessive" } &&
-                     tokens[5].Kind == TokenKind.LeftParen)
+            else if (kind != ExpressionContextKind.Number && tokenIndex >= 6 &&
+                     tokens.GetRange(tokenIndex - 6, 6).ToArray() is [{ Kind: TokenKind.Identifier } possessor,
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "pronoun" },
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "possessive-pronoun" },
+                         { Kind: TokenKind.Colon }] &&
+                     symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == possessor.Text))
             {
-                keywords = ExpressionParser.PossessiveFormArguments.Select(value => $"\"{value}\"").ToArray();
-                details = PossessiveArgumentDetails;
+                keywords = ExpressionParser.PossessiveProperties;
+                details = PossessivePropertyDetails;
             }
             else if (start > 0 && text[start - 1] == '@')
             {
@@ -101,9 +96,12 @@ internal static class ExpressionCompletion
             {
                 if (owner.Text == "faction")
                     keywords = ["name", "tier"];
-                else if (member.Text == "pronoun" &&
+                else if (kind != ExpressionContextKind.Number && member.Text == "pronoun" &&
                          symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text))
-                    continue;
+                {
+                    keywords = ExpressionParser.PronounProperties;
+                    details = PronounFormDetails;
+                }
             }
             else if (before is [.., { Kind: TokenKind.Identifier } ns, { Kind: TokenKind.Colon }])
             {
@@ -118,7 +116,7 @@ internal static class ExpressionCompletion
                         => [AuthoringSymbolKind.Stat],
                     _ => []
                 };
-                if (kind == ExpressionContextKind.Substitution && kinds.Contains(AuthoringSymbolKind.Stat))
+                if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
                     keywords = ["first-name", "last-name", "name", "pronoun"];
             }
             else if (before is [.., { Text: "visited" }, { Kind: TokenKind.LeftParen }])
@@ -166,13 +164,26 @@ internal static class ExpressionCompletion
             if (unfinishedEnd == text.Length) end = unfinishedEnd;
             yield return new(text[start..end], map(start, end - start), kinds, keywords,
                 Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray(),
-                end < text.Length && text[end] is ':' or '(' ? text[end] : null, candidates, details);
+                end < text.Length && text[end] is ':' or '(' ? text[end] : null, null, details);
         }
     }
 
-    /// <summary>True when the expression starts with <c>&lt;character&gt;:pronoun #</c>.</summary>
-    private static bool IsPronounReference(List<Token> tokens, IReadOnlyList<AuthoringSymbol> symbols) =>
-        tokens is [{ Kind: TokenKind.Identifier } owner, { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "pronoun" },
-            { Kind: TokenKind.Error, Text: "#" }, ..] &&
-        symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text);
+    private static bool IsPronounReference(List<Token> tokens, IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        var hash = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
+        if (hash < 0) return false;
+        var reference = tokens.Take(hash).Where(token => token.Kind is not (TokenKind.LeftParen or TokenKind.RightParen)).ToArray();
+        if (reference is not [{ Kind: TokenKind.Identifier } owner, { Kind: TokenKind.Colon },
+                { Kind: TokenKind.Identifier, Text: "pronoun" }, ..] ||
+            !symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text))
+            return false;
+        return reference[3..] switch
+        {
+            [] => true,
+            [{ Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "subject" or "object" or "reflexive" }] => true,
+            [{ Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "possessive-pronoun" },
+                { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "determiner" or "independent" }] => true,
+            _ => false,
+        };
+    }
 }
