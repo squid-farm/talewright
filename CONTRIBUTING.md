@@ -60,6 +60,9 @@ python3 player/tests/run_e2e.py linux     # real Photino window through AT-SPI
 Tests use small stories defined in C#, not the samples. See [tests/README.md](tests/README.md) for
 prerequisites, targeted runs, performance budgets and other platforms.
 
+PR checks run affected projects. To run every regular CI check on a branch without deploying, use
+the [full branch verification workflow](docs/developer/nx-ci.md#run-the-full-pipeline-on-a-branch-without-deploying).
+
 ## Repository layout
 
 | Path | What |

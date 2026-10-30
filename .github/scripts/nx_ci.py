@@ -172,9 +172,13 @@ def select(args):
     try:
         result = nx(*command, "-t", *TARGETS, "--dry-run", "--graph=stdout", capture=True)
         graph = json.loads(result.stdout)
-    except (subprocess.CalledProcessError, json.JSONDecodeError):
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
         write_summary("## Nx verification selection\n\n"
                       "**Incomplete:** graph selection failed; no successful selection is reported.")
+        if isinstance(error, subprocess.CalledProcessError):
+            for output in (error.stdout, error.stderr):
+                if output:
+                    print(output, file=sys.stderr, end="")
         raise
     plan = make_plan(graph)
     args.plan.parent.mkdir(parents=True, exist_ok=True)
