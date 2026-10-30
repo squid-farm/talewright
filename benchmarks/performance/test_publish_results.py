@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from publish_results import benchmark_rows, collect, integration_rows, markdown_for_run, update_history
 
@@ -224,6 +225,7 @@ class PublishResultsTests(unittest.TestCase):
             self.assertIn("(reports/42-2.md)", index)
             self.assertIn("(runs/42-2.json)", index)
 
+    @patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"})
     def test_unsupported_record_fields_are_archived(self):
         cases = [
             ("schemaVersion", 99),
@@ -261,7 +263,7 @@ class PublishResultsTests(unittest.TestCase):
                 inputs.mkdir()
                 history = root / "history"
                 run = collect(inputs)
-                run.update(runId="current", workflowRunUrl="")
+                run.update(runId="current", runAttempt=1, workflowRunUrl="")
                 runs = history / "runs"
                 runs.mkdir(parents=True)
                 unsupported = {**run, field: value}

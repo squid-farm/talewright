@@ -1,6 +1,6 @@
 """CI summaries describe real selection and batch execution without replacing verification."""
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 import json
 import os
@@ -71,14 +71,22 @@ class ReportingTests(unittest.TestCase):
                 self.assertIn("`talewright-editor:test`" if tasks else "Not selected", text)
 
     def test_selection_error_is_incomplete_and_still_raises(self):
-        error = subprocess.CalledProcessError(7, ["nx", "affected"])
-        with patch("nx_ci.nx", side_effect=error), self.assertRaises(
-            subprocess.CalledProcessError
-        ) as caught:
-            nx_ci.select(self.args)
-        self.assertIs(error, caught.exception)
-        self.assertFalse(self.args.plan.exists())
-        self.assertIn("Incomplete", self.summary.read_text())
+        for output, stderr in (("Nx graph failed\n", "dependency error\n"), (None, None)):
+            with self.subTest(output=output, stderr=stderr):
+                error = subprocess.CalledProcessError(
+                    7, ["nx", "affected"], output=output, stderr=stderr,
+                )
+                stdout, diagnostics = io.StringIO(), io.StringIO()
+                with patch("nx_ci.nx", side_effect=error), redirect_stdout(stdout), \
+                        redirect_stderr(diagnostics), self.assertRaises(
+                            subprocess.CalledProcessError
+                        ) as caught:
+                    nx_ci.select(self.args)
+                self.assertIs(error, caught.exception)
+                self.assertFalse(self.args.plan.exists())
+                self.assertIn("Incomplete", self.summary.read_text())
+                self.assertEqual("", stdout.getvalue())
+                self.assertEqual((output or "") + (stderr or ""), diagnostics.getvalue())
 
     def test_local_selection_stdout_remains_machine_readable(self):
         plan = self.plan(["test"])

@@ -201,6 +201,29 @@ Pushes to `main`, release tags, Build manual dispatches, and the weekly Build sc
 `run-many`, bypassing affected selection. Standalone Tests manual dispatches also generate a full
 verification plan. A release still uses the existing publication approvals and package version logic.
 
+### Run the full pipeline on a branch without deploying
+
+PR checks select affected projects; a green PR run is not evidence that every check ran.
+Before merging a CI repair, dispatch **Build** on the pushed repair branch and require a passing
+full run at its final commit:
+
+```sh
+gh workflow run build.yml --ref <branch-name>
+gh run list --workflow build.yml --branch <branch-name> --event workflow_dispatch
+gh run watch <run-id> --exit-status
+```
+
+In the GitHub UI, use **Actions > Build > Run workflow** and select the branch.
+Check the run's commit SHA and its **Nx verification selection** summary: it must say **Full**,
+with all six environments selected. This covers the Release build/package checks, unit tests,
+three browsers, Linux desktop, editor and CI/documentation/bounded-performance checks.
+
+Manual dispatch cannot publish samples, NuGet packages, Marketplace extensions or GitHub releases:
+those jobs require a `push` event. Tag-only cross-platform CLI/VSIX packaging and exhaustive
+performance workloads remain separate from normal main verification. Dispatch **Build**, not
+standalone **Tests**, to include the build/package job. Repeat full verification after changing the
+branch or integrating newer main changes.
+
 To reproduce the full regular suite locally, retain the same browser/native prerequisites as CI:
 
 ```sh
