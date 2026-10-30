@@ -41,12 +41,13 @@ public sealed class DebuggerTests
             var snapshot = await WaitFor(driver, "Late scene 1000.");
             Assert.Contains("Synthetic history", snapshot.Content);
             Assert.Contains("Seed: 42", snapshot.Content);
-            await driver.FillAsync("Filter decisions", "c0");
+            await driver.FillAsync("Filter decisions", "step:4999:1");
             snapshot = await WaitFor(driver, "ConditionTrue");
             Assert.Contains("Offered", snapshot.Content);
-            await driver.ActivateAsync("Choice scene1000 c0: Offered (ConditionTrue)");
+            await driver.ActivateAsync("Choice scene1000 step:4999:1: Offered (ConditionTrue)");
             snapshot = await WaitFor(driver, "Events [");
             Assert.Contains("ready", snapshot.Content);
+            Assert.Contains("Source: main.tale:4999:1", snapshot.Content);
             await driver.ChooseAsync("Prepared");
             await WaitFor(driver, "Play again");
             await File.WriteAllTextAsync(tale, "=== scene1\n-> missing");
@@ -380,7 +381,7 @@ public sealed class DebuggerTests
                 await driver.FillAsync("Value var:count", "7");
                 await driver.ClickAsync("Start selected scene");
                 await WaitFor(driver, "Before scene1000. Count 7. Robin.");
-                await driver.FillAsync("Filter decisions", "c0");
+                await driver.FillAsync("Filter decisions", "step:4999:1");
                 await WaitFor(driver, "ConditionTrue", "Offered");
                 source = source.Replace("Before scene1000.", "After scene1000.");
                 await File.WriteAllTextAsync(tale, source);
