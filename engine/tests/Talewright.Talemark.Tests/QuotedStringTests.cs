@@ -53,6 +53,7 @@ public class QuotedStringTests
         Assert.Equal(2, text.Split("Say \"hi\" \\ {x}, # ] ) ;").Length - 1);
         var choice = Assert.Single(scene.Steps.OfType<ChoiceStep>()).Choice;
         Assert.True(ExpressionEvaluator.IsTrue(choice.Requires!, EvaluationContext.For(log.State)));
+        Assert.NotNull(choice.Label);
         Assert.Equal(Value, Assert.IsType<RenderedText>(Assert.Single(renderer.RenderInlines(choice.Label, log.State))).Text);
         EffectExecutor.ExecuteAll(choice.Effects, log, story.Predicates);
         Assert.Equal(Value, log.State.GetTextVariable(new("word")));
