@@ -70,17 +70,19 @@ def verify(directory, version):
                 raise ValueError(f"{path}: unexpected or duplicate package {identity}")
             if metadata.findtext("{*}version") != version:
                 raise ValueError(f"{path}: package version does not match {version}")
-            required_files = ["README.md", f"lib/net10.0/{identity}.dll"]
+            if metadata.findtext("{*}icon") != "icon.png":
+                raise ValueError(f"{path}: package icon must be icon.png")
+            required_files = ["README.md", "icon.png", f"lib/net10.0/{identity}.dll"]
             if identity == "Talewright.LanguageServer":
                 required_files = [
-                    "README.md", "tools/net10.0/any/DotnetToolSettings.xml",
+                    "README.md", "icon.png", "tools/net10.0/any/DotnetToolSettings.xml",
                     *[f"tools/net10.0/any/Talewright.LanguageServer.{extension}"
                       for extension in ("dll", "deps.json", "runtimeconfig.json")],
                     "tools/net10.0/any/Talewright.Authoring.dll",
                     *[f"tools/net10.0/any/{assembly}.dll" for assembly in ENGINE_ASSEMBLIES - {"Talewright.Runtime"}],
                 ]
             if identity == "Talewright.Cli":
-                required_files = ["README.md", "tools/net10.0/any/DotnetToolSettings.xml",
+                required_files = ["README.md", "icon.png", "tools/net10.0/any/DotnetToolSettings.xml",
                                   "tools/net10.0/any/Talewright.Cli.dll",
                                   "tools/net10.0/any/Talewright.Cli.deps.json",
                                   "tools/net10.0/any/Talewright.Cli.runtimeconfig.json",

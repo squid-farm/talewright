@@ -8,7 +8,16 @@ let client;
 
 async function activate(context) {
   registerAuthorActions(context);
-  if (!vscode.workspace.isTrusted) return;
+  if (!vscode.workspace.isTrusted) {
+    // VS Code does not reactivate extensions with limited trust support, so start once trust is granted.
+    context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => startLanguageServer(context)));
+    return;
+  }
+  await startLanguageServer(context);
+}
+
+async function startLanguageServer(context) {
+  if (client) return;
   const configuration = vscode.workspace.getConfiguration('talewright');
   if (!configuration.get('languageServer.enabled', true)) return;
   let command = configuration.get('languageServer.command', '');

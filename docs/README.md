@@ -32,3 +32,5 @@ New here? Play the [web player](https://play.trytalewright.com/), then follow
 
 Extending Talewright in C# or contributing to the engine: see the **[developer docs](developer/README.md)**
 and **[CONTRIBUTING](../CONTRIBUTING.md)**.
+
+Thanks to everyone in the [hall of fame](hall-of-fame.md) who helped make Talewright better.

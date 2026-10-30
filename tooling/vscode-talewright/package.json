@@ -4,6 +4,7 @@
   "description": "Talemark highlighting, snippets, story configuration schema, shared completion/hover/navigation, and live compiler diagnostics.",
   "version": "0.1.0",
   "publisher": "squid-farm",
+  "icon": "icon.png",
   "license": "MPL-2.0",
   "main": "./dist/extension.cjs",
   "activationEvents": ["onLanguage:tale", "onLanguage:yaml", "workspaceContains:**/story.talewright.yaml", "onTaskType:talewright"],

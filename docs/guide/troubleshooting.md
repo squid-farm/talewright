@@ -8,6 +8,17 @@ can cause several messages. Look up any code in [error codes](../reference/diagn
 If the list says the story has no `story.talewright.yaml`, make sure the zip contains `story.talewright.yaml`, either at the
 top level or inside a single folder.
 
+## VS Code doesn't underline mistakes as I type
+
+- Check that the bottom-right corner says **Talemark** when a `.tale` file is open. If it says
+  **Plain Text**, the file name must end in `.tale`.
+- Live checks only run in a trusted folder. If VS Code shows **Restricted Mode** in the bottom-left
+  corner, select it and choose **Trust**. Checking starts straight away.
+- Open **View > Output** and choose **Talewright Language Server** from the list to see why the
+  live checker did not start. Only Linux x64 is runtime-tested; please report failures on other systems.
+- **Talewright: Validate Story** in the Command Palette uses the separate CLI, not the live checker.
+  Run **Talewright: Set Up CLI** first if VS Code says the CLI is missing.
+
 ## A choice I wrote doesn't appear
 
 Choices with `(requires: ...)` are hidden while the condition is false. So are choices inside an
@@ -34,7 +45,8 @@ saves to a file for backup is planned ([#84](https://github.com/squid-farm/talew
 ## The desktop player or debugger won't start on Linux
 
 Install WebKitGTK 4.1: `sudo apt install libwebkit2gtk-4.1-0` (Debian, Ubuntu, Mint) or your
-distribution's equivalent. You also need a graphical desktop session. Players of published Linux games
+distribution's equivalent. You also need a graphical desktop session (X11 or Wayland); the
+debugger cannot open from a remote terminal or SSH session without one. Players of published Linux games
 need it too; removing that step is being explored ([#85](https://github.com/squid-farm/talewright/issues/85)).
 
 ## A published desktop game won't start

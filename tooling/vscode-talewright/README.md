@@ -41,7 +41,7 @@ failures, including your OS, architecture and **Talewright Language Server** out
    `talewright.languageServer.enabled` to `false` for schema/syntax-only use.
    Reload the window after changing settings. Launch errors appear in the
    **Talewright Language Server** output channel. Untrusted workspaces never
-   launch a process.
+   launch a process; the server starts as soon as you trust the folder, without a reload.
 
 This package identifier is `squid-farm.talewright`.
 
@@ -89,7 +89,7 @@ workspace trust. See [server setup and other editors](https://github.com/squid-f
 
 ## CLI actions (separate CLI installation required)
 
-The Command Palette provides **Talewright: Validate Story**, **Talewright: Publish Story ZIP**
+The Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**) provides **Talewright: Validate Story**, **Talewright: Publish Story ZIP**
 and **Talewright: Open Author Debugger**. These run the existing `talewright` CLI in a visible,
 interactive task terminal. The bundled language server provides live editor help; it is **not**
 the CLI and does not include the native debugger.

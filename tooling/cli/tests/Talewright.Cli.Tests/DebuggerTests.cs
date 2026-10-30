@@ -291,5 +291,17 @@ public sealed class DebuggerTests : IDisposable
         Assert.Contains("TWCLI002", error.ToString());
     }
 
+    [Theory]
+    [InlineData(":0", null, true)]
+    [InlineData(null, "wayland-0", true)]
+    [InlineData(":0", "wayland-0", true)]
+    [InlineData(null, null, false)]
+    [InlineData("", "", false)]
+    public void Graphical_desktop_detection_accepts_x11_or_wayland(string? display, string? wayland, bool expected)
+    {
+        var environment = new Dictionary<string, string?> { ["DISPLAY"] = display, ["WAYLAND_DISPLAY"] = wayland };
+        Assert.Equal(expected, DebugCommand.HasGraphicalDisplay(name => environment.GetValueOrDefault(name)));
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

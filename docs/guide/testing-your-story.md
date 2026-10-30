@@ -4,7 +4,7 @@ Talewright checks your whole story every time it loads, so most mistakes show up
 There are three ways to test, from quickest to most thorough.
 
 In VS Code, use **Talewright: Validate Story** and **Talewright: Open Author Debugger** from the
-Command Palette. Run **Talewright: Set Up CLI** if needed; the extension's live diagnostics and the
+Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**). Run **Talewright: Set Up CLI** if needed; the extension's live diagnostics and the
 CLI are separate. See [tool setup](cli-installation.md) for portable downloads and prerequisites.
 The examples below use `talewright`, the .NET-tool command. From a portable tools folder, use
 `.\Talewright.Cli.exe` on Windows or `./Talewright.Cli` on Mac/Linux instead, and quote story paths
