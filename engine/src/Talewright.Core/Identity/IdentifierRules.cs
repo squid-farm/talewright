@@ -1,10 +1,10 @@
-namespace Talewright.Talemark.Parsing;
+namespace Talewright.Core.Identity;
 
 /// <summary>
 /// The one identifier rule: an ASCII letter or '_', then letters, digits and '_',
 /// with single '.' or '-' separators between word groups.
 /// </summary>
-internal static class IdentifierRules
+public static class IdentifierRules
 {
     public static bool IsValid(string value)
     {

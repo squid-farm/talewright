@@ -29,7 +29,9 @@ naming lint diagnostics TWL001 and TWL002 are warnings about that style.
 The same story-name character set applies in the compiler, manifest schema and editor grammar.
 Expression words such as `true`, `false`, `and`, `or`, `not`, `has` and `visited` have special meanings
 in their expression positions; a valid spelling is not a guarantee that a name is available there.
-C#-registered predicate and modifier names also depend on their registration contracts.
+Named predicates use these same case-sensitive identifier rules, including dotted and hyphenated
+names such as `@Can.Open-door`. Invalid predicate names are rejected at C# registration.
+Modifier names depend on their registration contract.
 Pronoun properties use `character:pronoun:subject`, `:object`, `:reflexive`,
 `:possessive-pronoun:determiner` and `:possessive-pronoun:independent`.
 `character:pronoun` is subject shorthand. Dots remain part of names, not property access.

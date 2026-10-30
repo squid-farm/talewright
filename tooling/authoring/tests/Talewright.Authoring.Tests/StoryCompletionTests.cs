@@ -1,4 +1,5 @@
 using Talewright.Core.Rulesets;
+using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
@@ -418,6 +419,31 @@ public sealed class StoryCompletionTests
 
     private static string Apply(string line, int start, int end, string newText) =>
         line[..(start - 1)] + newText + line[(end - 1)..];
+
+    [Theory]
+    [InlineData("Can.", "Can.Open-door")]
+    [InlineData("Can.Op", "Can.Open-door")]
+    [InlineData("Can-", "Can-Go")]
+    public void Predicate_completion_replaces_the_whole_dotted_or_hyphenated_name(string prefix, string expected)
+    {
+        var marked = $"=== first\n@requires @{prefix}|";
+        var caret = marked.IndexOf('|');
+        var options = new CompilerOptions
+        {
+            Predicates = new NamedPredicateRegistry()
+                .Register("Can.Open-door", _ => throw new InvalidOperationException("Must not execute during analysis."))
+                .Register("Can-Go", _ => true),
+        };
+        var analysis = AuthoringProjectMetadata.Export(options).Analyze(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["main.tale"] = marked.Remove(caret, 1),
+        }));
+        var item = Assert.Single(StoryCompletion.Complete(analysis, Position("main.tale", marked[..caret])),
+            completion => completion.Label == expected);
+        Assert.Equal($"@requires @{expected}",
+            Apply(marked.Split('\n')[1].Replace("|", ""), item.Range.Start.Column, item.Range.End.Column, item.NewText));
+    }
 
     private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked)
     {

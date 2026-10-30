@@ -1,4 +1,5 @@
 using Talewright.Core.State;
+using Talewright.Core.Identity;
 
 namespace Talewright.Rules.Expressions;
 
@@ -14,6 +15,12 @@ public sealed class NamedPredicateRegistry
 
     public NamedPredicateRegistry Register(string name, Func<IGameStateView, bool> predicate)
     {
+        ArgumentNullException.ThrowIfNull(name);
+        if (!IdentifierRules.IsValid(name))
+        {
+            throw new ArgumentException("Predicate names must use ASCII letters, digits or underscores, start with a letter or underscore, and use single dots or hyphens only between name segments.", nameof(name));
+        }
+
         _predicates[name] = predicate;
         return this;
     }
