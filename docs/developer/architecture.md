@@ -285,8 +285,8 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   - `StoryCompiler`: orchestrates. Order: read `story.talewright.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
     every `.tale` for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
     validate → assemble `StoryDefinition`. Any error ⇒ `Story` is null.
-  - `StoryValidator`: whole-story checks after parsing: start scene exists, dead ends, fall-through with nowhere
-    to go, empty hubs, unreachable scenes.
+  - `StoryValidator`: whole-story checks after parsing: start scene exists, choices form the final block
+    and have explicit targets, no dead ends, empty hubs, unreachable steps and scenes.
 - **`Parsing/`**
   - `StoryYamlReader`: `story.talewright.yaml` → manifest (uses YamlDotNet's node model, not reflection-based
     deserialisation, for trimming and precise error locations).
@@ -412,36 +412,39 @@ samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Co
 
 ## 5. The engine loop in detail
 
-All of this is in `engine/src/Talewright.Runtime/StorySession.cs` (the class remarks repeat it next to the code).
+`StorySession` owns transitions and presentation. `SceneExecutor` interprets the compiled
+`SceneDefinition.Steps`; the same nested step model is used by validation and inspection.
 
 **Entering a scene** (`Enter`):
 
 1. Append `SceneEntered(scene)` (this increments the visit count).
-2. Run entry effects (`~` lines), each only if its `{if}` condition holds.
-3. `AfterChanges()`: run triggers until stable, then `StateChanges.CheckLevel` for every character.
-4. Render the scene body with the _current_ state, so text reflects the entry effects.
-5. Append notes describing what changed (`EventNarrator`).
-6. Decide what to offer:
-   - **Entry skill check** (`::: skill-check` at the top level of a scene): resolve it now, apply the outcome's
-     effects, and offer a single **Continue** that leads to the outcome's target.
-   - Otherwise, **choices**: explicit `*` choices whose `requires` hold (keys `c0`, `c1`, …) plus, if the scene is
-     a `@hub tag`, `all(a,b)` or `any(a,b)`, eligible other storylets matching that query
-     (keys `storylet:<scene-id>`). Filter requirements/once/self first, sort by descending priority
-     then declaration order and apply optional positive `@hub-limit` to generated choices only.
-   - If that's empty: the **first matching divert** `->` becomes a **Continue**. If that divert is `-> END`, the
-     story ends right here and this scene is the final frame.
+2. Settle visit-trigger consequences through `AfterBatch` (bounded triggers and leveling).
+3. Execute steps in source order: render prose against the current state, decide each conditional block
+   once, apply each effect line as a batch, and resolve checks when reached.
+4. After each effect/outcome batch, `AfterBatch` settles triggers and leveling. Insert `EventNarrator` notes
+   at that point, before rendering the next prose step.
+5. Collect choices when reached: evaluate requirements and render their labels then. The compiler requires
+   choices to be the final block, but the executor itself does not impose a separate choice phase.
+6. A reached divert stops all later steps, offering **Continue**, or ending with the current frame for END.
+   Otherwise offer collected choices followed by eligible hub storylets (keys `storylet:<scene-id>`).
+   Filter requirements/once/self, order by priority then declaration order, and apply `@hub-limit` only
+   to generated choices. A scene divert never acts as a fallback for choices or hubs.
 
 **Choosing** (`Choose(key)`):
 
 1. Append `ChoiceMade`.
-2. Run the choice's effects.
+2. Run the choice's effects as one batch, then `AfterBatch`.
 3. If the choice has a skill check, resolve it (`DiceRolled` + `SkillCheckResolved`) and run the success or
    failure effects.
-4. `AfterChanges()` (triggers, leveling).
+4. `AfterBatch()` for that outcome (triggers, leveling).
 5. Collect notes for everything that happened. They are shown at the top of the _next_ frame.
-6. Go to the choice's (or outcome's) target. **If none was given, fall through** to the current scene's first
-   matching `->`, evaluated _after_ the effects. This lets an author write
-   `* [Bribe him] { var:gold -= 5 }` and let a single `-> market` below handle every choice.
+6. Go to the choice's (or outcome's) explicit target. Missing targets are compile errors.
+   `BeforeTransition` clears the old actions and author entry boundary before the next scene begins.
+
+Steps carry stable source-position IDs and spans. Choice keys still count choice steps in source order.
+Shared structural walks exclude steps beyond guaranteed exits, keeping validator reachability consistent
+with the model consumed by the story map. The replay fingerprint salt is `talewright-replay-v2`; the
+player save format itself is unchanged.
 
 Invalid keys throw `InvalidOperationException` listing the valid ones. The UI only ever sends keys it was given.
 

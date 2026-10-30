@@ -46,7 +46,7 @@ public class ItemGrammarTests
         var state = GameState.CreateInitial(story.World, 1);
         Assert.Equal(1, state.GetItemCount(EntityId.Player, new("pants")));
         Assert.Equal(5, state.GetItemCount(EntityId.Player, new("sword")));
-        Assert.Equal(expected, new TemplateRenderer().Render(story.GetScene(new("start")).Body, state).ToPlainText());
+        Assert.Equal(expected, new TemplateRenderer().Render(CompilerTests.Templates(story.GetScene(new("start"))), state).ToPlainText());
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class ItemGrammarTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
         Assert.Equal("Those pants look expensive. Some ARMOR/These pants/are/HANDCUFFS'",
-            new TemplateRenderer().Render(story.GetScene(new("start")).Body, GameState.CreateInitial(story.World, 1)).ToPlainText());
+            new TemplateRenderer().Render(CompilerTests.Templates(story.GetScene(new("start"))), GameState.CreateInitial(story.World, 1)).ToPlainText());
         var plural = Assert.Single(story.World.Items.Values, item => item.Id == new ItemId("pants"));
         Assert.Equal(GrammaticalNumber.Plural, plural.NameAgreement);
         Assert.False(plural.Uncountable);

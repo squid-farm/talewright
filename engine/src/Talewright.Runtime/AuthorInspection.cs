@@ -4,6 +4,7 @@ using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Model;
+using Talewright.Talemark.Analysis;
 
 namespace Talewright.Runtime;
 
@@ -21,9 +22,13 @@ public sealed record AuthorTriggerInspection(string Id, bool HasFired);
 /// </summary>
 public sealed class AuthorInspection
 {
+    private readonly IReadOnlyDictionary<(SceneId Scene, string Step), SourceRange> _stepSources;
+
     internal AuthorInspection(StoryDefinition story, IGameStateView state, IReadOnlyList<GameEvent> events,
         IReadOnlyList<RuleDecision> decisions, bool decisionsCaptured)
     {
+        _stepSources = story.Scenes.SelectMany(scene => SceneSteps.Walk(scene.Steps)
+            .Select(step => (Key: (scene.Id, step.Id), step.Source))).ToDictionary(step => step.Key, step => step.Source);
         Seed = state.Seed;
         RollCount = state.RollCount;
         CurrentScene = state.CurrentScene;
@@ -72,6 +77,9 @@ public sealed class AuthorInspection
     public IReadOnlyList<KeyValuePair<VarId, string>> TextVariables { get; }
     public IReadOnlyList<AuthorSceneInspection> Scenes { get; }
     public IReadOnlyList<AuthorTriggerInspection> Triggers { get; }
+
+    public SourceRange? SourceFor(RuleDecision decision) =>
+        decision.Scene is { } scene ? _stepSources.GetValueOrDefault((scene, decision.Subject)) : null;
 
     public IEnumerable<RuleDecision> FindDecisions(string query = "", DecisionKind? kind = null)
     {

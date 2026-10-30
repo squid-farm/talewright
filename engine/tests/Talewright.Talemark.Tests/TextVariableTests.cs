@@ -4,6 +4,7 @@ using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Rules.Effects;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Tests;
 
@@ -46,9 +47,9 @@ public class TextVariableTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
         var log = new EventLog(story.World, 1);
-        foreach (var effect in story.Scenes[0].EntryEffects)
-            EffectExecutor.Execute(effect.Effect, log, story.Predicates);
-        var text = new TemplateRenderer().Render(story.Scenes[0].Body, log.State).ToPlainText();
+        foreach (var batch in story.Scenes[0].Steps.OfType<EffectStep>())
+            EffectExecutor.ExecuteAll(batch.Effects, log, story.Predicates);
+        var text = new TemplateRenderer().Render(CompilerTests.Templates(story.Scenes[0]), log.State).ToPlainText();
         Assert.Contains("orage \\ ciel|雪|12|1", text);
         Assert.Contains("equal", text);
         Assert.Contains("different", text);

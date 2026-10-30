@@ -37,9 +37,11 @@ images have a separate path catalogue. Unrelated files are not published as stor
    assignment targets from those blocks and manifest effects. Comments, prose and choice labels do not
    declare flags/vars. Forward references across files remain supported.
 3. **Parse.** `TaleParser` walks each file line by line (files in path order). Prose goes through `InlineParser`;
-   conditions, substitutions and effects through `ExpressionParser`. Choices/effects/diverts inside `{if}` blocks
-   get the condition ANDed in.
-4. **Validate.** `StoryValidator` checks the whole story (start scene, dead ends, fall-through, hubs, reachability).
+   conditions, substitutions and effects through `ExpressionParser`. `SceneDefinition.Steps` preserves source
+   order, effect batches and nested conditions. Every step has a deterministic source-position ID and half-open
+   UTF-16 source span; choice keys remain `c0`, `c1`, ... in source order.
+4. **Validate.** `StoryValidator` checks final choice blocks, explicit choice targets, dead ends, unreachable
+   steps, hubs and reachability. Shared `SceneSteps` walks describe possible flow without evaluating game state.
 5. **Assemble.** If there were no errors, build the `StoryDefinition`. Warnings never block compilation.
 
 ## Accepted source provenance
@@ -54,7 +56,7 @@ Errors produce no accepted map. Manually constructed results/C# story models may
 consumers must report absent provenance, not infer it from IDs or reparse source independently.
 The map stays outside `StoryDefinition` and does not affect fingerprints, runtime execution or saves.
 This is a narrow reusable scene-provenance seam, not the partial-symbol/overlay analysis API in #29
-and not a statement-level execution map.
+and remains separate from the step-level execution spans carried by `SceneDefinition.Steps`.
 
 ## Files
 
@@ -70,7 +72,8 @@ and not a statement-level execution map.
 | `Parsing/ExpressionParser.cs` | Recursive descent with type checking: conditions (`player:str >= 12 and player has rope`), numbers, substitutions (`player:first-name#possessive`), effects (`player:hp -= 2`). |
 | `Parsing/Lexer.cs` | Tokens for the expression parser. |
 | `Parsing/StorySymbols.cs` | Declared names (stats, characters, items, factions, flags, vars, scenes) for resolution. |
-| `Model/StoryDefinition.cs` | The compiled story: `StoryDefinition`, `SceneDefinition` (an `IStorylet`), `ChoiceDefinition`, `CheckBranch`, `CheckOutcome`, `ConditionalEffect`, `ConditionalDivert`, `DivertTarget` (incl. `End`). |
+| `Model/StoryDefinition.cs` | The compiled story: `StoryDefinition`, `SceneDefinition` (an `IStorylet` with ordered `Steps`; `Choices` is derived), `ChoiceDefinition`, `CheckBranch`, `CheckOutcome`, `DivertTarget` (incl. `End`). |
+| `Model/SceneStep.cs` | Ordered scene steps (prose, effect, `{if}` branch, choice, divert, check), each with a stable `step:<line>:<column>` ID and source span, plus the shared `SceneSteps` walks for successors and reachability. |
 | `Diagnostics/Diagnostic.cs` | `Diagnostic`, `DiagnosticSeverity`, `SourceLocation`, `DiagnosticBag`. |
 
 ## Diagnostic codes
@@ -80,8 +83,9 @@ the [error code reference](../../../docs/reference/diagnostics.md). To find wher
 
 ## Semantics worth knowing
 
-- A choice (or check outcome) with no `-> target` **falls through** to the scene's first matching `->`,
-  evaluated after the choice's effects.
+- A scene runs in source order: each line sees only the lines above it, a block `{if}` is decided once, and a
+  reached `->` leaves immediately. Every choice and choice-check outcome needs its own `-> target`; there is no
+  scene fallback.
 - A line starting with `*` is a choice only if followed by a space, tab or `[`, so `*emphasis*` at the start of a
   paragraph is still prose.
 - Comparing a faction standing with a tier name (`faction:explorers-guild >= friendly`) compares tier order.

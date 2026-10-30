@@ -10,7 +10,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
         new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = "game:\n  id: hubs\n  title: Hubs\n  start: hub\ncharacters:\n  player: {first-name: Tester}\n",
-            ["main.tale"] = $"=== hub\n{metadata}\n-> END\n=== other\n@tags a,b\n-> END",
+            ["main.tale"] = $"=== hub\n{metadata}\n* [Leave] -> END\n=== other\n@tags a,b\n-> END",
         }));
 
     [Theory]
@@ -68,7 +68,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
                 === hub
                 @tags self
                 @hub {query}
-                -> END
+                * [Leave] -> END
                 === a
                 @tags a,b
                 -> END

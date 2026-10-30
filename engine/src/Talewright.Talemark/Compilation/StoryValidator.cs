@@ -8,7 +8,7 @@ namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// Whole-story structural checks that need every scene at once (<c>TW3xxx</c>): the start scene exists, no
-/// scene is a dead end, fall-through choices have somewhere to fall to, hubs have content, and every scene is
+/// scene is a dead end, choices have explicit targets, hubs have content, and every scene is
 /// reachable. Reference checks (unknown scenes, stats, items…) already happened while parsing.
 /// </summary>
 internal static class StoryValidator
@@ -84,25 +84,45 @@ internal static class StoryValidator
 
     private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)
     {
-        var hasOwnDivert = scene.Diverts.Count > 0;
-        if (!hasOwnDivert && scene.Choices.Count == 0 && scene.EntryCheck is null && scene.Hub is null)
+        var seenChoice = false;
+        CheckSteps(scene.Steps, ref seenChoice, diagnostics);
+        if (!SceneSteps.Targets(scene.Steps).Any()
+            && !SceneSteps.Reachable(scene.Steps).OfType<ChoiceStep>().Any() && scene.Hub is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
-            return;
         }
+    }
 
-        if (hasOwnDivert)
+    private static void CheckSteps(IReadOnlyList<SceneStep> steps, ref bool seenChoice, DiagnosticBag diagnostics)
+    {
+        var reachable = true;
+        foreach (var step in steps)
         {
-            return;
-        }
-
-        var fallsThrough =
-            scene.Choices.Any(c => c.Check is null && c.Divert is null)
-            || scene.Choices.Any(c => c.Check is { } check && (check.Success.Divert is null || check.Failure.Divert is null))
-            || scene.EntryCheck is { } entry && (entry.Success.Divert is null || entry.Failure.Divert is null);
-        if (fallsThrough)
-        {
-            diagnostics.Error("TW3003", $"Scene '{scene.Id}' has a choice or check outcome without '-> target', but the scene has no '-> target' of its own to fall through to.", location);
+            if (!reachable)
+            {
+                diagnostics.Warning("TW3012", "This line cannot run: an earlier step always leaves this block.", step.Source.Start);
+            }
+            if (seenChoice && step is not (ChoiceStep or ConditionalStep))
+            {
+                diagnostics.Error("TW3011", "Choices must be the final block of a scene. Move prose, effects, diverts and checks before the first choice.", step.Source.Start);
+            }
+            if (step is ConditionalStep branch)
+            {
+                CheckSteps(branch.Then, ref seenChoice, diagnostics);
+                CheckSteps(branch.Else, ref seenChoice, diagnostics);
+            }
+            if (step is ChoiceStep choice)
+            {
+                seenChoice = true;
+                var missingTarget = choice.Choice.Check is { } check
+                    ? check.Success.Divert is null || check.Failure.Divert is null
+                    : choice.Choice.Divert is null;
+                if (missingTarget)
+                {
+                    diagnostics.Error("TW3003", "Every choice and each choice skill-check outcome needs its own '-> target' or '-> END'. There is no scene fallback.", step.Source.Start);
+                }
+            }
+            reachable &= SceneSteps.CanContinue(step);
         }
     }
 
@@ -141,11 +161,7 @@ internal static class StoryValidator
 
     private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
     {
-        IEnumerable<DivertTarget?> targets = scene.Diverts.Select(d => d.Target)
-            .Concat(scene.Choices.Select(c => c.Divert))
-            .Concat(scene.Choices.Where(c => c.Check is not null).SelectMany(c => new[] { c.Check!.Success.Divert, c.Check.Failure.Divert }))
-            .Concat(scene.EntryCheck is { } e ? [e.Success.Divert, e.Failure.Divert] : []);
-        foreach (var target in targets)
+        foreach (var target in SceneSteps.Targets(scene.Steps))
         {
             if (target?.Scene is { } id)
             {
@@ -153,7 +169,7 @@ internal static class StoryValidator
             }
         }
 
-        if (scene.Hub is { } hub)
+        if (scene.Hub is { } hub && SceneSteps.CanContinue(scene.Steps))
         {
             foreach (var candidate in ResolveTags(hub, byTag))
             {

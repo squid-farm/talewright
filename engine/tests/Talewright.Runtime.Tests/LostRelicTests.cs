@@ -166,7 +166,7 @@ public partial class LostRelicTests
         Assert.Equal(2, history.State.GetItemCount(EntityId.Player, new ItemId("ration")));
         Assert.True(history.State.GetFlag(new FlagId("packing-open")));
         Assert.Equal(2, history.State.GetVariable(new("supplies")));
-        Assert.Equal("Sign the expedition register", Assert.Single(history.Current.Choices).Text);
+        Assert.Equal(["Return to camp", "Sign the expedition register"], history.Current.Choices.Select(choice => choice.Text));
         Choose(history, "Sign the expedition register");
         Choose(history, "Continue");
         Assert.Equal("camp.hub", history.Current.Scene!.Value.Value);
@@ -187,9 +187,9 @@ public partial class LostRelicTests
         Choose(history, "Sign the expedition register");
         Choose(history, "Continue");
         Choose(history, "Haggle for supplies");
-        Assert.Equal("Continue", Assert.Single(history.Current.Choices).Text);
+        Assert.Equal("Return to camp", Assert.Single(history.Current.Choices).Text);
         Assert.Equal(2, history.State.GetItemCount(EntityId.Player, new("ration")));
-        Choose(history, "Continue");
+        Choose(history, "Return to camp");
         Assert.Equal("camp.hub", history.Current.Scene!.Value.Value);
     }
 

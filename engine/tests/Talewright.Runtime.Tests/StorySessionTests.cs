@@ -87,16 +87,12 @@ public class StorySessionTests
     }
 
     [Fact]
-    public void Choice_effects_produce_notes_and_steer_fall_through_diverts()
+    public void Choice_effects_produce_notes_before_the_explicit_target()
     {
         var session = new StorySession(Compile("""
             === camp
-            * [Take the relic] { give player relic; faction:guild -= 20 }
-            * [Leave it]
-            {if player has relic}
-            -> cursed
-            {/if}
-            -> safe
+            * [Take the relic] { give player relic; faction:guild -= 20 } -> cursed
+            * [Leave it] -> safe
             === cursed
             The relic hums. Outcast: {if flag:outcast}yes{else}no{/if}.
             -> END
@@ -116,7 +112,7 @@ public class StorySessionTests
     }
 
     [Fact]
-    public void Entry_effects_apply_before_rendering()
+    public void Entry_effects_and_their_notes_precede_later_prose()
     {
         var session = new StorySession(Compile("""
             === camp
@@ -127,7 +123,7 @@ public class StorySessionTests
             """));
 
         var frame = session.Start();
-        Assert.Equal("Fires: 1. HP: 7.\n\n[Hit Points −3 (7)]", Text(frame));
+        Assert.Equal("[Hit Points −3 (7)]\n\nFires: 1. HP: 7.", Text(frame));
     }
 
     [Theory]
@@ -256,7 +252,7 @@ public class StorySessionTests
             """));
 
         var frame = session.Start();
-        Assert.Equal("Level 2.\n\n[Experience +150 (150)]\n\n[Level 2!]", Text(frame));
+        Assert.Equal("[Experience +150 (150)]\n\n[Level 2!]\n\nLevel 2.", Text(frame));
     }
 
     [Fact]

@@ -17,7 +17,6 @@ public sealed class RicherHubTests
                 @priority 999
                 * [Explicit] -> END
                 {{extra}}
-                -> END
                 === blocked
                 @tags a,b
                 @priority 100
@@ -66,7 +65,7 @@ public sealed class RicherHubTests
     }
 
     [Fact]
-    public void Fallback_does_not_replace_an_explicit_choice()
+    public void Empty_hub_keeps_the_explicit_exit_choice()
     {
         var history = History("all(absent,b)");
         Assert.Single(history.Current.Choices);

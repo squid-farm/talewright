@@ -95,7 +95,9 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         var diagnostics = Page.Locator(".tw-diagnostics");
         await Expect(diagnostics).ToContainTextAsync("TW2002");
         await Expect(diagnostics.Locator(".tw-diagnostic-where").First).ToHaveTextAsync(
-            "chapters/main.tale:1:1");
+            "chapters/main.tale:3:28");
+        await Expect(diagnostics.Locator("li").Filter(new() { HasTextString = "TW3003" })
+            .Locator(".tw-diagnostic-where")).ToHaveTextAsync("chapters/main.tale:3:1");
         await Expect(diagnostics.Locator("li").Filter(new() { HasTextString = "TW2002" })).ToContainTextAsync("missing");
         await Expect(diagnostics.Locator(".tw-warning")).ToHaveCountAsync(1);
         var severities = await diagnostics.Locator("li").EvaluateAllAsync<string[]>(

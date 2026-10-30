@@ -290,22 +290,54 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | blank-line separated text                          | Paragraphs (bold, italic and code formatting).                                                  |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
-| `~ effect`                                         | Effect applied when the scene is entered (before rendering).                                   |
+| `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
-| `-> target`                                        | Scene divert. With no choices, the player sees a single **Continue**. `-> END` ends the story. |
+| `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
 Metadata lines are only recognized directly after the `===` header. Lines starting with `//` are comments.
 
-**Where a scene goes next.** A choice with its own `-> target` (or a skill check) goes there. A choice with
-_no_ target — e.g. `* [Take the torch] { give player torch }` — uses the scene's own `-> target` line
-as its destination. A check outcome without `-> target` works the same way. A scene must have at least
-one way out (choices, `->`, a `::: skill-check` block or `@hub`), otherwise Talewright reports an error.
+**Scenes run top to bottom.** Each line sees the state produced by the lines above it, never by
+lines below it. Prose and substitutions render when reached. For example:
+
+```tale
+=== drawer
+{if not flag:searched}
+The drawer is still full.
+~ set flag:searched
+~ give player coin
+You take the coin.
+{/if}
+* [Leave] -> hall
+```
+
+The block condition is decided once. Setting `searched` inside the block does not skip its remaining
+lines. Change notes such as "Gained:" appear at the effect line, between the surrounding prose.
+
+**Where a scene goes next.** Every choice, including each outcome of a choice skill check, needs
+its own `-> target` or `-> END`. Choices are the scene's final block: after the first choice, only
+more choices, conditions containing only choices, comments and blank lines are allowed. Choice
+requirements and enclosing conditions are evaluated when reached; choice effects run when chosen.
+
+A scene-level `->` leaves immediately, showing the prose already rendered with a single **Continue**
+(or as the final frame for `-> END`). Put conditional early exits **before** the choices:
+
+```tale
+{if faction:gang <= -31}
+-> the-gang-hates-you
+{/if}
+* [Ask for work] -> gang.work
+* [Leave] -> street
+```
+
+There is no implicit fallback or gather. A scene without a possible choice, divert or hub is a dead end.
+These are breaking pre-v1 execution rules; the replay fingerprint changed, not the save format.
 
 **Advanced: hub selection.** A scene may have only one `@hub` and one
 `@hub-limit`. A hub checks tags, requirements and `@once`, then sorts matching scenes by priority
 before applying its limit. Multiple matching tags never duplicate a choice. Explicit choices are
-not capped. A fallback `->` applies only when no explicit or hub choices are available. These details
+not capped. Generated choices follow written choices when the scene reaches its end. Give a hub an
+explicit exit choice; a scene-level `->` leaves immediately instead of offering the hub. These details
 matter when building a story around hubs; you can skip them when using direct choices.
 
 For exact selection behavior: tags must be distinct and nonempty; the hub scene itself is never
@@ -314,9 +346,9 @@ only to generated hub choices, not choices written directly in the scene. When c
 scene can ever be reached, Talewright considers all matching tag scenes, even if the current limit
 would hide some; their requirements may change later.
 
-**Conditional structure.** Choices, `~` effects and `->` diverts inside a block `{if}` only apply when the
-condition holds (a choice's own `requires` is combined with it using `and`). With several `->` lines, the
-first whose condition holds wins, so put conditional diverts before an unconditional fallback.
+**Conditional structure.** A block `{if}` selects one branch once, when reached. Its nested steps run in
+order without retesting that condition. Inline conditions are evaluated when their prose line renders.
+Several conditional diverts may precede the choices; the first reached divert ends execution.
 
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
 by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
@@ -587,7 +619,10 @@ The current string-literal escape limitations in the
 quote or backslash decoding. See the runnable
 [TextVariables example](../../examples/TextVariables).
 
-Separated by `;` inside `{ }`, one per `~` line.
+Separate effects with `;` on a `~` line or inside a choice/outcome's `{ }`.
+Triggers and leveling settle after the whole batch, before the next line. For example,
+`~ var:gold -= 10; var:gold += 7` never exposes the temporary zero to triggers.
+Writing those effects on two `~` lines creates two batches instead.
 
 ```
 player:hp -= 3            stat arithmetic (= += -=), clamped to min/max
@@ -608,7 +643,7 @@ Attached to a choice (outcome lines indented below it):
   failure: { player:hp -= 2 } -> temple.fall
 ```
 
-Or as a block that resolves when the scene is entered:
+Or as a block that resolves at its position in the scene:
 
 ```tale
 ::: skill-check perception dc 12
@@ -616,6 +651,10 @@ success: -> temple.hidden-door
 failure: -> temple.hall
 :::
 ```
+
+An outcome's effects run there as one batch. An outcome with `->` leaves immediately; without it,
+an entry check continues with the next line. Multiple checks and checks inside block conditions
+are allowed, but all must precede the final choices. Choice-check outcomes always require targets.
 
 Optional actor: `skill-check guide survival dc 10`. Resolution is defined by the ruleset
 (generic: `d20 + attribute modifier + skill rank ≥ DC`). Dice are seeded and recorded as events.

@@ -66,13 +66,14 @@ Giving a character a value does not declare the skill. See the complete
 |---|---|---|
 | TW3001 | Text before the first scene, or no `.tale` files at all. | Start each file with `=== scene.id`. |
 | TW3002 | Dead end: a scene with no way out. | Add choices, `-> target` or `-> END`. |
-| TW3003 | A choice or check outcome has no target, and the scene has no `->` to fall through to. | Give it a target or add a `->` line to the scene. Also appears as a side effect of TW2002. |
+| TW3003 | A choice or choice-check outcome has no explicit target. | Add `-> target` or `-> END` to that choice/outcome. Scene diverts are not fallbacks. Also appears as a side effect of TW2002. |
 | TW3005 | The ruleset has no skill-check rule. | Use the `generic` ruleset, or remove the checks. |
-| TW3006 | More than one `::: skill-check` block in a scene, or one inside `{if}`. | Move the check into its own scene. |
 | TW3007 | The `start` scene doesn't exist. | Fix `game.start:` in `story.talewright.yaml`. |
 | ⚠ TW3008 | A hub has no scenes with its tags. | Tag some scenes, or fix the hub's tag. |
 | ⚠ TW3009 | A scene can never be reached. | Link to it, or remove it. Only shown once there are no errors. |
 | TW3010 | Two scenes have the same id. | Rename one. The message says where the first one is. |
+| TW3011 | A non-choice step follows the scene's first choice, including inside another condition branch. | Move prose, images, effects, diverts and checks before the final choice block. |
+| ⚠ TW3012 | A line cannot run because an earlier step always leaves its block. | Move the line before the exit, make the exit conditional, or remove the unreachable line. |
 
 ## TW4xxx: `story.talewright.yaml`
 

@@ -418,7 +418,7 @@ the plan above:
   object. Same guarantees, nothing to serialise.
 - **Fall-through diverts:** a choice or check outcome without `-> target` continues at the scene's first matching
   `->`, evaluated *after* its effects. This was not in the original syntax draft; it removes a lot of repetition.
-  Documented in the [Talemark syntax reference](../reference/talemark-syntax.md).
+  Superseded by ordered scene execution (#321): every choice and choice-check outcome now needs its own target.
 - **Built-in rulesets:** `generic` and `none` (no stats or checks; tiers only).
 - **Bundled stories** are embedded resources in each host (`stories/<Story>/<path>`), read through
   `IStoryLibrary`. No HTTP manifest. Desktop also takes folders/zips on the command line; both hosts accept a zip
@@ -432,7 +432,7 @@ the plan above:
 
 ### Open questions for review
 
-1. Fall-through divert semantics (above): keep?
+1. Fall-through divert semantics: resolved by ordered scene execution (#321); removed.
 2. The `none` ruleset keeps the generic reputation tiers. Should it have no tiers?
 3. Embedding all of `samples/` in both hosts: fine for now, to be replaced by `talewright publish` in M2?
 4. Item names are lowercase in the sample ("sputtering torch") and appear that way on the character sheet. Should

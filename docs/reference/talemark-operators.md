@@ -73,20 +73,23 @@ there is no general escape for a line directive today. Do not assume that `\@` o
 |---|---|---|---|
 | `===` | Start a scene on its own line; followed by one scene ID. | `=== camp.arrival` | TW1008 invalid ID; TW3010 duplicate; TW3001 text before a scene. |
 | `@` | Scene metadata directly after its header. `title` takes text; `requires` a condition; `tags` comma-separated tags; `priority` an integer; `once` no argument; `hub` a tag or `all(...)`/`any(...)`; `hub-limit` a positive integer with `hub`. | `@requires player:hp > 0` | TW1006 misplaced, duplicate or invalid metadata; TW1002 invalid priority; expression errors for conditions. |
-| `->` | Divert in a scene, choice or check outcome; takes one scene ID or `END`. Put a scene divert inside a block condition to make it conditional. | `-> camp.arrival` | TW1010 missing target; TW1008 invalid ID; TW2002 unknown target. |
+| `->` | Immediate divert in a scene, choice or check outcome; takes one scene ID or `END`. Later scene steps do not run. Conditional early exits precede choices; there is no fallback/gather. | `-> camp.arrival` | TW1010 missing target; TW1008 invalid ID; TW2002 unknown target; TW3011 after choices. |
 | `*` with `[label]` | Choice at the start of a line (`* ` or `*[`). Takes a prose label, optional `(requires: condition)`, `{ effects }`, target or skill check. This is not multiplication in this context. | `* [Enter] (requires: player:hp > 0) -> hall` | TW1011 malformed choice; TW3003 no usable target. |
 | `[` `]` | Bound a choice label; its contents are reader text with substitutions and formatting. The current label scanner skips backslash-escaped closing brackets. | `* [Hello {player:first-name}] -> hall` | TW1011 missing closing bracket. |
 | `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
-| `~` | Entry effect at the start of a line; followed by effects. Runs before rendering. | `~ var:coins += 1` | TW1003 malformed effect; name/type errors. |
+| `~` | Effect batch at the start of a line; executes in source order. Triggers settle after the whole semicolon-separated batch. | `~ var:coins += 1` | TW1003 malformed effect; TW3011 after choices; name/type errors. |
 | `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed effect block. |
 | `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted path and optional quoted literal alt, comma-separated. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "The camp")}` | TW1014 malformed call/escape. Asset validation and rendering are not connected yet. |
-| `:::` | Delimit an entry skill-check block. Opening line takes `skill-check [actor] skill dc number-expression`; closing line has only `:::`. Both outcomes are required. | `::: skill-check perception dc 12` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3006 illegal placement or duplicate check. |
+| `:::` | Delimit a skill check executed at this line. Opening takes `skill-check [actor] skill dc number-expression`; closing line has only `:::`. Both outcomes are required; an entry outcome without a target continues at the next line. | `::: skill-check perception dc 12` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3011 after choices. |
 | `:` in labels | Separates fixed control labels from their contents: `requires:`, `success:`, `failure:`. Not a property read in this context. | `success: -> hall` | TW1009 misplaced/missing outcomes; TW1011 malformed choice condition. |
 | `//` | Comment when it begins a trimmed line; the rest of the line is ignored. It is not a trailing-comment operator. | `// The guard remembers this.` | None for comment contents. |
 
 `END` is the reserved divert destination that ends the story, not a scene declaration.
 `skill-check` and `dc` are words, not new sigils. On a choice, write
 `* [Climb] skill-check athletics dc 14` and follow it with `success:` and `failure:` lines.
+Choices form the final block, optionally nested in conditions. Every choice and choice-check outcome
+requires an explicit target (TW3003). Block conditions select a branch once; inline conditions evaluate
+at their prose line. Unreachable steps after a guaranteed exit produce warning TW3012.
 Unknown names, incorrect types and malformed expressions can also produce the expression diagnostics
 below. See [error codes](diagnostics.md) for the complete messages.
 

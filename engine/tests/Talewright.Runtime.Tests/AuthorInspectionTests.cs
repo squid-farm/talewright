@@ -86,7 +86,7 @@ public sealed class AuthorInspectionTests
             * [Wait] -> END
             """, predicates: new NamedPredicateRegistry().Register("Never", _ => { calls++; return true; }));
         var session = Start(story);
-        var decision = Assert.Single(session.Inspect().FindDecisions("c0", DecisionKind.Choice));
+        var decision = Assert.Single(session.Inspect().FindDecisions("step:2:1", DecisionKind.Choice));
         Assert.Equal(DecisionOutcome.Excluded, decision.Outcome);
         Assert.Equal(DecisionReason.ConditionFalse, decision.Reason);
         var trace = Assert.IsType<ExpressionTrace>(decision.Expression);
@@ -271,11 +271,12 @@ public sealed class AuthorInspectionTests
         var session = Start(story);
         var diverts = session.Decisions.Where(d => d.Kind == DecisionKind.Divert).ToArray();
         Assert.Equal(3, diverts.Length);
-        Assert.Equal(DecisionOutcome.Excluded, diverts[0].Outcome);
+        Assert.Equal(DecisionOutcome.NotEvaluated, diverts[0].Outcome);
         Assert.Equal(DecisionOutcome.Selected, diverts[1].Outcome);
         Assert.Equal(DecisionOutcome.NotEvaluated, diverts[2].Outcome);
         Assert.Equal(DecisionReason.EarlierDivert, diverts[2].Reason);
-        Assert.Null(diverts[2].Expression!.Result);
+        Assert.Null(Assert.Single(session.Decisions, d => d.Kind == DecisionKind.Branch
+            && d.Reason == DecisionReason.EarlierDivert).Expression!.Result);
         session.Choose("continue");
         Assert.Equal("target", session.Current.Scene?.Value);
         Assert.Equal("c0", Assert.Single(session.Current.Choices).Key);
@@ -283,22 +284,20 @@ public sealed class AuthorInspectionTests
     }
 
     [Fact]
-    public void Available_choices_and_explicit_targets_explain_unevaluated_fallbacks()
+    public void Early_exit_explains_unevaluated_later_choice_requirements()
     {
         var calls = 0;
         var story = Compile("""
             === start
-            * [Next] -> target
-            {if @Never}
-            -> END
-            {/if}
+            -> target
+            * [Unused] (requires: @Never) -> END
             === target
             -> END
             """, predicates: new NamedPredicateRegistry().Register("Never", _ => { calls++; return true; }));
         var session = Start(story);
-        Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Divert && d.Reason == DecisionReason.ChoicesAvailable);
-        session.Choose("c0");
-        Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Divert && d.Reason == DecisionReason.ExplicitTarget);
+        Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Choice && d.Reason == DecisionReason.EarlierDivert
+            && d.Outcome == DecisionOutcome.NotEvaluated);
+        session.Choose("continue");
         Assert.Equal(0, calls);
     }
 
@@ -312,12 +311,11 @@ public sealed class AuthorInspectionTests
         var story = Compile($$"""
             === start
             @hub hub
-            * [Unused] (requires: @Never) -> END
             ::: skill-check athletics dc {{dc}}
-            success: { var:count += 1 }
-            failure: { var:count += 2 }
+            success: { var:count += 1 } -> target
+            failure: { var:count += 2 } -> target
             :::
-            -> target
+            * [Unused] (requires: @Never) -> END
             === target
             @tags hub
             @requires @Never
@@ -338,9 +336,8 @@ public sealed class AuthorInspectionTests
         Assert.Contains(session.Events.Skip(effects.EventStart!.Value)
             .Take(effects.EventEnd!.Value - effects.EventStart.Value), e => e is VariableChanged);
         Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Choice && d.Reason == DecisionReason.EntryCheck);
-        Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Storylet && d.Reason == DecisionReason.EntryCheck);
-        Assert.DoesNotContain(session.Decisions, d => d.Kind == DecisionKind.Divert && d.Outcome == DecisionOutcome.NotEvaluated);
-        Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Divert && d.Outcome == DecisionOutcome.Selected);
+        Assert.Contains(session.Decisions, d => d.Kind == DecisionKind.Storylet && d.Reason == DecisionReason.ExplicitTarget);
+        Assert.DoesNotContain(session.Decisions, d => d.Kind == DecisionKind.Divert);
         Assert.Equal(0, calls);
     }
 
@@ -368,7 +365,7 @@ public sealed class AuthorInspectionTests
                 once: false
             """);
         var session = Start(story);
-        var excluded = Assert.Single(session.Decisions, d => d.Kind == DecisionKind.EntryEffect && d.Subject == "entry:0");
+        var excluded = Assert.Single(session.Decisions, d => d.Kind == DecisionKind.Branch && d.Subject == "step:2:1");
         Assert.Equal(DecisionReason.ConditionFalse, excluded.Reason);
         Assert.Equal(false, excluded.Expression?.Result?.Bool);
         Assert.True(session.State.GetFlag(new FlagId("ready")));
@@ -465,7 +462,7 @@ public sealed class AuthorInspectionTests
         var session = Start(story);
         Assert.Equal(1, calls);
         var inspection = session.Inspect();
-        Assert.Single(inspection.FindDecisions("C0", DecisionKind.Choice));
+        Assert.Single(inspection.FindDecisions("STEP:2:1", DecisionKind.Choice));
         Assert.Empty(inspection.FindDecisions("missing"));
         Assert.Single(inspection.FindCharacters("robin"));
         Assert.Empty(inspection.FindCharacters("missing"));

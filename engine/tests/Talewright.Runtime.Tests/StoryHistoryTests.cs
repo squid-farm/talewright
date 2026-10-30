@@ -319,19 +319,15 @@ public class StoryHistoryTests
                     Once = scene.Once,
                     Hub = scene.Hub,
                     HubLimit = scene.HubLimit,
-                    EntryEffects = scene.EntryEffects,
-                    Body = scene.Body,
-                    EntryCheck = scene.EntryCheck,
-                    Choices =
+                    Steps =
                     [
-                        new ChoiceDefinition
+                        new ChoiceStep("step:2:1", scene.Steps[0].Source, new ChoiceDefinition
                         {
                             Key = key,
                             Label = scene.Choices[0].Label,
                             Divert = new DivertTarget(story.Start),
-                        },
+                        }),
                     ],
-                    Diverts = scene.Diverts,
                 },
             ],
         };

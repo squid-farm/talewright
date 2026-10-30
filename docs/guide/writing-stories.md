@@ -26,6 +26,27 @@ Keep settings together while your story is small, or split related characters an
 items into smaller files as it grows. See [Organizing your story](organizing-your-story.md)
 for two complete layouts.
 
+## Scenes run top to bottom
+
+Each line sees only the changes above it. Put an effect before the prose that should show its result:
+
+```tale
+=== counter
+Before: {var:coins}.
+~ var:coins += 1
+After: {var:coins}.
+* [Again] -> counter
+* [Leave] -> END
+```
+
+On the first visit this shows "Before: 0" and "After: 1". A block `{if}` chooses its branch once;
+changing its condition inside that branch does not skip the remaining lines.
+Triggers run after each whole effect batch, and change notes appear where the batch happens.
+
+Keep choices last. Every choice and every choice-check outcome needs its own `->` destination.
+A scene-level `->` means **leave now**, not "use this if there are no choices"; later lines do not run.
+For an early exit, put the conditional `->` before the choices. Give hubs an explicit exit choice.
+
 ## Characters and pronouns
 
 Declare every character under `characters:` in `story.talewright.yaml` or a supporting
@@ -88,7 +109,7 @@ Will's +2 modifier totals 17 in the dream check. See
 [link a skill to a custom attribute](authoring-recipes.md#link-a-skill-to-a-custom-attribute)
 for the optional `governing-attribute` setting.
 
-Change stats with effects: `~ player:hp -= 2` on its own line when a scene starts, or
+Change stats with effects: `~ player:hp -= 2` on its own line where the change should happen, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
 
 ## Items
@@ -196,7 +217,7 @@ Attach a check to a choice:
   failure: { player:hp -= 2 } -> fall
 ```
 
-Or make it happen as soon as a scene starts:
+Or resolve it at a particular point in the scene:
 
 ```tale
 ::: skill-check perception dc 12
@@ -204,6 +225,9 @@ success: -> hidden-door
 failure: -> hall
 :::
 ```
+
+An entry-check outcome without `->` continues with the next line. An outcome with a target leaves
+immediately. Checks can appear inside block conditions or before later prose, but not after choices.
 
 A check rolls a d20 and adds the skill and its attribute bonus. Another character can make the check:
 `skill-check guide survival dc 10`. Results are shown to the player in the story.

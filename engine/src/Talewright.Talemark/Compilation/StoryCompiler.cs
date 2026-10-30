@@ -199,7 +199,7 @@ public static class StoryCompiler
             } while (!completed);
         }
 
-        Append("talewright-replay-v1");
+        Append("talewright-replay-v2");
         Append(compatibilityId);
         foreach (var (path, text) in source.Files.OrderBy(f => f.Key, StringComparer.Ordinal))
         {

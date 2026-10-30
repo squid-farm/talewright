@@ -30,7 +30,7 @@ internal static class AuthorReloadComparison
                 && (rules.SkillCheckRule is null or D20SkillCheckRule)
                 && (rules.LevelingRule is null or ExperienceLevelingRule)
                 && rules.Modifiers.Count == 0, "custom extensions require trusted rebuild/restart");
-            Require(story.Scenes.All(scene => BuiltInBlocks(scene.Body)
+            Require(story.Scenes.All(scene => BuiltInBlocks(SceneSteps.Walk(scene.Steps).OfType<ProseStep>().Select(step => step.Block))
                 && scene.Choices.All(choice => BuiltInInlines(choice.Label))),
                 "custom text modifiers require trusted rebuild/restart");
         }
@@ -118,6 +118,7 @@ internal static class AuthorReloadComparison
         }
         return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property => property.GetIndexParameters().Length == 0)
+            .Where(property => left is not SceneStep || property.Name is not (nameof(SceneStep.Id) or nameof(SceneStep.Source)))
             .All(property => Equal(property.GetValue(left), property.GetValue(right)));
     }
 }

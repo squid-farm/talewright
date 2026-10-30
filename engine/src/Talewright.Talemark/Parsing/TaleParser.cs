@@ -22,10 +22,7 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 /// grouped into paragraphs by blank lines and handed to <see cref="InlineParser"/>.
 /// </summary>
 /// <remarks>
-/// Block-level <c>{if}</c> lines push a condition onto a stack. Prose inside goes into a
-/// <see cref="ConditionalBlockTemplate"/>; choices, <c>~</c> effects and diverts inside get the combined
-/// condition attached (a choice's <c>requires</c> is ANDed with it), so "this choice only exists if…" can be
-/// written either way.
+/// Block-level conditions retain their nested steps so the runtime decides each branch once.
 /// </remarks>
 internal sealed partial class TaleParser
 {
@@ -75,6 +72,8 @@ internal sealed partial class TaleParser
         new TaleParser(file, text, symbols, new DiagnosticBag(), effects, scene).Run();
 
     private SourceLocation At(int column) => new(_file, _index + 1, column + 1);
+    private SourceRange SpanFrom(SourceLocation start) => new(start, At(_lineLength));
+    private static string StepId(SourceLocation start) => $"step:{start.Line}:{start.Column}";
 
     private void Run()
     {
@@ -236,7 +235,8 @@ internal sealed partial class TaleParser
                 var target = ParseDivertTarget(line[2..], indent + 2);
                 if (target is not null)
                 {
-                    scene.Diverts.Add(new ConditionalDivert(scene.CurrentCondition, target));
+                    var start = At(indent);
+                    scene.CurrentSteps.Add(new DivertStep(StepId(start), SpanFrom(start), target));
                 }
 
                 return;
@@ -412,10 +412,8 @@ internal sealed partial class TaleParser
     {
         var scene = _scene!;
         var frame = scene.Frames.Pop();
-        if (frame.Then.Count > 0 || frame.Else.Count > 0)
-        {
-            scene.CurrentBlocks.Add(new ConditionalBlockTemplate(frame.Condition, frame.Then, frame.Else));
-        }
+        scene.CurrentSteps.Add(new ConditionalStep(StepId(frame.Location), SpanFrom(frame.Location),
+            frame.Condition, frame.Then, frame.Else));
     }
 
     // ---- prose -----------------------------------------------------------------------------------------------------
@@ -431,7 +429,9 @@ internal sealed partial class TaleParser
         var inlines = _discoverEffects is null ? InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics) : [];
         if (inlines.Count > 0)
         {
-            scene.CurrentBlocks.Add(new ParagraphTemplate(inlines));
+            var start = scene.Paragraph.Locate(0);
+            scene.CurrentSteps.Add(new ProseStep(StepId(start),
+                new SourceRange(start, scene.Paragraph.Locate(scene.Paragraph.Text.Length)), new ParagraphTemplate(inlines)));
         }
 
         scene.Paragraph = new SourceText();
@@ -473,7 +473,8 @@ internal sealed partial class TaleParser
         var text = body[(colon + 1)..];
         var lead = text.Length - text.TrimStart().Length;
         var inlines = InlineParser.Parse(SourceText.Single(text.Trim(), At(indent + 1 + colon + 1 + lead)), _symbols, _diagnostics);
-        _scene!.CurrentBlocks.Add(new SpeechTemplate(speaker, inlines));
+        var start = At(indent);
+        _scene!.CurrentSteps.Add(new ProseStep(StepId(start), SpanFrom(start), new SpeechTemplate(speaker, inlines)));
     }
 
     // ---- effects and diverts ---------------------------------------------------------------------------------------
@@ -482,9 +483,10 @@ internal sealed partial class TaleParser
     {
         var lead = text.Length - text.TrimStart().Length;
         var effects = ParseEffects(text.Trim(), At(column + lead));
-        foreach (var effect in effects ?? [])
+        if (effects is not null)
         {
-            _scene!.EntryEffects.Add(new ConditionalEffect(_scene.CurrentCondition, effect));
+            var start = At(column - 1);
+            _scene!.CurrentSteps.Add(new EffectStep(StepId(start), SpanFrom(start), effects));
         }
     }
 
@@ -538,6 +540,7 @@ internal sealed partial class TaleParser
     private void ParseChoice(string line, int indent)
     {
         var scene = _scene!;
+        var start = At(indent);
         var rest = line[1..];
         var pos = SkipSpaces(rest, 0);
         if (pos >= rest.Length || rest[pos] != '[')
@@ -622,15 +625,15 @@ internal sealed partial class TaleParser
             }
         }
 
-        scene.Choices.Add(new ChoiceDefinition
+        scene.CurrentSteps.Add(new ChoiceStep(StepId(start), SpanFrom(start), new ChoiceDefinition
         {
-            Key = $"c{scene.Choices.Count}",
+            Key = $"c{scene.ChoiceCount++}",
             Label = label,
-            Requires = And(scene.CurrentCondition, requires),
+            Requires = requires,
             Effects = effects,
             Check = check,
             Divert = divert,
-        });
+        }));
     }
 
     // ---- skill checks ----------------------------------------------------------------------------------------------
@@ -649,21 +652,10 @@ internal sealed partial class TaleParser
         var check = ParseCheckSpec(spec["skill-check".Length..], indent + line.IndexOf("skill-check", StringComparison.Ordinal) + "skill-check".Length);
         var (success, failure) = ParseOutcomeLines(location, insideBlock: true);
 
-        if (scene.Frames.Count > 0)
-        {
-            _diagnostics.Error("TW3006", "A '::: skill-check' block cannot be inside {if}. Put the check in its own scene and divert to it conditionally.", location);
-            return;
-        }
-
-        if (scene.EntryCheck is not null)
-        {
-            _diagnostics.Error("TW3006", "A scene can have only one '::: skill-check' block.", location);
-            return;
-        }
-
         if (check is not null && success is not null && failure is not null)
         {
-            scene.EntryCheck = new CheckBranch(check, success, failure);
+            scene.CurrentSteps.Add(new CheckStep(StepId(location), SpanFrom(location),
+                new CheckBranch(check, success, failure)));
         }
     }
 
@@ -832,13 +824,6 @@ internal sealed partial class TaleParser
 
     // ---- helpers ---------------------------------------------------------------------------------------------------
 
-    private static Expr? And(Expr? a, Expr? b) => (a, b) switch
-    {
-        (null, _) => b,
-        (_, null) => a,
-        _ => new BinaryExpr(BinaryOp.And, a, b),
-    };
-
     private static int SkipSpaces(string text, int pos)
     {
         while (pos < text.Length && char.IsWhiteSpace(text[pos]))
@@ -910,8 +895,8 @@ internal sealed partial class TaleParser
     {
         public Expr Condition { get; } = condition;
         public SourceLocation Location { get; } = location;
-        public List<TemplateBlock> Then { get; } = [];
-        public List<TemplateBlock> Else { get; } = [];
+        public List<SceneStep> Then { get; } = [];
+        public List<SceneStep> Else { get; } = [];
         public bool InElse { get; set; }
     }
 
@@ -929,21 +914,13 @@ internal sealed partial class TaleParser
         public Talewright.Rules.Storylets.StoryletTags? Hub { get; set; }
         public int? HubLimit { get; set; }
         public HashSet<string> HubDirectives { get; } = [];
-        public List<ConditionalEffect> EntryEffects { get; } = [];
-        public List<TemplateBlock> Body { get; } = [];
-        public CheckBranch? EntryCheck { get; set; }
-        public List<ChoiceDefinition> Choices { get; } = [];
-        public List<ConditionalDivert> Diverts { get; } = [];
+        public List<SceneStep> Steps { get; } = [];
+        public int ChoiceCount { get; set; }
         public Stack<Frame> Frames { get; } = new();
         public SourceText Paragraph { get; set; } = new();
 
-        public List<TemplateBlock> CurrentBlocks =>
-            Frames.Count == 0 ? Body : Frames.Peek().InElse ? Frames.Peek().Else : Frames.Peek().Then;
-
-        /// <summary>The conjunction of every enclosing <c>{if}</c> (negated inside <c>{else}</c>), or null.</summary>
-        public Expr? CurrentCondition =>
-            Frames.Reverse().Aggregate<Frame, Expr?>(null, (acc, f) =>
-                And(acc, f.InElse ? new UnaryExpr(UnaryOp.Not, f.Condition) : f.Condition));
+        public List<SceneStep> CurrentSteps =>
+            Frames.Count == 0 ? Steps : Frames.Peek().InElse ? Frames.Peek().Else : Frames.Peek().Then;
 
         public SceneDefinition Build() => new()
         {
@@ -955,11 +932,7 @@ internal sealed partial class TaleParser
             Once = Once,
             Hub = Hub,
             HubLimit = HubLimit,
-            EntryEffects = EntryEffects,
-            Body = Body,
-            EntryCheck = EntryCheck,
-            Choices = Choices,
-            Diverts = Diverts,
+            Steps = Steps,
         };
     }
 }

@@ -20,6 +20,7 @@ while (!frame.IsEnded)
 |---|---|
 | `IStorySession.cs` | `Start()`, `Choose(key)`, `Current`, `State` (`IGameStateView`), `Events`, `Seed`, `Story`. |
 | `StorySession.cs` | The loop: entering scenes, building choices, resolving choices. The class doc comment is the spec. |
+| `SceneExecutor.cs` | Source-order step execution, branch decisions, effect batches, checks and inline notes. |
 | `StoryFrame.cs` | `StoryFrame(Scene, Title, Document, Choices, IsEnded)` and `ChoiceView(Key, Label)` (`Label` is rendered inlines; `.Text` gives plain text). |
 | `EventNarrator.cs` | Events → `RenderedNote`s ("Gained: rope", "Hit Points −3 (7)", "Athletics check: 10 +2 = 12 vs DC 12 — success", "Explorers' Guild −20 (now Unfriendly)", "Level 2!"). Other characters' changes are prefixed with their name. |
 
@@ -27,11 +28,13 @@ while (!frame.IsEnded)
 
 Full description in [architecture §5](../../../docs/developer/architecture.md#5-the-engine-loop-in-detail).
 
-- **Enter scene:** `SceneEntered` → entry effects → triggers + leveling → render body → notes → entry check
-  (offer Continue) *or* choices (explicit + hub storylets) *or* first matching divert as Continue (`-> END` ends
-  the story on this frame).
-- **Choose:** `ChoiceMade` → effects → check + outcome → triggers + leveling → go to target or fall through to the
-  scene's first matching `->`. Notes about what changed appear at the top of the next frame.
+- **Enter scene:** `SceneEntered` → settle visit-trigger consequences → execute ordered steps. Render prose at
+  its line; decide each block condition once; apply each effect batch, settle triggers/leveling and insert notes
+  there. Checks resolve at their line. A reached divert stops execution with Continue (or a final END frame).
+  Otherwise offer collected choices, followed by eligible hub storylets.
+- **Choose:** `ChoiceMade` → choice effect batch → optional check/outcome batch → explicit target.
+  `AfterBatch` settles triggers and leveling after each complete batch. `BeforeTransition` clears the old
+  continuation and entry boundary. Choice consequences appear at the top of the next frame.
 
 ## Choice keys
 
@@ -109,7 +112,8 @@ an existing session or does file I/O.
 The host supplies its trusted compiler/extension compatibility identity (for built-ins,
 `CompilerOptions.Default.CompatibilityId`); compiled stories also need a content fingerprint.
 The scenario stores story ID/version/fingerprint, the explicit extension identity, and the
-`author-replay-v2` protocol plus engine package version (informational version excluding build metadata).
+`author-replay-v3` protocol plus engine package version (informational version excluding build metadata).
+The protocol changed for ordered scene execution; neither the player-save shape nor scenario JSON shape changed.
 No extension is discovered or loaded from a file. Custom hosts must version extension behavior
 honestly and keep callbacks deterministic and side-effect-free.
 
@@ -146,11 +150,13 @@ it runs normal triggers/leveling against existing rising-edge memory after the c
 field keys (`flag:`, `var:`, `faction:`, `stat:`, `inventory:`) to distinguish character IDs
 from other editable fields.
 
-Presentation refresh renders current text and reevaluates choice/storylet eligibility and
-ordinary diverts without entering the scene, duplicating visits/effects or rolling dice.
-For an entry check, the already resolved continuation is retained even if edited state would
-produce a different outcome now. Its original notes and incoming transition notes remain visible.
-An edit leaving no live continuation is explicitly rejected; use fresh-world setup instead.
+Presentation refresh does not enter the scene, duplicate visits/effects or roll dice.
+Steps up to and including the scene's last executed effect batch or entry check keep their
+recorded text, branch decisions, notes and check continuation; refresh emits no new decisions
+for them. Steps after that point reevaluate against edited state: text, block conditions,
+diverts, choices and hub storylet eligibility. Incoming transition notes remain visible.
+Refresh rejects reaching an effect or check that did not run, and an edit leaving no live
+continuation; use fresh-world setup instead.
 
 `Jump(target)` uses normal scene entry on the existing session, unlike `JumpFresh`.
 The runtime rejects ended-session edits/jumps rather than clearing `IsEnded`.
@@ -242,11 +248,12 @@ Hub explanations distinguish tag/self/once exclusion, false requirements,
 duplicate IDs, stable priority ordering and hub-limit exclusion. Requirements
 are evaluated before ranking/limiting, as in normal selection. Explicit diverts
 still bypass storylet eligibility; observing them does not introduce new gates.
-Entry conditions, choice requirements, fallback diverts, check difficulty/results
+Block conditions, choice requirements, immediate diverts, check difficulty/results
 and outcome effects, trigger priming/edges/cascade effects are observed at their
 actual engine boundaries. This is not a trace of every prose substitution or
-effect arithmetic operation, nor an exact source navigator; source mapping is
-separate shared-analysis work.
+effect arithmetic operation. Scene decisions use stable step IDs, not collection indexes;
+`AuthorInspection.SourceFor` resolves their compiled source spans. Trigger/storylet subjects keep their IDs.
+The debugger displays the location without reevaluating any condition.
 
 Recording follows successful author candidate replay: `Choose`, `JumpFresh`
 and checkpoint `Reenter` preserve the recording setting, with no duplicated

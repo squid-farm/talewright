@@ -31,7 +31,7 @@
   },
   "Entry skill check": {
     "prefix": "tale-check",
-    "description": "Resolve a skill check when entering the scene.",
+    "description": "Resolve a skill check at this point in the scene.",
     "body": [
       "::: skill-check ${1:perception} dc ${2:12}",
       "success: -> ${3:scene.success}",

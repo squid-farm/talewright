@@ -19,7 +19,7 @@ public static class AuthorScenario
     public const int MaxIdentifierLength = 512;
     public const int MaxFields = 10_000;
     private const int FormatVersion = 2;
-    public static string EngineCompatibility => "author-replay-v2/"
+    public static string EngineCompatibility => "author-replay-v3/"
         + typeof(AuthorSession).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
     public static byte[] Export(AuthorSession session, string extensionIdentity)

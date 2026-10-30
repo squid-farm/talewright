@@ -27,6 +27,50 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Ordered_scene_text_and_inline_notes_survive_save_load_and_navigation()
+    {
+        await Upload(new StoryFixture("ordered-scenes", TestStories.DefaultYaml, """
+            === start
+            Before {var:visits}.
+            {if not flag:ready}
+            ~ set flag:ready; give player rope
+            ~ var:visits += 1
+            {/if}
+            After {var:visits}.
+            * [Go] -> next
+            === next
+            ~ var:visits += 1
+            Second {var:visits}.
+            * [Return] -> start
+            """));
+        await AssertState(state =>
+        {
+            var before = state.Passage.IndexOf("Before 0.", StringComparison.Ordinal);
+            var note = state.Passage.IndexOf("Gained: Test rope", StringComparison.Ordinal);
+            var after = state.Passage.IndexOf("After 1.", StringComparison.Ordinal);
+            Assert.True(before >= 0 && before < note && note < after, state.Passage);
+        });
+        await Choose("Go");
+        await Observe(new(null, "Second 2."));
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+        await Choose("Return");
+        await Observe(new(null, "Before 2."));
+        await Driver.ClickAsync("Back");
+        await Observe(new(null, "Second 2."));
+        await Driver.ClickAsync("Forward");
+        await Observe(new(null, "After 2."));
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await Observe(new(null, "Second 2."));
+        await Driver.ClickAsync("Back");
+        await Observe(new(null, "Before 0."));
+        await AssertState(state => Assert.Contains("After 1.", state.Passage));
+    }
+
+    [Fact]
     public async Task Bundled_sample_opens_without_a_sample_specific_route()
     {
         await Driver.OpenBundledAsync();
