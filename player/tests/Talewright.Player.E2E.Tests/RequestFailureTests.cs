@@ -14,4 +14,16 @@ public sealed class RequestFailureTests
     {
         Assert.Equal(expected, PlayerTest.IsReloadCancellation(reloading, resourceType, url, failure));
     }
+
+    [Theory]
+    [InlineData(": ResizeObserver loop completed with undelivered notifications.", true)]
+    [InlineData("ResizeObserver loop completed with undelivered notifications.", true)]
+    [InlineData("Error: ResizeObserver loop completed with undelivered notifications.", false)]
+    [InlineData("TypeError: ResizeObserver loop completed with undelivered notifications.", false)]
+    [InlineData(": ResizeObserver loop limit exceeded", false)]
+    [InlineData("TypeError: undefined is not an object", false)]
+    public void Only_the_resize_observer_loop_notice_is_expected(string error, bool expected)
+    {
+        Assert.Equal(expected, PlayerTest.IsResizeObserverLoopNotice(error));
+    }
 }

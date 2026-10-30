@@ -49,7 +49,13 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         await Context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true, Sources = true });
         Page = await Context.NewPageAsync();
         Driver = new BrowserPlayerDriver(Page);
-        Page.PageError += (_, error) => _errors.Add("Uncaught: " + error);
+        Page.PageError += (_, error) =>
+        {
+            if (!IsResizeObserverLoopNotice(error))
+            {
+                _errors.Add("Uncaught: " + error);
+            }
+        };
         Page.Console += (_, message) =>
         {
             output.WriteLine($"Console [{message.Type}]: {message.Text}");
@@ -92,6 +98,12 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     internal static bool IsReloadCancellation(bool reloading, string resourceType, string url, string? failure) =>
         reloading && resourceType == "image" && url.StartsWith("blob:", StringComparison.Ordinal)
         && failure == "Load request cancelled";
+
+    // Browsers report deferred resize notifications as an error event, but the notifications
+    // are still delivered on the next frame. The toolbar already defers its layout writes.
+    internal static bool IsResizeObserverLoopNotice(string error) =>
+        error is "ResizeObserver loop completed with undelivered notifications."
+            or ": ResizeObserver loop completed with undelivered notifications.";
 
     protected async Task ReloadAsync()
     {
