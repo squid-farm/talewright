@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Core.World;
+using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Parsing;
@@ -20,6 +21,8 @@ public enum ExpressionContextKind { Condition, Number, Effects, Substitution }
 /// <summary>Parser-recognized expression input, retained even when semantic parsing fails.</summary>
 public sealed record ExpressionContext(ExpressionContextKind Kind, string Text, SourceRange Range);
 
+public sealed record AuthoredSubstitution(SourceRange Range, SubstitutionTemplate Template);
+
 /// <summary>Immutable, source-aware authoring data, separate from the runtime story model.</summary>
 public sealed class StoryAnalysis
 {
@@ -30,6 +33,8 @@ public sealed class StoryAnalysis
         Expressions = original.Expressions;
         CompletionSites = original.CompletionSites;
         Tokens = original.Tokens;
+        World = original.World;
+        Substitutions = original.Substitutions;
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
@@ -39,6 +44,8 @@ public sealed class StoryAnalysis
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
         CompletionSites = Array.AsReadOnly(collector.CompletionSites.ToArray());
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
+        World = collector.AuthoredWorld;
+        Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
@@ -48,6 +55,8 @@ public sealed class StoryAnalysis
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
     public IReadOnlyList<CompletionSite> CompletionSites { get; }
     public IReadOnlyList<AuthoringToken> Tokens { get; }
+    public WorldDefinition? World { get; }
+    public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
     /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
     public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
@@ -78,6 +87,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSite> CompletionSites { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
+    internal WorldDefinition? AuthoredWorld { get; private set; }
+    internal List<AuthoredSubstitution> Substitutions { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
 
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)
@@ -378,6 +389,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
 
     internal void World(WorldDefinition world, IReadOnlySet<VarId>? unresolved = null)
     {
+        AuthoredWorld = world;
         foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = "integer";
         foreach (var id in world.TextVariables.Keys) _variableTypes[id.Value] = "text";
         foreach (var id in unresolved ?? new HashSet<VarId>()) _variableTypes[id.Value] = "unresolved";

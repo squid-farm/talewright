@@ -54,7 +54,7 @@ diagnostics are separately identified by source `talewright`.
 ## Client contract and workspace behavior
 
 The server supports initialize/initialized, shutdown/exit, full-text
-didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover,
+didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover, textDocument/inlayHint,
 textDocument/definition, and workspace/didChangeWatchedFiles. Documents are the
 root `story.talewright.yaml`, supporting `*.talewright.yaml` files (case-sensitive
 suffix), and `.tale` files; other YAML is ignored. Positions
@@ -62,7 +62,8 @@ are UTF-16 and zero-based. Compiler point locations become zero-width ranges,
 clamped to the current file; codes, messages, and error/warning severities remain
 the compiler's. Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
 returns a complete list with explicit `textEdit` replacement ranges. Hover returns
-source-aware help, and definition returns the authored declaration; signature help, inlay hints, rename, formatting, and autofixes are not advertised.
+source-aware help with authored-default previews, and definition returns the authored declaration;
+signature help, rename, formatting, and autofixes are not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
 ### Semantic completion
@@ -131,12 +132,13 @@ escaped identifiers. Red Hat YAML can independently show structural help.
 
 Hover ranges are half-open token ranges and may span physical lines (unlike
 completion's primary edit). Unknown or partial identifiers and ordinary prose,
-comments, and expression string literals return `null`, not invented symbol
+comments, and string literals outside complete substitutions return `null`, not invented symbol
 documentation. Already-recognized tokens in incomplete expressions still work;
 syntactically broken YAML has no fabricated schema locations. Registered
 predicates/modifiers expose their names and types, not undocumented signatures
 or runtime results. Source context is authored text, never a current gameplay
-value or evaluated registration.
+value or evaluated custom registration. Complete substitutions additionally show authored-default
+examples and built-in manipulator steps. Character symbols include their default name and pronoun forms.
 
 Clients advertising Markdown receive formatted help with authored names, paths,
 and source lines isolated in code spans; no authored text is promoted into links,
@@ -144,6 +146,29 @@ HTML, or commands. Other clients receive plaintext. Required missing/invalid
 metadata returns `-32001` explicitly, just like completion. An open document and
 valid UTF-16 request position are required (`-32602` otherwise). Hover does not
 save files, build projects, load assemblies, or execute game code.
+
+### Substitution inlay hints
+
+`textDocument/inlayHint` returns final authored-default text after complete supported
+substitutions, positioned immediately after `}`. The request requires an open document
+and an ordered, in-bounds UTF-16 range; only hint positions within that range are returned.
+Labels are quoted/escaped and limited to 40 UTF-16 code units; plaintext tooltips include
+the full result, `default` provenance, and manipulator steps. No text edits are supplied.
+Names, pronoun forms, built-in manipulator chains/arguments, item/faction names, and
+explicit manifest variable defaults are supported. Implicit variable assignments and
+gameplay-dependent expressions are not evaluated. Unsupported/custom operations supply
+no hint and explain the limitation on hover.
+
+Previews reuse typed compiler substitutions and engine expressions/modifiers, not a second
+editor parser. Only engine-owned built-in instances can execute; exported metadata
+identifies these explicitly with `BuiltInModifiers`. Older metadata without this field
+remains valid but its modifier placeholders cannot be previewed. No project assemblies
+or custom delegates execute. Configuration errors retain normal metadata error behavior.
+
+Clients advertising `workspace.inlayHint.refreshSupport` receive a
+`workspace/inlayHint/refresh` request after updated story analysis, including cross-file
+unsaved changes. VS Code uses native inlay rendering/settings; its Talewright preview
+toggle changes only the Talemark language's `editor.inlayHints.enabled`.
 
 #### Beginner hover check
 
@@ -156,7 +181,7 @@ save files, build projects, load assemblies, or execute game code.
    semantic hover. Closing the buffer restores the latest disk context.
 4. Hover `hp` in `{player:hp}`, `requires` in a scene header's
    `@requires player:hp > 0`, and `capitalize` in `{player:first-name#capitalize}`.
-   Check symbol/type or syntax help, not evaluated values.
+   Check symbol/type or syntax help and, for complete supported substitutions, a result tagged `default`.
 5. Hover `start` in `story.talewright.yaml` for its schema description; hover its
    scene value for declaration context. Quoted values keep quotes outside the
    identifier range.

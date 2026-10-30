@@ -8,6 +8,14 @@ let client;
 
 async function activate(context) {
   registerAuthorActions(context);
+  context.subscriptions.push(vscode.commands.registerCommand('talewright.togglePreviewHints', async () => {
+    const configuration = vscode.workspace.getConfiguration('editor', {
+      uri: vscode.window.activeTextEditor?.document.uri, languageId: 'tale',
+    });
+    const enabled = configuration.get('inlayHints.enabled', 'on');
+    await configuration.update('inlayHints.enabled', enabled === 'off' ? 'on' : 'off',
+      vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global, true);
+  }));
   if (!vscode.workspace.isTrusted) {
     // VS Code does not reactivate extensions with limited trust support, so start once trust is granted.
     context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => startLanguageServer(context)));

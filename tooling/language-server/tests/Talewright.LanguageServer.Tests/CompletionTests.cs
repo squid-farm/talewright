@@ -57,7 +57,7 @@ public sealed partial class ServerTests
         var registrations = AuthoringProjectMetadata.Export(CompilerOptions.Default) with
         {
             Predicates = ["IsHero"],
-            Modifiers = ["custom"]
+            Modifiers = ["custom"], BuiltInModifiers = []
         };
         File.WriteAllText(client.PathOf("project.authoring.json"), registrations.ToJson());
         File.AppendAllText(client.PathOf("story.talewright.yaml"),
