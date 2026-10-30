@@ -81,6 +81,28 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Pronoun_property_diagnostics_clear_in_unsaved_text_expressions()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale",
+            "=== start\n{player:pronoun:possessive-pronoun:unknown}\n-> END", 1);
+        var error = Assert.Single(await client.Diagnostics("start.tale", 1));
+        Assert.Equal("TW2001", error.GetProperty("code").GetString());
+        Assert.Contains("Unknown possessive pronoun property", error.GetProperty("message").GetString());
+        await client.Change("start.tale", """
+            === start
+            ~ var:word = (player:pronoun:possessive-pronoun:independent)
+            {if (var:word == player:pronoun:possessive-pronoun:independent)}
+            {player:pronoun:object#capitalize}
+            {("# remains literal")#capitalize}
+            {/if}
+            -> END
+            """, 2);
+        Assert.Empty(await client.Diagnostics("start.tale", 2));
+    }
+
+    [Fact]
     public async Task Image_syntax_diagnostics_clear_and_valid_calls_receive_asset_lookup()
     {
         await using var client = new Client();

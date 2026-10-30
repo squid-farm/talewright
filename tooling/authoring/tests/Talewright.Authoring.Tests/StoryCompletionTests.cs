@@ -47,10 +47,13 @@ public sealed class StoryCompletionTests
     [InlineData("::: skill-check player h|", "hp")]
     [InlineData("::: skill-check player |", "hp")]
     [InlineData("::: skill-check |", "guide")]
-    [InlineData("{player:pronoun#ob|", "object")]
-    [InlineData("{player:pronoun#|}", "reflexive")]
+    [InlineData("{player:pronoun:ob|", "object")]
+    [InlineData("{player:pronoun:|}", "reflexive")]
     [InlineData("{player:pronoun#|}", "capitalize")]
-    [InlineData("{player:pronoun#possessive(|)}", "\"independent\"")]
+    [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
+    [InlineData("{if (player:pronoun:ob| == \"her\")}Yes{/if}", "object")]
+    [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
+    [InlineData("{if player:pro| == \"she\"}Yes{/if}", "pronoun")]
     [InlineData("{player:first-name# cap|", "capitalize")]
     [InlineData("{item:ro|}", "rope")]
     [InlineData("{ima|", "image(")]
@@ -201,26 +204,24 @@ public sealed class StoryCompletionTests
     }
 
     [Fact]
-    public void Pronoun_form_completion_offers_forms_once_and_marks_the_default_possessive()
+    public void Pronoun_property_completion_offers_forms_and_explicit_possessive_properties()
     {
-        var (analysis, position) = Analyze("=== first\n{player:pronoun#|}");
+        var (analysis, position) = Analyze("=== first\n{player:pronoun:|}");
         var forms = StoryCompletion.Complete(analysis, position);
-        var possessive = Assert.Single(forms, item => item.Label == "possessive");
-        Assert.Contains("Pronoun form", possessive.Detail);
-        Assert.Contains(forms, item => item.Label == "capitalize");
+        Assert.Equal(["object", "possessive-pronoun", "reflexive", "subject"], forms.Select(item => item.Label));
+        Assert.Contains("Possessive pronoun", Assert.Single(forms, item => item.Label == "possessive-pronoun").Detail);
 
-        (analysis, position) = Analyze("=== first\n{player:pronoun#possessive(|)}");
+        (analysis, position) = Analyze("=== first\n{player:pronoun:possessive-pronoun:|}");
         var values = StoryCompletion.Complete(analysis, position);
-        Assert.Equal(["\"determiner\"", "\"independent\""], values.Select(item => item.Label));
-        Assert.Contains("(default)", Assert.Single(values, item => item.Label == "\"determiner\"").Detail);
-        Assert.DoesNotContain("default", Assert.Single(values, item => item.Label == "\"independent\"").Detail);
+        Assert.Equal(["determiner", "independent"], values.Select(item => item.Label));
+        Assert.Contains("before a noun", Assert.Single(values, item => item.Label == "determiner").Detail);
+        Assert.Contains("stands alone", Assert.Single(values, item => item.Label == "independent").Detail);
     }
 
     [Theory]
     [InlineData("{player:first-name#|}")]
     [InlineData("{player:pronoun#capitalize#|}")]
-    [InlineData("{player:pronoun:|}")]
-    public void Pronoun_forms_are_only_offered_straight_after_pronoun(string line)
+    public void Pronoun_forms_are_not_offered_as_modifiers(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label is "object" or "reflexive" or "subject");
@@ -229,7 +230,13 @@ public sealed class StoryCompletionTests
     [Theory]
     [InlineData("{player:pronoun#|}", true)]
     [InlineData("{player:pronoun#one-|}", true)]
-    [InlineData("{player:pronoun#object#|}", true)]
+    [InlineData("{player:pronoun:object#|}", true)]
+    [InlineData("{player:pronoun:subject#|}", true)]
+    [InlineData("{player:pronoun:reflexive#capitalize#|}", true)]
+    [InlineData("{player:pronoun:possessive-pronoun:determiner#|}", true)]
+    [InlineData("{(player:pronoun:possessive-pronoun:independent)#|}", true)]
+    [InlineData("{player:pronoun:unknown#|}", false)]
+    [InlineData("{\"#literal\"#|}", false)]
     [InlineData("{player:first-name#|}", false)]
     [InlineData("{item:rope#|}", false)]
     public void One_many_completion_is_pronoun_only(string line, bool offered)
@@ -243,9 +250,11 @@ public sealed class StoryCompletionTests
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:h|p+=3", "hp", "~ player:hp+=3")]
-    [InlineData("{player:pronoun#|}", "object", "{player:pronoun#object}")]
-    [InlineData("{player:pronoun#pos|", "possessive", "{player:pronoun#possessive")]
-    [InlineData("{player:pronoun#possessive(|)}", "\"independent\"", "{player:pronoun#possessive(\"independent\")}")]
+    [InlineData("{player:pronoun:|}", "object", "{player:pronoun:object}")]
+    [InlineData("{player:pronoun:pos|:", "possessive-pronoun", "{player:pronoun:possessive-pronoun:")]
+    [InlineData("{player:pronoun:possessive-pronoun:in|dependent}", "independent", "{player:pronoun:possessive-pronoun:independent}")]
+    [InlineData("{if (player:pronoun:ob|ject == \"them\")}yes{/if}", "object", "{if (player:pronoun:object == \"them\")}yes{/if}")]
+    [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|dependent)", "independent", "~ var:word = (player:pronoun:possessive-pronoun:independent)")]
     [InlineData("@requires flag:door-|", "door-open", "@requires flag:door-open")]
     [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]

@@ -347,25 +347,30 @@ Any character id can replace `player`.
 | `#upper` / `#lower` | Case                                                                                         |
 | `#a`                | Prefix with `a`/`an`                                                                         |
 
-**Pronoun forms.** `{player:pronoun}` gives the subject form. Choose another form with a modifier straight
-after `pronoun`, then chain other modifiers after it:
+**Pronoun properties.** `{player:pronoun}` is shorthand for `{player:pronoun:subject}`.
+Choose a stored form with property access, then chain text modifiers after the value:
 
 | Write                                         | `she`     | `they`       |
 | --------------------------------------------- | --------- | ------------ |
 | `{player:pronoun}`                            | she       | they         |
-| `{player:pronoun#object}`                     | her       | them         |
-| `{player:pronoun#possessive}`                 | her       | their        |
-| `{player:pronoun#possessive("independent")}`  | hers      | theirs       |
-| `{player:pronoun#reflexive}`                  | herself   | themselves   |
-| `{player:pronoun#reflexive#capitalize}`       | Herself   | Themselves   |
+| `{player:pronoun:subject}`                    | she       | they         |
+| `{player:pronoun:object}`                     | her       | them         |
+| `{player:pronoun:possessive-pronoun:determiner}`                 | her       | their        |
+| `{player:pronoun:possessive-pronoun:independent}`  | hers      | theirs       |
+| `{player:pronoun:reflexive}`                  | herself   | themselves   |
+| `{player:pronoun:reflexive#capitalize}`       | Herself   | Themselves   |
 
-On a pronoun, `#possessive` picks the declared possessive form instead of adding `'s`. Its optional argument is
-`"determiner"` (the default, used before a noun) or `"independent"` (stands alone). Custom pronoun sets use the
-forms they declare under `possessive-pronoun`: `determiner` and `independent`. Both values are required.
-The old flat `possessive` and scalar `possessive-pronoun` fields are errors that name the nested replacement.
-The older `player:pronoun:object` and `player:pronoun.object` spellings are errors that name the replacement.
-The dotted forms `pronoun.subject`, `pronoun.object`, `pronoun.possessive`,
-`pronoun.possessive-pronoun` and `pronoun.reflexive` are rejected even if a custom stat has the same name.
+The determiner goes before a noun (`her book`); the independent possessive stands
+alone (`hers`). Custom sets use their declared `possessive-pronoun` values.
+These are ordinary text expressions, usable in comparisons and text assignments:
+
+```tale
+{if player:pronoun:object == "her"}She recognizes the voice.{/if}
+~ var:remembered-word = (player:pronoun:possessive-pronoun:independent)
+```
+
+`#possessive` is a text transformation, not a way to select stored pronoun data.
+This is a breaking pre-alpha syntax change with no compatibility aliases or migration handling.
 
 **Pronoun agreement.** Supply two wordings with `#one-many("singular", "plural")`:
 
@@ -383,7 +388,7 @@ Custom sets use their required `agreement` setting.
 The selector outputs only the chosen text, not the pronoun. Both strings are
 required (empty strings are allowed); authors control the wording, including
 nonstandard grammar. Other text modifiers can follow it, as with `#capitalize`.
-Like the possessive argument, these quoted arguments do not decode backslash
+These quoted arguments do not decode backslash
 escapes. Commas, apostrophes, braces and `#` inside a quoted string are text.
 
 This selector is **pronoun-only**. Names, character-root `name-agreement`,

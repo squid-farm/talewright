@@ -442,7 +442,6 @@ public class CompilerTests
     [Theory]
     [InlineData("{faction:guild.name}", "faction:guild:name")]
     [InlineData("{faction:missing.tier}", "faction:missing:tier")]
-    [InlineData("{player:pronoun.subject}", "'player:pronoun'")]
     public void Dotted_property_access_reports_its_colon_replacement(string reference, string replacement)
     {
         var error = Error($"=== a\n{reference}\n-> END", "TW2001");
@@ -613,7 +612,7 @@ public class CompilerTests
     [Fact]
     public void Default_pronouns_and_name_agreement_use_singular_they_without_a_plural_name()
     {
-        var story = Ok("=== a\n{player:first-name#possessive}/{player:last-name#possessive}/{player:pronoun#possessive(\"independent\")}\n-> END",
+        var story = Ok("=== a\n{player:first-name#possessive}/{player:last-name#possessive}/{player:pronoun:possessive-pronoun:independent}\n-> END",
             Yaml.Replace("pronouns: she", ""));
         var player = story.World.Characters[EntityId.Player];
         Assert.Equal(Pronouns.They, player.Pronouns);
@@ -649,7 +648,7 @@ public class CompilerTests
             .Replace("pronouns: she", $"pronouns: {{ subject: xe, object: xem, possessive-pronoun: {{ determiner: xyr, independent: xyrs }}, reflexive: xemself, agreement: {agreement} }}");
         var story = Ok("""
             === a
-            {player:first-name}/{player:first-name#possessive}/{player:pronoun#possessive}/{player:pronoun#possessive("independent")}
+            {player:first-name}/{player:first-name#possessive}/{player:pronoun:possessive-pronoun:determiner}/{player:pronoun:possessive-pronoun:independent}
             -> END
             """, yaml);
         var player = story.World.Characters[EntityId.Player];
@@ -773,7 +772,6 @@ public class CompilerTests
     [InlineData("player:pronoun#one-many(\"has\", \"have\", \"third\")", "Expected ')'")]
     [InlineData("player:pronoun#one-many(\"has\", \"have\"", "Expected ')'")]
     [InlineData("player:pronoun#one-many(\"has\", \"have\") extra", "Expected '#' or the end")]
-    [InlineData("player:pronoun#possessive(\"determiner\", \"independent\")", "Expected ')'")]
     public void Unsupported_one_many_forms_report_modifier_diagnostics(string expression, string message)
     {
         var error = Error($"=== a\n{{{expression}}}\n-> END", "TW2006");
@@ -806,11 +804,11 @@ public class CompilerTests
     [Theory]
     [InlineData("player", "she/her/her/her/hers/herself/Herself/Her/SHE")]
     [InlineData("guards", "they/them/their/their/theirs/themselves/Themselves/Their/THEY")]
-    public void Pronoun_forms_are_chosen_with_hash_modifiers(string who, string expected)
+    public void Pronoun_forms_are_character_properties(string who, string expected)
     {
         var story = Ok("""
             === a
-            {W:pronoun}/{W:pronoun#object}/{W:pronoun#possessive}/{W:pronoun#possessive("determiner")}/{W:pronoun#possessive("independent")}/{W:pronoun#reflexive}/{W:pronoun#reflexive#capitalize}/{W:pronoun#possessive#capitalize}/{W:pronoun#upper}
+            {W:pronoun:subject}/{W:pronoun:object}/{W:pronoun:possessive-pronoun:determiner}/{W:pronoun:possessive-pronoun:determiner}/{W:pronoun:possessive-pronoun:independent}/{W:pronoun:reflexive}/{W:pronoun:reflexive#capitalize}/{W:pronoun:possessive-pronoun:determiner#capitalize}/{W:pronoun#upper}
             -> END
             """.Replace("W", who));
         Assert.Equal(expected, Render(story, story.GetScene(new SceneId("a"))));
@@ -822,7 +820,7 @@ public class CompilerTests
         var yaml = Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself, agreement: singular }");
         var result = Compile("""
             === a
-            {player:pronoun}/{player:pronoun#object}/{player:pronoun#possessive}/{player:pronoun#possessive("determiner")}/{player:pronoun#possessive("independent")}/{player:pronoun#reflexive#upper}
+            {player:pronoun}/{player:pronoun:object}/{player:pronoun:possessive-pronoun:determiner}/{player:pronoun:possessive-pronoun:determiner}/{player:pronoun:possessive-pronoun:independent}/{player:pronoun:reflexive#upper}
             -> END
             """, yaml);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -859,21 +857,80 @@ public class CompilerTests
     }
 
     [Theory]
-    [InlineData("subject", "player:pronoun")]
-    [InlineData("object", "player:pronoun#object")]
-    [InlineData("possessive", "player:pronoun#possessive")]
-    [InlineData("possessive-pronoun", "player:pronoun#possessive(\"independent\")")]
-    [InlineData("reflexive", "player:pronoun#reflexive")]
-    public void Legacy_pronoun_forms_are_rejected_even_when_a_stat_has_the_same_name(string form, string replacement)
+    [InlineData("she", "she/her/her/hers/herself")]
+    [InlineData("he", "he/him/his/his/himself")]
+    [InlineData("they", "they/them/their/theirs/themselves")]
+    [InlineData("it", "it/it/its/its/itself")]
+    [InlineData("custom", "xe/xem/xyr/xyrs/xemself")]
+    public void Every_pronoun_property_is_a_text_expression(string pronouns, string expected)
     {
-        var yaml = Yaml.Replace("seed: 42", $"seed: 42\n  ruleset:\n    base: generic\n    stats:\n      - {{ id: pronoun.{form}, default: 3 }}");
-        var error = Error($"=== a\n{{player:pronoun.{form}}}\n-> END", "TW2001", yaml);
-        Assert.Contains($"Use '{replacement}'.", error.Message);
-        Assert.Equal(new SourceLocation("main.tale", 2, 17), error.Location);
+        var properties = new[] { "subject", "object", "possessive-pronoun:determiner", "possessive-pronoun:independent", "reflexive" };
+        var forms = expected.Split('/');
+        for (var index = 0; index < properties.Length; index++)
+        {
+            var reference = "player:pronoun:" + properties[index];
+            var story = Ok($$"""
+                === a
+                ~ var:word = ({{reference}})
+                {if not ({{reference}} != "{{forms[index]}}") and (var:word == {{reference}})}matched{/if}
+                {{{reference}}#capitalize}/{var:word}
+                -> END
+                """, Yaml.Replace("pronouns: she", "pronouns: " + (pronouns == "custom"
+                    ? "{subject: xe, object: xem, possessive-pronoun: {determiner: xyr, independent: xyrs}, reflexive: xemself, agreement: singular}"
+                    : pronouns)));
+            var state = GameState.CreateInitial(story.World, 1);
+            var effect = Assert.IsType<SetTextVariable>(Assert.Single(story.GetScene(new("a")).EntryEffects).Effect);
+            var value = Assert.IsType<PronounRef>(effect.Value);
+            Assert.Equal(forms[index], ExpressionEvaluator.Evaluate(value, new(state, new())).Text);
+            state.Apply(new TextVariableChanged(new("word"), "", forms[index]));
+            Assert.Contains("matched", Render(story, story.GetScene(new("a")), state));
+            Assert.Contains("/" + forms[index], Render(story, story.GetScene(new("a")), state));
+        }
+    }
+
+    [Theory]
+    [InlineData("\"hash # stays\"", "hash # stays")]
+    [InlineData("(\"hash # stays\")#capitalize", "Hash # stays")]
+    [InlineData("((\"#object: (literal), {braces}\"))#upper", "#OBJECT: (LITERAL), {BRACES}")]
+    public void Quoted_hash_is_literal_until_the_actual_modifier_boundary(string expression, string expected)
+    {
+        var story = Ok("=== a\n{" + expression + "}\n{if \"#\" == \"#\"}matched{/if}\n-> END");
+        Assert.Equal(expected + " matched", Render(story, story.GetScene(new("a"))));
+    }
+
+    [Theory]
+    [InlineData("player:pronoun:")]
+    [InlineData("player:pronoun:possessive-pronoun")]
+    [InlineData("player:pronoun:possessive-pronoun:")]
+    [InlineData("player:pronoun:object:extra")]
+    [InlineData("player:pronoun:possessive-pronoun:independent:extra")]
+    public void Incomplete_or_extra_pronoun_properties_report_located_syntax_errors(string reference)
+    {
+        var error = Error("=== a\n{" + reference + "}\n-> END", "TW1001");
+        Assert.Equal("main.tale", error.Location.File);
+        Assert.Equal(2, error.Location.Line);
+        Assert.InRange(error.Location.Column, 2, reference.Length + 2);
     }
 
     [Fact]
-    public void Non_legacy_dotted_pronoun_stat_names_remain_valid()
+    public void Pronoun_properties_keep_effective_agreement_through_modifier_chains()
+    {
+        var story = Ok("=== a\n{player:pronoun:object#upper#one-many(\"has\", \"have\")#capitalize}\n-> END");
+        var state = GameState.CreateInitial(story.World, 1);
+        Assert.Equal("Has", Render(story, story.GetScene(new("a")), state));
+        state.Apply(new CharacterIdentityChanged(EntityId.Player, "Mara", "Burns", Pronouns.They));
+        Assert.Equal("Have", Render(story, story.GetScene(new("a")), state));
+    }
+
+    [Fact]
+    public void Possessive_is_a_generic_text_modifier_without_pronoun_dispatch()
+    {
+        var story = Ok("=== a\n{player:pronoun#possessive}/{player:pronoun:object#possessive}/{player:first-name#possessive}\n-> END");
+        Assert.Equal("she's/her's/Mara's", Render(story, story.GetScene(new("a"))));
+    }
+
+    [Fact]
+    public void Dotted_stat_names_remain_valid()
     {
         var yaml = Yaml.Replace("seed: 42", "seed: 42\n  ruleset:\n    base: generic\n    stats:\n      - { id: pronoun.fluency, default: 3 }");
         var story = Ok("=== a\n{player:pronoun.fluency}\n-> END", yaml);
@@ -881,48 +938,32 @@ public class CompilerTests
     }
 
     [Theory]
-    [InlineData("{player:pronoun:subject}", "Use 'player:pronoun'.")]
-    [InlineData("{player:pronoun:object}", "Use 'player:pronoun#object'.")]
-    [InlineData("{player:pronoun:possessive}", "Use 'player:pronoun#possessive'.")]
-    [InlineData("{player:pronoun:possessive-pronoun}", "Use 'player:pronoun#possessive(\"independent\")'.")]
-    [InlineData("{guards:pronoun:reflexive#capitalize}", "Use 'guards:pronoun#reflexive'.")]
-    [InlineData("{player:pronoun.object}", "Use 'player:pronoun#object'.")]
-    [InlineData("{player:pronoun.possessive-pronoun}", "Use 'player:pronoun#possessive(\"independent\")'.")]
-    [InlineData("{player:pronoun:own}", "Unknown pronoun form 'own'")]
-    public void Old_pronoun_forms_report_their_hash_replacement(string reference, string message)
+    [InlineData("{player:pronoun:own}", "Unknown pronoun property 'own'")]
+    [InlineData("{player:pronoun:possessive-pronoun:other}", "Unknown possessive pronoun property 'other'")]
+    public void Unknown_pronoun_properties_report_standard_diagnostics(string reference, string message)
     {
         var error = Error($"=== a\n{reference}\n-> END", "TW2001");
         Assert.Contains(message, error.Message);
     }
 
     [Theory]
-    [InlineData("{player:pronoun#possessive(\"hers\")}", "Unknown possessive form \"hers\"")]
-    [InlineData("{player:pronoun#object(\"x\")}", "'#object' does not take an argument")]
-    [InlineData("{player:first-name#possessive(\"independent\")}", "only allowed after '<character>:pronoun'")]
+    [InlineData("{player:first-name#possessive(\"independent\")}", "'#possessive' does not take an argument")]
     [InlineData("{player:first-name#capitalize(\"x\")}", "'#capitalize' does not take an argument")]
-    [InlineData("{player:first-name#object}", "only follow '<character>:pronoun'")]
-    [InlineData("{player:pronoun#capitalize#object}", "come straight after 'pronoun'")]
-    [InlineData("{player:pronoun#capitalize#possessive}", "come straight after 'pronoun'")]
-    [InlineData("{player:pronoun#object#reflexive}", "come straight after 'pronoun'")]
-    [InlineData("{player:pronoun#subject}", "already gives the subject form")]
-    [InlineData("{player:pronoun#possessive(independent)}", "double quotes")]
-    [InlineData("{player:pronoun#possessive(\"independent\"}", "Expected ')'")]
-    [InlineData("{player:pronoun#possessive(\"independent\") x}", "Expected '#' or the end")]
-    public void Invalid_pronoun_modifiers_are_reported(string reference, string message)
+    public void Invalid_text_modifier_arguments_are_reported(string reference, string message)
     {
         var error = Error($"=== a\n{reference}\n-> END", "TW2006");
         Assert.Contains(message, error.Message);
     }
 
     [Fact]
-    public void Unclosed_pronoun_argument_quote_leaves_the_substitution_open() =>
-        Error("=== a\n{player:pronoun#possessive(\"independent)}\n-> END", "TW1004");
+    public void Unclosed_modifier_argument_quote_leaves_the_substitution_open() =>
+        Error("=== a\n{player:first-name#capitalize(\"unfinished)}\n-> END", "TW1004");
 
     [Fact]
-    public void Invalid_possessive_form_points_at_the_argument()
+    public void Invalid_possessive_property_points_at_the_property()
     {
-        var error = Error("=== a\n{player:pronoun#possessive(\"hers\")}\n-> END", "TW2006");
-        Assert.Equal(new SourceLocation("main.tale", 2, 28), error.Location);
+        var error = Error("=== a\n{player:pronoun:possessive-pronoun:other}\n-> END", "TW2001");
+        Assert.Equal(new SourceLocation("main.tale", 2, 36), error.Location);
     }
 
     [Fact]

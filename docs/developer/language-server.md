@@ -79,9 +79,10 @@ for stats, items, factions, flags, and variables. `visited(` offers scene IDs.
 `item:` references offer item names, and `give`/`take` quantities offer numeric
 expression operands after the actor and item.
 `@` in conditions offers explicitly registered predicates, and `#` in
-substitutions offers registered modifiers. Right after `<character>:pronoun#`,
-`#` also offers the pronoun forms `object`, `possessive` and `reflexive`, and
-`#possessive(` offers `"determiner"` (marked as the default) and `"independent"`.
+substitutions offers registered text modifiers. After `<character>:pronoun:`,
+completion offers `subject`, `object`, `possessive-pronoun` and `reflexive`;
+`possessive-pronoun:` offers `determiner` and `independent`, both explicit.
+These property slots work in substitutions, conditions and assignment expressions.
 Ordinary prose, comments, expression
 string literals, and unknown namespaces do not receive story-ID suggestions.
 Identifiers replace the whole current token, including text after the cursor;

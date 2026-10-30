@@ -43,10 +43,15 @@ Use them in prose, and Talewright takes care of the grammar:
 {player:first-name#possessive} torch gutters.     → Mara's torch gutters.
 {player:last-name#possessive} reputation          → Burns's reputation
 {player:pronoun#capitalize} hesitates.            → She hesitates.
+{player:pronoun:object#capitalize} again?         → Her again?
+{player:pronoun:possessive-pronoun:independent}   → hers
 > guide: Careful.                                 → dialogue spoken by Tomas
 ```
 
 Pronouns can be `she`, `he`, `they`, `it`, or a [custom set](../reference/talemark-syntax.md#1-storytalewrightyaml).
+Select stored forms with `:subject`, `:object`, `:reflexive`,
+`:possessive-pronoun:determiner` or `:possessive-pronoun:independent` after
+`player:pronoun`. These properties also work in comparisons and text assignments.
 See [substitutions](../reference/talemark-syntax.md#3-substitutions) for everything you can insert and the
 `#modifiers` you can apply.
 For a complete two-branch example, see [change a name in one place](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).

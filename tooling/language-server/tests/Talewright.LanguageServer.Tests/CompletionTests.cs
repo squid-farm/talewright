@@ -47,9 +47,11 @@ public sealed partial class ServerTests
     [InlineData("~ take player rope |", "player")]
     [InlineData("@requires @IsH|", "IsHero")]
     [InlineData("@requires flag:door-|", "door-open")]
-    [InlineData("{player:pronoun#|}", "reflexive")]
+    [InlineData("{player:pronoun:|}", "reflexive")]
     [InlineData("{player:pronoun#one-|}", "one-many")]
-    [InlineData("{player:pronoun#possessive(|)}", "\"independent\"")]
+    [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
+    [InlineData("{if (player:pronoun:ob| == \"them\")}yes{/if}", "object")]
+    [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
     {
@@ -75,15 +77,15 @@ public sealed partial class ServerTests
     }
 
     [Fact]
-    public async Task Possessive_pronoun_values_mark_the_default()
+    public async Task Possessive_pronoun_properties_describe_both_forms()
     {
         await using var client = new Client();
         await client.Initialize();
-        const string marked = "=== start\n{player:pronoun#possessive(|)}";
+        const string marked = "=== start\n{player:pronoun:possessive-pronoun:|}";
         await client.Open("start.tale", marked.Replace("|", ""), 1);
         var items = Items(await Completion(client, "start.tale", marked)).ToArray();
-        Assert.Contains("(default)", Assert.Single(items, HasLabel("\"determiner\"")).GetProperty("detail").GetString());
-        Assert.DoesNotContain("default", Assert.Single(items, HasLabel("\"independent\"")).GetProperty("detail").GetString());
+        Assert.Contains("before a noun", Assert.Single(items, HasLabel("determiner")).GetProperty("detail").GetString());
+        Assert.Contains("stands alone", Assert.Single(items, HasLabel("independent")).GetProperty("detail").GetString());
     }
 
     [Fact]
@@ -112,8 +114,10 @@ public sealed partial class ServerTests
 
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
-    [InlineData("{player:pronoun#|}", "object", "{player:pronoun#object}")]
-    [InlineData("{player:pronoun#possessive(|)}", "\"determiner\"", "{player:pronoun#possessive(\"determiner\")}")]
+    [InlineData("{player:pronoun:|}", "object", "{player:pronoun:object}")]
+    [InlineData("{player:pronoun:possessive-pronoun:de|terminer}", "determiner", "{player:pronoun:possessive-pronoun:determiner}")]
+    [InlineData("{if (player:pronoun:ob|ject == \"them\")}yes{/if}", "object", "{if (player:pronoun:object == \"them\")}yes{/if}")]
+    [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|dependent)", "independent", "~ var:word = (player:pronoun:possessive-pronoun:independent)")]
     [InlineData("~ player:hp|-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:hp| - 3", "hp", "~ player:hp - 3")]
     [InlineData("~ player:hp -= player:h|p-", "hp", "~ player:hp -= player:hp-")]
