@@ -64,6 +64,55 @@ public sealed partial class ExpressionViewTests
     }
 
     [Fact]
+    public async Task Decision_details_omit_absent_metadata_and_keep_zero_and_negative_values()
+    {
+        var model = Start("""
+            === hall
+            @hub any(adventure)
+            @hub-limit 2
+            * [Wait] -> END
+            === cave
+            @tags adventure
+            @priority 0
+            -> END
+            === cellar
+            @tags adventure
+            @priority -1
+            -> END
+            """, """
+
+            triggers:
+              - id: ready
+                when: flag:ready
+                do: set flag:ready
+                once: true
+            """);
+        var decisions = model.Inspection!.Decisions;
+        Assert.Contains(decisions, decision => decision.Pass == 0);
+        Assert.Contains(decisions, decision => decision.Priority == 0);
+        Assert.Contains(decisions, decision => decision.Priority == -1);
+        Assert.Contains(decisions, decision => decision.Rank is not null);
+        Assert.Contains(decisions, decision => decision.Limit == 2);
+        Assert.Contains(decisions, decision => decision.Pass is null && decision.Priority is null &&
+            decision.Rank is null && decision.Limit is null);
+
+        var html = await Render<InspectionPanel>(new() { [nameof(InspectionPanel.Inspection)] = model.Inspection });
+        var details = Regex.Matches(html, @"<p>Events (?<details>.*?)</p>", RegexOptions.Singleline);
+        Assert.Equal(decisions.Count, details.Count);
+        for (var i = 0; i < decisions.Count; i++)
+        {
+            var decision = decisions[i];
+            var expected = $"[{decision.EventStart}, {decision.EventEnd}).";
+            if (decision.Pass is { } pass) expected += $" Pass: {pass}.";
+            if (decision.Priority is { } priority) expected += $" Priority: {priority}.";
+            if (decision.Rank is { } rank) expected += $" Rank: {rank}.";
+            if (decision.Limit is { } limit) expected += $" Limit: {limit}.";
+            var actual = WebUtility.HtmlDecode(details[i].Groups["details"].Value);
+            Assert.Equal(expected, Regex.Replace(actual, @"\s+", " ").Trim());
+        }
+    }
+
+    [Fact]
     public async Task Host_built_nodes_without_Talemark_text_render_a_fallback_and_keep_formattable_children()
     {
         var quoted = new TextLiteral("say \"hi\"");
@@ -82,7 +131,7 @@ public sealed partial class ExpressionViewTests
         Assert.DoesNotContain("TextLiteral", html);
     }
 
-    private static WorkbenchModel Start()
+    private static WorkbenchModel Start(string? tale = null, string extraYaml = "")
     {
         var source = new StorySource(new Dictionary<string, string>
         {
@@ -100,8 +149,8 @@ public sealed partial class ExpressionViewTests
                   river: {name: River Folk, standing: 1}
                 characters:
                   player: {first-name: Ada, inventory: [lantern]}
-                """,
-            ["main.tale"] = $"""
+                """ + extraYaml,
+            ["main.tale"] = tale ?? $"""
                 === hall
                 * [Light] (requires: {Compound}) -> cave
                 * [Ready] (requires: flag:ready and player has lantern) -> cave
