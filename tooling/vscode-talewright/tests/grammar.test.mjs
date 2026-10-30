@@ -45,6 +45,7 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['  // {if true} * [not a choice]', '//', 'comment.line.double-slash.tale'],
     ['@requires player:dex >= 12 and @CanClimb', '@requires', 'keyword.control.metadata.tale'],
     ['@requires player:dex >= 12 and @CanClimb', '@CanClimb', 'support.function.predicate.tale'],
+    ['@requires @Can.Open-door_2', '@Can.Open-door_2', 'support.function.predicate.tale'],
     ['@hub any(camp, temple)', '@hub', 'keyword.control.metadata.tale'],
     ['@hub-limit 3', '@hub-limit', 'keyword.control.metadata.tale'],
     ['@once', '@once', 'keyword.control.metadata.tale'],

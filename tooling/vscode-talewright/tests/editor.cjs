@@ -328,6 +328,28 @@ async function testLiveDiagnostics() {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
 
     await vscode.window.showTextDocument(document);
+    const previewEdit = new vscode.WorkspaceEdit();
+    previewEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n{player:name#upper} {player:pronoun#object}\n-> END\n');
+    assert.equal(await vscode.workspace.applyEdit(previewEdit), true);
+    await waitForCompiler(document, items => items.length === 0);
+    const hints = await vscode.commands.executeCommand(
+      'vscode.executeInlayHintProvider', document.uri, new vscode.Range(0, 0, 3, 0));
+    assert.deepEqual(hints.map(hint => hint.label), ['"ADA"', '"them"']);
+    assert.equal(hints[0].position.character, 19);
+    assert.ok(hints[0].tooltip.value.includes('default'));
+    assert.equal(document.isDirty, true, 'Preview hints must not modify or save source');
+    const previewHover = await vscode.commands.executeCommand(
+      'vscode.executeHoverProvider', document.uri, new vscode.Position(1, 14));
+    assert.ok(previewHover.some(hover => hover.contents.some(content =>
+      content.value?.includes('**Result:**') && content.value.includes('ADA'))));
+    await vscode.commands.executeCommand('talewright.togglePreviewHints');
+    const editorConfig = vscode.workspace.getConfiguration('editor', { uri: document.uri, languageId: 'tale' });
+    assert.equal(editorConfig.get('inlayHints.enabled'), 'off');
+    await vscode.commands.executeCommand('talewright.togglePreviewHints');
+    assert.equal(vscode.workspace.getConfiguration('editor', { uri: document.uri, languageId: 'tale' })
+      .get('inlayHints.enabled'), 'on');
+
     const speakerEdit = new vscode.WorkspaceEdit();
     speakerEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
       '=== start\n> guide: Hi.\n-> END\n');

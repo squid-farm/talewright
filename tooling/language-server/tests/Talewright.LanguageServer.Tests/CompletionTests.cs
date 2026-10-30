@@ -50,9 +50,6 @@ public sealed partial class ServerTests
     [InlineData("{player:pronoun:|}", "reflexive")]
     [InlineData("{player:pronoun#one-|}", "one-many")]
     [InlineData("{item:rope#one-|}", "one-many")]
-    [InlineData("{item:rope#th|}", "this")]
-    [InlineData("{item:rope#th|}", "that")]
-    [InlineData("{item:rope#th|}", "the")]
     [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
     [InlineData("{if (player:pronoun:ob| == \"them\")}yes{/if}", "object")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
@@ -63,7 +60,7 @@ public sealed partial class ServerTests
         var registrations = AuthoringProjectMetadata.Export(CompilerOptions.Default) with
         {
             Predicates = ["IsHero"],
-            Modifiers = [.. CompilerOptions.Default.Modifiers.Names, "custom"]
+            Modifiers = ["custom"], BuiltInModifiers = []
         };
         File.WriteAllText(client.PathOf("project.authoring.json"), registrations.ToJson());
         File.AppendAllText(client.PathOf("story.talewright.yaml"),
@@ -78,6 +75,24 @@ public sealed partial class ServerTests
         var item = Assert.Single(Items(response), item => item.GetProperty("label").GetString() == expected);
         Assert.Equal(expected, item.GetProperty("textEdit").GetProperty("newText").GetString());
         Assert.Equal(1, item.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
+    [Fact]
+    public async Task Default_item_name_helpers_are_offered_by_the_stdio_server()
+    {
+        await using var client = new Client();
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "items: {rope: Rope}\n");
+        File.WriteAllText(client.PathOf("project.authoring.json"),
+            AuthoringProjectMetadata.Export(CompilerOptions.Default).ToJson());
+        await client.Initialize(new { metadataPath = "project.authoring.json" });
+        await client.Open("start.tale", "=== start\n{item:rope#th}\n-> END", 1);
+        var response = await Completion(client, "start.tale", "=== start\n{item:rope#th|}\n-> END");
+        Assert.True(response.TryGetProperty("result", out _), response.ToString());
+        var items = Items(response)
+            .Select(item => item.GetProperty("label").GetString()).ToArray();
+        Assert.Contains("the", items);
+        Assert.Contains("this", items);
+        Assert.Contains("that", items);
     }
 
     [Fact]

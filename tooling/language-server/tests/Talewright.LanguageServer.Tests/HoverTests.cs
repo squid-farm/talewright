@@ -22,7 +22,7 @@ public sealed partial class ServerTests
     public async Task Hover_categories_share_the_stdio_contract(string marked, string expected, string token)
     {
         await using var client = new Client();
-        var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["IsHero"], Modifiers = ["custom"] };
+        var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["IsHero"], Modifiers = ["custom"], BuiltInModifiers = [] };
         File.WriteAllText(client.PathOf("project.authoring.json"), metadata.ToJson());
         File.AppendAllText(client.PathOf(StorySource.ManifestFileName),
             "flags: [ready]\nvars: {coins: 1}\nitems: {rope: Rope}\nfactions: {guild: {name: Guild}}\n");

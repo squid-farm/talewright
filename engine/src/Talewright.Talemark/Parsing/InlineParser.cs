@@ -212,6 +212,9 @@ internal static class InlineParser
                 }
                 context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
                 fragment = ParseFragment(inner, location, context);
+                if (fragment is InlinePiece { Inline: SubstitutionTemplate substitution })
+                    context.Symbols.Analysis?.Substitutions.Add(new(
+                        new(context.Source.Locate(i), context.Source.Locate(close + 1)), substitution));
             }
             context.Fragments.Add(fragment);
             var placeholder = $"{PlaceholderStart}{context.Fragments.Count - 1}{PlaceholderEnd}";

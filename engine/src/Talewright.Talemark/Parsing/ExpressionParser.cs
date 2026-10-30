@@ -497,16 +497,52 @@ internal sealed class ExpressionParser
         if (Peek.Kind == TokenKind.Minus)
         {
             var op = Next();
+            if (TryReadMinimumMagnitude())
+            {
+                return new NumberLiteral(int.MinValue);
+            }
+
             var operand = ParseUnary();
             if (operand.Type != ExprType.Number)
             {
                 Fail("TW2003", "'-' needs a number.", op.Offset);
             }
 
-            return operand is NumberLiteral n ? new NumberLiteral(-n.Value) : new UnaryExpr(UnaryOp.Negate, operand);
+            return operand is NumberLiteral n
+                ? new NumberLiteral(n.Value == int.MinValue ? int.MaxValue : -n.Value)
+                : new UnaryExpr(UnaryOp.Negate, operand);
         }
 
         return ParsePrimary();
+    }
+
+    private bool TryReadMinimumMagnitude()
+    {
+        var position = _pos;
+        var parentheses = 0;
+        while (_tokens[position].Kind == TokenKind.LeftParen)
+        {
+            parentheses++;
+            position++;
+        }
+
+        if (_tokens[position] is not { Kind: TokenKind.Number } number ||
+            !long.TryParse(number.Text, out var magnitude) || magnitude != -(long)int.MinValue)
+        {
+            return false;
+        }
+
+        position++;
+        for (var index = 0; index < parentheses; index++, position++)
+        {
+            if (_tokens[position].Kind != TokenKind.RightParen)
+            {
+                return false;
+            }
+        }
+
+        _pos = position;
+        return true;
     }
 
     private Expr ParsePrimary()

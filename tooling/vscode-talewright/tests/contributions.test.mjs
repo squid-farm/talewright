@@ -11,6 +11,7 @@ test('package wires Talemark syntax, snippets, manifest schema, and the thin LSP
   assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.talewright.yaml', 'onTaskType:talewright']);
   assert.deepEqual(manifest.contributes.commands.map(command => command.command), [
     'talewright.validateStory', 'talewright.publishStoryZip', 'talewright.openAuthorDebugger', 'talewright.setUpCli',
+    'talewright.togglePreviewHints',
   ]);
   assert.ok(manifest.capabilities.untrustedWorkspaces.restrictedConfigurations.includes('talewright.cli.executablePath'));
   assert.ok(manifest.dependencies['vscode-languageclient']);

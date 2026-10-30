@@ -286,9 +286,36 @@ Completion and hover use the same story-wide inference as validation, including
 forward references, assignment chains and unsaved files. Incomplete or unresolved
 declarations retain symbols marked `unresolved`, not a guessed integer type.
 
+## Substitution previews
+
+Talemark substitutions show editor-only inlay hints with their final text after built-in
+manipulators: `{player:name#upper}` shows `"MARA BURNS"` for an authored name of Mara Burns.
+Character names, all pronoun forms (including independent possessives), `#one-many`,
+item/faction names, constant literals (text, numbers, booleans, and reputation tiers),
+and explicitly declared variable defaults are supported.
+Hints also work in dialogue, choice labels, and styled or multiline prose.
+
+Hover a substitution for its result marked **default**, intermediate manipulator results,
+and existing symbol/syntax help. Hover a character for its authored name and pronoun forms.
+These are examples using authored defaults, **not current gameplay values**; entry effects,
+triggers, character creation choices, and assignments are not executed or inferred.
+Unsaved story configuration changes update previews across files.
+
+Use **Talewright: Toggle Substitution Preview Hints** to switch hints on/off immediately.
+This changes VS Code's language-specific `editor.inlayHints.enabled` setting for Talemark.
+Hints never insert text or change saved stories. Long hints are abbreviated to at most
+40 UTF-16 code units; hover shows the full result with whitespace/control characters escaped.
+Unknown/incomplete substitutions have no hints. Gameplay-dependent expressions and custom
+manipulators have no guessed results; their hover explains the limitation.
+
+Project metadata exports now identify engine-owned built-ins so these can be previewed
+without executing custom registrations. Older metadata still loads, but manipulators remain
+unavailable for preview until it is explicitly re-exported. Overrides of built-in names are
+treated as custom manipulators, not executed.
+
 ## Not included
 
-- Signature help, inlay hints, rename, lint, formatting, or runtime debugging.
+- Signature help, rename, lint, formatting, or runtime debugging.
 - Implicit project builds/assembly execution, gameplay, network service, or telemetry.
 
 The language server uses only shared compiler/authoring analysis. Custom C#
