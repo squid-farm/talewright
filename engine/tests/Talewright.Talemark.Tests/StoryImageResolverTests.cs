@@ -35,7 +35,7 @@ public sealed class StoryImageResolverTests
     {
         var paths = extensions.Select(ext => "images/map" + ext).ToArray();
         var diagnostics = new DiagnosticBag();
-        var result = StoryImageResolver.Resolve(Source(paths.Reverse().ToArray()), "map", "A map.", Location, diagnostics);
+        var result = StoryImageResolver.Resolve(Source(Enumerable.Reverse(paths).ToArray()), "map", "A map.", Location, diagnostics);
 
         Assert.Equal(paths[0], result?.Path);
         var warning = Assert.Single(diagnostics.Items);

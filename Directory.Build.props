@@ -1,6 +1,9 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TalewrightLibraryTargetFrameworks Condition="'$(TalewrightLibraryTargetFrameworks)' == ''">net8.0;net9.0;net10.0</TalewrightLibraryTargetFrameworks>
+    <!-- Engine libraries multi-target; everything else (hosts, samples) stays on the latest TFM. -->
+    <TargetFrameworks Condition="'$(TalewrightMultiTarget)' == 'true' And '$(TargetFrameworks)' == ''">$(TalewrightLibraryTargetFrameworks)</TargetFrameworks>
+    <TargetFramework Condition="'$(TalewrightMultiTarget)' != 'true'">net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
