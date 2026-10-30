@@ -2,6 +2,7 @@ using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Rules.Effects;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Tests;
 
@@ -39,7 +40,7 @@ public class ImplicitTextVariableTests
         Assert.Equal(3, story.World.TextVariables.Count);
         Assert.All(story.World.TextVariables.Values, value => Assert.Equal("", value));
         Assert.Contains("Before [] []", new TemplateRenderer()
-            .Render(story.Scenes[0].Body, GameState.CreateInitial(story.World, 1)).ToPlainText());
+            .Render(CompilerTests.Templates(story.Scenes[0]), GameState.CreateInitial(story.World, 1)).ToPlainText());
     }
 
     [Fact]
@@ -58,8 +59,8 @@ public class ImplicitTextVariableTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
         var log = new EventLog(story.World, 1);
-        foreach (var effect in story.Scenes[0].EntryEffects)
-            EffectExecutor.Execute(effect.Effect, log, story.Predicates);
+        foreach (var batch in story.Scenes[0].Steps.OfType<EffectStep>())
+            EffectExecutor.ExecuteAll(batch.Effects, log, story.Predicates);
         Assert.Equal("Ada", log.State.GetTextVariable(new("copy")));
         Assert.Equal("stormy", log.State.GetTextVariable(new("source")));
         Assert.Equal(1, log.State.GetVariable(new("counter")));

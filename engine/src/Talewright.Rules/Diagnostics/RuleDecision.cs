@@ -5,6 +5,7 @@ namespace Talewright.Rules.Diagnostics;
 
 public enum DecisionKind
 {
+    Branch,
     EntryEffect,
     Choice,
     Storylet,

@@ -54,8 +54,7 @@ Beyond the firelight, the jungle never quite falls silent.
 
 You open the pack and unwrap a {item:ration} for supper.
 
-* [Share supper by the fire] { take player ration; clear flag:packing-open }
--> trail.supper-done
+* [Share supper by the fire] { take player ration; clear flag:packing-open } -> trail.supper-done
 
 === trail.supper-done
 @title A Quiet Meal

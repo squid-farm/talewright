@@ -41,7 +41,7 @@ public class ExpressionFormatterTests
     {
         var result = Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        var paragraph = Assert.IsType<ParagraphTemplate>(Assert.Single(result.Story!.Scenes[0].Body));
+        var paragraph = Assert.IsType<ParagraphTemplate>(Assert.Single(CompilerTests.Templates(result.Story!.Scenes[0])));
         return Assert.IsType<SubstitutionTemplate>(Assert.Single(paragraph.Inlines)).Value;
     }
 

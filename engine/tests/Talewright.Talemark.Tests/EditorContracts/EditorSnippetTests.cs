@@ -26,10 +26,11 @@ public class EditorSnippetTests
             var expanded = Regex.Replace(body, @"\$\{\d+:([^{}]*)\}", "$1").Replace("$0", "");
             Assert.DoesNotContain("$", expanded);
             var isScene = snippet.Name == "Scene";
+            var needsExit = snippet.Name is "Image" or "Conditional";
             var tale = isScene ? expanded : $"""
                 === snippet.start
                 {expanded}
-                -> END
+                {(needsExit ? "-> END" : "")}
 
                 === scene.id
                 Target.

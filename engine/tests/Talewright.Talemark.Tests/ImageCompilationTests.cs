@@ -27,7 +27,7 @@ public sealed class ImageCompilationTests
     {
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return Assert.IsType<MediaTemplate>(Assert.Single(
-            Assert.IsType<ParagraphTemplate>(result.Story!.GetScene(new SceneId("start")).Body[0]).Inlines));
+            Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(result.Story!.GetScene(new SceneId("start")))[0]).Inlines));
     }
 
     [Theory]

@@ -41,7 +41,7 @@
 </section>
 <section aria-label="Branch explanations">
     <h2>Branch explanations</h2>
-    <p>Historical results at recorded event offsets, not reevaluations of current state. Null results are not evaluated. Exact source locations are unavailable in this release.</p>
+    <p>Historical results at recorded event offsets, not reevaluations of current state. Null results are not evaluated. Scene-step decisions include their source location.</p>
     <label>Filter decisions <input aria-label="Filter decisions" @bind="_decisionFilter" @bind:event="oninput" /></label>
     <label>Decision kind <select aria-label="Decision kind" @bind="_kind">
         <option value="">All</option>
@@ -56,6 +56,10 @@
     {
         <details>
             <summary>@decision.Kind @decision.Scene @decision.Subject: @decision.Outcome (@decision.Reason)</summary>
+            @if (Inspection.SourceFor(decision) is { } source)
+            {
+                <p>Source: @source.Start.File:@source.Start.Line:@source.Start.Column</p>
+            }
             <p>Events [@decision.EventStart, @decision.EventEnd). Pass: @decision.Pass. Priority: @decision.Priority. Rank: @decision.Rank. Limit: @decision.Limit.</p>
             @if (decision.Expression is { } expression) { <ul><ExpressionView Trace="expression" /></ul> }
             @if (decision.EventStart is { } start && decision.EventEnd is { } end && end > start)

@@ -44,7 +44,7 @@ beside your pack and points to the empty signature line.
 ~ set flag:packing-open
 ~ var:supplies += 2
 
--> camp.hub
+* [Return to camp] -> camp.hub
 
 === camp.register
 @title Sign the expedition register

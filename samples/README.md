@@ -52,7 +52,7 @@ split settings, how global IDs work and why triggers stay together.
 | Ruleset extension/removal, custom bounded stats and governing attribute | Root manifest adds Courage (custom, 0–10), Will (attribute, 1–30) and Lucidity (skill, 0–10, `governing-attribute: will`); disables Performance |
 | Built-in/custom pronoun sets, NPC stats | Player creation and Tomas's explicit pronouns/stats in the root manifest |
 | Basic hub, `@once`, `@priority`, stable equal-priority order | `camp.hub`; trader and register tie at priority 10, journal follows at 5 |
-| Intersection hub and empty-hub fallback | Trader `camp.supplies` uses `all(camp,records)` to offer the unsigned register; if it is already signed, Continue returns to camp |
+| Intersection hub and explicit exit | Trader `camp.supplies` uses `all(camp,records)` to offer the unsigned register; **Return to camp** remains available even when the hub is empty |
 | Give items, counted inventory, item stat modifiers | Trader gives rope, charm (+2 WIS) and two rations; relic adds +2 CHA |
 | Arithmetic, assignment/subtraction, numeric equality/inequality | Ines in `dream.ines` computes `((6 + 2) * 3 / 2 - 1) - 1 = 10` and pays off Tomas's rumor; `supplies` still increments at camp |
 | All five pronoun forms, names, chained modifiers, literal braces | `camp.register`: uppercase/full names, subject/object/possessive/independent/reflexive, `#capitalize`, escaped braces |
@@ -63,7 +63,7 @@ split settings, how global IDs work and why triggers stay together.
 | Journal check, flag gate, XP and Lucidity progression | `camp.journal*`: success gives 50 XP, `knows-glyphs` and +2 Lucidity; the flag opens the temple's glyph route |
 | Choice skill checks for player and NPC | `trail.river`: swim or ask the guide; rope offers a safe route |
 | Union hub, cap, changing eligibility, `not`, visits | `trail.night`: `any(night,watch)`, `@hub-limit 1`; supper, jaguar, signal and bell; **Press on at dawn** always remains available |
-| Counted take, clear flag, choice fall-through | `trail.supper*`: eat one of two rations, clear `packing-open`, then follow the scene divert |
+| Counted take, clear flag, explicit choice target | `trail.supper*`: eat one of two rations, clear `packing-open`, then go to the supper result |
 | Stat clamping, custom-stat trigger, conditional entry effect | `trail.jaguar`: Courage saturates at 10, `courage-earned` sets `steady`, Courage >=6 grants 5 XP |
 | Text comparison, conditional divert with fallback | `trail.signal`: a matching nonempty watchword reaches `trail.found`; a changed, retired or unrecorded phrase reaches `trail.wait` |
 | Repeatable edge trigger | `trail.bell`: ring/silence/ring counts two alarms; root `watch-bell` has `once: false` |
@@ -71,7 +71,7 @@ split settings, how global IDs work and why triggers stay together.
 | Entry skill check | `temple.hall`: Perception leads to the idol niche or directly to the altar |
 | Faction tiers and trigger, XP and level-up | Guild standing throughout; keeping the relic fires `guild-wary` |
 | Nested block/inline conditions, `and`/`or`, parentheses, `visited(...)` | `ending.keep` |
-| Conditional choices and unconditional fallback | `ending.return`: guild/keeper choices when carrying the relic, otherwise `ending.empty-handed` |
+| Conditional early exit before choices | `ending.return`: leave immediately for `ending.empty-handed` without the relic; otherwise offer guild/keeper choices |
 | Dream intersection hub and cap | `dream.hub`: `all(dream,keeper)`, `@hub-limit 2` offers at most two eligible keepers **per visit**, not two total visits; a fixed waking choice remains |
 | Custom pronouns and watchword responses | The Spiral uses xe/xem with singular agreement; current, changed, retired and unrecorded watchwords produce distinct responses |
 | NPC check and alternate player checks | The Watcher uses it/its; its Perception roll changes prose, then player Lucidity, Stealth or Courage >=6 gets past; failed checks allow another attempt or waking |
@@ -90,7 +90,7 @@ split settings, how global IDs work and why triggers stay together.
    agreement; repeat with she, they and he.
 2. Continue to camp. **Haggle for supplies** gives two rations.
    **Sign the expedition register** and inspect the pronoun forms.
-   Alternatively, sign first, then trade, to see the trader's empty-hub fallback.
+   Alternatively, sign first, then trade: **Return to camp** remains when the register hub is empty.
 3. Study the journal: success gives +2 Lucidity and the glyph route; failure
    leaves forcing and the side gap available. Ask the guide about the temple.
 4. Agree on a night watchword, record it, and keep, change or retire it. The

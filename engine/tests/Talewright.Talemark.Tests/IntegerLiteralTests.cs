@@ -4,6 +4,7 @@ using Talewright.Narrative.Rendering;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Tests;
 
@@ -40,16 +41,16 @@ public class IntegerLiteralTests
         var story = result.Story!;
         var scene = story.Scenes[0];
         var log = new EventLog(story.World, 1);
-        foreach (var effect in scene.EntryEffects)
+        foreach (var batch in scene.Steps.OfType<EffectStep>())
         {
-            EffectExecutor.Execute(effect.Effect, log, story.Predicates);
+            EffectExecutor.ExecuteAll(batch.Effects, log, story.Predicates);
         }
 
         Assert.Equal(expected, log.State.GetVariable(new("count")));
         Assert.True(ExpressionEvaluator.IsTrue(scene.Requires!, EvaluationContext.For(log.State)));
         Assert.Equal(expected.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            new TemplateRenderer().Render(scene.Body, log.State).ToPlainText());
-        var amount = Assert.IsType<ChangeVariable>(Assert.Single(scene.EntryEffects).Effect).Amount;
+            new TemplateRenderer().Render(CompilerTests.Templates(scene), log.State).ToPlainText());
+        var amount = Assert.IsType<ChangeVariable>(Assert.Single(Assert.Single(scene.Steps.OfType<EffectStep>()).Effects)).Amount;
         if (!source.Contains(" + ", StringComparison.Ordinal))
         {
             Assert.Equal(new NumberLiteral(expected), amount);

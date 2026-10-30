@@ -47,7 +47,7 @@ public sealed class ImageSyntaxTests
     {
         var result = Compile($"=== start\n{call}\n-> END");
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        var paragraph = Assert.IsType<ParagraphTemplate>(result.Story!.GetScene(new SceneId("start")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(result.Story!.GetScene(new SceneId("start")))[0]);
         Assert.Equal(new MediaTemplate($"images/{path}.png", alt), Assert.Single(paragraph.Inlines));
     }
 
@@ -59,22 +59,23 @@ public sealed class ImageSyntaxTests
             Before {image("camp", "Camp")} after.
 
             > player: See {image("map", "A } ] map")}.
-            * [Pick {image("coin", "A } ] coin")}] -> END
-            * [Otherwise] -> END
-
             **{image("bold")}**
 
             {if true}{image("conditional")}{/if}
+
+            * [Pick {image("coin", "A } ] coin")}] -> END
+            * [Otherwise] -> END
             """);
         var scene = story.GetScene(new SceneId("start"));
-        var prose = Assert.IsType<ParagraphTemplate>(scene.Body[0]);
+        var body = CompilerTests.Templates(scene);
+        var prose = Assert.IsType<ParagraphTemplate>(body[0]);
         Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), prose.Inlines.OfType<MediaTemplate>().Single());
-        var speech = Assert.IsType<SpeechTemplate>(scene.Body[1]);
+        var speech = Assert.IsType<SpeechTemplate>(body[1]);
         Assert.Equal(new MediaTemplate("images/map.png", "A } ] map"), speech.Inlines.OfType<MediaTemplate>().Single());
         Assert.Equal(new MediaTemplate("images/coin.png", "A } ] coin"), scene.Choices[0].Label.OfType<MediaTemplate>().Single());
-        var bold = Assert.IsType<StyledTemplate>(Assert.IsType<ParagraphTemplate>(scene.Body[2]).Inlines.Single());
+        var bold = Assert.IsType<StyledTemplate>(Assert.IsType<ParagraphTemplate>(body[2]).Inlines.Single());
         Assert.Equal(new MediaTemplate("images/bold.png", "Bold"), bold.Children.Single());
-        var conditional = Assert.IsType<ConditionalInlineTemplate>(Assert.IsType<ParagraphTemplate>(scene.Body[3]).Inlines.Single());
+        var conditional = Assert.IsType<ConditionalInlineTemplate>(Assert.IsType<ParagraphTemplate>(body[3]).Inlines.Single());
         Assert.Equal(new MediaTemplate("images/conditional.png", "Conditional"), conditional.Then.Single());
     }
 
@@ -82,7 +83,7 @@ public sealed class ImageSyntaxTests
     public void Images_in_code_formatting_do_not_leak_internal_placeholders()
     {
         var story = Story("=== start\n`{image(\"camp\")}`\n-> END");
-        var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("start")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);
         var code = Assert.IsType<StyledTemplate>(paragraph.Inlines.Single());
         Assert.Equal(TextStyle.Code, code.Style);
         Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), code.Children.Single());
@@ -96,7 +97,7 @@ public sealed class ImageSyntaxTests
             \{image("camp")\}
             -> END
             """);
-        var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("start")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);
         Assert.DoesNotContain(paragraph.Inlines, inline => inline is MediaTemplate);
         Assert.Equal("{image(\"camp\")}", string.Concat(paragraph.Inlines.OfType<TextTemplate>().Select(text => text.Text)));
     }
@@ -105,7 +106,7 @@ public sealed class ImageSyntaxTests
     public void Image_character_references_and_prefixes_remain_substitutions()
     {
         var story = Story("=== start\n{image:name} {image:first-name#possessive} {imagery:name}\n-> END");
-        var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("start")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);
         Assert.Equal(3, paragraph.Inlines.OfType<SubstitutionTemplate>().Count());
         Assert.Empty(paragraph.Inlines.OfType<MediaTemplate>());
     }
@@ -125,7 +126,7 @@ public sealed class ImageSyntaxTests
             {"trailing\"}
             -> END
             """);
-        var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("start")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);
         var substitution = Assert.IsType<SubstitutionTemplate>(paragraph.Inlines.Single());
         Assert.Equal(new TextLiteral("trailing\\"), substitution.Value);
     }

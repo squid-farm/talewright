@@ -10,7 +10,7 @@ using Talewright.Rules.Triggers;
 namespace Talewright.Talemark.Model;
 
 /// <summary>
-/// A fully compiled, validated story. Immutable and free of source text: the runtime only ever sees this.
+/// A fully compiled, validated story. Contains source positions, but no source text.
 /// </summary>
 public sealed class StoryDefinition
 {
@@ -54,15 +54,9 @@ public sealed record DivertTarget(SceneId? Scene)
     public override string ToString() => Scene?.Value ?? "END";
 }
 
-/// <summary>A divert that only applies when <see cref="Condition"/> holds (from <c>{if}</c> blocks).</summary>
-public sealed record ConditionalDivert(Expr? Condition, DivertTarget Target);
-
-/// <summary>An effect that only applies when <see cref="Condition"/> holds.</summary>
-public sealed record ConditionalEffect(Expr? Condition, Effect Effect);
-
 /// <summary>
-/// What happens after a check: effects, then a divert. A null <see cref="Divert"/> falls through to the
-/// scene's own <see cref="SceneDefinition.Diverts"/>.
+/// What happens after a check: one effect batch, then an optional immediate divert.
+/// An entry check without a divert continues at the next scene step.
 /// </summary>
 public sealed record CheckOutcome(IReadOnlyList<Effect> Effects, DivertTarget? Divert);
 
@@ -70,9 +64,7 @@ public sealed record CheckOutcome(IReadOnlyList<Effect> Effects, DivertTarget? D
 public sealed record CheckBranch(SkillCheck Check, CheckOutcome Success, CheckOutcome Failure);
 
 /// <summary>
-/// One scene / storylet. Entering it: apply <see cref="EntryEffects"/>, render <see cref="Body"/>, then either
-/// resolve <see cref="EntryCheck"/>, offer <see cref="Choices"/> (plus hub storylets), or follow the first
-/// matching <see cref="Diverts"/>.
+/// One scene / storylet, executed in source order.
 /// </summary>
 public sealed class SceneDefinition : IStorylet
 {
@@ -87,16 +79,13 @@ public sealed class SceneDefinition : IStorylet
     public StoryletTags? Hub { get; init; }
     public int? HubLimit { get; init; }
 
-    public IReadOnlyList<ConditionalEffect> EntryEffects { get; init; } = [];
-    public IReadOnlyList<TemplateBlock> Body { get; init; } = [];
-    public CheckBranch? EntryCheck { get; init; }
-    public IReadOnlyList<ChoiceDefinition> Choices { get; init; } = [];
-    public IReadOnlyList<ConditionalDivert> Diverts { get; init; } = [];
+    public IReadOnlyList<SceneStep> Steps { get; init; } = [];
+    public IReadOnlyList<ChoiceDefinition> Choices =>
+        SceneSteps.Walk(Steps).OfType<ChoiceStep>().Select(step => step.Choice).ToArray();
 }
 
 /// <summary>
-/// A player choice. <see cref="Check"/> or <see cref="Divert"/> decides where it leads; with neither, the choice
-/// falls through to the scene's own <see cref="SceneDefinition.Diverts"/> (like an ink "gather").
+/// A player choice. Its divert, or both skill-check outcomes, must name an explicit target.
 /// </summary>
 public sealed class ChoiceDefinition
 {

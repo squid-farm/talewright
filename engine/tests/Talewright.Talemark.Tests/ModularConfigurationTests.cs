@@ -87,7 +87,7 @@ public sealed class ModularConfigurationTests
             Assert.Equal(left.Once, right.Once);
         }
         string Render(StoryDefinition story) => new TemplateRenderer().Render(
-            story.GetScene(story.Start).Body, GameState.CreateInitial(story.World, 42)).ToPlainText();
+            CompilerTests.Templates(story.GetScene(story.Start)), GameState.CreateInitial(story.World, 42)).ToPlainText();
         Assert.Equal(Render(expected), Render(actual));
         Assert.Contains("Hello, Ada. sunny, 2.", Render(actual));
     }

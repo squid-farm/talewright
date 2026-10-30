@@ -81,7 +81,19 @@ public class CompilerTests
     }
 
     private static string Render(StoryDefinition story, SceneDefinition scene, GameState? state = null) =>
-        new TemplateRenderer().Render(scene.Body, state ?? GameState.CreateInitial(story.World, 1)).ToPlainText();
+        new TemplateRenderer().Render(Templates(scene), state ?? GameState.CreateInitial(story.World, 1)).ToPlainText();
+
+    // Parser tests inspect the prose tree; ordered execution is covered by runtime tests.
+    internal static IReadOnlyList<TemplateBlock> Templates(SceneDefinition scene) => Templates(scene.Steps);
+
+    private static IReadOnlyList<TemplateBlock> Templates(IEnumerable<SceneStep> steps) =>
+        steps.SelectMany(step => step switch
+        {
+            ProseStep prose => new[] { prose.Block },
+            ConditionalStep branch => new TemplateBlock[]
+                { new ConditionalBlockTemplate(branch.Condition, Templates(branch.Then), Templates(branch.Else)) },
+            _ => Array.Empty<TemplateBlock>(),
+        }).ToArray();
 
     [Theory]
     [InlineData(0)]
@@ -110,7 +122,7 @@ public class CompilerTests
             hash.AppendData(bytes);
         }
 
-        Append("talewright-replay-v1");
+        Append("talewright-replay-v2");
         Append(compatibilityId);
         foreach (var (path, text) in files.OrderBy(file => file.Key, StringComparer.Ordinal))
         {
@@ -259,7 +271,7 @@ public class CompilerTests
             "Mara's torch gutters. Burns's map is old. The guards' post. She carries a coil of rope.\n\nthe guards: Halt, Mara Burns!",
             text);
 
-        var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("a")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(Templates(story.GetScene(new SceneId("a")))[0]);
         Assert.Contains(paragraph.Inlines, i => i is StyledTemplate { Style: TextStyle.Strong });
         Assert.Contains(paragraph.Inlines, i => i is StyledTemplate { Style: TextStyle.Emphasis });
         Assert.Contains(paragraph.Inlines, i => i is StyledTemplate { Style: TextStyle.Code });
@@ -270,7 +282,7 @@ public class CompilerTests
     {
         var story = Ok("=== a\n{image(\"door-art\", \"The sealed door\")}\n-> END");
 
-        var paragraph = Assert.IsType<ParagraphTemplate>(story.GetScene(new SceneId("a")).Body[0]);
+        var paragraph = Assert.IsType<ParagraphTemplate>(Templates(story.GetScene(new SceneId("a")))[0]);
         Assert.Equal(new MediaTemplate("images/door-art.png", "The sealed door"), Assert.Single(paragraph.Inlines));
     }
 
@@ -334,9 +346,10 @@ public class CompilerTests
             {/if}
             """);
 
-        var choices = story.GetScene(new SceneId("a")).Choices;
-        Assert.Equal(new HasItem(EntityId.Player, new ItemId("rope")), choices[0].Requires);
-        Assert.Equal(new UnaryExpr(UnaryOp.Not, new HasItem(EntityId.Player, new ItemId("rope"))), choices[1].Requires);
+        var branch = Assert.IsType<ConditionalStep>(Assert.Single(story.GetScene(new SceneId("a")).Steps));
+        Assert.Equal(new HasItem(EntityId.Player, new ItemId("rope")), branch.Condition);
+        Assert.Null(Assert.IsType<ChoiceStep>(Assert.Single(branch.Then)).Choice.Requires);
+        Assert.Null(Assert.IsType<ChoiceStep>(Assert.Single(branch.Else)).Choice.Requires);
     }
 
     [Fact]
@@ -355,10 +368,10 @@ public class CompilerTests
             """);
 
         var scene = story.GetScene(new SceneId("a"));
-        Assert.Equal(3, scene.EntryEffects.Count);
-        Assert.All(scene.EntryEffects, e => Assert.Null(e.Condition));
-        Assert.Equal(new FlagRef(new FlagId("burned")), scene.Diverts[0].Condition);
-        Assert.True(scene.Diverts[1].Target.IsEnd);
+        Assert.Equal(2, scene.Steps.OfType<EffectStep>().Count());
+        Assert.Equal(3, scene.Steps.OfType<EffectStep>().Sum(step => step.Effects.Count));
+        Assert.Equal(new FlagRef(new FlagId("burned")), Assert.IsType<ConditionalStep>(scene.Steps[2]).Condition);
+        Assert.True(Assert.IsType<DivertStep>(scene.Steps[3]).Target.IsEnd);
     }
 
     [Fact]
@@ -388,7 +401,7 @@ public class CompilerTests
         Assert.Equal(new EntityId("guards"), ask.Check.Actor);
         Assert.IsType<BinaryExpr>(ask.Check.Difficulty);
 
-        var block = story.GetScene(new SceneId("b")).EntryCheck!;
+        var block = Assert.Single(story.GetScene(new SceneId("b")).Steps.OfType<CheckStep>()).Check;
         Assert.True(block.Success.Divert!.IsEnd);
         Assert.Null(block.Failure.Divert);
     }
@@ -797,7 +810,7 @@ public class CompilerTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
         Assert.Equal("Xe wins.", new TemplateRenderer(new Narrative.Grammar.EnglishGrammar(), options.Predicates)
-            .Render(story.GetScene(new SceneId("a")).Body, GameState.CreateInitial(story.World, 1)).ToPlainText());
+            .Render(Templates(story.GetScene(new SceneId("a"))), GameState.CreateInitial(story.World, 1)).ToPlainText());
     }
 
     [Theory]
@@ -878,7 +891,7 @@ public class CompilerTests
                     ? "{subject: xe, object: xem, possessive-pronoun: {determiner: xyr, independent: xyrs}, reflexive: xemself, agreement: singular}"
                     : pronouns)));
             var state = GameState.CreateInitial(story.World, 1);
-            var effect = Assert.IsType<SetTextVariable>(Assert.Single(story.GetScene(new("a")).EntryEffects).Effect);
+            var effect = Assert.IsType<SetTextVariable>(Assert.Single(Assert.Single(story.GetScene(new("a")).Steps.OfType<EffectStep>()).Effects));
             var value = Assert.IsType<PronounRef>(effect.Value);
             Assert.Equal(forms[index], ExpressionEvaluator.Evaluate(value, new(state, new())).Text);
             state.Apply(new TextVariableChanged(new("word"), "", forms[index]));

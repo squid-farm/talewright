@@ -107,6 +107,8 @@ public class TextDebuggerTests
         Assert.Contains("var:weather (text)", inspection);
         Assert.Contains("var:count (integer)", inspection);
         Assert.Contains("&quot;&quot;", inspection);
+        Assert.Contains("Choice a step:3:1", inspection);
+        Assert.Contains("Source: main.tale:3:1", inspection);
         var edit = Assert.Single(model.EditTexts);
         edit.Enabled = true;
         edit.Value = "<script>alert('not markup')</script>\n";

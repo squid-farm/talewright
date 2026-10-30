@@ -4,6 +4,7 @@ using Talewright.Narrative.Templates;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Authoring.Tests;
 
@@ -144,7 +145,7 @@ public sealed class StoryPreviewTests
         var previews = StoryPreview.Get(analysis, "main.tale");
         Assert.Equal(["Those pants", "are", "Some ARMOR"], previews.Select(preview => preview.Value));
         var story = Assert.IsType<Talewright.Talemark.Model.StoryDefinition>(StoryCompiler.Compile(source).Story);
-        var rendered = new TemplateRenderer().Render(story.GetScene(new("start")).Body,
+        var rendered = new TemplateRenderer().Render(story.GetScene(new("start")).Steps.OfType<ProseStep>().Select(step => step.Block),
             GameState.CreateInitial(story.World, 0)).ToPlainText();
         Assert.Contains("Those pants are / Some ARMOR", rendered);
     }

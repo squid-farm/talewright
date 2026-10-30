@@ -121,7 +121,8 @@ public sealed class AuthorTimelineTests
         Assert.DoesNotContain(session.Events.Skip(before), e => e is SceneEntered or ChoiceMade or DiceRolled);
         Assert.Contains("Count 17. Ready.", session.Current.Document.ToPlainText());
         Assert.Equal("Prepared 17", session.Current.Choices[0].Text);
-        Assert.Contains(session.Decisions, d => d.Subject == "c0" && d.EventStart == session.Events.Count);
+        Assert.Contains(session.Decisions, d => d.Kind == Talewright.Rules.Diagnostics.DecisionKind.Choice
+            && d.EventStart == session.Events.Count);
         var result = Assert.Single(session.Results);
         Assert.Equal(before, result.EventStart);
         Assert.Contains(result.Changes, value => value.Field == "var:count" && value.Before == "1" && value.After == "17");

@@ -37,9 +37,11 @@ images have a separate path catalogue. Unrelated files are not published as stor
    assignment targets from those blocks and manifest effects. Comments, prose and choice labels do not
    declare flags/vars. Forward references across files remain supported.
 3. **Parse.** `TaleParser` walks each file line by line (files in path order). Prose goes through `InlineParser`;
-   conditions, substitutions and effects through `ExpressionParser`. Choices/effects/diverts inside `{if}` blocks
-   get the condition ANDed in.
-4. **Validate.** `StoryValidator` checks the whole story (start scene, dead ends, fall-through, hubs, reachability).
+   conditions, substitutions and effects through `ExpressionParser`. `SceneDefinition.Steps` preserves source
+   order, effect batches and nested conditions. Every step has a deterministic source-position ID and half-open
+   UTF-16 source span; choice keys remain `c0`, `c1`, ... in source order.
+4. **Validate.** `StoryValidator` checks final choice blocks, explicit choice targets, dead ends, unreachable
+   steps, hubs and reachability. Shared `SceneSteps` walks describe possible flow without evaluating game state.
 5. **Assemble.** If there were no errors, build the `StoryDefinition`. Warnings never block compilation.
 
 ## Accepted source provenance
@@ -54,7 +56,7 @@ Errors produce no accepted map. Manually constructed results/C# story models may
 consumers must report absent provenance, not infer it from IDs or reparse source independently.
 The map stays outside `StoryDefinition` and does not affect fingerprints, runtime execution or saves.
 This is a narrow reusable scene-provenance seam, not the partial-symbol/overlay analysis API in #29
-and not a statement-level execution map.
+and remains separate from the step-level execution spans carried by `SceneDefinition.Steps`.
 
 ## Files
 
