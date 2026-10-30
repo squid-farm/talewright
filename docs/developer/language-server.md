@@ -139,7 +139,13 @@ syntactically broken YAML has no fabricated schema locations. Registered
 predicates/modifiers expose their names and types, not undocumented signatures
 or runtime results. Source context is authored text, never a current gameplay
 value or evaluated custom registration. Complete substitutions additionally show authored-default
-examples and built-in manipulator steps. Character symbols include their default name and pronoun forms.
+examples and built-in manipulator steps. Symbol cards list authored facts only:
+characters show their default name and pronoun forms; items their name, stat
+modifiers and starting holders; stats their name, category, range, default and
+per-character starting values; factions their name, initial standing and tier;
+scenes their authored title, tags, priority, `once` and hub settings. Each kind's
+facts come from one list in `StoryHover`, where future authored metadata (such as
+custom item properties) can be added.
 
 Clients advertising Markdown receive formatted help with authored names, paths,
 and source lines isolated in code spans; no authored text is promoted into links,

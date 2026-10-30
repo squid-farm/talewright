@@ -188,7 +188,9 @@ public sealed class StoryHoverTests
             other: "=== second\n@title [click](https://example.invalid) <script> `payload`\n-> END");
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
         Assert.Contains("` === second `", hover.Markdown);
-        Assert.DoesNotContain("https://", hover.Markdown);
+        const string title = "`` \"[click](https://example.invalid) <script> `payload`\" ``";
+        Assert.Contains("Title: " + title, hover.Markdown);
+        Assert.DoesNotContain("https://", hover.Markdown.Replace(title, ""));
         var yaml = Manifest.Replace("player: {first-name: Ada}", "player: {first-name: '[click](https://example.invalid) `x` <b>'}");
         (analysis, position) = Analyze("=== first\n> pla|yer: Hello", yaml);
         hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
@@ -267,6 +269,91 @@ public sealed class StoryHoverTests
             Position(StorySource.ManifestFileName, yaml[..id]))).PlainText);
         Assert.Contains("Ruleset", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis,
             Position(StorySource.ManifestFileName, yaml[..ruleset]))).PlainText);
+    }
+
+    private const string CardManifest = """
+        game:
+          id: hover
+          title: Hover
+          start: first
+          ruleset:
+            stats:
+              - {id: grit, name: Grit, category: attribute, min: 1, max: 20, default: 8}
+        characters:
+          player: {first-name: Ada, stats: {grit: 12}, inventory: {rope: 2}}
+        items:
+          rope: {name: Coil of Rope, modifiers: {grit: 1}}
+        factions: {guild: {name: Thieves Guild, standing: 0}}
+        """;
+
+    [Fact]
+    public void Item_card_shows_authored_name_modifiers_and_starting_holders()
+    {
+        var (analysis, position) = Analyze("=== first\n{item:ro|pe}", CardManifest);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Name: \"Coil of Rope\"", hover);
+        Assert.Contains("Stat modifiers: grit +1", hover);
+        Assert.Contains("Starting holders: player ×2", hover);
+        Assert.Contains("Declared at story.talewright.yaml", hover);
+    }
+
+    [Fact]
+    public void Stat_card_shows_declared_bounds_default_and_character_starting_values()
+    {
+        var (analysis, position) = Analyze("=== first\n::: skill-check gr|it dc 12", CardManifest);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Name: \"Grit\"", hover);
+        Assert.Contains("Category: Attribute", hover);
+        Assert.Contains("Range: 1..20", hover);
+        Assert.Contains("Default: 8", hover);
+        Assert.Contains("Starting values: player 12", hover);
+        Assert.Contains("Declared at story.talewright.yaml", hover);
+    }
+
+    [Fact]
+    public void Ruleset_stat_card_has_facts_without_a_declaration()
+    {
+        var (analysis, position) = Analyze("=== first\n::: skill-check ath|letics dc 12");
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Default:", hover);
+        Assert.Contains("Range:", hover);
+        Assert.Contains("Available from the selected ruleset.", hover);
+    }
+
+    [Fact]
+    public void Faction_card_shows_name_initial_standing_and_tier()
+    {
+        var (analysis, position) = Analyze("=== first\n{faction:gu|ild:name}", CardManifest);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Name: \"Thieves Guild\"", hover);
+        Assert.Contains("Initial standing: 0", hover);
+        Assert.Contains("Initial tier: ", hover);
+    }
+
+    [Fact]
+    public void Scene_card_shows_authored_metadata_only_when_present()
+    {
+        var (analysis, position) = Analyze("=== first\n-> sec|ond", other:
+            "=== second\n@title The Market\n@tags town, day\n@priority 5\n@once\n@hub all(camp, records)\n@hub-limit 2\n-> END");
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Title: \"The Market\"", hover);
+        Assert.Contains("Tags: day, town", hover);
+        Assert.Contains("Priority: 5", hover);
+        Assert.Contains("Once: true", hover);
+        Assert.Contains("Hub: all(camp, records)", hover);
+        Assert.Contains("Hub limit: 2", hover);
+        Assert.Contains("Source: === second", hover);
+
+        (analysis, position) = Analyze("=== first\n-> sec|ond");
+        hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.DoesNotContain("Title:", hover);
+        Assert.DoesNotContain("Hub", hover);
+        Assert.DoesNotContain("Priority:", hover);
+
+        (analysis, position) = Analyze("=== first\n-> sec|ond", other:
+            "=== second\n@priority 0\n-> END");
+        hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
+        Assert.Contains("Priority: 0", hover);
     }
 
     private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked, string yaml = Manifest,

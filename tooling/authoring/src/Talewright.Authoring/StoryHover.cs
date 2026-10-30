@@ -1,6 +1,9 @@
 using System.Text.Json;
+using Talewright.Core.Rulesets;
+using Talewright.Core.World;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Authoring;
 
@@ -126,25 +129,10 @@ public static class StoryHover
         var summary = $"{symbol.Kind}: {symbol.Name} ({symbol.Type})";
         var markdown = $"**{symbol.Kind}** {Code(symbol.Name)} ({Code(symbol.Type)})";
         var plain = summary;
-        if (symbol.Kind == AuthoringSymbolKind.Character &&
-            analysis.World?.Characters.Values.FirstOrDefault(character => character.Id.Value == symbol.Name) is { } character)
+        foreach (var (label, value) in Facts(analysis, symbol))
         {
-            var pronouns = character.Pronouns;
-            var details = new[]
-            {
-                ("Name (default)", character.FullName),
-                ("Subject", pronouns.Subject),
-                ("Object", pronouns.Object),
-                ("Possessive determiner", pronouns.Possessive),
-                ("Independent possessive", pronouns.PossessivePronoun),
-                ("Reflexive", pronouns.Reflexive),
-                ("Pronoun agreement", pronouns.Agreement.ToString()),
-            };
-            foreach (var (label, value) in details)
-            {
-                markdown += $"\n\n{label}: {Code(StoryPreview.Quote(value))}";
-                plain += $"\n{label}: {StoryPreview.Quote(value)}";
-            }
+            markdown += $"\n\n{label}: {Code(value)}";
+            plain += $"\n{label}: {value}";
         }
         if (symbol.Declaration is { } declaration)
         {
@@ -167,6 +155,88 @@ public static class StoryHover
         }
         return new(range, markdown, plain);
     }
+
+    /// <summary>
+    /// Authored-default facts for a symbol's hover card. Each kind lists only data the story declares today;
+    /// future authored metadata (for example custom item properties) belongs here as additional facts.
+    /// </summary>
+    private static IEnumerable<(string Label, string Value)> Facts(StoryAnalysis analysis, AuthoringSymbol symbol)
+    {
+        if (symbol.Kind == AuthoringSymbolKind.Scene)
+            return analysis.Scenes.FirstOrDefault(scene => scene.Definition.Id.Value == symbol.Name) is { } scene
+                ? SceneFacts(scene) : [];
+        if (analysis.World is not { } world) return [];
+        return symbol.Kind switch
+        {
+            AuthoringSymbolKind.Character when world.Characters.Values.FirstOrDefault(c => c.Id.Value == symbol.Name) is { } character
+                => CharacterFacts(character),
+            AuthoringSymbolKind.Item when world.Items.Values.FirstOrDefault(i => i.Id.Value == symbol.Name) is { } item
+                => ItemFacts(world, item),
+            AuthoringSymbolKind.Stat when world.Ruleset.Stats.FirstOrDefault(s => s.Id.Value == symbol.Name) is { } stat
+                => StatFacts(world, stat),
+            AuthoringSymbolKind.Faction when world.Factions.Values.FirstOrDefault(f => f.Id.Value == symbol.Name) is { } faction
+                => FactionFacts(world, faction),
+            _ => [],
+        };
+    }
+
+    private static IEnumerable<(string, string)> CharacterFacts(CharacterDefinition character)
+    {
+        var pronouns = character.Pronouns;
+        yield return ("Name (default)", StoryPreview.Quote(character.FullName));
+        yield return ("Subject", StoryPreview.Quote(pronouns.Subject));
+        yield return ("Object", StoryPreview.Quote(pronouns.Object));
+        yield return ("Possessive determiner", StoryPreview.Quote(pronouns.Possessive));
+        yield return ("Independent possessive", StoryPreview.Quote(pronouns.PossessivePronoun));
+        yield return ("Reflexive", StoryPreview.Quote(pronouns.Reflexive));
+        yield return ("Pronoun agreement", StoryPreview.Quote(pronouns.Agreement.ToString()));
+    }
+
+    private static IEnumerable<(string, string)> ItemFacts(WorldDefinition world, ItemDefinition item)
+    {
+        yield return ("Name", StoryPreview.Quote(item.Name));
+        if (item.Modifiers.Count > 0)
+            yield return ("Stat modifiers", string.Join(", ", item.Modifiers.Select(m => $"{m.Key.Value} {Signed(m.Value)}")));
+        var holders = world.Characters.Values.Where(c => c.Inventory.GetValueOrDefault(item.Id) > 0)
+            .Select(c => $"{c.Id.Value} ×{c.Inventory[item.Id]}").ToArray();
+        if (holders.Length > 0) yield return ("Starting holders", string.Join(", ", holders));
+    }
+
+    private static IEnumerable<(string, string)> StatFacts(WorldDefinition world, StatDefinition stat)
+    {
+        yield return ("Name", StoryPreview.Quote(stat.Name));
+        yield return ("Category", stat.Category.ToString());
+        yield return ("Range", $"{stat.Min}..{(stat.Max == int.MaxValue ? "no maximum" : stat.Max)}");
+        yield return ("Default", stat.Default.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (stat.GoverningAttribute is { } attribute) yield return ("Governing attribute", attribute.Value);
+        var starting = world.Characters.Values.Where(c => c.Stats.ContainsKey(stat.Id))
+            .Select(c => $"{c.Id.Value} {c.Stats[stat.Id]}").ToArray();
+        if (starting.Length > 0) yield return ("Starting values", string.Join(", ", starting));
+    }
+
+    private static IEnumerable<(string, string)> FactionFacts(WorldDefinition world, FactionDefinition faction)
+    {
+        yield return ("Name", StoryPreview.Quote(faction.Name));
+        yield return ("Initial standing", faction.InitialStanding.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (world.Ruleset.TierFor(faction.InitialStanding) is { } tier)
+            yield return ("Initial tier", $"{tier.Id} ({StoryPreview.Quote(tier.Name)})");
+    }
+
+    private static IEnumerable<(string, string)> SceneFacts(AuthoredScene authoredScene)
+    {
+        var scene = authoredScene.Definition;
+        if (scene.Title is { } title) yield return ("Title", StoryPreview.Quote(title));
+        if (scene.Tags.Count > 0) yield return ("Tags", string.Join(", ", scene.Tags.Order(StringComparer.Ordinal)));
+        if (authoredScene.HasExplicitPriority)
+            yield return ("Priority", scene.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (scene.Once) yield return ("Once", "true");
+        if (scene.Hub is { } hub)
+            yield return ("Hub", hub.Tags.Count == 1 && !hub.MatchAll ? hub.Tags[0] : $"{(hub.MatchAll ? "all" : "any")}({string.Join(", ", hub.Tags)})");
+        if (scene.HubLimit is { } limit) yield return ("Hub limit", limit.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static string Signed(int value) =>
+        (value > 0 ? "+" : "") + value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static AuthoringHover Help(string name, string help, SourceRange range) =>
         new(range, $"{Code(name)}\n\n{help}", $"{name}\n\n{help}");

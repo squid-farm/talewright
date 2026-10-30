@@ -296,7 +296,9 @@ and explicitly declared variable defaults are supported.
 Hints also work in dialogue, choice labels, and styled or multiline prose.
 
 Hover a substitution for its result marked **default**, intermediate manipulator results,
-and existing symbol/syntax help. Hover a character for its authored name and pronoun forms.
+and existing symbol/syntax help. Hover a character for its authored name and pronoun
+forms; an item, stat, faction or scene for its authored details (for example an item's
+stat modifiers and starting holders, or a scene's title and tags).
 These are examples using authored defaults, **not current gameplay values**; entry effects,
 triggers, character creation choices, and assignments are not executed or inferred.
 Unsaved story configuration changes update previews across files.

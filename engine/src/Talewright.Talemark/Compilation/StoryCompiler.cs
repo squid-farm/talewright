@@ -125,6 +125,7 @@ public static class StoryCompiler
                 if (seen.Add(scene.Definition.Id))
                 {
                     parsed.Add(scene);
+                    analysis?.Scenes.Add(new(scene.Definition, scene.HasExplicitPriority));
                 }
             }
         }

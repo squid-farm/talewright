@@ -13,6 +13,7 @@ namespace Talewright.Talemark.Parsing;
 internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Location)
 {
     public required int EndLine { get; init; }
+    public bool HasExplicitPriority { get; init; }
 }
 
 /// <summary>
@@ -180,7 +181,11 @@ internal sealed partial class TaleParser
             CloseFrame();
         }
 
-        _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location) { EndLine = _index });
+        _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location)
+        {
+            EndLine = _index,
+            HasExplicitPriority = _scene.HasExplicitPriority,
+        });
         _scene = null;
     }
 
@@ -304,6 +309,7 @@ internal sealed partial class TaleParser
                 if (int.TryParse(value, out var priority))
                 {
                     scene.Priority = priority;
+                    scene.HasExplicitPriority = true;
                 }
                 else
                 {
@@ -918,6 +924,7 @@ internal sealed partial class TaleParser
         public Expr? Requires { get; set; }
         public HashSet<string> Tags { get; } = [];
         public int Priority { get; set; }
+        public bool HasExplicitPriority { get; set; }
         public bool Once { get; set; }
         public Talewright.Rules.Storylets.StoryletTags? Hub { get; set; }
         public int? HubLimit { get; set; }
