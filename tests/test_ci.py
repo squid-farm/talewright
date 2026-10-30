@@ -109,8 +109,9 @@ class PackageBoundaryTests(unittest.TestCase):
                         '</group></dependencies>') if identity.endswith(".Player") else ""
         with ZipFile(path, "w") as package:
             package.writestr(f"{identity}.nuspec", f"""<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
-<metadata><id>{identity}</id><version>{version}</version>{dependencies}</metadata></package>""")
+<metadata><id>{identity}</id><version>{version}</version><icon>icon.png</icon>{dependencies}</metadata></package>""")
             package.writestr("README.md", "Package readme")
+            package.writestr("icon.png", "")
             if identity == "Talewright.LanguageServer":
                 prefix = "tools/net10.0/any/"
                 for name in ["Talewright.LanguageServer.dll", "Talewright.LanguageServer.deps.json",

@@ -16,8 +16,13 @@
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/squid-farm/talewright</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <!-- Items evaluate after every project property, so this sees each project's own IsPackable. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)apps/web/wwwroot/icon-192.png" Pack="true" PackagePath="icon.png" Visible="false" />
   </ItemGroup>
 </Project>

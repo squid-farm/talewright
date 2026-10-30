@@ -2,5 +2,6 @@
 artifacts/
 LICENSE.txt
 THIRD-PARTY-NOTICES.txt
+icon.png
 dist/
 server/

@@ -15,6 +15,7 @@ test('VSIX contains exactly the distributable assets', async () => {
     '[Content_Types].xml',
     'extension.vsixmanifest',
     'extension/LICENSE.txt',
+    'extension/icon.png',
     'extension/THIRD-PARTY-NOTICES.txt',
     'extension/readme.md',
     'extension/language-configuration.json',

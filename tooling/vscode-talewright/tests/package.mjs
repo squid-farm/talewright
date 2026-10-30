@@ -7,6 +7,7 @@ import { releaseIdentity } from './release-identity.mjs';
 const root = new URL('../', import.meta.url);
 const license = new URL('LICENSE.txt', root);
 const notices = new URL('THIRD-PARTY-NOTICES.txt', root);
+const icon = new URL('icon.png', root);
 const manifestPath = new URL('package.json', root);
 const manifestSource = await readFile(manifestPath, 'utf8');
 const release = releaseIdentity();
@@ -20,6 +21,7 @@ if (!rid) throw new Error(`Unsupported VSIX target: ${target}`);
 const packageName = target === 'linux-x64' ? 'talewright.vsix' : `talewright-${target}.vsix`;
 await mkdir(new URL('artifacts/', root), { recursive: true });
 await copyFile(new URL('../../LICENSE', root), license);
+await copyFile(new URL('../../apps/web/wwwroot/icon-192.png', root), icon);
 try {
   if (release) {
     const manifest = JSON.parse(manifestSource);
@@ -74,5 +76,6 @@ try {
 } finally {
   if (release) await writeFile(manifestPath, manifestSource);
   await rm(license);
+  await rm(icon, { force: true });
   await rm(notices, { force: true });
 }
