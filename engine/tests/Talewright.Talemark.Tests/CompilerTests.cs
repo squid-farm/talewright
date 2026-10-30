@@ -757,11 +757,10 @@ public class CompilerTests
     }
 
     [Theory]
-    [InlineData("player:first-name#one-many(\"has\", \"have\")", "pronoun references only")]
-    [InlineData("player:name#one-many(\"has\", \"have\")", "pronoun references only")]
-    [InlineData("item:rope#one-many(\"has\", \"have\")", "pronoun references only")]
-    [InlineData("player:hp#one-many(\"has\", \"have\")", "pronoun references only")]
-    [InlineData("var:torches#one-many(\"has\", \"have\")", "pronoun references only")]
+    [InlineData("player:first-name#one-many(\"has\", \"have\")", "pronoun or item-name references only")]
+    [InlineData("player:name#one-many(\"has\", \"have\")", "pronoun or item-name references only")]
+    [InlineData("player:hp#one-many(\"has\", \"have\")", "pronoun or item-name references only")]
+    [InlineData("var:torches#one-many(\"has\", \"have\")", "pronoun or item-name references only")]
     [InlineData("player:pronoun#one-many", "two quoted strings")]
     [InlineData("player:pronoun#one-many()", "double quotes")]
     [InlineData("player:pronoun#one-many(\"has\")", "exactly two")]

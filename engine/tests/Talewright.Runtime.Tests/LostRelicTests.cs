@@ -111,6 +111,7 @@ public partial class LostRelicTests
             Assert.Contains($"check it {forms[3]}", text);
             Assert.Contains("MARA BURNS", text);
             Assert.Contains("An obsidian idol", text);
+            Assert.Contains("this obsidian idol belongs to the guild", text);
             Assert.Contains("{expedition copy}", text);
             Assert.Equal(text, StoryHistory.Restore(story, history.Save()).Current.Document.ToPlainText());
         }

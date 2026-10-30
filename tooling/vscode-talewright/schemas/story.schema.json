@@ -356,6 +356,17 @@
           "type": "string",
           "description": "Display name. Defaults to the item ID."
         },
+        "name-agreement": {
+          "type": "string",
+          "enum": ["singular", "plural"],
+          "default": "singular",
+          "description": "Displayed-name grammar, never inventory quantity. Controls #this/#that, #possessive and #one-many(\"singular\", \"plural\"). A pair of boots is singular; pants is plural."
+        },
+        "uncountable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use some with #a, as in some armor. Does not imply plural agreement: this armor is singular. No automatic inflection or count phrasing."
+        },
         "modifiers": {
           "$ref": "#/definitions/statMap",
           "description": "Stat modifiers while the item is held."

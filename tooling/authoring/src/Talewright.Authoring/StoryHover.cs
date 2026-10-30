@@ -34,7 +34,7 @@ public static class StoryHover
         ["flag"] = "flag:id: a declared boolean story flag.",
         ["var"] = "var:id: a story variable with a fixed integer or text type.",
         ["faction"] = "faction:id: numeric standing; faction:id:tier selects its reputation tier and faction:id:name its display name.",
-        ["item"] = "item:id: the item's display name.",
+        ["item"] = "item:id: the item's display name. #a, #the, #this, #that and #possessive use its name grammar; #one-many(\"singular\", \"plural\") selects from name-agreement, not quantity. Copying the name to a text variable copies text only.",
         ["image"] = "image(\"path\", \"alt text\"): inserts image media in narrative text, dialogue or choices. Path is relative to images/; literal alt text is optional. File lookup and image rendering are separate features.",
         ["set"] = "set flag:id: sets a flag to true.",
         ["clear"] = "clear flag:id: sets a flag to false.",

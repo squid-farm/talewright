@@ -49,6 +49,10 @@ public sealed partial class ServerTests
     [InlineData("@requires flag:door-|", "door-open")]
     [InlineData("{player:pronoun:|}", "reflexive")]
     [InlineData("{player:pronoun#one-|}", "one-many")]
+    [InlineData("{item:rope#one-|}", "one-many")]
+    [InlineData("{item:rope#th|}", "this")]
+    [InlineData("{item:rope#th|}", "that")]
+    [InlineData("{item:rope#th|}", "the")]
     [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
     [InlineData("{if (player:pronoun:ob| == \"them\")}yes{/if}", "object")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
@@ -59,7 +63,7 @@ public sealed partial class ServerTests
         var registrations = AuthoringProjectMetadata.Export(CompilerOptions.Default) with
         {
             Predicates = ["IsHero"],
-            Modifiers = ["custom"]
+            Modifiers = [.. CompilerOptions.Default.Modifiers.Names, "custom"]
         };
         File.WriteAllText(client.PathOf("project.authoring.json"), registrations.ToJson());
         File.AppendAllText(client.PathOf("story.talewright.yaml"),
@@ -115,6 +119,8 @@ public sealed partial class ServerTests
     [Theory]
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("{player:pronoun:|}", "object", "{player:pronoun:object}")]
+    [InlineData("{item:rope#one-|many}", "one-many", "{item:rope#one-many}")]
+    [InlineData("{item:rope#th|at}", "that", "{item:rope#that}")]
     [InlineData("{player:pronoun:possessive-pronoun:de|terminer}", "determiner", "{player:pronoun:possessive-pronoun:determiner}")]
     [InlineData("{if (player:pronoun:ob|ject == \"them\")}yes{/if}", "object", "{if (player:pronoun:object == \"them\")}yes{/if}")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|dependent)", "independent", "~ var:word = (player:pronoun:possessive-pronoun:independent)")]
@@ -132,7 +138,7 @@ public sealed partial class ServerTests
     public async Task Applying_protocol_text_edit_preserves_surrounding_syntax(string line, string label, string expected)
     {
         await using var client = new Client();
-        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "factions: {guild: {name: Guild}}\n");
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "factions: {guild: {name: Guild}}\nitems: {rope: Rope}\n");
         await client.Initialize();
         var marked = "=== start\n" + line;
         await client.Open("start.tale", marked.Replace("|", ""), 1);

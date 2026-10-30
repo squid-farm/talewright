@@ -81,6 +81,52 @@ public sealed class AuthorReloadTests
     }
 
     [Fact]
+    public void Item_name_assignment_copies_only_text_and_survives_history_and_save()
+    {
+        var yaml = Yaml + """
+
+            items:
+              pants: {name: pants, name-agreement: plural}
+              armor: {name: armor, uncountable: true}
+            """;
+        var story = Compile("""
+            === start
+            ~ var:word = item:pants
+            ~ var:mass = item:armor
+            {item:pants#that#capitalize}/{var:word#that}/{item:armor#a}/{var:mass#a}
+            * [{item:pants#the#capitalize}] -> next
+            === next
+            {var:word#possessive}/{item:pants#possessive}/{item:pants#upper#one-many("is", "are")}
+            -> END
+            """, yaml);
+        var history = new StoryHistory(story);
+        Assert.Contains("Those pants/that pants/some armor/an armor", history.Current.Document.ToPlainText());
+        Assert.Equal("pants", history.State.GetTextVariable(new("word")));
+        history.Choose("c0");
+        Assert.Contains("pants's/pants'/are", history.Current.Document.ToPlainText());
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(history.Events, restored.Events);
+        restored.Back();
+        Assert.Contains("Those pants/that pants/some armor/an armor", restored.Current.Document.ToPlainText());
+        restored.Forward();
+        Assert.Contains("pants's/pants'/are", restored.Current.Document.ToPlainText());
+    }
+
+    [Fact]
+    public void Item_helpers_remain_engine_owned_during_author_reload()
+    {
+        var yaml = Yaml + "\nitems:\n  pants: {name: pants, name-agreement: plural}\n";
+        var tale = Tale.Replace("[Travel]", "[{item:pants#the#capitalize}]")
+            .Replace("Old passage.", "{item:pants#this#capitalize} {item:pants#one-many(\"is\", \"are\")} old.");
+        var original = AuthorSession.Create(Compile(tale, yaml), new("start"), seed: 42);
+        original.Choose("c0");
+        var candidate = original.Reload(Compile(tale.Replace("old.", "new."), yaml));
+        Assert.Contains("These pants are new.", candidate.Current.Document.ToPlainText());
+        Assert.Throws<AuthorReloadException>(() => original.Reload(
+            Compile(tale.Replace("#the#", "#that#"), yaml)));
+    }
+
+    [Fact]
     public void One_many_is_engine_owned_and_its_arguments_are_compared_during_reload()
     {
         var tale = Tale.Replace("[Travel]", "[{player:pronoun#one-many(\"Travel\", \"Travel together\")}]")

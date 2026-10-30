@@ -5,9 +5,9 @@
 
 {image("camp-art", "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.")}
 
-The boat leaves {player:first-name} at the edge of the jungle with a pack, a {item:torch#lower} and
+The boat leaves {player:first-name} at the edge of the jungle with a pack, {item:torch#a#lower} and
 three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun:object}
-one season to find the **{item:relic}** before they hand the expedition to someone more *reliable*.
+one season to find **{item:relic#the}** before they hand the expedition to someone more *reliable*.
 
 > guide: {player:name}. You're later than your letter promised. I'm {guide:first-name} — the guild sent me.
 
@@ -58,6 +58,7 @@ The clerk writes **{player:name#upper}**, then carefully corrects the entry to
 Ask {player:pronoun:object} to check it {player:pronoun:reflexive}."
 
 {item:idol#a#capitalize} decorates the clerk's stamp. Its label reads \{expedition copy\}.
+The clerk says {item:idol#this} {item:idol#one-many("belongs", "belong")} to the guild.
 
 > guide: I use {guide:pronoun}/{guide:pronoun:object}. Names matter more than the guild admits.
 

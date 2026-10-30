@@ -238,8 +238,10 @@ public sealed class StoryCompletionTests
     [InlineData("{player:pronoun:unknown#|}", false)]
     [InlineData("{\"#literal\"#|}", false)]
     [InlineData("{player:first-name#|}", false)]
-    [InlineData("{item:rope#|}", false)]
-    public void One_many_completion_is_pronoun_only(string line, bool offered)
+    [InlineData("{item:rope#|}", true)]
+    [InlineData("{(item:rope)#upper#|}", true)]
+    [InlineData("{item:missing#|}", false)]
+    public void One_many_completion_requires_a_pronoun_or_item_reference(string line, bool offered)
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         var matches = StoryCompletion.Complete(analysis, position).Where(item => item.Label == "one-many").ToArray();
@@ -251,6 +253,8 @@ public sealed class StoryCompletionTests
     [InlineData("~ player:h|p-=3", "hp", "~ player:hp-=3")]
     [InlineData("~ player:h|p+=3", "hp", "~ player:hp+=3")]
     [InlineData("{player:pronoun:|}", "object", "{player:pronoun:object}")]
+    [InlineData("{item:rope#one-|many}", "one-many", "{item:rope#one-many}")]
+    [InlineData("{item:rope#th|at}", "that", "{item:rope#that}")]
     [InlineData("{player:pronoun:pos|:", "possessive-pronoun", "{player:pronoun:possessive-pronoun:")]
     [InlineData("{player:pronoun:possessive-pronoun:in|dependent}", "independent", "{player:pronoun:possessive-pronoun:independent}")]
     [InlineData("{if (player:pronoun:ob|ject == \"them\")}yes{/if}", "object", "{if (player:pronoun:object == \"them\")}yes{/if}")]

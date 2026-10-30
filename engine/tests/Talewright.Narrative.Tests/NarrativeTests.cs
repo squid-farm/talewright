@@ -33,6 +33,8 @@ public class NarrativeTests
     [InlineData("Mara", false, "Mara's")]
     [InlineData("Burns", false, "Burns's")]
     [InlineData("the guards", true, "the guards'")]
+    [InlineData("HANDCUFFS", true, "HANDCUFFS'")]
+    [InlineData("ARMOR", false, "ARMOR's")]
     [InlineData("the children", true, "the children's")]
     public void Possessives_follow_chicago_style(string word, bool plural, string expected)
     {
@@ -63,6 +65,28 @@ public class NarrativeTests
             new TextTemplate(" smiles."));
 
         Assert.Equal("Mara's and Burns's and The guards'. She smiles.", text);
+    }
+
+    [Fact]
+    public void CSharp_item_references_keep_original_grammar_after_custom_transformations()
+    {
+        var world = State().World;
+        var item = new ItemDefinition(new("supplies"), "supplies", new Dictionary<StatId, int>(),
+            NameAgreement: GrammaticalNumber.Plural, Uncountable: true);
+        var state = GameState.CreateInitial(new WorldDefinition(world.Ruleset, world.Characters.Values,
+            [item], [], [], new Dictionary<VarId, int>()), 1);
+        var renamed = new DelegateTextModifier("rename", (_, context) =>
+        {
+            Assert.True(context.IsPlural);
+            Assert.True(context.IsUncountable);
+            return "goods";
+        });
+        var template = new SubstitutionTemplate(new ItemNameRef(item.Id),
+            [renamed, Mod("a"), Mod("capitalize")]);
+        var rendered = new TemplateRenderer().RenderInlines([template], state);
+        Assert.Equal("Some goods", RenderedInline.ToPlainText(rendered));
+        Assert.Equal("are", RenderedInline.ToPlainText(new TemplateRenderer().RenderInlines(
+            [template with { Modifiers = [renamed, new OneManyTextModifier("is", "are")] }], state)));
     }
 
     [Fact]

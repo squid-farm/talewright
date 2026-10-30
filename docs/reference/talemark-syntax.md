@@ -345,7 +345,9 @@ Any character id can replace `player`.
 | `#possessive`       | Grammatically correct English possessive (Chicago style): `Mara's`, `Burns's`, `the guards'` |
 | `#capitalize`       | First letter upper case                                                                      |
 | `#upper` / `#lower` | Case                                                                                         |
-| `#a`                | Prefix with `a`/`an`                                                                         |
+| `#a`                | Prefix with `a`/`an`; use `some` for plural or uncountable names                               |
+| `#the`              | Prefix with `the`                                                                            |
+| `#this` / `#that`   | Prefix with `this`/`that`, or `these`/`those` for plural agreement                               |
 
 **Pronoun properties.** `{player:pronoun}` is shorthand for `{player:pronoun:subject}`.
 Choose a stored form with property access, then chain text modifiers after the value:
@@ -391,11 +393,58 @@ nonstandard grammar. Other text modifiers can follow it, as with `#capitalize`.
 These quoted arguments do not decode backslash
 escapes. Commas, apostrophes, braces and `#` inside a quoted string are text.
 
-This selector is **pronoun-only**. Names, character-root `name-agreement`,
-population, item quantities and item names never select a branch. Unsupported
+The selector accepts **pronoun and item-name references only**. Item references use
+their `name-agreement`, as described below. Character names, text variables,
+population and item quantities never select a branch. Unsupported
 targets, missing arguments and extra arguments produce TW2006; an unclosed quote
 can leave the substitution unclosed (TW1004). This adds no general multi-argument
 modifier support or grammar inference.
+
+### Item-name grammar
+
+Declare the displayed name's grammar, not how many inventory units exist.
+Items default to `name-agreement: singular` and `uncountable: false`; shorthand
+such as `sword: sword` keeps those defaults.
+
+```yaml
+items:
+  sword: sword
+  amulet: {name: amulet}
+  pants: {name: pants, name-agreement: plural}
+  handcuffs: {name: handcuffs, name-agreement: plural}
+  armor: {name: armor, uncountable: true}
+  boots: {name: pair of boots}
+```
+
+| Name | `#a` | `#the` | `#this` | `#that` | `#one-many("is", "are")` |
+|---|---|---|---|---|---|
+| sword | a sword | the sword | this sword | that sword | is |
+| amulet | an amulet | the amulet | this amulet | that amulet | is |
+| pants | some pants | the pants | these pants | those pants | are |
+| handcuffs | some handcuffs | the handcuffs | these handcuffs | those handcuffs | are |
+| armor | some armor | the armor | this armor | that armor | is |
+| pair of boots | a pair of boots | the pair of boots | this pair of boots | that pair of boots | is |
+
+```tale
+{item:pants#that#capitalize} {item:pants#one-many("looks", "look")} expensive.
+```
+
+This renders "Those pants look expensive." `#one-many` outputs only the chosen
+string, singular first. `uncountable` changes `#a` to `some`, not agreement:
+armor still takes "this" and "is". `#possessive` also respects name agreement:
+`handcuffs'` and `armor's`.
+
+The original item reference retains its grammar throughout a modifier chain:
+`{item:pants#upper#one-many("is", "are")}` still gives "are". Inventory quantity
+does not matter: one unit of pants remains plural; five swords do not change
+the singular displayed name. Assigning `~ var:word = item:pants` copies only the
+text "pants", not item identity or grammar. `{var:word#that}` therefore gives
+"that pants", and `#one-many` on that variable is invalid.
+
+Choose helpers explicitly. They do not infer context, inflect nouns, count items,
+or add pair/suit/unit wording. Author exceptional phrasing directly; `#a` retains
+the existing a/an rules, not a pronunciation dictionary. These helpers take no
+arguments; only `#one-many` accepts its exact two quoted strings.
 
 ### Images
 
