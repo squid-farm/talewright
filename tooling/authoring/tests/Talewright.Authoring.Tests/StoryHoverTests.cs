@@ -44,7 +44,7 @@ public sealed class StoryHoverTests
     [InlineData("{im|age(\"maps/camp\", \"Camp\")}", "inserts image media", "image")]
     [InlineData("-> E|ND", "Ends the story", "END")]
     [InlineData("-|> second", "Diverts to", "->")]
-    [InlineData("|~ player:hp += 1", "Entry effects", "~")]
+    [InlineData("|~ player:hp += 1", "when this line is reached", "~")]
     [InlineData("|* [Go] -> second", "Choice:", "*")]
     [InlineData("{i|f flag:ready}yes{/if}", "Begins conditional", "if")]
     [InlineData("{if flag:ready}yes{el|se}no{/if}", "Alternative text", "else")]

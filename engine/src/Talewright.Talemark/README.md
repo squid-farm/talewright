@@ -72,7 +72,8 @@ and remains separate from the step-level execution spans carried by `SceneDefini
 | `Parsing/ExpressionParser.cs` | Recursive descent with type checking: conditions (`player:str >= 12 and player has rope`), numbers, substitutions (`player:first-name#possessive`), effects (`player:hp -= 2`). |
 | `Parsing/Lexer.cs` | Tokens for the expression parser. |
 | `Parsing/StorySymbols.cs` | Declared names (stats, characters, items, factions, flags, vars, scenes) for resolution. |
-| `Model/StoryDefinition.cs` | The compiled story: `StoryDefinition`, `SceneDefinition` (an `IStorylet`), `ChoiceDefinition`, `CheckBranch`, `CheckOutcome`, `ConditionalEffect`, `ConditionalDivert`, `DivertTarget` (incl. `End`). |
+| `Model/StoryDefinition.cs` | The compiled story: `StoryDefinition`, `SceneDefinition` (an `IStorylet` with ordered `Steps`; `Choices` is derived), `ChoiceDefinition`, `CheckBranch`, `CheckOutcome`, `DivertTarget` (incl. `End`). |
+| `Model/SceneStep.cs` | Ordered scene steps (prose, effect, `{if}` branch, choice, divert, check), each with a stable `step:<line>:<column>` ID and source span, plus the shared `SceneSteps` walks for successors and reachability. |
 | `Diagnostics/Diagnostic.cs` | `Diagnostic`, `DiagnosticSeverity`, `SourceLocation`, `DiagnosticBag`. |
 
 ## Diagnostic codes
@@ -82,8 +83,9 @@ the [error code reference](../../../docs/reference/diagnostics.md). To find wher
 
 ## Semantics worth knowing
 
-- A choice (or check outcome) with no `-> target` **falls through** to the scene's first matching `->`,
-  evaluated after the choice's effects.
+- A scene runs in source order: each line sees only the lines above it, a block `{if}` is decided once, and a
+  reached `->` leaves immediately. Every choice and choice-check outcome needs its own `-> target`; there is no
+  scene fallback.
 - A line starting with `*` is a choice only if followed by a space, tab or `[`, so `*emphasis*` at the start of a
   paragraph is still prose.
 - Comparing a faction standing with a tier name (`faction:explorers-guild >= friendly`) compares tier order.
