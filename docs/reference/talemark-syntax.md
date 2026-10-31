@@ -344,6 +344,9 @@ A scene-level `->` leaves immediately, showing the prose already rendered with a
 ```
 
 There is no implicit fallback or gather. A scene without a possible choice, divert or hub is a dead end.
+Validation warns when its choices may all be unavailable: add an unconditional choice such as
+`* -> END`, or make every continuing branch offer one. Hub offers may be empty and do not count as
+an unconditional choice. See [TW3013](diagnostics.md#tw3xxx-story-structure) for details.
 These are breaking pre-v1 execution rules; the replay fingerprint changed, not the save format.
 
 **Advanced: hub selection.** A scene may have only one `@hub` and one

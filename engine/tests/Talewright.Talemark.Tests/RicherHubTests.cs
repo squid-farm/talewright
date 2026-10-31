@@ -89,7 +89,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
     public void Sparse_hub_ring_is_fully_reachable(int count)
     {
         var text = string.Join("\n", Enumerable.Range(0, count).Select(i =>
-            $"=== s{i}\n@tags t{i}\n@hub t{(i + 1) % count}"));
+            $"=== s{i}\n@tags t{i}\n@hub t{(i + 1) % count}\n* -> END"));
         var timer = Stopwatch.StartNew();
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {

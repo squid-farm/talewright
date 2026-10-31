@@ -1,6 +1,10 @@
 === beginning
 {player:first-name#greeting}.
-* [Continue] (requires: @Ready) -> ending
+{if @Ready}
+* [Continue] -> ending
+{else}
+* -> END
+{/if}
 
 === ending
 Your explicitly registered extensions work.

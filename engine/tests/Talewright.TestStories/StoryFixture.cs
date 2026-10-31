@@ -6,6 +6,8 @@ namespace Talewright.Testing;
 
 public sealed record StoryFixture(string Id, string Yaml, string Tale, IReadOnlyList<string>? ImagePaths = null)
 {
+    public IReadOnlyList<string> ExpectedWarningCodes { get; init; } = [];
+
     public IReadOnlyDictionary<string, string> Files => new Dictionary<string, string>
     {
         ["story.talewright.yaml"] = Yaml,
@@ -21,9 +23,10 @@ public sealed record StoryFixture(string Id, string Yaml, string Tale, IReadOnly
     public StoryDefinition Compile()
     {
         var result = StoryCompiler.Compile(Source());
-        if (!result.Success || result.Diagnostics.Count != 0)
+        if (!result.Success || !result.Diagnostics.Select(diagnostic => diagnostic.Code).SequenceEqual(ExpectedWarningCodes))
         {
-            throw new InvalidOperationException($"Fixture {Id}: {string.Join("\n", result.Diagnostics)}");
+            throw new InvalidOperationException(
+                $"Fixture {Id}: expected warnings [{string.Join(", ", ExpectedWarningCodes)}]; got:\n{string.Join("\n", result.Diagnostics)}");
         }
 
         return result.Story!;
