@@ -76,8 +76,10 @@ public static class SceneSteps
     /// Preview. Every divert on a line of <paramref name="scene"/> that can run, in source order. Conditional diverts
     /// are listed whatever their condition.
     /// </summary>
-    public static IEnumerable<StoryDivert> Diverts(SceneDefinition scene) =>
-        DivertLines(scene.Steps).Select((line, order) =>
+    public static IEnumerable<StoryDivert> Diverts(SceneDefinition scene)
+    {
+        var conditionsByStep = new Dictionary<string, StoryCondition>(StringComparer.Ordinal);
+        return DivertLines(scene.Steps).Select((line, order) =>
         {
             var choice = (line.Step as ChoiceStep)?.Choice;
             var id = $"{scene.Id.Value}/{line.Step.Id}" + line.Outcome switch
@@ -86,9 +88,20 @@ public static class SceneSteps
                 SkillCheckOutcome.Failure => "/failure",
                 _ => "",
             };
+            if (!conditionsByStep.TryGetValue(line.Step.Id, out var condition))
+            {
+                var conditions = line.Blocks.Select(block => block.InElse
+                    ? new UnaryExpr(UnaryOp.Not, block.Condition)
+                    : block.Condition).ToList();
+                if (choice?.Requires is { } requires)
+                    conditions.Add(requires);
+                condition = StoryCondition.FromExpressions(conditions);
+                conditionsByStep.Add(line.Step.Id, condition);
+            }
             return new StoryDivert(id, scene.Id, line.Target, line.Kind, line.Outcome, line.Step.Id, line.Step.Source,
-                order, choice?.Key, choice?.Label, choice?.Requires, line.Blocks);
+                order, choice?.Key, choice?.Label, choice?.Requires, line.Blocks, condition);
         });
+    }
 
     private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks, DivertKind Kind,
         SkillCheckOutcome? Outcome, DivertTarget Target)> DivertLines(IEnumerable<SceneStep> steps)

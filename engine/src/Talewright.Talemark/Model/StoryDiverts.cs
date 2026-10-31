@@ -46,6 +46,7 @@ public sealed record DivertBlockCondition(Expr Condition, bool InElse);
 /// <param name="ChoiceLabel">The choice's label template, or null for a textless choice or a non-choice divert.</param>
 /// <param name="ChoiceRequires">The choice's <c>requires</c>, as compiled.</param>
 /// <param name="BlockConditions">Enclosing block <c>{if}</c>s, outermost first.</param>
+/// <param name="Condition">The formatted condition and state reads for this divert.</param>
 public sealed record StoryDivert(
     string Id,
     SceneId From,
@@ -58,13 +59,26 @@ public sealed record StoryDivert(
     string? ChoiceKey,
     IReadOnlyList<TemplateInline>? ChoiceLabel,
     Expr? ChoiceRequires,
-    IReadOnlyList<DivertBlockCondition> BlockConditions);
+    IReadOnlyList<DivertBlockCondition> BlockConditions,
+    StoryCondition Condition);
 
 /// <summary>
 /// Preview. A hub offer: a scene matching a hub's tags, ignoring <c>@hub-limit</c>.
 /// <see cref="Id"/> is the hub scene and the offered scene, for example <c>camp/hub:camp.well</c>.
 /// </summary>
-public sealed record HubOffer(string Id, SceneId Hub, SceneId Scene, StoryletTags Tags);
+/// <param name="Id">The hub scene and offered scene.</param>
+/// <param name="Hub">The scene offering the matching scenes.</param>
+/// <param name="Scene">The offered scene.</param>
+/// <param name="Tags">The hub's tag query.</param>
+/// <param name="Condition">The offered scene's formatted <c>@requires</c> and state reads.</param>
+/// <param name="Once">Whether the offered scene has <c>@once</c>.</param>
+public sealed record HubOffer(
+    string Id,
+    SceneId Hub,
+    SceneId Scene,
+    StoryletTags Tags,
+    StoryCondition Condition,
+    bool Once);
 
 /// <summary>
 /// Preview. Every divert and hub offer in a story, from the lines that can run. Diverts follow scene declaration
@@ -87,10 +101,13 @@ public sealed class StoryDiverts
     public static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes)
     {
         var order = new Dictionary<SceneId, int>();
+        var scenesById = new Dictionary<SceneId, SceneDefinition>();
+        var conditionsByScene = new Dictionary<SceneId, StoryCondition>();
         var byTag = new Dictionary<string, HashSet<SceneId>>(StringComparer.Ordinal);
         foreach (var scene in scenes)
         {
             order.TryAdd(scene.Id, order.Count);
+            scenesById.TryAdd(scene.Id, scene);
             foreach (var tag in scene.Tags)
             {
                 if (!byTag.TryGetValue(tag, out var ids))
@@ -106,7 +123,17 @@ public sealed class StoryDiverts
             if (scene.Hub is not { } hub || !SceneSteps.CanContinue(scene.Steps))
                 continue;
             foreach (var offered in ResolveTags(hub, byTag).Where(id => id != scene.Id).OrderBy(id => order[id]))
-                hubOffers.Add(new HubOffer($"{scene.Id.Value}/hub:{offered.Value}", scene.Id, offered, hub));
+            {
+                var offeredScene = scenesById[offered];
+                if (!conditionsByScene.TryGetValue(offered, out var condition))
+                {
+                    condition = StoryCondition.FromExpressions(
+                        offeredScene.Requires is { } requires ? [requires] : []);
+                    conditionsByScene.Add(offered, condition);
+                }
+                hubOffers.Add(new HubOffer($"{scene.Id.Value}/hub:{offered.Value}", scene.Id, offered, hub,
+                    condition, offeredScene.Once));
+            }
         }
 
         return new StoryDiverts(scenes.SelectMany(SceneSteps.Diverts).ToArray(), hubOffers);
