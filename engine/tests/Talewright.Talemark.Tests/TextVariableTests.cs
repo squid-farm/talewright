@@ -35,7 +35,7 @@ public class TextVariableTests
     {
         var result = Compile("""
             === a
-            ~ var:weather = "orage \ ciel"
+            ~ var:weather = "orage \\ ciel"
             ~ var:copy = var:weather
             ~ var:weather = "雪"
             ~ var:count += 1

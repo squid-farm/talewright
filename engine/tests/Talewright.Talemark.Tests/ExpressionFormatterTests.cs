@@ -53,7 +53,10 @@ public class ExpressionFormatterTests
     [InlineData("\"River Guild\"", "\"River Guild\"")]
     [InlineData("\"\"", "\"\"")]
     [InlineData("\"Joel's cat\"", "\"Joel's cat\"")]
-    [InlineData("\"a\\b # {text} (x)\"", "\"a\\b # {text} (x)\"")]
+    [InlineData("\"a\\\\b # {text} (x)\"", "\"a\\\\b # {text} (x)\"")]
+    [InlineData(" \"say \\\"hi\\\"\" ", "\"say \\\"hi\\\"\"")]
+    [InlineData("\"\\\\\\\"\"", "\"\\\\\\\"\"")]
+    [InlineData("(\"a \\\" } # , ] )\")", "\"a \\\" } # , ] )\"")]
     [InlineData("\"雪\"", "\"雪\"")]
     [InlineData("friendly", "friendly")]
     [InlineData("player:dex", "player:dex")]
@@ -219,7 +222,7 @@ public class ExpressionFormatterTests
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
             Assert.Equal("-2147483648", ExpressionFormatter.Format(new NumberLiteral(int.MinValue)));
-            Assert.Equal("\"a\\b\"", ExpressionFormatter.Format(new TextLiteral("a\\b")));
+            Assert.Equal("\"a\\\\b\"", ExpressionFormatter.Format(new TextLiteral("a\\b")));
         }
         finally
         {
@@ -228,12 +231,25 @@ public class ExpressionFormatterTests
     }
 
     [Fact]
-    public void Quoted_text_fails_clearly_even_when_nested()
+    public void Host_built_quoted_text_round_trips_even_when_nested()
     {
         var expression = new BinaryExpr(BinaryOp.Equal, new TextVarRef(new("weather")), new TextLiteral("a\"b"));
-        var error = Assert.Throws<NotSupportedException>(() => ExpressionFormatter.Format(expression));
-        Assert.Contains("double quotes", error.Message);
-        Assert.Contains("escape", error.Message);
+        var formatted = ExpressionFormatter.Format(expression);
+        Assert.Equal("""var:weather == "a\"b" """.TrimEnd(), formatted);
+        Assert.Equal(expression, Parse(formatted));
+    }
+
+    [Theory]
+    [InlineData("\"\\\\n\"", "\\n")]
+    [InlineData("\"\\\\u0041\"", "\\u0041")]
+    [InlineData("\"\\\\\\\"\"", "\\\"")]
+    [InlineData("\"\\\\\"", "\\")]
+    [InlineData("\"\\\"\"", "\"")]
+    public void Escapes_decode_exactly_once_and_format_canonically(string source, string value)
+    {
+        var literal = Assert.IsType<TextLiteral>(Parse(source));
+        Assert.Equal(value, literal.Value);
+        Assert.Equal(source, ExpressionFormatter.Format(literal));
     }
 
     [Fact]

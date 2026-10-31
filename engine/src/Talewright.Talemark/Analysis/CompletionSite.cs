@@ -47,8 +47,8 @@ internal static class ExpressionCompletion
             if (start < text.Length && text[start] == '@') start++;
             while (tokenIndex < tokens.Count && tokens[tokenIndex].Offset < start) tokenIndex++;
             if (tokenIndex > 0 && tokens[tokenIndex - 1] is { } previous &&
-                (previous.Kind == TokenKind.String && start <= previous.Offset + previous.Text.Length + 1 ||
-                 previous is { Kind: TokenKind.Error, Text: "unterminated string" })) continue;
+                previous.StringEnd is { } stringEnd &&
+                (start < stringEnd || start == stringEnd && previous.ErrorOffset is not null)) continue;
             var end = start;
             if (tokenIndex < tokens.Count && tokens[tokenIndex] is { Kind: TokenKind.Identifier } identifier &&
                 identifier.Offset == start)

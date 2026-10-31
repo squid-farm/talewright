@@ -1,6 +1,7 @@
 using System.Globalization;
 using Talewright.Core.Identity;
 using Talewright.Rules.Expressions;
+using Talewright.Talemark.Parsing;
 
 namespace Talewright.Talemark.Formatting;
 
@@ -8,7 +9,7 @@ namespace Talewright.Talemark.Formatting;
 /// <remarks>
 /// Reparse against the same story symbols, ruleset and predicate registrations. Parsed expressions
 /// round-trip structurally; C#-constructed numeric negations may normalize to literals.
-/// Double quotes within text cannot be represented until Talemark supports expression string escapes.
+/// Text literals escape double quotes and backslashes using Talemark string syntax.
 /// This API does not format substitutions' modifier chains or reproduce original source text.
 /// </remarks>
 public static class ExpressionFormatter
@@ -16,7 +17,7 @@ public static class ExpressionFormatter
     /// <summary>Returns Talemark text without surrounding template braces.</summary>
     /// <exception cref="ArgumentNullException">The expression is null.</exception>
     /// <exception cref="ArgumentException">The tree has invalid operands, names or enum values.</exception>
-    /// <exception cref="NotSupportedException">The expression kind or a quoted text value cannot be represented.</exception>
+    /// <exception cref="NotSupportedException">The expression kind cannot be represented.</exception>
     public static string Format(Expr expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
@@ -133,12 +134,7 @@ public static class ExpressionFormatter
     private static string Quote(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        if (value.Contains('"'))
-        {
-            throw new NotSupportedException("Talemark expression strings cannot contain double quotes: string escape syntax is not supported.");
-        }
-
-        return $"\"{value}\"";
+        return QuotedStringSyntax.Quote(value);
     }
 
     private static string Name(string value)

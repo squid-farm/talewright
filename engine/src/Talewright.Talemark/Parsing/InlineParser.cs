@@ -180,6 +180,8 @@ internal static class InlineParser
                     analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
                         incomplete[offset..], context.Source.Locate(i + 1).Offset(offset));
                 }
+                ExpressionParser.ReportStringErrors(text[(i + 1)..],
+                    offset => context.Source.Locate(i + 1 + offset), context.Diagnostics);
                 context.Diagnostics.Error("TW1004", "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(i));
                 result.Append(text, i, text.Length - i);
                 break;
@@ -211,7 +213,7 @@ internal static class InlineParser
                             context.Source.Locate(i + 1 + lead + keyword.Length))));
                 }
                 context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
-                fragment = ParseFragment(inner, location, context);
+                fragment = ParseFragment(inner, location, context, i + 1);
                 if (fragment is InlinePiece { Inline: SubstitutionTemplate substitution })
                     context.Symbols.Analysis?.Substitutions.Add(new(
                         new(context.Source.Locate(i), context.Source.Locate(close + 1)), substitution));
@@ -231,11 +233,10 @@ internal static class InlineParser
     {
         var depth = 0;
         var inString = false;
-        var image = ImageSyntax.IsCall(text.AsSpan(open + 1));
         for (var i = open; i < text.Length; i++)
         {
             var c = text[i];
-            if (image && inString && c == '\\')
+            if (inString && c == '\\')
             {
                 i++;
             }
@@ -256,7 +257,7 @@ internal static class InlineParser
         return -1;
     }
 
-    private static Piece? ParseFragment(string inner, SourceLocation location, Context context)
+    private static Piece? ParseFragment(string inner, SourceLocation location, Context context, int sourceOffset)
     {
         var trimmed = inner.Trim();
         var lead = inner.Length - inner.TrimStart().Length;
@@ -272,11 +273,13 @@ internal static class InlineParser
 
         if (trimmed.StartsWith("if ", StringComparison.Ordinal))
         {
-            var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3), context.Symbols, context.Diagnostics);
+            var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3), context.Symbols, context.Diagnostics,
+                locate: offset => context.Source.Locate(sourceOffset + lead + 3 + offset));
             return condition is null ? null : new IfPiece(condition, location);
         }
 
-        var substitution = ExpressionParser.ParseSubstitution(inner, location, context.Symbols, context.Diagnostics);
+        var substitution = ExpressionParser.ParseSubstitution(inner, location, context.Symbols, context.Diagnostics,
+            offset => context.Source.Locate(sourceOffset + offset));
         return substitution is null ? null : new InlinePiece(substitution);
     }
 
