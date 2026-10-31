@@ -10,118 +10,239 @@ public sealed class GraphAlgorithmTests
         var graph = BuildReachabilityGraph();
         var forward = GraphReachability.Find(
             graph,
-            [new VertexId(0), new VertexId(0)],
+            [V(0), V(0)],
             edgeFilter: edge => edge.Value != "filtered");
 
-        Assert.Equal(
-            new[] { new VertexId(0), new VertexId(1), new VertexId(2), new VertexId(3) },
-            forward.Order);
-        Assert.True(forward.IsReached(new VertexId(0)));
-        Assert.Null(forward.FirstEdgeTo(new VertexId(0)));
-        Assert.Equal(new EdgeId(2), forward.FirstEdgeTo(new VertexId(3)));
-        Assert.False(forward.IsReached(new VertexId(4)));
-        Assert.Null(forward.FirstEdgeTo(new VertexId(4)));
+        Assert.Equal(new[] { V(0), V(1), V(2), V(3) }, forward.Order);
+        Assert.True(forward.IsReached(V(0)));
+        Assert.Null(forward.FirstEdgeTo(V(0)));
+        Assert.Equal(new EdgeId(2), forward.FirstEdgeTo(V(3)));
+        Assert.False(forward.IsReached(V(4)));
+        Assert.Null(forward.FirstEdgeTo(V(4)));
 
         var reverse = GraphReachability.Find(
             graph,
-            [new VertexId(3)],
+            [V(3)],
             GraphDirection.Incoming,
             edge => edge.Value != "filtered");
-        Assert.Equal(
-            new[] { new VertexId(3), new VertexId(1), new VertexId(2), new VertexId(0) },
-            reverse.Order);
-        Assert.Equal(new EdgeId(0), reverse.FirstEdgeTo(new VertexId(0)));
+        Assert.Equal(new[] { V(3), V(1), V(2), V(0) }, reverse.Order);
+        Assert.Equal(new EdgeId(0), reverse.FirstEdgeTo(V(0)));
 
         var filtered = GraphReachability.Find(
             graph,
-            [new VertexId(0)],
+            [V(0)],
             edgeFilter: edge => edge.Value == "filtered");
-        Assert.Equal(new[] { new VertexId(0), new VertexId(1), new VertexId(4) }, filtered.Order);
+        Assert.Equal(new[] { V(0), V(1), V(4) }, filtered.Order);
+
+        var orderedRoots = GraphReachability.Find(graph, [V(2), V(0)]);
+        Assert.Equal(new[] { V(2), V(0), V(3), V(1), V(4) }, orderedRoots.Order);
+        Assert.Null(orderedRoots.FirstEdgeTo(V(2)));
+        Assert.Null(orderedRoots.FirstEdgeTo(V(0)));
+        Assert.Equal(new EdgeId(3), orderedRoots.FirstEdgeTo(V(3)));
+        Assert.Equal(new EdgeId(0), orderedRoots.FirstEdgeTo(V(1)));
+        Assert.Equal(new EdgeId(6), orderedRoots.FirstEdgeTo(V(4)));
+
+        var noRoots = GraphReachability.Find(graph, []);
+        Assert.Empty(noRoots.Order);
+        Assert.All(Enumerable.Range(0, graph.VertexCount), index => Assert.False(noRoots.IsReached(V(index))));
     }
 
     [Fact]
-    public void DepthFirstSearchReportsEveryEdgeKindAndStableOrders()
+    public void DepthFirstSearchFromAllVerticesReportsEveryEdgeKindInBothDirections()
     {
-        var builder = new GraphBuilder<int, int>();
-        for (var index = 0; index < 6; index++)
-        {
-            builder.AddVertex(index);
-        }
+        var graph = BuildDepthFirstGraph();
 
-        builder.AddEdge(0, 1, 0);
-        builder.AddEdge(1, 2, 1);
-        builder.AddEdge(2, 0, 2);
-        builder.AddEdge(0, 1, 3);
-        builder.AddEdge(0, 3, 4);
-        builder.AddEdge(3, 1, 5);
-        builder.AddEdge(4, 4, 6);
-        var graph = builder.Build();
-
-        var result = GraphDepthFirstSearch.Run(graph);
-
-        Assert.Equal(
-            new[] { 0, 1, 2, 3, 4, 5 }.Select(index => new VertexId(index)),
-            result.PreOrder);
-        Assert.Equal(
-            new[] { 2, 1, 3, 0, 4, 5 }.Select(index => new VertexId(index)),
-            result.PostOrder);
+        var outgoing = GraphDepthFirstSearch.FromAllVertices(graph);
+        Assert.Equal(new[] { V(0), V(1), V(2), V(3), V(4), V(5) }, outgoing.PreOrder);
+        Assert.Equal(new[] { V(2), V(1), V(3), V(0), V(4), V(5) }, outgoing.PostOrder);
         Assert.Equal(
             new[]
             {
-                new DepthFirstEdgeClassification(new EdgeId(0), DepthFirstEdgeKind.Tree),
-                new DepthFirstEdgeClassification(new EdgeId(1), DepthFirstEdgeKind.Tree),
-                new DepthFirstEdgeClassification(new EdgeId(2), DepthFirstEdgeKind.Back),
-                new DepthFirstEdgeClassification(new EdgeId(3), DepthFirstEdgeKind.Forward),
-                new DepthFirstEdgeClassification(new EdgeId(4), DepthFirstEdgeKind.Tree),
-                new DepthFirstEdgeClassification(new EdgeId(5), DepthFirstEdgeKind.Cross),
-                new DepthFirstEdgeClassification(new EdgeId(6), DepthFirstEdgeKind.Back)
+                Classification(0, DepthFirstEdgeKind.Tree),
+                Classification(1, DepthFirstEdgeKind.Tree),
+                Classification(2, DepthFirstEdgeKind.Back),
+                Classification(3, DepthFirstEdgeKind.Forward),
+                Classification(4, DepthFirstEdgeKind.Tree),
+                Classification(5, DepthFirstEdgeKind.Cross),
+                Classification(6, DepthFirstEdgeKind.Back)
             },
-            result.EdgeClassifications);
+            outgoing.EdgeClassifications);
 
-        var incoming = GraphDepthFirstSearch.Run(graph, [new VertexId(3)], GraphDirection.Incoming);
-        Assert.Equal(6, incoming.PreOrder.Length);
-        Assert.Equal(7, incoming.EdgeClassifications.Length);
+        var incoming = GraphDepthFirstSearch.FromAllVertices(graph, GraphDirection.Incoming);
+        Assert.Equal(new[] { V(0), V(2), V(1), V(3), V(4), V(5) }, incoming.PreOrder);
+        Assert.Equal(new[] { V(3), V(1), V(2), V(0), V(4), V(5) }, incoming.PostOrder);
+        Assert.Equal(
+            new[]
+            {
+                Classification(0, DepthFirstEdgeKind.Back),
+                Classification(1, DepthFirstEdgeKind.Tree),
+                Classification(2, DepthFirstEdgeKind.Tree),
+                Classification(3, DepthFirstEdgeKind.Back),
+                Classification(4, DepthFirstEdgeKind.Back),
+                Classification(5, DepthFirstEdgeKind.Tree),
+                Classification(6, DepthFirstEdgeKind.Back)
+            },
+            incoming.EdgeClassifications);
 
-        var filtered = GraphDepthFirstSearch.Run(graph, edgeFilter: edge => edge.Value != 3);
-        Assert.DoesNotContain(filtered.EdgeClassifications, item => item.Edge == new EdgeId(3));
-        Assert.Equal(6, filtered.EdgeClassifications.Length);
+        var filtered = GraphDepthFirstSearch.FromAllVertices(graph, edgeFilter: edge => edge.Value != 3);
+        Assert.Equal(
+            new[]
+            {
+                Classification(0, DepthFirstEdgeKind.Tree),
+                Classification(1, DepthFirstEdgeKind.Tree),
+                Classification(2, DepthFirstEdgeKind.Back),
+                Classification(4, DepthFirstEdgeKind.Tree),
+                Classification(5, DepthFirstEdgeKind.Cross),
+                Classification(6, DepthFirstEdgeKind.Back)
+            },
+            filtered.EdgeClassifications);
+    }
+
+    [Fact]
+    public void DepthFirstSearchFromRootsVisitsOnlyReachableVertices()
+    {
+        var graph = BuildDepthFirstGraph();
+
+        var rooted = GraphDepthFirstSearch.FromRoots(graph, [V(3)]);
+        Assert.Equal(new[] { V(3), V(1), V(2), V(0) }, rooted.PreOrder);
+        Assert.Equal(new[] { V(0), V(2), V(1), V(3) }, rooted.PostOrder);
+        Assert.Equal(
+            new[]
+            {
+                Classification(0, DepthFirstEdgeKind.Back),
+                Classification(1, DepthFirstEdgeKind.Tree),
+                Classification(2, DepthFirstEdgeKind.Tree),
+                Classification(3, DepthFirstEdgeKind.Back),
+                Classification(4, DepthFirstEdgeKind.Back),
+                Classification(5, DepthFirstEdgeKind.Tree)
+            },
+            rooted.EdgeClassifications);
+
+        var duplicateRoots = GraphDepthFirstSearch.FromRoots(graph, [V(3), V(4), V(3)]);
+        Assert.Equal(new[] { V(3), V(1), V(2), V(0), V(4) }, duplicateRoots.PreOrder);
+        Assert.Equal(new[] { V(0), V(2), V(1), V(3), V(4) }, duplicateRoots.PostOrder);
+        Assert.Equal(7, duplicateRoots.EdgeClassifications.Length);
+        Assert.Contains(Classification(6, DepthFirstEdgeKind.Back), duplicateRoots.EdgeClassifications);
+
+        var incoming = GraphDepthFirstSearch.FromRoots(graph, [V(1)], GraphDirection.Incoming);
+        Assert.Equal(new[] { V(1), V(0), V(2), V(3) }, incoming.PreOrder);
+        Assert.Equal(new[] { V(2), V(0), V(3), V(1) }, incoming.PostOrder);
+        Assert.Equal(
+            new[]
+            {
+                Classification(0, DepthFirstEdgeKind.Tree),
+                Classification(1, DepthFirstEdgeKind.Back),
+                Classification(2, DepthFirstEdgeKind.Tree),
+                Classification(3, DepthFirstEdgeKind.Forward),
+                Classification(4, DepthFirstEdgeKind.Cross),
+                Classification(5, DepthFirstEdgeKind.Tree)
+            },
+            incoming.EdgeClassifications);
+
+        var noRoots = GraphDepthFirstSearch.FromRoots(graph, []);
+        Assert.Empty(noRoots.PreOrder);
+        Assert.Empty(noRoots.PostOrder);
+        Assert.Empty(noRoots.EdgeClassifications);
+    }
+
+    [Fact]
+    public void EdgeFiltersAreCalledOncePerExaminedEdge()
+    {
+        var graph = BuildGraph(4, [(0, 1), (2, 3), (3, 3)]);
+        var rootedReachabilityCalls = 0;
+        GraphReachability.Find(graph, [V(0)], edgeFilter: edge =>
+        {
+            rootedReachabilityCalls++;
+            return true;
+        });
+        Assert.Equal(1, rootedReachabilityCalls);
+
+        var rootedDfsCalls = 0;
+        GraphDepthFirstSearch.FromRoots(graph, [V(0)], edgeFilter: _ =>
+        {
+            rootedDfsCalls++;
+            return true;
+        });
+        Assert.Equal(1, rootedDfsCalls);
+
+        var fullDfsCalls = 0;
+        GraphDepthFirstSearch.FromAllVertices(graph, edgeFilter: _ =>
+        {
+            fullDfsCalls++;
+            return true;
+        });
+        Assert.Equal(graph.EdgeCount, fullDfsCalls);
+
+        var componentCalls = 0;
+        GraphStronglyConnectedComponents.Find(graph, edgeFilter: _ =>
+        {
+            componentCalls++;
+            return true;
+        });
+        Assert.Equal(graph.EdgeCount, componentCalls);
+    }
+
+    [Fact]
+    public void RootSequencesAreEnumeratedOnlyOnce()
+    {
+        var graph = BuildGraph(2, [(0, 1)]);
+        var reachabilityEnumerations = 0;
+        IEnumerable<VertexId> ReachabilityRoots()
+        {
+            reachabilityEnumerations++;
+            if (reachabilityEnumerations > 1)
+            {
+                throw new InvalidOperationException("The root sequence was enumerated more than once.");
+            }
+
+            yield return V(0);
+        }
+
+        GraphReachability.Find(graph, ReachabilityRoots());
+        Assert.Equal(1, reachabilityEnumerations);
+
+        var depthFirstEnumerations = 0;
+        IEnumerable<VertexId> DepthFirstRoots()
+        {
+            depthFirstEnumerations++;
+            if (depthFirstEnumerations > 1)
+            {
+                throw new InvalidOperationException("The root sequence was enumerated more than once.");
+            }
+
+            yield return V(0);
+        }
+
+        GraphDepthFirstSearch.FromRoots(graph, DepthFirstRoots());
+        Assert.Equal(1, depthFirstEnumerations);
     }
 
     [Fact]
     public void ComponentsAreTopologicallyNumberedAndCondensationKeepsCrossingEdges()
     {
-        var builder = new GraphBuilder<string, int>();
-        foreach (var vertex in new[] { "a", "b", "c", "d", "e", "f", "isolated", "loop" })
-        {
-            builder.AddVertex(vertex);
-        }
-
-        builder.AddEdge("a", "b", 0);
-        builder.AddEdge("b", "a", 1);
-        var aToC = builder.AddEdge("a", "c", 2);
-        builder.AddEdge("b", "c", 3);
-        builder.AddEdge("c", "d", 4);
-        builder.AddEdge("d", "c", 5);
-        var dToE = builder.AddEdge("d", "e", 6);
-        builder.AddEdge("e", "f", 7);
-        builder.AddEdge("loop", "loop", 8);
-        var graph = builder.Build();
+        var graph = BuildComponentGraph();
         var components = GraphStronglyConnectedComponents.Find(graph);
         var condensation = GraphCondensation.Build(graph, components);
 
-        Assert.Equal(6, components.Components.Length);
-        Assert.Equal(components.GetComponentOf(new VertexId(0)), components.GetComponentOf(new VertexId(1)));
-        Assert.Equal(components.GetComponentOf(new VertexId(2)), components.GetComponentOf(new VertexId(3)));
-        Assert.NotEqual(components.GetComponentOf(new VertexId(0)), components.GetComponentOf(new VertexId(2)));
-        Assert.True(components.IsLoop(components.GetComponentOf(new VertexId(0))));
-        Assert.True(components.IsLoop(components.GetComponentOf(new VertexId(2))));
-        Assert.False(components.IsLoop(components.GetComponentOf(new VertexId(4))));
-        Assert.False(components.IsLoop(components.GetComponentOf(new VertexId(6))));
-        Assert.True(components.IsLoop(components.GetComponentOf(new VertexId(7))));
-        Assert.Equal(components.Components.Length, condensation.VertexCount);
-        Assert.Equal(4, condensation.EdgeCount);
-        Assert.Equal(new[] { aToC, new EdgeId(3), dToE, new EdgeId(7) }, Enumerable.Range(0, condensation.EdgeCount)
-            .Select(index => condensation.GetEdge(new EdgeId(index)).Value));
+        Assert.Equal(
+            new[] { "[7]", "[6]", "[0,1]", "[2,3]", "[4]", "[5]" },
+            FormatComponents(components));
+        Assert.Equal(new[] { true, false, true, true, false, false },
+            Enumerable.Range(0, components.Components.Length)
+                .Select(index => components.IsLoop(new ComponentId(index))));
+        Assert.Equal(6, condensation.VertexCount);
+        Assert.Equal(
+            Enumerable.Range(0, 6).Select(index => new ComponentId(index)),
+            Enumerable.Range(0, 6).Select(index => condensation.GetVertexValue(V(index))));
+        Assert.Equal(
+            new[]
+            {
+                (2, 3, 2),
+                (2, 3, 3),
+                (3, 4, 6),
+                (4, 5, 7)
+            },
+            CondensationEdges(condensation));
 
         for (var index = 0; index < graph.EdgeCount; index++)
         {
@@ -134,147 +255,51 @@ public sealed class GraphAlgorithmTests
             }
         }
 
-        var otherGraph = new GraphBuilder<string, int>();
-        otherGraph.AddVertex("different");
-        Assert.Throws<ArgumentException>(() => GraphCondensation.Build(otherGraph.Build(), components));
+        var otherGraphBuilder = new GraphBuilder<string, int>();
+        otherGraphBuilder.AddVertex("different");
+        Assert.Throws<ArgumentException>(() => GraphCondensation.Build(otherGraphBuilder.Build(), components));
     }
 
     [Fact]
     public void ComponentsAndCondensationHonorDirectionAndEdgeFilter()
     {
-        var builder = new GraphBuilder<int, int>();
-        for (var vertex = 0; vertex < 5; vertex++)
-        {
-            builder.AddVertex(vertex);
-        }
-
-        builder.AddEdge(0, 1, 0);
-        builder.AddEdge(1, 0, 1);
-        builder.AddEdge(1, 2, 2);
-        builder.AddEdge(2, 3, 3);
-        builder.AddEdge(3, 2, 4);
-        builder.AddEdge(3, 4, 5);
-        var graph = builder.Build();
+        var graph = BuildGraph(5, [(0, 1), (1, 0), (1, 2), (2, 3), (3, 2), (3, 4)]);
         var components = GraphStronglyConnectedComponents.Find(
             graph,
             GraphDirection.Incoming,
             edge => edge.Id != new EdgeId(1));
         var condensation = GraphCondensation.Build(graph, components);
 
-        Assert.NotEqual(components.GetComponentOf(new VertexId(0)), components.GetComponentOf(new VertexId(1)));
-        Assert.Equal(components.GetComponentOf(new VertexId(2)), components.GetComponentOf(new VertexId(3)));
-        Assert.True(components.IsLoop(components.GetComponentOf(new VertexId(2))));
-        Assert.False(components.IsLoop(components.GetComponentOf(new VertexId(0))));
-
-        var expectedCrossingEdges = new[] { new EdgeId(0), new EdgeId(2), new EdgeId(5) };
+        Assert.Equal(new[] { "[4]", "[2,3]", "[1]", "[0]" }, FormatComponents(components));
         Assert.Equal(
-            expectedCrossingEdges,
-            Enumerable.Range(0, condensation.EdgeCount)
-                .Select(index => condensation.GetEdge(new EdgeId(index)).Value));
-        for (var index = 0; index < condensation.EdgeCount; index++)
-        {
-            var condensedEdge = condensation.GetEdge(new EdgeId(index));
-            Assert.True(condensedEdge.Source.Value < condensedEdge.Target.Value);
-        }
+            new[] { 3, 2, 1, 1, 0 },
+            Enumerable.Range(0, 5).Select(index => components.GetComponentOf(V(index)).Value));
+        Assert.Equal(new[] { false, true, false, false },
+            Enumerable.Range(0, 4).Select(index => components.IsLoop(new ComponentId(index))));
+        Assert.Equal(
+            new[] { (2, 3, 0), (1, 2, 2), (0, 1, 5) },
+            CondensationEdges(condensation));
     }
 
     [Fact]
-    public void RandomGraphsMatchTransitiveClosureAndRemainDeterministicWithCollidingHashes()
+    public void ComponentNumberingAndMemberOrderArePinned()
     {
-        for (var seed = 0; seed < 40; seed++)
-        {
-            try
-            {
-                var random = new Random(seed);
-                var vertexCount = random.Next(0, 10);
-                var specs = new List<(int Source, int Target, int Payload)>();
-                var edgeCount = random.Next(0, Math.Max(1, vertexCount * vertexCount * 2 + 1));
-                for (var index = 0; index < edgeCount; index++)
-                {
-                    if (vertexCount == 0)
-                    {
-                        break;
-                    }
+        var isolated = BuildGraph(3, []);
+        var isolatedComponents = GraphStronglyConnectedComponents.Find(isolated);
+        Assert.Equal(new[] { "[2]", "[1]", "[0]" }, FormatComponents(isolatedComponents));
 
-                    specs.Add((random.Next(vertexCount), random.Next(vertexCount), index));
-                }
-
-                var normal = BuildGraph(vertexCount, specs, EqualityComparer<int>.Default);
-                var collisions = BuildGraph(vertexCount, specs, new ConstantHashComparer());
-                var closure = TransitiveClosure(vertexCount, specs, _ => true);
-                var roots = vertexCount == 0
-                    ? Array.Empty<VertexId>()
-                    : new[] { new VertexId(0), new VertexId(0), new VertexId(random.Next(vertexCount)) };
-                var reached = GraphReachability.Find(normal, roots);
-                var collisionReached = GraphReachability.Find(collisions, roots);
-                var repeatedReached = GraphReachability.Find(normal, roots);
-                var expectedReached = Enumerable.Range(0, vertexCount)
-                    .Where(vertex => roots.Any(root => closure[root.Value, vertex]))
-                    .Select(vertex => new VertexId(vertex));
-                Assert.Equal(expectedReached.OrderBy(id => id.Value), reached.Order.OrderBy(id => id.Value));
-                Assert.Equal(reached.Order.ToArray(), collisionReached.Order.ToArray());
-                Assert.Equal(reached.Order.ToArray(), repeatedReached.Order.ToArray());
-                for (var vertex = 0; vertex < vertexCount; vertex++)
-                {
-                    var id = new VertexId(vertex);
-                    Assert.Equal(reached.IsReached(id), collisionReached.IsReached(id));
-                    Assert.Equal(reached.FirstEdgeTo(id), collisionReached.FirstEdgeTo(id));
-                }
-
-                var components = GraphStronglyConnectedComponents.Find(normal);
-                var collisionComponents = GraphStronglyConnectedComponents.Find(collisions);
-                Assert.Equal(
-                    components.Components.Select(component => string.Join(',', component.Select(vertex => vertex.Value))),
-                    collisionComponents.Components.Select(component => string.Join(',', component.Select(vertex => vertex.Value))));
-                for (var left = 0; left < vertexCount; left++)
-                {
-                    Assert.Equal(
-                        components.GetComponentOf(new VertexId(left)),
-                        collisionComponents.GetComponentOf(new VertexId(left)));
-                    for (var right = 0; right < vertexCount; right++)
-                    {
-                        Assert.Equal(
-                            closure[left, right] && closure[right, left],
-                            components.GetComponentOf(new VertexId(left))
-                                == components.GetComponentOf(new VertexId(right)));
-                    }
-                }
-
-                var dfs = GraphDepthFirstSearch.Run(normal);
-                var collisionDfs = GraphDepthFirstSearch.Run(collisions);
-                Assert.Equal(dfs.PreOrder.ToArray(), collisionDfs.PreOrder.ToArray());
-                Assert.Equal(dfs.PostOrder.ToArray(), collisionDfs.PostOrder.ToArray());
-                Assert.Equal(dfs.EdgeClassifications.ToArray(), collisionDfs.EdgeClassifications.ToArray());
-                Assert.Equal(normal.EdgeCount, dfs.EdgeClassifications.Length);
-
-                var condensed = GraphCondensation.Build(normal, components);
-                var collisionCondensed = GraphCondensation.Build(collisions, collisionComponents);
-                Assert.Equal(
-                    Enumerable.Range(0, condensed.EdgeCount)
-                        .Select(index => condensed.GetEdge(new EdgeId(index))),
-                    Enumerable.Range(0, collisionCondensed.EdgeCount)
-                        .Select(index => collisionCondensed.GetEdge(new EdgeId(index))));
-
-                var reverseClosure = TransitiveClosure(vertexCount, specs, _ => true, reverse: true);
-                var incoming = GraphReachability.Find(normal, roots, GraphDirection.Incoming);
-                var expectedIncoming = Enumerable.Range(0, vertexCount)
-                    .Where(vertex => roots.Any(root => reverseClosure[root.Value, vertex]))
-                    .Select(vertex => new VertexId(vertex));
-                Assert.Equal(
-                    expectedIncoming.OrderBy(id => id.Value),
-                    incoming.Order.OrderBy(id => id.Value));
-            }
-            catch (Xunit.Sdk.XunitException exception)
-            {
-                throw new Xunit.Sdk.XunitException($"Random graph seed {seed}: {exception.Message}");
-            }
-        }
+        var ring = BuildGraph(3, [(0, 1), (1, 2), (2, 0)]);
+        var ringComponents = GraphStronglyConnectedComponents.Find(ring);
+        Assert.Equal(new[] { "[0,1,2]" }, FormatComponents(ringComponents));
+        Assert.True(ringComponents.IsLoop(new ComponentId(0)));
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void EveryAlgorithmHandlesADeepChainAndRingWithoutRecursion(bool ring)
+    [InlineData(false, GraphDirection.Outgoing)]
+    [InlineData(false, GraphDirection.Incoming)]
+    [InlineData(true, GraphDirection.Outgoing)]
+    [InlineData(true, GraphDirection.Incoming)]
+    public void EveryAlgorithmHandlesADeepChainAndRingWithoutRecursion(bool ring, GraphDirection direction)
     {
         const int vertexCount = 100_000;
         var builder = new GraphBuilder<int, int>();
@@ -285,107 +310,106 @@ public sealed class GraphAlgorithmTests
 
         for (var vertex = 0; vertex < vertexCount - 1; vertex++)
         {
-            builder.AddEdge(vertex, vertex + 1, vertex);
+            builder.AddEdge(V(vertex), V(vertex + 1), vertex);
         }
 
         if (ring)
         {
-            builder.AddEdge(vertexCount - 1, 0, vertexCount - 1);
+            builder.AddEdge(V(vertexCount - 1), V(0), vertexCount - 1);
         }
 
         var graph = builder.Build();
-        var roots = new[] { new VertexId(0) };
-        var reachable = GraphReachability.Find(graph, roots);
-        var depthFirst = GraphDepthFirstSearch.Run(graph);
-        var components = GraphStronglyConnectedComponents.Find(graph);
+        var root = direction == GraphDirection.Outgoing ? V(0) : V(vertexCount - 1);
+        var reachable = GraphReachability.Find(graph, [root], direction);
+        var rootedDfs = GraphDepthFirstSearch.FromRoots(graph, [root], direction);
+        var fullDfs = GraphDepthFirstSearch.FromAllVertices(graph, direction);
+        var components = GraphStronglyConnectedComponents.Find(graph, direction);
         var condensation = GraphCondensation.Build(graph, components);
 
         Assert.Equal(vertexCount, reachable.Order.Length);
-        Assert.Equal(vertexCount, depthFirst.PreOrder.Length);
-        Assert.Equal(graph.EdgeCount, depthFirst.EdgeClassifications.Length);
+        Assert.Equal(vertexCount, rootedDfs.PreOrder.Length);
+        Assert.Equal(graph.EdgeCount, rootedDfs.EdgeClassifications.Length);
+        Assert.Equal(vertexCount, fullDfs.PreOrder.Length);
+        Assert.Equal(graph.EdgeCount, fullDfs.EdgeClassifications.Length);
         Assert.Equal(ring ? 1 : vertexCount, components.Components.Length);
         Assert.Equal(ring ? 0 : vertexCount - 1, condensation.EdgeCount);
         if (ring)
         {
+            Assert.Equal(V(0), components.Components[0][0]);
+            Assert.Equal(V(vertexCount - 1), components.Components[0][^1]);
             Assert.True(components.IsLoop(new ComponentId(0)));
         }
     }
 
-    private static Graph<int, int> BuildGraph(
-        int vertexCount,
-        IEnumerable<(int Source, int Target, int Payload)> specs,
-        IEqualityComparer<int> comparer)
+    private static Graph<string, int> BuildComponentGraph()
     {
-        var builder = new GraphBuilder<int, int>(comparer);
+        var names = new[] { "a", "b", "c", "d", "e", "f", "isolated", "loop" };
+        var builder = new GraphBuilder<string, int>();
+        var vertices = names.Select(builder.AddVertex).ToArray();
+        builder.AddEdge(vertices[0], vertices[1], 0);
+        builder.AddEdge(vertices[1], vertices[0], 1);
+        builder.AddEdge(vertices[0], vertices[2], 2);
+        builder.AddEdge(vertices[1], vertices[2], 3);
+        builder.AddEdge(vertices[2], vertices[3], 4);
+        builder.AddEdge(vertices[3], vertices[2], 5);
+        builder.AddEdge(vertices[3], vertices[4], 6);
+        builder.AddEdge(vertices[4], vertices[5], 7);
+        builder.AddEdge(vertices[7], vertices[7], 8);
+        return builder.Build();
+    }
+
+    private static Graph<int, int> BuildGraph(int vertexCount, IEnumerable<(int Source, int Target)> edges)
+    {
+        var builder = new GraphBuilder<int, int>();
         for (var vertex = 0; vertex < vertexCount; vertex++)
         {
             builder.AddVertex(vertex);
         }
 
-        foreach (var (source, target, payload) in specs)
+        var payload = 0;
+        foreach (var (source, target) in edges)
         {
-            builder.AddEdge(source, target, payload);
+            builder.AddEdge(V(source), V(target), payload++);
         }
 
         return builder.Build();
     }
 
-    private static bool[,] TransitiveClosure(
-        int vertexCount,
-        IEnumerable<(int Source, int Target, int Payload)> specs,
-        Func<int, bool> include,
-        bool reverse = false)
-    {
-        var closure = new bool[vertexCount, vertexCount];
-        for (var vertex = 0; vertex < vertexCount; vertex++)
-        {
-            closure[vertex, vertex] = true;
-        }
-
-        foreach (var (source, target, payload) in specs)
-        {
-            if (include(payload))
-            {
-                closure[reverse ? target : source, reverse ? source : target] = true;
-            }
-        }
-
-        for (var via = 0; via < vertexCount; via++)
-        {
-            for (var source = 0; source < vertexCount; source++)
-            {
-                for (var target = 0; target < vertexCount; target++)
-                {
-                    closure[source, target] |= closure[source, via] && closure[via, target];
-                }
-            }
-        }
-
-        return closure;
-    }
+    private static Graph<int, int> BuildDepthFirstGraph() =>
+        BuildGraph(6, [(0, 1), (1, 2), (2, 0), (0, 1), (0, 3), (3, 1), (4, 4)]);
 
     private static Graph<int, string> BuildReachabilityGraph()
     {
         var builder = new GraphBuilder<int, string>();
-        for (var vertex = 0; vertex < 5; vertex++)
-        {
-            builder.AddVertex(vertex);
-        }
-
-        builder.AddEdge(0, 1, "first");
-        builder.AddEdge(0, 2, "second");
-        builder.AddEdge(1, 3, "route");
-        builder.AddEdge(2, 3, "route");
-        builder.AddEdge(0, 0, "loop");
-        builder.AddEdge(0, 1, "filtered");
-        builder.AddEdge(0, 4, "filtered");
+        var vertices = Enumerable.Range(0, 5).Select(builder.AddVertex).ToArray();
+        builder.AddEdge(vertices[0], vertices[1], "first");
+        builder.AddEdge(vertices[0], vertices[2], "second");
+        builder.AddEdge(vertices[1], vertices[3], "route");
+        builder.AddEdge(vertices[2], vertices[3], "route");
+        builder.AddEdge(vertices[0], vertices[0], "loop");
+        builder.AddEdge(vertices[0], vertices[1], "filtered");
+        builder.AddEdge(vertices[0], vertices[4], "filtered");
         return builder.Build();
     }
 
-    private sealed class ConstantHashComparer : IEqualityComparer<int>
-    {
-        public bool Equals(int x, int y) => x == y;
+    private static string[] FormatComponents<TVertex, TEdge>(
+        StronglyConnectedComponentsResult<TVertex, TEdge> components) =>
+        components.Components
+            .Select(component => $"[{string.Join(',', component.Select(vertex => vertex.Value))}]")
+            .ToArray();
 
-        public int GetHashCode(int obj) => 0;
-    }
+    private static (int Source, int Target, int Payload)[] CondensationEdges(
+        Graph<ComponentId, EdgeId> graph) =>
+        Enumerable.Range(0, graph.EdgeCount)
+            .Select(index =>
+            {
+                var edge = graph.GetEdge(new EdgeId(index));
+                return (edge.Source.Value, edge.Target.Value, edge.Value.Value);
+            })
+            .ToArray();
+
+    private static VertexId V(int value) => new(value);
+
+    private static DepthFirstEdgeClassification Classification(int edge, DepthFirstEdgeKind kind) =>
+        new(new EdgeId(edge), kind);
 }

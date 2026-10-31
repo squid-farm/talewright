@@ -41,39 +41,82 @@ public sealed class DepthFirstResult
     public ImmutableArray<VertexId> PostOrder { get; }
 
     /// <summary>
-    /// Gets classifications in edge insertion order. Filtered-out edges are omitted.
+    /// Gets classifications in edge insertion order. Filtered-out edges and edges that leave
+    /// unvisited vertices in the selected direction are omitted.
     /// </summary>
     public ImmutableArray<DepthFirstEdgeClassification> EdgeClassifications { get; }
 }
 
 /// <summary>
-/// Runs iterative depth-first search in O(V + E) time and O(V + E) extra space. The supplied
-/// roots are visited first in argument order (duplicates ignored), then any remaining vertices
-/// in id order, so every accepted edge is classified. Adjacency follows edge insertion order.
-/// Classifications are relative to the selected traversal direction.
+/// Runs iterative depth-first search without recursion. Adjacency follows edge insertion order.
+/// Classifications are relative to the selected traversal direction. An edge filter is called
+/// at most once per edge; filtered-out and unvisited edges are omitted.
 /// </summary>
 public static class GraphDepthFirstSearch
 {
-    /// <summary>Runs a deterministic depth-first forest without recursion.</summary>
-    /// <typeparam name="TVertex">The graph vertex key type.</typeparam>
+    /// <summary>
+    /// Runs deterministic depth-first search from the supplied roots, visiting only vertices
+    /// reachable from them. Duplicate roots are ignored; an empty sequence visits nothing.
+    /// Roots are enumerated once. Runs in O(V + E + R) time and O(V + E) extra space, where R is
+    /// the number of roots supplied, counting duplicates, assuming the edge filter runs in
+    /// constant time.
+    /// </summary>
+    /// <typeparam name="TVertex">The graph vertex value type.</typeparam>
     /// <typeparam name="TEdge">The graph edge payload type.</typeparam>
     /// <param name="graph">The immutable graph to search.</param>
-    /// <param name="roots">Optional first roots, in priority order.</param>
+    /// <param name="roots">Root vertex ids in traversal-priority order.</param>
     /// <param name="direction">Whether to follow outgoing or incoming edges.</param>
     /// <param name="edgeFilter">An optional predicate applied to each examined edge.</param>
-    /// <returns>Pre-order, post-order, and edge classifications.</returns>
-    /// <exception cref="ArgumentNullException">The graph is null.</exception>
+    /// <returns>
+    /// Visited vertices in pre-order and post-order, and classifications for accepted edges leaving
+    /// visited vertices in edge id order.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">The graph or roots are null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A root id or direction is outside its valid range.</exception>
-    public static DepthFirstResult Run<TVertex, TEdge>(
+    public static DepthFirstResult FromRoots<TVertex, TEdge>(
         Graph<TVertex, TEdge> graph,
-        IEnumerable<VertexId>? roots = null,
+        IEnumerable<VertexId> roots,
         GraphDirection direction = GraphDirection.Outgoing,
         Func<GraphEdge<TEdge>, bool>? edgeFilter = null)
-        where TVertex : notnull
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        ArgumentNullException.ThrowIfNull(roots);
+        GraphReachability.ValidateDirection(direction);
+        return Traverse(graph, roots, direction, edgeFilter);
+    }
+
+    /// <summary>
+    /// Runs a deterministic depth-first forest starting at every unvisited vertex in id order, so
+    /// every accepted edge is classified. Runs in O(V + E) time and O(V + E) extra space,
+    /// assuming the edge filter runs in constant time.
+    /// </summary>
+    /// <typeparam name="TVertex">The graph vertex value type.</typeparam>
+    /// <typeparam name="TEdge">The graph edge payload type.</typeparam>
+    /// <param name="graph">The immutable graph to search.</param>
+    /// <param name="direction">Whether to follow outgoing or incoming edges.</param>
+    /// <param name="edgeFilter">An optional predicate applied to each examined edge.</param>
+    /// <returns>
+    /// All vertices in pre-order and post-order, and classifications for accepted edges in edge id
+    /// order.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">The graph is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The direction is outside its valid range.</exception>
+    public static DepthFirstResult FromAllVertices<TVertex, TEdge>(
+        Graph<TVertex, TEdge> graph,
+        GraphDirection direction = GraphDirection.Outgoing,
+        Func<GraphEdge<TEdge>, bool>? edgeFilter = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
         GraphReachability.ValidateDirection(direction);
+        return Traverse(graph, AllVertices(graph.VertexCount), direction, edgeFilter);
+    }
 
+    private static DepthFirstResult Traverse<TVertex, TEdge>(
+        Graph<TVertex, TEdge> graph,
+        IEnumerable<VertexId> roots,
+        GraphDirection direction,
+        Func<GraphEdge<TEdge>, bool>? edgeFilter)
+    {
         var state = new byte[graph.VertexCount];
         var discoveredAt = new int[graph.VertexCount];
         var finishedAt = new int[graph.VertexCount];
@@ -141,18 +184,10 @@ public static class GraphDepthFirstSearch
             }
         }
 
-        if (roots is not null)
+        foreach (var root in roots)
         {
-            foreach (var root in roots)
-            {
-                graph.ValidateVertex(root);
-                Visit(root);
-            }
-        }
-
-        for (var index = 0; index < graph.VertexCount; index++)
-        {
-            Visit(new VertexId(index));
+            graph.ValidateVertex(root);
+            Visit(root);
         }
 
         var classifications = ImmutableArray.CreateBuilder<DepthFirstEdgeClassification>();
@@ -179,6 +214,14 @@ public static class GraphDepthFirstSearch
             preOrder.ToImmutable(),
             postOrder.ToImmutable(),
             classifications.ToImmutable());
+    }
+
+    private static IEnumerable<VertexId> AllVertices(int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            yield return new VertexId(index);
+        }
     }
 
     private struct Frame(VertexId vertex)

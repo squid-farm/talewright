@@ -1,6 +1,11 @@
 namespace Talewright.Graphs;
 
-/// <summary>Identifies a vertex in one built graph.</summary>
+/// <summary>
+/// Identifies a vertex in one built graph. Ids are dense from zero in insertion order.
+/// <c>default(VertexId)</c> is vertex 0, so callers must handle failed lookups explicitly rather
+/// than falling back to a default id. An id from another graph passes range checks when its value
+/// is in range.
+/// </summary>
 public readonly record struct VertexId(int Value);
 
 /// <summary>Identifies an edge in one built graph.</summary>
@@ -19,57 +24,58 @@ public enum GraphDirection
     Incoming
 }
 
-/// <summary>An edge and its endpoints in a built graph.</summary>
+/// <summary>
+/// An edge and its endpoints in a built graph. Equality and hashing use only <see cref="Id"/>;
+/// the edge payload is never compared, hashed, or formatted.
+/// </summary>
 /// <typeparam name="TEdge">The caller-supplied edge payload type.</typeparam>
 public readonly record struct GraphEdge<TEdge>(
     EdgeId Id,
     VertexId Source,
     VertexId Target,
-    TEdge Value);
+    TEdge Value)
+{
+    /// <summary>Returns whether another edge has the same id.</summary>
+    public bool Equals(GraphEdge<TEdge> other) => Id == other.Id;
+
+    /// <summary>Gets a hash code based only on the edge id.</summary>
+    public override int GetHashCode() => Id.GetHashCode();
+
+    /// <summary>Returns a string containing only the edge id.</summary>
+    public override string ToString() => $"GraphEdge {{ Id = {Id} }}";
+}
 
 /// <summary>
-/// Builds an immutable directed multigraph in O(V + E) time and space.
-/// Vertex and edge ids follow insertion order. The optional comparer defines vertex-key equality.
+/// Builds an immutable directed multigraph in worst-case O(V + E) time and space. Vertex and
+/// edge ids are dense and follow insertion order. Vertex and edge values are stored but never
+/// compared, hashed, or formatted; equal values identify distinct vertices, and null is allowed.
 /// </summary>
-/// <typeparam name="TVertex">A non-null caller-supplied vertex key.</typeparam>
+/// <typeparam name="TVertex">A caller-supplied vertex value.</typeparam>
 /// <typeparam name="TEdge">A caller-supplied edge payload.</typeparam>
 public sealed class GraphBuilder<TVertex, TEdge>
-    where TVertex : notnull
 {
-    private readonly Dictionary<TVertex, VertexId> _vertexIds;
     private readonly List<TVertex> _vertices = [];
     private readonly List<PendingEdge> _edges = [];
 
-    /// <summary>Creates a builder using the optional vertex-key comparer.</summary>
-    public GraphBuilder(IEqualityComparer<TVertex>? comparer = null)
-    {
-        _vertexIds = new Dictionary<TVertex, VertexId>(comparer);
-    }
-
-    /// <summary>Adds a unique vertex key and returns its insertion-order id.</summary>
-    /// <exception cref="ArgumentException">The key already exists.</exception>
-    public VertexId AddVertex(TVertex key)
+    /// <summary>Adds a vertex and returns its id, the number of vertices added before it.</summary>
+    public VertexId AddVertex(TVertex value)
     {
         var id = new VertexId(_vertices.Count);
-        if (!_vertexIds.TryAdd(key, id))
-        {
-            throw new ArgumentException($"A vertex with key '{key}' already exists.", nameof(key));
-        }
-
-        _vertices.Add(key);
+        _vertices.Add(value);
         return id;
     }
 
     /// <summary>
-    /// Adds an edge between existing vertices. Parallel edges and self-loops are retained.
+    /// Adds an edge between vertices already added to this builder. Parallel edges and self-loops
+    /// are retained.
     /// </summary>
-    /// <exception cref="KeyNotFoundException">Either endpoint has not been added.</exception>
-    public EdgeId AddEdge(TVertex source, TVertex target, TEdge value)
+    /// <exception cref="ArgumentOutOfRangeException">Either vertex id is outside this builder's vertex range.</exception>
+    public EdgeId AddEdge(VertexId source, VertexId target, TEdge value)
     {
-        var sourceId = FindVertex(source, nameof(source));
-        var targetId = FindVertex(target, nameof(target));
+        ValidateAddedVertex(source, nameof(source));
+        ValidateAddedVertex(target, nameof(target));
         var id = new EdgeId(_edges.Count);
-        _edges.Add(new PendingEdge(sourceId, targetId, value));
+        _edges.Add(new PendingEdge(source, target, value));
         return id;
     }
 
@@ -117,14 +123,12 @@ public sealed class GraphBuilder<TVertex, TEdge>
             incomingEdgeIds);
     }
 
-    private VertexId FindVertex(TVertex key, string parameterName)
+    private void ValidateAddedVertex(VertexId vertex, string parameterName)
     {
-        if (_vertexIds.TryGetValue(key, out var id))
+        if ((uint)vertex.Value >= (uint)_vertices.Count)
         {
-            return id;
+            throw new ArgumentOutOfRangeException(parameterName, vertex, "The vertex id is outside this builder's vertex range.");
         }
-
-        throw new KeyNotFoundException($"No vertex with key '{key}' has been added ({parameterName}).");
     }
 
     private static void PrefixSum(int[] offsets)
@@ -140,13 +144,13 @@ public sealed class GraphBuilder<TVertex, TEdge>
 
 /// <summary>
 /// An immutable directed multigraph with insertion-ordered vertices, edges, and adjacency.
-/// Construction takes O(V + E) time and space; adjacency reads take O(degree) time and allocate
-/// no memory.
+/// Construction takes worst-case O(V + E) time and space; adjacency reads take O(degree) time
+/// and allocate no memory. Vertex and edge values are stored but never compared, hashed, or
+/// formatted.
 /// </summary>
-/// <typeparam name="TVertex">The caller-supplied vertex key type.</typeparam>
+/// <typeparam name="TVertex">The caller-supplied vertex value type.</typeparam>
 /// <typeparam name="TEdge">The caller-supplied edge payload type.</typeparam>
 public sealed class Graph<TVertex, TEdge>
-    where TVertex : notnull
 {
     private readonly TVertex[] _vertices;
     private readonly GraphEdge<TEdge>[] _edges;
@@ -177,9 +181,9 @@ public sealed class Graph<TVertex, TEdge>
     /// <summary>Gets the number of edges.</summary>
     public int EdgeCount => _edges.Length;
 
-    /// <summary>Gets a vertex key by its id.</summary>
+    /// <summary>Gets the value stored for a vertex.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The id is outside this graph.</exception>
-    public TVertex GetVertexKey(VertexId vertex)
+    public TVertex GetVertexValue(VertexId vertex)
     {
         ValidateVertex(vertex);
         return _vertices[vertex.Value];

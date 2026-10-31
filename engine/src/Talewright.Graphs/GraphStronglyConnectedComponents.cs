@@ -4,7 +4,6 @@ namespace Talewright.Graphs;
 
 /// <summary>The immutable strongly connected component partition of a graph.</summary>
 public sealed class StronglyConnectedComponentsResult<TVertex, TEdge>
-    where TVertex : notnull
 {
     private readonly Graph<TVertex, TEdge> _graph;
     private readonly ImmutableArray<ComponentId> _componentByVertex;
@@ -26,7 +25,7 @@ public sealed class StronglyConnectedComponentsResult<TVertex, TEdge>
         Direction = direction;
     }
 
-    /// <summary>Gets components in deterministic topological order for <see cref="Direction"/>.</summary>
+    /// <summary>Gets components in topological order, with members in ascending vertex id order.</summary>
     public ImmutableArray<ImmutableArray<VertexId>> Components { get; }
 
     /// <summary>Gets the direction used to order components and orient their condensation.</summary>
@@ -68,9 +67,13 @@ public sealed class StronglyConnectedComponentsResult<TVertex, TEdge>
 }
 
 /// <summary>
-/// Computes strongly connected components with iterative Kosaraju traversal in O(V + E) time
-/// and O(V + E) extra space. Components are numbered in deterministic topological order for the
-/// selected direction; vertices within a component follow reverse-graph DFS order.
+/// Computes strongly connected components with iterative Kosaraju traversal in worst-case
+/// O(V + E) time and space. Components are numbered in a topological order for the selected
+/// direction: every selected edge between components goes from the lower to the higher number.
+/// When no edge orders two components, numbering is deterministic and follows a depth-first search
+/// from all vertices in id order, then numbers components in reverse post-order of that search.
+/// Vertices within a component are in ascending id order. The filter is called exactly once per
+/// edge, in edge id order. The complexity bound assumes the filter runs in constant time.
 /// </summary>
 public static class GraphStronglyConnectedComponents
 {
@@ -78,7 +81,7 @@ public static class GraphStronglyConnectedComponents
     /// Partitions every graph vertex into exactly one strongly connected component, following the
     /// selected direction and only edges accepted by <paramref name="edgeFilter"/>.
     /// </summary>
-    /// <typeparam name="TVertex">The graph vertex key type.</typeparam>
+    /// <typeparam name="TVertex">The graph vertex value type.</typeparam>
     /// <typeparam name="TEdge">The graph edge payload type.</typeparam>
     /// <param name="graph">The immutable graph to analyze.</param>
     /// <param name="direction">The direction used to order the components.</param>
@@ -90,7 +93,6 @@ public static class GraphStronglyConnectedComponents
         Graph<TVertex, TEdge> graph,
         GraphDirection direction = GraphDirection.Outgoing,
         Func<GraphEdge<TEdge>, bool>? edgeFilter = null)
-        where TVertex : notnull
     {
         ArgumentNullException.ThrowIfNull(graph);
         GraphReachability.ValidateDirection(direction);
@@ -102,13 +104,13 @@ public static class GraphStronglyConnectedComponents
             includedEdges[index] = edgeFilter is null || edgeFilter(edge);
         }
 
-        var postOrder = GraphDepthFirstSearch.Run(
+        var postOrder = GraphDepthFirstSearch.FromAllVertices(
             graph,
-            direction: direction,
-            edgeFilter: edge => includedEdges[edge.Id.Value]).PostOrder;
+            direction,
+            edge => includedEdges[edge.Id.Value]).PostOrder;
         var visited = new bool[graph.VertexCount];
         var componentByVertex = new ComponentId[graph.VertexCount];
-        var components = ImmutableArray.CreateBuilder<ImmutableArray<VertexId>>();
+        var componentCount = 0;
         var stack = new Stack<VertexId>();
         var reverseDirection = direction == GraphDirection.Outgoing
             ? GraphDirection.Incoming
@@ -122,15 +124,13 @@ public static class GraphStronglyConnectedComponents
                 continue;
             }
 
-            var componentId = new ComponentId(components.Count);
-            var members = ImmutableArray.CreateBuilder<VertexId>();
+            var componentId = new ComponentId(componentCount);
             visited[root.Value] = true;
             componentByVertex[root.Value] = componentId;
             stack.Push(root);
 
             while (stack.TryPop(out var current))
             {
-                members.Add(current);
                 var adjacent = reverseDirection == GraphDirection.Outgoing
                     ? graph.OutgoingEdges(current)
                     : graph.IncomingEdges(current);
@@ -155,11 +155,28 @@ public static class GraphStronglyConnectedComponents
                 }
             }
 
-            components.Add(members.ToImmutable());
+            componentCount++;
         }
 
-        var loopFlags = new bool[components.Count];
-        for (var index = 0; index < components.Count; index++)
+        var memberBuilders = new ImmutableArray<VertexId>.Builder[componentCount];
+        for (var index = 0; index < componentCount; index++)
+        {
+            memberBuilders[index] = ImmutableArray.CreateBuilder<VertexId>();
+        }
+
+        for (var vertex = 0; vertex < graph.VertexCount; vertex++)
+        {
+            memberBuilders[componentByVertex[vertex].Value].Add(new VertexId(vertex));
+        }
+
+        var components = ImmutableArray.CreateBuilder<ImmutableArray<VertexId>>(componentCount);
+        for (var index = 0; index < componentCount; index++)
+        {
+            components.Add(memberBuilders[index].ToImmutable());
+        }
+
+        var loopFlags = new bool[componentCount];
+        for (var index = 0; index < componentCount; index++)
         {
             loopFlags[index] = components[index].Length > 1;
         }

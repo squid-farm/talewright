@@ -1,9 +1,10 @@
 namespace Talewright.Graphs;
 
 /// <summary>
-/// Builds the SCC condensation graph in O(V + E) time and space, retaining one edge for every
-/// original edge accepted by the component analysis that crosses components. The payload is that
-/// original edge's id; orientation follows the analysis direction.
+/// Builds the SCC condensation graph in worst-case O(V + E) time and space, retaining one edge
+/// per accepted original edge that crosses components. The payload is that edge's id; orientation
+/// follows the analysis direction. Condensation vertex i is component i, and its value is that
+/// <see cref="ComponentId"/>. Edges are added in original edge id order.
 /// </summary>
 public static class GraphCondensation
 {
@@ -11,7 +12,7 @@ public static class GraphCondensation
     /// Creates the acyclic graph of components for the exact graph analyzed. The selected edge
     /// filter and direction are inherited from <paramref name="components"/>.
     /// </summary>
-    /// <typeparam name="TVertex">The original graph vertex key type.</typeparam>
+    /// <typeparam name="TVertex">The original graph vertex value type.</typeparam>
     /// <typeparam name="TEdge">The original graph edge payload type.</typeparam>
     /// <param name="graph">The graph analyzed by <paramref name="components"/>.</param>
     /// <param name="components">Its strongly connected component result.</param>
@@ -21,7 +22,6 @@ public static class GraphCondensation
     public static Graph<ComponentId, EdgeId> Build<TVertex, TEdge>(
         Graph<TVertex, TEdge> graph,
         StronglyConnectedComponentsResult<TVertex, TEdge> components)
-        where TVertex : notnull
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(components);
@@ -45,7 +45,7 @@ public static class GraphCondensation
             {
                 var from = components.Direction == GraphDirection.Outgoing ? source : target;
                 var to = components.Direction == GraphDirection.Outgoing ? target : source;
-                builder.AddEdge(from, to, edge.Id);
+                builder.AddEdge(new VertexId(from.Value), new VertexId(to.Value), edge.Id);
             }
         }
 

@@ -48,10 +48,12 @@ public sealed class ReachabilityResult
 }
 
 /// <summary>
-/// Finds vertices by breadth-first search in O(V + E) time and O(V) extra space.
-/// Roots are considered in argument order, duplicates are ignored, and adjacency follows edge
-/// insertion order. First-edge witnesses use the fewest edges; ties follow this deterministic
-/// traversal order.
+/// Finds vertices by breadth-first search in O(V + E + R) time and O(V) extra space, where R is
+/// the number of roots supplied, counting duplicates. Roots are enumerated once in argument
+/// order, duplicates are ignored, and adjacency follows edge insertion order. First-edge
+/// witnesses use the fewest edges; ties follow this deterministic traversal order. The edge
+/// filter is called at most once per edge and only for edges leaving reached vertices; complexity
+/// assumes the filter runs in constant time.
 /// </summary>
 public static class GraphReachability
 {
@@ -59,7 +61,7 @@ public static class GraphReachability
     /// Finds vertices reachable from roots, optionally following only edges accepted by
     /// <paramref name="edgeFilter"/>.
     /// </summary>
-    /// <typeparam name="TVertex">The graph vertex key type.</typeparam>
+    /// <typeparam name="TVertex">The graph vertex value type.</typeparam>
     /// <typeparam name="TEdge">The graph edge payload type.</typeparam>
     /// <param name="graph">The immutable graph to search.</param>
     /// <param name="roots">Root vertex ids in traversal-priority order.</param>
@@ -73,7 +75,6 @@ public static class GraphReachability
         IEnumerable<VertexId> roots,
         GraphDirection direction = GraphDirection.Outgoing,
         Func<GraphEdge<TEdge>, bool>? edgeFilter = null)
-        where TVertex : notnull
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(roots);
