@@ -330,7 +330,8 @@ public class CompilerTests
         Assert.Equal(new SceneId("b"), choices[0].Divert!.Scene);
         Assert.Equal(3, choices[1].Effects.Count);
         Assert.Equal(new ChangeStanding(new FactionId("guild"), AssignOp.Subtract, new NumberLiteral(5)), choices[1].Effects[0]);
-        Assert.IsType<SubstitutionTemplate>(choices[1].Label[1]);
+        var label = Assert.IsAssignableFrom<IReadOnlyList<TemplateInline>>(choices[1].Label);
+        Assert.IsType<SubstitutionTemplate>(label[1]);
         Assert.True(choices[2].Divert!.IsEnd);
     }
 

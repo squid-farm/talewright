@@ -89,10 +89,14 @@ public sealed class SceneDefinition : IStorylet
 /// </summary>
 public sealed class ChoiceDefinition
 {
+    /// <summary>Default text for an omitted choice label and for an automatic scene continuation.</summary>
+    public const string ContinueLabelText = "Continue";
+
     /// <summary>Stable key within the scene (declaration index), recorded in <c>ChoiceMade</c> events.</summary>
     public required string Key { get; init; }
 
-    public required IReadOnlyList<TemplateInline> Label { get; init; }
+    /// <summary>Authored label, or null for a textless choice. An explicitly empty label remains empty.</summary>
+    public required IReadOnlyList<TemplateInline>? Label { get; init; }
     public Expr? Requires { get; init; }
     public IReadOnlyList<Effect> Effects { get; init; } = [];
     public CheckBranch? Check { get; init; }

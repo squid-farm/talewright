@@ -71,6 +71,66 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Textless_choices_keep_order_effects_history_and_save_navigation()
+    {
+        await Upload(new StoryFixture("textless-choices",
+            TestStories.DefaultYaml.Replace("id: player-test", $"id: textless-{Guid.NewGuid():N}"), """
+            === start
+            Visits {var:visits}.
+            * [Open] (requires: flag:ready) -> final
+            * -> road
+            === road
+            The road.
+            * (requires: not flag:ready) { set flag:ready; var:visits += 1 } -> start
+            * [Stop] -> final
+            === final
+            The end.
+            * -> END
+            """));
+        await AssertState(state =>
+        {
+            Assert.Contains("Visits 0.", state.Passage);
+            Assert.Equal(["Continue"], state.Choices);
+        });
+        await Choose("Continue");
+        await AssertState(state =>
+        {
+            Assert.Contains("The road.", state.Passage);
+            Assert.Equal(["Continue", "Stop"], state.Choices);
+            Assert.Contains("Continue", state.Transcript);
+        });
+        await Choose("Continue");
+        await AssertState(state =>
+        {
+            Assert.Contains("Visits 1.", state.Passage);
+            Assert.Equal(["Open", "Continue"], state.Choices);
+        });
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+        await Choose("Open");
+        await AssertState(state =>
+        {
+            Assert.Contains("The end.", state.Passage);
+            Assert.Equal(["Continue"], state.Choices);
+        });
+        await Choose("Continue");
+        await AssertState(state => Assert.True(state.Ended));
+        await Driver.ClickAsync("Back");
+        await AssertState(state => Assert.Contains("The end.", state.Passage));
+        await Driver.ClickAsync("Forward");
+        await AssertState(state => Assert.True(state.Ended));
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await AssertState(state =>
+        {
+            Assert.Contains("Visits 1.", state.Passage);
+            Assert.Equal(["Open", "Continue"], state.Choices);
+        });
+    }
+
+    [Fact]
     public async Task Bundled_sample_opens_without_a_sample_specific_route()
     {
         await Driver.OpenBundledAsync();

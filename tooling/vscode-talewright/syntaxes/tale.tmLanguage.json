@@ -44,7 +44,7 @@
       "patterns": [{"include": "#expression"}]
     },
     {
-      "begin": "^\\s*(\\*)(?=\\s*\\[)",
+      "begin": "^\\s*(\\*)(?=\\s*\\[|[\\t ]+(?:\\(requires:|\\{|->)|\\s*$)",
       "beginCaptures": {"1": {"name": "punctuation.definition.choice.tale"}},
       "end": "$",
       "patterns": [

@@ -106,6 +106,15 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
     }
 
+    [Theory]
+    [InlineData("*")]
+    [InlineData("* { set flag:ready }")]
+    public async Task Textless_choices_without_a_destination_report_tw1011(string choice)
+    {
+        await Upload(new StoryFixture("invalid-textless", TestStories.DefaultYaml, $"=== start\n{choice}"));
+        await AssertState(state => Assert.Contains("TW1011", state.Library));
+    }
+
     [Fact]
     public async Task Exactly_twenty_MiB_is_accepted_by_the_upload_layer()
     {
