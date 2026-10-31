@@ -67,12 +67,20 @@ whatever its condition.
 
 - **`StoryDivert`**: from-scene, target (a scene or END), `DivertKind` (scene divert, choice, choice skill
   check outcome, entry check outcome), source order and, for choices, the choice key, label template (none
-  for a textless choice) and `requires`. Its enclosing block `{if}`s are kept as compiled expressions. The id
-  is the scene, the step id of the divert's line and `success`/`failure` for a skill check outcome, e.g.
-  `camp/step:12:1/success`; like step ids, it changes when lines move.
+  for a textless choice) and `requires`. Its enclosing block `{if}`s are kept as compiled expressions.
+  `Condition` exposes their formatted parts, a combined Talemark expression and the state reads in first-use
+  order. An `{else}` part is formatted as a negation. Conditions are described, not evaluated.
+  The id is the scene, the step id of the divert's line and `success`/`failure` for a skill check outcome,
+  e.g. `camp/step:12:1/success`; like step ids, it changes when lines move.
 - **`HubOffer`**: a hub scene to each other scene matching its tags, ignoring `@hub-limit`, with the hub's
-  tag query. A hub that always diverts before reaching its choices offers nothing. The id is
-  `hub/hub:offered`, e.g. `camp/hub:camp.well`.
+  tag query. `Condition` describes the offered scene's `@requires`; `Once` reports whether it has `@once`.
+  A hub that always diverts before reaching its choices offers nothing. The id is `hub/hub:offered`,
+  e.g. `camp/hub:camp.well`.
+- **`StoryCondition`**, **`StoryStateRead`** and **`StoryStateReadKind`**: `Parts` keeps the conditions
+  separate; `Text` combines them with `and` while preserving grouping. `Reads` lists distinct references
+  to stats, standings and tiers, flags, number and text variables, character names and pronouns, faction
+  and item names, held items, visited scenes and named predicates. A named predicate is marked opaque
+  because its C# implementation cannot be inspected.
 
 ## Files
 
@@ -91,6 +99,7 @@ whatever its condition.
 | `Model/StoryDefinition.cs` | The compiled story: `StoryDefinition`, `SceneDefinition` (an `IStorylet` with ordered `Steps`; `Choices` is derived), `ChoiceDefinition`, `CheckBranch`, `CheckOutcome`, `DivertTarget` (incl. `End`). |
 | `Model/SceneStep.cs` | Ordered scene steps (prose, effect, `{if}` branch, choice, divert, check), each with a stable `step:<line>:<column>` ID and source span, plus the shared `SceneSteps` walks for successors and reachability. |
 | `Model/StoryDiverts.cs` | Preview: `StoryDiverts`, every divert and hub offer in a story. |
+| `Model/StoryCondition.cs` | Preview: formatted conditions and unique state reads for diverts and hub offers. |
 | `Diagnostics/Diagnostic.cs` | `Diagnostic`, `DiagnosticSeverity`, `SourceLocation`, `DiagnosticBag`. |
 
 ## Diagnostic codes
