@@ -51,6 +51,23 @@ player instead.
    should say **Talemark**.
 
 The extension highlights your writing, suggests story names and reports mistakes as you edit.
+
+![A Talemark scene in VS Code, with grey previews such as "Mara" and "a sputtering torch" after each substitution](../images/vscode-editor.png)
+
+Grey previews after each `{...}` substitution show the text players will see with the story's
+default values. Hover a substitution to see each step of how its text was produced, plus details
+such as an item's stat modifiers and where it is declared:
+
+![A hover card for {item:relic#the} showing the result "the Relic of Ysh", the item's stat modifiers and its declaration in story.talewright.yaml](../images/vscode-hover.png)
+
+Start typing a scene, item or other story name to get suggestions from your own story:
+
+![Scene suggestions such as trail.river and trail.night after typing "-> tr" in a choice](../images/vscode-completion.png)
+
+Mistakes are underlined as you type and listed in the **Problems** panel with their line number:
+
+![An unknown item named lantern underlined in red, with the error also listed in the Problems panel](../images/vscode-diagnostics.png)
+
 Its live-checking tool, called the **language server**, is included: you do not need to install
 .NET or build Talewright. Save your changes before checking or playing the files on disk.
 The [extension guide](../../tooling/vscode-talewright/README.md) includes a download-and-install
@@ -62,6 +79,8 @@ Talewright's actions live in VS Code's **Command Palette**, a search box for eve
 from the menu with **View > Command Palette**, or press **Ctrl+Shift+P** (**Cmd+Shift+P** on Mac).
 A box appears at the top of the window. Type `Talewright` to list the Talewright actions, then
 choose one.
+
+![The Command Palette filtered to Talewright, listing Open Author Debugger, Publish Story ZIP, Set Up CLI, Toggle Substitution Preview Hints and Validate Story](../images/vscode-commands.png)
 
 ## 3. Get the story-checking tools (CLI)
 
