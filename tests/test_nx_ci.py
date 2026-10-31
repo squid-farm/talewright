@@ -197,7 +197,10 @@ class CiRoutingTests(unittest.TestCase):
         self.assertIn(
             {"project": "talewright-e2e-runner", "target": "check"}, full["checks"],
         )
-        self.assertEqual(8, len(full["unit"]))
+        self.assertEqual(9, len(full["unit"]))
+        self.assertIn(
+            {"project": "Talewright.Graphs.Tests", "target": "test"}, full["unit"],
+        )
         self.assertIn(
             {"project": "Talewright.Authoring.Tests", "target": "test"}, full["unit"],
         )

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/engine/src/">
     <Project Path="engine/src/Talewright.Core/Talewright.Core.csproj" />
+    <Project Path="engine/src/Talewright.Graphs/Talewright.Graphs.csproj" />
     <Project Path="engine/src/Talewright.Narrative/Talewright.Narrative.csproj" />
     <Project Path="engine/src/Talewright.Rules/Talewright.Rules.csproj" />
     <Project Path="engine/src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" />
@@ -9,6 +10,7 @@
   </Folder>
   <Folder Name="/engine/tests/">
     <Project Path="engine/tests/Talewright.Core.Tests/Talewright.Core.Tests.csproj" />
+    <Project Path="engine/tests/Talewright.Graphs.Tests/Talewright.Graphs.Tests.csproj" />
     <Project Path="engine/tests/Talewright.Narrative.Tests/Talewright.Narrative.Tests.csproj" />
     <Project Path="engine/tests/Talewright.Rules.Tests/Talewright.Rules.Tests.csproj" />
     <Project Path="engine/tests/Talewright.Runtime.Tests/Talewright.Runtime.Tests.csproj" />
