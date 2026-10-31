@@ -15,7 +15,7 @@ public sealed class StoryProjectValidatorTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
             "game:\n  id: build\n  title: Build\n  start: a\n  ruleset: {base: custom}\ncharacters:\n  player: {first-name: Author}\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"),
-            "=== a\n{player:first-name#greeting}\n* [Continue] (requires: @Ready) -> END\n");
+            "=== a\n{player:first-name#greeting}\n* [Continue] (requires: @Ready) -> END\n* -> END\n");
     }
 
     private static CompilerOptions Options() => new()
@@ -34,6 +34,31 @@ public sealed class StoryProjectValidatorTests : IDisposable
         Assert.Equal("", output.ToString());
         Assert.True(StoryCompiler.Compile(StorySource.FromDirectory(_root), Options()).Success);
         Assert.False(StoryCompiler.Compile(StorySource.FromDirectory(_root)).Success);
+    }
+
+    [Fact]
+    public void Choice_availability_warning_is_reported_in_build_format_without_rejecting_the_story()
+    {
+        File.WriteAllText(Path.Combine(_root, "main.tale"),
+            "=== a\n* [Continue] (requires: @Ready) -> END\n");
+        using var output = new StringWriter();
+
+        Assert.Equal(0, StoryProjectValidator.Validate(_root, Options(), output));
+        Assert.Contains($"{Path.Combine(_root, "main.tale")}(1,1): warning TW3013:", output.ToString());
+    }
+
+    [Fact]
+    public void Csharp_extension_example_compiles_without_warnings()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var source = StorySource.FromDirectory(Path.Combine(root.FullName, "examples", "CSharpStory", "Story", "Content"));
+
+        var result = StoryCompiler.Compile(source, Options());
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Empty(result.Diagnostics);
     }
 
     [Fact]

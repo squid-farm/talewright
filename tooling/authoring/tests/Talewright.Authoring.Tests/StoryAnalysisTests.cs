@@ -23,6 +23,22 @@ public class StoryAnalysisTests
         new Dictionary<string, string> { ["story.talewright.yaml"] = yaml, ["main.tale"] = tale });
 
     [Fact]
+    public void Choice_availability_warning_matches_compiler_and_clears_after_an_unconditional_exit()
+    {
+        var source = Source("=== first\n* [Maybe] (requires: player:hp > 0) -> END");
+        var compiled = StoryCompiler.Compile(source);
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(compiled.Diagnostics, analysis.Diagnostics);
+        var warning = Assert.Single(analysis.Diagnostics);
+        Assert.Equal("TW3013", warning.Code);
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Equal(new SourceLocation("main.tale", 1, 1), warning.Location);
+        Assert.Empty(StoryAnalyzer.Analyze(Source("=== first\n* [Maybe] (requires: player:hp > 0) -> END\n* -> END")).Diagnostics);
+    }
+
+    [Fact]
     public void Terminal_dc_preserves_empty_difficulty_context_in_blocks_and_choices()
     {
         foreach (var prefix in new[] { "::: skill-check athletics dc", "* [Go] skill-check athletics dc" })

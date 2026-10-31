@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
@@ -8,8 +9,9 @@ namespace Talewright.Talemark.Compilation;
 
 /// <summary>
 /// Whole-story structural checks that need every scene at once (<c>TW3xxx</c>): the start scene exists, no
-/// scene is a dead end, choices have explicit targets, hubs have content, and every scene is
-/// reachable. Reference checks (unknown scenes, stats, items…) already happened while parsing.
+/// scene is a dead end, choices have explicit targets and a guaranteed option, hubs have content,
+/// and every scene is reachable. Reference checks (unknown scenes, stats, items…) already happened
+/// while parsing.
 /// </summary>
 internal static class StoryValidator
 {
@@ -86,11 +88,45 @@ internal static class StoryValidator
     {
         var seenChoice = false;
         CheckSteps(scene.Steps, ref seenChoice, diagnostics);
+        var hasReachableChoice = SceneSteps.Reachable(scene.Steps).OfType<ChoiceStep>().Any();
         if (!SceneSteps.Targets(scene.Steps).Any()
-            && !SceneSteps.Reachable(scene.Steps).OfType<ChoiceStep>().Any() && scene.Hub is null)
+            && !hasReachableChoice && scene.Hub is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
         }
+        if ((hasReachableChoice || scene.Hub is not null) && CanReachEndWithoutChoice(scene.Steps))
+        {
+            diagnostics.Warning("TW3013", $"Scene '{scene.Id}' may have no available choice. Add an unconditional choice such as '* -> target' or '* [The end] -> END'.", location);
+        }
+    }
+
+    private static bool CanReachEndWithoutChoice(IReadOnlyList<SceneStep> steps)
+    {
+        foreach (var step in steps)
+        {
+            if (step is ChoiceStep { Choice.Requires: null })
+            {
+                return false;
+            }
+            if (step is ConditionalStep branch)
+            {
+                var canReachEnd = branch.Condition switch
+                {
+                    BoolLiteral { Value: true } => CanReachEndWithoutChoice(branch.Then),
+                    BoolLiteral { Value: false } => CanReachEndWithoutChoice(branch.Else),
+                    _ => CanReachEndWithoutChoice(branch.Then) || CanReachEndWithoutChoice(branch.Else),
+                };
+                if (!canReachEnd)
+                {
+                    return false;
+                }
+            }
+            else if (!SceneSteps.CanContinue(step))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void CheckSteps(IReadOnlyList<SceneStep> steps, ref bool seenChoice, DiagnosticBag diagnostics)

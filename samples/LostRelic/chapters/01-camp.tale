@@ -133,7 +133,7 @@ if a stranger overhears it.
 
 * [Change the watchword to lantern light] (requires: var:watchword == var:watch-note) { var:watchword = "lantern light" } -> camp.watchword-readback
 * [Retire the watchword without a replacement] (requires: var:watchword == var:watch-note) { var:watchword = "" } -> camp.watchword-readback
-* [Keep the recorded watchword] (requires: var:watchword == var:watch-note) -> camp.watchword-readback
+* [Keep the recorded watchword] -> camp.watchword-readback
 
 === camp.watchword-readback
 @title Ink Does Not Follow Orders

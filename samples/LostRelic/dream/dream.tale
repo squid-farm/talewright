@@ -196,7 +196,7 @@ You cannot hold the shape in mind. Only its hunger remains when you look away.
 {/if}
 {/if}
 
-* [Pay the Hands and return to the temple] (requires: var:marks == 3) { take player glyph-mark; give hands glyph-mark; var:marks -= 1; set flag:dream-opened; player:xp += 50 } -> dream.passage
+* [Pay the Hands and return to the temple] { take player glyph-mark; give hands glyph-mark; var:marks -= 1; set flag:dream-opened; player:xp += 50 } -> dream.passage
 
 === dream.passage
 @title The Price of Waking
