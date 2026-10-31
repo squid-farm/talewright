@@ -15,7 +15,8 @@ namespace Talewright.Talemark.Compilation;
 /// </summary>
 internal static class StoryValidator
 {
-    public static void Validate(StoryManifest manifest, IReadOnlyList<ParsedScene> scenes, DiagnosticBag diagnostics)
+    /// <summary>Returns the reachability TW3009 used, or null when the story has errors.</summary>
+    public static StoryReachability? Validate(StoryManifest manifest, IReadOnlyList<ParsedScene> scenes, DiagnosticBag diagnostics)
     {
         var byId = new Dictionary<SceneId, ParsedScene>();
         foreach (var scene in scenes)
@@ -59,7 +60,7 @@ internal static class StoryValidator
         // unreachable. Only report reachability once the story is otherwise error-free.
         if (!byId.ContainsKey(start) || diagnostics.HasErrors)
         {
-            return;
+            return null;
         }
 
         var definitions = scenes.Select(scene => scene.Definition).ToArray();
@@ -71,6 +72,8 @@ internal static class StoryValidator
                 diagnostics.Warning("TW3009", $"Scene '{scene.Id}' can never be reached from '{start}'.", location);
             }
         }
+
+        return reachability;
     }
 
     private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)

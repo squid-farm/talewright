@@ -9,8 +9,7 @@ public sealed class StoryReachabilityTests
 {
     private static IEnumerable<string> Unreachable(StoryDefinition story)
     {
-        var reachability = StoryReachability.Find(story.Scenes, StoryDiverts.From(story), story.Start);
-        return story.Scenes.Where(scene => !reachability.IsReached(scene.Id)).Select(scene => scene.Id.Value);
+        return story.Scenes.Where(scene => !story.Reachability.IsReached(scene.Id)).Select(scene => scene.Id.Value);
     }
 
     private static IEnumerable<string> Tw3009(CompilationResult result) => result.Warnings
@@ -68,5 +67,25 @@ public sealed class StoryReachabilityTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Equal(["lost", "orphan"], Unreachable(result.Story!));
         Assert.Equal(["lost", "orphan"], Tw3009(result));
+    }
+
+    [Fact]
+    public void Compiled_story_keeps_the_graph_built_for_TW3009()
+    {
+        var story = TestStories.All[0].Compile();
+        var reachability = story.Reachability;
+
+        Assert.Same(reachability, story.Reachability);
+        Assert.Same(reachability.Diverts, StoryDiverts.From(story));
+        Assert.Same(StoryDiverts.From(story), StoryDiverts.From(story));
+
+        var copy = new StoryDefinition
+        {
+            Id = story.Id, Title = story.Title, Version = story.Version, Start = story.Start, Randomness = story.Randomness,
+            World = story.World, Scenes = story.Scenes, Triggers = story.Triggers, Predicates = story.Predicates,
+        };
+        Assert.NotSame(reachability, copy.Reachability);
+        Assert.Same(copy.Reachability, copy.Reachability);
+        Assert.Equal(reachability.Diverts.Diverts.Select(divert => divert.Id), StoryDiverts.From(copy).Diverts.Select(divert => divert.Id));
     }
 }

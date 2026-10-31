@@ -141,7 +141,7 @@ public static class StoryCompiler
             }
         }
 
-        StoryValidator.Validate(manifest, parsed, diagnostics);
+        var reachability = StoryValidator.Validate(manifest, parsed, diagnostics);
 
         if (diagnostics.HasErrors)
         {
@@ -163,6 +163,7 @@ public static class StoryCompiler
             Scenes = parsed.Select(p => p.Definition).ToList(),
             Triggers = triggers,
             Predicates = options.Predicates,
+            Reachability = reachability,
         };
         return new CompilationResult(story, diagnostics.Items)
         {

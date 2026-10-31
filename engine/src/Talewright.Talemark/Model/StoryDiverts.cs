@@ -81,7 +81,8 @@ public sealed class StoryDiverts
     public IReadOnlyList<StoryDivert> Diverts { get; }
     public IReadOnlyList<HubOffer> HubOffers { get; }
 
-    public static StoryDiverts From(StoryDefinition story) => From(story.Scenes);
+    /// <summary>The story's diverts and hub offers, built once per story.</summary>
+    public static StoryDiverts From(StoryDefinition story) => story.Reachability.Diverts;
 
     public static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes)
     {

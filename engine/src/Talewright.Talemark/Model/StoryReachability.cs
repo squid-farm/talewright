@@ -15,12 +15,16 @@ internal sealed class StoryReachability
     private readonly Dictionary<SceneId, VertexId> _vertices;
     private readonly ReachabilityResult _result;
 
-    private StoryReachability(Graph<SceneId, StoryRoute> graph, Dictionary<SceneId, VertexId> vertices, ReachabilityResult result)
+    private StoryReachability(StoryDiverts diverts, Graph<SceneId, StoryRoute> graph, Dictionary<SceneId, VertexId> vertices,
+        ReachabilityResult result)
     {
+        Diverts = diverts;
         Graph = graph;
         _vertices = vertices;
         _result = result;
     }
+
+    public StoryDiverts Diverts { get; }
 
     /// <summary>One vertex per scene in declaration order, with one entry per divert to a scene and per hub offer.</summary>
     public Graph<SceneId, StoryRoute> Graph { get; }
@@ -46,7 +50,7 @@ internal sealed class StoryReachability
 
         var graph = builder.Build();
         VertexId[] roots = vertices.TryGetValue(start, out var root) ? [root] : [];
-        return new StoryReachability(graph, vertices, GraphReachability.Find(graph, roots));
+        return new StoryReachability(diverts, graph, vertices, GraphReachability.Find(graph, roots));
     }
 
     public bool IsReached(SceneId scene) => _vertices.TryGetValue(scene, out var vertex) && _result.IsReached(vertex);

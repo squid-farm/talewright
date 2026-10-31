@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
@@ -37,6 +38,15 @@ public sealed class StoryDefinition
     public required NamedPredicateRegistry Predicates { get; init; }
 
     private Dictionary<SceneId, SceneDefinition>? _byId;
+    private StoryReachability? _reachability;
+
+    /// <summary>The compiler keeps the graph it built for TW3009; other stories build it on first use.</summary>
+    [AllowNull]
+    internal StoryReachability Reachability
+    {
+        get => _reachability ??= StoryReachability.Find(Scenes, StoryDiverts.From(Scenes), Start);
+        init => _reachability = value;
+    }
 
     public SceneDefinition GetScene(SceneId id) =>
         (_byId ??= Scenes.ToDictionary(s => s.Id)).TryGetValue(id, out var scene)
