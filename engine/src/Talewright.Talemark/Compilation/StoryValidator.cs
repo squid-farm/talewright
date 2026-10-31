@@ -49,7 +49,7 @@ internal static class StoryValidator
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
             }
-            if (scene.Hub is { } hub && !ResolveTags(hub, byTag).Any(id => id != scene.Id))
+            if (scene.Hub is { } hub && !StoryDiverts.ResolveTags(hub, byTag).Any(id => id != scene.Id))
             {
                 diagnostics.Warning("TW3008", $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
             }
@@ -162,39 +162,6 @@ internal static class StoryValidator
         }
     }
 
-    private static IEnumerable<SceneId> ResolveTags(StoryletTags query, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
-    {
-        var sets = query.Tags.Select(tag => byTag.GetValueOrDefault(tag)).ToArray();
-        if (query.MatchAll && sets.Any(set => set is null))
-        {
-            return [];
-        }
-
-        var candidates = sets.OfType<HashSet<SceneId>>().OrderBy(set => set.Count).ToArray();
-        if (candidates.Length == 0)
-        {
-            return [];
-        }
-        if (candidates.Length == 1)
-        {
-            return candidates[0];
-        }
-
-        var result = new HashSet<SceneId>(candidates[0]);
-        foreach (var set in candidates.Skip(1))
-        {
-            if (query.MatchAll)
-            {
-                result.IntersectWith(set);
-            }
-            else
-            {
-                result.UnionWith(set);
-            }
-        }
-        return result;
-    }
-
     private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
     {
         foreach (var target in SceneSteps.Targets(scene.Steps))
@@ -207,7 +174,7 @@ internal static class StoryValidator
 
         if (scene.Hub is { } hub && SceneSteps.CanContinue(scene.Steps))
         {
-            foreach (var candidate in ResolveTags(hub, byTag))
+            foreach (var candidate in StoryDiverts.ResolveTags(hub, byTag))
             {
                 if (candidate != scene.Id)
                 {

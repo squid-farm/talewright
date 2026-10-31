@@ -58,6 +58,22 @@ The map stays outside `StoryDefinition` and does not affect fingerprints, runtim
 This is a narrow reusable scene-provenance seam, not the partial-symbol/overlay analysis API in #29
 and remains separate from the step-level execution spans carried by `SceneDefinition.Steps`.
 
+## Diverts and hub offers (Preview)
+
+Preview: these types may change before v1. `StoryDiverts.From(story)` lists every divert (`->`) and hub offer
+in a compiled story, so tools don't walk scene steps themselves. It uses the same reachable-steps walk as
+`SceneSteps.Targets`: lines that can never run (TW3012) produce no divert, and a conditional divert is listed
+whatever its condition.
+
+- **`StoryDivert`**: from-scene, target (a scene or END), `DivertKind` (scene divert, choice, choice skill
+  check outcome, entry check outcome), source order and, for choices, the choice key, label template (none
+  for a textless choice) and `requires`. Its enclosing block `{if}`s are kept as compiled expressions. The id
+  is the scene, the step id of the divert's line and `success`/`failure` for a skill check outcome, e.g.
+  `camp/step:12:1/success`; like step ids, it changes when lines move.
+- **`HubOffer`**: a hub scene to each other scene matching its tags, ignoring `@hub-limit`, with the hub's
+  tag query. A hub that always diverts before reaching its choices offers nothing. The id is
+  `hub/hub:offered`, e.g. `camp/hub:camp.well`.
+
 ## Files
 
 | File | Contents |
@@ -74,6 +90,7 @@ and remains separate from the step-level execution spans carried by `SceneDefini
 | `Parsing/StorySymbols.cs` | Declared names (stats, characters, items, factions, flags, vars, scenes) for resolution. |
 | `Model/StoryDefinition.cs` | The compiled story: `StoryDefinition`, `SceneDefinition` (an `IStorylet` with ordered `Steps`; `Choices` is derived), `ChoiceDefinition`, `CheckBranch`, `CheckOutcome`, `DivertTarget` (incl. `End`). |
 | `Model/SceneStep.cs` | Ordered scene steps (prose, effect, `{if}` branch, choice, divert, check), each with a stable `step:<line>:<column>` ID and source span, plus the shared `SceneSteps` walks for successors and reachability. |
+| `Model/StoryDiverts.cs` | Preview: `StoryDiverts`, every divert and hub offer in a story. |
 | `Diagnostics/Diagnostic.cs` | `Diagnostic`, `DiagnosticSeverity`, `SourceLocation`, `DiagnosticBag`. |
 
 ## Diagnostic codes
