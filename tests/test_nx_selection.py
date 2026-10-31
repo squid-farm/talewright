@@ -366,7 +366,8 @@ class NxSelectionTests(unittest.TestCase):
             for source, dependencies in graph["dependencies"].items()
             for dependency in dependencies
         }
-        self.assertEqual(30, projects)
+        self.assertEqual(32, projects)
+        self.assertIn(("Talewright.Graphs.Tests", "Talewright.Graphs"), actual)
         self.assertIn(
             ("Talewright.Authoring", "Talewright.Talemark"), actual,
         )
