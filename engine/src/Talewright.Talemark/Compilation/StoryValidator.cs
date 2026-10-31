@@ -62,22 +62,11 @@ internal static class StoryValidator
             return;
         }
 
-        var reached = new HashSet<SceneId> { start };
-        var queue = new Queue<SceneId>([start]);
-        while (queue.Count > 0)
-        {
-            foreach (var next in Successors(byId[queue.Dequeue()].Definition, byTag))
-            {
-                if (byId.ContainsKey(next) && reached.Add(next))
-                {
-                    queue.Enqueue(next);
-                }
-            }
-        }
-
+        var definitions = scenes.Select(scene => scene.Definition).ToArray();
+        var reachability = StoryReachability.Find(definitions, StoryDiverts.From(definitions), start);
         foreach (var (scene, location) in scenes)
         {
-            if (!reached.Contains(scene.Id))
+            if (!reachability.IsReached(scene.Id))
             {
                 diagnostics.Warning("TW3009", $"Scene '{scene.Id}' can never be reached from '{start}'.", location);
             }
@@ -159,28 +148,6 @@ internal static class StoryValidator
                 }
             }
             reachable &= SceneSteps.CanContinue(step);
-        }
-    }
-
-    private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
-    {
-        foreach (var target in SceneSteps.Targets(scene.Steps))
-        {
-            if (target?.Scene is { } id)
-            {
-                yield return id;
-            }
-        }
-
-        if (scene.Hub is { } hub && SceneSteps.CanContinue(scene.Steps))
-        {
-            foreach (var candidate in StoryDiverts.ResolveTags(hub, byTag))
-            {
-                if (candidate != scene.Id)
-                {
-                    yield return candidate;
-                }
-            }
         }
     }
 }

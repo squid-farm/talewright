@@ -84,8 +84,8 @@ library. Authoring is excluded from the shipped engine and player packages; see
 [shared authoring analysis](authoring-analysis.md).
 
 `Talewright.Graphs` is an independent directed-graph library. It has no project or
-package references; future analysis projects may reference it without making the graph
-model depend on Talewright types.
+package references, so the graph model never depends on Talewright types. `Talewright.Talemark`
+references it to find which scenes the start scene can reach (TW3009).
 
 ### Dependency graph
 
@@ -110,6 +110,8 @@ Arrows mean "references". Nothing points upward; the engine never knows about th
                                ▼                        ▼
                            Talewright.Core ◄────────────┘
 ```
+
+`Talewright.Talemark` also references `Talewright.Graphs`, which references nothing.
 
 (`Narrative` references `Rules` because inline conditionals `{if …}` use the same typed expression trees and
 evaluator as everything else.)
