@@ -35,6 +35,10 @@ jobs:
         run: >
           dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --
           --filter '*IndependentDimensionBenchmarks*' --artifacts artifacts/performance/dimensions
+      - name: Run realistic story BenchmarkDotNet suite
+        run: >
+          dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --
+          --filter '*RealisticStoryBenchmarks*' --artifacts artifacts/performance/realistic
       - name: Run exact and over-limit BenchmarkDotNet suite
         run: >
           dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release --no-build --

@@ -26,6 +26,8 @@ stories or maximum file/byte limits. Compile and restore allocated approximately
 Compilation p95 reached 878 ms during a separate run under concurrent build load.
 
 See [methodology, reproduction commands and recorded results](../../tests/README.md#reproducible-performance-budgets).
+That section also describes the realistic story benchmark, which compiles a generated story with branches,
+hubs, loops, conditions and endings; the corpus tiers above are single-path rings that measure size and limits.
 
 ## First GitHub-hosted real-file baseline
 

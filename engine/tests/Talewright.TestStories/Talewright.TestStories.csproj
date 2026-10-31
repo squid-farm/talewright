@@ -3,6 +3,9 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Bogus" Version="35.6.5" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/Talewright.Runtime/Talewright.Runtime.csproj" />
   </ItemGroup>
 </Project>
