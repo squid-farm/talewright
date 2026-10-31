@@ -83,6 +83,10 @@ The compiler exposes parser-backed partial analysis without depending on this
 library. Authoring is excluded from the shipped engine and player packages; see
 [shared authoring analysis](authoring-analysis.md).
 
+`Talewright.Graphs` is an independent directed-graph library. It has no project or
+package references; future analysis projects may reference it without making the graph
+model depend on Talewright types.
+
 ### Dependency graph
 
 Arrows mean "references". Nothing points upward; the engine never knows about the UI.
@@ -516,6 +520,7 @@ One xUnit test project per engine project, under `tests/` (the generic ruleset i
 | `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
 | `Talewright.Talemark.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
 | `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, and sample compilation smoke |
+| `Talewright.Graphs.Tests`    | immutable graph model, iterative graph algorithms, deterministic ordering, and randomized references |
 | `Talewright.Cli.Tests`       | validation output/exit policies, bounded publication and archive contracts |
 | `Talewright.Player.E2E.Tests` | one C#/xUnit suite: production Release web host in Chromium, Firefox, and WebKit plus real Linux Photino; opt-in, outside the root solution |
 
