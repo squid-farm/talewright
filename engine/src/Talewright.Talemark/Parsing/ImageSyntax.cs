@@ -1,4 +1,3 @@
-using System.Text;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
@@ -81,49 +80,32 @@ internal static class ImageSyntax
                 return false;
             }
 
-            var quote = i++;
-            var result = new StringBuilder();
-            var positions = new List<SourceLocation> { source.Locate(i) };
-            while (i < end)
+            var quote = i;
+            var offsets = new List<int>();
+            var literal = QuotedStringSyntax.Read(text, i, end, offsets);
+            i = literal.End;
+            if (literal.Error == QuotedStringSyntax.InvalidEscape)
             {
-                var c = text[i++];
-                if (c == '"')
-                {
-                    value = result.ToString();
-                    RecordPath(i - 1);
-                    return true;
-                }
-
-                if (c == '\\')
-                {
-                    if (i >= end || text[i] is not ('"' or '\\'))
-                    {
-                        Error("Unknown image string escape. Use '\\\"' for a quote or '\\\\' for a backslash.", i - 1);
-                        return false;
-                    }
-
-                    c = text[i++];
-                }
-
-                result.Append(c);
-                positions.Add(source.Locate(i));
+                Error("Unknown image string escape. Use '\\\"' for a quote or '\\\\' for a backslash.", literal.ErrorOffset);
+                return false;
             }
 
-            RecordPath(i);
-            Error("The image argument is missing its closing double quote.", quote);
-            return false;
-
-            void RecordPath(int contentEnd)
+            if (isPath)
+                analysis?.ImagePath(literal.Value,
+                    new(source.Locate(quote + 1), source.Locate(literal.Closed ? i - 1 : i)),
+                    offsets.Select(source.Locate).ToArray());
+            if (literal.Error is not null)
             {
-                if (isPath)
-                    analysis?.ImagePath(result.ToString(),
-                        new(source.Locate(quote + 1), source.Locate(contentEnd)), positions);
+                Error("The image argument is missing its closing double quote.", quote);
+                return false;
             }
+            value = literal.Value;
+            return true;
         }
 
         void Error(string message, int offset) =>
             diagnostics.Error("TW1014", message, source.Locate(offset));
     }
 
-    internal static string Quote(string text) => "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+    internal static string Quote(string text) => QuotedStringSyntax.Quote(text);
 }

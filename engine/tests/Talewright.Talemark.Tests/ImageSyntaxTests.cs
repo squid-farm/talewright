@@ -120,11 +120,11 @@ public sealed class ImageSyntaxTests
     }
 
     [Fact]
-    public void Non_image_string_decoding_is_unchanged()
+    public void Expression_strings_also_decode_literal_backslashes()
     {
         var story = Story("""
             === start
-            {"trailing\"}
+            {"trailing\\"}
             -> END
             """);
         var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);

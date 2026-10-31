@@ -44,19 +44,20 @@ Talemark string delimiter: apostrophes are ordinary text.
 
 Backslash is the escape character everywhere. Inside double quotes, `\"` means a literal double
 quote and `\\` means a literal backslash. In prose, `\{` and `\}` mean literal braces.
-For example, the decided string `"She said \"Go\"."` contains `She said "Go".`.
-Image path and alt arguments implement these escapes today. These rules do not introduce a
+For example, `"She said \"Go\"."` contains `She said "Go".`.
+Expression strings, modifier arguments, and image path/alt arguments all decode these escapes.
+Other escapes, including `\n` and `\u0041`, are errors. These rules do not introduce a
 quoted choice-label spelling or a new formatting feature.
 
-**Today:** expression string literals and the one-many modifier arguments use double quotes, but
-their scanners do not decode `\"` or `\\`. Unclosed strings can produce TW1001, TW2006, or TW1004
-when the enclosing brace cannot be found. Prose already supports `\{` and `\}`. Existing scene
+Write `"C:\\stories"` for the text `C:\stories`. A single backslash inside a Talemark string
+must now be doubled, including in stories written before escape decoding was implemented.
+Malformed expression strings report TW1001; modifier arguments report TW2006. An unclosed
+enclosing brace can additionally produce TW1004. Existing scene
 titles, dialogue and choice labels still use their current unquoted forms:
 `@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`.
 Do not add quotes to those forms expecting them to be removed.
 Image calls use `{image("path", "alt text")}` with literal arguments; both `\"` and `\\`
-are decoded there. Unknown image escapes produce TW1014. This does not change expression-string
-or modifier-argument decoding.
+are decoded there. Unknown image escapes produce TW1014.
 
 The manifest is YAML, not Talemark: YAML quoting and escaping still apply there. A Talemark
 expression stored in YAML must first survive YAML decoding.
@@ -107,8 +108,8 @@ using the quoted-text rules when it is inside syntax.
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
 | `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value. |
 | `(` `)` | Group an expression; also bound `visited`'s scene argument, modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
-| `"` | Bound text literals, modifier string arguments and image arguments. No single-quoted Talemark string form. Only image arguments currently decode the decided escapes. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
-| `\` | Escape character, with the current/decided distinction described above. | During text scanning | `Literal \{braces\}` | Unescaped `{` can cause TW1004; not a numeric or boolean operator. |
+| `"` | Bound text literals, modifier string arguments and image arguments. All decode `\"` and `\\`; no single-quoted Talemark string form. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
+| `\` | Escape a quote or backslash inside strings, or a brace in prose. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |
 | `,` | Separate metadata tags, hub arguments and image arguments today; decided separator for multiple double-quoted modifier arguments. Each modifier defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; multi-argument modifiers are not implemented (TW2006). |
 | Unary `-` | Negate one number. | 2 | `{var:coins + -3}` | TW2003 non-number; TW1002 oversized literal. |
 | `*` `/` | Integer multiplication and division; two numbers. A slash also appears in `{/if}` and `//` comments, with structural meanings. | 3 | `{var:coins / 2}` | TW2003 non-numbers; TW1001 missing operand. |
@@ -236,7 +237,7 @@ The language server uses the shared authoring completion provider.
 | `#one-many("singular", "plural")` | Pronoun selection implemented in [#192](https://github.com/squid-farm/talewright/issues/192); item-name selection in [#308](https://github.com/squid-farm/talewright/issues/308). Uses effective pronoun `agreement` or item `name-agreement`, never quantity. |
 | Item `name-agreement` / `uncountable`, `#a` / `#the` / `#this` / `#that` | Implemented in [#308](https://github.com/squid-farm/talewright/issues/308); explicit helpers retain original-reference grammar through chains, with no object-copy semantics. |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
-| `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197); enclosing braces and choice labels respect quoted delimiters. Expression and modifier string decoding remains separate work under [#184](https://github.com/squid-farm/talewright/issues/184). Prose `\{` and `\}` already work. |
+| `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/modifier strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Prose `\{` and `\}` also work. |
 | Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts; alt is optional and literal, never a substitution template. Quoted paths are asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |

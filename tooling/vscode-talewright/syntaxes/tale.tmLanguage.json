@@ -159,7 +159,10 @@
           "begin": "\"",
           "end": "\"|(?=$)",
           "name": "string.quoted.double.tale",
-          "patterns": [{"match": "\\\\.", "name": "constant.character.escape.tale"}]
+          "patterns": [
+            {"match": "\\\\[\"\\\\]", "name": "constant.character.escape.tale"},
+            {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"}
+          ]
         },
         {"match": "@[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*", "name": "support.function.predicate.tale"},
         {"match": "#[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*", "name": "support.function.modifier.tale"},

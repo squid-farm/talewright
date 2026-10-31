@@ -435,8 +435,8 @@ Custom sets use their required `agreement` setting.
 The selector outputs only the chosen text, not the pronoun. Both strings are
 required (empty strings are allowed); authors control the wording, including
 nonstandard grammar. Other text modifiers can follow it, as with `#capitalize`.
-These quoted arguments do not decode backslash
-escapes. Commas, apostrophes, braces and `#` inside a quoted string are text.
+Inside these quoted arguments, `\"` means a quote and `\\` means a backslash.
+Other backslash escapes are errors. Commas, apostrophes, braces and `#` inside a quoted string are text.
 
 The selector accepts **pronoun and item-name references only**. Item references use
 their `name-agreement`, as described below. Character names, text variables,
@@ -627,9 +627,18 @@ compound assignments require integers. When a chain has no resolvable type (for
 example, two variables only assigned from each other), the compiler reports
 TW2007: add an explicit manifest initial value to establish the type.
 
-The current string-literal escape limitations in the
-[operator registry](talemark-operators.md) still apply; text variables do not add
-quote or backslash decoding. See the runnable
+Talemark strings decode `\"` and `\\` exactly once:
+
+```tale
+~ var:nickname = "Joel \"big buck\" Bennet"
+~ var:path = "C:\\stories"
+```
+
+Those values contain ordinary quotes and a single backslash. Spell every literal backslash
+as `\\`, including when updating older stories. Other escapes such as `\n` are errors;
+this does not change YAML quoting or ordinary dialogue. Punctuation inside the quotes,
+including braces, commas and `#`, remains text. See the
+[operator registry](talemark-operators.md#reader-text-quotes-and-escapes) and runnable
 [TextVariables example](../../examples/TextVariables).
 
 Separate effects with `;` on a `~` line or inside a choice/outcome's `{ }`.

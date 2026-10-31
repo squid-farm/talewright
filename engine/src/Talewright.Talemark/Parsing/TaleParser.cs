@@ -555,6 +555,11 @@ internal sealed partial class TaleParser
                     ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
                         rest.Length, false, _diagnostics, _symbols.ImageSource, _symbols.Analysis);
                 }
+                else if (_discoverEffects is null && unclosedBrace >= 0)
+                {
+                    ExpressionParser.ReportStringErrors(rest[(unclosedBrace + 1)..],
+                        offset => At(indent + unclosedBrace + 2 + offset), _diagnostics);
+                }
                 _diagnostics.Error("TW1011", "Choice label is missing its closing ']'.", At(indent + 1 + pos));
                 return;
             }
@@ -581,6 +586,8 @@ internal sealed partial class TaleParser
                 var end = FindClosingParen(rest, pos);
                 if (end < 0)
                 {
+                    ExpressionParser.ReportStringErrors(rest[(pos + 10)..],
+                        offset => At(column + 10 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[(pos + 10)..], At(column + 10));
                     _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
                     return;
@@ -594,6 +601,8 @@ internal sealed partial class TaleParser
                 var end = InlineParser.FindClosingBrace(rest, pos);
                 if (end < 0)
                 {
+                    ExpressionParser.ReportStringErrors(rest[(pos + 1)..],
+                        offset => At(column + 1 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Effects, rest[(pos + 1)..], At(column + 1));
                     _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
                     return;
@@ -890,7 +899,11 @@ internal sealed partial class TaleParser
         for (var i = open; i < text.Length; i++)
         {
             var c = text[i];
-            if (c == '"')
+            if (inString && c == '\\')
+            {
+                i++;
+            }
+            else if (c == '"')
             {
                 inString = !inString;
             }

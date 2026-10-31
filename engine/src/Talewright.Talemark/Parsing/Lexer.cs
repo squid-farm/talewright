@@ -30,7 +30,8 @@ internal enum TokenKind
     End,
 }
 
-internal readonly record struct Token(TokenKind Kind, string Text, int Offset);
+internal readonly record struct Token(TokenKind Kind, string Text, int Offset,
+    int? StringEnd = null, int? ErrorOffset = null);
 
 /// <summary>
 /// Tokenizer for expressions and effects. Identifiers follow <see cref="IdentifierRules"/>; a dot is only
@@ -78,20 +79,11 @@ internal static class Lexer
 
             if (c == '"')
             {
-                i++;
-                while (i < text.Length && text[i] != '"')
-                {
-                    i++;
-                }
-
-                if (i >= text.Length)
-                {
-                    tokens.Add(new Token(TokenKind.Error, "unterminated string", start));
-                    break;
-                }
-
-                tokens.Add(new Token(TokenKind.String, text[(start + 1)..i], start));
-                i++;
+                var literal = QuotedStringSyntax.Read(text, i, text.Length);
+                tokens.Add(literal.Error is { } error
+                    ? new(TokenKind.Error, error, start, literal.End, literal.ErrorOffset)
+                    : new(TokenKind.String, literal.Value, start, literal.End));
+                i = literal.End;
                 continue;
             }
 
