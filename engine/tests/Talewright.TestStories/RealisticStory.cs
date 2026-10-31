@@ -1,6 +1,4 @@
 using System.Text;
-using Bogus;
-using Bogus.DataSets;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.Testing;
@@ -23,7 +21,6 @@ public sealed record RealisticStoryProfile
     public int ChaptersPerAct { get; init; } = 5;
     public int RumorsPerAct { get; init; } = 3;
     public int CutSceneEveryChapters { get; init; } = 10;
-    public (int Min, int Max) WordsPerScene { get; init; } = (30, 150);
 
     public double OnceStorylet { get; init; } = 0.7;
     public double StoryletRequires { get; init; } = 0.25;
@@ -32,36 +29,24 @@ public sealed record RealisticStoryProfile
     public double BranchSkillCheck { get; init; } = 0.5;
     public double DeathOnRetry { get; init; } = 0.3;
     public double EarlyExit { get; init; } = 0.1;
-    public double ChoiceRequires { get; init; } = 0.2;
-    public double ChoiceEffects { get; init; } = 0.2;
     public double PathDivertOnly { get; init; } = 0.5;
     public double PathCrossOver { get; init; } = 0.25;
-    public double Substitution { get; init; } = 0.35;
-    public double SpeakerLine { get; init; } = 0.4;
-    public double Bold { get; init; } = 0.15;
-    public double InlineIf { get; init; } = 0.1;
 }
 
 /// <summary>
 /// A deterministic generated story with branches that merge at bottlenecks, hubs whose storylets loop back,
 /// shared act rumors, skill check retry loops, deaths, a finale with several endings and cut (unreachable)
 /// scenes. Unlike <see cref="PerformanceCorpus"/>, it measures realistic structure rather than size limits.
+/// This class only decides the structure; <see cref="TaleFaker"/> writes each scene. Every chapter, cut scene,
+/// act and the finale has its own seed, so changing one of them leaves the other files unchanged.
 /// </summary>
 public sealed class RealisticStory
 {
-    private static readonly string[] Requirements =
-        ["player:dex >= 12", "player has rope", "var:gold >= 5", "flag:scouted", "not flag:alarm"];
-    private static readonly string[] Effects =
-        ["var:gold += 5", "set flag:scouted", "set flag:alarm", "give player rope", "var:trust += 1", "player:hp -= 1"];
-    private static readonly string[] Substitutions =
-        ["{player:first-name}", "{guide:first-name}", "{var:gold}", "{item:rope}"];
     private static readonly string[] Skills = ["athletics", "perception", "survival"];
 
     private readonly RealisticStoryProfile _profile;
-    private readonly Randomizer _random;
-    private readonly Lorem _lorem;
+    private readonly TaleCast _cast;
     private readonly Dictionary<string, string> _files = new(StringComparer.Ordinal);
-    private StringBuilder _text = new();
 
     private RealisticStory(RealisticStoryProfile profile)
     {
@@ -71,8 +56,7 @@ public sealed class RealisticStory
         }
 
         _profile = profile;
-        _random = new Randomizer(profile.Seed);
-        _lorem = new Lorem("en") { Random = _random };
+        _cast = TaleCast.Create(profile.Seed);
     }
 
     public IReadOnlyDictionary<string, string> Files => _files;
@@ -101,104 +85,78 @@ public sealed class RealisticStory
 
     private void Generate()
     {
-        _files[StorySource.ManifestFileName] = $$"""
-            game:
-              id: realistic-story
-              title: Realistic story
-              version: 1.0.0
-              start: c0.open
-              seed: {{_profile.Seed}}
-              ruleset:
-                base: generic
-            flags: [scouted, alarm]
-            vars: {chapter: 0, gold: 0, trust: 0}
-            items:
-              rope: { name: coil of rope }
-            characters:
-              player:
-                first-name: Tester
-                stats: { dex: 12 }
-              guide:
-                first-name: Ada
-                stats: { survival: 3 }
-            """;
-
+        _files[StorySource.ManifestFileName] = _cast.Manifest("realistic-story", "c0.open", _profile.Seed);
         for (var chapter = 0; chapter < _profile.Chapters; chapter++)
         {
-            _text = new StringBuilder();
-            Chapter(chapter);
+            var text = new StringBuilder(Chapter(chapter));
+            if ((chapter + 1) % _profile.CutSceneEveryChapters == 0)
+            {
+                var fake = Faker(part: 2, chapter);
+                text.Append(fake.Scene($"c{chapter}.cut", fake.Choice($"c{chapter}.open")));
+                Count(fake);
+                CutSceneCount++;
+            }
+
             var act = chapter / _profile.ChaptersPerAct;
             if (chapter == _profile.Chapters - 1 || (chapter + 1) % _profile.ChaptersPerAct == 0)
             {
-                Rumors(act);
+                text.Append(Rumors(act));
             }
 
-            _files[$"chapters/c{chapter:D3}.tale"] = _text.ToString();
+            _files[$"chapters/c{chapter:D3}.tale"] = text.ToString();
         }
 
-        _text = new StringBuilder();
-        Finale();
-        _files["chapters/finale.tale"] = _text.ToString();
+        _files["chapters/finale.tale"] = Finale();
     }
 
-    private void Chapter(int chapter)
+    private TaleFaker Faker(int part, int index) =>
+        new(unchecked((_profile.Seed * 31 + part) * 1_000_003 + index), _cast);
+
+    private void Count(TaleFaker fake)
     {
+        SceneCount += fake.SceneCount;
+        ProseBytes += fake.ProseBytes;
+    }
+
+    private string Chapter(int chapter)
+    {
+        var fake = Faker(part: 1, chapter);
         var id = $"c{chapter}";
-        Scene($"{id}.open", $"@title {Label()}");
-        _text.Append("~ var:chapter = ").Append(chapter).Append('\n');
-        Prose();
-        Divert($"{id}.s0.fork");
-
-        var segments = _profile.SegmentsPerChapter;
+        var text = new StringBuilder(fake.Scene($"{id}.open", $"~ var:chapter = {chapter}", TaleFaker.Divert($"{id}.s0.fork")));
         var after = chapter < _profile.Chapters - 1 ? $"c{chapter + 1}.open" : "finale";
-        for (var segment = 0; segment < segments; segment++)
+        for (var segment = 0; segment < _profile.SegmentsPerChapter; segment++)
         {
-            var next = segment == 0 ? $"{id}.town" : segment < segments - 1 ? $"{id}.s{segment + 1}.fork" : after;
-            Segment($"{id}.s{segment}", next);
+            var next = segment == 0 ? $"{id}.town"
+                : segment < _profile.SegmentsPerChapter - 1 ? $"{id}.s{segment + 1}.fork"
+                : after;
+            text.Append(Segment(fake, $"{id}.s{segment}", next));
         }
 
-        Hub(id, chapter / _profile.ChaptersPerAct, $"{id}.s1.fork");
-        if ((chapter + 1) % _profile.CutSceneEveryChapters == 0)
-        {
-            Scene($"{id}.cut", $"@title {Label()}");
-            Prose();
-            Choice("Back", $"{id}.open", conditional: false);
-            CutSceneCount++;
-        }
+        text.Append(Hub(fake, id, chapter / _profile.ChaptersPerAct));
+        Count(fake);
+        return text.ToString();
     }
 
-    private void Segment(string id, string next)
+    private string Segment(TaleFaker fake, string id, string next)
     {
-        var lengths = Enumerable.Range(0, Number(_profile.PathsPerBranch)).Select(_ => Number(_profile.PathLength)).ToArray();
-        var check = _random.Bool((float)_profile.BranchSkillCheck);
-        Scene($"{id}.fork");
-        Prose();
-        for (var path = 0; path < lengths.Length; path++)
-        {
-            if (check && path == lengths.Length - 1)
-            {
-                _text.Append("* [").Append(Label()).Append("] skill-check ").Append(_random.ArrayElement(Skills))
-                    .Append(" dc ").Append(_random.Number(10, 15)).Append('\n')
-                    .Append("  success: -> ").Append(id).Append(".p").Append(path).Append(".0\n")
-                    .Append("  failure: -> ").Append(id).Append(".retry\n");
-            }
-            else
-            {
-                Choice(Label(), $"{id}.p{path}.0", conditional: path > 0);
-            }
-        }
+        var text = new StringBuilder();
+        var lengths = Enumerable.Range(0, fake.Between(_profile.PathsPerBranch)).Select(_ => fake.Between(_profile.PathLength)).ToArray();
+        var check = fake.Chance(_profile.BranchSkillCheck);
+        var fork = lengths.Select((_, path) => check && path == lengths.Length - 1
+            ? $"* [{fake.Label()}] skill-check {fake.Pick(Skills)} dc {fake.Bogus.Random.Number(10, 15)}\n" +
+              $"  success: -> {id}.p{path}.0\n  failure: -> {id}.retry"
+            : fake.Choice($"{id}.p{path}.0", gated: path > 0));
+        text.Append(fake.Scene($"{id}.fork", [.. fork]));
 
         if (check)
         {
-            Scene($"{id}.retry", $"@title {Label()}");
-            Prose();
-            Choice("Try again", $"{id}.fork", conditional: false);
-            if (_random.Bool((float)_profile.DeathOnRetry))
+            var death = fake.Chance(_profile.DeathOnRetry);
+            text.Append(death
+                ? fake.Scene($"{id}.retry", fake.Choice($"{id}.fork", "Try again"), fake.Choice($"{id}.death"))
+                : fake.Scene($"{id}.retry", fake.Choice($"{id}.fork", "Try again")));
+            if (death)
             {
-                Choice(Label(), $"{id}.death", conditional: false);
-                Scene($"{id}.death", $"@title {Label()}");
-                Prose();
-                Divert("END");
+                text.Append(fake.Scene($"{id}.death", TaleFaker.Divert("END")));
             }
         }
 
@@ -206,224 +164,125 @@ public sealed class RealisticStory
         {
             for (var step = 0; step < lengths[path]; step++)
             {
-                var target = step == lengths[path] - 1 ? $"{id}.join" : $"{id}.p{path}.{step + 1}";
-                Scene($"{id}.p{path}.{step}");
-                Prose();
-                if (step < lengths[path] - 1 && _random.Bool((float)_profile.EarlyExit))
+                var last = step == lengths[path] - 1;
+                var lines = new List<string>();
+                if (!last && fake.Chance(_profile.EarlyExit))
                 {
-                    _text.Append("{if flag:alarm}\n-> ").Append(id).Append(".join\n{/if}\n");
+                    lines.Add($"{{if flag:alarm}}\n-> {id}.join\n{{/if}}");
                 }
 
-                if (_random.Bool((float)_profile.PathDivertOnly))
+                var target = last ? $"{id}.join" : $"{id}.p{path}.{step + 1}";
+                if (fake.Chance(_profile.PathDivertOnly))
                 {
-                    Divert(target);
-                    continue;
+                    lines.Add(TaleFaker.Divert(target));
+                }
+                else
+                {
+                    lines.Add(fake.Choice(target));
+                    if (lengths.Length > 1 && fake.Chance(_profile.PathCrossOver))
+                    {
+                        var other = (path + fake.Bogus.Random.Number(1, lengths.Length - 1)) % lengths.Length;
+                        lines.Add(fake.Choice($"{id}.p{other}.{Math.Min(step + 1, lengths[other] - 1)}", gated: true));
+                    }
                 }
 
-                Choice(Label(), target, conditional: false);
-                if (lengths.Length > 1 && _random.Bool((float)_profile.PathCrossOver))
-                {
-                    var other = (path + _random.Number(1, lengths.Length - 1)) % lengths.Length;
-                    Choice(Label(), $"{id}.p{other}.{Math.Min(step + 1, lengths[other] - 1)}", conditional: true);
-                }
+                text.Append(fake.Scene($"{id}.p{path}.{step}", [.. lines]));
             }
         }
 
-        Scene($"{id}.join");
-        if (_random.Bool(0.3f))
-        {
-            _text.Append("~ clear flag:alarm\n");
-        }
-
-        Prose();
-        if (_random.Bool())
-        {
-            Divert(next);
-        }
-        else
-        {
-            Choice(Label(), next, conditional: false);
-        }
+        var leave = fake.Chance(0.5) ? TaleFaker.Divert(next) : fake.Choice(next);
+        text.Append(fake.Chance(0.3)
+            ? fake.Scene($"{id}.join", "~ clear flag:alarm", leave)
+            : fake.Scene($"{id}.join", leave));
+        return text.ToString();
     }
 
-    private void Hub(string chapter, int act, string exit)
+    private string Hub(TaleFaker fake, string chapter, int act)
     {
         var hub = $"{chapter}.town";
-        Scene(hub, $"@title {Label()}", $"@hub any({chapter}-town, a{act}-rumor)", $"@hub-limit {Number(_profile.HubLimit)}");
-        Prose();
-        Choice("Move on", exit, conditional: false);
+        var text = new StringBuilder(fake.Scene(
+            hub,
+            $"@hub any({chapter}-town, a{act}-rumor)",
+            $"@hub-limit {fake.Between(_profile.HubLimit)}",
+            fake.Choice($"{chapter}.s1.fork", "Move on")));
 
-        var storylets = Number(_profile.StoryletsPerHub);
+        var storylets = fake.Between(_profile.StoryletsPerHub);
         for (var index = 0; index < storylets; index++)
         {
             var id = $"{hub}.{index}";
-            Storylet(id, $"{chapter}-town");
-            if (_random.Bool((float)_profile.EntryCheck))
+            var lines = Storylet(fake, $"{chapter}-town");
+            if (fake.Chance(_profile.EntryCheck))
             {
-                _text.Append("::: skill-check perception dc 12\nsuccess: { var:gold += 5 }\nfailure: { player:hp -= 1 }\n:::\n");
+                lines.Add("::: skill-check perception dc 12\nsuccess: { var:gold += 5 }\nfailure: { player:hp -= 1 }\n:::");
             }
 
-            Prose();
-            if (_random.Bool((float)_profile.StoryletFollowUp))
+            if (fake.Chance(_profile.StoryletFollowUp))
             {
-                Choice(Label(), $"{id}.after", conditional: false);
-                Scene($"{id}.after");
-                Prose();
-                Divert(hub);
+                lines.Add(fake.Choice($"{id}.after"));
+                text.Append(fake.Scene(id, [.. lines])).Append(fake.Scene($"{id}.after", TaleFaker.Divert(hub)));
                 continue;
             }
 
-            Choice("Back to camp", hub, conditional: false);
-            if (_random.Bool(0.3f))
+            lines.Add(fake.Choice(hub, "Back to camp"));
+            if (fake.Chance(0.3))
             {
-                Choice(Label(), hub, conditional: true);
+                lines.Add(fake.Choice(hub, gated: true));
             }
+
+            text.Append(fake.Scene(id, [.. lines]));
         }
+
+        return text.ToString();
     }
 
-    private void Rumors(int act)
+    private string Rumors(int act)
     {
+        var fake = Faker(part: 3, act);
         var first = act * _profile.ChaptersPerAct;
         var last = Math.Min(_profile.Chapters, first + _profile.ChaptersPerAct) - 1;
+        var text = new StringBuilder();
         for (var index = 0; index < _profile.RumorsPerAct; index++)
         {
-            Storylet($"a{act}.rumor.{index}", $"a{act}-rumor");
-            Prose();
+            var lines = Storylet(fake, $"a{act}-rumor");
             // A rumor is offered by every hub in its act, so it returns to whichever hub the player came from.
-            for (var chapter = first; chapter < last; chapter++)
-            {
-                _text.Append("{if var:chapter == ").Append(chapter).Append("}\n-> c").Append(chapter).Append(".town\n{/if}\n");
-            }
-
-            Divert($"c{last}.town");
+            lines.AddRange(Enumerable.Range(first, last - first).Select(chapter => $"{{if var:chapter == {chapter}}}\n-> c{chapter}.town\n{{/if}}"));
+            lines.Add(TaleFaker.Divert($"c{last}.town"));
+            text.Append(fake.Scene($"a{act}.rumor.{index}", [.. lines]));
         }
+
+        Count(fake);
+        return text.ToString();
     }
 
-    private void Finale()
+    private string Finale()
     {
-        Scene("finale", "@title Finale");
-        Prose();
-        string[] requirements = ["var:trust >= 3", "var:gold >= 20", "player has rope", "flag:scouted"];
+        var fake = Faker(part: 4, 0);
+        string?[] requirements = ["var:trust >= 3", "var:gold >= 20", $"player has {_cast.Items[0].Id}", "flag:scouted", null];
+        var text = new StringBuilder(fake.Scene(
+            "finale",
+            ["@title Finale", .. requirements.Select((requires, index) => fake.Choice($"ending.{index}", requires: requires))]));
         for (var index = 0; index < requirements.Length; index++)
         {
-            _text.Append("* [").Append(Label()).Append("] (requires: ").Append(requirements[index])
-                .Append(") -> ending.").Append(index).Append('\n');
+            text.Append(fake.Scene($"ending.{index}", TaleFaker.Divert("END")));
         }
 
-        Choice(Label(), $"ending.{requirements.Length}", conditional: false);
-        for (var index = 0; index <= requirements.Length; index++)
-        {
-            Scene($"ending.{index}", $"@title {Label()}");
-            Prose();
-            Divert("END");
-        }
+        Count(fake);
+        return text.ToString();
     }
 
-    private void Storylet(string id, string tag)
+    private List<string> Storylet(TaleFaker fake, string tag)
     {
-        var metadata = new List<string> { $"@title {Label()}", $"@tags {tag}", $"@priority {_random.Number(0, 20)}" };
-        if (_random.Bool((float)_profile.OnceStorylet))
+        List<string> metadata = [$"@tags {tag}", $"@priority {fake.Bogus.Random.Number(0, 20)}"];
+        if (fake.Chance(_profile.OnceStorylet))
         {
             metadata.Add("@once");
         }
 
-        if (_random.Bool((float)_profile.StoryletRequires))
+        if (fake.Chance(_profile.StoryletRequires))
         {
-            metadata.Add($"@requires {_random.ArrayElement(Requirements)}");
+            metadata.Add($"@requires {fake.Requirement()}");
         }
 
-        Scene(id, [.. metadata]);
+        return metadata;
     }
-
-    private void Scene(string id, params string[] metadata)
-    {
-        if (_text.Length > 0)
-        {
-            _text.Append('\n');
-        }
-
-        _text.Append("=== ").Append(id).Append('\n');
-        foreach (var line in metadata)
-        {
-            _text.Append(line).Append('\n');
-        }
-
-        _text.Append('\n');
-        SceneCount++;
-    }
-
-    private void Prose()
-    {
-        var start = _text.Length;
-        var words = Number(_profile.WordsPerScene);
-        while (words > 0)
-        {
-            var sentences = _random.Number(2, 4);
-            for (var sentence = 0; sentence < sentences && words > 0; sentence++)
-            {
-                var count = Math.Min(words, _random.Number(6, 14));
-                words -= count;
-                _text.Append(Sentence(count)).Append(' ');
-            }
-
-            if (_random.Bool((float)_profile.InlineIf))
-            {
-                _text.Append("{if flag:scouted}").Append(Sentence(6)).Append("{/if} ");
-            }
-
-            _text.Length--;
-            _text.Append("\n\n");
-        }
-
-        if (_random.Bool((float)_profile.SpeakerLine))
-        {
-            _text.Append("> guide: ").Append(Sentence(_random.Number(5, 12))).Append("\n\n");
-        }
-
-        ProseBytes += _text.Length - start;
-    }
-
-    private string Sentence(int words)
-    {
-        var parts = _lorem.Words(words);
-        if (_random.Bool((float)_profile.Substitution))
-        {
-            parts[_random.Number(0, parts.Length - 1)] = _random.ArrayElement(Substitutions);
-        }
-
-        if (_random.Bool((float)_profile.Bold))
-        {
-            var index = _random.Number(0, parts.Length - 1);
-            parts[index] = $"**{parts[index]}**";
-        }
-
-        var text = string.Join(' ', parts);
-        return char.ToUpperInvariant(text[0]) + text[1..] + ".";
-    }
-
-    private void Choice(string label, string target, bool conditional)
-    {
-        _text.Append("* [").Append(label).Append(']');
-        if (conditional && _random.Bool((float)_profile.ChoiceRequires))
-        {
-            _text.Append(" (requires: ").Append(_random.ArrayElement(Requirements)).Append(')');
-        }
-
-        if (_random.Bool((float)_profile.ChoiceEffects))
-        {
-            _text.Append(" { ").Append(_random.ArrayElement(Effects)).Append(" }");
-        }
-
-        _text.Append(" -> ").Append(target).Append('\n');
-    }
-
-    private void Divert(string target) => _text.Append("-> ").Append(target).Append('\n');
-
-    private string Label()
-    {
-        var text = string.Join(' ', _lorem.Words(_random.Number(2, 4)));
-        return char.ToUpperInvariant(text[0]) + text[1..];
-    }
-
-    private int Number((int Min, int Max) range) => _random.Number(range.Min, range.Max);
 }

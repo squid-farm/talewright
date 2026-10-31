@@ -191,8 +191,13 @@ destination, the scenes form a single ring with no endings, and one hub matches 
 - conditions, effects, items and substitutions;
 - a finale with five endings, and one unreachable cut scene every ten chapters.
 
-`RealisticStoryProfile` holds its ranges and weights. Bogus (pinned) supplies the seeded randomness and
-Lorem prose, so the same profile and seed produce the same files within a Bogus major version. Upgrading
+`RealisticStoryProfile` holds its ranges and weights; `RealisticStory` only decides structure. `TaleFaker`
+(in `Talewright.TestStories`) writes each scene with one call: titles, labels, prose with substitutions,
+speaker lines, inline conditions and choices, all declared by a generated cast's manifest. Other generated
+tests can use it directly, for example `fake.Scene("camp", fake.Choice("END"))`. Bogus (pinned) supplies the
+seeded randomness, names and text. Each chapter, act and the finale has its own seed, so changing one part
+leaves the other files unchanged, and the same profile and seed produce the same files within a Bogus
+major version. Upgrading
 Bogus to a new major version may change the generated story, so treat benchmark results from before and
 after such an upgrade as separate baselines. `RealisticStoryTests` keeps the generated story's shape
 within realistic ranges.

@@ -21,6 +21,37 @@ public sealed class RealisticStoryTests
         Assert.NotEqual(first.Files, reseeded.Files);
     }
 
+    [Fact]
+    public void Changing_one_chapter_leaves_the_other_files_unchanged()
+    {
+        var everyTenth = RealisticStory.Create(Profile);
+        var everyFifth = RealisticStory.Create(Profile with { CutSceneEveryChapters = 5 });
+
+        var changed = everyTenth.Files.Keys.Where(path => everyTenth.Files[path] != everyFifth.Files[path]);
+        Assert.Equal(["chapters/c004.tale", "chapters/c014.tale"], changed.Order());
+    }
+
+    [Fact]
+    public void Tale_faker_writes_a_compilable_scene_in_one_call()
+    {
+        string Generate()
+        {
+            var fake = new TaleFaker(7);
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                [StorySource.ManifestFileName] = fake.Manifest("camp"),
+                ["story.tale"] = fake.Scene("camp", fake.Choice("END", gated: true)),
+            }));
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.Empty(result.Diagnostics);
+            return result.Story!.Scenes.Single().Id.Value;
+        }
+
+        Assert.Equal("camp", Generate());
+        Assert.Equal(new TaleFaker(7).Scene("camp"), new TaleFaker(7).Scene("camp"));
+        Assert.NotEqual(new TaleFaker(7).Scene("camp"), new TaleFaker(8).Scene("camp"));
+    }
+
     [Theory]
     [InlineData(20, 900, 1_100)]
     [InlineData(200, 9_000, 11_000)]
@@ -77,8 +108,8 @@ public sealed class RealisticStoryTests
         Assert.Contains(story.Scenes, scene => scene.Once);
         Assert.InRange(
             generated.ProseBytes / (double)generated.SceneCount,
-            Profile.WordsPerScene.Min * 4,
-            Profile.WordsPerScene.Max * 10);
+            new TaleFaker(0).WordsPerScene.Min * 4,
+            new TaleFaker(0).WordsPerScene.Max * 10);
     }
 
     [Fact]
