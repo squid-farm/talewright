@@ -60,6 +60,11 @@ support** (cross-built and inspected, not yet verified in the installed editor).
 Each package includes its language server, with no .NET installation or source build needed.
 See [Getting started](docs/guide/getting-started.md) for installation and platform details.
 
+![The Lost Relic open in VS Code, with Talemark highlighting and grey previews of each substitution's text](docs/images/vscode-editor.png)
+
+Grey previews show what each `{...}` substitution will say. Hover one to see how it was worked out, and
+mistakes such as an unknown item are underlined as you type.
+
 For **Validate Story**, **Publish Story ZIP** and **Open Author Debugger**, run
 **Talewright: Set Up CLI** in the Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**). These actions use the separate story tools,
 which setup helps you select or install with approval. Ready-to-use CLI downloads for Windows,

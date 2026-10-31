@@ -4,6 +4,8 @@ Write Talewright stories in **Talemark** (`.tale` files), insert common story st
 schema support, shared semantic completion/hover, and live compiler diagnostics without
 running your story.
 
+![A Talemark scene in VS Code with highlighting and grey previews of each substitution's text](https://raw.githubusercontent.com/squid-farm/talewright/main/docs/images/vscode-editor.png)
+
 ## Install
 
 **Optional:** You do not need this extension to write a story. A plain-text editor
@@ -294,6 +296,8 @@ Character names, all pronoun forms (including independent possessives), `#one-ma
 item/faction names, constant literals (text, numbers, booleans, and reputation tiers),
 and explicitly declared variable defaults are supported.
 Hints also work in dialogue, choice labels, and styled or multiline prose.
+
+![A hover card for {item:relic#the} showing the result "the Relic of Ysh", each manipulator step, the item's stat modifiers and its declaration](https://raw.githubusercontent.com/squid-farm/talewright/main/docs/images/vscode-hover.png)
 
 Hover a substitution for its result marked **default**, intermediate manipulator results,
 and existing symbol/syntax help. Hover a character for its authored name and pronoun

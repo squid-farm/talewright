@@ -438,6 +438,10 @@ nonstandard grammar. Other text modifiers can follow it, as with `#capitalize`.
 Inside these quoted arguments, `\"` means a quote and `\\` means a backslash.
 Other backslash escapes are errors. Commas, apostrophes, braces and `#` inside a quoted string are text.
 
+In VS Code, hover a selector to see which wording the story's default pronouns choose:
+
+![A hover on #one-many("has", "have") showing the input "she", the selected result "has" and a description of the agreement selector](../images/vscode-hover-substitution.png)
+
 The selector accepts **pronoun and item-name references only**. Item references use
 their `name-agreement`, as described below. Character names, text variables,
 population and item quantities never select a branch. Unsupported
