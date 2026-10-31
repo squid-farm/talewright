@@ -1,12 +1,13 @@
 # Talewright: the headless engine
 
-Packaging shell for the headless engine: it bundles the six projects below (with their XML docs) into
+Packaging shell for the headless engine: it bundles the seven projects below (with their XML docs) into
 one NuGet package. Source folders, namespaces, assembly names and dependency boundaries are unchanged.
 No Blazor or Photino dependencies.
 
 | Module | Responsibility |
 |---|---|
 | [Core](../../engine/src/Talewright.Core/README.md) | Typed state, events, ruleset contracts, deterministic randomness |
+| [Graphs](../../engine/src/Talewright.Graphs/README.md) | Directed graphs and reachability, used for story analysis |
 | [Rules](../../engine/src/Talewright.Rules/README.md) | Conditions, effects, checks, triggers, storylet selection |
 | [Narrative](../../engine/src/Talewright.Narrative/README.md) | Templates, grammar, presentation-independent documents |
 | [Rulesets.Generic](../../engine/src/Talewright.Rulesets.Generic/README.md) | The default, behaviorally replaceable d20 ruleset |
@@ -14,7 +15,7 @@ No Blazor or Photino dependencies.
 | [Runtime](../../engine/src/Talewright.Runtime/README.md) | Story sessions, frames, event narration |
 
 - **Dependencies:** Markdig and YamlDotNet are package dependencies, not bundled. Component project
-  references are private, so consumers install one package, not six.
+  references are private, so consumers install one package, not seven.
 - **Which package:** `Talewright` for headless tooling or a custom frontend; `Talewright.Player` for the
   supplied Blazor UI (it brings this package in). Story authors need neither.
 - **Build-time validation:** the package includes an opt-in MSBuild target. Set `TalewrightStoryProject`

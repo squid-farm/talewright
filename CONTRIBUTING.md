@@ -68,12 +68,13 @@ the [full branch verification workflow](docs/developer/nx-ci.md#run-the-full-pip
 | Path | What |
 |---|---|
 | `engine/src/Talewright.Core` | State, events, ruleset contracts, deterministic randomness |
+| `engine/src/Talewright.Graphs` | Directed graphs and reachability for story analysis |
 | `engine/src/Talewright.Rules` | Conditions, effects, checks, triggers, storylets |
 | `engine/src/Talewright.Narrative` | Templates, grammar, presentation-independent documents |
 | `engine/src/Talewright.Rulesets.Generic` | Default d20 ruleset |
 | `engine/src/Talewright.Talemark` | Talemark and `story.talewright.yaml` compiler and diagnostics |
 | `engine/src/Talewright.Runtime` | Story sessions, history, saves, author sessions |
-| `packaging/Talewright` | Packaging shell: ships the six projects above as one NuGet package |
+| `packaging/Talewright` | Packaging shell: ships the seven engine projects above as one NuGet package |
 | `player/src/Talewright.Player` | Shared Blazor UI (Razor Class Library) |
 | `apps/desktop` / `apps/web` | Photino desktop host / Blazor WebAssembly host |
 | `tooling/authoring/` | Editor-neutral workspace and project metadata infrastructure |

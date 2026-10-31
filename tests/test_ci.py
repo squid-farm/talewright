@@ -63,7 +63,7 @@ class RepositoryLayoutTests(unittest.TestCase):
 
     def test_engine_package_uses_the_Talemark_compiler_identity(self):
         self.assertIn("Talewright.Talemark", ENGINE_ASSEMBLIES)
-        self.assertEqual(6, len(ENGINE_ASSEMBLIES))
+        self.assertEqual(7, len(ENGINE_ASSEMBLIES))
 
     def test_engine_package_frameworks_match_the_build(self):
         project = ET.parse(self.ROOT / "Directory.Build.props")

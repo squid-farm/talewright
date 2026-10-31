@@ -533,7 +533,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         xml.Descendants("EmbeddedResource").Remove();
         var binaries = Path.GetDirectoryName(typeof(PublishCommand).Assembly.Location)!;
         var references = new XElement("ItemGroup");
-        foreach (var name in new[] { "Talewright.Core", "Talewright.Rules", "Talewright.Narrative",
+        foreach (var name in new[] { "Talewright.Core", "Talewright.Graphs", "Talewright.Rules", "Talewright.Narrative",
             "Talewright.Rulesets.Generic", "Talewright.Talemark", "Talewright.Runtime", "Talewright.Player", "Markdig", "YamlDotNet" })
         {
             var path = Path.Combine(binaries, name + ".dll");

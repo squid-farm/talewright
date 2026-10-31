@@ -15,7 +15,8 @@ namespace Talewright.Talemark.Compilation;
 /// </summary>
 internal static class StoryValidator
 {
-    public static void Validate(StoryManifest manifest, IReadOnlyList<ParsedScene> scenes, DiagnosticBag diagnostics)
+    /// <summary>Returns the reachability TW3009 used, or null when the story has errors.</summary>
+    public static StoryReachability? Validate(StoryManifest manifest, IReadOnlyList<ParsedScene> scenes, DiagnosticBag diagnostics)
     {
         var byId = new Dictionary<SceneId, ParsedScene>();
         foreach (var scene in scenes)
@@ -59,29 +60,20 @@ internal static class StoryValidator
         // unreachable. Only report reachability once the story is otherwise error-free.
         if (!byId.ContainsKey(start) || diagnostics.HasErrors)
         {
-            return;
+            return null;
         }
 
-        var reached = new HashSet<SceneId> { start };
-        var queue = new Queue<SceneId>([start]);
-        while (queue.Count > 0)
-        {
-            foreach (var next in Successors(byId[queue.Dequeue()].Definition, byTag))
-            {
-                if (byId.ContainsKey(next) && reached.Add(next))
-                {
-                    queue.Enqueue(next);
-                }
-            }
-        }
-
+        var definitions = scenes.Select(scene => scene.Definition).ToArray();
+        var reachability = StoryReachability.Find(definitions, StoryDiverts.From(definitions), start);
         foreach (var (scene, location) in scenes)
         {
-            if (!reached.Contains(scene.Id))
+            if (!reachability.IsReached(scene.Id))
             {
                 diagnostics.Warning("TW3009", $"Scene '{scene.Id}' can never be reached from '{start}'.", location);
             }
         }
+
+        return reachability;
     }
 
     private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)
@@ -159,28 +151,6 @@ internal static class StoryValidator
                 }
             }
             reachable &= SceneSteps.CanContinue(step);
-        }
-    }
-
-    private static IEnumerable<SceneId> Successors(SceneDefinition scene, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
-    {
-        foreach (var target in SceneSteps.Targets(scene.Steps))
-        {
-            if (target?.Scene is { } id)
-            {
-                yield return id;
-            }
-        }
-
-        if (scene.Hub is { } hub && SceneSteps.CanContinue(scene.Steps))
-        {
-            foreach (var candidate in StoryDiverts.ResolveTags(hub, byTag))
-            {
-                if (candidate != scene.Id)
-                {
-                    yield return candidate;
-                }
-            }
         }
     }
 }

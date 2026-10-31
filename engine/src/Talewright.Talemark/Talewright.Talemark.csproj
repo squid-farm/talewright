@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Talewright.Core/Talewright.Core.csproj" />
+    <ProjectReference Include="../Talewright.Graphs/Talewright.Graphs.csproj" />
     <ProjectReference Include="../Talewright.Rules/Talewright.Rules.csproj" />
     <ProjectReference Include="../Talewright.Narrative/Talewright.Narrative.csproj" />
     <ProjectReference Include="../Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" />
@@ -11,6 +12,10 @@
     <PackageReference Include="Humanizer.Core" Version="3.0.10" />
     <PackageReference Include="Markdig" Version="1.4.2" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.Talemark.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

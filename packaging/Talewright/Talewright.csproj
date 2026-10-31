@@ -10,6 +10,7 @@
   <ItemGroup>
     <None Include="buildTransitive/Talewright.targets" Pack="true" PackagePath="buildTransitive/" />
     <ProjectReference Include="../../engine/src/Talewright.Core/Talewright.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../../engine/src/Talewright.Graphs/Talewright.Graphs.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../engine/src/Talewright.Rules/Talewright.Rules.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../engine/src/Talewright.Narrative/Talewright.Narrative.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../engine/src/Talewright.Rulesets.Generic/Talewright.Rulesets.Generic.csproj" PrivateAssets="all" />

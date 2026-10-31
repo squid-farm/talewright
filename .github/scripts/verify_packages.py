@@ -17,7 +17,7 @@ from package_version import version_from_tag
 
 PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli", "Talewright.LanguageServer"}
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
-                     ("Core", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
+                     ("Core", "Graphs", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
 ENGINE_FRAMEWORKS = ("net8.0", "net9.0", "net10.0")
 
 
