@@ -71,8 +71,10 @@ public sealed partial class ServerTests
         await client.Open("start.tale", marked.Replace("|", ""), 1);
         Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
         await client.Open(StorySource.ManifestFileName, Manifest + declarations.Replace("\"sunny\"", "0"), 1);
+        await client.Diagnostics(StorySource.ManifestFileName, 1);
         Assert.Contains("(integer)", Text(await Hover(client, "start.tale", marked)));
         await client.Change(StorySource.ManifestFileName, Manifest + declarations, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
         Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
     }
 
@@ -115,21 +117,31 @@ public sealed partial class ServerTests
         const string marked = "=== start\n-> sec|ond";
         await client.Open("start.tale", marked.Replace("|", ""), 1);
         Assert.Equal(JsonValueKind.Null, (await Hover(client, "start.tale", marked)).GetProperty("result").ValueKind);
+        await client.Diagnostics("start.tale", 1);
         File.WriteAllText(client.PathOf("other.tale"), "=== second\n-> END");
         await client.Watch("other.tale", 1);
+        await client.Diagnostics("start.tale", 1);
         Assert.Contains("other.tale:1:5", Text(await Hover(client, "start.tale", marked)));
         await client.Open("other.tale", "// unsaved\n=== second\n-> END", 3);
+        await client.Diagnostics("other.tale", 3);
+        await client.Diagnostics("start.tale", 1);
         Assert.Contains("other.tale:2:5", Text(await Hover(client, "start.tale", marked)));
         await client.Change("other.tale", "=== stale\n-> END", 2);
         Assert.Contains("other.tale:2:5", Text(await Hover(client, "start.tale", marked)));
         await client.Change("other.tale", "=== renamed\n-> END", 4);
+        await client.Diagnostics("other.tale", 4);
+        await client.Diagnostics("start.tale", 1);
         Assert.Equal(JsonValueKind.Null, (await Hover(client, "start.tale", marked)).GetProperty("result").ValueKind);
         File.WriteAllText(client.PathOf("other.tale"), "// disk\n// next\n=== second\n-> END");
         await client.Watch("other.tale", 2);
+        await client.Diagnostics("other.tale", 4);
+        await client.Diagnostics("start.tale", 1);
         await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("other.tale") } });
+        await client.Diagnostics("start.tale", 1);
         Assert.Contains("other.tale:3:5", Text(await Hover(client, "start.tale", marked)));
         File.Delete(client.PathOf("other.tale"));
         await client.Watch("other.tale", 3);
+        await client.Diagnostics("start.tale", 1);
         Assert.Equal(JsonValueKind.Null, (await Hover(client, "start.tale", marked)).GetProperty("result").ValueKind);
     }
 
@@ -152,6 +164,7 @@ public sealed partial class ServerTests
         await client.Open("start.tale", tale.Replace("|", ""), 1);
         Assert.Contains("Flag", Text(await Hover(client, "start.tale", tale)));
         await client.Change(StorySource.ManifestFileName, Manifest, 4);
+        await client.Diagnostics(StorySource.ManifestFileName, 4);
         Assert.Equal(JsonValueKind.Null, (await Hover(client, "start.tale", tale)).GetProperty("result").ValueKind);
     }
 

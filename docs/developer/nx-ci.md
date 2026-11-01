@@ -136,7 +136,7 @@ work. Native Nx inputs model these consumers, not a path classifier in the workf
 | `workflows/build.yml`, `workflows/publish-nuget.yml` | Complete `build` group. CI contract tests additionally exercise the aggregate/orchestration wiring. |
 | `workflows/editor-tooling.yml` | Complete editor group, including both compiler contracts, packaging and installed-editor smoke. |
 | `workflows/tests.yml` | All non-build groups: headless units, browser, Linux, editor and every checks target (including uncovered leaf compilation). |
-| `workflows/publish-samples.yml` | Complete browser group. Deployment remains main-only. |
+| `workflows/publish-samples.yml` | Complete browser group. Deployment is restricted to validated version-tag pushes. |
 | `workflows/performance.yml` | Performance-report Python tests; exhaustive measurements remain scheduled/manual. |
 | `workflows/publish-ui-test-image.yml`, `docker/ui-tests/Dockerfile`, `docker/ui-tests/image.json`, `docker/ui-tests/verify.py` | The independent UI-image workflow still validates candidate builds, browser story loading and the native prerequisite probe. |
 

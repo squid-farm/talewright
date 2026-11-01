@@ -53,7 +53,7 @@ diagnostics are separately identified by source `talewright`.
 
 ## Client contract and workspace behavior
 
-The server supports initialize/initialized, shutdown/exit, full-text
+The server supports initialize/initialized, shutdown/exit, `$/cancelRequest`, full-text
 didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover, textDocument/inlayHint,
 textDocument/definition, and workspace/didChangeWatchedFiles. Documents are the
 root `story.talewright.yaml`, supporting `*.talewright.yaml` files (case-sensitive
@@ -66,13 +66,43 @@ source-aware help with authored-default previews, and definition returns the aut
 signature help, rename, formatting, and autofixes are not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
+### Requests, analysis, and diagnostics
+
+Document and filesystem notifications are handled in arrival order. Semantic
+requests run separately, so a request waiting for whole-story analysis does not
+hold up later notifications or diagnostic publication; responses can arrive out
+of order. Output frames are serialized.
+
+Each story revision has one shared analysis. Diagnostic analysis normally waits
+150 ms for edits to settle; a request needing that revision ends the debounce
+and waits for the same analysis instead of starting another. A running analysis
+is not yet interrupted when superseded, and a newer analysis for that story
+waits for it to finish. Superseded results do not publish diagnostics.
+
+Hover and definition may use the last published analysis when the requested
+document's text is unchanged. Cross-file semantic information may therefore be
+older, but a definition does not use a previous target if that target's text
+has changed or the target has been removed; it waits for current analysis
+instead. Completion and inlay hints always wait for the requested revision.
+
+Cancelling a request with `$/cancelRequest` returns RequestCancelled (`-32800`)
+without cancelling analysis shared by other requests or diagnostics. If a
+request's awaited revision is superseded, it returns ContentModified (`-32801`).
+Shutdown cancels outstanding requests, and exit waits for running work to finish.
+
+For each file, the server publishes at most 200 compiler and lint diagnostics,
+in source order when the limit is exceeded, followed by informational `TWLSP005`
+at the first hidden position with the number omitted. Files at or below the
+limit are unchanged. This limit applies only to editor publication, not compiler
+results or CLI validation and lint output.
+
 ### Semantic completion
 
 The compiler records reference slots using its Talemark parser, expression lexer,
 and existing YAML representation tree. `Talewright.Authoring` matches those slots
 against the current whole-story partial symbol table; clients contain no
-completion rules. A request analyzes the latest accepted document versions if
-the cached snapshot is invalid, without waiting for the diagnostic debounce.
+completion rules. A request uses the shared analysis for the latest accepted
+document versions, without waiting for the diagnostic debounce.
 
 Supported slots include scene diverts (including `END`), speech characters,
 scene metadata directives, skill-check actors/stats, and expression namespaces

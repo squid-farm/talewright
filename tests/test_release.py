@@ -410,6 +410,47 @@ class PublicationSafeguardTests(unittest.TestCase):
         self.assertEqual({"workflow_call"}, set(nuget["on"]))
         self.assertTrue(TAG_PUSH <= condition_terms(nuget["jobs"]["publish"]["if"]))
 
+    def test_pages_deploys_only_a_validated_tag_after_verification_and_smoke(self):
+        samples = self.workflows["publish-samples.yml"]
+        caller = self.build["publish-samples"]
+        self.assertTrue(
+            {"build", "tests", "verification"} <= self.dependencies(self.build, "publish-samples")
+        )
+        self.assertTrue(TAG_PUSH <= condition_terms(caller["if"]))
+
+        selection = next(
+            step for step in self.build["select"]["steps"]
+            if step.get("name") == "Validate public release tag"
+        )
+        self.assertEqual({"github.ref_type == 'tag'"}, condition_terms(selection["if"]))
+        self.assertIn("package_version.py --tag", selection["run"])
+        self.assertIn("--release-json", selection["run"])
+
+        pages = samples["jobs"]
+        build = pages["build"]
+        self.assertTrue(TAG_PUSH <= condition_terms(build["if"]))
+        steps = build["steps"]
+        checkout = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        self.assertEqual("${{ github.sha }}", checkout["with"]["ref"])
+        validation = next(step for step in steps if step.get("name") == "Validate the release tag")
+        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json',
+                      validation["run"])
+        publish = next(step for step in steps if step.get("name") == "Publish the bundled sample player")
+        self.assertIn("publish_samples.py --base-path / --output artifacts/pages", publish["run"])
+        smoke = next(step for step in steps if step.get("name") == "Smoke-test the deployment path")
+        self.assertEqual("/", smoke["env"]["TALEWRIGHT_WEB_BASE_PATH"])
+        self.assertIn("Bundled_sample_assets_work_when_served_at_the_selected_base_path", smoke["run"])
+        smoke_index = steps.index(smoke)
+        artifact_index = next(
+            index for index, step in enumerate(steps)
+            if step.get("uses") == "actions/upload-pages-artifact@v3"
+        )
+        self.assertLess(smoke_index, artifact_index)
+
+        deploy = pages["deploy"]
+        self.assertEqual({"build"}, self.dependencies(pages, "deploy"))
+        self.assertEqual("github-pages", deploy["environment"]["name"])
+
     def test_write_permissions_are_limited_to_known_publication_jobs(self):
         actual = {}
         for name, workflow in self.workflows.items():
