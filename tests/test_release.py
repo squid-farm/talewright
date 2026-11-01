@@ -292,6 +292,26 @@ class PublicationWorkflowTests(unittest.TestCase):
         self.build = (ROOT / ".github/workflows/build.yml").read_text()
         self.nuget = (ROOT / ".github/workflows/publish-nuget.yml").read_text()
 
+    def test_pages_deploys_only_a_validated_tag_after_verification_and_smoke(self):
+        samples = (ROOT / ".github/workflows/publish-samples.yml").read_text()
+        caller = self.build.split("\n  publish-samples:\n", 1)[1].split("\n  cli-archives:", 1)[0]
+        selection = self.build.split("\n  select:\n", 1)[1].split("\n  build:", 1)[0]
+        build = samples.split("\n  build:\n", 1)[1].split("\n  deploy:", 1)[0]
+        deploy = samples.split("\n  deploy:\n", 1)[1]
+        tag_push = "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
+
+        self.assertIn("needs: [build, tests, verification]", caller)
+        self.assertIn(tag_push, caller)
+        self.assertIn(tag_push, build)
+        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json', selection)
+        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json', build)
+        self.assertIn("ref: ${{ github.sha }}", build)
+        self.assertIn("publish_samples.py --base-path / --output artifacts/pages", build)
+        self.assertIn("TALEWRIGHT_WEB_BASE_PATH: /", build)
+        self.assertIn("Bundled_sample_assets_work_when_served_at_the_selected_base_path", build)
+        self.assertLess(build.index("Smoke-test the deployment path"), build.index("actions/upload-pages-artifact"))
+        self.assertIn("needs: build", deploy)
+
     def test_existing_validation_gates_every_publication(self):
         ready = self.build.split("\n  release-ready:\n", 1)[1].split("\n  publish-nuget:", 1)[0]
         self.assertIn("needs: [build, tests, verification, cli-archives, provisional-vsix]", ready)
