@@ -197,18 +197,18 @@ with the default seed 57057. At this baseline it has 946 scenes and 22 source
 files, totaling **709,952 UTF-8 bytes including the manifest**. The harness
 prints these counts each run so corpus changes are visible.
 
-Three post-#416 calibration runs on 2026-11-01 used .NET 10.0.14, Release,
+Four post-#416 calibration runs on 2026-11-01 used .NET 10.0.14, Release,
 `DOTNET_TieredCompilation=0`, Linux Mint 22.3 x64, an AMD Ryzen 9 7940HS,
 AC power and the performance CPU governor. Two ran the already-built harness
-directly; the third used the Nx budget target with one Nx worker and
+directly; two used the Nx budget target with one Nx worker and
 `DOTNET_PROCESSOR_COUNT=1` to bound build resources. Each run warmed once and
 measured seven iterations; the maximum below is the largest sample across all
-three runs.
+four runs.
 
 | Workload | Median allocated bytes, across runs | Maximum allocated bytes | Maximum B/source byte | Ceiling B/source byte |
 |---|---:|---:|---:|---:|
-| Compile | 34,781,064–34,794,024 | 34,794,072 | 49.01 | 55 |
-| Analyze | 60,046,632–60,072,480 | 60,072,816 | 84.62 | 95 |
+| Compile | 34,781,064–34,795,208 | 34,795,216 | 49.01 | 55 |
+| Analyze | 60,046,632–60,073,688 | 60,073,984 | 84.62 | 95 |
 
 For the rounded historical #393 figures of 33.5/57.4 “MB”, the same denominator
 would yield approximately 47.19/80.85 B/source byte if MB meant decimal
