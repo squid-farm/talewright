@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Talewright.Core.Identity;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
@@ -19,6 +21,26 @@ public sealed class RealisticStoryTests
 
         Assert.Equal(first.Files, second.Files);
         Assert.NotEqual(first.Files, reseeded.Files);
+    }
+
+    [Fact]
+    public void Reference_corpus_preserves_its_files_and_bytes()
+    {
+        var story = RealisticStory.Create(Profile);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var (path, text) in story.Files.OrderBy(file => file.Key, StringComparer.Ordinal))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(path));
+            hash.AppendData([0]);
+            hash.AppendData(Encoding.UTF8.GetBytes(text));
+            hash.AppendData([0]);
+        }
+
+        Assert.Equal(22, story.Files.Count);
+        Assert.Equal(946, story.SceneCount);
+        Assert.Equal(709_952, story.Files.Values.Sum(text => Encoding.UTF8.GetByteCount(text)));
+        Assert.Equal("9607B69F2BE21F12A82B8CA02AEAF649D08BDA2BA9CAB7B64DFB7414107C2DB9",
+            Convert.ToHexString(hash.GetHashAndReset()));
     }
 
     [Fact]

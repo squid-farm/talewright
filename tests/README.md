@@ -46,6 +46,38 @@ The reported lifecycle counts do not measure retained browser memory or prove
 immediate bitmap reclamation. This work does not introduce runtime checkpoints,
 change save/replay, or activate the broader deferred attribution/device work.
 
+## Generating test stories
+
+`Talewright.TestStories` contains reusable `IfFaker`, `ChoiceFaker`,
+`SceneFaker`, `DivertFaker`, `ExpressionFaker`, `EffectFaker`,
+`SubstitutionFaker` and markup and skill-check helpers. They construct
+deterministic Talemark fragments; the seeded `TaleFaker` composes them into
+scenes and prose. `ManifestFaker` builds manifest YAML and returns references
+for declared variables, flags, characters and items. Its sections follow the
+order in which each kind of declaration is first added:
+
+```csharp
+var manifest = new ManifestFaker("test-story", "Test story", "start", 42);
+var count = manifest.Number("count", 0);
+var ready = manifest.Flag("ready");
+manifest.Character("player", "Tester");
+
+var tale = string.Join('\n',
+    SceneFaker.Header("start"),
+    IfFaker.Block(ready, SubstitutionFaker.Variable(count)),
+    ChoiceFaker.Create("END", "Leave"));
+var source = new StorySource(new Dictionary<string, string>
+{
+    [StorySource.ManifestFileName] = manifest.Build(),
+    ["main.tale"] = tale,
+});
+```
+
+Fragments such as `IfFaker.Open` and `MarkupFaker.LinkOpen` can also form
+deliberately incomplete inputs. Keep literals when the exact syntax, diagnostic
+range or malformed YAML is the behavior under test. `RealisticStory` and
+`PerformanceCorpus` use these helpers while preserving their reference corpus bytes.
+
 ## Fast .NET tests
 
 ```bash
