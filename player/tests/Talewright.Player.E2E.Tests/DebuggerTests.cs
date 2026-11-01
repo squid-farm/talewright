@@ -60,7 +60,24 @@ public sealed class DebuggerTests
             await driver.PressAsync("Down");
             snapshot = await WaitFor(driver, "Hub offers: 1");
             Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
-            Assert.Contains("Hub offer of Well (well) via #fire, once, if flag:lit", snapshot.Content);
+            const string hubOffer = "Hub offer of Well (well) via #fire, once, if flag:lit";
+            Assert.Contains(hubOffer, snapshot.Content);
+            await driver.PressAsync("Tab");
+            await driver.PressAsync("Tab");
+            snapshot = await WaitFor(driver, hubOffer);
+            Assert.Equal(hubOffer, Focused(snapshot).Name);
+
+            var tale = Path.Combine(root, "main.tale");
+            var source = await File.ReadAllTextAsync(tale);
+            await File.WriteAllTextAsync(tale, source.Replace("@title Orphan", "@title Updated orphan"));
+            snapshot = await WaitFor(driver, "Updated orphan (orphan), unreachable");
+            Assert.Equal(hubOffer, Focused(snapshot).Name);
+            await File.WriteAllTextAsync(tale, source);
+            snapshot = await WaitFor(driver, "Orphan (orphan), unreachable");
+            Assert.Equal(hubOffer, Focused(snapshot).Name);
+            await driver.ActivateAsync(hubOffer);
+            snapshot = await WaitFor(driver, "Well (well), once, requires flag:lit");
+            Assert.Equal("Well (well), once, requires flag:lit", Focused(snapshot).Name);
 
             await driver.PressAsync("End");
             snapshot = await WaitFor(driver, "Diverts: 0");
@@ -78,6 +95,17 @@ public sealed class DebuggerTests
             await driver.ActivateAsync("Hub offer of Well (well) via #fire, once, if flag:lit");
             snapshot = await WaitFor(driver, "Well (well), once, requires flag:lit");
             Assert.Equal("Well (well), once, requires flag:lit", Focused(snapshot).Name);
+
+            await driver.PressAsync("Up");
+            snapshot = await WaitFor(driver, "Hub offers: 1");
+            Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
+            await driver.PressAsync("Tab");
+            await driver.PressAsync("Tab");
+            snapshot = await WaitFor(driver, hubOffer);
+            Assert.Equal(hubOffer, Focused(snapshot).Name);
+            await File.WriteAllTextAsync(tale, source.Replace("@tags fire", "@tags frost"));
+            snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 0 hub offers, 2 unreachable.");
+            Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
 
             await driver.ActivateAsync("Play");
             snapshot = await WaitFor(driver, "Scene setup");

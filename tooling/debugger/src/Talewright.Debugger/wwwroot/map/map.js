@@ -495,9 +495,16 @@ window.talewrightMap = (() => {
     state.groupSizes = new Map(view.groups.map(group => [group.id, view.nodes.filter(node => node.group === group.id).length]));
     state.highlighted = null;
     if (!state.nodes.has(state.selected)) state.selected = null;
+    const activeElement = document.activeElement;
+    const focusedItemId = state.details.contains(activeElement) ? activeElement.dataset.item : null;
     buildSceneButtons(state);
     if (state.selected) showDetails(state, state.nodes.get(state.selected));
     else state.details.replaceChildren(element("p", null, "Select a scene to list its diverts and hub offers."));
+    if (focusedItemId) {
+      const replacement = Array.from(state.details.querySelectorAll("button[data-item]"))
+        .find(button => button.dataset.item === focusedItemId);
+      (replacement || state.buttons.get(state.selected) || state.buttons.values().next().value)?.focus();
+    }
     const scenes = view.nodes.filter(node => !node.end && !node.stub).length;
     const diverts = view.nodes.reduce((sum, node) => sum + node.items.filter(item => !item.hubOffer).length, 0);
     const offers = view.nodes.reduce((sum, node) => sum + node.items.length, 0) - diverts;
