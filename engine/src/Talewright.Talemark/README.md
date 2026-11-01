@@ -82,6 +82,14 @@ whatever its condition.
   and item names, held items, visited scenes and named predicates. A named predicate is marked opaque
   because its C# implementation cannot be inspected.
 
+## Story map (Preview)
+
+`StoryMap.Build(story)` returns the map for a successfully compiled story. `Nodes` contains every scene
+in declaration order followed by END; each node includes its id, title, tags and reachability.
+`Diverts` and `HubOffers` reuse the compiler's shared map data and include the conditions described above.
+Reachability follows diverts and hub offers only. It does not evaluate conditions or decide whether a
+player can meet them.
+
 ## Files
 
 | File | Contents |
@@ -100,6 +108,7 @@ whatever its condition.
 | `Model/SceneStep.cs` | Ordered scene steps (prose, effect, `{if}` branch, choice, divert, check), each with a stable `step:<line>:<column>` ID and source span, plus the shared `SceneSteps` walks for successors and reachability. |
 | `Model/StoryDiverts.cs` | Preview: `StoryDiverts`, every divert and hub offer in a story. |
 | `Model/StoryCondition.cs` | Preview: formatted conditions and unique state reads for diverts and hub offers. |
+| `Model/StoryMap.cs` | Preview: public read-only story map API with nodes and reachability. |
 | `Diagnostics/Diagnostic.cs` | `Diagnostic`, `DiagnosticSeverity`, `SourceLocation`, `DiagnosticBag`. |
 
 ## Diagnostic codes
