@@ -1,0 +1,11 @@
+game:
+  id: trigger-once-yes
+  title: Trigger once yes
+  start: beginning
+characters:
+  player: {first-name: Ada}
+triggers:
+  - id: greeting
+    when: "true"
+    do: set flag:greeted
+    once: yes

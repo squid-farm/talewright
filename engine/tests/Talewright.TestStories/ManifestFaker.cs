@@ -16,7 +16,7 @@ public sealed class ManifestFaker
 
     private static readonly HashSet<string> YamlKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
-        "true", "false", "null", "yes", "no", "on", "off",
+        "true", "false", "null",
     };
 
     private readonly List<TaleFlagRef> _flags = [];

@@ -162,6 +162,32 @@ public sealed class TalemarkFakerTests
     }
 
     [Fact]
+    public void Manifest_quotes_only_core_yaml_keywords()
+    {
+        var manifest = new ManifestFaker("faker-test", "yes", "start");
+        manifest.Character("player", "on");
+        manifest.Text("answer", "true");
+        manifest.Text("nothing", "null");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = manifest.Build(),
+            ["main.tale"] = $"{SceneFaker.Header("start")}\n{DivertFaker.To("END")}",
+        });
+
+        var compiled = StoryCompiler.Compile(source);
+
+        Assert.Contains("title: yes", manifest.Build());
+        Assert.Contains("first-name: on", manifest.Build());
+        Assert.Contains("answer: \"true\"", manifest.Build());
+        Assert.Contains("nothing: \"null\"", manifest.Build());
+        Assert.True(compiled.Success, string.Join(Environment.NewLine, compiled.Diagnostics));
+        Assert.Equal("yes", compiled.Story!.Title);
+        Assert.Equal("on", compiled.Story.World.Characters[EntityId.Player].FirstName);
+        Assert.Equal("true", compiled.Story.World.TextVariables[new("answer")]);
+        Assert.Equal("null", compiled.Story.World.TextVariables[new("nothing")]);
+    }
+
+    [Fact]
     public void Manifest_supports_the_full_nonnegative_seed_range()
     {
         var manifest = new ManifestFaker("faker-test", "Faker test", "start", ulong.MaxValue);
