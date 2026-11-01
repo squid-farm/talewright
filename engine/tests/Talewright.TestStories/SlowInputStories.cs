@@ -20,93 +20,103 @@ public enum SlowInputShape
 /// <summary>Reproducible authoring inputs for measuring and testing known slow shapes.</summary>
 public static class SlowInputStories
 {
-    private const string Manifest = """
-        game:
-          id: slow-input
-          title: Slow input
-          start: start
-          seed: 42
-        characters:
-          player: {first-name: Tester}
-        vars: {x: 1, count: 1}
-        flags: [ready]
-        """;
-
     public static StorySource Create(SlowInputShape shape, int size)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
 
-        var tale = new StringBuilder("=== start\n");
+        var manifest = new ManifestFaker("slow-input", "Slow input", "start", 42);
+        manifest.Character("player", "Tester");
+        var x = manifest.Number("x", 1);
+        var count = manifest.Number("count", 1);
+        var ready = manifest.Flag("ready");
+        var tale = new StringBuilder().Append(SceneFaker.Header("start")).Append('\n');
         switch (shape)
         {
             case SlowInputShape.ParagraphLines:
+            {
+                var line = $"Line {SubstitutionFaker.Variable(x)}. {IfFaker.Inline(ready, "shown")}.\n";
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append("Line {var:x}. {if flag:ready}shown{/if}.\n");
+                    tale.Append(line);
                 }
                 break;
+            }
             case SlowInputShape.InlineSubstitutions:
+            {
+                var substitution = SubstitutionFaker.Variable(count);
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append("{var:count}");
+                    tale.Append(substitution);
                 }
                 tale.Append('\n');
                 break;
+            }
             case SlowInputShape.NestedConditions:
+            {
+                var open = IfFaker.Open(ready);
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append("{if flag:ready}\n");
+                    tale.Append(open).Append('\n');
                 }
                 tale.Append("Nested.\n");
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append("{/if}\n");
+                    tale.Append(IfFaker.Close).Append('\n');
                 }
                 break;
+            }
             case SlowInputShape.UnmatchedEmphasis:
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append("*a ");
+                    tale.Append(MarkupFaker.EmphasisOpen("a "));
                 }
                 tale.Append('\n');
                 break;
             case SlowInputShape.UnclosedLinks:
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append("[a](");
+                    tale.Append(MarkupFaker.LinkOpen("a"));
                 }
                 tale.Append('\n');
                 break;
             case SlowInputShape.Choices:
             case SlowInputShape.ChoicesWithExpressions:
+            {
+                var requires = shape == SlowInputShape.ChoicesWithExpressions ? ExpressionFaker.GreaterThan(count, 0) : null;
+                var effect = shape == SlowInputShape.ChoicesWithExpressions ? EffectFaker.Increase(count, 1) : null;
                 for (var i = 0; i < size; i++)
                 {
-                    tale.Append(CultureInfo.InvariantCulture, $"* [Choice {i}]");
-                    if (shape == SlowInputShape.ChoicesWithExpressions)
-                    {
-                        tale.Append(" (requires: var:count > 0) { var:count += 1 }");
-                    }
-                    tale.Append(" -> END\n");
+                    var label = $"Choice {i.ToString(CultureInfo.InvariantCulture)}";
+                    tale.Append(ChoiceFaker.Create("END", label, requires, effect)).Append('\n');
                 }
                 break;
+            }
             case SlowInputShape.NestedParentheses:
-                tale.Append("~ var:count = ").Append('(', size).Append('1').Append(')', size).Append('\n');
+            {
+                var expression = string.Concat(
+                    new string(ExpressionFaker.OpenParenthesis, size), "1",
+                    new string(ExpressionFaker.CloseParenthesis, size));
+                tale.Append(EffectFaker.Line(EffectFaker.Assign(count, expression))).Append('\n');
                 break;
+            }
             case SlowInputShape.UnaryPrefixes:
-                tale.Append("~ var:count = ").Append('-', size).Append("1\n");
+            {
+                var expression = new string(ExpressionFaker.UnaryMinus, size) + "1";
+                tale.Append(EffectFaker.Line(EffectFaker.Assign(count, expression))).Append('\n');
                 break;
+            }
             default:
                 throw new ArgumentOutOfRangeException(nameof(shape), shape, "Unknown slow-input shape.");
         }
 
         if (shape is not (SlowInputShape.Choices or SlowInputShape.ChoicesWithExpressions))
         {
-            tale.Append("-> END\n");
+            tale.Append(DivertFaker.To("END")).Append('\n');
         }
 
         return new StorySource(new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = Manifest,
+            [StorySource.ManifestFileName] = manifest.Build(),
             ["main.tale"] = tale.ToString(),
         });
     }

@@ -79,6 +79,8 @@ Fragments such as `IfFaker.Open` and `MarkupFaker.LinkOpen` can also form
 deliberately incomplete inputs. Keep literals when the exact syntax, diagnostic
 range or malformed YAML is the behavior under test. `RealisticStory` and
 `PerformanceCorpus` use these helpers while preserving their reference corpus bytes.
+The console benchmark's scene loops and slow-input ladder also use the shared
+fakers; fingerprint tests protect their reference inputs byte for byte.
 
 The generated-fixture migration covers shared compiler/runtime stories,
 Talemark compilation and reachability fixtures, runtime session/authoring,
@@ -93,9 +95,9 @@ Intentional literal exceptions remain in parser/compiler tests that assert exact
 Talemark syntax, malformed source, diagnostics or source ranges; YAML/schema
 tests that exercise authored YAML syntax; and editor/LSP tests that mutate
 precise source text or assert its positions. The checked-in story corpus and
-performance fixtures also remain byte-stable. Supporting YAML files in tests
-for split configuration remain explicit where the file boundary and fragment
-placement are the behavior under test. Shared narrative examples remain
+byte-sensitive performance fixtures remain byte-stable. Supporting YAML files
+in tests for split configuration remain explicit where the file boundary and
+fragment placement are the behavior under test. Shared narrative examples remain
 authored source where their prose or feature combinations are the scenario;
 native debugger source/map tests retain literals when displayed source lines
 are asserted. JavaScript schema/VS Code tests keep their own static YAML
@@ -170,6 +172,24 @@ not parse those crash-prone shapes until #396. These timing reports are not
 proof of linear CPU work; fixing issues should add deterministic work or
 structural assertions and allocation bounds where applicable.
 
+One post-#416 `--slow-input-stress` run on the calibration machine described
+below reported these median / p95 times (milliseconds) and median allocations:
+
+| Shape | 1,000 elements ms | 10,000 elements ms | 10,000 allocated MiB |
+|---|---:|---:|---:|
+| Paragraph lines | 27.10 / 28.77 | 1,913.86 / 1,991.37 | 118.07 |
+| Inline substitutions | 2.68 / 4.96 | 72.61 / 89.40 | 50.73 |
+| Nested conditions | 84.31 / 88.55 | 16,763.70 / 21,888.45 | 2,368.15 |
+| Unmatched emphasis | 3.78 / 4.32 | 397.96 / 404.11 | 6.59 |
+| Unclosed links | 4.14 / 4.52 | 384.24 / 400.72 | 6.61 |
+| Choices | 3.06 / 4.49 | 72.60 / 74.79 | 39.99 |
+| Choices with expressions | 32.62 / 34.63 | 382.72 / 402.56 | 241.60 |
+
+This is one local run, not a CI timing gate; its p95 is the maximum of seven
+samples. The harness took 189.83 seconds, and `time` reported a maximum process
+RSS of about 852 MiB. Per-operation allocations are cumulative and must not be
+confused with RSS.
+
 #### Realistic allocation ceilings and ratchet
 
 The reference is `RealisticStory.Create(new RealisticStoryProfile { Chapters = 20 }).ToSource()`
@@ -177,15 +197,18 @@ with the default seed 57057. At this baseline it has 946 scenes and 22 source
 files, totaling **709,952 UTF-8 bytes including the manifest**. The harness
 prints these counts each run so corpus changes are visible.
 
-Two calibration runs on 2026-11-01 used .NET 10.0.14, Release,
+Three post-#416 calibration runs on 2026-11-01 used .NET 10.0.14, Release,
 `DOTNET_TieredCompilation=0`, Linux Mint 22.3 x64, an AMD Ryzen 9 7940HS,
-AC power and the performance CPU governor. Each run warmed once and measured
-seven iterations; the maximum below is the largest sample across both runs.
+AC power and the performance CPU governor. Two ran the already-built harness
+directly; the third used the Nx budget target with one Nx worker and
+`DOTNET_PROCESSOR_COUNT=1` to bound build resources. Each run warmed once and
+measured seven iterations; the maximum below is the largest sample across all
+three runs.
 
 | Workload | Median allocated bytes, across runs | Maximum allocated bytes | Maximum B/source byte | Ceiling B/source byte |
 |---|---:|---:|---:|---:|
-| Compile | 34,780,024–34,785,736 | 34,800,848 | 49.02 | 55 |
-| Analyze | 60,062,280–60,066,344 | 60,071,096 | 84.61 | 95 |
+| Compile | 34,781,064–34,794,024 | 34,794,072 | 49.01 | 55 |
+| Analyze | 60,046,632–60,072,480 | 60,072,816 | 84.62 | 95 |
 
 For the rounded historical #393 figures of 33.5/57.4 “MB”, the same denominator
 would yield approximately 47.19/80.85 B/source byte if MB meant decimal
@@ -196,11 +219,12 @@ Any later PR in #392 that lowers a workload's allocation must lower its ceiling
 to the new measured maximum plus 10% (rounding up as needed). No PR may raise a
 ceiling without the lead's approval.
 
-On the calibration machine, two baseline harness runs took 6.83–7.13 seconds
-and the new default took 15.06–20.15 seconds, an added 7.9–13.3 seconds locally.
-The harness prints its own total excluding build for comparison in CI; the local
-delta is not a measurement of hosted CI. The target is about 30 seconds or
-less of additional default CI work.
+On the calibration machine, two already-built runs of the current main harness
+took 7.34–7.86 seconds, and two runs of the updated default took 15.66–18.32
+seconds, an additional 7.8–11.0 seconds locally. These wall times include the
+`dotnet run` host, not a build; the harness also prints its own total excluding
+build for comparison in CI. The local delta is not a measurement of hosted CI.
+The target is about 30 seconds or less of additional default CI work.
 
 Budgets deliberately allow slower CI/author machines: compile 100/1,000 scenes
 500 ms and 10,000 scenes 2.5 s; ZIP load+compile 750 ms / 3 s; startup 250 ms;

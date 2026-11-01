@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
@@ -7,6 +10,52 @@ namespace Talewright.Talemark.Tests;
 
 public sealed class SlowInputStoriesTests
 {
+    [Theory]
+    [InlineData(SlowInputShape.ParagraphLines, 41_166, "737ABC47E5BD491AA0F45930FF916A0B765B13956083A695A315B121162C8055")]
+    [InlineData(SlowInputShape.InlineSubstitutions, 11_167, "30CF5996FC9C085D26B5A461DD961FD870AEBF7DC4884B3C8580985C98C7C062")]
+    [InlineData(SlowInputShape.NestedConditions, 22_174, "355D6230101072136C8087BC4CA5F75834D258C064F142B1A7AB75DD2070A8A8")]
+    [InlineData(SlowInputShape.UnmatchedEmphasis, 3_167, "E81CA2347132C809944BC1432F3D28036FD137F6D8EF099814BDFC186AAF5E92")]
+    [InlineData(SlowInputShape.UnclosedLinks, 4_167, "2D9B68D53911BD882088BA164EC3213076ABD25E7CA24689B7D5BD0145B6B644")]
+    [InlineData(SlowInputShape.Choices, 22_049, "053FD46B604D0ACAA1B25F5F15B4F22B5F87323046FDE820FA2FFEFC7FEBA37E")]
+    [InlineData(SlowInputShape.ChoicesWithExpressions, 67_049, "E40444CDCF6441CDF91F84224A153CD3F8378EB6D1E254B7160F94A78114DECA")]
+    [InlineData(SlowInputShape.NestedParentheses, 2_182, "BC9E630280B9216D3D844B5B8758885957F34B878B851F9D81411299ACCEA390")]
+    [InlineData(SlowInputShape.UnaryPrefixes, 1_182, "7C72C05219A6D9588E23CCBFA04EEA4BA81257F40742FEC355B23930E4FF0C97")]
+    public void Reference_ladder_preserves_source_bytes(SlowInputShape shape, int expectedBytes, string expectedHash)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var size in new[] { 1, 5, 10, 20, 50, 100, 500, 1_000, 10_000 })
+        {
+            var source = SlowInputStories.Create(shape, size);
+            if (size == 1_000)
+            {
+                Assert.Equal("""
+                    game:
+                      id: slow-input
+                      title: Slow input
+                      start: start
+                      seed: 42
+                    characters:
+                      player: {first-name: Tester}
+                    vars: {x: 1, count: 1}
+                    flags: [ready]
+                    """, source.Files[StorySource.ManifestFileName]);
+                Assert.Equal(expectedBytes, PerformanceSource.Utf8ByteCount(source));
+            }
+
+            hash.AppendData(Encoding.UTF8.GetBytes(size.ToString(CultureInfo.InvariantCulture)));
+            hash.AppendData([0]);
+            foreach (var (path, text) in source.Files.OrderBy(file => file.Key, StringComparer.Ordinal))
+            {
+                hash.AppendData(Encoding.UTF8.GetBytes(path));
+                hash.AppendData([0]);
+                hash.AppendData(Encoding.UTF8.GetBytes(text));
+                hash.AppendData([0]);
+            }
+        }
+
+        Assert.Equal(expectedHash, Convert.ToHexString(hash.GetHashAndReset()));
+    }
+
     [Theory]
     [InlineData(SlowInputShape.ParagraphLines)]
     [InlineData(SlowInputShape.InlineSubstitutions)]

@@ -25,37 +25,12 @@ Console.WriteLine("Workload\tMedian ms\tp95 ms\tMedian allocated MiB\tMedian all
 var failed = false;
 foreach (var scenes in new[] { 100, 1_000, 10_000 })
 {
-    var tale = new StringBuilder();
-    for (var i = 0; i < scenes; i++)
-    {
-        tale.Append(CultureInfo.InvariantCulture, $$"""
-            === scene.{{i}}
-            @title Scene {{i}}
-            ~ var:visits += 1
-            Hello, {player:first-name}. Visits: {var:visits}.
-            * [Next] -> scene.{{(i + 1) % scenes}}
-
-            """);
-    }
-
-    var source = new StorySource(new Dictionary<string, string>
-    {
-        ["story.talewright.yaml"] = """
-            game:
-              id: benchmark
-              title: Benchmark
-              start: scene.0
-              seed: 42
-            characters:
-              player: {first-name: Tester}
-            """,
-        ["main.tale"] = tale.ToString(),
-    });
+    var source = BenchmarkStories.CreateSceneLoop(scenes);
     var sourceBytes = PerformanceSource.Utf8ByteCount(source);
     var cold = Stopwatch.StartNew();
     var story = Compile(source);
     cold.Stop();
-    Console.WriteLine($"First compile {scenes} scenes: {cold.Elapsed.TotalMilliseconds:F2} ms; {Encoding.UTF8.GetByteCount(tale.ToString())} Talemark bytes");
+    Console.WriteLine($"First compile {scenes} scenes: {cold.Elapsed.TotalMilliseconds:F2} ms; {Encoding.UTF8.GetByteCount(source.Files[BenchmarkStories.TaleFileName])} Talemark bytes");
     Measure($"Compile {scenes} scenes", () => Compile(source), scenes == 10_000 ? 2_500 : 500, sourceBytes);
     MeasureAnalysis($"Analyze {scenes} scenes", source, scenes);
     using var zip = new MemoryStream();
