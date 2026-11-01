@@ -219,7 +219,10 @@ remain YAML or Talemark, not JSON.
    the command cursor.
 3. Click **Export SVG**, choose a destination, and open the saved file. Expect the full map, labels,
    hub-offer group and the current route presentation. Repeat with **Export PNG** and confirm the image
-   includes the whole layout rather than only the visible/panned area.
+   includes the whole layout rather than only the visible/panned area. This is the only check of the
+   native save dialog: automated native tests bypass it with a test-only override, because UI automation
+   cannot accept a system save dialog. Also confirm **Cancel** leaves no file, and a name typed without
+   an extension saves with `.svg` or `.png`.
 4. In a disposable copy of a sufficiently large story, attempt a PNG export whose layout exceeds the
    documented 8192-pixel edge or 16,777,216-pixel total limit. Expect an explicit error before canvas
    allocation that recommends SVG; SVG export remains available.

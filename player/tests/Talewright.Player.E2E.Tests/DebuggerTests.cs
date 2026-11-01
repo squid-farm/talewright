@@ -700,6 +700,12 @@ public sealed class DebuggerTests
         }
     }
 
+    // Test-only deviation: exports bypass the native save dialog. See MapExportDialog.TestExportDirectoryVariable.
+    private static string MapExportPath(string extension) =>
+        Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_MAP_EXPORT_DIRECTORY")
+            ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py."),
+            $"story-map.{extension}");
+
     [Fact]
     public async Task Native_map_exports_full_svg_and_png_with_the_current_run()
     {
@@ -709,8 +715,8 @@ public sealed class DebuggerTests
         Directory.CreateDirectory(root);
         var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
             "debugger-map-export", Guid.NewGuid().ToString("N"));
-        var svgPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Path.GetFileName(root) + ".svg");
-        var pngPath = Path.ChangeExtension(svgPath, ".png");
+        var svgPath = MapExportPath("svg");
+        var pngPath = MapExportPath("png");
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
@@ -741,7 +747,7 @@ public sealed class DebuggerTests
             await driver.ActivateAsync("Map");
             await WaitFor(driver, "Current scene: next");
 
-            await driver.SaveFileAsync("Export SVG", svgPath);
+            await driver.ClickAsync("Export SVG");
             await WaitFor(driver, $"Saved map to {svgPath}");
             var svg = System.Xml.Linq.XDocument.Load(svgPath);
             XNamespace svgNamespace = "http://www.w3.org/2000/svg";
@@ -754,7 +760,7 @@ public sealed class DebuggerTests
             Assert.Contains(labels, label => label.Contains("CURRENT", StringComparison.Ordinal));
             Assert.Contains(labels, label => label.Contains("#fire", StringComparison.Ordinal));
 
-            await driver.SaveFileAsync("Export PNG", pngPath);
+            await driver.ClickAsync("Export PNG");
             await WaitFor(driver, $"Saved map to {pngPath}");
             var png = await File.ReadAllBytesAsync(pngPath);
             Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png[..8]);
@@ -783,8 +789,8 @@ public sealed class DebuggerTests
         Directory.CreateDirectory(root);
         var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
             "debugger-map-large", Guid.NewGuid().ToString("N"));
-        var pngPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Path.GetFileName(root) + ".png");
-        var svgPath = Path.ChangeExtension(pngPath, ".svg");
+        var pngPath = MapExportPath("png");
+        var svgPath = MapExportPath("svg");
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
@@ -797,10 +803,10 @@ public sealed class DebuggerTests
             await WaitFor(driver, "Scene setup");
             await driver.ActivateAsync("Map");
             await WaitFor(driver, "120 scenes, 120 diverts");
-            await driver.SaveFileAsync("Export PNG", pngPath);
+            await driver.ClickAsync("Export PNG");
             await WaitFor(driver, "Map export failed:", "Use SVG export");
             Assert.False(File.Exists(pngPath));
-            await driver.SaveFileAsync("Export SVG", svgPath);
+            await driver.ClickAsync("Export SVG");
             await WaitFor(driver, $"Saved map to {svgPath}");
             var labels = XDocument.Load(svgPath).Descendants(XName.Get("text", "http://www.w3.org/2000/svg"))
                 .Select(node => node.Value).ToArray();

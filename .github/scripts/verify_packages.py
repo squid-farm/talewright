@@ -16,6 +16,15 @@ from zipfile import ZipFile
 from package_version import version_from_tag
 
 PACKAGE_IDS = {"Talewright", "Talewright.Player", "Talewright.Cli", "Talewright.LanguageServer"}
+MAP_ASSETS = ("debug-assets/map/map.js",
+              "debug-assets/map/vendor/THIRD-PARTY-NOTICES.md",
+              "debug-assets/map/vendor/d3-zoom.bundle.min.js",
+              "debug-assets/map/vendor/elk-api.js",
+              "debug-assets/map/vendor/elk-worker.min.js",
+              *[f"debug-assets/map/vendor/licenses/{name}"
+                for name in ("elkjs.md", "d3-color.txt", "d3-dispatch.txt", "d3-drag.txt", "d3-ease.txt",
+                             "d3-interpolate.txt", "d3-selection.txt", "d3-timer.txt", "d3-transition.txt",
+                             "d3-zoom.txt")])
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Graphs", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
 ENGINE_FRAMEWORKS = ("net8.0", "net9.0", "net10.0")
@@ -89,15 +98,7 @@ def verify(directory, version):
                                   "tools/net10.0/any/Talewright.Debugger.dll",
                                   "tools/net10.0/any/debug-assets/index.html",
                                   "tools/net10.0/any/debug-assets/debugger.css",
-                                  "tools/net10.0/any/debug-assets/map/map.js",
-                                  "tools/net10.0/any/debug-assets/map/vendor/THIRD-PARTY-NOTICES.md",
-                                  "tools/net10.0/any/debug-assets/map/vendor/d3-zoom.bundle.min.js",
-                                  "tools/net10.0/any/debug-assets/map/vendor/elk-api.js",
-                                  "tools/net10.0/any/debug-assets/map/vendor/elk-worker.min.js",
-                                  *[f"tools/net10.0/any/debug-assets/map/vendor/licenses/{name}"
-                                    for name in ("elkjs.md", "d3-color.txt", "d3-dispatch.txt", "d3-drag.txt",
-                                                 "d3-ease.txt", "d3-interpolate.txt", "d3-selection.txt",
-                                                 "d3-timer.txt", "d3-transition.txt", "d3-zoom.txt")],
+                                  *[f"tools/net10.0/any/{asset}" for asset in MAP_ASSETS],
                                   "tools/net10.0/any/debug-assets/_content/Talewright.Player/talewright.css",
                                   "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
                                   "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
