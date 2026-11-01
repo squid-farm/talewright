@@ -129,7 +129,7 @@ public sealed class DebuggerTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
-                "game:\n  id: map-route-debug\n  title: Map Route Debug\n  start: start\nvars: {visits: 0}\n");
+                "game:\n  id: map-route-debug\n  title: Map Route Debug\n  start: start\nvars: {visits: 0}\ncharacters:\n  player: {first-name: Tester}\n");
             await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
                 === start
                 @title The gate
@@ -146,6 +146,7 @@ public sealed class DebuggerTests
             await driver.StartAsync(root);
             await WaitFor(driver, "Scene setup");
             await driver.ActivateAsync("Map");
+            await WaitFor(driver, "2 scenes, 2 diverts, 0 hub offers, 0 unreachable.");
             await driver.PressAsync("Tab");
             await driver.PressAsync("Tab");
             var snapshot = await WaitFor(driver, "Diverts: 1");
