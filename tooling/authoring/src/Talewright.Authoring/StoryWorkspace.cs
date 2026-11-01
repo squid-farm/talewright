@@ -6,31 +6,29 @@ namespace Talewright.Authoring;
 
 public sealed record AnalysisUpdate(long Revision, StoryAnalysis Analysis, bool Published);
 
-/// <summary>One analysis shared by callers interested in the same workspace revision.</summary>
+/// <summary>One cancellable analysis shared by callers interested in the same workspace revision.</summary>
 public sealed class SharedAnalysis
 {
     private readonly TaskCompletionSource _start = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _superseded = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly CancellationTokenSource _cancellation = new();
     private Task<AnalysisUpdate>? _completion;
-    private int _retainSupersededResult;
 
-    internal SharedAnalysis(long revision, bool retainSupersededResult)
-    {
-        Revision = revision;
-        if (retainSupersededResult) _retainSupersededResult = 1;
-    }
+    internal SharedAnalysis(long revision) => Revision = revision;
 
     public long Revision { get; }
     public Task<AnalysisUpdate> Completion => _completion ?? throw new InvalidOperationException("Analysis has not been scheduled.");
     public Task Superseded => _superseded.Task;
+    internal CancellationToken CancellationToken => _cancellation.Token;
 
     /// <summary>Ends the debounce without creating another analysis.</summary>
     public void StartImmediately() => _start.TrySetResult();
 
     internal Task StartRequested => _start.Task;
-    internal bool RetainSupersededResult => Volatile.Read(ref _retainSupersededResult) != 0;
-    internal void RetainResult() => Interlocked.Exchange(ref _retainSupersededResult, 1);
-    internal void Supersede() => _superseded.TrySetResult();
+    internal void Supersede()
+    {
+        if (_superseded.TrySetResult()) _cancellation.Cancel();
+    }
     internal void SetCompletion(Task<AnalysisUpdate> completion) => _completion = completion;
 }
 
@@ -67,7 +65,7 @@ public sealed class StoryWorkspace
         _options = options ?? CompilerOptions.Default;
         _missingMetadata = requiresProjectMetadata && options is null;
         _analyze = analyze ?? ((snapshot, compilerOptions, token) =>
-            Task.Run(() => StoryAnalyzer.Analyze(snapshot, compilerOptions), token));
+            Task.Run(() => StoryAnalyzer.Analyze(snapshot, compilerOptions, token), token));
         _delay = delay ?? Task.Delay;
         _analysisGate = analysisGate ?? new SemaphoreSlim(1, 1);
     }
@@ -158,20 +156,20 @@ public sealed class StoryWorkspace
     }
 
     /// <summary>
-    /// Debounces then analyzes an immutable whole-story snapshot. Superseded results are returned with
-    /// Published=false and never replace Current. Cancellation propagates to the caller.
+    /// Debounces then analyzes an immutable whole-story snapshot. Superseded analysis is cancelled;
+    /// the caller's token cancels only its wait and never the work shared with other callers.
     /// </summary>
     public Task<AnalysisUpdate> AnalyzeAsync(TimeSpan debounce, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<AnalysisUpdate>(cancellationToken);
-        return GetSharedAnalysis(debounce, retainSupersededResult: true).Completion.WaitAsync(cancellationToken);
+        return GetSharedAnalysis(debounce).Completion.WaitAsync(cancellationToken);
     }
 
     /// <summary>
     /// Returns the single scheduled analysis for the latest revision. Superseded work that has not
     /// started may be skipped; a caller can stop waiting without cancelling the shared analysis.
     /// </summary>
-    public SharedAnalysis ScheduleAnalysis(TimeSpan debounce) => GetSharedAnalysis(debounce, retainSupersededResult: false);
+    public SharedAnalysis ScheduleAnalysis(TimeSpan debounce) => GetSharedAnalysis(debounce);
 
     internal bool HasText(string path, string text)
     {
@@ -184,20 +182,19 @@ public sealed class StoryWorkspace
         }
     }
 
-    private SharedAnalysis GetSharedAnalysis(TimeSpan debounce, bool retainSupersededResult)
+    private SharedAnalysis GetSharedAnalysis(TimeSpan debounce)
     {
         lock (_gate)
         {
             if (_shared is { } existing)
             {
-                if (retainSupersededResult) existing.RetainResult();
                 if (debounce == TimeSpan.Zero) existing.StartImmediately();
                 return existing;
             }
             var files = new Dictionary<string, string>(_disk, StringComparer.Ordinal);
             foreach (var (path, document) in _open) files[path] = document.Text;
             var snapshot = new StorySource(files, _imagePaths);
-            var shared = new SharedAnalysis(_revision, retainSupersededResult);
+            var shared = new SharedAnalysis(_revision);
             shared.SetCompletion(_current is { } current
                 ? Task.FromResult(new AnalysisUpdate(_revision, current, true))
                 : RunSharedAnalysisAsync(shared, snapshot, debounce));
@@ -211,9 +208,7 @@ public sealed class StoryWorkspace
         await Task.Yield();
         using var delayCancellation = new CancellationTokenSource();
         var delay = _delay(debounce, delayCancellation.Token);
-        var ready = shared.RetainSupersededResult
-            ? await Task.WhenAny(delay, shared.StartRequested).ConfigureAwait(false)
-            : await Task.WhenAny(delay, shared.StartRequested, shared.Superseded).ConfigureAwait(false);
+        var ready = await Task.WhenAny(delay, shared.StartRequested, shared.Superseded).ConfigureAwait(false);
         if (ready != delay)
         {
             delayCancellation.Cancel();
@@ -221,30 +216,13 @@ public sealed class StoryWorkspace
             catch (OperationCanceledException) when (delayCancellation.IsCancellationRequested) { }
         }
         else await delay.ConfigureAwait(false);
-        if (shared.Superseded.IsCompleted && !shared.RetainSupersededResult)
-            throw new OperationCanceledException("Analysis revision was superseded before it started.");
-
-        using var gateCancellation = new CancellationTokenSource();
-        var enter = _analysisGate.WaitAsync(gateCancellation.Token);
-        if (!shared.RetainSupersededResult &&
-            await Task.WhenAny(enter, shared.Superseded).ConfigureAwait(false) == shared.Superseded &&
-            !enter.IsCompletedSuccessfully)
-        {
-            gateCancellation.Cancel();
-            try
-            {
-                await enter.ConfigureAwait(false);
-                _analysisGate.Release();
-            }
-            catch (OperationCanceledException) when (gateCancellation.IsCancellationRequested) { }
-            throw new OperationCanceledException("Analysis revision was superseded before it started.");
-        }
-        await enter.ConfigureAwait(false);
+        shared.CancellationToken.ThrowIfCancellationRequested();
+        await _analysisGate.WaitAsync(shared.CancellationToken).ConfigureAwait(false);
         try
         {
-            if (shared.Superseded.IsCompleted && !shared.RetainSupersededResult)
-                throw new OperationCanceledException("Analysis revision was superseded before it started.");
-            var analysis = await _analyze(snapshot, _options, CancellationToken.None).ConfigureAwait(false);
+            shared.CancellationToken.ThrowIfCancellationRequested();
+            var analysis = await _analyze(snapshot, _options, shared.CancellationToken).ConfigureAwait(false);
+            shared.CancellationToken.ThrowIfCancellationRequested();
             if (_missingMetadata)
             {
                 analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5001",

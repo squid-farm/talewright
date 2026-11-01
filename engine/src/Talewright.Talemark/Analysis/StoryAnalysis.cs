@@ -72,12 +72,17 @@ public sealed class StoryAnalysis
 public static class StoryAnalyzer
 {
     /// <summary>Reuses compiler parsing/checks, retaining authoring data even when no runtime story can be built.</summary>
-    public static StoryAnalysis Analyze(StorySource source, CompilerOptions? options = null)
+    public static StoryAnalysis Analyze(StorySource source, CompilerOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         options ??= CompilerOptions.Default;
         var collector = new AnalysisCollector(source, options);
-        var result = StoryCompiler.CompileForAnalysis(source, options, collector);
-        return new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
+        var result = StoryCompiler.CompileForAnalysis(source, options, collector, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var analysis = new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
+        cancellationToken.ThrowIfCancellationRequested();
+        return analysis;
     }
 }
 
@@ -422,8 +427,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             Symbols.Add(new(name, AuthoringSymbolKind.Ruleset, "ruleset", null));
     }
 
-    internal void DiscoverWithoutManifest()
+    internal void DiscoverWithoutManifest(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var world = new WorldDefinition(new Talewright.Core.Rulesets.RulesetBuilder("analysis-recovery").Build(),
             [], [], [], [], new Dictionary<VarId, int>());
         var symbols = new StorySymbols
@@ -435,9 +441,12 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         };
         foreach (var (file, text) in source.TaleFiles)
         {
-            TaleParser.Discover(file, text, symbols, (_, _) => { }, Scene);
+            cancellationToken.ThrowIfCancellationRequested();
+            TaleParser.Discover(file, text, symbols, (_, _) => { }, Scene, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
-            TaleParser.Parse(file, text, symbols, diagnostics);
+            TaleParser.Parse(file, text, symbols, diagnostics, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
                 diagnostic.Code is "TW2010" or "TW2011" or "TW2012" or "TW2013" or "TW2014"));
         }

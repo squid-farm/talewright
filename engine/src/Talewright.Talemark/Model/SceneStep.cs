@@ -41,53 +41,76 @@ public static class SceneSteps
 
     /// <summary>Potentially executable steps, without evaluating state-dependent conditions.</summary>
     public static IEnumerable<SceneStep> Reachable(IEnumerable<SceneStep> steps) =>
-        ReachableWithBlocks(steps, []).Select(entry => entry.Step);
+        Reachable(steps, null);
+
+    internal static IEnumerable<SceneStep> Reachable(IEnumerable<SceneStep> steps, CancellationCheckpoint? checkpoint) =>
+        ReachableWithBlocks(steps, [], checkpoint).Select(entry => entry.Step);
 
     private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks)> ReachableWithBlocks(
-        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition> blocks)
+        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition> blocks, CancellationCheckpoint? checkpoint)
     {
         foreach (var step in steps)
         {
+            checkpoint?.Check();
             yield return (step, blocks);
             if (step is ConditionalStep branch)
             {
                 if (branch.Condition is not BoolLiteral { Value: false })
-                    foreach (var child in ReachableWithBlocks(branch.Then, [.. blocks, new(branch.Condition, false)]))
+                    foreach (var child in ReachableWithBlocks(branch.Then, [.. blocks, new(branch.Condition, false)], checkpoint))
                         yield return child;
                 if (branch.Condition is not BoolLiteral { Value: true })
-                    foreach (var child in ReachableWithBlocks(branch.Else, [.. blocks, new(branch.Condition, true)]))
+                    foreach (var child in ReachableWithBlocks(branch.Else, [.. blocks, new(branch.Condition, true)], checkpoint))
                         yield return child;
             }
-            if (!CanContinue(step))
+            if (!CanContinue(step, checkpoint))
                 yield break;
         }
     }
 
-    public static bool CanContinue(IEnumerable<SceneStep> steps) => steps.All(CanContinue);
+    public static bool CanContinue(IEnumerable<SceneStep> steps) => CanContinue(steps, null);
 
-    public static bool CanContinue(SceneStep step) => step switch
+    internal static bool CanContinue(IEnumerable<SceneStep> steps, CancellationCheckpoint? checkpoint)
     {
-        DivertStep => false,
-        CheckStep check => check.Check.Success.Divert is null || check.Check.Failure.Divert is null,
-        ConditionalStep { Condition: BoolLiteral literal } branch =>
-            CanContinue(literal.Value ? branch.Then : branch.Else),
-        ConditionalStep branch => CanContinue(branch.Then) || CanContinue(branch.Else),
-        ProseStep or EffectStep or ChoiceStep => true,
-        _ => throw new NotSupportedException($"Unknown scene step '{step.GetType().Name}'."),
-    };
+        foreach (var step in steps)
+            if (!CanContinue(step, checkpoint)) return false;
+        return true;
+    }
+
+    public static bool CanContinue(SceneStep step) => CanContinue(step, null);
+
+    internal static bool CanContinue(SceneStep step, CancellationCheckpoint? checkpoint)
+    {
+        checkpoint?.Check();
+        return step switch
+        {
+            DivertStep => false,
+            CheckStep check => check.Check.Success.Divert is null || check.Check.Failure.Divert is null,
+            ConditionalStep { Condition: BoolLiteral literal } branch =>
+                CanContinue(literal.Value ? branch.Then : branch.Else, checkpoint),
+            ConditionalStep branch => CanContinue(branch.Then, checkpoint) || CanContinue(branch.Else, checkpoint),
+            ProseStep or EffectStep or ChoiceStep => true,
+            _ => throw new NotSupportedException($"Unknown scene step '{step.GetType().Name}'."),
+        };
+    }
 
     public static IEnumerable<DivertTarget> Targets(IEnumerable<SceneStep> steps) =>
-        DivertLines(steps).Select(line => line.Target);
+        Targets(steps, null);
+
+    internal static IEnumerable<DivertTarget> Targets(IEnumerable<SceneStep> steps, CancellationCheckpoint? checkpoint) =>
+        DivertLines(steps, checkpoint).Select(line => line.Target);
 
     /// <summary>
     /// Preview. Every divert on a line of <paramref name="scene"/> that can run, in source order. Conditional diverts
     /// are listed whatever their condition.
     /// </summary>
-    public static IEnumerable<StoryDivert> Diverts(SceneDefinition scene)
+    public static IEnumerable<StoryDivert> Diverts(SceneDefinition scene) => Diverts(scene, null);
+
+    internal static IEnumerable<StoryDivert> Diverts(SceneDefinition scene, CancellationCheckpoint? checkpoint)
     {
         var conditionsByStep = new Dictionary<string, StoryCondition>(StringComparer.Ordinal);
-        return DivertLines(scene.Steps).Select((line, order) =>
+        return DivertLines(scene.Steps, checkpoint).Select((line, order) =>
         {
+            checkpoint?.Check();
             var choice = (line.Step as ChoiceStep)?.Choice;
             var id = $"{scene.Id.Value}/{line.Step.Id}" + line.Outcome switch
             {
@@ -97,9 +120,12 @@ public static class SceneSteps
             };
             if (!conditionsByStep.TryGetValue(line.Step.Id, out var condition))
             {
-                var conditions = line.Blocks.Select(block => block.InElse
-                    ? new UnaryExpr(UnaryOp.Not, block.Condition)
-                    : block.Condition).ToList();
+                var conditions = new List<Expr>();
+                foreach (var block in line.Blocks)
+                {
+                    checkpoint?.Check();
+                    conditions.Add(block.InElse ? new UnaryExpr(UnaryOp.Not, block.Condition) : block.Condition);
+                }
                 if (choice?.Requires is { } requires)
                     conditions.Add(requires);
                 condition = StoryCondition.FromExpressions(conditions);
@@ -111,9 +137,10 @@ public static class SceneSteps
     }
 
     private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks, DivertKind Kind,
-        SkillCheckOutcome? Outcome, DivertTarget Target)> DivertLines(IEnumerable<SceneStep> steps)
+        SkillCheckOutcome? Outcome, DivertTarget Target)> DivertLines(IEnumerable<SceneStep> steps,
+        CancellationCheckpoint? checkpoint)
     {
-        foreach (var (step, blocks) in ReachableWithBlocks(steps, []))
+        foreach (var (step, blocks) in ReachableWithBlocks(steps, [], checkpoint))
         {
             switch (step)
             {

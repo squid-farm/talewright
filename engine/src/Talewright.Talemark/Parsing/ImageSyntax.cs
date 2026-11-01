@@ -16,8 +16,9 @@ internal static class ImageSyntax
     }
 
     internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
-        StorySymbols symbols)
+        StorySymbols symbols, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(symbols.ImageSource);
         var text = source.Text;
         var i = start;
@@ -73,7 +74,11 @@ internal static class ImageSyntax
 
         void SkipSpace()
         {
-            while (i < end && char.IsWhiteSpace(text[i])) i++;
+            while (i < end && char.IsWhiteSpace(text[i]))
+            {
+                if ((i & 1023) == 0) cancellationToken.ThrowIfCancellationRequested();
+                i++;
+            }
         }
 
         bool ReadString(out string value)
@@ -88,6 +93,7 @@ internal static class ImageSyntax
             var quote = i;
             var offsets = new List<int>();
             var literal = QuotedStringSyntax.Read(text, i, end, offsets);
+            cancellationToken.ThrowIfCancellationRequested();
             i = literal.End;
             if (literal.Error == QuotedStringSyntax.InvalidEscape)
             {
@@ -123,8 +129,14 @@ internal static class ImageSyntax
             var templateText = new StringBuilder();
             var plain = new StringBuilder();
             var locations = new List<SourceLocation>();
+            var nextCancellationCheck = i;
             while (i < end)
             {
+                if (i >= nextCancellationCheck)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    nextCancellationCheck = i + Math.Min(1024, end - i);
+                }
                 var c = text[i];
                 if (c == '"')
                 {
@@ -132,9 +144,10 @@ internal static class ImageSyntax
                     locations.Add(source.Locate(i));
                     decoded = plain.ToString();
                     var authored = templateText.ToString();
-                    if (HasTemplate(authored))
+                    if (HasTemplate(authored, cancellationToken))
                     {
-                        var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics, allowImages: false);
+                        var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics,
+                            allowImages: false, cancellationToken: cancellationToken);
                         if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
                     }
 
@@ -196,11 +209,16 @@ internal static class ImageSyntax
                     endAt--;
                 }
 
-                if (!HasTemplate(authored)) return;
+                if (!HasTemplate(authored, cancellationToken)) return;
                 var mapped = new List<SourceLocation>(count + 1);
-                for (var index = 0; index < count; index++) mapped.Add(locations[index]);
+                for (var index = 0; index < count; index++)
+                {
+                    if ((index & 1023) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    mapped.Add(locations[index]);
+                }
                 mapped.Add(source.Locate(endAt));
-                InlineParser.Parse(SourceText.Mapped(authored, mapped), symbols, new DiagnosticBag(), allowImages: false);
+                InlineParser.Parse(SourceText.Mapped(authored, mapped), symbols, new DiagnosticBag(),
+                    allowImages: false, cancellationToken: cancellationToken);
             }
         }
 
@@ -208,10 +226,16 @@ internal static class ImageSyntax
             diagnostics.Error("TW1014", message, source.Locate(offset));
     }
 
-    private static bool HasTemplate(string text)
+    private static bool HasTemplate(string text, CancellationToken cancellationToken)
     {
+        var nextCancellationCheck = 0;
         for (var i = 0; i < text.Length; i++)
         {
+            if (i >= nextCancellationCheck)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                nextCancellationCheck = i + Math.Min(1024, text.Length - i);
+            }
             if (text[i] == '\\' && i + 1 < text.Length && text[i + 1] is '{' or '}')
             {
                 i++;

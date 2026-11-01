@@ -98,7 +98,9 @@ public sealed class StoryDiverts
     /// <summary>The story's diverts and hub offers, built once per story.</summary>
     public static StoryDiverts From(StoryDefinition story) => story.Reachability.Diverts;
 
-    public static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes)
+    public static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes) => From(scenes, null);
+
+    internal static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes, CancellationCheckpoint? checkpoint)
     {
         var order = new Dictionary<SceneId, int>();
         var scenesById = new Dictionary<SceneId, SceneDefinition>();
@@ -106,10 +108,12 @@ public sealed class StoryDiverts
         var byTag = new Dictionary<string, HashSet<SceneId>>(StringComparer.Ordinal);
         foreach (var scene in scenes)
         {
+            checkpoint?.Token.ThrowIfCancellationRequested();
             order.TryAdd(scene.Id, order.Count);
             scenesById.TryAdd(scene.Id, scene);
             foreach (var tag in scene.Tags)
             {
+                checkpoint?.Check();
                 if (!byTag.TryGetValue(tag, out var ids))
                     byTag[tag] = ids = [];
                 ids.Add(scene.Id);
@@ -119,11 +123,13 @@ public sealed class StoryDiverts
         var hubOffers = new List<HubOffer>();
         foreach (var scene in scenes)
         {
+            checkpoint?.Token.ThrowIfCancellationRequested();
             // A hub only offers scenes when its lines can reach the end of the scene.
-            if (scene.Hub is not { } hub || !SceneSteps.CanContinue(scene.Steps))
+            if (scene.Hub is not { } hub || !SceneSteps.CanContinue(scene.Steps, checkpoint))
                 continue;
-            foreach (var offered in ResolveTags(hub, byTag).Where(id => id != scene.Id).OrderBy(id => order[id]))
+            foreach (var offered in OrderedOffers(ResolveTags(hub, byTag, checkpoint), scene.Id, order, checkpoint))
             {
+                checkpoint?.Check();
                 var offeredScene = scenesById[offered];
                 if (!conditionsByScene.TryGetValue(offered, out var condition))
                 {
@@ -136,29 +142,122 @@ public sealed class StoryDiverts
             }
         }
 
-        return new StoryDiverts(scenes.SelectMany(SceneSteps.Diverts).ToArray(), hubOffers);
+        var diverts = new List<StoryDivert>();
+        foreach (var scene in scenes)
+        {
+            checkpoint?.Token.ThrowIfCancellationRequested();
+            diverts.AddRange(SceneSteps.Diverts(scene, checkpoint));
+        }
+        checkpoint?.Token.ThrowIfCancellationRequested();
+        var result = new StoryDiverts(diverts.ToArray(), hubOffers);
+        checkpoint?.Token.ThrowIfCancellationRequested();
+        return result;
     }
 
-    internal static IEnumerable<SceneId> ResolveTags(StoryletTags query, IReadOnlyDictionary<string, HashSet<SceneId>> byTag)
+    private static IEnumerable<SceneId> OrderedOffers(IEnumerable<SceneId> matches, SceneId hub,
+        IReadOnlyDictionary<SceneId, int> order, CancellationCheckpoint? checkpoint)
     {
-        var sets = query.Tags.Select(tag => byTag.GetValueOrDefault(tag)).ToArray();
-        if (query.MatchAll && sets.Any(set => set is null))
-            return [];
+        if (checkpoint is null)
+        {
+            foreach (var id in matches.Where(id => id != hub).OrderBy(id => order[id]))
+                yield return id;
+            yield break;
+        }
 
-        var candidates = sets.OfType<HashSet<SceneId>>().OrderBy(set => set.Count).ToArray();
-        if (candidates.Length == 0)
-            return [];
-        if (candidates.Length == 1)
-            return candidates[0];
+        // A heap preserves declaration order while allowing cancellation during large offer sets.
+        var ordered = new PriorityQueue<SceneId, int>();
+        foreach (var id in matches)
+        {
+            checkpoint.Check();
+            if (id != hub) ordered.Enqueue(id, order[id]);
+        }
+        while (ordered.TryDequeue(out var id, out _))
+        {
+            checkpoint.Check();
+            yield return id;
+        }
+    }
 
-        var result = new HashSet<SceneId>(candidates[0]);
+    internal static IEnumerable<SceneId> ResolveTags(StoryletTags query,
+        IReadOnlyDictionary<string, HashSet<SceneId>> byTag, CancellationCheckpoint? checkpoint = null)
+    {
+        var sets = new List<HashSet<SceneId>>();
+        foreach (var tag in query.Tags)
+        {
+            checkpoint?.Check();
+            if (byTag.TryGetValue(tag, out var set))
+                sets.Add(set);
+            else if (query.MatchAll)
+                return [];
+        }
+
+        if (sets.Count == 0)
+            return [];
+        if (sets.Count == 1)
+            return CheckMatches(sets[0], checkpoint);
+
+        var candidates = OrderedSets(sets, checkpoint);
+
+        var result = new HashSet<SceneId>();
+        foreach (var id in candidates[0])
+        {
+            checkpoint?.Check();
+            result.Add(id);
+        }
         foreach (var set in candidates.Skip(1))
         {
-            if (query.MatchAll)
+            if (checkpoint is null && query.MatchAll)
                 result.IntersectWith(set);
-            else
+            else if (checkpoint is null)
                 result.UnionWith(set);
+            else if (query.MatchAll)
+            {
+                var intersection = new HashSet<SceneId>();
+                foreach (var id in result)
+                {
+                    checkpoint.Check();
+                    if (set.Contains(id)) intersection.Add(id);
+                }
+                result = intersection;
+            }
+            else
+            {
+                foreach (var id in set)
+                {
+                    checkpoint.Check();
+                    result.Add(id);
+                }
+            }
+        }
+        return CheckMatches(result, checkpoint);
+    }
+
+    private static IReadOnlyList<HashSet<SceneId>> OrderedSets(
+        IReadOnlyList<HashSet<SceneId>> sets, CancellationCheckpoint? checkpoint)
+    {
+        if (checkpoint is null) return sets.OrderBy(set => set.Count).ToArray();
+
+        var ordered = new PriorityQueue<HashSet<SceneId>, (int Size, int Order)>();
+        for (var index = 0; index < sets.Count; index++)
+        {
+            checkpoint.Check();
+            ordered.Enqueue(sets[index], (sets[index].Count, index));
+        }
+        var result = new List<HashSet<SceneId>>(sets.Count);
+        while (ordered.TryDequeue(out var set, out _))
+        {
+            checkpoint.Check();
+            result.Add(set);
         }
         return result;
+    }
+
+    private static IEnumerable<SceneId> CheckMatches(IEnumerable<SceneId> matches, CancellationCheckpoint? checkpoint)
+    {
+        foreach (var id in matches)
+        {
+            checkpoint?.Check();
+            yield return id;
+        }
     }
 }

@@ -48,6 +48,40 @@ public sealed class GraphAlgorithmTests
     }
 
     [Fact]
+    public void ReachabilityStopsDuringAHighDegreeVertexWhenCancelled()
+    {
+        var builder = new GraphBuilder<int, int>();
+        var root = builder.AddVertex(0);
+        for (var index = 1; index <= 4096; index++)
+        {
+            var target = builder.AddVertex(index);
+            builder.AddEdge(root, target, index);
+        }
+        var graph = builder.Build();
+        using var cancellation = new CancellationTokenSource();
+        var visited = 0;
+
+        Assert.Throws<OperationCanceledException>(() =>
+            GraphReachability.Find(graph, [root], GraphDirection.Outgoing, _ =>
+            {
+                if (++visited == 1) cancellation.Cancel();
+                return true;
+            }, cancellation.Token));
+        Assert.InRange(visited, 1, 64);
+    }
+
+    [Fact]
+    public void GraphBuildRejectsAnAlreadyCancelledToken()
+    {
+        var builder = new GraphBuilder<int, int>();
+        builder.AddVertex(0);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => builder.Build(cancellation.Token));
+    }
+
+    [Fact]
     public void DepthFirstSearchFromAllVerticesReportsEveryEdgeKindInBothDirections()
     {
         var graph = BuildDepthFirstGraph();

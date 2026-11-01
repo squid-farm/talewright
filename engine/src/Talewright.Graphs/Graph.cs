@@ -83,21 +83,28 @@ public sealed class GraphBuilder<TVertex, TEdge>
     /// Builds a snapshot using O(V + E) stable counting sorts. Further builder changes do not
     /// change this graph.
     /// </summary>
-    public Graph<TVertex, TEdge> Build()
+    public Graph<TVertex, TEdge> Build() => Build(CancellationToken.None);
+
+    /// <summary>Builds a snapshot, stopping if cancellation is requested.</summary>
+    /// <exception cref="OperationCanceledException">Cancellation was requested.</exception>
+    public Graph<TVertex, TEdge> Build(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var vertexCount = _vertices.Count;
         var edgeCount = _edges.Count;
         var outgoingOffsets = new int[vertexCount + 1];
         var incomingOffsets = new int[vertexCount + 1];
 
+        var checkedEdges = 0;
         foreach (var edge in _edges)
         {
+            if ((checkedEdges++ & 63) == 0) cancellationToken.ThrowIfCancellationRequested();
             outgoingOffsets[edge.Source.Value + 1]++;
             incomingOffsets[edge.Target.Value + 1]++;
         }
 
-        PrefixSum(outgoingOffsets);
-        PrefixSum(incomingOffsets);
+        PrefixSum(outgoingOffsets, cancellationToken);
+        PrefixSum(incomingOffsets, cancellationToken);
 
         var outgoingEdgeIds = new EdgeId[edgeCount];
         var incomingEdgeIds = new EdgeId[edgeCount];
@@ -107,6 +114,7 @@ public sealed class GraphBuilder<TVertex, TEdge>
 
         for (var index = 0; index < edgeCount; index++)
         {
+            if ((index & 63) == 0) cancellationToken.ThrowIfCancellationRequested();
             var pending = _edges[index];
             var edgeId = new EdgeId(index);
             edges[index] = new GraphEdge<TEdge>(edgeId, pending.Source, pending.Target, pending.Value);
@@ -114,8 +122,11 @@ public sealed class GraphBuilder<TVertex, TEdge>
             incomingEdgeIds[nextIncoming[pending.Target.Value]++] = edgeId;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        var vertices = _vertices.ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
         return new Graph<TVertex, TEdge>(
-            _vertices.ToArray(),
+            vertices,
             edges,
             outgoingOffsets,
             outgoingEdgeIds,
@@ -131,12 +142,14 @@ public sealed class GraphBuilder<TVertex, TEdge>
         }
     }
 
-    private static void PrefixSum(int[] offsets)
+    private static void PrefixSum(int[] offsets, CancellationToken cancellationToken)
     {
         for (var index = 1; index < offsets.Length; index++)
         {
+            if ((index & 63) == 0) cancellationToken.ThrowIfCancellationRequested();
             offsets[index] += offsets[index - 1];
         }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private readonly record struct PendingEdge(VertexId Source, VertexId Target, TEdge Value);

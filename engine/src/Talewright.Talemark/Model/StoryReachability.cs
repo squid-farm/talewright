@@ -29,28 +29,38 @@ internal sealed class StoryReachability
     /// <summary>One vertex per scene in declaration order, with one entry per divert to a scene and per hub offer.</summary>
     public Graph<SceneId, StoryRoute> Graph { get; }
 
-    public static StoryReachability Find(IReadOnlyList<SceneDefinition> scenes, StoryDiverts diverts, SceneId start)
+    public static StoryReachability Find(IReadOnlyList<SceneDefinition> scenes, StoryDiverts diverts, SceneId start,
+        CancellationCheckpoint? checkpoint = null)
     {
+        var cancellationToken = checkpoint?.Token ?? CancellationToken.None;
+        cancellationToken.ThrowIfCancellationRequested();
         var builder = new GraphBuilder<SceneId, StoryRoute>();
         var vertices = new Dictionary<SceneId, VertexId>();
         foreach (var scene in scenes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!vertices.ContainsKey(scene.Id))
                 vertices[scene.Id] = builder.AddVertex(scene.Id);
         }
 
         foreach (var divert in diverts.Diverts)
         {
+            checkpoint?.Check();
             if (divert.Target.Scene is { } target && vertices.TryGetValue(target, out var to))
                 builder.AddEdge(vertices[divert.From], to, new StoryRoute(divert, null));
         }
 
         foreach (var offer in diverts.HubOffers)
+        {
+            checkpoint?.Check();
             builder.AddEdge(vertices[offer.Hub], vertices[offer.Scene], new StoryRoute(null, offer));
+        }
 
-        var graph = builder.Build();
+        var graph = builder.Build(cancellationToken);
         VertexId[] roots = vertices.TryGetValue(start, out var root) ? [root] : [];
-        return new StoryReachability(diverts, graph, vertices, GraphReachability.Find(graph, roots));
+        var result = GraphReachability.Find(graph, roots, GraphDirection.Outgoing, null, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new StoryReachability(diverts, graph, vertices, result);
     }
 
     public bool IsReached(SceneId scene) => _vertices.TryGetValue(scene, out var vertex) && _result.IsReached(vertex);

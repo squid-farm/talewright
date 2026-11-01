@@ -74,19 +74,32 @@ public static class GraphReachability
         Graph<TVertex, TEdge> graph,
         IEnumerable<VertexId> roots,
         GraphDirection direction = GraphDirection.Outgoing,
-        Func<GraphEdge<TEdge>, bool>? edgeFilter = null)
+        Func<GraphEdge<TEdge>, bool>? edgeFilter = null) =>
+        Find(graph, roots, direction, edgeFilter, CancellationToken.None);
+
+    /// <summary>Finds reachable vertices, stopping if cancellation is requested.</summary>
+    /// <exception cref="OperationCanceledException">Cancellation was requested.</exception>
+    public static ReachabilityResult Find<TVertex, TEdge>(
+        Graph<TVertex, TEdge> graph,
+        IEnumerable<VertexId> roots,
+        GraphDirection direction,
+        Func<GraphEdge<TEdge>, bool>? edgeFilter,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(roots);
         ValidateDirection(direction);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var reached = new bool[graph.VertexCount];
         var firstEdges = new EdgeId?[graph.VertexCount];
         var order = ImmutableArray.CreateBuilder<VertexId>();
         var queue = new Queue<VertexId>();
+        var visited = 0;
 
         foreach (var root in roots)
         {
+            if ((visited++ & 63) == 0) cancellationToken.ThrowIfCancellationRequested();
             graph.ValidateVertex(root);
             if (reached[root.Value])
             {
@@ -100,12 +113,14 @@ public static class GraphReachability
 
         while (queue.TryDequeue(out var current))
         {
+            if ((visited++ & 63) == 0) cancellationToken.ThrowIfCancellationRequested();
             var adjacent = direction == GraphDirection.Outgoing
                 ? graph.OutgoingEdges(current)
                 : graph.IncomingEdges(current);
 
             foreach (var edgeId in adjacent)
             {
+                if ((visited++ & 63) == 0) cancellationToken.ThrowIfCancellationRequested();
                 var edge = graph.GetEdge(edgeId);
                 if (edgeFilter is not null && !edgeFilter(edge))
                 {
@@ -125,10 +140,13 @@ public static class GraphReachability
             }
         }
 
-        return new ReachabilityResult(
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = new ReachabilityResult(
             order.ToImmutable(),
             ImmutableArray.CreateRange(reached),
             ImmutableArray.CreateRange(firstEdges));
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 
     internal static void ValidateDirection(GraphDirection direction)
