@@ -1,0 +1,44 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<p>Every scene, divert and hub offer from the last successful compilation. Scenes the start scene can't reach through diverts and hub offers are drawn in a separate area on the right; reachability doesn't check whether conditions can be met.</p>
+@if (_error is not null)
+{
+    <p role="alert" class="tw-error">@_error</p>
+}
+<div class="story-map" @ref="_host"></div>
+
+@code {
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+
+    private ElementReference _host;
+    private StoryDefinition? _rendered;
+    private MapView? _view;
+    private string? _error;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(Story, _rendered))
+            _view = MapView.Build(Story);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_view is null || ReferenceEquals(Story, _rendered))
+            return;
+        _rendered = Story;
+        try
+        {
+            await JS.InvokeVoidAsync("talewrightMap.render", _host, _view);
+            if (_error is null)
+                return;
+            _error = null;
+        }
+        catch (JSException ex)
+        {
+            _error = $"The map could not be drawn: {ex.Message}";
+        }
+
+        StateHasChanged();
+    }
+}
