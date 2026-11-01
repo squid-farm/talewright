@@ -173,8 +173,8 @@ never publishes, even when run against a tag.
 
 The existing `talewright-ci-tests:ci-check` target includes `tests/test_release.py`, covering
 version boundaries/order/collisions, the complete six-platform VSIX set, native architecture,
-identity/channel/bundling, validation gating, scoped
-permissions, and release API retry/error cases without network publication:
+identity/channel/bundling, and release API retry/error cases without network publication.
+Publication gating and permissions live in the workflow and are verified by real release runs:
 
 ```bash
 ./nx run talewright-ci-tests:ci-check

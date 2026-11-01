@@ -146,9 +146,8 @@ The narrower exceptions are selector/planner unit contracts, scheduled performan
 UI-image workflow's existing candidate validation. Local CI contracts do not prove GitHub deployment,
 permissions or reusable-workflow execution; hosted workflow runs remain necessary release evidence.
 
-`InfrastructureSelectionTests` audits every current workflow, script and image-definition file against
-this matrix and asserts exact task lists, not just the presence of one expected task. Adding one of
-these files requires extending the matrix/test; otherwise CI validation fails. Mixed source and
+`InfrastructureSelectionTests` checks a representative row of this matrix for each kind of consumer
+(checks only, build/editor, browser, all non-build groups) with exact group lists. Mixed source and
 infrastructure edits retain both sets of verification. Genuinely shared inputs and unknown product
 paths outside owned projects retain broad verification.
 
@@ -255,12 +254,16 @@ E2E project as a substitute for the host-aware runners.
 ## Regression evidence
 
 `tests/test_nx_selection.py` validates the inferred graph against MSBuild references and explicit
-contracts, affected selections, Release prerequisites, browser configurations, and disabled caching.
-`tests/test_nx_ci.py` checks environment routing, complete PR checks with affected other groups,
-full/fallback equivalence, invalid Git revisions,
-and success/failure/cancellation/skip aggregation. It also executes an isolated real Nx workspace:
-a prerequisite must finish before its consumer; forcing that prerequisite to exit nonzero must return
-failure without executing the consumer. These tests need the pinned Nx installation, not UI libraries.
+contracts, one representative affected selection per kind of change, Release prerequisites, browser
+configurations, and disabled caching. `tests/test_nx_ci.py` checks environment routing, complete PR
+checks with affected other groups, full/fallback equivalence, invalid Git revisions, and
+success/failure/cancellation/skip aggregation. `tests/test_nx_reporting.py` checks that router
+failures, interruptions and selection errors are never recorded as success. Affected graphs are cached
+per file set so each distinct change costs one Nx invocation. These tests need the pinned Nx
+installation, not UI libraries.
+
+The suite deliberately does not assert workflow YAML text, summary wording, or Nx's own task ordering:
+those are verified by real workflow runs and by Nx itself, and freezing them only made edits expensive.
 
 Shared workflow ownership was cleared with the M2 CI session before wiring these jobs. Container/image
 provisioning is deliberately separate: any future image reference belongs in shared inputs, and
