@@ -410,6 +410,32 @@ class PublicationSafeguardTests(unittest.TestCase):
         self.assertEqual({"workflow_call"}, set(nuget["on"]))
         self.assertTrue(TAG_PUSH <= condition_terms(nuget["jobs"]["publish"]["if"]))
 
+    def test_publication_cannot_proceed_past_a_failed_check(self):
+        publishers = ("release-ready", "publish-samples", "publish-nuget",
+                      "publish-marketplace", "github-release")
+        pending = [("build.yml", job) for job in publishers]
+        pending += [("build.yml", job) for name in publishers for job in self.dependencies(self.build, name)]
+        seen = set()
+        while pending:
+            workflow, job = pending.pop()
+            if (workflow, job) in seen:
+                continue
+            seen.add((workflow, job))
+            body = self.workflows[workflow]["jobs"][job]
+            for location, item in [(job, body)] + [
+                (f"{job}:{step.get('name') or step.get('uses')}", step) for step in body.get("steps", [])
+            ]:
+                with self.subTest(workflow=workflow, location=location):
+                    self.assertIn(item.get("continue-on-error", "false"), ("false", False))
+            called = body.get("uses", "")
+            if called.startswith("./.github/workflows/"):
+                name = Path(called).name
+                pending += [(name, nested) for nested in self.workflows[name]["jobs"]]
+
+        for job in publishers:
+            with self.subTest(job=job):
+                self.assertNotRegex(self.build[job]["if"], r"\b(always|failure|cancelled)\(\)")
+
     def test_pages_deploys_only_a_validated_tag_after_verification_and_smoke(self):
         samples = self.workflows["publish-samples.yml"]
         caller = self.build["publish-samples"]

@@ -188,6 +188,18 @@ test('ordinary prose, Markdown, comments and escaped braces are not Talemark com
   assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
 });
 
+test('speaker names use the shared identifier fixture', async () => {
+  const fixture = JSON.parse(await readFile(new URL('./fixtures/identifiers.json', import.meta.url), 'utf8'));
+  const speaker = id => tokens(`> ${id}: Hello.`).tokens
+    .filter(token => token.scopes.includes('entity.name.tag.character.tale'))
+    .map(token => `> ${id}: Hello.`.slice(token.startIndex, token.endIndex)).join('');
+  for (const id of fixture.valid) assert.equal(speaker(id), id, `valid identifier ${JSON.stringify(id)}`);
+  // A tokenized line cannot contain a line break.
+  for (const id of fixture.invalid.filter(id => !/[\r\n]/.test(id))) {
+    assert.equal(speaker(id), '', `invalid identifier ${JSON.stringify(id)}`);
+  }
+});
+
 test('unterminated edits recover before the next scene', () => {
   for (const line of [
     '{player:first-name', '{if var:count == "unfinished', '* [unfinished',
