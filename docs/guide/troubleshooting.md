@@ -49,6 +49,20 @@ distribution's equivalent. You also need a graphical desktop session (X11 or Way
 debugger cannot open from a remote terminal or SSH session without one. Players of published Linux games
 need it too; removing that step is being explored ([#85](https://github.com/squid-farm/talewright/issues/85)).
 
+## The debugger says it can't watch your story folder
+
+The debugger watches your story folder so it can reload your saved edits automatically. Every editor
+window and file-watching tool uses some of a limited system allowance, so with several open, the
+debugger may not get one. Automatic reload pauses, but your current playtest keeps running.
+
+Close other editor windows or file-watching tools, then select **Rescan / retry watcher**. **Restart
+from source** also retries, and starts a fresh run with your latest edits. The original system message
+is shown after **Details** if you need it.
+
+On Linux these limits are the `fs.inotify.max_user_instances` and `fs.inotify.max_user_watches` system
+settings. Closing other programs is usually enough; raising the limits is up to you or your system
+administrator.
+
 ## A published desktop game won't start
 
 - Extract the **whole** zip first; don't run files from inside it.

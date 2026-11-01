@@ -163,7 +163,8 @@ discarded after the new source and retained setup validate successfully.
 
 Failed compilations and runtime errors keep the last good run visible and mark the source as stale.
 **Rescan / retry watcher** retries compilation and rearms a failed watcher without bypassing restart
-requirements. C# extensions are not hot-reloaded; rebuild and restart them.
+requirements. C# extensions are not hot-reloaded; rebuild and restart them. If the debugger can't watch
+your story folder at all, see [Troubleshooting](troubleshooting.md#the-debugger-says-it-cant-watch-your-story-folder).
 
 Reload reconstructs the state before the current scene entry and enters once, so changes to its entry
 effects or checks may deliberately change their results. It replaces the current passage and rebuilds
