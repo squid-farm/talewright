@@ -41,6 +41,9 @@ public sealed class ChoiceDiagnosticsTests
     private static Diagnostic Err(string code, string message, int line, int column) =>
         new(DiagnosticSeverity.Error, code, message, new("main.tale", line, column));
 
+    private static Diagnostic Warn(string code, string message, int line, int column) =>
+        new(DiagnosticSeverity.Warning, code, message, new("main.tale", line, column));
+
     private static int Col(string line, string marker, int occurrence = 1)
     {
         var index = -1;
@@ -307,6 +310,58 @@ public sealed class ChoiceDiagnosticsTests
         const string effect = "success: { var:count += } -> END";
         Expect("=== start\n* [Try] skill-check athletics dc 1\n" + effect + "\nfailure: -> END",
             Err("TW1001", "Expression is incomplete.", 3, Col(effect, "}")));
+    }
+
+    [Fact]
+    public void Dropped_choice_suppresses_a_dead_end_only_when_that_spot_is_reachable()
+    {
+        const string line = "* [Go -> END";
+        const string unreachable = """
+            === start
+            {if false}
+            * [Go -> END
+            {/if}
+            """;
+        const string topLevel = """
+            === start
+            Hello.
+            * [Go -> END
+            """;
+        const string reachable = """
+            === start
+            {if flag:ready}
+            * [Go -> END
+            {/if}
+            """;
+        const string nested = """
+            === start
+            {if flag:ready}
+            {if false}
+            * [Go -> END
+            {/if}
+            {/if}
+            """;
+        const string deadEnd = "Scene 'start' is a dead end: add choices, a '-> target', or '-> END'.";
+        const string mayBeEmpty = "Scene 'start' may have no available choice. Add an unconditional choice such as '* -> target' or '* [The end] -> END'.";
+        Expect(unreachable,
+            Err("TW1011", MissingBracketBefore("->"), 3, Col(line, "[")),
+            Err("TW3002", deadEnd, 1, 1));
+        Expect(topLevel,
+            Err("TW1011", MissingBracketBefore("->"), 3, Col(line, "[")));
+        Expect(reachable,
+            Err("TW1011", MissingBracketBefore("->"), 3, Col(line, "[")),
+            Warn("TW3013", mayBeEmpty, 1, 1));
+        Expect(nested,
+            Err("TW1011", MissingBracketBefore("->"), 4, Col(line, "[")),
+            Err("TW3002", deadEnd, 1, 1));
+
+        var formed = Compile("""
+            === start
+            {if false}
+            * [Go] -> END
+            {/if}
+            """);
+        Assert.Equal(["TW3002"], formed.Diagnostics.Select(diagnostic => diagnostic.Code));
     }
 
     [Fact]

@@ -14,12 +14,6 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 {
     public required int EndLine { get; init; }
     public bool HasExplicitPriority { get; init; }
-
-    /// <summary>
-    /// A choice line was rejected before it became a step. Exit validation skips the dead-end error
-    /// that would otherwise exist only because that choice was dropped.
-    /// </summary>
-    public bool DroppedMalformedChoice { get; init; }
 }
 
 /// <summary>
@@ -190,7 +184,6 @@ internal sealed partial class TaleParser
         {
             EndLine = _index,
             HasExplicitPriority = _scene.HasExplicitPriority,
-            DroppedMalformedChoice = _scene.DroppedMalformedChoice,
         });
         _scene = null;
     }
@@ -570,7 +563,7 @@ internal sealed partial class TaleParser
                     ReportMissingLabelBracket(rest, pos, indent);
                 }
 
-                MarkDroppedChoice();
+                MarkDroppedChoice(start);
                 return;
             }
 
@@ -607,7 +600,7 @@ internal sealed partial class TaleParser
                         offset => At(column + 10 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[(pos + 10)..], At(column + 10));
                     _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
-                    MarkDroppedChoice();
+                    MarkDroppedChoice(start);
                     return;
                 }
 
@@ -634,7 +627,7 @@ internal sealed partial class TaleParser
                         offset => At(column + 1 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Effects, rest[(pos + 1)..], At(column + 1));
                     _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
-                    MarkDroppedChoice();
+                    MarkDroppedChoice(start);
                     return;
                 }
 
@@ -660,7 +653,7 @@ internal sealed partial class TaleParser
                 {
                     _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
                     ReportSkillCheckTrailing(remaining["skill-check".Length..], column + "skill-check".Length);
-                    MarkDroppedChoice();
+                    MarkDroppedChoice(start);
                     return;
                 }
                 var spec = ParseCheckSpec(remaining["skill-check".Length..], column + "skill-check".Length);
@@ -674,7 +667,7 @@ internal sealed partial class TaleParser
             }
             else if (TryReportRequiresWhitespace(rest, pos, column))
             {
-                MarkDroppedChoice();
+                MarkDroppedChoice(start);
                 return;
             }
             else
@@ -686,7 +679,7 @@ internal sealed partial class TaleParser
                     ? "Use '* [label] ...' or a textless '* ... -> target'."
                     : "Expected (requires: …), { effects }, -> target or skill-check.";
                 _diagnostics.Error("TW1011", $"Unexpected '{excerpt}' in choice. {insert}{help}", At(column));
-                MarkDroppedChoice();
+                MarkDroppedChoice(start);
                 return;
             }
         }
@@ -694,7 +687,7 @@ internal sealed partial class TaleParser
         if (label is null && !hasDivert)
         {
             _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'.", At(indent));
-            MarkDroppedChoice();
+                    MarkDroppedChoice(start);
             return;
         }
 
@@ -709,12 +702,17 @@ internal sealed partial class TaleParser
         }));
     }
 
-    private void MarkDroppedChoice()
+    /// <summary>
+    /// Leaves a placeholder where the choice was written. <see cref="SceneSteps.Reachable"/> then treats
+    /// it like a real choice, so a dead end is suppressed only when this spot could have been an exit.
+    /// </summary>
+    private void MarkDroppedChoice(SourceLocation start)
     {
-        if (_scene is not null)
+        _scene?.CurrentSteps.Add(new ChoiceStep(StepId(start), SpanFrom(start), new ChoiceDefinition
         {
-            _scene.DroppedMalformedChoice = true;
-        }
+            Key = ChoiceDefinition.StructuralPlaceholderKey,
+            Label = null,
+        }));
     }
 
     private void ReportMissingLabelBracket(string rest, int open, int indent)
@@ -1599,7 +1597,6 @@ internal sealed partial class TaleParser
         public HashSet<string> HubDirectives { get; } = [];
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
-        public bool DroppedMalformedChoice { get; set; }
         public Stack<Frame> Frames { get; } = new();
         public SourceText Paragraph { get; set; } = new();
 

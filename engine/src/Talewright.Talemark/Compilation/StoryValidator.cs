@@ -47,7 +47,7 @@ internal static class StoryValidator
         {
             var scene = parsed.Definition;
             var location = parsed.Location;
-            CheckExits(scene, location, diagnostics, parsed.DroppedMalformedChoice);
+            CheckExits(scene, location, diagnostics);
             if (scene.HubLimit is not null && scene.Hub is null)
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
@@ -78,15 +78,15 @@ internal static class StoryValidator
         return reachability;
     }
 
-    private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics,
-        bool droppedMalformedChoice)
+    private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)
     {
         var seenChoice = false;
         CheckSteps(scene.Steps, ref seenChoice, diagnostics);
+        // A placeholder stands in for a dropped choice, so this is true exactly when a well-formed
+        // choice in that same spot would have been reachable.
         var hasReachableChoice = SceneSteps.Reachable(scene.Steps).OfType<ChoiceStep>().Any();
-        // A choice rejected before it became a step is not, by itself, a dead end. Other scenes still report.
         if (!SceneSteps.Targets(scene.Steps).Any()
-            && !hasReachableChoice && scene.Hub is null && !droppedMalformedChoice)
+            && !hasReachableChoice && scene.Hub is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
         }
@@ -130,6 +130,11 @@ internal static class StoryValidator
         var reachable = true;
         foreach (var step in steps)
         {
+            // The placeholder exists for reachability only. It must not add TW3003, TW3011 or TW3012.
+            if (step is ChoiceStep { Choice.Key: ChoiceDefinition.StructuralPlaceholderKey })
+            {
+                continue;
+            }
             if (!reachable)
             {
                 diagnostics.Warning("TW3012", "This line cannot run: an earlier step always leaves this block.", step.Source.Start);

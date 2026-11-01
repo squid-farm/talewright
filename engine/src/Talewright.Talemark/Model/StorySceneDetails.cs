@@ -50,6 +50,8 @@ public sealed record StorySceneDetails(
                     if (effect.Effects.Count > 0)
                         effects.Add(new StorySceneEffect(step.Id, stepOrder, effect.Effects, blockCondition, null, null));
                     break;
+                case ChoiceStep choiceStep when choiceStep.Choice.Key == ChoiceDefinition.StructuralPlaceholderKey:
+                    break;
                 case ChoiceStep choiceStep:
                 {
                     var choice = choiceStep.Choice;

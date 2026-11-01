@@ -67,7 +67,7 @@ Giving a character a value does not declare the skill. See the complete
 | Code | Meaning | Usual fix |
 |---|---|---|
 | TW3001 | Text before the first scene, or no `.tale` files at all. | Start each file with `=== scene.id`. |
-| TW3002 | Dead end: a scene with no way out. | Add choices, `-> target` or `-> END`. |
+| TW3002 | Dead end: a scene with no way out. | Add choices, `-> target` or `-> END`. A malformed choice suppresses this only when a well-formed choice in that same spot would have been reachable. One inside `{if false}` does not hide a real dead end. |
 | TW3003 | A choice or choice-check outcome has no explicit target. | Add `-> target` or `-> END` to that choice/outcome. Scene diverts are not fallbacks. Also appears as a side effect of TW2002. |
 | TW3005 | The ruleset has no skill-check rule. | Use the `generic` ruleset, or remove the checks. |
 | TW3007 | The `start` scene doesn't exist. | Fix `game.start:` in `story.talewright.yaml`. |
