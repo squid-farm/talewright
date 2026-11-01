@@ -117,6 +117,65 @@ public sealed class DebuggerTests
         }
     }
 
+    [Fact]
+    public async Task Native_map_previews_setup_and_current_run_state_and_updates_its_route()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-map-route-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-map-route", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: map-route-debug\n  title: Map Route Debug\n  start: start\nvars: {visits: 0}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title The gate
+                ~ var:visits += 1
+                Visits {var:visits}.
+                * [Continue] -> next
+                === next
+                @title The road
+                Visits {var:visits}.
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ActivateAsync("Map");
+            await driver.PressAsync("Tab");
+            await driver.PressAsync("Tab");
+            var snapshot = await WaitFor(driver, "Diverts: 1");
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+            Assert.Contains("Preview only, using scene setup values.", snapshot.Content);
+            Assert.Contains("Visits 0.", snapshot.Content);
+
+            await driver.ActivateAsync("Play");
+            await driver.ClickAsync("Start selected scene");
+            await WaitFor(driver, "Visits 1.");
+            await driver.ActivateAsync("Map");
+            snapshot = await WaitFor(driver, "Current scene: start.");
+            Assert.Contains("Preview only, using the current playtest state.", snapshot.Content);
+            Assert.Contains("Visits 1.", snapshot.Content);
+            Assert.Contains("Started at start", snapshot.Content);
+
+            await driver.ActivateAsync("Play");
+            await driver.ChooseAsync("Continue");
+            await WaitFor(driver, "The road");
+            await driver.ActivateAsync("Map");
+            snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Continue", snapshot.Content);
+            Assert.Contains("next", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static AccessibleNode Focused(AccessibleNode snapshot) =>
         snapshot.Descendants().Last(node => node.Focused);
 

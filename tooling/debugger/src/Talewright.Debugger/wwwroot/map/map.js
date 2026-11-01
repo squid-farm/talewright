@@ -161,12 +161,16 @@ window.talewrightMap = (() => {
     details.setAttribute("aria-label", "Scene details");
     details.append(element("p", null, "Select a scene to list its diverts and hub offers."));
 
-    host.append(toolbar, surface, scenes, details);
+    const route = element("section", "map-route");
+    route.setAttribute("aria-label", "Current run route");
+
+    host.append(toolbar, surface, scenes, details, route);
 
     const state = {
-      host, canvas, context: canvas.getContext("2d"), surface, tooltip, status, scenes, details,
+      host, canvas, context: canvas.getContext("2d"), surface, tooltip, status, scenes, details, route,
       view: null, laid: null, colors: palette(host), transform: d3.zoomIdentity, fitted: false, queued: false,
       selected: null, focused: null, highlighted: null, buttons: new Map(), generation: 0,
+      run: null, routeVisits: new Map(), routeLines: new Map(), dotnet: null, summary: "",
     };
 
     state.zoom = d3.zoom().scaleExtent([0.02, 4]).on("zoom", event => {
@@ -265,10 +269,11 @@ window.talewrightMap = (() => {
     const drawLine = (line, highlighted) => {
       const { sections, label, bounds } = laid.lines.get(line.id);
       if (!visible(bounds, bounds.x2 - bounds.x, bounds.y2 - bounds.y)) return;
-      const color = highlighted ? colors.accent : lineColor(line);
+      const taken = state.routeLines.has(line.id);
+      const color = highlighted ? colors.accent : taken ? kindColors.Success : lineColor(line);
       ctx.strokeStyle = color;
-      ctx.lineWidth = width(highlighted ? 4 : line.kind === "HubOffer" ? 1.4 : 1.2);
-      ctx.setLineDash(highlighted ? [] : lineDash(line));
+      ctx.lineWidth = width(highlighted ? 4 : taken ? 3 : line.kind === "HubOffer" ? 1.4 : 1.2);
+      ctx.setLineDash(highlighted || taken ? [] : lineDash(line));
       for (const section of sections) {
         ctx.beginPath();
         section.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
@@ -296,6 +301,26 @@ window.talewrightMap = (() => {
       text(line.label, label.x + 4, label.y + 10.5, `${line.kind === "HubOffer" || highlighted ? "bold " : ""}10px monospace`,
         highlighted ? colors.accent : line.kind === "HubOffer" ? kindColors.HubOffer : colors.muted);
     }
+    if (detail) {
+      for (const [id, orders] of state.routeLines) {
+        const line = state.lines.get(id);
+        const geometry = laid.lines.get(id);
+        if (!line || !geometry || !visible(geometry.bounds,
+          geometry.bounds.x2 - geometry.bounds.x, geometry.bounds.y2 - geometry.bounds.y)) continue;
+        const section = geometry.sections.reduce((best, candidate) =>
+          candidate.length > best.length ? candidate : best);
+        const point = section[Math.floor(section.length / 2)];
+        const label = `${orders[0]}${orders.length > 1 ? ` ×${orders.length}` : ""}`;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 8 / box.k, 0, Math.PI * 2);
+        ctx.fillStyle = kindColors.Success;
+        ctx.fill();
+        ctx.lineWidth = width(1);
+        ctx.strokeStyle = colors.background;
+        ctx.stroke();
+        text(label, point.x, point.y + 3, `bold 9px ${SANS}`, colors.background, "center");
+      }
+    }
 
     for (const node of view.nodes) {
       const b = laid.boxes.get(node.id);
@@ -306,6 +331,10 @@ window.talewrightMap = (() => {
       if (node.end) fill = stroke = colors.text;
       if (node.stub) { fill = colors.panel; stroke = colors.border; dash = [4, 3]; }
       else if (!node.reachable) { stroke = colors.error; lineWidth = 2; dash = [4, 3]; }
+      const visits = state.routeVisits.get(node.id);
+      if (visits) { stroke = kindColors.Success; lineWidth = 2.8; dash = []; }
+      if (state.run?.currentScene === node.id) { stroke = colors.accent; lineWidth = 4; dash = []; }
+      if (state.run?.startedMidStory && state.run.startScene === node.id) { stroke = kindColors.Choice; lineWidth = 3; dash = []; }
       if (node.id === state.selected) { stroke = colors.accent; lineWidth = 4; dash = []; }
       rect(b, node.end ? 17 : 5, fill, stroke, lineWidth, dash);
       if (node.id === state.focused) {
@@ -323,7 +352,18 @@ window.talewrightMap = (() => {
       node.text.forEach((line, i) => text(line, b.x + 8, b.y + 18 + i * LINE_HEIGHT,
         i === 0 ? "10.5px monospace" : i === 2 ? "10px monospace" : `11px ${SANS}`,
         i === 0 ? colors.muted : i === 2 ? kindColors.HubOffer : colors.text));
-      const badges = [node.start && "START", node.hub && "HUB", node.once && "ONCE", !node.reachable && "UNREACHABLE"].filter(Boolean);
+      if (detail && visits) {
+        const label = `${visits.first}${visits.count > 1 ? ` ×${visits.count}` : ""}`;
+        text(label, b.x + b.width - 6, b.y + b.height - 4, `bold 9px ${SANS}`, kindColors.Success, "right");
+      }
+      const badges = [
+        node.start && "START",
+        state.run?.startedMidStory && state.run.startScene === node.id && "RUN START",
+        state.run?.currentScene === node.id && "CURRENT",
+        node.hub && "HUB",
+        node.once && "ONCE",
+        !node.reachable && "UNREACHABLE",
+      ].filter(Boolean);
       if (badges.length) text(badges.join(" · "), b.x + b.width - 6, b.y + 12, `bold 9px ${SANS}`, colors.warning, "right");
     }
   }
@@ -404,6 +444,61 @@ window.talewrightMap = (() => {
     state.selected = id;
     state.highlighted = null;
     showDetails(state, state.nodes.get(id));
+    state.dotnet?.invokeMethodAsync("SelectScene", id).catch(error => {
+      console.error("Could not update the selected scene preview.", error);
+      state.status.textContent = "The selected scene preview could not be updated.";
+    });
+    redraw(state);
+  }
+
+  function renderRun(state) {
+    const { route, run } = state;
+    const heading = element("h3", null, "Current run route");
+    if (!run) {
+      route.replaceChildren(heading, element("p", null, "Start a synthetic playtest to show its route."));
+      state.status.textContent = state.summary;
+      return;
+    }
+
+    const content = [heading];
+    if (run.startedMidStory)
+      content.push(element("p", null, `Started at mid-story scene ${run.startScene} from Scene setup.`));
+    const list = element("ol");
+    for (const step of run.steps) {
+      const text = step.takenItemName
+        ? `${step.takenItemName} to ${step.scene}`
+        : step.order === 1 ? `Started at ${step.scene}` : step.scene;
+      list.append(element("li", null, text));
+    }
+    if (run.steps.length) content.push(list);
+    else content.push(element("p", null, "No scenes have been entered."));
+    route.replaceChildren(...content);
+
+    const start = run.startedMidStory ? ` Started at mid-story scene ${run.startScene} from Scene setup.` : "";
+    const current = run.currentScene ? ` Current scene: ${run.currentScene}.` : "";
+    const ended = run.isEnded ? " The playtest has ended." : "";
+    state.status.textContent = `${state.summary}${start}${current}${ended}`;
+  }
+
+  function updateRun(host, run) {
+    const state = host.talewrightMap;
+    if (!state) throw new Error("The story map has not been rendered.");
+    state.run = run;
+    state.routeVisits = new Map();
+    state.routeLines = new Map();
+    for (const step of run?.steps || []) {
+      if (step.scene !== "END") {
+        const visits = state.routeVisits.get(step.scene) || { first: step.order, count: 0 };
+        visits.count++;
+        state.routeVisits.set(step.scene, visits);
+      }
+      if (step.lineId) {
+        const orders = state.routeLines.get(step.lineId) || [];
+        orders.push(step.order);
+        state.routeLines.set(step.lineId, orders);
+      }
+    }
+    renderRun(state);
     redraw(state);
   }
 
@@ -476,9 +571,10 @@ window.talewrightMap = (() => {
   }
 
   // Renders a MapView from MapTab.razor. Called again with the new view whenever the debugger reloads the story.
-  async function render(host, view) {
+  async function render(host, view, run, dotnet) {
     const state = host.talewrightMap || (host.talewrightMap = create(host));
     const generation = ++state.generation;
+    state.dotnet = dotnet;
     state.status.textContent = "Laying out the map…";
     let laid;
     try {
@@ -509,11 +605,12 @@ window.talewrightMap = (() => {
     const diverts = view.nodes.reduce((sum, node) => sum + node.items.filter(item => !item.hubOffer).length, 0);
     const offers = view.nodes.reduce((sum, node) => sum + node.items.length, 0) - diverts;
     const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    state.status.textContent = `${count(scenes, "scene", "scenes")}, ${count(diverts, "divert", "diverts")}, ` +
+    state.summary = `${count(scenes, "scene", "scenes")}, ${count(diverts, "divert", "diverts")}, ` +
       `${count(offers, "hub offer", "hub offers")}, ${view.unreachableScenes} unreachable.`;
     if (!state.fitted) fit(state);
+    updateRun(host, run);
     redraw(state);
   }
 
-  return { render };
+  return { render, updateRun };
 })();

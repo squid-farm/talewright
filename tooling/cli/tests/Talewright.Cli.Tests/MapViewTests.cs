@@ -1,5 +1,10 @@
+using Talewright.Core.Identity;
+using Talewright.Core.State;
 using Talewright.Debugger;
+using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
+using Talewright.Runtime;
 
 namespace Talewright.Cli.Tests;
 
@@ -59,14 +64,17 @@ public sealed class MapViewTests
         """;
 
     private static MapView Build(string tale = Tale)
+        => MapView.Build(CompileStory(tale));
+
+    private static StoryDefinition CompileStory(string tale, string yaml = Yaml)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = Yaml,
+            ["story.talewright.yaml"] = yaml,
             ["main.tale"] = tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        return MapView.Build(result.Story!);
+        return result.Story!;
     }
 
     private static string Lines(MapView view) => string.Join("\n", view.Lines.Select(line =>
@@ -194,5 +202,116 @@ public sealed class MapViewTests
         var hearth = Assert.Single(view.Nodes, node => node.Id == "hearth");
         Assert.Equal(["camp"], hearth.Items.Select(item => item.Target));
         Assert.DoesNotContain(view.Lines, line => line.From == "hearth" && line.To == "start");
+    }
+
+    [Fact]
+    public void Current_run_tracks_taken_check_diverts_and_hub_offers_in_order_and_replays_undo_redo()
+    {
+        var story = CompileStory("""
+            === start
+            * [Choose] skill-check athletics dc 12
+              success: -> road
+              failure: -> road
+            === road
+            @hub fire
+            * [Finish] -> END
+            === camp
+            @tags fire
+            -> END
+            """, Yaml.Replace("randomness: off", "randomness: checks-only", StringComparison.Ordinal));
+        var map = MapView.Build(story);
+        var outcomes = new HashSet<DecisionReason>();
+
+        foreach (var seed in Enumerable.Range(1, 200).Select(value => (ulong)value))
+        {
+            var session = AuthorSession.Create(story, new SceneId("start"), captureDecisions: true, seed: seed);
+            Assert.Equal(["start"], MapRunView.Build(story, map, session).Steps.Select(step => step.Scene));
+
+            session.Choose("c0");
+            var outcome = Assert.Single(session.Decisions, decision => decision.Kind == DecisionKind.CheckOutcome);
+            var route = MapRunView.Build(story, map, session);
+            Assert.Equal(["start", "road"], route.Steps.Select(step => step.Scene));
+            Assert.Equal("road", route.CurrentScene);
+            var selected = route.Steps[1];
+            var outcomeName = outcome.Reason == DecisionReason.CheckSucceeded ? "success" : "failure";
+            Assert.Contains($"on {outcomeName}", selected.TakenItemName);
+            Assert.Equal(selected.LineId, Assert.Single(map.Nodes.SelectMany(node => node.Items),
+                item => item.Id == selected.TakenItemId).Line);
+            outcomes.Add(outcome.Reason);
+
+            session.Choose($"{StorySession.StoryletKeyPrefix}camp");
+            route = MapRunView.Build(story, map, session);
+            Assert.Equal(["start", "road", "camp", "END"], route.Steps.Select(step => step.Scene));
+            Assert.Equal("road/hub:camp", route.Steps[2].TakenItemId);
+            Assert.True(route.IsEnded);
+
+            session.Back();
+            route = MapRunView.Build(story, map, session);
+            Assert.Equal(["start", "road"], route.Steps.Select(step => step.Scene));
+            Assert.Equal("road", route.CurrentScene);
+
+            session.Forward();
+            route = MapRunView.Build(story, map, session);
+            Assert.Equal(["start", "road", "camp", "END"], route.Steps.Select(step => step.Scene));
+            Assert.True(route.IsEnded);
+            if (outcomes.Contains(DecisionReason.CheckSucceeded) && outcomes.Contains(DecisionReason.CheckFailed))
+                break;
+        }
+
+        Assert.Contains(DecisionReason.CheckSucceeded, outcomes);
+        Assert.Contains(DecisionReason.CheckFailed, outcomes);
+    }
+
+    [Fact]
+    public void Current_run_marks_a_mid_story_start()
+    {
+        var story = CompileStory("""
+            === start
+            -> road
+            === road
+            * [Finish] -> END
+            """);
+        var session = AuthorSession.Create(story, new SceneId("road"), captureDecisions: true, seed: 42);
+
+        var route = MapRunView.Build(story, MapView.Build(story), session);
+
+        Assert.Equal("road", route.StartScene);
+        Assert.True(route.StartedMidStory);
+        Assert.Equal(["road"], route.Steps.Select(step => step.Scene));
+    }
+
+    [Fact]
+    public void Scene_preview_renders_story_start_values_and_current_run_state_without_running_effects()
+    {
+        var story = CompileStory("""
+            === start
+            ~ var:visits += 1
+            {if flag:ready}
+            Ready {var:visits}.
+            {else}
+            Waiting {var:visits}.
+            {/if}
+            * [Prepared {var:visits}] (requires: flag:ready) -> END
+            * [Wait] -> END
+            """);
+        var start = new SceneId("start");
+        var initial = GameState.CreateInitial(story.World, 42);
+        var startPreview = MapScenePreviewBuilder.Build(story, start, initial, usesCurrentRunState: false);
+
+        Assert.Contains("Waiting 0.", startPreview.Document.ToPlainText());
+        Assert.Equal(["Wait"], startPreview.Choices.Select(choice => choice.Text));
+        Assert.False(startPreview.UsesCurrentRunState);
+
+        var session = AuthorSession.Create(story, start, captureDecisions: true,
+            setup: new AuthorSetup
+            {
+                Flags = new Dictionary<FlagId, bool> { [new("ready")] = true },
+                Variables = new Dictionary<VarId, int> { [new("visits")] = 2 },
+            }, seed: 42);
+        var currentPreview = MapScenePreviewBuilder.Build(story, start, session.State, usesCurrentRunState: true);
+
+        Assert.Contains("Ready 3.", currentPreview.Document.ToPlainText());
+        Assert.Equal(["Prepared 3", "Wait"], currentPreview.Choices.Select(choice => choice.Text));
+        Assert.True(currentPreview.UsesCurrentRunState);
     }
 }

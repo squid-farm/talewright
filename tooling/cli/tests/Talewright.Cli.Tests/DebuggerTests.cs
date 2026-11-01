@@ -117,6 +117,29 @@ public sealed class DebuggerTests : IDisposable
     }
 
     [Fact]
+    public void Map_preview_uses_pending_setup_when_no_run_exists_and_current_state_after_start()
+    {
+        using var model = new WorkbenchModel(_root);
+        model.Reload();
+        var story = model.Story!;
+        var scene = new SceneId("scene1");
+
+        var defaultPreview = MapScenePreviewBuilder.Build(story, scene, model.PreviewState, usesCurrentRunState: false);
+        Assert.Equal(["Wait"], defaultPreview.Choices.Select(choice => choice.Text));
+
+        var ready = Assert.Single(model.Flags);
+        ready.Enabled = true;
+        ready.Value = true;
+        var setupPreview = MapScenePreviewBuilder.Build(story, scene, model.PreviewState, usesCurrentRunState: false);
+        Assert.Equal(["Prepared", "Wait"], setupPreview.Choices.Select(choice => choice.Text));
+
+        model.Start();
+        var currentPreview = MapScenePreviewBuilder.Build(story, scene, model.PreviewState, usesCurrentRunState: true);
+        Assert.Equal(["Prepared", "Wait"], currentPreview.Choices.Select(choice => choice.Text));
+        Assert.True(currentPreview.UsesCurrentRunState);
+    }
+
+    [Fact]
     public void Live_fields_apply_atomically_navigate_jump_and_retain_commands_across_reload()
     {
         var path = Path.Combine(_root, "main.tale");

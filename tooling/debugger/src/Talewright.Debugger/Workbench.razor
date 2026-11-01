@@ -161,7 +161,8 @@
     @if (Model.Story is { } mapStory && _mapOpened)
     {
         <div role="tabpanel" id="map-panel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
-            <MapTab Story="mapStory" />
+            <MapTab Story="mapStory" Session="Model.Session" Inspection="Model.Inspection"
+                    PreviewState="Model.PreviewState" />
         </div>
     }
 </main>

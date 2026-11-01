@@ -1,5 +1,7 @@
 @using Microsoft.JSInterop
+@using Talewright.Core.State
 @inject IJSRuntime JS
+@implements IDisposable
 
 <p>Every scene, divert and hub offer from the last successful compilation. Scenes the start scene can't reach through diverts and hub offers are drawn in a separate area on the right; reachability doesn't check whether conditions can be met.</p>
 @if (_error is not null)
@@ -7,38 +9,132 @@
     <p role="alert" class="tw-error">@_error</p>
 }
 <div class="story-map" @ref="_host"></div>
+@if (_previewError is not null)
+{
+    <p role="alert" class="tw-error">@_previewError</p>
+}
+@if (_preview is { } preview)
+{
+    <section class="map-preview" aria-label="Scene preview">
+        <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
+        <p>Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
+        <DocumentView Document="preview.Document" />
+        <h4>Available choices in this preview</h4>
+        @if (preview.Choices.Count == 0)
+        {
+            <p>No choices are available in this preview.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var choice in preview.Choices)
+                {
+                    <li>@choice.Text</li>
+                }
+            </ul>
+        }
+    </section>
+}
 
 @code {
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+    [Parameter] public AuthorSession? Session { get; set; }
+    [Parameter] public AuthorInspection? Inspection { get; set; }
+    [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
 
     private ElementReference _host;
     private StoryDefinition? _rendered;
     private MapView? _view;
+    private AuthorInspection? _renderedInspection;
+    private DotNetObjectReference<MapTab>? _reference;
+    private SceneId? _selectedScene;
+    private MapScenePreview? _preview;
     private string? _error;
+    private string? _previewError;
 
     protected override void OnParametersSet()
     {
         if (!ReferenceEquals(Story, _rendered))
+        {
             _view = MapView.Build(Story);
+            if (_selectedScene is { } selected && !Story.Scenes.Any(scene => scene.Id == selected))
+                _selectedScene = null;
+        }
+
+        if (_selectedScene is { } sceneId)
+            BuildPreview(sceneId);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_view is null || ReferenceEquals(Story, _rendered))
+        if (_view is not null && !ReferenceEquals(Story, _rendered))
+        {
+            _rendered = Story;
+            _reference ??= DotNetObjectReference.Create(this);
+            _renderedInspection = Inspection;
+            try
+            {
+                await JS.InvokeVoidAsync("talewrightMap.render", _host, _view,
+                    Session is null ? null : MapRunView.Build(Story, _view, Session), _reference);
+                _error = null;
+            }
+            catch (JSException ex)
+            {
+                _error = $"The map could not be drawn: {ex.Message}";
+                StateHasChanged();
+            }
             return;
-        _rendered = Story;
+        }
+
+        if (ReferenceEquals(Inspection, _renderedInspection) || _view is null)
+            return;
+        _renderedInspection = Inspection;
         try
         {
-            await JS.InvokeVoidAsync("talewrightMap.render", _host, _view);
-            if (_error is null)
-                return;
-            _error = null;
+            await JS.InvokeVoidAsync("talewrightMap.updateRun", _host,
+                Session is null ? null : MapRunView.Build(Story, _view, Session));
         }
         catch (JSException ex)
         {
-            _error = $"The map could not be drawn: {ex.Message}";
+            _error = $"The map route could not be updated: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public Task SelectScene(string scene)
+    {
+        if (scene == "END")
+        {
+            _selectedScene = null;
+            _preview = null;
+            _previewError = null;
+            return InvokeAsync(StateHasChanged);
         }
 
-        StateHasChanged();
+        var definition = Story.Scenes.SingleOrDefault(candidate => candidate.Id.Value == scene)
+            ?? throw new ArgumentException($"Unknown scene '{scene}'.", nameof(scene));
+        _selectedScene = definition.Id;
+        BuildPreview(definition.Id);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildPreview(SceneId scene)
+    {
+        try
+        {
+            _preview = MapScenePreviewBuilder.Build(Story, scene, PreviewState, Session is not null);
+            _previewError = null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException or ArithmeticException)
+        {
+            _preview = null;
+            _previewError = $"The scene preview could not be rendered: {ex.Message}";
+        }
+    }
+
+    public void Dispose()
+    {
+        _reference?.Dispose();
     }
 }

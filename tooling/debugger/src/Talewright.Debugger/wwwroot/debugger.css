@@ -26,3 +26,6 @@
 .map-details ul { list-style: none; padding: 0; }
 .map-details li { margin: .25rem 0; }
 .map-details .map-item { text-align: left; }
+.map-route ol { max-height: 16rem; overflow: auto; }
+.map-route li { margin: .25rem 0; }
+.map-preview ul { padding-inline-start: 1.5rem; }
