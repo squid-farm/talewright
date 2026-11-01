@@ -40,6 +40,24 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Settings_dialog_exposes_theme_choices_on_desktop()
+    {
+        await Driver.StartAsync();
+        await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var snapshot = await Assert.IsType<NativePlayerDriver>(Driver).SnapshotAsync();
+        foreach (var label in new[] { "Settings", "Theme", "System", "Light", "Dark", "Close settings" })
+        {
+            Assert.Contains(label, snapshot.Content);
+        }
+
+        await Driver.PressAsync("Escape");
+    }
+
+    [Fact]
     public async Task Folder_and_multiple_cli_paths_are_available_in_library()
     {
         var directory = Path.Combine(_fixtures, "linear");

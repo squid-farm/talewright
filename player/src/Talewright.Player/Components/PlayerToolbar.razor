@@ -1,5 +1,6 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 
 <header class="tw-bar" aria-label="Player toolbar" @ref="_bar">
     <h1>@Title</h1>
@@ -23,6 +24,7 @@
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
                     disabled="@(Busy || ReadingHistory || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
+                <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="OpenSettings">Settings</button>
                 <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
                 {
@@ -37,6 +39,23 @@
            role="@(Error ? "alert" : "status")">@Message</p>
     }
 </header>
+
+<dialog class="tw-settings" aria-labelledby="tw-settings-heading" @ref="_settings">
+    <h2 id="tw-settings-heading">Settings</h2>
+    <label for="tw-theme">Theme</label>
+    <select id="tw-theme" value="@_theme" @onchange="ChangeTheme">
+        <option value="@PlayerTheme.System">System</option>
+        <option value="@PlayerTheme.Light">Light</option>
+        <option value="@PlayerTheme.Dark">Dark</option>
+    </select>
+    @if (Preferences.Warning is not null)
+    {
+        <p class="tw-error" role="status">@Preferences.Warning</p>
+    }
+    <div class="tw-settings-actions">
+        <button type="button" class="tw-choice" @onclick="CloseSettings">Close settings</button>
+    </div>
+</dialog>
 
 <dialog class="tw-confirm" aria-label="Restart story?" @ref="_confirmation">
     <h2>Restart story?</h2>
@@ -65,11 +84,14 @@
     [Parameter] public bool ReadingHistory { get; set; }
     [Parameter] public EventCallback OnHistory { get; set; }
 
-    private ElementReference _bar, _toggle, _menu, _confirmation;
+    private ElementReference _bar, _toggle, _menu, _settings, _confirmation;
     private IJSObjectReference? _module;
     private bool _menuOpen;
     private bool _initialized;
     private bool _focusMenu;
+    private PlayerTheme _theme = PlayerTheme.System;
+
+    protected override void OnInitialized() => _theme = Preferences.Current.Theme;
 
     protected override void OnParametersSet()
     {
@@ -85,7 +107,7 @@
         if (firstRender)
         {
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/PlayerToolbar.razor.js");
-            await _module.InvokeVoidAsync("initialize", _bar, _toggle, _menu, _confirmation);
+            await _module.InvokeVoidAsync("initialize", _bar, _toggle, _menu, _confirmation, _settings);
             _initialized = true;
             StateHasChanged();
         }
@@ -106,6 +128,26 @@
     {
         _menuOpen = false;
         await _module!.InvokeVoidAsync("openConfirmation", _confirmation);
+    }
+
+    private async Task OpenSettings()
+    {
+        _menuOpen = false;
+        await _module!.InvokeVoidAsync("openSettings", _menu, _settings);
+    }
+
+    private async Task CloseSettings() =>
+        await _module!.InvokeVoidAsync("closeSettings", _settings, _toggle);
+
+    private async Task ChangeTheme(ChangeEventArgs args)
+    {
+        if (!Enum.TryParse<PlayerTheme>(args.Value?.ToString(), out var theme) || !Enum.IsDefined(theme))
+        {
+            throw new InvalidOperationException($"Unknown theme selection '{args.Value}'.");
+        }
+
+        await Preferences.SetThemeAsync(theme);
+        _theme = theme;
     }
 
     private async Task CancelRestart() =>

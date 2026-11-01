@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor;
 using Talewright.Player.Library;
+using Talewright.Player.Preferences;
 using Talewright.Runtime.Saves;
 
 namespace Talewright.Host.Desktop;
@@ -42,6 +43,7 @@ internal static class Program
         var options = new DesktopOptions(paths.Count > 0 ? $"1|{Path.GetFullPath(paths[0])}" : null, launch.LibraryEnabled);
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<ISaveStore>(new FileSaveStore(FileSaveStore.DefaultRoot));
+        builder.Services.AddScoped<PlayerPreferencesStore>();
         builder.RootComponents.Add<App>("app");
 
         var app = builder.Build();
