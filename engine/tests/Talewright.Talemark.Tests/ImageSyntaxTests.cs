@@ -36,10 +36,10 @@ public sealed class ImageSyntaxTests
 
     [Theory]
     [InlineData("""{image("maps/camp", "The camp")}""", "maps/camp", "The camp")]
-    [InlineData("""{image("maps/sector (west), v2", "Joel's {player:name} #upper **map**")}""",
-        "maps/sector (west), v2", "Joel's {player:name} #upper **map**")]
+    [InlineData("""{image("maps/sector (west), v2", "Joel's map #upper (west)")}""",
+        "maps/sector (west), v2", "Joel's map #upper (west)")]
     [InlineData("""{image("a\"b", "He said \"Go\"; \\ remains.")}""", "a\"b", "He said \"Go\"; \\ remains.")]
-    [InlineData("""{ image ( "camp" , "A } ] { camp" ) }""", "camp", "A } ] { camp")]
+    [InlineData("""{ image ( "camp" , "A } ] \{ camp" ) }""", "camp", "A } ] { camp")]
     [InlineData("""{image("camp")}""", "camp", "Camp")]
     [InlineData("""{image("camp", "")}""", "camp", "Camp")]
     [InlineData("""{image("camp", "  ")}""", "camp", "Camp")]
@@ -145,6 +145,7 @@ public sealed class ImageSyntaxTests
     [InlineData("""{image("camp", "Alt"}""", "Expected ')'")]
     [InlineData("""{image("camp")#upper}""", "Unexpected text")]
     [InlineData("""{image("camp", "\q")}""", "Unknown image string escape")]
+    [InlineData("""{image("ca\{mp", "Alt")}""", "Unknown image string escape")]
     [InlineData("""{image("camp", "unclosed)}""", "closing double quote")]
     [InlineData("""{image("camp")""", "closing '}'")]
     public void Invalid_images_have_actionable_diagnostics_and_do_not_hide_the_next_scene(string call, string message)

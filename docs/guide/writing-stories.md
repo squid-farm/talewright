@@ -348,8 +348,9 @@ choice labels, formatting and conditional text. They display in browser and desk
 including story ZIPs and published games.
 
 The second argument is **alt text**: a description for readers who cannot see the image and for
-cases where the image cannot load. It is literal text, not a substitution:
-`"{player:first-name}"` would display those exact characters rather than the player's name.
+cases where the image cannot load. It accepts the same substitutions as the rest of the story.
+`{image("places/harbour.png", "{guide:first-name} at the harbour")}` shows the guide's name.
+Write `\{` for a literal brace. The path stays a filename, not a substitution.
 Use `\"` for a quote inside an argument and `\\` for a backslash.
 
 Checking your story catches missing image files, unsupported formats and unsafe paths.

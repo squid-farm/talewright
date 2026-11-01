@@ -19,6 +19,17 @@ internal sealed class SourceText
 {
     private readonly List<(int Start, SourceLocation Location)> _lines = [];
     private readonly StringBuilder _text = new();
+    private readonly SourceLocation[]? _locations;
+
+    internal SourceText()
+    {
+    }
+
+    private SourceText(string text, SourceLocation[] locations)
+    {
+        _text.Append(text);
+        _locations = locations;
+    }
 
     public string Text => _text.ToString();
 
@@ -44,6 +55,12 @@ internal sealed class SourceText
 
     public SourceLocation Locate(int offset)
     {
+        if (_locations is { Length: > 0 })
+        {
+            var index = offset < 0 ? 0 : Math.Min(offset, _locations.Length - 1);
+            return _locations[index];
+        }
+
         for (var i = _lines.Count - 1; i >= 0; i--)
         {
             if (offset >= _lines[i].Start)
@@ -53,6 +70,20 @@ internal sealed class SourceText
         }
 
         return _lines.Count > 0 ? _lines[0].Location : SourceLocation.None;
+    }
+
+    /// <summary>
+    /// A string whose characters are not a 1:1 slice of a source line.
+    /// <paramref name="locations"/> has one entry per character, plus a final entry for the position after the text.
+    /// </summary>
+    public static SourceText Mapped(string text, IReadOnlyList<SourceLocation> locations)
+    {
+        if (locations.Count != text.Length + 1)
+        {
+            throw new ArgumentException("A mapped source needs one location per character and one trailing location.", nameof(locations));
+        }
+
+        return new SourceText(text, locations as SourceLocation[] ?? locations.ToArray());
     }
 }
 
@@ -101,7 +132,7 @@ internal static class InlineParser
 
     private sealed record EndIfPiece(SourceLocation Location) : Piece;
 
-    private sealed class Context(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics)
+    private sealed class Context(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics, bool allowImages)
     {
         public SourceText Source { get; } = source;
         public StorySymbols Symbols { get; } = symbols;
@@ -109,12 +140,14 @@ internal static class InlineParser
         public List<Piece?> Fragments { get; } = [];
         // Map Markdig's masked offsets back to authored text for migration diagnostics.
         public List<(int Offset, int Delta, int Start, int Length)> MaskedOffsets { get; } = [];
+        public bool AllowImages { get; } = allowImages;
     }
 
     /// <summary>Parses prose. Errors are reported to <paramref name="diagnostics"/>; the result is still usable.</summary>
-    public static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics)
+    public static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
+        bool allowImages = true)
     {
-        var context = new Context(source, symbols, diagnostics);
+        var context = new Context(source, symbols, diagnostics, allowImages);
         var masked = Mask(context);
         var document = Markdown.Parse(masked, Pipeline);
         var pieces = new List<Piece>();
@@ -163,8 +196,17 @@ internal static class InlineParser
             {
                 if (ImageSyntax.IsCall(text.AsSpan(i + 1)))
                 {
-                    ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics,
-                        context.Symbols.ImageSource, context.Symbols.Analysis);
+                    if (!context.AllowImages)
+                    {
+                        context.Diagnostics.Error("TW1014",
+                            "Image alt text cannot contain {image(...)}. Write the description as text.",
+                            context.Source.Locate(i));
+                    }
+                    else
+                    {
+                        ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics, context.Symbols);
+                    }
+
                     break;
                 }
 
@@ -193,12 +235,21 @@ internal static class InlineParser
             Piece? fragment;
             if (image)
             {
-                var lead = inner.Length - inner.TrimStart().Length;
-                context.Symbols.Analysis?.Tokens.Add(new("image",
-                    new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 1 + lead + 5))));
-                var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics,
-                    context.Symbols.ImageSource, context.Symbols.Analysis);
-                fragment = media is null ? null : new InlinePiece(media);
+                if (!context.AllowImages)
+                {
+                    context.Diagnostics.Error("TW1014",
+                        "Image alt text cannot contain {image(...)}. Write the description as text.",
+                        context.Source.Locate(i));
+                    fragment = null;
+                }
+                else
+                {
+                    var lead = inner.Length - inner.TrimStart().Length;
+                    context.Symbols.Analysis?.Tokens.Add(new("image",
+                        new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 1 + lead + 5))));
+                    var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics, context.Symbols);
+                    fragment = media is null ? null : new InlinePiece(media);
+                }
             }
             else
             {

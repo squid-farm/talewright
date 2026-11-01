@@ -8,6 +8,12 @@ public sealed class DottedPrefixCompletionTests
 {
     [Theory]
     [InlineData("{item:weapon.|}", "weapon.knife,weapon.sword")]
+    [InlineData("{image(\"camp\", \"{item:weapon.|}\")}", "weapon.knife,weapon.sword")]
+    [InlineData("""{image("camp", "{item:weapon.|""", "weapon.knife,weapon.sword")]
+    [InlineData("""{image("camp", "{item:weapon.|}""", "weapon.knife,weapon.sword")]
+    [InlineData("""{image("camp", "{item:weapon.|)""", "weapon.knife,weapon.sword")]
+    [InlineData("""> player: {image("camp", "{item:weapon.|""", "weapon.knife,weapon.sword")]
+    [InlineData("""* [{image("camp", "{item:weapon.|""", "weapon.knife,weapon.sword")]
     [InlineData("{weapon.|}", "weapon.keeper")]
     [InlineData("{faction:weapon.|}", "weapon.knights")]
     [InlineData("{flag:weapon.|}", "weapon.known")]

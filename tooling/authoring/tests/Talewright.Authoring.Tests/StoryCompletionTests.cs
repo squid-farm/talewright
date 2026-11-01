@@ -85,14 +85,52 @@ public sealed class StoryCompletionTests
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "second");
     }
 
+    [Fact]
+    public void Image_paths_do_not_offer_expression_completions()
+    {
+        var (analysis, position) = Analyze("=== first\n{image(\"sec|ond\", \"Map\")}");
+        Assert.Empty(StoryCompletion.Complete(analysis, position));
+    }
+
     [Theory]
-    [InlineData("""{image("sec|ond", "Map")}""")]
     [InlineData("""{image("map", "{player:|}")}""")]
     [InlineData("""{image("map", "{player:|}")""")]
-    public void Literal_image_arguments_do_not_offer_expression_completions(string marked)
+    [InlineData("""{image("map", "{player:|""")]
+    [InlineData("""{image("map", "{player:|}""")]
+    [InlineData("""{image("map", "{player:|)""")]
+    [InlineData("""> guide: {image("map", "{player:|""")]
+    [InlineData("""> guide: {image("map", "{player:|}""")]
+    [InlineData("""* [Go {image("map", "{player:|""")]
+    [InlineData("""* [Go {image("map", "{player:|}""")]
+    public void Image_alt_text_offers_the_same_substitutions_as_prose(string marked)
     {
         var (analysis, position) = Analyze("=== first\n" + marked);
-        Assert.Empty(StoryCompletion.Complete(analysis, position));
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == "first-name");
+    }
+
+    [Theory]
+    [InlineData("""{image("map", "{player:fir""")]
+    [InlineData("""{image("map", "{player:fir}""")]
+    [InlineData("""{image("map", "{player:fir)""")]
+    [InlineData("""> guide: {image("map", "{player:fir""")]
+    [InlineData("""* [Go {image("map", "{player:fir""")]
+    public void Unclosed_alt_quote_reports_only_the_missing_quote(string line)
+    {
+        var (analysis, _) = Analyze("=== first\n" + line + "|\n-> END");
+        var errors = analysis.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (line.StartsWith("*", StringComparison.Ordinal))
+        {
+            Assert.Equal(["TW1014", "TW1011"], errors.Select(diagnostic => diagnostic.Code));
+        }
+        else
+        {
+            var diagnostic = Assert.Single(errors);
+            Assert.Equal("TW1014", diagnostic.Code);
+        }
+
+        var quote = Assert.Single(errors, diagnostic => diagnostic.Code == "TW1014");
+        Assert.Contains("closing double quote", quote.Message);
+        Assert.DoesNotContain(errors, diagnostic => diagnostic.Code is "TW1004" or "TW2001");
     }
 
     [Theory]

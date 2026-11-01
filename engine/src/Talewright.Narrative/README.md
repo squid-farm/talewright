@@ -25,5 +25,6 @@ RenderedParagraph[ RenderedText("Mara's", None), RenderedText(" torch", Strong) 
 - **New `#modifier`**: `registry.Register(new DelegateTextModifier("shout", (text, ctx) => text.ToUpperInvariant() + "!"))`
   and pass the registry in `CompilerOptions.Modifiers` (the compiler validates modifier names at load time).
 - **Different grammar/language**: implement `IGrammar` and pass it to `StorySession`.
-- **Media**: `MediaTemplate` → `RenderedMedia(MediaId, AltText)` already flows through. A front-end decides how
+- **Media**: `MediaTemplate` → `RenderedMedia(MediaId, AltText)`. Literal alt is copied. An alt template
+  renders with the same state as the surrounding prose, then becomes the plain alt string. A front-end decides how
   (or whether) to show it.

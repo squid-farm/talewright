@@ -124,7 +124,35 @@
           "end": "\\}|(?=$)",
           "endCaptures": {"0": {"name": "punctuation.section.template.end.tale"}},
           "name": "meta.image.tale",
-          "patterns": [{"include": "#expression"}]
+          "patterns": [
+            {
+              "begin": "\"",
+              "end": "\"|(?=$)",
+              "name": "string.quoted.double.tale",
+              "patterns": [
+                {"match": "\\\\[\"\\\\]", "name": "constant.character.escape.tale"},
+                {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"}
+              ]
+            },
+            {
+              "applyEndPatternLast": true,
+              "begin": ",",
+              "end": "(?=\\))|(?=$)",
+              "patterns": [
+                {
+                  "applyEndPatternLast": true,
+                  "begin": "\"",
+                  "end": "\"|(?=$)",
+                  "name": "string.quoted.double.tale",
+                  "patterns": [
+                    {"match": "\\\\[\"\\\\{}]", "name": "constant.character.escape.tale"},
+                    {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"},
+                    {"include": "#template"}
+                  ]
+                }
+              ]
+            }
+          ]
         },
         {
           "begin": "(\\{)(/?if|else)\\b",

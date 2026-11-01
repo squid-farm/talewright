@@ -35,8 +35,15 @@ public sealed record StyledTemplate(TextStyle Style, IReadOnlyList<TemplateInlin
 
 public sealed record LineBreakTemplate : TemplateInline;
 
-/// <summary>Image media with a resolved story-root-relative asset path and effective alt text; presentation is separate.</summary>
-public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInline;
+/// <summary>
+/// Image media with a resolved story-root-relative asset path. <see cref="AltText"/> is the literal alt,
+/// including the filename fallback. When <see cref="AltTemplate"/> is set, rendering uses that template
+/// and the state where the image appears. Presentation is separate.
+/// </summary>
+public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInline
+{
+    public IReadOnlyList<TemplateInline>? AltTemplate { get; init; }
+}
 
 /// <summary>
 /// <c>{player:first-name#possessive}</c>: a value plus a chain of text modifiers.

@@ -272,10 +272,11 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     Missing, empty or whitespace-only alt text warns and uses Humanizer.Core 3.0.10 to
     turn the filename into words, then applies invariant sentence case. For example,
     `old_map-v2.png` becomes `Old map v2`; punctuation-only names become `Image`.
-    Author-written alt text is preserved exactly. All diagnostics point to the reference.
-    Ordinary compilation, `talewright validate` and editor analysis use this resolver
+    Author-written literal alt text is preserved after escape decoding. Alt that contains a
+    template is parsed with the prose template language and rendered later. All diagnostics point
+    to the reference. Ordinary compilation, `talewright validate` and editor analysis use this resolver
     for well-formed image calls. Compiled `MediaTemplate` nodes store the selected
-    story-root-relative path and effective alt text. Editor completion also reuses
+    story-root-relative path and either that literal alt or the alt template. Editor completion also reuses
     the resolver's supported safe-path catalogue. Lookup diagnostics point to the
     path's authored opening quote, and malformed calls receive only parser diagnostics.
     This adds no image rendering, byte decoding or image size checks.

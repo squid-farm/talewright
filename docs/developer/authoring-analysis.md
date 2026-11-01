@@ -38,7 +38,7 @@ does not invent a repaired manifest or reuse stale symbols from a prior snapshot
 Diagnostics include the compiler's diagnostics for that exact input, including
 TW2010–TW2014 from the shared image resolver, reported once per image reference.
 Lookup reads the source's image catalogue, not image bytes. Compilation stores
-resolved paths and effective alt text in media nodes; presentation stays separate.
+resolved paths and either literal alt text or an alt template in media nodes; presentation renders the alt.
 If a missing or malformed manifest prevents normal compilation, editor recovery
 still retains image completion slots and lookup diagnostics from the available
 narrative without inventing a repaired manifest.

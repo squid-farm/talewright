@@ -553,7 +553,7 @@ internal sealed partial class TaleParser
                 if (_discoverEffects is null && unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1)))
                 {
                     ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
-                        rest.Length, false, _diagnostics, _symbols.ImageSource, _symbols.Analysis);
+                        rest.Length, false, _diagnostics, _symbols);
                 }
                 else if (_discoverEffects is null && unclosedBrace >= 0)
                 {

@@ -85,7 +85,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
                     output.Add(new RenderedLineBreak());
                     break;
                 case MediaTemplate m:
-                    output.Add(new RenderedMedia(m.MediaId, m.AltText) { Style = style });
+                    output.Add(new RenderedMedia(m.MediaId, RenderAlt(m, context)) { Style = style });
                     break;
                 case SubstitutionTemplate s:
                     output.Add(new RenderedText(Substitute(s, context), style));
@@ -97,6 +97,18 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
                     throw new NotSupportedException($"Unknown inline {inline.GetType().Name}.");
             }
         }
+    }
+
+    private string RenderAlt(MediaTemplate media, EvaluationContext context)
+    {
+        if (media.AltTemplate is not { } alt)
+        {
+            return media.AltText;
+        }
+
+        var rendered = new List<RenderedInline>();
+        RenderInlines(alt, TextStyle.None, context, rendered);
+        return RenderedInline.ToPlainText(Normalize(rendered));
     }
 
     private string Substitute(SubstitutionTemplate substitution, EvaluationContext context)
