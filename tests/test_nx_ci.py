@@ -112,17 +112,43 @@ class CiRoutingTests(unittest.TestCase):
             for group, tasks in actual.items()
         })
 
-    def test_editor_and_documentation_plans_do_not_run_product_jobs(self):
+    def test_editor_and_documentation_plans_select_expected_groups(self):
         for changed, expected in [
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),
             ("tooling/vscode-talewright/snippets/tale.json", {"editor"}),
             ("docs/guide/first-story.md", {"checks", "editor"}),
             ("docs/developer/architecture.md", {"checks"}),
-            ("docs/reference/diagnostics.md", {"checks"}),
+            ("docs/reference/diagnostics.md", {"checks", "unit"}),
         ]:
             with self.subTest(changed=changed):
                 plan = make_plan(affected_graph(changed))
                 self.assertEqual(expected, {group for group, tasks in plan.items() if tasks})
+
+    def test_diagnostic_reference_selects_compiler_units_and_docs_only(self):
+        plan = make_plan(affected_graph("docs/reference/diagnostics.md"))
+        self.assertEqual(
+            [{"project": "Talewright.Talemark.Tests", "target": "test"}], plan["unit"],
+        )
+        self.assertEqual(
+            [{"project": "talewright-docs", "target": "check"}], plan["checks"],
+        )
+        for group in ("build", "editor", "browser", "linux-desktop"):
+            self.assertEqual([], plan[group])
+
+    def test_compiler_test_inputs_preserve_workspace_test_inputs(self):
+        project = json.loads((ROOT / "engine/tests/Talewright.Talemark.Tests/project.json").read_text())
+        workspace = json.loads((ROOT / "nx.json").read_text())
+        inputs = project["targets"]["test"]["inputs"]
+        for shared in workspace["targetDefaults"]["test"]["inputs"]:
+            self.assertIn(shared, inputs)
+        self.assertIn("{workspaceRoot}/docs/reference/diagnostics.md", inputs)
+
+    def test_diagnostic_contract_routing_changes_select_the_ci_suite(self):
+        plan = make_plan(affected_graph("engine/tests/Talewright.Talemark.Tests/project.json"))
+        self.assertIn(
+            {"project": "talewright-ci-tests", "target": "ci-check"},
+            plan["checks"],
+        )
 
     def test_documented_manifests_select_only_schema_verification(self):
         schema_test = ROOT / "tooling/vscode-talewright/tests/story-schema.test.mjs"

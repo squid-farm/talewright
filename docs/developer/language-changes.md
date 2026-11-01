@@ -47,6 +47,11 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 
 - [ ] Test canonical examples and invalid inputs, not just token acceptance. Cover quoted punctuation,
   escapes, defaults, modifier order, old spellings and identifier collisions where applicable.
+- [ ] For each new compiler diagnostic, use a literal code in the compiler source, document its meaning
+  in the [diagnostic reference](../reference/diagnostics.md), and add an emitting fixture to
+  [CompilerDiagnosticCoverageTests](../../engine/tests/Talewright.Talemark.Tests/CompilerDiagnosticCoverageTests.cs).
+  The contract compiles each fixture and checks the actual code and severity; add a valid counterpart and
+  precise location checks for the changed syntax. Authoring and lint codes have their own scope and tests.
 - [ ] Verify dotted-prefix completion in each relevant symbol category. For example, `weapon.`
   must offer only matching `weapon.*` names, with the correct whole-token replacement range.
   Record gaps and route follow-up tracker changes through the project manager.

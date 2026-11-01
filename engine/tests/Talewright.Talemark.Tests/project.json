@@ -6,6 +6,17 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build:release"],
       "cache": false,
+      "inputs": [
+        "default",
+        "^production",
+        {"workingDirectory": "absolute"},
+        {"dependentTasksOutputFiles": "**/*"},
+        {"env": "NUGET_PACKAGES"},
+        "{workspaceRoot}/Directory.Build.props",
+        "{workspaceRoot}/global.json",
+        "testWorkflow",
+        "{workspaceRoot}/docs/reference/diagnostics.md"
+      ],
       "options": {
         "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests'",
         "cwd": "engine/tests/Talewright.Talemark.Tests"
