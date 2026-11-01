@@ -58,6 +58,7 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW1013", Scene("::: skill-check athletics dc\nsuccess:\nfailure:\n:::\n-> END")),
         Error("TW1014", Scene("{image()}\n-> END")),
         Error("TW1015", Scene("![Alt](map)\n-> END")),
+        Error("TW1016", Scene($"@requires {new string('(', 257)}true{new string(')', 257)}\n-> END")),
 
         Error("TW2001", Scene("{player:strenght}\n-> END")),
         Error("TW2002", Scene("-> nowhere")),

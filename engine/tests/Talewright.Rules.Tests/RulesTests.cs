@@ -47,6 +47,53 @@ public class RulesTests
     }
 
     [Fact]
+    public void Evaluates_long_left_deep_expressions_without_recursion()
+    {
+        Expr expression = new NumberLiteral(0);
+        for (var index = 0; index < 20_000; index++)
+            expression = new BinaryExpr(BinaryOp.Add, expression, new NumberLiteral(1));
+
+        Assert.Equal(20_000, Eval(expression, NewLog()).Number);
+    }
+
+    [Fact]
+    public void Traces_deep_short_circuited_expressions_without_recursion()
+    {
+        Expr skipped = new BoolLiteral(true);
+        for (var index = 0; index < 10_000; index++)
+            skipped = new BinaryExpr(BinaryOp.Or, new BoolLiteral(false), skipped);
+        var expression = new BinaryExpr(BinaryOp.And, new BoolLiteral(false), skipped);
+        ExpressionTrace? trace = null;
+        var context = EvaluationContext.For(NewLog().State) with { Trace = result => trace = result };
+
+        Assert.False(ExpressionEvaluator.IsTrue(expression, context));
+
+        var skippedTrace = Assert.Single(Assert.IsType<ExpressionTrace>(trace).Children.Skip(1));
+        var pending = new Stack<ExpressionTrace>();
+        pending.Push(skippedTrace);
+        var count = 0;
+        while (pending.TryPop(out var current))
+        {
+            Assert.Null(current.Result);
+            count++;
+            foreach (var child in current.Children)
+                pending.Push(child);
+        }
+        Assert.Equal(20_001, count);
+    }
+
+    [Fact]
+    public void Traces_a_standalone_literal()
+    {
+        ExpressionTrace? trace = null;
+        var context = EvaluationContext.For(NewLog().State) with { Trace = result => trace = result };
+
+        Assert.True(ExpressionEvaluator.IsTrue(new BoolLiteral(true), context));
+
+        Assert.Equal(Value.Of(true), Assert.IsType<ExpressionTrace>(trace).Result);
+    }
+
+    [Fact]
     public void Tier_comparisons_use_tier_order()
     {
         var log = NewLog();

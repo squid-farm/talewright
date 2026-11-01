@@ -145,6 +145,18 @@ public sealed partial class ExpressionViewTests
         Assert.Equal([(2, "true", "true")], Nodes(html));
     }
 
+    [Fact]
+    public async Task Long_expression_trace_is_truncated_for_display_without_recursion()
+    {
+        Expr expression = new BoolLiteral(false);
+        for (var index = 0; index < 500; index++)
+            expression = new BinaryExpr(BinaryOp.And, expression, new BoolLiteral(true));
+
+        var html = await RenderTrace(ExpressionTrace.NotEvaluated(expression));
+
+        Assert.Contains("Additional expression details omitted.", html);
+    }
+
     private sealed record UnsupportedExpr : Expr
     {
         public override ExprType Type => ExprType.Bool;

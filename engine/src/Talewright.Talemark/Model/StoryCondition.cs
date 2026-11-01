@@ -97,38 +97,43 @@ public sealed class StoryCondition
 
     private static void AddReads(Expr expression, List<StoryStateRead> reads, HashSet<StoryStateRead> seen)
     {
-        switch (expression)
+        var pending = new Stack<Expr>();
+        pending.Push(expression);
+        while (pending.TryPop(out var current))
         {
-            case NumberLiteral or BoolLiteral or TextLiteral or TierLiteral:
-                return;
-            case UnaryExpr unary:
-                AddReads(unary.Operand, reads, seen);
-                return;
-            case BinaryExpr binary:
-                AddReads(binary.Left, reads, seen);
-                AddReads(binary.Right, reads, seen);
-                return;
-        }
+            switch (current)
+            {
+                case NumberLiteral or BoolLiteral or TextLiteral or TierLiteral:
+                    continue;
+                case UnaryExpr unary:
+                    pending.Push(unary.Operand);
+                    continue;
+                case BinaryExpr binary:
+                    pending.Push(binary.Right);
+                    pending.Push(binary.Left);
+                    continue;
+            }
 
-        var read = expression switch
-        {
-            StatRef value => Create(StoryStateReadKind.Stat, value),
-            StandingRef value => Create(StoryStateReadKind.Standing, value),
-            StandingTierRef value => Create(StoryStateReadKind.StandingTier, value),
-            FlagRef value => Create(StoryStateReadKind.Flag, value),
-            VarRef value => Create(StoryStateReadKind.NumberVariable, value),
-            TextVarRef value => Create(StoryStateReadKind.TextVariable, value),
-            NameRef value => Create(StoryStateReadKind.CharacterName, value),
-            PronounRef value => Create(StoryStateReadKind.CharacterPronoun, value),
-            FactionNameRef value => Create(StoryStateReadKind.FactionName, value),
-            ItemNameRef value => Create(StoryStateReadKind.ItemName, value),
-            HasItem value => Create(StoryStateReadKind.ItemsHeld, value),
-            Visited value => Create(StoryStateReadKind.VisitedScene, value),
-            NamedPredicate value => Create(StoryStateReadKind.NamedPredicate, value, isOpaque: true),
-            _ => throw new NotSupportedException($"Expression kind '{expression.GetType().Name}' has no story-read visitor."),
-        };
-        if (seen.Add(read))
-            reads.Add(read);
+            var read = current switch
+            {
+                StatRef value => Create(StoryStateReadKind.Stat, value),
+                StandingRef value => Create(StoryStateReadKind.Standing, value),
+                StandingTierRef value => Create(StoryStateReadKind.StandingTier, value),
+                FlagRef value => Create(StoryStateReadKind.Flag, value),
+                VarRef value => Create(StoryStateReadKind.NumberVariable, value),
+                TextVarRef value => Create(StoryStateReadKind.TextVariable, value),
+                NameRef value => Create(StoryStateReadKind.CharacterName, value),
+                PronounRef value => Create(StoryStateReadKind.CharacterPronoun, value),
+                FactionNameRef value => Create(StoryStateReadKind.FactionName, value),
+                ItemNameRef value => Create(StoryStateReadKind.ItemName, value),
+                HasItem value => Create(StoryStateReadKind.ItemsHeld, value),
+                Visited value => Create(StoryStateReadKind.VisitedScene, value),
+                NamedPredicate value => Create(StoryStateReadKind.NamedPredicate, value, isOpaque: true),
+                _ => throw new NotSupportedException($"Expression kind '{current.GetType().Name}' has no story-read visitor."),
+            };
+            if (seen.Add(read))
+                reads.Add(read);
+        }
     }
 
     private static StoryStateRead Create(StoryStateReadKind kind, Expr expression, bool isOpaque = false) =>

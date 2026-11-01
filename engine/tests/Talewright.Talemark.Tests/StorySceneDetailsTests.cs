@@ -120,6 +120,16 @@ public sealed class StorySceneDetailsTests
     }
 
     [Fact]
+    public void Details_walk_long_flat_conditions_without_recursion()
+    {
+        var source = $"=== start\n@requires {string.Join(" and ", Enumerable.Repeat("true", 10_000))}\n-> END";
+
+        var details = Details(Compile(source), "start");
+
+        Assert.Equal(10_000, details.Requires.Text.Split(" and ").Length);
+    }
+
+    [Fact]
     public void Details_for_the_most_nested_LostRelic_scene_match_the_golden_snapshot()
     {
         var source = StorySource.FromDirectory(Path.Combine(RepositoryRoot().FullName, "samples", "LostRelic"));

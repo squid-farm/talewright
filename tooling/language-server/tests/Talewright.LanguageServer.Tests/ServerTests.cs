@@ -50,6 +50,22 @@ public sealed partial class ServerTests
         Assert.Equal(1, client.Process.ExitCode);
     }
 
+    [Fact]
+    public async Task Deep_expression_reports_a_diagnostic_and_the_server_answers_a_later_request()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var expression = new string('(', 100_000) + "true" + new string(')', 100_000);
+        await client.Open("start.tale", $"=== start\n@requires {expression}\n-> END\n", 1);
+
+        var diagnostics = await client.Diagnostics("start.tale", 1);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW1016");
+
+        var response = await client.Request("textDocument/signatureHelp", new { });
+        Assert.Equal(-32601, response.GetProperty("error").GetProperty("code").GetInt32());
+        Assert.False(client.Process.HasExited);
+    }
+
     [Theory]
     [InlineData("{", -32700)]
     [InlineData("{\"jsonrpc\":\"2.0\",\"method\":3}", -32600)]

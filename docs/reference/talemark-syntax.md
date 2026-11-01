@@ -364,6 +364,8 @@ would hide some; their requirements may change later.
 
 **Conditional structure.** A block `{if}` selects one branch once, when reached. Its nested steps run in
 order without retesting that condition. Inline conditions are evaluated when their prose line renders.
+Block and inline conditions each allow 64 nested `{if}` levels; expressions allow 256 nested groups
+and prefix operators combined. Deeper Markdown constructs may also be rejected with TW1016.
 Several conditional diverts may precede the choices; the first reached divert ends execution.
 
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed

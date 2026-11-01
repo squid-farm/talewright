@@ -47,7 +47,7 @@ You wonder what waited beyond the dream you abandoned.
 {/if}
 {if flag:guild-wary}
 The guild's letters stop coming. Then the guild's people start coming instead.
-// Nested conditionals and a compound and/or test. Blocks nest to any depth; `and` binds tighter than `or`,
+// Nested conditionals and a compound and/or test. Blocks nest up to 64 levels; `and` binds tighter than `or`,
 // and parentheses group as usual.
 {if player:level >= 2 and (player has idol or visited(temple.side))}
 You meet them at the door, rested and unhurried{if player has idol}, the {item:idol} watching from the
