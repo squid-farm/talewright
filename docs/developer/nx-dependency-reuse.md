@@ -219,8 +219,7 @@ On failure, its output identifies the retained directory for investigation.
 
 [Measurement tests](../../tests/test_nx_dependency_reuse.py) cover matching trial pairs, negative
 savings, failed/incomplete records, fresh-output isolation, pair-local stores, cleanup, and nonzero
-command propagation. The [Nx infrastructure scenarios](../../tests/test_nx_ci.py) explicitly
-route changes to the experiment script to checks only. Existing full/fallback, browser matrix,
+command propagation. Changes to the experiment script select only the CI checks. Existing full/fallback, browser matrix,
 serialized builds, and fail-closed aggregate contracts remain unchanged.
 
 Validation ran the existing 47 Nx regression cases. The new script initially required adding

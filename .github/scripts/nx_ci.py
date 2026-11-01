@@ -17,6 +17,7 @@ TARGETS = [
     "ci-check", "check", "budget", "editor-full", "editor-contract", "build:release",
 ]
 GROUPS = ("build", "unit", "browser", "linux-desktop", "editor", "checks")
+CHECK_TARGETS = ("ci-check", "check", "budget")
 
 
 def write_summary(content, *, stdout=False):
@@ -44,12 +45,16 @@ def selection_summary(plan, graph, args):
         lines.append(f"Revision: {code(revision)}.")
     if fallback and not args.full:
         lines.append("Conservative workspace fallback selected by the Nx graph.")
+    if not args.full:
+        lines.append("Every workspace check task runs on pull requests; "
+                     "other environments use affected selection.")
     if not any(plan.values()):
         lines.append("**No impact:** no verification tasks selected.")
-    lines.extend(["", "| Environment | Selected projects and targets |", "|---|---|"])
+    scopes = selection_scopes(args)
+    lines.extend(["", "| Environment | Scope | Selected projects and targets |", "|---|---|---|"])
     for group, tasks in plan.items():
         selected = ", ".join(code(f"{task['project']}:{task['target']}") for task in tasks)
-        lines.append(f"| {group} | {selected or 'Not selected'} |")
+        lines.append(f"| {group} | {scopes[group].capitalize()} | {selected or 'Not selected'} |")
     lines.extend(["", "Selection is graph-derived; execution timings appear in the work-job summaries."])
     return "\n".join(lines)
 
@@ -165,13 +170,38 @@ def make_plan(graph):
     return groups
 
 
+def selection_scopes(args):
+    if args.full:
+        return {group: "full" for group in GROUPS}
+    return {group: "complete" if group == "checks" else "affected" for group in GROUPS}
+
+
+def with_complete_checks(affected, checks):
+    """Merge every workspace check task into an affected graph before routing."""
+    merged = json.loads(json.dumps(affected))
+    merged["tasks"]["tasks"].update(checks["tasks"]["tasks"])
+    dependencies = merged["graph"]["dependencies"]
+    for project, edges in checks["graph"]["dependencies"].items():
+        known = dependencies.setdefault(project, [])
+        known.extend(edge for edge in edges if edge not in known)
+    return merged
+
+
+def task_graph(*command, targets=TARGETS):
+    result = nx(*command, "-t", *targets, "--dry-run", "--graph=stdout", capture=True)
+    return json.loads(result.stdout)
+
+
 def select(args):
-    command = ["run-many", "--all", "--exclude=talewright-workspace"] if args.full else [
-        "affected", f"--base={args.base}", f"--head={args.head}",
-    ]
+    every_project = ("run-many", "--all", "--exclude=talewright-workspace")
     try:
-        result = nx(*command, "-t", *TARGETS, "--dry-run", "--graph=stdout", capture=True)
-        graph = json.loads(result.stdout)
+        if args.full:
+            graph = task_graph(*every_project)
+        else:
+            graph = with_complete_checks(
+                task_graph("affected", f"--base={args.base}", f"--head={args.head}"),
+                task_graph(*every_project, targets=CHECK_TARGETS),
+            )
     except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
         write_summary("## Nx verification selection\n\n"
                       "**Incomplete:** graph selection failed; no successful selection is reported.")
@@ -183,8 +213,12 @@ def select(args):
     plan = make_plan(graph)
     args.plan.parent.mkdir(parents=True, exist_ok=True)
     args.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+    scopes = selection_scopes(args)
+    args.plan.with_name("selection.json").write_text(
+        json.dumps({"scopes": scopes}, indent=2) + "\n", encoding="utf-8",
+    )
     selected = {group: bool(tasks) for group, tasks in plan.items()}
-    print(json.dumps({"selected": selected, "tasks": plan}, indent=2))
+    print(json.dumps({"selected": selected, "scopes": scopes, "tasks": plan}, indent=2))
     if output := os.environ.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as stream:
             stream.write(f"selected={json.dumps(selected)}\n")
