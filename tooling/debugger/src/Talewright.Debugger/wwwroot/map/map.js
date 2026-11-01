@@ -221,8 +221,9 @@ window.talewrightMap = (() => {
     draw(state, { k: transform.k, x, y, x2, y2 });
   }
 
-  function draw(state, box) {
-    const { context: ctx, view, laid, colors } = state;
+  function draw(state, box, context = state.context) {
+    const { view, laid, colors } = state;
+    const ctx = context;
     const visible = (b, w = b.width, h = b.height) => b.x < box.x2 && b.x + w > box.x && b.y < box.y2 && b.y + h > box.y;
     const detail = box.k >= DETAIL_ZOOM;
     const width = value => Math.max(value, 0.45 / box.k);
@@ -366,6 +367,112 @@ window.talewrightMap = (() => {
       ].filter(Boolean);
       if (badges.length) text(badges.join(" · "), b.x + b.width - 6, b.y + 12, `bold 9px ${SANS}`, colors.warning, "right");
     }
+  }
+
+  function createSvgContext() {
+    const output = [];
+    let path = [];
+    const context = {
+      globalAlpha: 1,
+      fillStyle: "#000",
+      strokeStyle: "#000",
+      lineWidth: 1,
+      lineDash: [],
+      font: "10px sans-serif",
+      textAlign: "left",
+      setLineDash(value) { this.lineDash = value; },
+      beginPath() { path = []; },
+      moveTo(x, y) { path.push(`M${x} ${y}`); },
+      lineTo(x, y) { path.push(`L${x} ${y}`); },
+      closePath() { path.push("Z"); },
+      roundRect(x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        path.push(`M${x + r} ${y}H${x + width - r}A${r} ${r} 0 0 1 ${x + width} ${y + r}` +
+          `V${y + height - r}A${r} ${r} 0 0 1 ${x + width - r} ${y + height}` +
+          `H${x + r}A${r} ${r} 0 0 1 ${x} ${y + height - r}V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`);
+      },
+      arc(x, y, radius, start, end) {
+        if (Math.abs(end - start) < Math.PI * 2 - 0.0001)
+          throw new Error("SVG map export only supports full-circle arcs.");
+        path.push(`M${x + radius} ${y}A${radius} ${radius} 0 1 1 ${x - radius} ${y}` +
+          `A${radius} ${radius} 0 1 1 ${x + radius} ${y}`);
+      },
+      fillRect(x, y, width, height) {
+        output.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${escapeXml(this.fillStyle)}" opacity="${this.globalAlpha}"/>`);
+      },
+      fill() { this.emitPath("fill", this.fillStyle); },
+      stroke() { this.emitPath("stroke", this.strokeStyle); },
+      fillText(value, x, y) {
+        const anchor = this.textAlign === "center" ? "middle" : this.textAlign === "right" ? "end" : "start";
+        output.push(`<text x="${x}" y="${y}" text-anchor="${anchor}" style="font: ${escapeXml(this.font)}" ` +
+          `fill="${escapeXml(this.fillStyle)}" opacity="${this.globalAlpha}">${escapeXml(value)}</text>`);
+      },
+      emitPath(kind, color) {
+        const d = path.join("");
+        const dash = this.lineDash.length ? ` stroke-dasharray="${this.lineDash.join(" ")}"` : "";
+        const attributes = kind === "fill"
+          ? `fill="${escapeXml(color)}" opacity="${this.globalAlpha}"`
+          : `fill="none" stroke="${escapeXml(color)}" stroke-width="${this.lineWidth}"` +
+            ` stroke-linecap="butt" stroke-linejoin="miter" opacity="${this.globalAlpha}"${dash}`;
+        output.push(`<path d="${d}" ${attributes}/>`);
+      },
+      toString(width, height, background, padding) {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" ` +
+          `viewBox="0 0 ${width} ${height}" role="img" aria-label="Talewright story map">` +
+          `<rect width="100%" height="100%" fill="${escapeXml(background)}"/>` +
+          `<g transform="translate(${padding},${padding})">${output.join("")}</g></svg>`;
+      },
+    };
+    return context;
+  }
+
+  function escapeXml(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&apos;",
+    })[character]);
+  }
+
+  async function exportMap(host, format, dotnet, padding, maxPngDimension, maxPngPixels) {
+    const state = host.talewrightMap;
+    if (!state?.laid) throw new Error("The story map is not ready to export.");
+    if (format !== "svg" && format !== "png") throw new Error(`Unsupported map export format: ${format}`);
+    const width = Math.ceil(state.laid.width + padding * 2);
+    const height = Math.ceil(state.laid.height + padding * 2);
+    const box = { k: 1, x: -padding, y: -padding, x2: state.laid.width + padding, y2: state.laid.height + padding };
+    let blob;
+
+    if (format === "svg") {
+      const context = createSvgContext();
+      draw(state, box, context);
+      blob = new Blob([context.toString(width, height, state.colors.background, padding)], { type: "image/svg+xml;charset=utf-8" });
+    } else {
+      if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
+        || width > maxPngDimension || height > maxPngDimension || width * height > maxPngPixels) {
+        throw new Error(`PNG export is limited to ${maxPngDimension.toLocaleString()} pixels per side and ` +
+          `${maxPngPixels.toLocaleString()} total pixels. Use SVG export for a full-resolution image of this map.`);
+      }
+      const size = await dotnet.invokeMethodAsync("CheckPngExportSize", width, height);
+      if (!size.allowed) throw new Error(size.message);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = size.width;
+      canvas.height = size.height;
+      try {
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) throw new Error("The browser could not create a PNG canvas. Try SVG export instead.");
+        context.fillStyle = state.colors.background;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.translate(padding, padding);
+        draw(state, box, context);
+        blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+      } finally {
+        canvas.width = canvas.height = 0;
+      }
+      if (!blob) throw new Error("The browser could not encode the map as PNG. Try SVG export instead.");
+    }
+
+    const stream = DotNet.createJSStreamReference(blob);
+    await dotnet.invokeMethodAsync("SaveMapExport", format, stream);
   }
 
   function nodeAt(state, event) {
@@ -612,5 +719,5 @@ window.talewrightMap = (() => {
     redraw(state);
   }
 
-  return { render, updateRun };
+  return { render, updateRun, exportMap };
 })();

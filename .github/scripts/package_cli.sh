@@ -43,7 +43,33 @@ if [[ "$rid" == win-* ]]; then extension=.exe; fi
 for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension" \
   Talewright.Cli.deps.json Talewright.Cli.runtimeconfig.json \
   debug-host/Talewright.Debugger.runtimeconfig.json debug-host/debug-assets/index.html \
+  debug-host/debug-assets/map/map.js debug-host/debug-assets/map/vendor/THIRD-PARTY-NOTICES.md \
+  debug-host/debug-assets/map/vendor/d3-zoom.bundle.min.js \
+  debug-host/debug-assets/map/vendor/elk-api.js debug-host/debug-assets/map/vendor/elk-worker.min.js \
+  debug-host/debug-assets/map/vendor/licenses/elkjs.md \
+  debug-host/debug-assets/map/vendor/licenses/d3-color.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-dispatch.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-drag.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-ease.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-interpolate.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-selection.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-timer.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-transition.txt \
+  debug-host/debug-assets/map/vendor/licenses/d3-zoom.txt \
   debug-assets/index.html publish-assets/standalone/web/App.razor \
+  debug-assets/map/map.js debug-assets/map/vendor/THIRD-PARTY-NOTICES.md \
+  debug-assets/map/vendor/d3-zoom.bundle.min.js \
+  debug-assets/map/vendor/elk-api.js debug-assets/map/vendor/elk-worker.min.js \
+  debug-assets/map/vendor/licenses/elkjs.md \
+  debug-assets/map/vendor/licenses/d3-color.txt \
+  debug-assets/map/vendor/licenses/d3-dispatch.txt \
+  debug-assets/map/vendor/licenses/d3-drag.txt \
+  debug-assets/map/vendor/licenses/d3-ease.txt \
+  debug-assets/map/vendor/licenses/d3-interpolate.txt \
+  debug-assets/map/vendor/licenses/d3-selection.txt \
+  debug-assets/map/vendor/licenses/d3-timer.txt \
+  debug-assets/map/vendor/licenses/d3-transition.txt \
+  debug-assets/map/vendor/licenses/d3-zoom.txt \
   publish-assets/standalone/desktop/App.razor publish-assets/player/talewright.css; do
   test -s "$output/$file" || { echo "Missing CLI archive asset: $file" >&2; exit 1; }
 done

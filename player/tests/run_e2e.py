@@ -95,6 +95,11 @@ def main():
             environment[variable] = str(directory)
         # Pin GTK settings instead of inheriting distro overrides: the upstream file chooser default
         # (startup-mode=recent) ignores a typed location when Open is activated.
+        # Test-only deviation: native automation cannot accept Photino's GTK save dialog, so map
+        # exports bypass it. See MapExportDialog.TestExportDirectoryVariable.
+        exports = temporary / "map-exports"
+        exports.mkdir()
+        environment["TALEWRIGHT_TEST_ONLY_MAP_EXPORT_DIRECTORY"] = str(exports)
         environment["GSETTINGS_BACKEND"] = "keyfile"
         settings = temporary / "config/glib-2.0/settings"
         settings.mkdir(parents=True)
