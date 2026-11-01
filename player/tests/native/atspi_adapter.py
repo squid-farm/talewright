@@ -128,6 +128,34 @@ class Desktop:
             raise RuntimeError("The GTK location entry does not support activation")
         self.wait(lambda: self.find(role="file chooser") is None, "file chooser accepts selected archive")
 
+    def save_file(self, name, path):
+        if Path(path).resolve().parent != Path.home():
+            raise ValueError("Native save-file tests select a filename in the dialog's home folder")
+        self.click(name=name, role="push button")
+        self.wait(lambda: self.find(role="file chooser"), "map export file chooser")
+
+        def location():
+            root = self.root()
+            return None if root is None else next((node for node in nodes(root)
+                if node.getRoleName() == "text"
+                and node.getState().contains(pyatspi.STATE_EDITABLE)
+                and node.getState().contains(pyatspi.STATE_FOCUSED)), None)
+        entry = self.wait(location, "editable file chooser location")
+        entry.queryComponent().grabFocus()
+        self.key("Control_L", pyatspi.KEY_PRESS)
+        try:
+            self.key("a")
+        finally:
+            self.key("Control_L", pyatspi.KEY_RELEASE)
+        pyatspi.Registry.generateKeyboardEvent(0, Path(path).name, pyatspi.KEY_STRING)
+        self.wait(lambda: entry.queryText().getText(0, -1) == Path(path).name,
+                  "finish typing the map export path")
+        self.key("Tab")
+        save = self.wait(lambda: self.find(name="Save", role="push button"), "save button")
+        save.queryComponent().grabFocus()
+        self.key("Space")
+        self.wait(lambda: self.find(role="file chooser") is None, "map export path is saved")
+
     def snapshot(self):
         root = self.root()
         if root is None:
@@ -221,6 +249,8 @@ def serve(args):
                     app.key("Tab")
                 elif command == "upload":
                     app.upload(**arguments)
+                elif command == "save-file":
+                    app.save_file(**arguments)
                 elif command == "key":
                     app.key(**arguments)
                 elif command == "resize":

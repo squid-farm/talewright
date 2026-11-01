@@ -208,3 +208,27 @@ and `remembered-weather` declarations and an implicit `forecast` assignment.
 
 These scenario JSON checks do not change authoring syntax: story declarations
 remain YAML or Talemark, not JSON.
+
+## 9. Inspect and export the story map
+
+1. Open **Map** and expect every scene, divert and hub offer from the last successful compilation.
+   Select a scene and confirm its diverts, hub offers and preview appear. The unreachable area follows
+   diverts and hub offers only; it does not evaluate whether their conditions are satisfiable.
+2. With a synthetic playtest active, choose a divert, then use **Back command** and **Forward command**.
+   Expect visited scenes and taken diverts or hub offers to remain highlighted in route order and track
+   the command cursor.
+3. Click **Export SVG**, choose a destination, and open the saved file. Expect the full map, labels,
+   hub-offer group and the current route presentation. Repeat with **Export PNG** and confirm the image
+   includes the whole layout rather than only the visible/panned area.
+4. In a disposable copy of a sufficiently large story, attempt a PNG export whose layout exceeds the
+   documented 8192-pixel edge or 16,777,216-pixel total limit. Expect an explicit error before canvas
+   allocation that recommends SVG; SVG export remains available.
+5. In a packaged debugger, confirm
+   `debug-assets/map/vendor/THIRD-PARTY-NOTICES.md` and all files under
+   `debug-assets/map/vendor/licenses` are present. Disconnect network access and repeat the map checks;
+   no external map resources should be requested.
+6. Publish the story for web and desktop. Confirm the player packages contain no `debug-assets`, ELK,
+   D3 map bundles or debugger notice files.
+
+For release validation, also capture a partly played LostRelic route from the Linux x64 standalone CLI
+build. Record the platform and tool version with the screenshot.
