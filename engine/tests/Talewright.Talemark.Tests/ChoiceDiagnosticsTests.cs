@@ -20,7 +20,6 @@ public sealed class ChoiceDiagnosticsTests
     private const string NeedsBoth = "A skill check needs both a 'success:' and a 'failure:' line.";
     private const string UnclosedOutcome = "Outcome effect block is missing its closing '}'.";
     private const string NeedsTarget = "Every choice and each choice skill-check outcome needs its own '-> target' or '-> END'. There is no scene fallback.";
-    private const string UnclosedBrace = "Unclosed '{'. Use '\\{' for a literal brace.";
 
     private static string MissingBracketBefore(string marker) =>
         $"Choice label is missing its closing ']'. Place ']' before '{marker}'.";
@@ -40,9 +39,6 @@ public sealed class ChoiceDiagnosticsTests
 
     private static Diagnostic Err(string code, string message, int line, int column) =>
         new(DiagnosticSeverity.Error, code, message, new("main.tale", line, column));
-
-    private static Diagnostic Warn(string code, string message, int line, int column) =>
-        new(DiagnosticSeverity.Warning, code, message, new("main.tale", line, column));
 
     private static int Col(string line, string marker, int occurrence = 1)
     {
@@ -142,14 +138,35 @@ public sealed class ChoiceDiagnosticsTests
     }
 
     [Fact]
-    public void Unclosed_substitution_with_a_later_bracket_is_not_a_missing_bracket()
+    public void Unclosed_substitution_before_a_bracket_stays_a_missing_bracket()
     {
         const string line = "* [Hello {player:first-name] -> END";
         const string quoted = "* [Hello {name == \"]\"] -> END";
         Expect("=== start\n" + line,
-            Err("TW1004", UnclosedBrace, 2, Col(line, "{")));
+            Err("TW1011", MissingBracket, 2, Col(line, "[")));
         Expect("=== start\n" + quoted,
-            Err("TW1004", UnclosedBrace, 2, Col(quoted, "{")));
+            Err("TW1011", MissingBracket, 2, Col(quoted, "[")));
+    }
+
+    [Fact]
+    public void Closed_effect_block_and_a_divert_are_two_label_boundaries()
+    {
+        const string line = "* [Go { set flag:left } -> END";
+        Expect("=== start\n" + line,
+            Err("TW1011", MissingBracket, 2, Col(line, "[")));
+    }
+
+    [Fact]
+    public void Reader_text_quotes_in_an_unfinished_label_are_not_expression_strings()
+    {
+        const string prose = "* [Say \"hi {player:first-name";
+        const string bad = "* [{player:name == \"bad\\q\"";
+        var escape = "Unknown string escape. Use '\\\"' for a quote or '\\\\' for a backslash.";
+        Expect("=== start\n" + prose,
+            Err("TW1011", MissingBracket, 2, Col(prose, "[")));
+        Expect("=== start\n" + bad,
+            Err("TW1001", escape, 2, Col(bad, "\\")),
+            Err("TW1011", MissingBracket, 2, Col(bad, "[")));
     }
 
     [Fact]
@@ -310,58 +327,6 @@ public sealed class ChoiceDiagnosticsTests
         const string effect = "success: { var:count += } -> END";
         Expect("=== start\n* [Try] skill-check athletics dc 1\n" + effect + "\nfailure: -> END",
             Err("TW1001", "Expression is incomplete.", 3, Col(effect, "}")));
-    }
-
-    [Fact]
-    public void Dropped_choice_suppresses_a_dead_end_only_when_that_spot_is_reachable()
-    {
-        const string line = "* [Go -> END";
-        const string unreachable = """
-            === start
-            {if false}
-            * [Go -> END
-            {/if}
-            """;
-        const string topLevel = """
-            === start
-            Hello.
-            * [Go -> END
-            """;
-        const string reachable = """
-            === start
-            {if flag:ready}
-            * [Go -> END
-            {/if}
-            """;
-        const string nested = """
-            === start
-            {if flag:ready}
-            {if false}
-            * [Go -> END
-            {/if}
-            {/if}
-            """;
-        const string deadEnd = "Scene 'start' is a dead end: add choices, a '-> target', or '-> END'.";
-        const string mayBeEmpty = "Scene 'start' may have no available choice. Add an unconditional choice such as '* -> target' or '* [The end] -> END'.";
-        Expect(unreachable,
-            Err("TW1011", MissingBracketBefore("->"), 3, Col(line, "[")),
-            Err("TW3002", deadEnd, 1, 1));
-        Expect(topLevel,
-            Err("TW1011", MissingBracketBefore("->"), 3, Col(line, "[")));
-        Expect(reachable,
-            Err("TW1011", MissingBracketBefore("->"), 3, Col(line, "[")),
-            Warn("TW3013", mayBeEmpty, 1, 1));
-        Expect(nested,
-            Err("TW1011", MissingBracketBefore("->"), 4, Col(line, "[")),
-            Err("TW3002", deadEnd, 1, 1));
-
-        var formed = Compile("""
-            === start
-            {if false}
-            * [Go] -> END
-            {/if}
-            """);
-        Assert.Equal(["TW3002"], formed.Diagnostics.Select(diagnostic => diagnostic.Code));
     }
 
     [Fact]

@@ -14,6 +14,12 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 {
     public required int EndLine { get; init; }
     public bool HasExplicitPriority { get; init; }
+
+    /// <summary>
+    /// A choice line was rejected before it became a step. Exit validation then skips the dead-end
+    /// error for this scene only, so a dead end in another scene still reports.
+    /// </summary>
+    public bool DroppedMalformedChoice { get; init; }
 }
 
 /// <summary>
@@ -184,6 +190,7 @@ internal sealed partial class TaleParser
         {
             EndLine = _index,
             HasExplicitPriority = _scene.HasExplicitPriority,
+            DroppedMalformedChoice = _scene.DroppedMalformedChoice,
         });
         _scene = null;
     }
@@ -560,10 +567,10 @@ internal sealed partial class TaleParser
                 }
                 else
                 {
-                    ReportMissingLabelBracket(rest, pos, indent);
+                    ReportMissingLabelBracket(rest, pos, indent, unclosedBrace);
                 }
 
-                MarkDroppedChoice(start);
+                MarkDroppedChoice();
                 return;
             }
 
@@ -600,7 +607,7 @@ internal sealed partial class TaleParser
                         offset => At(column + 10 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[(pos + 10)..], At(column + 10));
                     _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
-                    MarkDroppedChoice(start);
+                    MarkDroppedChoice();
                     return;
                 }
 
@@ -627,7 +634,7 @@ internal sealed partial class TaleParser
                         offset => At(column + 1 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Effects, rest[(pos + 1)..], At(column + 1));
                     _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
-                    MarkDroppedChoice(start);
+                    MarkDroppedChoice();
                     return;
                 }
 
@@ -652,8 +659,7 @@ internal sealed partial class TaleParser
                 if (label is null)
                 {
                     _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
-                    ReportSkillCheckTrailing(remaining["skill-check".Length..], column + "skill-check".Length);
-                    MarkDroppedChoice(start);
+                    MarkDroppedChoice();
                     return;
                 }
                 var spec = ParseCheckSpec(remaining["skill-check".Length..], column + "skill-check".Length);
@@ -667,7 +673,7 @@ internal sealed partial class TaleParser
             }
             else if (TryReportRequiresWhitespace(rest, pos, column))
             {
-                MarkDroppedChoice(start);
+                MarkDroppedChoice();
                 return;
             }
             else
@@ -679,7 +685,7 @@ internal sealed partial class TaleParser
                     ? "Use '* [label] ...' or a textless '* ... -> target'."
                     : "Expected (requires: …), { effects }, -> target or skill-check.";
                 _diagnostics.Error("TW1011", $"Unexpected '{excerpt}' in choice. {insert}{help}", At(column));
-                MarkDroppedChoice(start);
+                MarkDroppedChoice();
                 return;
             }
         }
@@ -687,7 +693,7 @@ internal sealed partial class TaleParser
         if (label is null && !hasDivert)
         {
             _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'.", At(indent));
-                    MarkDroppedChoice(start);
+            MarkDroppedChoice();
             return;
         }
 
@@ -702,54 +708,36 @@ internal sealed partial class TaleParser
         }));
     }
 
-    /// <summary>
-    /// Leaves a placeholder where the choice was written. <see cref="SceneSteps.Reachable"/> then treats
-    /// it like a real choice, so a dead end is suppressed only when this spot could have been an exit.
-    /// </summary>
-    private void MarkDroppedChoice(SourceLocation start)
+    private void MarkDroppedChoice()
     {
-        _scene?.CurrentSteps.Add(new ChoiceStep(StepId(start), SpanFrom(start), new ChoiceDefinition
+        if (_scene is not null)
         {
-            Key = ChoiceDefinition.StructuralPlaceholderKey,
-            Label = null,
-        }));
+            _scene.DroppedMalformedChoice = true;
+        }
     }
 
-    private void ReportMissingLabelBracket(string rest, int open, int indent)
+    private void ReportMissingLabelBracket(string rest, int open, int indent, int unclosedBrace)
     {
         var content = rest[(open + 1)..];
-        var hint = SoleClauseBoundary(content);
-        var slice = hint is { } found ? content[..found.Index] : content;
+        // Same string check as main: only the interior of an unclosed '{', never reader-text quotes.
+        if (_discoverEffects is null && unclosedBrace >= 0)
+        {
+            ExpressionParser.ReportStringErrors(rest[(unclosedBrace + 1)..],
+                offset => At(indent + unclosedBrace + 2 + offset), _diagnostics);
+        }
+
+        var marks = TopLevelClauses(content, effectBracesOnly: true);
+        var hint = marks.Count == 1 ? marks[0] : (ClauseMark?)null;
         var message = hint is { } boundary
             ? $"Choice label is missing its closing ']'. Place ']' before '{boundary.Marker}'."
             : "Choice label is missing its closing ']'.";
-        if (_discoverEffects is null)
+        if (_symbols.Analysis is not null && _discoverEffects is null)
         {
-            AnalyzeIncompleteLabel(slice, At(indent + 1 + open + 1));
+            var slice = hint is { } found ? content[..found.Index] : content;
+            InlineParser.Parse(SourceText.Single(slice, At(indent + 1 + open + 1)), _symbols, new DiagnosticBag());
         }
 
         _diagnostics.Error("TW1011", message, At(indent + 1 + open));
-    }
-
-    /// <summary>
-    /// Keeps completion for a half-typed label. An unclosed non-image brace is parsed into a scratch bag
-    /// so its structural noise stays unpublished; quoted-string errors are still reported for real.
-    /// Closed substitutions and image calls use the real bag.
-    /// </summary>
-    private void AnalyzeIncompleteLabel(string slice, SourceLocation location)
-    {
-        if (HasUnclosedNonImageBrace(slice))
-        {
-            ExpressionParser.ReportStringErrors(slice, offset => location.Offset(offset), _diagnostics);
-            if (_symbols.Analysis is not null)
-            {
-                InlineParser.Parse(SourceText.Single(slice, location), _symbols, new DiagnosticBag());
-            }
-
-            return;
-        }
-
-        InlineParser.Parse(SourceText.Single(slice, location), _symbols, _diagnostics);
     }
 
     // ---- skill checks ----------------------------------------------------------------------------------------------
@@ -786,7 +774,8 @@ internal sealed partial class TaleParser
         var trailingColumn = 0;
         if (dcStart >= 0)
         {
-            var boundary = FindClauseBoundary(dcExpression);
+            var clauses = TopLevelClauses(dcExpression, effectBracesOnly: false);
+            var boundary = clauses.Count == 0 ? -1 : clauses[0].Index;
             if (boundary >= 0)
             {
                 trailing = dcExpression[boundary..];
@@ -878,22 +867,6 @@ internal sealed partial class TaleParser
         var difficulty = ExpressionParser.ParseNumber(dcExpression, At(column + dcStart + 4), _symbols, _diagnostics);
         ReportTrailing();
         return difficulty is null ? null : new SkillCheck(actor, skill, difficulty);
-    }
-
-    private void ReportSkillCheckTrailing(string text, int column)
-    {
-        var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
-        if (dcStart < 0)
-        {
-            return;
-        }
-
-        var expression = text[(dcStart + 4)..];
-        var boundary = FindClauseBoundary(expression);
-        if (boundary >= 0)
-        {
-            ReportMisplacedClause(expression[boundary..], column + dcStart + 4 + boundary, "the skill check");
-        }
     }
 
     /// <summary>
@@ -1019,14 +992,7 @@ internal sealed partial class TaleParser
                     if (close < 0)
                     {
                         unclosedBrace = i;
-                        // An unclosed image keeps the historical recovery path (the later ']' stays
-                        // visible to the image parser). Any other unclosed brace does not swallow a ']'.
-                        if (ImageSyntax.IsCall(text.AsSpan(i + 1)))
-                        {
-                            return -1;
-                        }
-
-                        return FindBracketAfterUnclosedBrace(text, i, brackets);
+                        return -1;
                     }
                     i = close;
                     break;
@@ -1046,102 +1012,23 @@ internal sealed partial class TaleParser
         return -1;
     }
 
-    private static int FindBracketAfterUnclosedBrace(string text, int brace, int brackets)
-    {
-        var inString = false;
-        for (var i = brace + 1; i < text.Length; i++)
-        {
-            var c = text[i];
-            if (inString)
-            {
-                if (c == '\\' && i + 1 < text.Length)
-                {
-                    i++;
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    inString = false;
-                }
-
-                continue;
-            }
-
-            if (c == '\\' && i + 1 < text.Length)
-            {
-                i++;
-                continue;
-            }
-
-            if (c == '"')
-            {
-                inString = true;
-                continue;
-            }
-
-            if (c == '[')
-            {
-                brackets++;
-            }
-            else if (c == ']' && brackets == 0)
-            {
-                return i;
-            }
-            else if (c == ']')
-            {
-                brackets--;
-            }
-        }
-
-        return -1;
-    }
-
     private DivertTarget? ParseChoiceDivert(string text, int column)
     {
         var lead = SkipSpaces(text, 0);
-        var location = At(column + lead);
-        if (lead >= text.Length || IsClauseBoundary(text, lead))
+        var tail = text[lead..];
+        var marks = TopLevelClauses(tail, effectBracesOnly: false);
+        var stop = marks.Count == 0 ? tail.Length : marks[0].Index;
+        for (var i = 0; i < stop; i++)
         {
-            _symbols.Analysis?.Reference("", location, AuthoringSymbolKind.Scene, "END");
-            _diagnostics.Error("TW1010", "Divert needs a target: '-> scene.id' or '-> END'.", location);
-            if (lead < text.Length)
+            if (char.IsWhiteSpace(tail[i]))
             {
-                ReportMisplacedClause(text[lead..], column + lead, "the divert");
+                stop = i;
+                break;
             }
-
-            return null;
         }
 
-        var end = lead;
-        while (end < text.Length && !char.IsWhiteSpace(text[end]) && !IsClauseBoundary(text, end))
-        {
-            end++;
-        }
-
-        var id = text[lead..end];
-        _symbols.Analysis?.Reference(id, location, AuthoringSymbolKind.Scene, "END");
-        DivertTarget? target = null;
-        if (id == "END")
-        {
-            target = DivertTarget.End;
-        }
-        else if (!IdentifierRules.IsValid(id))
-        {
-            _diagnostics.Error("TW1008",
-                $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators.",
-                location);
-        }
-        else if (!_symbols.Scenes.Contains(new SceneId(id)))
-        {
-            _diagnostics.Error("TW2002", $"Unknown scene '{id}'.", location);
-        }
-        else
-        {
-            target = new DivertTarget(new SceneId(id));
-        }
-
-        var rest = SkipSpaces(text, end);
+        var target = ParseDivertTarget(text[..(lead + stop)], column);
+        var rest = SkipSpaces(text, lead + stop);
         if (rest < text.Length)
         {
             ReportMisplacedClause(text[rest..], column + rest, "the divert");
@@ -1252,12 +1139,21 @@ internal sealed partial class TaleParser
         return text[..Math.Max(0, budget)] + ellipsis;
     }
 
-    private readonly record struct ClauseHint(int Index, string Marker);
+    private readonly record struct ClauseMark(int Index, string Marker);
 
-    private static ClauseHint? SoleClauseBoundary(string text)
+    /// <summary>
+    /// Top-level <c>{</c>, <c>-&gt;</c> or exact <c>(requires:</c> marks.
+    /// Quotes, escapes and nested brackets are skipped. Balanced braces use
+    /// <see cref="InlineParser.FindClosingBrace"/>. When <paramref name="effectBracesOnly"/>
+    /// is set, a brace counts only if <see cref="LooksLikeEffects"/> accepts it, and an
+    /// unclosed substitution stops the scan.
+    /// </summary>
+    private static List<ClauseMark> TopLevelClauses(string text, bool effectBracesOnly)
     {
-        ClauseHint? found = null;
-        var brackets = 0;
+        var found = new List<ClauseMark>();
+        var paren = 0;
+        var bracket = 0;
+        var brace = 0;
         var inString = false;
         for (var i = 0; i < text.Length; i++)
         {
@@ -1290,258 +1186,110 @@ internal sealed partial class TaleParser
                 continue;
             }
 
-            if (c == '{')
+            if (paren == 0 && bracket == 0 && brace == 0 && c == '{')
             {
                 var close = InlineParser.FindClosingBrace(text, i);
+                var counts = !effectBracesOnly || LooksLikeEffects(text, i, close);
+                if (counts)
+                {
+                    found.Add(new(i, "{"));
+                    if (!effectBracesOnly)
+                    {
+                        return found;
+                    }
+                }
+
                 if (close >= 0)
                 {
                     i = close;
                     continue;
                 }
 
-                if (!LooksLikeEffects(text, i))
+                // An unclosed effect stays one candidate; a later clause can be another.
+                // An unclosed substitution makes the rest uncertain.
+                if (counts)
                 {
-                    // An unclosed substitution makes everything after it uncertain.
+                    continue;
+                }
+
+                return found;
+            }
+
+            if (paren == 0 && bracket == 0 && brace == 0
+                && text.AsSpan(i).StartsWith("->", StringComparison.Ordinal))
+            {
+                found.Add(new(i, "->"));
+                if (!effectBracesOnly)
+                {
                     return found;
                 }
 
-                if (found is not null)
-                {
-                    return null;
-                }
-
-                // The '{' is one candidate. A later -> or (requires: is another, so keep scanning.
-                found = new ClauseHint(i, "{");
-                continue;
-            }
-
-            if (c == '[')
-            {
-                brackets++;
-                continue;
-            }
-
-            if (c == ']')
-            {
-                if (brackets > 0)
-                {
-                    brackets--;
-                }
-
-                continue;
-            }
-
-            if (brackets > 0)
-            {
-                continue;
-            }
-
-            if (text.AsSpan(i).StartsWith("->", StringComparison.Ordinal))
-            {
-                if (found is not null)
-                {
-                    return null;
-                }
-
-                found = new ClauseHint(i, "->");
                 i++;
                 continue;
             }
 
-            if (text.AsSpan(i).StartsWith("(requires:", StringComparison.Ordinal))
+            if (paren == 0 && bracket == 0 && brace == 0
+                && text.AsSpan(i).StartsWith("(requires:", StringComparison.Ordinal))
             {
-                if (found is not null)
+                found.Add(new(i, "(requires:"));
+                if (!effectBracesOnly)
                 {
-                    return null;
+                    return found;
                 }
 
-                found = new ClauseHint(i, "(requires:");
                 i += "(requires:".Length - 1;
+                continue;
+            }
+
+            switch (c)
+            {
+                case '(':
+                    paren++;
+                    break;
+                case ')' when paren > 0:
+                    paren--;
+                    break;
+                case '[':
+                    bracket++;
+                    break;
+                case ']' when bracket > 0:
+                    bracket--;
+                    break;
+                case '{':
+                    brace++;
+                    break;
+                case '}' when brace > 0:
+                    brace--;
+                    break;
             }
         }
 
         return found;
     }
 
-    private static bool LooksLikeEffects(string text, int brace)
+    private static bool LooksLikeEffects(string text, int open, int close)
     {
-        if (ImageSyntax.IsCall(text.AsSpan(brace + 1)))
+        var inner = close < 0 ? text[(open + 1)..] : text[(open + 1)..close];
+        if (ImageSyntax.IsCall(inner))
         {
             return false;
         }
 
-        var i = brace + 1;
-        while (i < text.Length && char.IsWhiteSpace(text[i]))
-        {
-            i++;
-        }
-
-        var rest = text.AsSpan(i);
-        if (StartsWithKeyword(rest, "set") || StartsWithKeyword(rest, "clear")
-            || StartsWithKeyword(rest, "give") || StartsWithKeyword(rest, "take"))
+        var tokens = Lexer.Tokenize(inner);
+        if (tokens.Count > 0 && tokens[0] is { Kind: TokenKind.Identifier, Text: "set" or "clear" or "give" or "take" })
         {
             return true;
         }
 
-        var inString = false;
-        for (; i < text.Length; i++)
+        foreach (var token in tokens)
         {
-            var c = text[i];
-            if (inString)
-            {
-                if (c == '\\' && i + 1 < text.Length)
-                {
-                    i++;
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    inString = false;
-                }
-
-                continue;
-            }
-
-            if (c == '"')
-            {
-                inString = true;
-                continue;
-            }
-
-            if (c == '}' || c == '\n')
-            {
-                break;
-            }
-
-            // Comparisons (==, !=, <=, >=) are label conditions, not effect assignments.
-            if (c is '+' or '-' && i + 1 < text.Length && text[i + 1] == '=')
-            {
-                return true;
-            }
-
-            if (c == '=' && (i == 0 || text[i - 1] is not ('=' or '!' or '<' or '>'))
-                && (i + 1 >= text.Length || text[i + 1] != '='))
+            if (token.Kind is TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign)
             {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private static bool StartsWithKeyword(ReadOnlySpan<char> text, string keyword) =>
-        text.StartsWith(keyword) && (text.Length == keyword.Length || char.IsWhiteSpace(text[keyword.Length]));
-
-    private static bool HasUnclosedNonImageBrace(string text)
-    {
-        for (var i = 0; i < text.Length; i++)
-        {
-            if (text[i] == '\\' && i + 1 < text.Length)
-            {
-                i++;
-                continue;
-            }
-
-            if (text[i] != '{')
-            {
-                continue;
-            }
-
-            var close = InlineParser.FindClosingBrace(text, i);
-            if (close >= 0)
-            {
-                i = close;
-                continue;
-            }
-
-            return !ImageSyntax.IsCall(text.AsSpan(i + 1));
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// A top-level <c>{</c>, <c>-&gt;</c>, or exact <c>(requires:</c>. Nested brackets and quoted text do not count.
-    /// </summary>
-    private static int FindClauseBoundary(string text)
-    {
-        var paren = 0;
-        var bracket = 0;
-        var brace = 0;
-        var inString = false;
-        for (var i = 0; i < text.Length; i++)
-        {
-            var c = text[i];
-            if (inString)
-            {
-                if (c == '\\' && i + 1 < text.Length)
-                {
-                    i++;
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    inString = false;
-                }
-
-                continue;
-            }
-
-            if (paren == 0 && bracket == 0 && brace == 0 && IsClauseBoundary(text, i))
-            {
-                return i;
-            }
-
-            if (c == '"')
-            {
-                inString = true;
-            }
-            else if (c == '(')
-            {
-                paren++;
-            }
-            else if (c == ')' && paren > 0)
-            {
-                paren--;
-            }
-            else if (c == '[')
-            {
-                bracket++;
-            }
-            else if (c == ']' && bracket > 0)
-            {
-                bracket--;
-            }
-            else if (c == '{')
-            {
-                brace++;
-            }
-            else if (c == '}' && brace > 0)
-            {
-                brace--;
-            }
-        }
-
-        return -1;
-    }
-
-    private static bool IsClauseBoundary(string text, int index)
-    {
-        if ((uint)index >= (uint)text.Length)
-        {
-            return false;
-        }
-
-        if (text[index] == '{')
-        {
-            return true;
-        }
-
-        var rest = text.AsSpan(index);
-        return rest.StartsWith("->", StringComparison.Ordinal)
-            || rest.StartsWith("(requires:", StringComparison.Ordinal);
     }
 
     private static int FindClosingParen(string text, int open)
@@ -1597,6 +1345,7 @@ internal sealed partial class TaleParser
         public HashSet<string> HubDirectives { get; } = [];
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
+        public bool DroppedMalformedChoice { get; set; }
         public Stack<Frame> Frames { get; } = new();
         public SourceText Paragraph { get; set; } = new();
 

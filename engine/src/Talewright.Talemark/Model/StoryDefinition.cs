@@ -91,10 +91,7 @@ public sealed class SceneDefinition : IStorylet
 
     public IReadOnlyList<SceneStep> Steps { get; init; } = [];
     public IReadOnlyList<ChoiceDefinition> Choices =>
-        SceneSteps.Walk(Steps).OfType<ChoiceStep>()
-            .Select(step => step.Choice)
-            .Where(choice => choice.Key != ChoiceDefinition.StructuralPlaceholderKey)
-            .ToArray();
+        SceneSteps.Walk(Steps).OfType<ChoiceStep>().Select(step => step.Choice).ToArray();
 }
 
 /// <summary>
@@ -104,12 +101,6 @@ public sealed class ChoiceDefinition
 {
     /// <summary>Default text for an omitted choice label and for an automatic scene continuation.</summary>
     public const string ContinueLabelText = "Continue";
-
-    /// <summary>
-    /// Key of a choice inserted only so exit validation can see where a malformed choice was dropped.
-    /// It is not an authored choice and is never offered.
-    /// </summary>
-    internal const string StructuralPlaceholderKey = "\0";
 
     /// <summary>Stable key within the scene (declaration index), recorded in <c>ChoiceMade</c> events.</summary>
     public required string Key { get; init; }
