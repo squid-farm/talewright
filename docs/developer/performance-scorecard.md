@@ -12,12 +12,13 @@ percentile.
 |---|---|---|
 | Source read and decode | BenchmarkDotNet directory-load cases; fixed-byte file-layout comparison below | Measures the `StorySource` read path, not editor file-watcher latency |
 | Compile | BenchmarkDotNet in-memory compile cases | Isolates compile from directory read/decode |
+| Authoring analysis | Realistic-story BenchmarkDotNet case and bounded console workloads | Measures full in-memory `StoryAnalyzer.Analyze`, not edit-to-diagnostic latency |
 | Runtime start | `StartupAndFirstFrame` BenchmarkDotNet case | Measures engine session start, not full host startup |
 | First playable passage | WebAssembly browser integration in Chromium, Firefox, and WebKit | One observation per browser/corpus; includes archive upload, compilation, and rendering |
 | Click to painted passage | Browser integration choice timing | One observation per browser/corpus; not a p95 |
 | End-cursor and redo-prefix restore | BenchmarkDotNet compares both with the same 10,000-choice save | The prefix case validates all saved choices and returns to cursor 5,000 |
 | Back/Forward | BenchmarkDotNet plus fixed-story browser navigation observations below | Browser observations include replay, component updates, DOM work and focus; native replay is measured separately, not subtracted |
-| Managed allocation | BenchmarkDotNet `MemoryDiagnoser` | Cumulative managed bytes per operation, not retained memory |
+| Managed allocation | BenchmarkDotNet `MemoryDiagnoser`; console allocation ceilings for realistic compile and analysis | Cumulative managed bytes per operation, not retained memory |
 | Live managed heap after repeated open/close/restore | Not measured | Needs a stable post-operation collection and retention protocol |
 | Process peak RSS | Benchmark worker metadata and standalone publication measurements | Worker peak includes setup and harness; it is not an isolated operation or a live heap measurement |
 | Browser process memory | Not measured | `navigator.deviceMemory` is only a browser-reported device-capacity hint, not memory usage |
