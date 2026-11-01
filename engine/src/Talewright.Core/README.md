@@ -8,7 +8,9 @@ See [architecture §3.1](../../../docs/developer/architecture.md#31-talewrightco
 ## Key ideas
 
 - **Event-sourced.** `GameState` is only ever changed by `Apply(GameEvent)`, and only `EventLog` calls that.
-  The whole game is `fold(initial state, events)`, which gives replay, saves (M2) and undo (`Truncate`) for free.
+  An existing event log folds into state and can be replayed with its recorded dice results. Player saves
+  instead store a seed and choice history, then rebuild the event log by replaying the story; `Truncate`
+  rewinds an in-memory log.
 - **Ruleset-defined.** There are no built-in stats. A `Ruleset` declares stats, reputation tiers and pluggable
   rules (skill checks, leveling, modifiers). The default d20 set lives in `Talewright.Rulesets.Generic`.
 - **Strongly typed ids.** `StatId`, `ItemId`, `FactionId` … are distinct types, so they can't be mixed up.

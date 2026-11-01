@@ -5,7 +5,8 @@ namespace Talewright.Core.State;
 
 /// <summary>
 /// The append-only event log of a playthrough plus its current projected <see cref="GameState"/>.
-/// A save game is just <c>(story version, seed, Events)</c>.
+/// Folding an existing log reconstructs its state. Player saves use <c>StoryHistory</c>
+/// and store a seed and choice history, not this event list.
 /// </summary>
 public sealed class EventLog
 {
@@ -41,7 +42,7 @@ public sealed class EventLog
         }
     }
 
-    /// <summary>Rebuilds a log (and its state) from a saved event list. Dice are not re-rolled.</summary>
+    /// <summary>Rebuilds a log and its state by folding existing events; recorded dice results are not rerolled.</summary>
     public static EventLog Replay(WorldDefinition world, ulong seed, IEnumerable<GameEvent> events)
     {
         var log = new EventLog(world, seed);

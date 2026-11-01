@@ -27,6 +27,12 @@ The web player, the desktop player and published games all share the same screen
 | **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |
 | **More actions → Library** | Return to the list of stories (not shown in published games). |
 
+Player saves store the story identity/version, seed, choice history and current position, and character
+selection—not a recorded event log or dice results. Loading checks the saved choices against the story and
+replays them with the saved seed, rebuilding the playthrough. **Back** and **Forward** use the same
+choice-replay approach. This differs from folding an existing event log to reconstruct state; that is an
+engine operation, not how player saves are restored.
+
 The toolbar stays visible while you scroll. Quick Save confirmations and storage errors appear
 in the toolbar without returning you to the start of the passage.
 The Saves dialog refreshes automatically when opened and lists the newest saves first.

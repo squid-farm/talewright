@@ -2,8 +2,8 @@ namespace Talewright.Core.Randomness;
 
 /// <summary>
 /// Deterministic dice: the n-th roll of a playthrough is a pure function of <c>(seed, n)</c>.
-/// Combined with <see cref="Events.DiceRolled"/> events this makes every playthrough reproducible
-/// and prevents save-scumming by reloading (the same roll comes back).
+/// Player saves reuse the seed and choice history to regenerate the same rolls. Folding an existing
+/// event log instead uses the results in <see cref="Events.DiceRolled"/>.
 /// </summary>
 /// <remarks>
 /// The hash is SplitMix64 (Steele, Lea &amp; Flood, "Fast splittable pseudorandom number generators", 2014; the
