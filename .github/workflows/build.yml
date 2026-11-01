@@ -7,6 +7,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      hosted_rollback:
+        description: Retained hosted-player tag to select at the root (optional)
+        required: false
+        type: string
   schedule:
     - cron: '37 4 * * 1'
 
@@ -136,12 +141,18 @@ jobs:
 
   publish-samples:
     needs: [build, tests, verification]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.hosted_rollback != '')
     permissions:
-      contents: read
+      contents: write
+      actions: read
+      deployments: read
       pages: write
       id-token: write
     uses: ./.github/workflows/publish-samples.yml
+    with:
+      rollback_tag: ${{ inputs.hosted_rollback || '' }}
 
   cli-archives:
     needs: [build]

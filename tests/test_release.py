@@ -292,25 +292,34 @@ class PublicationWorkflowTests(unittest.TestCase):
         self.build = (ROOT / ".github/workflows/build.yml").read_text()
         self.nuget = (ROOT / ".github/workflows/publish-nuget.yml").read_text()
 
-    def test_pages_deploys_only_a_validated_tag_after_verification_and_smoke(self):
+    def test_pages_retains_versions_and_promotes_only_after_candidate_smoke(self):
         samples = (ROOT / ".github/workflows/publish-samples.yml").read_text()
         caller = self.build.split("\n  publish-samples:\n", 1)[1].split("\n  cli-archives:", 1)[0]
         selection = self.build.split("\n  select:\n", 1)[1].split("\n  build:", 1)[0]
         build = samples.split("\n  build:\n", 1)[1].split("\n  deploy:", 1)[0]
         deploy = samples.split("\n  deploy:\n", 1)[1]
-        tag_push = "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
 
         self.assertIn("needs: [build, tests, verification]", caller)
-        self.assertIn(tag_push, caller)
-        self.assertIn(tag_push, build)
+        for section in (caller, build):
+            self.assertIn("github.event_name == 'push'", section)
+            self.assertIn("github.ref == 'refs/heads/main'", section)
+            self.assertIn("startsWith(github.ref, 'refs/tags/v')", section)
+            self.assertIn("github.event_name == 'workflow_dispatch'", section)
         self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json', selection)
-        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json', build)
+        self.assertIn("hosted_site.py plan", build)
         self.assertIn("ref: ${{ github.sha }}", build)
-        self.assertIn("publish_samples.py --base-path / --output artifacts/pages", build)
-        self.assertIn("TALEWRIGHT_WEB_BASE_PATH: /", build)
+        self.assertIn('publish_samples.py --base-path "$BASE_PATH" --output artifacts/pages', build)
+        self.assertIn("TALEWRIGHT_WEB_BASE_PATH: ${{ steps.plan.outputs.base_path }}", build)
         self.assertIn("Bundled_sample_assets_work_when_served_at_the_selected_base_path", build)
-        self.assertLess(build.index("Smoke-test the deployment path"), build.index("actions/upload-pages-artifact"))
         self.assertIn("needs: build", deploy)
+        self.assertIn("queue: max", samples)
+        self.assertIn("deployments: read", caller)
+        self.assertIn("deployments: read", deploy)
+        self.assertIn("hosted_store.py restore", deploy)
+        self.assertIn("artifact_name: hosted-previous", deploy)
+        self.assertLess(deploy.index("Verify the deployed candidate"), deploy.index("Promote the selected release"))
+        self.assertLess(deploy.index("Verify the selected root"), deploy.index("Persist the successful snapshot"))
+        self.assertIn("Restore the previous site after a failed deployment", deploy)
 
     def test_existing_validation_gates_every_publication(self):
         ready = self.build.split("\n  release-ready:\n", 1)[1].split("\n  publish-nuget:", 1)[0]

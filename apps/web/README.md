@@ -28,10 +28,11 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 
 ### GitHub Pages
 
-Each valid version-tag push that passes Build publishes that tagged host, with all bundled samples, to
-GitHub Pages at the root of the custom domain, <https://play.trytalewright.com/>. The root serves the
-most recently deployed eligible tag, including previews; pushes to `main` do not deploy it. The workflow
-publishes with base path `/`, smoke-tests the result at the root and uploads only `wwwroot`. See
+Each valid version-tag push that passes Build retains that tagged host, with all bundled samples, at
+`https://play.trytalewright.com/versions/<tag>/`. The [root](https://play.trytalewright.com/) selects
+the most recently deployed eligible tag, including previews. Main pushes update the experimental
+[/dev/](https://play.trytalewright.com/dev/) player without changing the root release. The workflow
+checks the actual subpath and assets before promotion and preserves previously published versions. See
 [releasing and CI](../../docs/developer/releasing.md) for repository settings.
 
 The publish script also supports subpath hosting. Reproduce one locally, then serve it under

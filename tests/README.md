@@ -453,16 +453,15 @@ unexpected/duplicate packages instead of accidentally publishing stale files.
 Pack the three projects sequentially: solution-wide packing can evaluate the
 CLI's publish graph concurrently with RCL packing and omit static assets.
 
-Pages publishing also checks the real static output at the site root, where
-`play.trytalewright.com` serves it. Use `--base-path /` and
-`TALEWRIGHT_WEB_BASE_PATH=/` to reproduce CI exactly; the commands below check a
-project-subpath deployment after installing Chromium:
+Pages publishing checks the real static output at its selected `/dev/` or
+`/versions/<tag>/` path. The commands below reproduce a version-path deployment
+after installing Chromium:
 
 ```bash
 python3 player/tests/run_e2e.py install-browsers --browser chromium
-python3 .github/scripts/publish_samples.py --base-path /talewright --output artifacts/pages
+python3 .github/scripts/publish_samples.py --base-path /versions/v0.4.0-preview.1 --output artifacts/pages
 BROWSER=chromium TALEWRIGHT_WEB_ROOT="$PWD/artifacts/pages/wwwroot" \
-  TALEWRIGHT_WEB_BASE_PATH=/talewright TALEWRIGHT_TEST_RESULTS="$PWD/artifacts/test-results/pages" \
+  TALEWRIGHT_WEB_BASE_PATH=/versions/v0.4.0-preview.1 TALEWRIGHT_TEST_RESULTS="$PWD/artifacts/test-results/pages" \
   dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --no-build \
   --filter FullyQualifiedName~Bundled_sample_assets_work_when_served_at_the_selected_base_path
 ```

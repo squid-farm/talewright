@@ -94,7 +94,9 @@
     "browserInfrastructure": [
       "testWorkflow",
       "{workspaceRoot}/.github/workflows/publish-samples.yml",
-      "{workspaceRoot}/.github/scripts/publish_samples.py"
+      "{workspaceRoot}/.github/scripts/publish_samples.py",
+      "{workspaceRoot}/.github/scripts/hosted_site.py",
+      "{workspaceRoot}/.github/scripts/hosted_store.py"
     ],
     "default": [
       "sharedGlobals",

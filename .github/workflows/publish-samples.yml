@@ -2,6 +2,11 @@ name: Publish Samples
 
 on:
   workflow_call:
+    inputs:
+      rollback_tag:
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -9,12 +14,18 @@ permissions:
 concurrency:
   group: github-pages
   cancel-in-progress: false
+  queue: max
 
 jobs:
   build:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.rollback_tag != '')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      kind: ${{ steps.plan.outputs.kind }}
+      base_path: ${{ steps.plan.outputs.base_path }}
     permissions:
       contents: read
       pages: read
@@ -22,23 +33,34 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Validate the release tag
-        run: python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME" --release-json
+      - name: Resolve the hosted-player deployment
+        id: plan
+        env:
+          ROLLBACK_TAG: ${{ inputs.rollback_tag }}
+        run: >-
+          python3 .github/scripts/hosted_site.py plan
+          --event "$GITHUB_EVENT_NAME" --ref "$GITHUB_REF" --commit "$GITHUB_SHA"
+          --rollback "$ROLLBACK_TAG" --output "$RUNNER_TEMP/hosted-plan.json" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-dotnet@v4
+        if: steps.plan.outputs.kind != 'rollback'
         with:
           global-json-file: global.json
       - uses: actions/configure-pages@v5
-      # The player is served from the root of its custom domain (play.trytalewright.com).
       - name: Publish the bundled sample player
+        if: steps.plan.outputs.kind != 'rollback'
+        env:
+          BASE_PATH: ${{ steps.plan.outputs.base_path }}
         run: |
-          python3 .github/scripts/publish_samples.py --base-path / --output artifacts/pages
-          grep -q '<base href="/" />' artifacts/pages/wwwroot/index.html
-      - run: python3 player/tests/run_e2e.py install-browsers --browser chromium
+          python3 .github/scripts/publish_samples.py --base-path "$BASE_PATH" --output artifacts/pages
+          grep -Fq "<base href=\"$BASE_PATH\" />" artifacts/pages/wwwroot/index.html
+      - if: steps.plan.outputs.kind != 'rollback'
+        run: python3 player/tests/run_e2e.py install-browsers --browser chromium
       - name: Smoke-test the deployment path
+        if: steps.plan.outputs.kind != 'rollback'
         env:
           BROWSER: chromium
           TALEWRIGHT_WEB_ROOT: ${{ github.workspace }}/artifacts/pages/wwwroot
-          TALEWRIGHT_WEB_BASE_PATH: /
+          TALEWRIGHT_WEB_BASE_PATH: ${{ steps.plan.outputs.base_path }}
           TALEWRIGHT_TEST_RESULTS: ${{ github.workspace }}/artifacts/test-results/pages
         run: |
           dotnet test player/tests/Talewright.Player.E2E.Tests -c Release --no-build \
@@ -50,24 +72,124 @@ jobs:
           assert counters is not None and int(counters.attrib["passed"]) == 1, "Pages smoke must run and pass one test"
           PY
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && steps.plan.outputs.kind != 'rollback' }}
         with:
           name: pages-smoke-results
           path: artifacts/test-results/pages
-      - uses: actions/upload-pages-artifact@v3
+      - name: Archive the published player
+        if: steps.plan.outputs.kind != 'rollback'
+        run: tar -cf "$RUNNER_TEMP/player.tar" -C artifacts/pages/wwwroot .
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.kind != 'rollback'
         with:
-          path: artifacts/pages/wwwroot
+          name: hosted-player-output
+          path: ${{ runner.temp }}/player.tar
+          retention-days: 1
 
   deploy:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
+      contents: write
+      actions: read
+      deployments: read
       pages: write
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: https://play.trytalewright.com/
     steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Resolve the hosted-player deployment
+        id: plan
+        env:
+          ROLLBACK_TAG: ${{ inputs.rollback_tag }}
+        run: >-
+          python3 .github/scripts/hosted_site.py plan
+          --event "$GITHUB_EVENT_NAME" --ref "$GITHUB_REF" --commit "$GITHUB_SHA"
+          --rollback "$ROLLBACK_TAG" --output "$RUNNER_TEMP/hosted-plan.json" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: steps.plan.outputs.kind != 'rollback'
+        with:
+          name: hosted-player-output
+          path: ${{ runner.temp }}/hosted-output
+      - name: Extract the published player
+        if: steps.plan.outputs.kind != 'rollback'
+        run: >-
+          python3 .github/scripts/hosted_store.py extract --archive "$RUNNER_TEMP/hosted-output/player.tar"
+          --destination "$RUNNER_TEMP/hosted-player"
+      - name: Restore the previous successful snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 .github/scripts/hosted_store.py restore --repository "$GITHUB_REPOSITORY"
+          --run-id "$GITHUB_RUN_ID" --destination "$RUNNER_TEMP/hosted-previous"
+          --information "$RUNNER_TEMP/hosted-state.json"
+      - name: Prepare retained snapshots
+        env:
+          KIND: ${{ steps.plan.outputs.kind }}
+        run: |
+          args=(prepare --previous "$RUNNER_TEMP/hosted-previous" --candidate "$RUNNER_TEMP/hosted-candidate"
+            --promoted "$RUNNER_TEMP/hosted-promoted" --plan "$RUNNER_TEMP/hosted-plan.json")
+          if [[ "$KIND" != rollback ]]; then args+=(--player "$RUNNER_TEMP/hosted-player"); fi
+          python3 .github/scripts/hosted_site.py "${args[@]}"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          name: hosted-previous
+          path: ${{ runner.temp }}/hosted-previous
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.plan.outputs.kind != 'rollback'
+        with:
+          name: hosted-candidate
+          path: ${{ runner.temp }}/hosted-candidate
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.plan.outputs.kind != 'dev'
+        with:
+          name: hosted-promoted
+          path: ${{ runner.temp }}/hosted-promoted
+      - name: Verify the rollback target before changing root
+        if: steps.plan.outputs.kind == 'rollback'
+        run: >-
+          python3 .github/scripts/hosted_site.py smoke --origin https://play.trytalewright.com
+          --site "$RUNNER_TEMP/hosted-promoted" --plan "$RUNNER_TEMP/hosted-plan.json"
+      - name: Deploy the candidate without changing root
+        if: steps.plan.outputs.kind != 'rollback'
+        id: candidate
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: hosted-candidate
+      - name: Verify the deployed candidate
+        if: steps.plan.outputs.kind != 'rollback'
+        run: >-
+          python3 .github/scripts/hosted_site.py smoke --origin https://play.trytalewright.com
+          --site "$RUNNER_TEMP/hosted-candidate" --plan "$RUNNER_TEMP/hosted-plan.json"
+      - name: Promote the selected release
+        if: steps.plan.outputs.kind != 'dev'
+        id: promoted
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: hosted-promoted
+      - name: Verify the selected root
+        if: steps.plan.outputs.kind != 'dev'
+        run: >-
+          python3 .github/scripts/hosted_site.py smoke --origin https://play.trytalewright.com
+          --site "$RUNNER_TEMP/hosted-promoted" --plan "$RUNNER_TEMP/hosted-plan.json" --root
+      - name: Persist the successful snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KIND: ${{ steps.plan.outputs.kind }}
+        run: |
+          site="$RUNNER_TEMP/hosted-promoted"
+          if [[ "$KIND" == dev ]]; then site="$RUNNER_TEMP/hosted-candidate"; fi
+          python3 .github/scripts/hosted_store.py persist --repository "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" --site "$site" --information "$RUNNER_TEMP/hosted-state.json"
+      - name: Restore the previous site after a failed deployment
+        if: >-
+          ${{ failure() && ((steps.candidate.outcome != '' && steps.candidate.outcome != 'skipped') ||
+          (steps.promoted.outcome != '' && steps.promoted.outcome != 'skipped')) }}
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: hosted-previous

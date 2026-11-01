@@ -11,9 +11,9 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 
 | Trigger | What happens |
 |---|---|
-| Push to `main` | Full verification only; the hosted player is not deployed. |
-| Valid version-tag push | After verification, **Publish Samples** builds that tagged web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). The root represents the most recently deployed eligible tag, including previews. **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. Package publishing jobs use environment `release`. |
-| PR / manual | Validation only. |
+| Push to `main` | After verification, **Publish Samples** updates the experimental player at [/dev/](https://play.trytalewright.com/dev/) without changing the root release. |
+| Valid version-tag push | After verification, **Publish Samples** retains the tagged player at `/versions/<tag>/` and promotes it at the [root](https://play.trytalewright.com/) only after the deployment smoke test passes. **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. Package publishing jobs use environment `release`. |
+| PR / manual | Validation only, except an explicit hosted-player rollback dispatched from `main`. |
 
 The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
 public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/update procedure is documented in
@@ -21,9 +21,9 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
 
 ## Repository settings
 
-1. **Settings > Pages > Source:** GitHub Actions, and allow `v*` tags in the `github-pages`
-   environment's deployment rules. The custom domain is `play.trytalewright.com`; the workflow
-   publishes at the site root (`/`). Invalid public tags fail validation before deployment.
+1. **Settings > Pages > Source:** GitHub Actions, and allow the `main` branch and `v*` tags in
+   the `github-pages` environment's deployment rules. The custom domain is
+   `play.trytalewright.com`. Invalid public tags fail validation before deployment.
 2. Keep the **release** environment's reviewer approval and `v*` tag deployment restriction.
    Store `VSCE_PAT` (Marketplace publisher `squid-farm`, **Marketplace > Manage** scope) and
    `NUGET_USER` (nuget.org username) as **environment secrets**, not repository secrets.
@@ -48,8 +48,47 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
    `Talewright.Player`, `Talewright.Cli`, and `Talewright.LanguageServer`. Authentication uses
    `NuGet/login@v1` to exchange OIDC for a one-hour key just before pushing.
 6. Only the NuGet publishing job/caller grants `id-token: write`; only the GitHub release job grants
-   `contents: write`. Marketplace needs only `contents: read` and the environment PAT.
-   Pages and GHCR image permissions remain separate.
+   `contents: write` for release publication. The Pages deploy job separately grants `contents: write`
+   to update its state branch, `actions: read` to recover an initial Pages artifact,
+   `deployments: read` to check the live deployment, and `pages: write` plus `id-token: write`
+   for deployment. These use the short-lived `GITHUB_TOKEN`; no long-lived Pages
+   secret is required. Marketplace needs only `contents: read` and the environment PAT.
+
+## Hosted-player retention and rollback
+
+GitHub Pages remains the host and custom domain; no additional cloud account is required. The
+`hosted-player-state` branch stores the last successful complete site snapshot. Each deployment
+reassembles that snapshot, preserving all recorded `/versions/<tag>/` directories. A repeated tag
+must produce the identical files and commit or deployment fails; it is never silently overwritten.
+Do not delete, rewrite or manually edit the state branch while deployments are running.
+
+On the first deployment, the workflow imports the currently live Pages artifact so an existing root
+continues to work even if `/dev/` is published first. Pages artifacts normally expire after one day:
+seed the state branch while the current artifact is available. If there is no state and the live
+artifact has expired, the workflow fails without deploying; recover the previous site snapshot
+before retrying. An unexpected deployment outside this workflow also stops a managed deployment
+instead of replacing an unknown live site.
+
+A release first deploys its version path with the previous root intact. After its live path and
+assets pass smoke tests, a second snapshot points `/` to that version; a failed deployment or smoke
+test triggers an attempt to restore the previous snapshot and leaves the workflow failed. If the
+restore itself fails, investigate Pages before retrying. A dev deployment replaces only `/dev/` and
+its metadata. The public `/versions.json` lists the retained versions, current root selection and
+available dev build.
+
+The root selects the **most recently successfully deployed eligible tag**, not necessarily the
+highest SemVer. Preview tags are eligible and remain explicitly labeled as previews; they are not
+claimed to be stable. To select a previous retained tag, dispatch **Build** from `main` with its
+`hosted_rollback` input set to that exact tag. The normal verification, target smoke test and
+rollback protection still apply.
+
+Pages serves the existing custom domain without a separate hosting bill, but does not offer per-file
+cache-header control here: responses may remain cached for about 10 minutes. Exact-version URLs are
+immutable, while root and dev updates can take that long to appear. Published Pages sites have a
+[1 GB limit](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)
+and a 100 GB/month soft bandwidth limit; the state branch also grows as builds are retained.
+The workflow checks the site and individual Git file sizes before deployment and fails rather than
+discarding old versions. Monitor usage and move to append-capable hosting before reaching the limit.
 
 ## All-in-one extension packages
 

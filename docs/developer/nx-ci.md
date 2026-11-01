@@ -125,10 +125,11 @@ work. Native Nx inputs model these consumers, not a path classifier in the workf
 | `scripts/nx_ci.py`, `scripts/ui_test_image_plan.py` | None: CI/selection and image-planning contract tests validate them. |
 | `scripts/package_version.py`, `scripts/verify_packages.py` | Complete `build` group: versioned packages and clean consumers. |
 | `scripts/publish_samples.py` | Complete browser group, including regular and published-game tests in all three browsers. |
+| `scripts/hosted_site.py`, `scripts/hosted_store.py` | Complete browser group and hosted snapshot/CI contracts. |
 | `workflows/build.yml`, `workflows/publish-nuget.yml` | Complete `build` group. CI contract tests additionally exercise the aggregate/orchestration wiring. |
 | `workflows/editor-tooling.yml` | Complete editor group, including both compiler contracts, packaging and installed-editor smoke. |
 | `workflows/tests.yml` | All non-build groups: headless units, browser, Linux, editor and every checks target (including uncovered leaf compilation). |
-| `workflows/publish-samples.yml` | Complete browser group. Deployment is restricted to validated version-tag pushes. |
+| `workflows/publish-samples.yml` | Complete browser group. Deployment accepts main, validated tag pushes and explicit main-branch rollback dispatches. |
 | `workflows/performance.yml` | Performance-report Python tests; exhaustive measurements remain scheduled/manual. |
 | `workflows/publish-ui-test-image.yml`, `docker/ui-tests/Dockerfile`, `docker/ui-tests/image.json`, `docker/ui-tests/verify.py` | The independent UI-image workflow still validates candidate builds, browser story loading and the native prerequisite probe. |
 
