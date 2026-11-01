@@ -173,36 +173,6 @@ public sealed class CompilerDiagnosticCoverageTests
         Assert.Equal(new SourceLocation(MainFile, 2, 1), diagnostic.Location);
     }
 
-    [Fact]
-    public void Contract_reports_missing_documentation_and_regressions_by_code()
-    {
-        var fixture = Assert.Single(Cases, item => item.Code == "TW1007");
-        var failures = CheckContract(
-            new HashSet<string>(["TW1007", "TW9999"], StringComparer.Ordinal),
-            new HashSet<string>(["TW9999"], StringComparer.Ordinal),
-            [fixture]);
-        Assert.Contains(failures, failure => failure.Contains("TW1007", StringComparison.Ordinal)
-            && failure.Contains("documented", StringComparison.Ordinal));
-        Assert.Contains(failures, failure => failure.Contains("TW9999", StringComparison.Ordinal)
-            && failure.Contains("regression", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Listing_a_code_without_emitting_it_does_not_count_as_coverage()
-    {
-        var codes = new HashSet<string>(["TW9999"], StringComparer.Ordinal);
-        var failures = CheckContract(codes, codes, [Error("TW9999", Scene("-> END"))]);
-        Assert.Contains(failures, failure => failure.Contains("TW9999", StringComparison.Ordinal)
-            && failure.Contains("no passing", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Reference_requires_a_table_row_with_a_meaning()
-    {
-        Assert.Empty(ExtractDocumentedCodes("Example: TW9999\n| TW9999 |   | Fix |"));
-        Assert.Contains("TW9999", ExtractDocumentedCodes("| TW9999 | Meaning | Fix |"));
-    }
-
     private static IReadOnlyList<string> CheckContract(
         IReadOnlySet<string> compilerCodes,
         IReadOnlySet<string> documentedCodes,

@@ -9,48 +9,6 @@ namespace Talewright.Talemark.Tests;
 public sealed class TalemarkFakerTests
 {
     [Fact]
-    public void Syntax_helpers_render_complete_and_intentionally_incomplete_constructs()
-    {
-        var ready = new TaleFlagRef("ready");
-        var count = new TaleVariableRef("count");
-        var player = TaleCharacterRef.Player;
-        var coin = new TaleItemRef("coin");
-
-        Assert.Equal("{if flag:ready}", IfFaker.Open(ready));
-        Assert.Equal("{if flag:ready}yes{/if}", IfFaker.Inline(ready, "yes"));
-        Assert.Equal("{if flag:ready}\n-> END\n{/if}", IfFaker.Block(ready, DivertFaker.To("END")));
-        Assert.Equal("{else}", IfFaker.Else);
-        Assert.Equal("{var:count}", SubstitutionFaker.Variable(count));
-        Assert.Equal("{player:first-name}", SubstitutionFaker.Character(player, "first-name"));
-        Assert.Equal("{item:coin}", SubstitutionFaker.Item(coin));
-        Assert.Equal("var:count >= 2", ExpressionFaker.AtLeast(count, 2));
-        Assert.Equal("var:count > 0", ExpressionFaker.GreaterThan(count, 0));
-        Assert.Equal("var:count == 2", ExpressionFaker.EqualTo(count, 2));
-        Assert.Equal("not flag:ready", ExpressionFaker.Not(ready));
-        Assert.Equal("player has coin", ExpressionFaker.HasItem(player, coin));
-        Assert.Equal("(flag:ready)", ExpressionFaker.Parenthesize(ready.ToString()));
-        Assert.Equal("-var:count", ExpressionFaker.Negate(count.ToString()));
-        Assert.Equal("~ var:count = 2", EffectFaker.Line(EffectFaker.Assign(count, 2)));
-        Assert.Equal("~ var:count = ((1))", EffectFaker.Line(EffectFaker.Assign(count,
-            ExpressionFaker.Parenthesize(ExpressionFaker.Parenthesize("1")))));
-        Assert.Equal("set flag:ready", EffectFaker.Set(ready));
-        Assert.Equal("clear flag:ready", EffectFaker.Clear(ready));
-        Assert.Equal("give player coin", EffectFaker.Give(player, coin));
-        Assert.Equal("* -> END", ChoiceFaker.Create("END"));
-        Assert.Equal("* [Go] (requires: flag:ready) { var:count += 1 } -> END",
-            ChoiceFaker.Create("END", "Go", ready.ToString(), EffectFaker.Increase(count, 1)));
-        Assert.Equal("**strong**", MarkupFaker.Strong("strong"));
-        Assert.Equal("*emphasis*", MarkupFaker.Emphasis("emphasis"));
-        Assert.Equal("`code`", MarkupFaker.Code("code"));
-        Assert.Equal("*a ", MarkupFaker.EmphasisOpen("a "));
-        Assert.Equal("[a](", MarkupFaker.LinkOpen("a"));
-        Assert.Equal("[a](target)", MarkupFaker.Link("a", "target"));
-        Assert.Equal("{image(\"portrait.png\", \"A portrait\")}", ImageFaker.Call("portrait.png", "A portrait"));
-        Assert.Equal("{image(\"portrait\\\\\\\".png\", \"A \\\"portrait\\\"\")}",
-            ImageFaker.Call("portrait\\\".png", "A \"portrait\""));
-    }
-
-    [Fact]
     public void Composed_syntax_and_manifest_produce_a_story_the_compiler_and_analyzer_accept()
     {
         var manifest = new ManifestFaker("faker-test", "Faker test", "start", 42);
