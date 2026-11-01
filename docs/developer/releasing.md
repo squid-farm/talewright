@@ -173,8 +173,10 @@ never publishes, even when run against a tag.
 
 The existing `talewright-ci-tests:ci-check` target includes `tests/test_release.py`, covering
 version boundaries/order/collisions, the complete six-platform VSIX set, native architecture,
-identity/channel/bundling, and release API retry/error cases without network publication.
-Publication gating and permissions live in the workflow and are verified by real release runs:
+identity/channel/bundling, and release API retry/error cases without network publication. It also
+parses the workflows to check publication safeguards: tag-only publication behind full verification,
+the allowlist of write permissions, explicitly forwarded secrets bound to the `release` environment,
+NuGet OIDC sign-in to nuget.org, and no `pull_request_target` triggers:
 
 ```bash
 ./nx run talewright-ci-tests:ci-check
