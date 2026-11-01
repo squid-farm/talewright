@@ -106,6 +106,12 @@ public sealed class ChoiceDiagnosticsTests
         const string balanced = "* [Hello {player:first-name} -> END";
         const string requires = "* [Hello {player:first-name} (requires: flag:ready)";
         const string effects = "* [Go { set flag:left";
+        const string effectsThenArrow = "* [Go { set flag:left -> END";
+        const string effectsThenRequires = "* [Go { set flag:left (requires: flag:ready";
+        const string arrowThenEffects = "* [Go -> END { set flag:left";
+        const string requiresThenEffects = "* [Go (requires: flag:ready { set flag:left";
+        const string requiresThenArrow = "* [Go (requires: flag:ready -> END";
+        const string arrowThenRequires = "* [Go -> END (requires: flag:ready";
         Expect("=== start\n" + one,
             Err("TW1011", MissingBracketBefore("->"), 2, Col(one, "[")));
         Expect("=== start\n" + two,
@@ -118,6 +124,18 @@ public sealed class ChoiceDiagnosticsTests
             Err("TW1011", MissingBracketBefore("(requires:"), 2, Col(requires, "[")));
         Expect("=== start\n" + effects,
             Err("TW1011", MissingBracketBefore("{"), 2, Col(effects, "[")));
+        Expect("=== start\n" + effectsThenArrow,
+            Err("TW1011", MissingBracket, 2, Col(effectsThenArrow, "[")));
+        Expect("=== start\n" + effectsThenRequires,
+            Err("TW1011", MissingBracket, 2, Col(effectsThenRequires, "[")));
+        Expect("=== start\n" + arrowThenEffects,
+            Err("TW1011", MissingBracket, 2, Col(arrowThenEffects, "[")));
+        Expect("=== start\n" + requiresThenEffects,
+            Err("TW1011", MissingBracket, 2, Col(requiresThenEffects, "[")));
+        Expect("=== start\n" + requiresThenArrow,
+            Err("TW1011", MissingBracket, 2, Col(requiresThenArrow, "[")));
+        Expect("=== start\n" + arrowThenRequires,
+            Err("TW1011", MissingBracket, 2, Col(arrowThenRequires, "[")));
     }
 
     [Fact]

@@ -1301,17 +1301,20 @@ internal sealed partial class TaleParser
                     continue;
                 }
 
-                if (LooksLikeEffects(text, i))
+                if (!LooksLikeEffects(text, i))
                 {
-                    if (found is not null)
-                    {
-                        return null;
-                    }
-
-                    found = new ClauseHint(i, "{");
+                    // An unclosed substitution makes everything after it uncertain.
+                    return found;
                 }
 
-                return found;
+                if (found is not null)
+                {
+                    return null;
+                }
+
+                // The '{' is one candidate. A later -> or (requires: is another, so keep scanning.
+                found = new ClauseHint(i, "{");
+                continue;
             }
 
             if (c == '[')
