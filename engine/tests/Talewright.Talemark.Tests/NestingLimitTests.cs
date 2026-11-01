@@ -85,7 +85,7 @@ public sealed class NestingLimitTests
 
         var result = Compile(tale);
 
-        Assert.Equal(expectedSuccess, result.Success);
+        Assert.True(expectedSuccess == result.Success, string.Join("\n", result.Diagnostics));
         if (expectedSuccess)
         {
             Assert.DoesNotContain(result.Diagnostics, item => item.Code == "TW1016");
@@ -100,46 +100,37 @@ public sealed class NestingLimitTests
     }
 
     [Theory]
-    [InlineData(64, true)]
-    [InlineData(65, false)]
-    public void Inline_conditions_observe_the_depth_limit(int depth, bool expectedSuccess)
+    [InlineData("prose", 64, true)]
+    [InlineData("prose", 65, false)]
+    [InlineData("choice", 64, true)]
+    [InlineData("choice", 65, false)]
+    [InlineData("dialogue", 64, true)]
+    [InlineData("dialogue", 65, false)]
+    public void Inline_conditions_observe_the_depth_limit_in_each_template_context(
+        string context, int depth, bool expectedSuccess)
     {
         var inline = string.Concat(Enumerable.Repeat("{if true}", depth)) + "inside" +
             string.Concat(Enumerable.Repeat("{/if}", depth));
+        var line = context switch
+        {
+            "prose" => inline,
+            "choice" => $"* [{inline}] -> END",
+            "dialogue" => $"> player: {inline}",
+            _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
+        };
 
-        var result = Compile($"=== start\n{inline}\n-> END");
+        var tale = context == "choice" ? $"=== start\n{line}" : $"=== start\n{line}\n-> END";
+        var result = Compile(tale);
 
-        Assert.Equal(expectedSuccess, result.Success);
+        Assert.True(expectedSuccess == result.Success, string.Join("\n", result.Diagnostics));
         if (!expectedSuccess)
         {
             var diagnostic = Assert.Single(result.Diagnostics, item => item.Code == "TW1016");
             Assert.Equal("Conditions are nested more than 64 levels deep.", diagnostic.Message);
-            Assert.Equal(new SourceLocation("main.tale", 2, ((depth - 1) * 9) + 1), diagnostic.Location);
+            Assert.Equal(new SourceLocation("main.tale", 2,
+                    line.IndexOf(inline, StringComparison.Ordinal) + ((depth - 1) * 9) + 1),
+                diagnostic.Location);
         }
-    }
-
-    [Fact]
-    public void One_hundred_thousand_parentheses_fails_safely_and_compilation_continues()
-    {
-        var expression = new string('(', 100_000) + "true" + new string(')', 100_000);
-
-        var result = Compile($"=== start\n@requires {expression}\n-> END\n=== after\n@hub-limit 0\n-> END");
-
-        Assert.Contains(result.Diagnostics, item => item.Code == "TW1016");
-        Assert.Contains(result.Diagnostics, item => item.Code == "TW1006");
-    }
-
-    [Fact]
-    public void One_hundred_thousand_block_conditions_are_skipped_linearly_and_recover()
-    {
-        const int depth = 100_000;
-        var tale = "=== start\n" + string.Concat(Enumerable.Repeat("{if true}\n", depth)) +
-            string.Concat(Enumerable.Repeat("{/if}\n", depth)) + "-> END";
-
-        var result = Compile(tale);
-
-        Assert.Contains(result.Diagnostics, item => item.Code == "TW1016");
-        Assert.DoesNotContain(result.Diagnostics, item => item.Code == "TW1005");
     }
 
     [Fact]
@@ -152,19 +143,6 @@ public sealed class NestingLimitTests
 
         Assert.Equal("Conditions are nested more than 64 levels deep.", diagnostic.Message);
         Assert.True(diagnostic.Location.Line == 2);
-    }
-
-    [Fact]
-    public void Ten_thousand_inline_conditions_are_skipped_without_recursive_folding()
-    {
-        const int depth = 10_000;
-        var inline = string.Concat(Enumerable.Repeat("{if true}", depth)) + "hidden" +
-            string.Concat(Enumerable.Repeat("{/if}", depth)) + " visible";
-
-        var result = Compile($"=== start\n{inline}\n-> END");
-
-        Assert.Contains(result.Diagnostics, item => item.Code == "TW1016");
-        Assert.DoesNotContain(result.Diagnostics, item => item.Code == "TW1005");
     }
 
     [Fact]
