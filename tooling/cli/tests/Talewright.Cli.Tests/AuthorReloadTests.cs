@@ -1,30 +1,36 @@
 using Talewright.Debugger;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
 public sealed class AuthorReloadTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "talewright-reload-" + Guid.NewGuid().ToString("N"));
-    private const string Yaml = """
-        game:
-          id: watched
-          title: Watched
-          start: start
-        flags: [ready]
-        vars: {count: 0}
-        characters:
-          player: {first-name: Tester}
-        """;
-    private const string Tale = """
-        === start
-        * [Go] -> current
-        === current
-        Old passage.
-        ~ var:count += 1
-        * [Finish] -> END
-        """;
+    private static readonly string Yaml = BuildManifest();
+    private static readonly string Tale = BuildTale();
+
+    private static string BuildManifest()
+    {
+        var manifest = new ManifestFaker("watched", "Watched", "start");
+        manifest.Flag("ready");
+        manifest.Number("count", 0);
+        manifest.Character("player", "Tester");
+        return manifest.Build();
+    }
+
+    private static string BuildTale()
+    {
+        var count = new TaleVariableRef("count");
+        return string.Join('\n',
+            SceneFaker.Header("start"),
+            ChoiceFaker.Create("current", "Go"),
+            SceneFaker.Header("current"),
+            "Old passage.",
+            EffectFaker.Line(EffectFaker.Increase(count, 1)),
+            ChoiceFaker.Create("END", "Finish"));
+    }
 
     public AuthorReloadTests()
     {
@@ -35,9 +41,9 @@ public sealed class AuthorReloadTests : IDisposable
 
     private void Write(string text) => File.WriteAllText(Path.Combine(_root, "main.tale"), text);
     private SourceCompilation Load() => SourceCompilation.Load(_root);
-    private static SourceCompilation Source(string tale, string yaml = Yaml)
+    private static SourceCompilation Source(string tale, string? yaml = null)
     {
-        var source = new StorySource(new Dictionary<string, string> { ["story.talewright.yaml"] = yaml, ["main.tale"] = tale });
+        var source = new StorySource(new Dictionary<string, string> { ["story.talewright.yaml"] = yaml ?? Yaml, ["main.tale"] = tale });
         return new(source, StoryCompiler.Compile(source), null);
     }
 

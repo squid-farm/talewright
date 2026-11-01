@@ -3,60 +3,57 @@ using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public sealed class AuthorTimelineTests
 {
-    private const string Yaml = """
-        game:
-          id: timeline
-          title: Timeline
-          start: start
-          undo: false
-        flags: [ready, fired]
-        vars: {count: 0}
-        characters:
-          player: {first-name: Tester, inventory: {rope: 2}}
-          guide: {first-name: Guide, stats: {str: 11}}
-        items:
-          rope: {name: Rope, modifiers: {str: 2}}
-        factions:
-          guild: {name: Guild}
-        triggers:
-          - id: repeat
-            when: flag:ready
-            do: var:count += 10
-            once: false
-          - id: once
-            when: flag:ready
-            do: set flag:fired
-            once: true
-        """;
-    private const string Tale = """
-        === start
-        ~ var:count += 1
-        Count {var:count}. {if flag:ready}Ready.{else}Waiting.{/if}
-        * [Prepared {var:count}] (requires: flag:ready) -> target
-        * [Wait] -> start
-        === target
-        @requires not flag:ready
-        ~ var:count += 2
-        Target {var:count}.
-        ::: skill-check athletics dc 10
-        success: -> finish
-        failure: -> finish
-        :::
-        === finish
-        * [Return] -> start
-        * [End] -> END
-        """;
+    private static readonly string Yaml = BuildManifest().Build();
+    private static readonly string Tale = BuildTale();
 
-    private static StoryDefinition Compile(string tale = Tale, string yaml = Yaml)
+    private static ManifestFaker BuildManifest(bool collision = false, string characterId = "guide", string factionId = "guild")
+    {
+        var manifest = new ManifestFaker("timeline", "Timeline", "start") { Undo = false };
+        manifest.Flag("ready");
+        manifest.Flag("fired");
+        manifest.Number("count", 0);
+        if (collision)
+        {
+            manifest.Flag("str");
+            manifest.Number("str", 0);
+        }
+
+        manifest.Character("player", "Tester", inventory: new Dictionary<string, int> { ["rope"] = 2 });
+        manifest.Character(characterId, "Guide", stats: new Dictionary<string, int> { ["str"] = 11 });
+        manifest.Item("rope", "Rope", new Dictionary<string, int> { ["str"] = 2 });
+        manifest.Faction(factionId, "Guild");
+        manifest.Trigger("repeat", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), 10));
+        manifest.Trigger("once", "flag:ready", EffectFaker.Set(new TaleFlagRef("fired")), once: true);
+        return manifest;
+    }
+
+    private static string BuildTale() => string.Join('\n',
+        SceneFaker.Header("start"),
+        EffectFaker.Line(EffectFaker.Increase(new TaleVariableRef("count"), 1)),
+        $"Count {SubstitutionFaker.Variable(new TaleVariableRef("count"))}. {IfFaker.Inline(new TaleFlagRef("ready"), "Ready.", "Waiting.")}",
+        ChoiceFaker.Create("target", $"Prepared {SubstitutionFaker.Variable(new TaleVariableRef("count"))}",
+            new TaleFlagRef("ready").ToString()),
+        ChoiceFaker.Create("start", "Wait"),
+        SceneFaker.Header("target"),
+        SceneFaker.Requires(ExpressionFaker.Not(new TaleFlagRef("ready"))),
+        EffectFaker.Line(EffectFaker.Increase(new TaleVariableRef("count"), 2)),
+        $"Target {SubstitutionFaker.Variable(new TaleVariableRef("count"))}.",
+        SkillCheckFaker.Entry("athletics", 10, successTarget: "finish", failureTarget: "finish"),
+        SceneFaker.Header("finish"),
+        ChoiceFaker.Create("start", "Return"),
+        ChoiceFaker.Create("END", "End"));
+
+    private static StoryDefinition Compile(string? tale = null, string? yaml = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml, ["main.tale"] = tale,
+            ["story.talewright.yaml"] = yaml ?? Yaml, ["main.tale"] = tale ?? Tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
@@ -73,10 +70,7 @@ public sealed class AuthorTimelineTests
     [InlineData("faction", "faction:str")]
     public void Mixed_field_batches_use_distinct_kind_keys_for_character_stats(string character, string field)
     {
-        var yaml = Yaml.Replace("flags: [ready, fired]", "flags: [ready, fired, str]")
-            .Replace("vars: {count: 0}", "vars: {count: 0, str: 0}")
-            .Replace("guide: {first-name: Guide, stats: {str: 11}}", $"{character}: {{first-name: Guide, stats: {{str: 11}}}}")
-            .Replace("guild: {name: Guild}", "str: {name: Guild}");
+        var yaml = BuildManifest(collision: true, characterId: character, factionId: "str").Build();
         var session = Start(Compile(yaml: yaml));
         session.Edit(new()
         {

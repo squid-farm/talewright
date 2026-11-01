@@ -46,6 +46,61 @@ The reported lifecycle counts do not measure retained browser memory or prove
 immediate bitmap reclamation. This work does not introduce runtime checkpoints,
 change save/replay, or activate the broader deferred attribution/device work.
 
+## Generating test stories
+
+`Talewright.TestStories` contains reusable `IfFaker`, `ChoiceFaker`,
+`SceneFaker`, `DivertFaker`, `ExpressionFaker`, `EffectFaker`,
+`SubstitutionFaker`, `ImageFaker`, markup and skill-check helpers. They
+construct deterministic Talemark fragments; the seeded `TaleFaker` composes
+them into scenes and prose. `ManifestFaker` builds manifest YAML and returns
+references for declared variables, flags, characters, items and factions. It
+also supports text variables, triggers, creation configuration and other game
+metadata. Its sections follow the order in which each kind of declaration is
+first added:
+
+```csharp
+var manifest = new ManifestFaker("test-story", "Test story", "start", 42);
+var count = manifest.Number("count", 0);
+var ready = manifest.Flag("ready");
+manifest.Character("player", "Tester");
+
+var tale = string.Join('\n',
+    SceneFaker.Header("start"),
+    IfFaker.Block(ready, SubstitutionFaker.Variable(count)),
+    ChoiceFaker.Create("END", "Leave"));
+var source = new StorySource(new Dictionary<string, string>
+{
+    [StorySource.ManifestFileName] = manifest.Build(),
+    ["main.tale"] = tale,
+});
+```
+
+Fragments such as `IfFaker.Open` and `MarkupFaker.LinkOpen` can also form
+deliberately incomplete inputs. Keep literals when the exact syntax, diagnostic
+range or malformed YAML is the behavior under test. `RealisticStory` and
+`PerformanceCorpus` use these helpers while preserving their reference corpus bytes.
+
+The generated-fixture migration covers shared compiler/runtime stories,
+Talemark compilation and reachability fixtures, runtime session/authoring,
+creation, history, hub and image-rendering stories, and generated setup in the
+player, authoring, CLI and language-server tests. In particular, the shared
+baseline manifests in `StoryAnalysisTests` and the language-server `ServerTests`
+are built by `ManifestFaker` without changing their line layout. The shared
+player image fixture uses syntax fakers for image, condition, speaker, choice,
+markup and scene constructs.
+
+Intentional literal exceptions remain in parser/compiler tests that assert exact
+Talemark syntax, malformed source, diagnostics or source ranges; YAML/schema
+tests that exercise authored YAML syntax; and editor/LSP tests that mutate
+precise source text or assert its positions. The checked-in story corpus and
+performance fixtures also remain byte-stable. Supporting YAML files in tests
+for split configuration remain explicit where the file boundary and fragment
+placement are the behavior under test. Shared narrative examples remain
+authored source where their prose or feature combinations are the scenario;
+native debugger source/map tests retain literals when displayed source lines
+are asserted. JavaScript schema/VS Code tests keep their own static YAML
+fixtures because they cannot consume the .NET faker library.
+
 ## Fast .NET tests
 
 ```bash

@@ -4,24 +4,24 @@ using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Testing;
 
 namespace Talewright.Talemark.Tests;
 
 public sealed class ImageAltTemplateTests
 {
-    private const string Manifest = """
-        game:
-          id: alt
-          title: Alt
-          start: gate
-        characters:
-          player: { first-name: Ada }
-          guide: { first-name: Bea }
-          image: { first-name: Iris }
-        vars:
-          place: "South"
-        flags: [met]
-        """;
+    private static readonly string Manifest = BuildManifest();
+
+    private static string BuildManifest()
+    {
+        var manifest = new ManifestFaker("alt", "Alt", "gate");
+        manifest.Character("player", "Ada");
+        manifest.Character("guide", "Bea");
+        manifest.Character("image", "Iris");
+        manifest.Text("place", "South");
+        manifest.Flag("met");
+        return manifest.Build();
+    }
 
     private static CompilationResult Compile(string tale) => StoryCompiler.Compile(
         new StorySource(new Dictionary<string, string>

@@ -74,7 +74,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     public async Task Textless_choices_keep_order_effects_history_and_save_navigation()
     {
         await Upload(new StoryFixture("textless-choices",
-            TestStories.DefaultYaml.Replace("id: player-test", $"id: textless-{Guid.NewGuid():N}"), """
+            TestStories.DefaultManifest($"textless-{Guid.NewGuid():N}").Build(), """
             === start
             Visits {var:visits}.
             * [Open] (requires: flag:ready) -> final

@@ -4,28 +4,37 @@ using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public sealed class CharacterCreationTests
 {
-    private static StoryDefinition Story(string creation = """
-        name: true
-        pronouns: [they, she, he]
-        stats:
-          str: [8, 12, 16]
-        presets:
-          explorer: {label: Explorer, stats: {str: 12, hp: 15}}
-          scholar: {label: Scholar, stats: {str: 8, hp: 10}}
-        """)
+    private static StoryDefinition Story(bool creation = true)
     {
-        var creationSection = creation.Length == 0 ? "" : "  creation:\n" +
-            string.Join('\n', creation.Split('\n').Select(line => "    " + line)) + "\n";
+        var manifest = new ManifestFaker("creation", "Creation", "a")
+        {
+            CreationName = creation ? true : null,
+        };
+        manifest.Character("player", "Default");
+        if (creation)
+        {
+            manifest.CreationPronouns("they", "she", "he");
+            manifest.CreationStat("str", 8, 12, 16);
+            manifest.CreationPreset("explorer", "Explorer", new Dictionary<string, int> { ["str"] = 12, ["hp"] = 15 });
+            manifest.CreationPreset("scholar", "Scholar", new Dictionary<string, int> { ["str"] = 8, ["hp"] = 10 });
+        }
+
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = "game:\n  id: creation\n  title: Creation\n  start: a\n" + creationSection +
-                "characters:\n  player: {first-name: Default}\n",
-            ["main.tale"] = "=== a\n{player:first-name} {player:pronoun} {player:str}.\n* [Next] -> b\n=== b\nDone.\n-> END\n",
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = string.Join('\n',
+                SceneFaker.Header("a"),
+                $"{SubstitutionFaker.Character(TaleCharacterRef.Player, "first-name")} {SubstitutionFaker.Character(TaleCharacterRef.Player, "pronoun")} {SubstitutionFaker.Character(TaleCharacterRef.Player, "str")}.",
+                ChoiceFaker.Create("b", "Next"),
+                SceneFaker.Header("b"),
+                "Done.",
+                DivertFaker.To("END")),
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
@@ -112,7 +121,7 @@ public sealed class CharacterCreationTests
     [Fact]
     public void Predefined_stories_roundtrip_null_character_and_reject_creation_input()
     {
-        var story = Story("");
+        var story = Story(creation: false);
         var history = new StoryHistory(story, 42);
         var bytes = history.Save();
         Assert.Null(history.Character);
@@ -123,7 +132,7 @@ public sealed class CharacterCreationTests
     [Fact]
     public void Saves_require_the_character_field_even_for_predefined_stories()
     {
-        var story = Story("");
+        var story = Story(creation: false);
         var history = new StoryHistory(story, 42);
         var bytes = history.Save();
         var json = JsonNode.Parse(bytes)!.AsObject();

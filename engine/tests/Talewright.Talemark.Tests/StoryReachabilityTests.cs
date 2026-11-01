@@ -41,9 +41,11 @@ public sealed class StoryReachabilityTests
     [Fact]
     public void Follows_hub_offers_and_diverts_but_not_lines_that_can_never_run()
     {
+        var manifest = TestStories.DefaultManifest();
+        manifest.Flag("ready");
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = TestStories.DefaultYaml + "\nflags: [ready]\n",
+            ["story.talewright.yaml"] = manifest.Build(),
             ["main.tale"] = """
                 === start
                 @hub town

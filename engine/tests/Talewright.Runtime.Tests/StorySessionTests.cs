@@ -3,40 +3,31 @@ using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public class StorySessionTests
 {
-    private const string Yaml = """
-        game:
-          id: test
-          title: Test
-          start: camp
-          randomness: off
-        characters:
-          player:
-            first-name: Mara
-            last-name: Burns
-            pronouns: she
-            stats: { dex: 14, athletics: 2 }
-        factions:
-          guild: { name: "Explorers' Guild", standing: 0 }
-        items:
-          relic: { name: Relic of Ysh, modifiers: { wis: 2 } }
-          rope: { name: coil of rope }
-        triggers:
-          - id: outcast
-            when: faction:guild <= unfriendly
-            do: set flag:outcast
-            once: true
-        """;
+    private static readonly string Yaml = BuildYaml();
 
-    private static StoryDefinition Compile(string tale, string yaml = Yaml)
+    private static string BuildYaml(string randomness = "off")
+    {
+        var manifest = new ManifestFaker("test", "Test", "camp", 42) { Randomness = randomness };
+        manifest.Character("player", "Mara", "Burns",
+            new Dictionary<string, int> { ["dex"] = 14, ["athletics"] = 2 }, "she");
+        manifest.Faction("guild", "Explorers' Guild");
+        manifest.Item("relic", "Relic of Ysh", new Dictionary<string, int> { ["wis"] = 2 });
+        manifest.Item("rope", "coil of rope");
+        manifest.Trigger("outcast", "faction:guild <= unfriendly", EffectFaker.Set(new TaleFlagRef("outcast")), once: true);
+        return manifest.Build();
+    }
+
+    private static StoryDefinition Compile(string tale, string? yaml = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml ?? Yaml,
             ["main.tale"] = tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -182,7 +173,7 @@ public class StorySessionTests
               success: -> camp
               failure: -> camp
             * [Stop] -> END
-            """, Yaml.Replace("randomness: off", "randomness: checks-only"));
+            """, BuildYaml("checks-only"));
 
         static List<GameEvent> Play(StoryDefinition story)
         {

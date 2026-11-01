@@ -5,24 +5,13 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Formatting;
+using Talewright.Testing;
 
 namespace Talewright.Talemark.Tests;
 
 public class ExpressionFormatterTests
 {
-    private const string Manifest = """
-        game: { id: formatter, title: Formatter, start: a }
-        characters:
-          player: { first-name: Mara, last-name: Burns, pronouns: she }
-        factions:
-          river: { name: River Guild, standing: 12 }
-        items:
-          lantern: { name: Lantern }
-        flags: [ready]
-        vars:
-          coins: 5
-          weather: "rain"
-        """;
+    private static readonly string Manifest = TestStories.ExpressionManifest("formatter", "Formatter", "a").Build();
 
     private static readonly CompilerOptions Options = new()
     {

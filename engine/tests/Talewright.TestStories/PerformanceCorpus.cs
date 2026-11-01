@@ -41,6 +41,7 @@ public sealed class PerformanceCorpus : IDisposable
     private const long MaxFileBytes = 5L * 1024 * 1024;
     private const long MaxExpandedBytes = 50L * 1024 * 1024;
     private static readonly UTF8Encoding Utf8 = new(false, true);
+    private static readonly TaleVariableRef Visits = new("visits");
 
     private PerformanceCorpus(string root, string archivePath, PerformanceCorpusMetadata metadata)
     {
@@ -184,39 +185,39 @@ public sealed class PerformanceCorpus : IDisposable
         }
     }
 
-    private static string CreateManifest(string tierName) => $$"""
-        game:
-          id: performance-{{tierName.ToLowerInvariant()}}
-          title: {{tierName}} performance corpus
-          version: 1.0.0
-          start: scene.0
-          seed: {{SeedValue}}
-          ruleset:
-            base: generic
-        vars: {visits: 0}
-        characters:
-          player: {first-name: Tester}
-        """;
+    private static string CreateManifest(string tierName)
+    {
+        var manifest = new ManifestFaker($"performance-{tierName.ToLowerInvariant()}", $"{tierName} performance corpus", "scene.0", SeedValue)
+        {
+            Version = "1.0.0",
+            BaseRuleset = "generic",
+        };
+        manifest.Number(Visits.Id, 0);
+        manifest.Character(TaleCharacterRef.Player.Id, "Tester");
+        return manifest.Build();
+    }
 
     private static void AppendScene(StringBuilder builder, int index, int sceneCount)
     {
-        builder.Append("=== scene.").Append(index).Append('\n');
-        builder.Append("@title Scene ").Append(index).Append('\n');
-        builder.Append("@tags benchmark\n");
-        builder.Append("@priority ").Append(index % 10).Append('\n');
+        builder.Append(SceneFaker.Header($"scene.{index}")).Append('\n');
+        builder.Append(SceneFaker.Title($"Scene {index}")).Append('\n');
+        builder.Append(SceneFaker.Tags("benchmark")).Append('\n');
+        builder.Append(SceneFaker.Priority(index % 10)).Append('\n');
         if (index == 0)
         {
-            builder.Append("@hub benchmark\n");
-            builder.Append("@hub-limit 20\n");
+            builder.Append(SceneFaker.Hub("benchmark")).Append('\n');
+            builder.Append(SceneFaker.HubLimit(20)).Append('\n');
         }
 
-        builder.Append("~ var:visits += 1\n");
-        builder.Append("Passage for {player:first-name}; visit {var:visits}.\n");
-        builder.Append("* [Next] { var:visits += 1 } -> scene.").Append((index + 1) % sceneCount).Append('\n');
+        builder.Append(EffectFaker.Line(EffectFaker.Increase(Visits, 1))).Append('\n');
+        builder.Append("Passage for ").Append(SubstitutionFaker.Character(TaleCharacterRef.Player, "first-name"))
+            .Append("; visit ").Append(SubstitutionFaker.Variable(Visits)).Append(".\n");
+        var target = $"scene.{(index + 1) % sceneCount}";
+        builder.Append(ChoiceFaker.Create(target, "Next", effect: EffectFaker.Increase(Visits, 1))).Append('\n');
         if (index % 10 == 0)
         {
-            builder.Append("* [Qualified] (requires: player:int >= 0) -> scene.")
-                .Append((index + 1) % sceneCount).Append('\n');
+            builder.Append(ChoiceFaker.Create(target, "Qualified",
+                requires: ExpressionFaker.AtLeast(TaleCharacterRef.Player.Field("int"), 0))).Append('\n');
         }
 
         builder.Append('\n');
@@ -254,7 +255,7 @@ public sealed class PerformanceCorpus : IDisposable
     }
 
     private static int CountChoices(string content) =>
-        content.Split('\n').Count(line => line.StartsWith("* [", StringComparison.Ordinal));
+        content.Split('\n').Count(line => line.StartsWith(ChoiceFaker.LabelPrefix, StringComparison.Ordinal));
 
     private static string ComputeHash(IEnumerable<string> paths, string root)
     {

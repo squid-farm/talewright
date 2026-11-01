@@ -3,6 +3,7 @@ using Talewright.Core.Identity;
 using Talewright.Debugger;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
+using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
@@ -12,29 +13,45 @@ public sealed class AuthorScenarioTests : IDisposable
     private readonly string _story;
     private readonly string _output;
 
+    private static string BuildManifest(IEnumerable<string>? flags = null)
+    {
+        var manifest = new ManifestFaker("scenario-ui", "Portable UI", "start");
+        if (flags is null)
+        {
+            manifest.Flag("ready");
+        }
+        else
+        {
+            foreach (var flag in flags)
+            {
+                manifest.Flag(flag);
+            }
+        }
+
+        manifest.Number("count", 0);
+        manifest.Character("player", "Tester");
+        return manifest.Build();
+    }
+
+    private static string BuildTale()
+    {
+        var count = new TaleVariableRef("count");
+        return string.Join('\n',
+            SceneFaker.Header("start"),
+            $"Count {SubstitutionFaker.Variable(count)}.",
+            ChoiceFaker.Create("target", "Next"),
+            SceneFaker.Header("target"),
+            $"Target {SubstitutionFaker.Variable(count)}.",
+            ChoiceFaker.Create("start", "Return"));
+    }
+
     public AuthorScenarioTests()
     {
         _story = Path.Combine(_root, "story");
         _output = Path.Combine(_root, "author", "portable.twscenario");
         Directory.CreateDirectory(_story);
-        File.WriteAllText(Path.Combine(_story, "story.talewright.yaml"), """
-            game:
-              id: scenario-ui
-              title: Portable UI
-              start: start
-            flags: [ready]
-            vars: {count: 0}
-            characters:
-              player: {first-name: Tester}
-            """);
-        File.WriteAllText(Path.Combine(_story, "main.tale"), """
-            === start
-            Count {var:count}.
-            * [Next] -> target
-            === target
-            Target {var:count}.
-            * [Return] -> start
-            """);
+        File.WriteAllText(Path.Combine(_story, "story.talewright.yaml"), BuildManifest());
+        File.WriteAllText(Path.Combine(_story, "main.tale"), BuildTale());
     }
 
     private WorkbenchModel Start()
@@ -122,8 +139,7 @@ public sealed class AuthorScenarioTests : IDisposable
         var original = await File.ReadAllBytesAsync(_output);
         var ids = Enumerable.Range(0, 5000).Select(index => $"flag-{index:D4}-" + new string('x', 490)).ToArray();
         var manifest = Path.Combine(_story, "story.talewright.yaml");
-        await File.WriteAllTextAsync(manifest, (await File.ReadAllTextAsync(manifest))
-            .Replace("flags: [ready]", $"flags: [{string.Join(", ", ids)}]"));
+        await File.WriteAllTextAsync(manifest, BuildManifest(ids));
         model.Reload();
         Assert.Null(model.Error);
         foreach (var flag in model.Flags)

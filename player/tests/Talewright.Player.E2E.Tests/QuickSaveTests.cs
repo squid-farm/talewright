@@ -11,7 +11,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
 {
     private static StoryFixture Fixture() => TestStories.Linear with
     {
-        Yaml = TestStories.DefaultYaml.Replace("id: player-test", $"id: quick-{Guid.NewGuid():N}"),
+        Yaml = TestStories.DefaultManifest($"quick-{Guid.NewGuid():N}").Build(),
     };
 
     [Theory]
