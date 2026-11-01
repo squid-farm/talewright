@@ -32,6 +32,8 @@ internal sealed partial class TaleParser
     private readonly DiagnosticBag _diagnostics;
     private readonly Action<string, SourceLocation>? _discoverEffects;
     private readonly Action<SceneId, SourceLocation>? _discoverScene;
+    private readonly CancellationToken _cancellationToken;
+    private int _linesSinceCancellationCheck;
     private readonly List<ParsedScene> _scenes = [];
     private SceneBuilder? _scene;
     private int _index;
@@ -45,7 +47,8 @@ internal sealed partial class TaleParser
     private bool _hasAfterNextLine;
 
     private TaleParser(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
-        Action<string, SourceLocation>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null)
+        Action<string, SourceLocation>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null,
+        CancellationToken cancellationToken = default)
     {
         _file = file;
         _text = text;
@@ -58,18 +61,21 @@ internal sealed partial class TaleParser
         _diagnostics = diagnostics;
         _discoverEffects = discoverEffects;
         _discoverScene = discoverScene;
+        _cancellationToken = cancellationToken;
     }
 
-    public static List<ParsedScene> Parse(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics)
+    public static List<ParsedScene> Parse(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
+        CancellationToken cancellationToken = default)
     {
-        var parser = new TaleParser(file, text, symbols, diagnostics);
+        var parser = new TaleParser(file, text, symbols, diagnostics, cancellationToken: cancellationToken);
         parser.Run();
         return parser._scenes;
     }
 
     public static void Discover(string file, string text, StorySymbols symbols,
-        Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene) =>
-        new TaleParser(file, text, symbols, new DiagnosticBag(), effects, scene).Run();
+        Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene,
+        CancellationToken cancellationToken = default) =>
+        new TaleParser(file, text, symbols, new DiagnosticBag(), effects, scene, cancellationToken).Run();
 
     private SourceLocation At(int column) => new(_file, _index + 1, column + 1);
     private SourceRange SpanFrom(SourceLocation start) => new(start, At(_lineLength));
@@ -77,6 +83,7 @@ internal sealed partial class TaleParser
 
     private void Run()
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         while (_hasCurrentLine)
         {
             var raw = _text.AsSpan(_lineStart, _lineLength);
@@ -91,6 +98,7 @@ internal sealed partial class TaleParser
 
             if (trimmed.StartsWith("===", StringComparison.Ordinal))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 _symbols.Analysis?.Tokens.Add(new("===", AnalysisCollector.Range(At(indent), "===")));
                 FinishScene();
                 StartScene(trimmed[3..].Trim().ToString(), At(indent));
@@ -140,6 +148,8 @@ internal sealed partial class TaleParser
 
     private void AdvanceLine()
     {
+        if ((_linesSinceCancellationCheck++ & 63) == 0)
+            _cancellationToken.ThrowIfCancellationRequested();
         _index++;
         if (!_hasNextLine)
         {
@@ -158,7 +168,9 @@ internal sealed partial class TaleParser
 
     private void StartScene(string id, SourceLocation location)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         _discoverScene?.Invoke(new SceneId(id), location);
+        _cancellationToken.ThrowIfCancellationRequested();
         _scene = new SceneBuilder(new SceneId(id), location);
         if (!IdentifierRules.IsValid(id) || id == "END")
         {

@@ -30,31 +30,38 @@ public static class StoryCompiler
 {
     /// <summary>Compiles <paramref name="source"/>.</summary>
     public static CompilationResult Compile(StorySource source, CompilerOptions? options = null)
-        => CompileCore(source, options ?? CompilerOptions.Default, null);
+        => CompileCore(source, options ?? CompilerOptions.Default, null, CancellationToken.None);
 
-    internal static CompilationResult CompileForAnalysis(StorySource source, CompilerOptions options, AnalysisCollector collector)
-        => CompileCore(source, options, collector);
+    internal static CompilationResult CompileForAnalysis(StorySource source, CompilerOptions options, AnalysisCollector collector,
+        CancellationToken cancellationToken)
+        => CompileCore(source, options, collector, cancellationToken);
 
-    private static CompilationResult CompileCore(StorySource source, CompilerOptions options, AnalysisCollector? analysis)
+    private static CompilationResult CompileCore(StorySource source, CompilerOptions options, AnalysisCollector? analysis,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var diagnostics = new DiagnosticBag();
         analysis?.Registrations();
 
         if (!source.Files.ContainsKey(StorySource.ManifestFileName))
         {
             diagnostics.Error("TW4002", "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
-            analysis?.DiscoverWithoutManifest();
+            analysis?.DiscoverWithoutManifest(cancellationToken);
             return new CompilationResult(null, diagnostics.Items);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var manifest = StoryYamlReader.Read(source, diagnostics, options, analysis);
+        cancellationToken.ThrowIfCancellationRequested();
         if (manifest is null)
         {
-            analysis?.DiscoverWithoutManifest();
+            analysis?.DiscoverWithoutManifest(cancellationToken);
             return new CompilationResult(null, diagnostics.Items);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var taleFiles = source.TaleFiles.ToList();
+        cancellationToken.ThrowIfCancellationRequested();
         if (taleFiles.Count == 0)
         {
             diagnostics.Error("TW3001", "The story has no .tale files.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
@@ -68,6 +75,7 @@ public static class StoryCompiler
         var discoveredNumbers = new Dictionary<VarId, int>();
         void DiscoverEffects(string text, SourceLocation location)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ExpressionParser.CollectDeclarations(text, flags, discoveredNumbers,
                 typedDeclaration: declarations.Add, location: location);
         }
@@ -82,6 +90,7 @@ public static class StoryCompiler
         };
         foreach (var (path, text) in taleFiles)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             TaleParser.Discover(path, text, discoverySymbols, DiscoverEffects, (id, location) =>
             {
                 analysis?.Scene(id, location);
@@ -89,7 +98,7 @@ public static class StoryCompiler
                 {
                     diagnostics.Error("TW3010", $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
                 }
-            });
+            }, cancellationToken);
         }
 
         foreach (var trigger in manifest.Triggers)
@@ -119,8 +128,10 @@ public static class StoryCompiler
         var seen = new HashSet<SceneId>();
         foreach (var (path, text) in taleFiles)
         {
-            foreach (var scene in TaleParser.Parse(path, text, symbols, diagnostics))
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var scene in TaleParser.Parse(path, text, symbols, diagnostics, cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 // Discovery reported duplicates; keep the first so the rest still validates.
                 if (seen.Add(scene.Definition.Id))
                 {
@@ -133,6 +144,7 @@ public static class StoryCompiler
         var triggers = new List<TriggerDefinition>();
         foreach (var raw in manifest.Triggers)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var when = ExpressionParser.ParseCondition(raw.When, raw.WhenLocation, symbols, diagnostics);
             var effects = ExpressionParser.ParseEffects(raw.Do, raw.DoLocation, symbols, diagnostics);
             if (when is not null && effects is not null)
@@ -141,13 +153,15 @@ public static class StoryCompiler
             }
         }
 
-        var reachability = StoryValidator.Validate(manifest, parsed, diagnostics);
+        var reachability = StoryValidator.Validate(manifest, parsed, diagnostics, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (diagnostics.HasErrors)
         {
             return new CompilationResult(null, diagnostics.Items);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var story = new StoryDefinition
         {
             Id = manifest.Id,

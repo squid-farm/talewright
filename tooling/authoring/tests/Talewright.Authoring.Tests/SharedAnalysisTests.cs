@@ -15,7 +15,8 @@ public sealed class SharedAnalysisTests
     private static string Tale(string prose) =>
         string.Join('\n', SceneFaker.Header("start"), prose, DivertFaker.To("END"), "");
 
-    private static Task HoldDelay(TimeSpan _, CancellationToken token) => Task.Delay(Timeout.InfiniteTimeSpan, token);
+    private static Task HoldDelay(TimeSpan delay, CancellationToken token) =>
+        delay == TimeSpan.Zero ? Task.CompletedTask : Task.Delay(Timeout.InfiniteTimeSpan, token);
 
     [Fact]
     public async Task Callers_share_one_analysis_and_cancelling_a_waiter_does_not_cancel_it()
@@ -28,7 +29,7 @@ public sealed class SharedAnalysisTests
             Interlocked.Increment(ref calls);
             entered.TrySetResult();
             await release.Task.WaitAsync(token);
-            return StoryAnalyzer.Analyze(source, options);
+            return StoryAnalyzer.Analyze(source, options, token);
         }
 
         var workspace = new StoryWorkspace(Source(), null, false, Analyze, HoldDelay);
@@ -56,10 +57,10 @@ public sealed class SharedAnalysisTests
     public async Task Rapid_edits_skip_superseded_debounces_and_analyze_the_latest_snapshot_once()
     {
         var calls = 0;
-        Task<StoryAnalysis> Analyze(StorySource source, CompilerOptions options, CancellationToken _)
+        Task<StoryAnalysis> Analyze(StorySource source, CompilerOptions options, CancellationToken token)
         {
             Interlocked.Increment(ref calls);
-            return Task.FromResult(StoryAnalyzer.Analyze(source, options));
+            return Task.FromResult(StoryAnalyzer.Analyze(source, options, token));
         }
 
         var workspace = new StoryWorkspace(Source(), null, false, Analyze, HoldDelay);
@@ -76,5 +77,42 @@ public sealed class SharedAnalysisTests
         Assert.True(result.Published);
         Assert.Equal(Tale("Latest."), result.Analysis.Source.Files["start.tale"]);
         Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task Superseding_a_running_revision_cancels_analysis_without_publishing_it()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        async Task<StoryAnalysis> Analyze(StorySource source, CompilerOptions options, CancellationToken token)
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                entered.TrySetResult();
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, token); }
+                catch (OperationCanceledException)
+                {
+                    cancelled.TrySetResult();
+                    throw;
+                }
+            }
+            return StoryAnalyzer.Analyze(source, options, token);
+        }
+
+        var workspace = new StoryWorkspace(Source(), null, false, Analyze, HoldDelay);
+        var stale = workspace.AnalyzeAsync(TimeSpan.Zero);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        workspace.Open("start.tale", 1, Tale("Latest."));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stale);
+        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Null(workspace.Current);
+
+        var latest = await workspace.AnalyzeAsync(TimeSpan.Zero).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(latest.Published);
+        Assert.Equal(Tale("Latest."), latest.Analysis.Source.Files["start.tale"]);
+        Assert.Same(latest.Analysis, workspace.Current);
+        Assert.Equal(2, calls);
     }
 }

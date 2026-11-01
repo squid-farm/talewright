@@ -449,8 +449,7 @@ public class StoryAnalysisTests
         var stale = workspace.AnalyzeAsync(TimeSpan.FromMilliseconds(50));
         workspace.Open("main.tale", 1, "=== fresh\n-> END");
         var current = await workspace.AnalyzeAsync(TimeSpan.Zero);
-        var rejected = await stale;
-        Assert.False(rejected.Published);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stale);
         Assert.Same(current.Analysis, workspace.Current);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();

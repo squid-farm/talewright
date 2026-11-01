@@ -144,6 +144,46 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
+    public async Task Burst_of_changes_cancels_old_analysis_and_only_latest_revision_publishes()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        await client.Initialize();
+        await PublishInitial(control, client, Original);
+
+        await client.Change("start.tale", Changed, 2);
+        var firstDelay = await control.NextDelay();
+        await client.Request(2, "textDocument/completion", Position(client));
+        var first = await control.NextAnalysis();
+        Assert.False(first.CancellationRequested);
+
+        var newestText = Tale("Newest.");
+        await client.Change("start.tale", newestText, 3);
+        var newestDelay = await control.NextDelay();
+        Assert.Equal(-32801, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
+        Assert.True(first.CancellationRequested);
+        Assert.False(client.HasDiagnostics("start.tale", 2));
+        Assert.Equal(2, control.AnalysisCount);
+
+        await client.Request(3, "textDocument/completion", Position(client));
+        var newest = await control.NextAnalysis();
+        Assert.Equal(newestText, newest.Source.Files["start.tale"]);
+        Assert.False(newest.CancellationRequested);
+        await client.Barrier(4);
+        Assert.False(client.HasResponse(3));
+        Assert.False(client.HasDiagnostics("start.tale", 3));
+
+        firstDelay.Release();
+        first.Release();
+        newestDelay.Release();
+        newest.Release();
+        Assert.Equal(JsonValueKind.Object, (await client.Response(3)).GetProperty("result").ValueKind);
+        await client.Diagnostics("start.tale", 3);
+        Assert.False(client.HasDiagnostics("start.tale", 2));
+        Assert.Equal(3, control.AnalysisCount);
+    }
+
+    [Fact]
     public async Task Closing_a_document_supersedes_a_waiting_request()
     {
         var control = new AnalysisControl();
@@ -377,9 +417,9 @@ public sealed class ConcurrencyTests
         {
             var gate = NewGate();
             Interlocked.Increment(ref _analysisCount);
-            _analyses.Writer.TryWrite(new AnalysisCall(source, gate));
+            _analyses.Writer.TryWrite(new AnalysisCall(source, gate, cancellationToken));
             await gate.Task.WaitAsync(cancellationToken);
-            return StoryAnalyzer.Analyze(source, options);
+            return StoryAnalyzer.Analyze(source, options, cancellationToken);
         }
 
         public Task<Gate> NextDelay() => _delays.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
@@ -412,9 +452,11 @@ public sealed class ConcurrencyTests
         public void Fail(Exception exception) => completion.TrySetException(exception);
     }
 
-    private sealed class AnalysisCall(StorySource source, TaskCompletionSource completion) : Gate(completion)
+    private sealed class AnalysisCall(StorySource source, TaskCompletionSource completion, CancellationToken cancellationToken)
+        : Gate(completion)
     {
         public StorySource Source { get; } = source;
+        public bool CancellationRequested => cancellationToken.IsCancellationRequested;
     }
 
     private sealed class InProcessClient : IAsyncDisposable

@@ -76,8 +76,10 @@ of order. Output frames are serialized.
 Each story revision has one shared analysis. Diagnostic analysis normally waits
 150 ms for edits to settle; a request needing that revision ends the debounce
 and waits for the same analysis instead of starting another. A running analysis
-is not yet interrupted when superseded, and a newer analysis for that story
-waits for it to finish. Superseded results do not publish diagnostics.
+is cancelled when superseded and checks for cancellation between files, scenes,
+and bounded line or validation-step intervals. A newer analysis for that story
+waits only for the cancelled run to unwind. Superseded results do not publish
+diagnostics.
 
 Hover and definition may use the last published analysis when the requested
 document's text is unchanged. Cross-file semantic information may therefore be
