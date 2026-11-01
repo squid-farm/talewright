@@ -1,11 +1,12 @@
 using BenchmarkDotNet.Attributes;
+using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
 
 namespace Talewright.BenchmarkDotNet;
 
-/// <summary>Compiles a generated story with realistic branches, hubs, loops, conditions and endings.</summary>
+/// <summary>Compiles and analyzes a story with realistic branches, hubs, loops, conditions and endings.</summary>
 [MemoryDiagnoser]
 [JsonExporterAttribute.Full]
 public class RealisticStoryBenchmarks
@@ -32,6 +33,9 @@ public class RealisticStoryBenchmarks
 
     [Benchmark]
     public StoryDefinition CompileInMemory() => Compile(_source);
+
+    [Benchmark]
+    public StoryAnalysis AnalyzeInMemory() => StoryAnalyzer.Analyze(_source);
 
     [Benchmark]
     public StoryDefinition LoadAndCompileDirectory() => Compile(StorySource.FromDirectory(_root));

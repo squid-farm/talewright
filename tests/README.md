@@ -72,19 +72,80 @@ and native I/O failures. Sticky-toolbar tests check Quick Save during actual scr
 
 ```bash
 DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release
+
+# Opt in to the 10,000-element slow-input extension; this may take several minutes.
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --slow-input-stress
+
 python3 player/tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
 ```
 
-The dependency-free console workload generates 100/1,000/10,000-scene stories
-with substitutions, effects and choices. It measures in-memory validation/compilation,
+The console workload generates 100/1,000/10,000-scene stories with substitutions,
+effects and choices. It measures in-memory compilation and authoring analysis,
 ZIP load+compile, startup, save serialization, full restore and Back+Forward at
 100/1,000/10,000 choices (the save format's upper limit). Restore verifies cursor
-and event counts. Each operation warms once, then reports median, nearest-rank
-p95 (the maximum of seven samples), current-thread managed allocations and its
-budget. It exits nonzero on any p95 over budget. First compile includes compiler
-JIT cost; later sizes share a warmed process. Timings are not cold OS/process
-startup measurements, peak memory or guarantees for arbitrary author code.
-Run without other build/test work for comparable results.
+and event counts. It also compiles and analyzes a 20-chapter `RealisticStory`.
+
+Each operation warms once, then reports median, nearest-rank p95 (the maximum
+of seven samples), and median and maximum current-thread managed allocations.
+Compilation and analysis rows also print the source-byte denominator and median
+and maximum allocated bytes per source byte. The denominator is the sum of
+`Encoding.UTF8.GetByteCount` over every text in `StorySource.Files`: it includes
+the manifest and Talemark files, but not paths, image data or an added UTF-8 BOM.
+For compilation and analysis, source generation, byte counting and extra
+result validation are outside the measured region. Current-thread allocation is
+valid because these operations are synchronous on the measured thread; use a
+correctly scoped total-allocation measurement if that changes.
+
+The existing time-budgeted rows still fail on p95 over budget. Analysis, the
+realistic compile row, and slow-input timings are report-only: they add no hard
+wall-clock CI gates. The realistic compile and analysis rows instead fail if
+**any** measured allocation exceeds their respective byte-per-source-byte
+ceilings. First compile includes compiler JIT cost; later sizes share a warmed
+process. Timings are not cold OS/process startup measurements, peak memory or
+guarantees for arbitrary author code. For comparisons, record the runtime,
+corpus, CPU, power source and power mode, and run without other build/test work.
+
+The default slow-input ladder analyzes paragraphs with substitutions and inline
+conditions, single-line substitutions, nested block conditions, unmatched
+emphasis, unclosed links, and both plain choices and choices with requirements
+and effects at 1, 5, 10, 20, 50, 100, 500 and 1,000 elements. The opt-in
+extension adds 10,000 for each shape. Reusable generators
+also cover deeply nested parentheses and unary prefixes, but the harness does
+not parse those crash-prone shapes until #396. These timing reports are not
+proof of linear CPU work; fixing issues should add deterministic work or
+structural assertions and allocation bounds where applicable.
+
+#### Realistic allocation ceilings and ratchet
+
+The reference is `RealisticStory.Create(new RealisticStoryProfile { Chapters = 20 }).ToSource()`
+with the default seed 57057. At this baseline it has 946 scenes and 22 source
+files, totaling **709,952 UTF-8 bytes including the manifest**. The harness
+prints these counts each run so corpus changes are visible.
+
+Two calibration runs on 2026-11-01 used .NET 10.0.14, Release,
+`DOTNET_TieredCompilation=0`, Linux Mint 22.3 x64, an AMD Ryzen 9 7940HS,
+AC power and the performance CPU governor. Each run warmed once and measured
+seven iterations; the maximum below is the largest sample across both runs.
+
+| Workload | Median allocated bytes, across runs | Maximum allocated bytes | Maximum B/source byte | Ceiling B/source byte |
+|---|---:|---:|---:|---:|
+| Compile | 34,780,024–34,785,736 | 34,800,848 | 49.02 | 55 |
+| Analyze | 60,062,280–60,066,344 | 60,071,096 | 84.61 | 95 |
+
+For the rounded historical #393 figures of 33.5/57.4 “MB”, the same denominator
+would yield approximately 47.19/80.85 B/source byte if MB meant decimal
+megabytes, or 49.48/84.78 if it meant MiB. The issue does not record the raw
+values or unit interpretation, so these are not an exact before/after comparison.
+
+Any later PR in #392 that lowers a workload's allocation must lower its ceiling
+to the new measured maximum plus 10% (rounding up as needed). No PR may raise a
+ceiling without the lead's approval.
+
+On the calibration machine, two baseline harness runs took 6.83–7.13 seconds
+and the new default took 15.06–20.15 seconds, an added 7.9–13.3 seconds locally.
+The harness prints its own total excluding build for comparison in CI; the local
+delta is not a measurement of hosted CI. The target is about 30 seconds or
+less of additional default CI work.
 
 Budgets deliberately allow slower CI/author machines: compile 100/1,000 scenes
 500 ms and 10,000 scenes 2.5 s; ZIP load+compile 750 ms / 3 s; startup 250 ms;
@@ -108,7 +169,7 @@ surface (#26); revisit with real complex stories and constrained-device profilin
 
 ### Real-file BenchmarkDotNet suite
 
-Issue #57 adds a separate, out-of-process BenchmarkDotNet suite. The dependency-free
+Issue #57 adds a separate, out-of-process BenchmarkDotNet suite. The
 seven-sample `Talewright.Benchmarks` runner above remains the fast correctness/budget
 check; it is not presented as BenchmarkDotNet evidence.
 
