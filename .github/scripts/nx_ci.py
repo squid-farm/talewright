@@ -18,6 +18,9 @@ TARGETS = [
 ]
 GROUPS = ("build", "unit", "browser", "linux-desktop", "editor", "checks")
 CHECK_TARGETS = ("ci-check", "check", "budget")
+E2E_TARGETS = ("e2e-web", "e2e-linux", "e2e-published-web", "e2e-published-linux")
+MAX_FAILURES_IN_SUMMARY = 20
+MAX_ASSERTION_LENGTH = 400
 
 
 def write_summary(content, *, stdout=False):
@@ -64,6 +67,113 @@ def execution_path(args):
     return args.plan.parent / f"execution-{args.group}{suffix}.json"
 
 
+def e2e_reports():
+    return sorted((ROOT / "artifacts/test-results").glob("*.trx"))
+
+
+def failure_summary(group):
+    if group == "unit":
+        reports = unit_reports()
+    elif group in ("browser", "linux-desktop"):
+        reports = e2e_reports()
+    else:
+        return []
+
+    if not reports:
+        return [
+            "",
+            "### Test failure details",
+            "",
+            "**No TRX report was produced.** The task may have failed before the test host "
+            "started or before it could write results; treat this as a runner/infrastructure "
+            "failure unless the task log shows otherwise.",
+        ]
+
+    failures = []
+    report_notes = []
+    executed_reports = 0
+    for report in reports:
+        try:
+            root = ET.parse(report).getroot()
+        except (OSError, ET.ParseError) as error:
+            report_notes.append(
+                f"- Could not read TRX report {code(report.relative_to(ROOT))}: "
+                f"{code(error)}; this is a report/runner failure, not a test assertion."
+            )
+            continue
+
+        counters = root.find(".//{*}Counters")
+        results = root.findall(".//{*}UnitTestResult")
+        failed_results = [
+            result for result in results if result.attrib.get("outcome", "").lower() == "failed"
+        ]
+        if counters is not None:
+            try:
+                executed_count = int(counters.attrib.get("executed", "0"))
+                failed_count = int(counters.attrib.get("failed", "0"))
+            except ValueError as error:
+                report_notes.append(
+                    f"- TRX report {code(report.relative_to(ROOT))} has invalid counters: "
+                    f"{code(error)}."
+                )
+                executed_count = failed_count = None
+        else:
+            executed_count = failed_count = None
+
+        if executed_count is not None and executed_count > 0:
+            executed_reports += 1
+        elif not failed_results:
+            report_notes.append(
+                f"- TRX report {code(report.relative_to(ROOT))} contains no executed tests; "
+                "this indicates a filter, test-host, or infrastructure failure."
+            )
+
+        for result in failed_results:
+            message = result.find(".//{*}ErrorInfo/{*}Message")
+            assertion = next(
+                (line.strip() for line in (message.text or "").splitlines() if line.strip()),
+                "",
+            ) if message is not None else ""
+            if len(assertion) > MAX_ASSERTION_LENGTH:
+                assertion = assertion[:MAX_ASSERTION_LENGTH].rstrip() + "..."
+            failures.append((
+                result.attrib.get("testName") or "Unnamed test",
+                assertion or "Assertion details are not available in the TRX report.",
+                report.relative_to(ROOT),
+            ))
+
+        if failed_count is not None and failed_count > len(failed_results):
+            report_notes.append(
+                f"- TRX report {code(report.relative_to(ROOT))} records "
+                f"{failed_count} failed test(s), but has no details for "
+                f"{failed_count - len(failed_results)} of them."
+            )
+
+    lines = ["", "### Test failure details", ""]
+    if failures:
+        lines.extend(
+            f"- {code(name)} — {code(assertion)} ({code(path)})"
+            for name, assertion, path in failures[:MAX_FAILURES_IN_SUMMARY]
+        )
+        if len(failures) > MAX_FAILURES_IN_SUMMARY:
+            lines.append(
+                f"- {len(failures) - MAX_FAILURES_IN_SUMMARY} additional test failure(s) "
+                "are in the uploaded TRX report."
+            )
+    elif executed_reports:
+        lines.append(
+            "No failed test cases were recorded in the available TRX reports. "
+            "The task failed outside test assertions, likely during build, startup, or runner setup."
+        )
+    else:
+        lines.append(
+            "**No usable test results were recorded.** Treat this as a test-host, report, "
+            "or infrastructure failure rather than a test assertion."
+        )
+    lines.extend(report_notes)
+    return lines
+
+
 def save_execution(args, record):
     path = execution_path(args)
     temporary = path.with_suffix(".tmp")
@@ -86,6 +196,8 @@ def execution_summary(args):
             lines.append("**Incomplete:** no execution record; the router may not have started.")
         else:
             lines.append(f"Router outcome: **{record['outcome']}**.")
+            if record["outcome"] == "failure":
+                lines.extend(failure_summary(args.group))
         if not tasks:
             lines.append("No tasks selected. This does not authorize running an unselected group.")
         else:
@@ -257,6 +369,9 @@ def run_group(args):
     if args.group == "unit":
         for report in unit_reports():
             report.unlink()
+    elif args.group in ("browser", "linux-desktop"):
+        for report in e2e_reports():
+            report.unlink()
     record = {"outcome": "incomplete", "batches": [
         {"target": target, "projects": [
             task["project"] for task in tasks if task["target"] == target
@@ -267,9 +382,10 @@ def run_group(args):
     try:
         for batch in record["batches"]:
             target = batch["target"]
+            output_style = "stream" if target in E2E_TARGETS else "static"
             arguments = [
                 "run-many", f"--projects={','.join(batch['projects'])}", f"--targets={target}",
-                "--parallel=3", "--output-style=static",
+                "--parallel=3", f"--output-style={output_style}",
             ]
             if target == "e2e-web":
                 arguments.append(f"--configuration={args.browser}")
@@ -278,8 +394,14 @@ def run_group(args):
             start = time.monotonic()
             try:
                 nx(*arguments, environment={"BROWSER": args.browser})
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as error:
                 batch["outcome"] = "failure"
+                projects = ", ".join(batch["projects"])
+                print(
+                    f"Nx batch failed: {target} for {projects} "
+                    f"(exit status {error.returncode}).",
+                    file=sys.stderr,
+                )
                 raise
             else:
                 batch["outcome"] = "success"
@@ -346,7 +468,10 @@ def main():
             parser.error("Affected selection requires both --base and --head")
         select(args)
     elif args.command == "run":
-        run_group(args)
+        try:
+            run_group(args)
+        except subprocess.CalledProcessError as error:
+            raise SystemExit(error.returncode) from None
     elif args.command == "summary":
         execution_summary(args)
     else:

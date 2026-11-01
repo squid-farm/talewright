@@ -103,6 +103,149 @@ class ReportingTests(unittest.TestCase):
             nx_ci.run_group(self.args)
         self.assertFalse(nx_ci.execution_path(self.args).exists())
 
+    def test_e2e_failure_summary_includes_failed_test_and_assertion(self):
+        self.args.group = "browser"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["browser"] = [
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"}
+        ]
+        self.args.plan.write_text(json.dumps(plan))
+        report = self.root / "artifacts/test-results/chromium.trx"
+        report.parent.mkdir(parents=True)
+        report.write_text(
+            """<TestRun>
+              <ResultSummary><Counters total="1" executed="1" passed="0" failed="1" /></ResultSummary>
+              <Results><UnitTestResult testName="Example.CharacterCreationTests.Pronouns"
+                outcome="Failed"><Output><ErrorInfo><Message>Assert.Equal() Failure: Value mismatch
+                Expected: 4
+                Actual: 0</Message></ErrorInfo></Output></UnitTestResult></Results>
+            </TestRun>"""
+        )
+        nx_ci.save_execution(self.args, {
+            "outcome": "failure",
+            "batches": [{"target": "e2e-web", "projects": ["Talewright.Player.E2E.Tests"],
+                         "outcome": "failure", "seconds": 2}],
+        })
+
+        with patch("nx_ci.ROOT", self.root):
+            nx_ci.execution_summary(self.args)
+        summary = self.summary.read_text()
+        self.assertIn("Example.CharacterCreationTests.Pronouns", summary)
+        self.assertIn("Assert.Equal() Failure: Value mismatch", summary)
+        self.assertIn("artifacts/test-results/chromium.trx", summary)
+        self.assertNotIn("Expected: 4", summary)
+
+    def test_missing_and_invalid_e2e_reports_are_classified_as_infrastructure(self):
+        self.args.group = "browser"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["browser"] = [
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"}
+        ]
+        self.args.plan.write_text(json.dumps(plan))
+        nx_ci.save_execution(self.args, {"outcome": "failure", "batches": []})
+
+        with patch("nx_ci.ROOT", self.root):
+            nx_ci.execution_summary(self.args)
+        self.assertIn("No TRX report was produced", self.summary.read_text())
+        self.assertIn("runner/infrastructure failure", self.summary.read_text())
+
+        self.summary.unlink()
+        report = self.root / "artifacts/test-results/chromium.trx"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text("<TestRun>")
+        with patch("nx_ci.ROOT", self.root):
+            nx_ci.execution_summary(self.args)
+        self.assertIn("Could not read TRX report", self.summary.read_text())
+        self.assertIn("report/runner failure", self.summary.read_text())
+
+        report.write_text(
+            '<TestRun><ResultSummary><Counters total="0" executed="0" failed="0" />'
+            "</ResultSummary></TestRun>"
+        )
+        self.summary.unlink()
+        with patch("nx_ci.ROOT", self.root):
+            nx_ci.execution_summary(self.args)
+        self.assertIn("contains no executed tests", self.summary.read_text())
+        self.assertIn("No usable test results", self.summary.read_text())
+
+        report.write_text(
+            '<TestRun><ResultSummary><Counters total="1" executed="1" passed="1" failed="0" />'
+            "</ResultSummary></TestRun>"
+        )
+        self.summary.unlink()
+        with patch("nx_ci.ROOT", self.root):
+            nx_ci.execution_summary(self.args)
+        self.assertIn("No failed test cases were recorded", self.summary.read_text())
+        self.assertIn("outside test assertions", self.summary.read_text())
+
+    def test_failure_summary_caps_test_details_and_points_to_full_report(self):
+        self.args.group = "browser"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["browser"] = [
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"}
+        ]
+        self.args.plan.write_text(json.dumps(plan))
+        report = self.root / "artifacts/test-results/chromium.trx"
+        report.parent.mkdir(parents=True)
+        results = "\n".join(
+            f'<UnitTestResult testName="FailedTest{index:02}" outcome="Failed">'
+            "<Output><ErrorInfo><Message>Assertion failed</Message></ErrorInfo></Output>"
+            "</UnitTestResult>"
+            for index in range(nx_ci.MAX_FAILURES_IN_SUMMARY + 1)
+        )
+        report.write_text(
+            f'<TestRun><ResultSummary><Counters executed="{nx_ci.MAX_FAILURES_IN_SUMMARY + 1}" '
+            f'failed="{nx_ci.MAX_FAILURES_IN_SUMMARY + 1}" /></ResultSummary>'
+            f"<Results>{results}</Results></TestRun>"
+        )
+        nx_ci.save_execution(self.args, {"outcome": "failure", "batches": []})
+
+        with patch("nx_ci.ROOT", self.root):
+            nx_ci.execution_summary(self.args)
+        summary = self.summary.read_text()
+        self.assertIn("FailedTest00", summary)
+        self.assertIn(f"FailedTest{nx_ci.MAX_FAILURES_IN_SUMMARY - 1:02}", summary)
+        self.assertNotIn(f"FailedTest{nx_ci.MAX_FAILURES_IN_SUMMARY:02}", summary)
+        self.assertIn("1 additional test failure", summary)
+        self.assertIn("artifacts/test-results/chromium.trx", summary)
+
+    def test_e2e_router_streams_output_and_prints_concise_failure_without_traceback(self):
+        self.args.group = "browser"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["browser"] = [
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"}
+        ]
+        self.args.plan.write_text(json.dumps(plan))
+        error = subprocess.CalledProcessError(13, ["nx"])
+        stderr = io.StringIO()
+        results = self.root / "artifacts/test-results"
+        results.mkdir(parents=True)
+        stale_report = results / "stale.trx"
+        stale_report.write_text("<TestRun />")
+        trace = results / "trace.zip"
+        trace.write_text("trace")
+        with patch("nx_ci.nx", side_effect=error) as run, patch(
+            "nx_ci.time.monotonic", side_effect=[10, 12]
+        ), patch("nx_ci.ROOT", self.root), redirect_stderr(stderr), self.assertRaises(
+            subprocess.CalledProcessError
+        ):
+            nx_ci.run_group(self.args)
+        self.assertIn("--output-style=stream", run.call_args.args)
+        self.assertIn("Nx batch failed: e2e-web", stderr.getvalue())
+        self.assertFalse(stale_report.exists())
+        self.assertTrue(trace.exists())
+
+        stderr = io.StringIO()
+        with patch("nx_ci.ROOT", self.root), patch(
+            "nx_ci.nx", side_effect=error
+        ), patch("nx_ci.time.monotonic", side_effect=[10, 12]), patch(
+            "sys.argv", ["nx_ci.py", "run", "browser", f"--plan={self.args.plan}"]
+        ), redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
+            nx_ci.main()
+        self.assertEqual(13, caught.exception.code)
+        self.assertNotIn("Traceback", stderr.getvalue())
+        self.assertIn("Nx batch failed: e2e-web", stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
