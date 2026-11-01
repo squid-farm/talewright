@@ -90,7 +90,7 @@ without cancelling analysis shared by other requests or diagnostics. If a
 request's awaited revision is superseded, it returns ContentModified (`-32801`).
 Shutdown cancels outstanding requests, and exit waits for running work to finish.
 
-For each file, the server publishes at most 500 compiler and lint diagnostics,
+For each file, the server publishes at most 200 compiler and lint diagnostics,
 in source order when the limit is exceeded, followed by informational `TWLSP005`
 at the first hidden position with the number omitted. Files at or below the
 limit are unchanged. This limit applies only to editor publication, not compiler

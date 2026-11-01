@@ -69,7 +69,7 @@ public sealed class LanguageServer
     private readonly record struct DiagnosticPosition(int Line, int Character);
     private sealed record ProtocolError(int Code, string Message);
     private enum Feature { Completion, Hover, Definition, InlayHints }
-    private const int DiagnosticLimit = 500;
+    private const int DiagnosticLimit = 200;
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
         Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown)
     {

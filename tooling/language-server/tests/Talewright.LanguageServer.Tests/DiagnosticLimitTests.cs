@@ -7,12 +7,14 @@ namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
+    private const int EditorDiagnosticLimit = 200;
+
     [Theory]
     [InlineData(0)]
-    [InlineData(499)]
-    [InlineData(500)]
-    [InlineData(501)]
-    [InlineData(503)]
+    [InlineData(199)]
+    [InlineData(200)]
+    [InlineData(201)]
+    [InlineData(203)]
     public async Task Editor_diagnostics_are_capped_in_source_order_without_capping_cli_results(int count)
     {
         await using var client = new Client();
@@ -36,24 +38,24 @@ public sealed partial class ServerTests
         await client.Initialize();
         await client.Open("start.tale", text, 1);
         var actual = await client.Diagnostics("start.tale", 1);
-        Assert.Equal(count <= 500 ? count : 501, actual.Length);
-        var ordered = count <= 500 ? expected : expected
+        Assert.Equal(count <= EditorDiagnosticLimit ? count : EditorDiagnosticLimit + 1, actual.Length);
+        var ordered = count <= EditorDiagnosticLimit ? expected : expected
             .OrderBy(diagnostic => diagnostic.GetProperty("line").GetInt32())
             .ThenBy(diagnostic => diagnostic.GetProperty("column").GetInt32()).ToArray();
-        for (var index = 0; index < Math.Min(count, 500); index++)
+        for (var index = 0; index < Math.Min(count, EditorDiagnosticLimit); index++)
             AssertDiagnostic(ordered[index], actual[index]);
-        if (count <= 500)
+        if (count <= EditorDiagnosticLimit)
         {
             Assert.DoesNotContain(actual, diagnostic => diagnostic.GetProperty("code").GetString() == "TWLSP005");
             return;
         }
-        AssertLimitNotice(actual[^1], ordered[500], count - 500);
+        AssertLimitNotice(actual[^1], ordered[EditorDiagnosticLimit], count - EditorDiagnosticLimit);
     }
 
     [Theory]
-    [InlineData(true, 499)]
-    [InlineData(true, 500)]
-    [InlineData(false, 500)]
+    [InlineData(true, 199)]
+    [InlineData(true, 200)]
+    [InlineData(false, 200)]
     public async Task Cap_combines_compiler_and_lint_diagnostics_without_capping_cli(bool lintFirst, int compilerCount)
     {
         await using var client = new Client();
@@ -79,20 +81,20 @@ public sealed partial class ServerTests
         await client.Initialize();
         await client.Open("start.tale", text, 1);
         var actual = await client.Diagnostics("start.tale", 1);
-        var ordered = expected.Length <= 500 ? expected : expected
+        var ordered = expected.Length <= EditorDiagnosticLimit ? expected : expected
             .OrderBy(diagnostic => diagnostic.GetProperty("line").GetInt32())
             .ThenBy(diagnostic => diagnostic.GetProperty("column").GetInt32()).ToArray();
-        Assert.Equal(expected.Length <= 500 ? expected.Length : 501, actual.Length);
-        for (var index = 0; index < Math.Min(expected.Length, 500); index++)
+        Assert.Equal(expected.Length <= EditorDiagnosticLimit ? expected.Length : EditorDiagnosticLimit + 1, actual.Length);
+        for (var index = 0; index < Math.Min(expected.Length, EditorDiagnosticLimit); index++)
             AssertDiagnostic(ordered[index], actual[index]);
-        if (expected.Length <= 500)
+        if (expected.Length <= EditorDiagnosticLimit)
         {
             Assert.DoesNotContain(actual, diagnostic => diagnostic.GetProperty("code").GetString() == "TWLSP005");
             return;
         }
         Assert.Equal(lintFirst, ordered[0].GetProperty("code").GetString() == "TWL001");
         Assert.Equal(!lintFirst, ordered[^1].GetProperty("code").GetString() == "TWL001");
-        AssertLimitNotice(actual[^1], ordered[500], 1);
+        AssertLimitNotice(actual[^1], ordered[EditorDiagnosticLimit], 1);
     }
 
     private static void AssertDiagnostic(JsonElement expected, JsonElement actual)
@@ -115,7 +117,7 @@ public sealed partial class ServerTests
         Assert.Equal("TWLSP005", notice.GetProperty("code").GetString());
         Assert.Equal(3, notice.GetProperty("severity").GetInt32());
         Assert.Equal("talewright", notice.GetProperty("source").GetString());
-        Assert.Equal($"Showing the first 500 problems in this file; {omitted} more are hidden. Fix these to see the rest.",
+        Assert.Equal($"Showing the first {EditorDiagnosticLimit} problems in this file; {omitted} more are hidden. Fix these to see the rest.",
             notice.GetProperty("message").GetString());
         var point = notice.GetProperty("range").GetProperty("start");
         Assert.Equal(firstHidden.GetProperty("line").GetInt32() - 1, point.GetProperty("line").GetInt32());
