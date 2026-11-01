@@ -58,7 +58,7 @@ public sealed class StoryReloadWatcher : IAsyncDisposable
             catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
             {
                 _yamlDirty = true;
-                return Track(ReportErrorAsync(ex.Message, _generation));
+                return Track(ReportErrorAsync(ex, _generation));
             }
             return Queue(restart, debounce: false);
         }
@@ -106,12 +106,12 @@ public sealed class StoryReloadWatcher : IAsyncDisposable
                 _debounce?.Cancel();
                 _yamlDirty = true;
                 _watcher!.EnableRaisingEvents = false;
-                Track(ReportErrorAsync(args.GetException().Message, _generation));
+                Track(ReportErrorAsync(args.GetException(), _generation));
             }
         }
     }
 
-    private Task ReportErrorAsync(string message, long generation) => _dispatch(() =>
+    private Task ReportErrorAsync(Exception exception, long generation) => _dispatch(() =>
     {
         lock (_gate)
         {
@@ -119,7 +119,7 @@ public sealed class StoryReloadWatcher : IAsyncDisposable
             {
                 return;
             }
-            _model.WatchFailed(message);
+            _model.WatchFailed(exception);
             _changed();
         }
     });

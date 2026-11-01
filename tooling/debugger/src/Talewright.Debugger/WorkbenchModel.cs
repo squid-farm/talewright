@@ -195,12 +195,12 @@ public sealed class WorkbenchModel(string root) : IDisposable
         ReloadStatus = "YAML changed or watcher history is uncertain. Explicit Restart from source is required; Talemark saves cannot adopt mixed source.";
     }
 
-    public void WatchFailed(string message)
+    public void WatchFailed(Exception exception)
     {
         SourcePending = false;
         RequireRestart();
         SourceRejected = true;
-        Error = $"Source watcher failed: {message}. Select Rescan / retry watcher. The last good run is unchanged.";
+        Error = WatcherFailure.Describe(exception);
     }
 
     public bool ApplySource(SourceCompilation candidate, bool restart = false, bool yamlChanged = false,
