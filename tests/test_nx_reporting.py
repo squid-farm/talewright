@@ -55,7 +55,7 @@ class ReportingTests(unittest.TestCase):
                 plan = self.plan(tasks)
                 graph = {"tasks": {"tasks": {
                     "workspace": {"target": {"project": "talewright-workspace"}}
-                } if fallback else {}}}
+                } if fallback else {}}, "graph": {"dependencies": {}}}
                 self.summary.unlink(missing_ok=True)
                 with patch("nx_ci.nx", return_value=SimpleNamespace(stdout=json.dumps(graph))), \
                         patch("nx_ci.make_plan", return_value=plan), \
@@ -93,7 +93,7 @@ class ReportingTests(unittest.TestCase):
         output = io.StringIO()
         with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}), \
                 patch("nx_ci.nx", return_value=SimpleNamespace(
-                    stdout=json.dumps({"tasks": {"tasks": {}}})
+                    stdout=json.dumps({"tasks": {"tasks": {}}, "graph": {"dependencies": {}}})
                 )), patch("nx_ci.make_plan", return_value=plan), redirect_stdout(output):
             nx_ci.select(self.args)
         self.assertEqual(plan, json.loads(output.getvalue())["tasks"])
