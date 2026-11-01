@@ -16,3 +16,13 @@
 .source-lines th[scope="row"] { color: var(--tw-muted); user-select: none; }
 .source-lines .source-scene { background: var(--tw-panel); }
 .source-lines .source-scene th[scope="row"] { color: var(--tw-accent); border-left: 3px solid var(--tw-accent); }
+.workbench-tabs { display: flex; gap: .3rem; border-bottom: 1px solid var(--tw-border); }
+.workbench-tabs [role="tab"][aria-selected="true"] { border-bottom: 3px solid var(--tw-accent); font-weight: bold; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.map-toolbar { display: flex; align-items: center; gap: 1rem; }
+.map-surface { position: relative; height: 70vh; min-height: 24rem; border: 1px solid var(--tw-border); }
+.map-surface canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.map-tooltip { position: absolute; max-width: 32rem; padding: .3rem .5rem; background: var(--tw-panel); border: 1px solid var(--tw-border); font: .85rem var(--tw-ui-font); pointer-events: none; }
+.map-details ul { list-style: none; padding: 0; }
+.map-details li { margin: .25rem 0; }
+.map-details .map-item { text-align: left; }

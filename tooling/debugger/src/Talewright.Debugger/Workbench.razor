@@ -26,9 +26,19 @@
     {
         <p role="alert" class="tw-error">@Model.Error</p>
     }
+    @if (Model.Story is { } shownStory)
+    {
+        <h2>@shownStory.Title</h2>
+        <div role="tablist" aria-label="Workbench views" class="workbench-tabs">
+            <button type="button" role="tab" id="play-tab" aria-controls="play-panel" aria-selected="@(_mapSelected ? "false" : "true")"
+                    tabindex="@(_mapSelected ? -1 : 0)" @ref="_playTab" @onclick="() => SelectTab(false)" @onkeydown="TabKey">Play</button>
+            <button type="button" role="tab" id="map-tab" aria-controls="@(_mapOpened ? "map-panel" : null)" aria-selected="@(_mapSelected ? "true" : "false")"
+                    tabindex="@(_mapSelected ? 0 : -1)" @ref="_mapTab" @onclick="() => SelectTab(true)" @onkeydown="TabKey">Map</button>
+        </div>
+    }
+    <div role="@(Model.Story is null ? null : "tabpanel")" id="play-panel" aria-labelledby="play-tab" hidden="@_mapSelected">
     @if (Model.Story is { } story)
     {
-        <h2>@story.Title</h2>
         <section aria-label="Portable author scenarios">
             <h2>Portable author scenarios</h2>
             <p>Synthetic .twscenario replay recipes, not player saves. Exact import verifies accepted source, extensions and engine/tool compatibility, including redo. Failed imports keep the active run.</p>
@@ -147,6 +157,13 @@
             <InspectionPanel Inspection="inspection" />
         </section>
     }
+    </div>
+    @if (Model.Story is { } mapStory && _mapOpened)
+    {
+        <div role="tabpanel" id="map-panel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
+            <MapTab Story="mapStory" />
+        </div>
+    }
 </main>
 </CascadingValue>
 
@@ -167,6 +184,23 @@
         Model.Dispose();
         if (Model.Images is not null) await Model.Images.DisposeAsync();
         await Model.DrainImagesAsync();
+    }
+    private bool _mapSelected;
+    private bool _mapOpened;
+    private ElementReference _playTab;
+    private ElementReference _mapTab;
+    private void SelectTab(bool map)
+    {
+        _mapSelected = map;
+        _mapOpened |= map;
+    }
+    private async Task TabKey(KeyboardEventArgs e)
+    {
+        if (e.Key is not ("ArrowLeft" or "ArrowRight" or "Home" or "End"))
+            return;
+        SelectTab(e.Key switch { "Home" => false, "End" => true, _ => !_mapSelected });
+        StateHasChanged();
+        await (_mapSelected ? _mapTab : _playTab).FocusAsync();
     }
     private void Start() => Model.Start();
     private void Choose(ChoiceView choice) => Model.Choose(choice.Key);

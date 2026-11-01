@@ -38,3 +38,13 @@ How it's built:
   with immutable compiled text. At most 100 rows render per file window; scene/snapshot changes reset
   the window to the scene declaration. Watcher generations publish pending status on the same dispatcher
   as source adoption. For controls and stale-state meaning, see the [author guide](../../../../docs/guide/testing-your-story.md#see-the-source-being-tested).
+- **Map tab.** `MapView` projects the accepted story's [story map](../../../../engine/src/Talewright.Talemark/README.md#story-map-preview)
+  into scenes, END, hub offer groups by tag, and lines that merge diverts and hub offers between the same
+  scenes. It omits diverts on lines that cannot run, and keeps scenes the start scene cannot reach in a
+  separate area with stubs for reachable targets. `MapTab` rebuilds it whenever the accepted story changes.
+  `wwwroot/map/map.js` lays each area out with ELK in a Web Worker, then paints, hit-tests and pans or zooms
+  one canvas with D3 zoom; it needs no GPU. The canvas is hidden from assistive technology: hidden scene
+  buttons with arrow-key navigation, per-scene divert and hub offer lists, and a status line carry the
+  same names and full conditions that hover shows. `wwwroot/map/vendor` pins elkjs 0.12.1 and a d3-zoom
+  bundle (d3-zoom 3.0.0 and its dependencies), with their licences beside them, so the map works offline.
+  ELK stays an authoring-tool dependency and must not ship in games.

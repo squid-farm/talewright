@@ -5,6 +5,94 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class DebuggerTests
 {
     [Fact]
+    public async Task Native_map_tab_exposes_scenes_diverts_and_hub_offers_to_the_keyboard()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-map-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-map", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: map-debug\n  title: Map Debug\n  start: start\nflags: [ready, lit]\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title The gate
+                {if flag:ready}
+                -> camp
+                {/if}
+                * [Wait] -> END
+                === camp
+                @title Camp
+                @hub fire
+                * [Leave] -> END
+                === well
+                @title Well
+                @tags fire
+                @requires flag:lit
+                @once
+                -> camp
+                === orphan
+                @title Orphan
+                -> camp
+                """);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            var snapshot = await WaitFor(driver, "Scene setup");
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Map");
+            Assert.DoesNotContain("Scenes on the map", snapshot.Content);
+
+            await driver.ActivateAsync("Play");
+            await driver.PressAsync("Right");
+            snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 1 hub offer, 1 unreachable.");
+            Assert.DoesNotContain("Scene setup", snapshot.Content);
+            Assert.Equal("Map", Focused(snapshot).Name);
+
+            await driver.PressAsync("Tab");
+            await driver.PressAsync("Tab");
+            snapshot = await WaitFor(driver, "Diverts: 2");
+            Assert.Equal("The gate (start), start", Focused(snapshot).Name);
+            Assert.Contains("Divert to camp, if flag:ready, main.tale line 4", snapshot.Content);
+            Assert.Contains("Choice c0 “Wait” to END, main.tale line 6", snapshot.Content);
+
+            await driver.PressAsync("Down");
+            snapshot = await WaitFor(driver, "Hub offers: 1");
+            Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
+            Assert.Contains("Hub offer of Well (well) via #fire, once, if flag:lit", snapshot.Content);
+
+            await driver.PressAsync("End");
+            snapshot = await WaitFor(driver, "Diverts: 0");
+            Assert.Equal("END", Focused(snapshot).Name);
+            await driver.PressAsync("Up");
+            snapshot = await WaitFor(driver, "Orphan (orphan), unreachable");
+            Assert.Equal("Orphan (orphan), unreachable", Focused(snapshot).Name);
+            Assert.Contains("Divert to camp, main.tale line 19", snapshot.Content);
+
+            await driver.PressAsync("Home");
+            await WaitFor(driver, "Diverts: 2");
+            await driver.ActivateAsync("Divert to camp, if flag:ready, main.tale line 4");
+            snapshot = await WaitFor(driver, "Hub offers: 1");
+            Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
+            await driver.ActivateAsync("Hub offer of Well (well) via #fire, once, if flag:lit");
+            snapshot = await WaitFor(driver, "Well (well), once, requires flag:lit");
+            Assert.Equal("Well (well), once, requires flag:lit", Focused(snapshot).Name);
+
+            await driver.ActivateAsync("Play");
+            snapshot = await WaitFor(driver, "Scene setup");
+            Assert.DoesNotContain("Scenes on the map", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static AccessibleNode Focused(AccessibleNode snapshot) =>
+        snapshot.Descendants().Last(node => node.Focused);
+
+    [Fact]
     public async Task Native_workbench_shows_textless_choices_as_continue()
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
