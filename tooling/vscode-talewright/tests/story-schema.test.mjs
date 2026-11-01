@@ -88,14 +88,11 @@ test('item grammar has explicit enum/boolean values and independent defaults', (
   assert.equal(schema.definitions.item.properties.uncountable.default, false);
 });
 
-test('compiler, schema, and editor grammar accept the same identifiers', async () => {
+test('compiler and schema accept the same identifiers', async () => {
   const pattern = schema.definitions.identifier.pattern;
   assert.ok(pattern.startsWith('^') && pattern.endsWith('$'), 'schema identifier pattern must be anchored');
-  const grammar = await read('tooling/vscode-talewright/syntaxes/tale.tmLanguage.json');
-  assert.ok(grammar.includes(pattern.slice(1, -1)),
-    'editor grammar should use the same identifier body as the manifest schema');
 
-  // EditorManifestSchemaTests runs the same fixture through the compiler.
+  // EditorManifestSchemaTests and grammar.test.mjs use the same fixture and faction-key position.
   const fixture = JSON.parse(await read('tooling/vscode-talewright/tests/fixtures/identifiers.json'));
   const manifest = id => ({
     game: {
@@ -103,7 +100,8 @@ test('compiler, schema, and editor grammar accept the same identifiers', async (
       title: 'Identifier test',
       start: 'beginning',
     },
-    characters: { player: { 'first-name': 'Ada' }, [id]: { 'first-name': 'Bea' } },
+    characters: { player: { 'first-name': 'Ada' } },
+    factions: { [id]: { name: 'Test' } },
   });
   for (const id of fixture.valid) {
     assertValid(validateManifest, manifest(id), `identifier ${JSON.stringify(id)}`);

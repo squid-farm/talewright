@@ -99,8 +99,17 @@ public class EditorManifestSchemaTests
                         """,
                     ["main.tale"] = "=== beginning\nHello.\n-> END\n",
                 }));
-                Assert.True(valid == result.Success,
-                    $"{JsonSerializer.Serialize(id)} should be {group}: {string.Join("; ", result.Diagnostics.Select(d => d.Message))}");
+                var details = $"{JsonSerializer.Serialize(id)} should be {group}: "
+                    + string.Join("; ", result.Diagnostics.Select(d => $"{d.Code} {d.Message}"));
+                if (valid)
+                {
+                    Assert.True(result.Success, details);
+                }
+                else
+                {
+                    Assert.True(result.Diagnostics.Any(d => d.Code == "TW4003"
+                        && d.Message.StartsWith("Invalid faction id", StringComparison.Ordinal)), details);
+                }
             }
         }
     }

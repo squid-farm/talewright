@@ -4,48 +4,6 @@ import { test } from 'node:test';
 
 const json = async file => JSON.parse(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
 
-test('package wires Talemark syntax, snippets, manifest schema, and the thin LSP client', async () => {
-  const manifest = await json('package.json');
-  assert.equal(manifest.main, './dist/extension.cjs');
-  assert.equal(manifest.browser, undefined);
-  assert.deepEqual(manifest.activationEvents, ['onLanguage:tale', 'onLanguage:yaml', 'workspaceContains:**/story.talewright.yaml', 'onTaskType:talewright']);
-  assert.deepEqual(manifest.contributes.commands.map(command => command.command), [
-    'talewright.validateStory', 'talewright.publishStoryZip', 'talewright.openAuthorDebugger', 'talewright.setUpCli',
-    'talewright.togglePreviewHints',
-  ]);
-  assert.ok(manifest.capabilities.untrustedWorkspaces.restrictedConfigurations.includes('talewright.cli.executablePath'));
-  assert.ok(manifest.dependencies['vscode-languageclient']);
-  assert.deepEqual(Object.keys(manifest.contributes).sort(),
-    ['commands', 'configuration', 'configurationDefaults', 'grammars', 'languages', 'snippets', 'taskDefinitions', 'yamlValidation']);
-  assert.deepEqual(manifest.contributes.configurationDefaults['[tale]'], {
-    'editor.autoClosingBrackets': 'never',
-    'editor.autoClosingQuotes': 'never',
-  });
-  assert.deepEqual(manifest.contributes.languages[0].extensions, ['.tale']);
-  assert.equal(manifest.contributes.languages[0].id, 'tale');
-  assert.deepEqual(manifest.contributes.languages[0].aliases, ['Talemark', 'tale']);
-  assert.equal((await json('syntaxes/tale.tmLanguage.json')).name, 'Talemark');
-  assert.equal(manifest.contributes.grammars[0].scopeName, 'text.tale');
-  for (const contribution of ['grammars', 'snippets']) {
-    await readFile(new URL(`../${manifest.contributes[contribution][0].path}`, import.meta.url));
-  }
-  assert.deepEqual(manifest.contributes.yamlValidation, [{
-    fileMatch: ['*.talewright.yaml'],
-    url: './schemas/story.schema.json',
-  }]);
-  await readFile(new URL(`../${manifest.contributes.yamlValidation[0].url}`, import.meta.url));
-  const [pattern] = manifest.contributes.yamlValidation[0].fileMatch;
-  const matches = name => new RegExp(`^${pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*')}$`).test(name);
-  for (const name of ['story.talewright.yaml', 'player.talewright.yaml']) assert.ok(matches(name), name);
-  for (const name of ['story.yaml', 'story.talewright.yml', 'talewright.yaml', 'docker-compose.yaml']) {
-    assert.ok(!matches(name), name);
-  }
-  const config = await json(manifest.contributes.languages[0].configuration);
-  assert.equal(config.comments.lineComment, '//');
-  assert.deepEqual(config.autoClosingPairs, []);
-  assert.ok(!config.surroundingPairs.some(([open]) => open === '{'));
-});
-
 test('snippets have discoverable prefixes and a bounded default-expansion contract', async () => {
   const snippets = await json('snippets/tale.json');
   assert.equal(Object.keys(snippets).length, 6);

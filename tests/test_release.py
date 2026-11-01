@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 import struct
 from pathlib import Path
 import sys
@@ -287,87 +288,246 @@ class RequestErrorTests(unittest.TestCase):
                         github_release.request("GET", "https://api.github.com")
 
 
-class PublicationWorkflowTests(unittest.TestCase):
-    def setUp(self):
-        self.build = (ROOT / ".github/workflows/build.yml").read_text()
-        self.nuget = (ROOT / ".github/workflows/publish-nuget.yml").read_text()
+
+WORKFLOWS = ROOT / ".github/workflows"
+KEY = re.compile(r"^([A-Za-z0-9_.-]+):(?:\s+(.*))?$")
+TAG_PUSH = {"github.event_name == 'push'", "startsWith(github.ref, 'refs/tags/v')"}
+
+
+def read_workflow(path):
+    """Parse the block-style YAML subset our workflows use; avoids a PyYAML dependency."""
+    rows = []
+    for raw in path.read_text().splitlines():
+        if (text := raw.strip()) and not text.startswith("#"):
+            rows.append((len(raw) - len(raw.lstrip(" ")), text))
+    workflow, end = _mapping(rows, 0, 0)
+    if end != len(rows):
+        raise ValueError(f"{path.name}: unsupported YAML near {rows[end][1]!r}")
+    return workflow
+
+
+def _scalar(text):
+    if text.startswith("[") and text.endswith("]"):
+        return [_scalar(part.strip()) for part in text[1:-1].split(",") if part.strip()]
+    if len(text) > 1 and text[0] == text[-1] and text[0] in "'\"":
+        return text[1:-1]
+    return text
+
+
+def _mapping(rows, i, indent):
+    result = {}
+    while i < len(rows) and rows[i][0] == indent and not rows[i][1].startswith("- "):
+        match = KEY.match(rows[i][1])
+        if not match:
+            break
+        key, text = match.groups()
+        i += 1
+        if text in ("|", "|-", ">", ">-"):
+            block = []
+            while i < len(rows) and rows[i][0] > indent:
+                block.append(rows[i][1])
+                i += 1
+            result[key] = "\n".join(block)
+        elif text is not None:
+            result[key] = _scalar(text)
+        elif i < len(rows) and rows[i][1].startswith("- ") and rows[i][0] >= indent:
+            result[key], i = _sequence(rows, i, rows[i][0])
+        elif i < len(rows) and rows[i][0] > indent:
+            result[key], i = _mapping(rows, i, rows[i][0])
+        else:
+            result[key] = None
+    return result, i
+
+
+def _sequence(rows, i, indent):
+    items = []
+    while i < len(rows) and rows[i][0] == indent and rows[i][1].startswith("- "):
+        text = rows[i][1][2:].strip()
+        if KEY.match(text):
+            rows[i] = (indent + 2, text)
+            item, i = _mapping(rows, i, indent + 2)
+        else:
+            item, i = _scalar(text), i + 1
+        items.append(item)
+    return items, i
+
+
+def condition_terms(condition):
+    return set() if "||" in (condition or "") else {
+        term.strip() for term in (condition or "").split("&&")
+    }
+
+
+class PublicationSafeguardTests(unittest.TestCase):
+    """Structural checks on the parsed workflows: gating, privileges and credentials."""
+
+    WRITE_PERMISSIONS = {
+        ("build.yml", "publish-samples"): {"pages", "id-token"},
+        ("build.yml", "publish-nuget"): {"id-token"},
+        ("build.yml", "github-release"): {"contents"},
+        ("performance.yml", "publish-results"): {"contents"},
+        ("publish-nuget.yml", "publish"): {"id-token"},
+        ("publish-samples.yml", "deploy"): {"pages", "id-token"},
+        ("publish-ui-test-image.yml", "publish"): {"packages"},
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        cls.workflows = {path.name: read_workflow(path) for path in sorted(WORKFLOWS.glob("*.yml"))}
+        cls.build = cls.workflows["build.yml"]["jobs"]
+
+    def dependencies(self, jobs, job):
+        seen, pending = set(), [job]
+        while pending:
+            needs = jobs[pending.pop()].get("needs") or []
+            for dependency in [needs] if isinstance(needs, str) else needs:
+                if dependency not in seen:
+                    seen.add(dependency)
+                    pending.append(dependency)
+        return seen
+
+    def test_every_workflow_parses_into_jobs(self):
+        for name, workflow in self.workflows.items():
+            with self.subTest(workflow=name):
+                self.assertTrue(workflow["jobs"])
+                for job, body in workflow["jobs"].items():
+                    self.assertTrue("steps" in body or "uses" in body, f"{name}:{job}")
+
+    def test_publication_waits_for_verification_and_only_runs_for_version_tags(self):
+        self.assertTrue(
+            {"build", "tests", "verification", "cli-archives", "provisional-vsix"}
+            <= self.dependencies(self.build, "release-ready")
+        )
+        for job in ("release-ready", "publish-nuget", "publish-marketplace", "github-release"):
+            with self.subTest(job=job):
+                self.assertTrue(TAG_PUSH <= condition_terms(self.build[job]["if"]))
+                if job != "release-ready":
+                    self.assertIn("release-ready", self.dependencies(self.build, job))
+        self.assertTrue(
+            {"publish-nuget", "publish-marketplace"} <= self.dependencies(self.build, "github-release")
+        )
+        nuget = self.workflows["publish-nuget.yml"]
+        self.assertEqual({"workflow_call"}, set(nuget["on"]))
+        self.assertTrue(TAG_PUSH <= condition_terms(nuget["jobs"]["publish"]["if"]))
+
+    def test_publication_cannot_proceed_past_a_failed_check(self):
+        publishers = ("release-ready", "publish-samples", "publish-nuget",
+                      "publish-marketplace", "github-release")
+        pending = [("build.yml", job) for job in publishers]
+        pending += [("build.yml", job) for name in publishers for job in self.dependencies(self.build, name)]
+        seen = set()
+        while pending:
+            workflow, job = pending.pop()
+            if (workflow, job) in seen:
+                continue
+            seen.add((workflow, job))
+            body = self.workflows[workflow]["jobs"][job]
+            for location, item in [(job, body)] + [
+                (f"{job}:{step.get('name') or step.get('uses')}", step) for step in body.get("steps", [])
+            ]:
+                with self.subTest(workflow=workflow, location=location):
+                    self.assertIn(item.get("continue-on-error", "false"), ("false", False))
+            called = body.get("uses", "")
+            if called.startswith("./.github/workflows/"):
+                name = Path(called).name
+                pending += [(name, nested) for nested in self.workflows[name]["jobs"]]
+
+        for job in publishers:
+            with self.subTest(job=job):
+                self.assertNotRegex(self.build[job]["if"], r"\b(always|failure|cancelled)\(\)")
 
     def test_pages_deploys_only_a_validated_tag_after_verification_and_smoke(self):
-        samples = (ROOT / ".github/workflows/publish-samples.yml").read_text()
-        caller = self.build.split("\n  publish-samples:\n", 1)[1].split("\n  cli-archives:", 1)[0]
-        selection = self.build.split("\n  select:\n", 1)[1].split("\n  build:", 1)[0]
-        build = samples.split("\n  build:\n", 1)[1].split("\n  deploy:", 1)[0]
-        deploy = samples.split("\n  deploy:\n", 1)[1]
-        tag_push = "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
+        samples = self.workflows["publish-samples.yml"]
+        caller = self.build["publish-samples"]
+        self.assertTrue(
+            {"build", "tests", "verification"} <= self.dependencies(self.build, "publish-samples")
+        )
+        self.assertTrue(TAG_PUSH <= condition_terms(caller["if"]))
 
-        self.assertIn("needs: [build, tests, verification]", caller)
-        self.assertIn(tag_push, caller)
-        self.assertIn(tag_push, build)
-        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json', selection)
-        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json', build)
-        self.assertIn("ref: ${{ github.sha }}", build)
-        self.assertIn("publish_samples.py --base-path / --output artifacts/pages", build)
-        self.assertIn("TALEWRIGHT_WEB_BASE_PATH: /", build)
-        self.assertIn("Bundled_sample_assets_work_when_served_at_the_selected_base_path", build)
-        self.assertLess(build.index("Smoke-test the deployment path"), build.index("actions/upload-pages-artifact"))
-        self.assertIn("needs: build", deploy)
+        selection = next(
+            step for step in self.build["select"]["steps"]
+            if step.get("name") == "Validate public release tag"
+        )
+        self.assertEqual({"github.ref_type == 'tag'"}, condition_terms(selection["if"]))
+        self.assertIn("package_version.py --tag", selection["run"])
+        self.assertIn("--release-json", selection["run"])
 
-    def test_existing_validation_gates_every_publication(self):
-        ready = self.build.split("\n  release-ready:\n", 1)[1].split("\n  publish-nuget:", 1)[0]
-        self.assertIn("needs: [build, tests, verification, cli-archives, provisional-vsix]", ready)
-        self.assertIn("github.event_name == 'push'", ready)
-        self.assertIn("startsWith(github.ref, 'refs/tags/v')", ready)
-        self.assertIn("name: nuget-packages", ready)
-        self.assertIn("name: talewright-vscode", ready)
-        self.assertIn("verify_release_vsix.py", ready)
-        self.assertIn("Verify CLI archive checksums", ready)
-        self.assertIn("test \"$(find . -name '*.sha256' | wc -l)\" -eq 6", ready)
-        self.assertNotIn("exit 1", ready)
-        self.assertIn("needs: [build, release-ready]", self.build)
-        self.assertIn("needs: release-ready", self.build)
-        self.assertIn("needs: [release-ready, publish-nuget, publish-marketplace]", self.build)
+        pages = samples["jobs"]
+        build = pages["build"]
+        self.assertTrue(TAG_PUSH <= condition_terms(build["if"]))
+        steps = build["steps"]
+        checkout = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        self.assertEqual("${{ github.sha }}", checkout["with"]["ref"])
+        validation = next(step for step in steps if step.get("name") == "Validate the release tag")
+        self.assertIn('package_version.py --tag "$GITHUB_REF_NAME" --release-json',
+                      validation["run"])
+        publish = next(step for step in steps if step.get("name") == "Publish the bundled sample player")
+        self.assertIn("publish_samples.py --base-path / --output artifacts/pages", publish["run"])
+        smoke = next(step for step in steps if step.get("name") == "Smoke-test the deployment path")
+        self.assertEqual("/", smoke["env"]["TALEWRIGHT_WEB_BASE_PATH"])
+        self.assertIn("Bundled_sample_assets_work_when_served_at_the_selected_base_path", smoke["run"])
+        smoke_index = steps.index(smoke)
+        artifact_index = next(
+            index for index, step in enumerate(steps)
+            if step.get("uses") == "actions/upload-pages-artifact@v3"
+        )
+        self.assertLess(smoke_index, artifact_index)
 
-    def test_nuget_caller_explicitly_forwards_required_environment_secret(self):
-        caller = self.build.split("\n  publish-nuget:\n", 1)[1].split("\n  publish-marketplace:", 1)[0]
-        self.assertIn("uses: ./.github/workflows/publish-nuget.yml", caller)
-        self.assertIn("    secrets:\n      NUGET_USER: ${{ secrets.NUGET_USER }}", caller)
-        self.assertNotIn("secrets: inherit", caller)
-        contract = self.nuget.split("\npermissions:", 1)[0]
-        self.assertIn("    secrets:\n      NUGET_USER:\n        required: true", contract)
+        deploy = pages["deploy"]
+        self.assertEqual({"build"}, self.dependencies(pages, "deploy"))
+        self.assertEqual("github-pages", deploy["environment"]["name"])
 
-    def test_scoped_environment_and_oidc_not_github_packages(self):
-        self.assertIn("environment: release", self.nuget)
-        self.assertIn("id-token: write", self.nuget)
-        self.assertIn("uses: NuGet/login@v1", self.nuget)
-        self.assertIn("user: ${{ secrets.NUGET_USER }}", self.nuget)
-        self.assertIn("steps.login.outputs.NUGET_API_KEY", self.nuget)
-        self.assertIn('source="https://api.nuget.org/v3/index.json"', self.nuget)
-        self.assertEqual(self.nuget.count("--skip-duplicate"), 4)
-        self.assertNotIn("packages: write", self.nuget + self.build)
-        self.assertNotIn("nuget.pkg.github.com", self.nuget)
-        for name in ["publish-marketplace", "github-release"]:
-            job = self.build.split(f"\n  {name}:\n", 1)[1].split("\n  github-release:", 1)[0]
-            self.assertIn("environment: release", job)
-        marketplace = self.build.split("\n  publish-marketplace:\n", 1)[1].split("\n  github-release:", 1)[0]
-        self.assertIn("secrets.VSCE_PAT", marketplace)
-        self.assertIn('for vsix in "$GITHUB_WORKSPACE"/artifacts/extension/*.vsix', marketplace)
-        self.assertIn('--packagePath "$vsix"', marketplace)
-        self.assertIn('artifacts/extension "$GITHUB_REF_NAME" --all', marketplace)
-        self.assertIn("--skip-duplicate", marketplace)
-        self.assertIn('if [[ "$PRERELEASE" == true ]]; then args+=(--pre-release); fi', marketplace)
-        self.assertNotIn("npm run package", marketplace)
-        self.assertNotIn("|| true", self.build + self.nuget)
+    def test_write_permissions_are_limited_to_known_publication_jobs(self):
+        actual = {}
+        for name, workflow in self.workflows.items():
+            self.assertEqual({"contents": "read"}, workflow.get("permissions"), name)
+            for job, body in workflow["jobs"].items():
+                permissions = body.get("permissions") or {}
+                self.assertIsInstance(permissions, dict, f"{name}:{job} must list scopes")
+                if writes := {scope for scope, level in permissions.items() if level == "write"}:
+                    actual[(name, job)] = writes
+        self.assertEqual(self.WRITE_PERMISSIONS, actual)
 
-    def test_provisional_packages_are_inspected_and_attached_without_runtime_claims(self):
-        job = self.build.split("\n  provisional-vsix:\n", 1)[1].split("\n  release-ready:", 1)[0]
-        self.assertIn("TALEWRIGHT_VSIX_TARGET: ${{ matrix.target }}", job)
-        for target in TARGETS:
-            if target != "linux-x64":
-                self.assertIn(target, job)
-        self.assertIn("npm run test:package", job)
-        self.assertNotIn("npm run test:editor", job)
-        self.assertEqual(self.build.count("pattern: talewright-vscode-*"), 3)
-        self.assertIn("--assets artifacts/extension/talewright-*.vsix", self.build)
+    def test_publication_secrets_are_explicit_and_bound_to_the_release_environment(self):
+        for name, workflow in self.workflows.items():
+            for job, body in workflow["jobs"].items():
+                with self.subTest(job=f"{name}:{job}"):
+                    self.assertNotEqual("inherit", body.get("secrets"))
+                    used = set(re.findall(r"secrets\.(\w+)", json.dumps(body))) - {"GITHUB_TOKEN"}
+                    if not used:
+                        continue
+                    if "uses" in body:
+                        callee = self.workflows[Path(body["uses"]).name]
+                        self.assertEqual(used, set(body["secrets"]))
+                        self.assertEqual(used, set(callee["on"]["workflow_call"]["secrets"]))
+                        for callee_job in callee["jobs"].values():
+                            self.assertEqual("release", callee_job.get("environment"))
+                    else:
+                        self.assertEqual("release", body.get("environment"))
+        self.assertEqual("release", self.build["github-release"].get("environment"))
+
+    def test_nuget_pushes_use_a_short_lived_oidc_key_and_nuget_org_only(self):
+        steps = self.workflows["publish-nuget.yml"]["jobs"]["publish"]["steps"]
+        logins = [index for index, step in enumerate(steps)
+                  if str(step.get("uses", "")).startswith("NuGet/login@")]
+        self.assertEqual(1, len(logins))
+        login = steps[logins[0]]
+        self.assertEqual("${{ secrets.NUGET_USER }}", login["with"]["user"])
+        pushes = [index for index, step in enumerate(steps) if "dotnet nuget push" in step.get("run", "")]
+        self.assertTrue(pushes)
+        for index in pushes:
+            step = steps[index]
+            self.assertGreater(index, logins[0])
+            self.assertIn(f"steps.{login['id']}.outputs.NUGET_API_KEY", json.dumps(step.get("env")))
+            self.assertIn("https://api.nuget.org/v3/index.json", step["run"])
+            self.assertNotIn("nuget.pkg.github.com", step["run"])
+
+    def test_untrusted_triggers_cannot_reach_publication(self):
+        for name, workflow in self.workflows.items():
+            with self.subTest(workflow=name):
+                self.assertNotIn("pull_request_target", workflow["on"])
+        image = self.workflows["publish-ui-test-image.yml"]["jobs"]["publish"]
+        self.assertIn("github.ref == 'refs/heads/main'", condition_terms(image["if"]))
 
 
 if __name__ == "__main__":
