@@ -177,6 +177,57 @@ public sealed class DebuggerTests
         }
     }
 
+    [Fact]
+    public async Task Native_map_clears_preview_when_reload_removes_selected_scene()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-map-reload-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-map-reload", Guid.NewGuid().ToString("N"));
+        var tale = Path.Combine(root, "main.tale");
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: map-reload-debug\n  title: Map Reload Debug\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(tale, """
+                === start
+                @title The start
+                * [Continue] -> next
+                === next
+                @title The old scene
+                Old scene body.
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ActivateAsync("Map");
+            await WaitFor(driver, "2 scenes, 2 diverts, 0 hub offers, 0 unreachable.");
+            await driver.PressAsync("Tab");
+            await driver.PressAsync("Tab");
+            await driver.PressAsync("Home");
+            await driver.PressAsync("Right");
+            var snapshot = await WaitFor(driver, "Scene preview: The old scene", "Old scene body.");
+
+            await File.WriteAllTextAsync(tale, """
+                === start
+                @title The start
+                The updated story.
+                * [Finish] -> END
+                """);
+            snapshot = await WaitFor(driver, "1 scene, 1 divert, 0 hub offers, 0 unreachable.");
+            Assert.DoesNotContain("Scene preview:", snapshot.Content);
+            Assert.DoesNotContain("Old scene body.", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static AccessibleNode Focused(AccessibleNode snapshot) =>
         snapshot.Descendants().Last(node => node.Focused);
 

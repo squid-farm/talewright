@@ -58,7 +58,11 @@
         {
             _view = MapView.Build(Story);
             if (_selectedScene is { } selected && !Story.Scenes.Any(scene => scene.Id == selected))
+            {
                 _selectedScene = null;
+                _preview = null;
+                _previewError = null;
+            }
         }
 
         if (_selectedScene is { } sceneId)
