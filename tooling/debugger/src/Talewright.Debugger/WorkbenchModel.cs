@@ -1,5 +1,8 @@
 using System.Globalization;
+using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
@@ -67,6 +70,7 @@ public sealed class WorkbenchModel(string root) : IDisposable
     public int CreationRevision { get; private set; }
     public AuthorSession? Session { get; private set; }
     public AuthorInspection? Inspection { get; private set; }
+    public IGameStateView PreviewState => Session?.State ?? StartingState();
     public CharacterSelection? Character { get; private set; }
     public string Target { get; set; } = "";
     public string Seed { get; set; } = "";
@@ -480,8 +484,62 @@ public sealed class WorkbenchModel(string root) : IDisposable
         {
             return null;
         }
+
         return ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var seed)
             ? seed : throw new ArgumentException("Seed must be an unsigned 64-bit integer, or empty for the story/random default.");
+    }
+
+    private IGameStateView StartingState()
+    {
+        var story = Story ?? throw new InvalidOperationException("Load a story first.");
+        var state = GameState.CreateInitial(story.World, story.Seed ?? 0);
+
+        void Apply(IEnumerable<GameEvent> events)
+        {
+            foreach (var gameEvent in events)
+                state.Apply(gameEvent);
+        }
+
+        if (Character is { } character)
+        {
+            var player = story.World.Characters[EntityId.Player];
+            Apply([new CharacterIdentityChanged(EntityId.Player,
+                character.FirstName ?? player.FirstName,
+                character.LastName ?? player.LastName,
+                character.Pronouns is null ? player.Pronouns : Pronouns.FromKeyword(character.Pronouns)!)]);
+
+            var stats = new Dictionary<StatId, int>();
+            if (story.Creation!.Presets.FirstOrDefault(preset => preset.Id == character.Preset) is { } preset)
+            {
+                foreach (var (stat, value) in preset.Stats)
+                    stats[stat] = value;
+            }
+            foreach (var (stat, value) in character.Stats)
+                stats[new StatId(stat)] = value;
+            foreach (var (stat, value) in stats.OrderBy(pair => pair.Key.Value, StringComparer.Ordinal))
+                Apply(StateChanges.SetStat(state, EntityId.Player, stat, value));
+        }
+
+        var setup = BuildSetup(Numbers, Flags, Texts).Validate(story);
+        foreach (var value in setup.Stats)
+            Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Value));
+        foreach (var value in setup.Inventory)
+        {
+            var current = state.GetItemCount(value.Character, value.Item);
+            Apply(value.Quantity >= current
+                ? StateChanges.GiveItem(value.Character, value.Item, value.Quantity - current)
+                : StateChanges.TakeItem(state, value.Character, value.Item, current - value.Quantity));
+        }
+        foreach (var (id, value) in setup.Standings)
+            Apply(StateChanges.SetStanding(state, id, value));
+        foreach (var (id, value) in setup.Flags)
+            Apply(StateChanges.SetFlag(state, id, value));
+        foreach (var (id, value) in setup.Variables)
+            Apply(StateChanges.SetVariable(state, id, value));
+        foreach (var (id, value) in setup.TextVariables)
+            Apply(StateChanges.SetTextVariable(state, id, value));
+
+        return state;
     }
 
     private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupFlag> flags,

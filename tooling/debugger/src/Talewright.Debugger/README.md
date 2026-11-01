@@ -45,6 +45,9 @@ How it's built:
   `wwwroot/map/map.js` lays each area out with ELK in a Web Worker, then paints, hit-tests and pans or zooms
   one canvas with D3 zoom; it needs no GPU. The canvas is hidden from assistive technology: hidden scene
   buttons with arrow-key navigation, per-scene divert and hub offer lists, and a status line carry the
-  same names and full conditions that hover shows. `wwwroot/map/vendor` pins elkjs 0.12.1 and a d3-zoom
-  bundle (d3-zoom 3.0.0 and its dependencies), with their licences beside them, so the map works offline.
-  ELK stays an authoring-tool dependency and must not ship in games.
+  same names and full conditions that hover shows. Selecting a scene shows a Preview of its prose and
+  eligible choices against either the current playtest state or scene setup values; the preview never runs
+  entry effects or skill checks. During a synthetic playtest, visited scenes and taken diverts or hub offers
+  are highlighted in route order and update with Back and Forward. `wwwroot/map/vendor` pins elkjs 0.12.1
+  and a d3-zoom bundle (d3-zoom 3.0.0 and its dependencies), with their licences beside them, so the map
+  works offline. ELK stays an authoring-tool dependency and must not ship in games.
