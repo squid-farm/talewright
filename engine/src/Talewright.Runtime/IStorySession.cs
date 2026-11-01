@@ -14,13 +14,16 @@ public interface IStorySession
     /// <summary>The compiled story being played.</summary>
     StoryDefinition Story { get; }
 
-    /// <summary>Seed for all dice in this playthrough. Same seed + same choices = same playthrough.</summary>
+    /// <summary>Seed for all dice in this playthrough. The same story, seed, character selection, and choices reproduce it.</summary>
     ulong Seed { get; }
 
     /// <summary>Read-only view of the current game state (for character sheets, debug panels…).</summary>
     IGameStateView State { get; }
 
-    /// <summary>Every event so far; the complete, replayable history of the playthrough.</summary>
+    /// <summary>
+    /// Events emitted in this session. Folding them rebuilds state; player saves instead store a seed and
+    /// choice history, then recreate the events by replaying the story.
+    /// </summary>
     IReadOnlyList<GameEvent> Events { get; }
 
     /// <summary>The most recent frame, or null before <see cref="Start"/>.</summary>

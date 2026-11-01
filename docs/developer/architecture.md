@@ -74,7 +74,8 @@ Two more projects glue it together:
 - `Talewright.Talemark` is the **compiler**: it turns `.tale` + `story.talewright.yaml` text into the typed objects the other
   layers use. It is the _only_ place that parses strings, and it runs once when a story loads.
 - `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
-  frame). It is the only project that knows about all the others.
+  frame), referencing Core, Rules, Narrative, and Talemark. Talemark also references the typed compiler
+  dependencies it needs, including Core, Rules, Narrative, Rulesets.Generic, and Graphs.
 
 `Talewright.Authoring` is a development-tool library above the compiler. It owns
 unsaved workspaces, analysis scheduling, explicit project metadata integration,
@@ -95,7 +96,7 @@ Arrows mean "references". Nothing points upward; the engine never knows about th
         Host.Desktop   Host.Web
               \          /
                ▼        ▼
-             Talewright.Player   (Blazor RCL)
+             Talewright.Player   (Blazor RCL; also references aggregate packaging shell)
                      │
                      ▼
              Talewright.Runtime  (StorySession, EventNarrator)
@@ -114,7 +115,8 @@ Arrows mean "references". Nothing points upward; the engine never knows about th
 `Talewright.Talemark` also references `Talewright.Graphs`, which references nothing.
 
 (`Narrative` references `Rules` because inline conditionals `{if …}` use the same typed expression trees and
-evaluator as everything else.)
+evaluator as everything else. The source `Talewright.Player` project directly references Runtime and the
+aggregate `Talewright` packaging project; the latter is a distribution shell, not an additional runtime layer.)
 
 ### The data that flows between tiers
 
@@ -125,12 +127,15 @@ evaluator as everything else.)
 | Rules ↔ state        | `IGameStateView` (read) and `GameEvent`s (write)                    | Core       |
 | Templates → renderer | `TemplateBlock` / `TemplateInline` AST                              | Narrative  |
 | Renderer → UI        | `RenderedDocument` (blocks, styled runs, notes, media placeholders) | Narrative  |
-| Runtime → UI         | `StoryFrame` (scene title, document, `ChoiceView`s, ended flag)     | Runtime    |
-| UI → runtime         | a choice **key** string (`IStorySession.Choose(key)`)               | Runtime    |
+| Runtime → UI         | Full `StoryDefinition` (used by Player for creation data), `IGameStateView`, and `StoryFrame` | Talemark / Core / Runtime |
+| Session API          | `IStorySession.Events` (events emitted in the current session)      | Runtime    |
+| UI → runtime         | a choice **key** string (`StoryHistory.Choose` / `IStorySession.Choose`) | Runtime |
 
-The UI never sees `Expr`, `Effect`, scenes or events directly. It renders frames and sends back keys. It also
-reads `IGameStateView` for the character sheet. `StoryPlayer` uses the `StoryHistory` wrapper for
-transcript, Back/Forward and save orchestration; presentation does not reimplement replay.
+The Player consumes `StoryDefinition` for character creation (including creation choices and ruleset stats),
+renders `StoryFrame`/`ChoiceView`, and reads `IGameStateView` for the character sheet. `IStorySession` also
+exposes the compiled definition and event history as public contracts. The Player does not interpret `Expr`
+or `Effect`, or execute `SceneDefinition.Steps`; `StorySession` owns scene execution. `StoryPlayer` uses
+`StoryHistory` for transcript, Back/Forward and save orchestration; presentation does not reimplement replay.
 
 ---
 
@@ -140,8 +145,9 @@ These are load-bearing. Breaking one will break saves, replays, tests or the "de
 
 1. **State changes only by applying `GameEvent`s.** `GameState.Apply(event)` is the only mutator, and
    `EventLog.Append` is the only caller. State is `fold(initial, events)`. Want a new kind of change? Add an event.
-2. **Dice results live in events.** `DiceRolled` stores the value. Replaying a log never re-rolls, and
-   `DeterministicDice.Roll(seed, index, sides)` is a pure function, so seed + choices reproduces a playthrough.
+2. **Dice results live in events.** `DiceRolled` stores the value, so folding an existing event log never
+   re-rolls. Player saves do not persist that log: they store a seed and choice history, then recreate the
+   session by replaying the story. `DeterministicDice.Roll(seed, index, sides)` makes that replay reproducible.
 3. **The engine has no built-in stats.** Strength, hit points, levels, reputation tiers, how checks resolve: all
    come from the `Ruleset`. `Talewright.Core` does not mention "strength" anywhere. The generic d20 set is an
    opt-out module.
@@ -410,8 +416,8 @@ samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Co
 3. **Play.** Fixed stories start immediately; creation stories first validate and snapshot an author-approved
    selection. `StorySession` creates an `EventLog` from world + seed, applies character initialization,
    primes triggers and enters the start scene. Every `Choose(key)` appends events and returns a new frame.
-   `StoryHistory` replays a fresh session for Back/Forward and validates the entire saved redo sequence
-   before replacement, preserving deterministic dice and trigger edge memory.
+   `StoryHistory` replays a fresh session from the seed and choice history for save restore and Back/Forward;
+   it validates the entire saved redo sequence before replacement, preserving deterministic dice and trigger edge memory.
 4. **Render.** `StoryPlayer` appends each frame to its transcript and asks `DocumentView` to draw it. The character
    sheet re-reads `IGameStateView` on each render, so it's always current.
 

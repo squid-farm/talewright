@@ -24,22 +24,22 @@ An unrelated [Talemark film/book diary app](https://talemark.app/en/) already us
 The project lead accepted that discoverability trade-off; use “Talewright's Talemark” where context
 is needed. The name is not claimed to be unique or legally cleared.
 
-## Planned authoring tools
+## Authoring tools (M2/M3 shipped; M9 planned)
 
-The CLI and editors share C# Talemark analysis, not just an output format. `talewright validate` (M2) exposes
+The CLI and editors share C# Talemark analysis, not just an output format. `talewright validate` (M2, shipped) exposes
 compiler checks with human-readable and JSON diagnostics plus an explicit exit policy. `talewright lint`
-(M3) adds configurable Talemark-aware authoring/style rules without duplicating compiler checks.
+(M3, shipped) adds configurable Talemark-aware authoring/style rules without duplicating compiler checks.
 Validation is static checking, not proof that every playthrough succeeds.
 
-A C# Language Server Protocol (LSP) server (M3; proposed CLI host: `talewright lsp`) exposes live diagnostics,
+A C# Language Server Protocol (LSP) server (M3, shipped) exposes live diagnostics,
 context-aware completion, and hover/syntax help to any LSP-capable editor. The VS Code extension provides
 highlighting, language configuration, snippets, and a thin LSP client; it does not contain a second parser
-for semantic analysis. Highlighting/snippets can ship before the language server.
+for semantic analysis. The extension also supports syntax highlighting and snippets independently of the server.
 
-The compiler currently produces a source-free runtime model and no story on errors. Editor tooling needs
-a separate partial-analysis surface with symbols and source ranges even for incomplete input, unsaved
-buffer overlays, and invalidation when Talemark/YAML files change. Do not burden the runtime AST with editor
-state. C# custom registrations require explicit project integration or exported metadata shared across
+The runtime compiler model remains source-free. Authoring tooling provides a separate partial-analysis
+surface with symbols and source ranges for incomplete input, unsaved-buffer overlays, and invalidation when
+Talemark/YAML files change. This keeps editor state out of the runtime AST. C# custom registrations require
+explicit project integration or exported metadata shared across
 CLI, MSBuild, and LSP; editing must not implicitly execute arbitrary project code.
 
 `talewright lint --fix` is planned for M9, lowest priority, not an M3 or M4 release gate.
