@@ -62,6 +62,13 @@ can still be described. A forced runner termination can prevent the final summar
 the aggregate job summary also exposes missing/cancelled/unexpectedly skipped job outcomes.
 It cannot reconstruct missing batch timings. Existing fail-closed gates remain authoritative.
 
+E2E task output is streamed into the job log as it runs. If an E2E or unit batch fails, its job
+summary reads the fresh TRX reports and lists failed test names with the first line of each assertion,
+up to a fixed limit, while the full reports remain in the uploaded artifacts. Missing, malformed, or
+empty reports are called out as test-host/reporting or infrastructure failures rather than being
+presented as failed assertions. The router prints a concise batch failure and preserves Nx's exit
+status instead of ending with a Python `CalledProcessError` traceback.
+
 Artifact/report links come only from a successful upload step's actual artifact URL. Missing or
 failed uploads are not presented as available reports. Checks without uploaded reports show no
 invented links. Raw router records are local to the job; the rendered summary persists with the run.
