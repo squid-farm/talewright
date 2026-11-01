@@ -145,6 +145,7 @@ internal static class ImageSyntax
                 {
                     if (i + 1 >= end || text[i + 1] is not ('"' or '\\' or '{' or '}'))
                     {
+                        AnalyzePartial(trimTrailingCall: false);
                         Error("Unknown image string escape. Use '\\\"' for a quote, '\\\\' for a backslash, or '\\{' and '\\}' for literal braces in alt text.", i);
                         return false;
                     }
@@ -174,8 +175,33 @@ internal static class ImageSyntax
                 i++;
             }
 
+            AnalyzePartial(trimTrailingCall: true);
             Error("The image argument is missing its closing double quote.", quote);
             return false;
+
+            // Completions need the alt template even when the quote never closes. That parse is not
+            // the story: a scratch bag drops unclosed-brace and half-typed-name diagnostics so the
+            // author still sees only the missing-quote (or bad-escape) error, and no media is returned.
+            // A final ')' is the image call's closer typed before the quote, not alt text.
+            void AnalyzePartial(bool trimTrailingCall)
+            {
+                if (symbols.Analysis is null) return;
+                var authored = templateText.ToString();
+                var count = locations.Count;
+                var endAt = i;
+                if (trimTrailingCall && authored.EndsWith(')'))
+                {
+                    authored = authored[..^1];
+                    count--;
+                    endAt--;
+                }
+
+                if (!HasTemplate(authored)) return;
+                var mapped = new List<SourceLocation>(count + 1);
+                for (var index = 0; index < count; index++) mapped.Add(locations[index]);
+                mapped.Add(source.Locate(endAt));
+                InlineParser.Parse(SourceText.Mapped(authored, mapped), symbols, new DiagnosticBag(), allowImages: false);
+            }
         }
 
         void Error(string message, int offset) =>
