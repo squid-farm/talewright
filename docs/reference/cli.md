@@ -13,6 +13,10 @@ standalone download or the .NET tool.
 | `talewright publish <story>` | Builds a story zip, web game or desktop game. |
 
 `talewright --help` and `talewright <command> --help` list every option. Unknown options are rejected.
+Run `talewright --version` (or `talewright -v`) by itself to print the CLI's build-stamped
+informational version and exit successfully. Both the standalone CLI and the .NET tool report this
+value, including any `+...` source-revision metadata.
+
 For the usual one-file web game, start with the [sharing guide](../guide/sharing-your-story.md#a-web-game).
 The less common desktop split-build and file-replacement details are covered below.
 

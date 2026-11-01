@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Spectre.Console;
@@ -23,10 +24,22 @@ public static class CommandLine
             return Failure("TWCLI001", "Choose a command. Use 'talewright --help' for available commands.", false, output, error);
         }
 
+        // Spectre's version shortcut otherwise ignores extra arguments and case sensitivity.
+        if ((args[0].Equals("--version", StringComparison.OrdinalIgnoreCase) ||
+             args[0].Equals("-v", StringComparison.OrdinalIgnoreCase)) &&
+            (args.Length != 1 || args[0] is not ("--version" or "-v")))
+        {
+            return Failure("TWCLI001", "Use 'talewright --version' or 'talewright -v' without other arguments.",
+                false, output, error);
+        }
+
         var app = new CommandApp();
         app.Configure(config =>
         {
             config.SetApplicationName("talewright");
+            var version = typeof(CommandLine).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? throw new InvalidOperationException("The CLI assembly has no informational version.");
+            config.SetApplicationVersion(Markup.Escape(version));
             config.CaseSensitivity(CaseSensitivity.All);
             config.UseStrictParsing();
             config.PropagateExceptions();
