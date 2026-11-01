@@ -110,6 +110,9 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['{image("camp", "He said \\"Go\\".")}', '\\"', 'constant.character.escape.tale'],
     ['* [{image("camp", "A ] camp")} Go] -> END', 'A ] camp', 'string.quoted.double.tale'],
     ['> guide: {image("camp", "Camp")}', 'image', 'support.function.image.tale'],
+    ['{image("camp", "{player:first-name} at the gate")}', 'first-name', 'variable.other.member.tale'],
+    ['{image("camp", "\\{literal\\}")}', '\\{', 'constant.character.escape.tale'],
+    ['{image("{player:name}", "Camp")}', 'player', 'string.quoted.double.tale'],
     ['{image:name}', 'name', 'variable.other.member.tale'],
     ['[label](https://example.org)', 'label', 'meta.link.inline.markdown'],
     ['Literal \\{player:first-name\\}', '\\{', 'constant.character.escape.tale'],
@@ -144,6 +147,10 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['[**Bold** {player:name} [x]](<https://example.org>)', 'Bold', 'markup.bold.markdown'],
     ['[**Bold** {player:name} [x]](<https://example.org>)', 'name', 'variable.other.member.tale'],
   ]) hasScope(line, text, scope);
+  const path = '{image("{player:name}", "Camp")}';
+  const pathName = path.indexOf('name');
+  const pathToken = tokens(path).tokens.find(token => token.startIndex <= pathName && token.endIndex > pathName);
+  assert.ok(!pathToken.scopes.includes('variable.other.member.tale'), pathToken.scopes.join(', '));
 });
 
 test('ordinary prose, Markdown, comments and escaped braces are not Talemark commands', () => {

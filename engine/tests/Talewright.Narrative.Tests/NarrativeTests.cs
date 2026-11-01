@@ -140,6 +140,21 @@ public class NarrativeTests
     }
 
     [Fact]
+    public void Media_alt_template_renders_with_state_and_literal_alt_is_unchanged()
+    {
+        var rendered = new TemplateRenderer().RenderInlines(
+        [
+            new MediaTemplate("images/map.png", "A map"),
+            new MediaTemplate("images/portrait.png", "{player:first-name}")
+            {
+                AltTemplate = [new SubstitutionTemplate(new NameRef(EntityId.Player, NamePart.First), [])],
+            },
+        ], State());
+        Assert.Equal("A map", Assert.IsType<RenderedMedia>(rendered[0]).AltText);
+        Assert.Equal("Mara", Assert.IsType<RenderedMedia>(rendered[1]).AltText);
+    }
+
+    [Fact]
     public void Empty_paragraphs_are_dropped()
     {
         var document = new TemplateRenderer().Render(

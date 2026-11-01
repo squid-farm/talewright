@@ -85,14 +85,20 @@ public sealed class StoryCompletionTests
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "second");
     }
 
+    [Fact]
+    public void Image_paths_do_not_offer_expression_completions()
+    {
+        var (analysis, position) = Analyze("=== first\n{image(\"sec|ond\", \"Map\")}");
+        Assert.Empty(StoryCompletion.Complete(analysis, position));
+    }
+
     [Theory]
-    [InlineData("""{image("sec|ond", "Map")}""")]
     [InlineData("""{image("map", "{player:|}")}""")]
     [InlineData("""{image("map", "{player:|}")""")]
-    public void Literal_image_arguments_do_not_offer_expression_completions(string marked)
+    public void Image_alt_text_offers_the_same_substitutions_as_prose(string marked)
     {
         var (analysis, position) = Analyze("=== first\n" + marked);
-        Assert.Empty(StoryCompletion.Complete(analysis, position));
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == "first-name");
     }
 
     [Theory]

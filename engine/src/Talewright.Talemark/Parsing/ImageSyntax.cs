@@ -1,3 +1,4 @@
+using System.Text;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
@@ -15,9 +16,9 @@ internal static class ImageSyntax
     }
 
     internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
-        StorySource? imageSource, AnalysisCollector? analysis = null)
+        StorySymbols symbols)
     {
-        ArgumentNullException.ThrowIfNull(imageSource);
+        ArgumentNullException.ThrowIfNull(symbols.ImageSource);
         var text = source.Text;
         var i = start;
         SkipSpace();
@@ -26,7 +27,7 @@ internal static class ImageSyntax
         i++;
         SkipSpace();
         var pathOffset = i;
-        if (!ReadString(out var path, true)) return null;
+        if (!ReadString(out var path)) return null;
         if (string.IsNullOrWhiteSpace(path))
         {
             Error("An image needs a non-empty path.", pathOffset);
@@ -35,11 +36,12 @@ internal static class ImageSyntax
 
         SkipSpace();
         var alt = "";
+        IReadOnlyList<TemplateInline>? altTemplate = null;
         if (i < end && text[i] == ',')
         {
             i++;
             SkipSpace();
-            if (!ReadString(out alt)) return null;
+            if (!ReadAlt(out alt, out altTemplate)) return null;
             SkipSpace();
         }
 
@@ -63,15 +65,18 @@ internal static class ImageSyntax
             return null;
         }
 
-        var resolved = StoryImageResolver.Resolve(imageSource, path, alt, source.Locate(pathOffset), diagnostics);
-        return resolved is null ? null : new(resolved.Path, resolved.AltText);
+        var resolved = StoryImageResolver.Resolve(symbols.ImageSource, path, alt, source.Locate(pathOffset), diagnostics);
+        if (resolved is null) return null;
+        return altTemplate is null
+            ? new MediaTemplate(resolved.Path, resolved.AltText)
+            : new MediaTemplate(resolved.Path, resolved.AltText) { AltTemplate = altTemplate };
 
         void SkipSpace()
         {
             while (i < end && char.IsWhiteSpace(text[i])) i++;
         }
 
-        bool ReadString(out string value, bool isPath = false)
+        bool ReadString(out string value)
         {
             value = "";
             if (i >= end || text[i] != '"')
@@ -90,22 +95,111 @@ internal static class ImageSyntax
                 return false;
             }
 
-            if (isPath)
-                analysis?.ImagePath(literal.Value,
-                    new(source.Locate(quote + 1), source.Locate(literal.Closed ? i - 1 : i)),
-                    offsets.Select(source.Locate).ToArray());
+            symbols.Analysis?.ImagePath(literal.Value,
+                new(source.Locate(quote + 1), source.Locate(literal.Closed ? i - 1 : i)),
+                offsets.Select(source.Locate).ToArray());
             if (literal.Error is not null)
             {
                 Error("The image argument is missing its closing double quote.", quote);
                 return false;
             }
+
             value = literal.Value;
             return true;
+        }
+
+        bool ReadAlt(out string decoded, out IReadOnlyList<TemplateInline>? template)
+        {
+            decoded = "";
+            template = null;
+            if (i >= end || text[i] != '"')
+            {
+                Error("Image arguments must be in double quotes. Write {image(\"path\", \"alt text\")}.", i);
+                return false;
+            }
+
+            var quote = i;
+            i++;
+            var templateText = new StringBuilder();
+            var plain = new StringBuilder();
+            var locations = new List<SourceLocation>();
+            while (i < end)
+            {
+                var c = text[i];
+                if (c == '"')
+                {
+                    i++;
+                    locations.Add(source.Locate(i));
+                    decoded = plain.ToString();
+                    var authored = templateText.ToString();
+                    if (HasTemplate(authored))
+                    {
+                        var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics, allowImages: false);
+                        if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
+                    }
+
+                    return true;
+                }
+
+                if (c == '\\')
+                {
+                    if (i + 1 >= end || text[i + 1] is not ('"' or '\\' or '{' or '}'))
+                    {
+                        Error("Unknown image string escape. Use '\\\"' for a quote, '\\\\' for a backslash, or '\\{' and '\\}' for literal braces in alt text.", i);
+                        return false;
+                    }
+
+                    var next = text[++i];
+                    i++;
+                    if (next is '"' or '\\')
+                    {
+                        templateText.Append(next);
+                        plain.Append(next);
+                        locations.Add(source.Locate(i - 1));
+                    }
+                    else
+                    {
+                        templateText.Append('\\').Append(next);
+                        plain.Append(next);
+                        locations.Add(source.Locate(i - 2));
+                        locations.Add(source.Locate(i - 1));
+                    }
+
+                    continue;
+                }
+
+                templateText.Append(c);
+                plain.Append(c);
+                locations.Add(source.Locate(i));
+                i++;
+            }
+
+            Error("The image argument is missing its closing double quote.", quote);
+            return false;
         }
 
         void Error(string message, int offset) =>
             diagnostics.Error("TW1014", message, source.Locate(offset));
     }
+
+    private static bool HasTemplate(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\\' && i + 1 < text.Length && text[i + 1] is '{' or '}')
+            {
+                i++;
+                continue;
+            }
+
+            if (text[i] == '{') return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPlain(IReadOnlyList<TemplateInline> inlines, string decoded) =>
+        inlines.Count == 1 && inlines[0] is TextTemplate text && text.Text == decoded;
 
     internal static string Quote(string text) => QuotedStringSyntax.Quote(text);
 }

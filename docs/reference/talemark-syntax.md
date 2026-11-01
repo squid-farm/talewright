@@ -507,16 +507,30 @@ You unfold {image("maps/old_map-v2", "An old map of the northern coast.")}.
 * [Take {image("items/coin", "A silver coin")}] -> END
 ```
 
-Both arguments are literal double-quoted strings, separated by a comma. The path is required,
+Both arguments are double-quoted strings, separated by a comma. The path is required,
 relative to the story's `images/` folder, with an optional extension. It is a file path, not a
-story identifier, so quote it even when it contains no spaces. Alt text is optional:
+story identifier, so quote it even when it contains no spaces. The path stays a literal string:
+braces in it are filename characters, not substitutions. Alt text is optional:
 `{image("maps/old_map-v2")}`.
 
-Inside either argument, `\"` means a quote and `\\` means a backslash. Other backslash escapes
-are errors. Apostrophes, commas, parentheses, brackets and braces are literal within the quotes.
-Alt text is not evaluated as a template: `"{player:name}"` remains that literal text.
-The parser preserves strings after escape decoding, including empty or whitespace-only alt text.
+Inside either argument, `\"` means a quote and `\\` means a backslash. Any other backslash escape
+in the path is an error. In alt text, `\{` and `\}` are literal braces; any other backslash escape
+is still an error. Apostrophes, commas, parentheses and brackets are literal within the quotes.
 Whitespace is allowed around `image`, parentheses and arguments.
+
+Alt text uses the same template language as prose, rendered with the state where the image appears:
+
+```tale
+{image("portrait", "{guide:first-name} at the gate")}
+```
+
+That shows the guide's first name. An unescaped `{` makes the whole alt a template, so `{if}`
+and prose formatting work too. The rendered alt is plain text, since an image description cannot
+keep bold or italic. Alt with no unescaped `{` stays literal, including `*` and backticks.
+There is no nested `{image(...)}`. Describe the picture in words. A reference the story does not
+know, such as an unknown character, is an error at that reference.
+
+The parser preserves a literal alt after escape decoding, including empty or whitespace-only alt text.
 
 Images work wherever narrative templates work: prose, dialogue, choice labels, formatting and
 conditions. There is no image-specific surface allowlist or author image-size limit. Plain-string
@@ -530,13 +544,16 @@ file existence, ambiguous extensions and missing alt through the shared resolver
 The editor suggests paths from `images/` in the first quoted argument and refreshes
 suggestions and diagnostics when files change. Lookup reads paths, not image bytes.
 Omitted, empty or whitespace-only alt warns and uses sentence-case filename fallback.
-Explicit nonblank alt is preserved after escape decoding. Extensionless paths select
+That fallback is decided from the alt the author wrote, not from text a template later renders
+as blank. Explicit literal alt is preserved after escape decoding. Extensionless paths select
 `.png`, `.jpg`, `.jpeg`, `.webp` in that order, warning if more than one matches.
-Compiled media stores the selected path including `images/` and the effective alt text.
+Compiled media stores the selected path including `images/`. A literal alt is stored as text.
+Alt that contains a substitution or other template is stored as that template and rendered where
+the image appears. The filename fallback is stored as text.
 The native desktop folder player and native folder Author Debugger display these images,
 as do the built-in samples in the desktop and web players. Images load only when their
 mounted occurrence approaches the viewport. They fit the available width, retain their
-aspect ratio, and use the effective alt text. Dialogue, choices, chosen-choice history,
+aspect ratio, and use the rendered alt text. Dialogue, choices, chosen-choice history,
 styles and conditionals use the same renderer.
 
 Folder images are **live files**, not a byte snapshot. Within an accepted story generation,

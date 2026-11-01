@@ -39,8 +39,8 @@ public sealed class ImageCompilationTests
     public void Compiles_explicit_supported_paths_without_reading_bytes(string extension)
     {
         var path = "maps/sector (west), v2" + extension;
-        var result = StoryCompiler.Compile(Source($"{{image(\"{path}\", \"  Literal {{player:name}}  \")}}", "images/" + path));
-        Assert.Equal(new MediaTemplate("images/" + path, "  Literal {player:name}  "), Media(result));
+        var result = StoryCompiler.Compile(Source($"{{image(\"{path}\", \"  Literal name  \")}}", "images/" + path));
+        Assert.Equal(new MediaTemplate("images/" + path, "  Literal name  "), Media(result));
         Assert.Empty(result.Diagnostics);
     }
 

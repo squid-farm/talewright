@@ -28,7 +28,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1011 | Malformed choice. | `* [label] (requires: ...) { effects } -> target` or `* -> target` for **Continue**. A textless choice needs `->`; check for missing `]`, `)` or `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
-| TW1014 | Malformed image call or image string escape. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments, separate them with a comma, and use `\"` or `\\` for embedded quotes or backslashes. |
+| TW1014 | Malformed image call, image string escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Use `\"` or `\\` for embedded quotes or backslashes. In alt text, `\{` and `\}` are literal braces. Describe a picture in words instead of nesting `{image(...)}`. |
 | TW1015 | Old Markdown image syntax. | Replace `![alt](path)` with `{image("path", "alt")}`; the message gives the escaped replacement. |
 
 ## TW2xxx: names and types
@@ -54,7 +54,9 @@ the authored narrative, including dialogue and choices. Malformed image calls re
 syntax diagnostics instead of resolver errors. Editors refresh the catalogue and
 diagnostics when files change. Lookup reads paths, not image bytes; it does not
 validate file contents or render images. Successful compilation stores the selected
-story-root-relative path and effective alt text in each media node.
+story-root-relative path in each media node, with literal alt text or an alt template.
+Missing or blank alt still stores the filename fallback. The rendered alt is what display,
+history and load failures use.
 
 For an unknown skill, check the id's spelling and its declaration under `game.ruleset.stats`.
 Giving a character a value does not declare the skill. See the complete

@@ -56,8 +56,10 @@ enclosing brace can additionally produce TW1004. Existing scene
 titles, dialogue and choice labels still use their current unquoted forms:
 `@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`.
 Do not add quotes to those forms expecting them to be removed.
-Image calls use `{image("path", "alt text")}` with literal arguments; both `\"` and `\\`
-are decoded there. Unknown image escapes produce TW1014.
+Image calls use `{image("path", "alt text")}`. The path is a literal string. Alt text uses the
+same template language as prose, including `\{` and `\}` for literal braces. Both arguments
+decode `\"` and `\\`. Unknown image escapes produce TW1014. A nested `{image(...)}` in alt text
+also produces TW1014.
 
 The manifest is YAML, not Talemark: YAML quoting and escaping still apply there. A Talemark
 expression stored in YAML must first survive YAML decoding.
@@ -80,7 +82,7 @@ there is no general escape for a line directive today. Do not assume that `\@` o
 | `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
 | `~` | Effect batch at the start of a line; executes in source order. Triggers settle after the whole semicolon-separated batch. | `~ var:coins += 1` | TW1003 malformed effect; TW3011 after choices; name/type errors. |
 | `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed effect block. |
-| `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted path and optional quoted literal alt, comma-separated. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "The camp")}` | TW1014 malformed call/escape. Asset validation and rendering are not connected yet. |
+| `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted literal path and optional quoted alt, comma-separated. Alt uses the prose template language and cannot contain a nested image. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "{guide:first-name} at the camp")}` | TW1014 malformed call/escape or nested image. Asset validation uses TW2010–TW2014. |
 | `:::` | Delimit a skill check executed at this line. Opening takes `skill-check [actor] skill dc number-expression`; closing line has only `:::`. Both outcomes are required; an entry outcome without a target continues at the next line. | `::: skill-check perception dc 12` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3011 after choices. |
 | `:` in labels | Separates fixed control labels from their contents: `requires:`, `success:`, `failure:`. Not a property read in this context. | `success: -> hall` | TW1009 misplaced/missing outcomes; TW1011 malformed choice condition. |
 | `//` | Comment when it begins a trimmed line; the rest of the line is ignored. It is not a trailing-comment operator. | `// The guard remembers this.` | None for comment contents. |
@@ -189,10 +191,12 @@ Wrong targets, missing strings and extra arguments produce TW2006.
 
 ### Image syntax decision
 
-The approved form is `{image("path", "alt text")}`, with optional literal alt text, in every
-narrative-template context. It constructs media; it is not an expression function returning text.
+The approved form is `{image("path", "alt text")}`, with optional alt text, in every
+narrative-template context. The path stays literal. Alt text is rendered with the prose template
+language where the image appears. It constructs media; it is not an expression function returning text.
 The value is the media node, with no arithmetic precedence or `#` chaining. Its strings decode
-`\"` and `\\` once. Quoted paths can contain filename punctuation without becoming story identifiers.
+`\"` and `\\` once. Alt text also treats `\{` and `\}` as literal braces. Quoted paths can contain
+filename punctuation without becoming story identifiers.
 Existing `{image:name}` character access is unchanged.
 
 The alternatives considered for [#197](https://github.com/squid-farm/talewright/issues/197) were
@@ -239,7 +243,7 @@ The language server uses the shared authoring completion provider.
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/modifier strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Prose `\{` and `\}` also work. |
 | Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
-| New image syntax | `{image("path", "alt")}` works across narrative-template contexts; alt is optional and literal, never a substitution template. Quoted paths are asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
+| New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
 

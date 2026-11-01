@@ -256,7 +256,8 @@ safe PNG, JPEG and WebP files from the owning story's `images/` catalogue. Label
 and inserted paths omit `images/`, use case-sensitive prefixes and replace the
 whole string content without replacing its quotes or alt text. Embedded quotes
 are escaped on insertion. Incomplete quoted paths also support completion.
-Alt text stays literal and offers no path or expression suggestions. Every
+Alt text is not an image-path slot. It offers the same expression completions as prose
+substitutions, and no image-path suggestions. Every
 narrative-template surface, including dialogue and choice labels, uses the same
 behavior; plain-string fields such as titles do not acquire image syntax.
 
@@ -266,7 +267,7 @@ the catalogue and refresh suggestions and diagnostics while preserving unsaved
 buffers. Report a rename as deletion of the old path and creation of the new path.
 No image bytes are read and no images are rendered. Ordinary compilation and
 `talewright validate` report the same resolver diagnostics; compiled media carries
-the selected asset path and effective alt text.
+the selected asset path and either literal alt text or an alt template.
 
 Use `initializationOptions.metadataPath` for an explicit data-only metadata file
 (absolute or relative to each story root), and

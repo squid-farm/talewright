@@ -42,8 +42,8 @@ from `images/`, preserving their folders. Private notes and unsupported image fo
 are left out. Anyone can open it with **Open a story file** in the web player.
 Images display lazily when opened in the desktop or web player, including ZIP uploads.
 Write references such as `{image("harbour.png", "Boats at the harbour")}` for a file at
-`images/harbour.png`. Paths and their letter case must match; alt text is a literal description,
-not a place for name substitutions. See [adding images](writing-stories.md#images).
+`images/harbour.png`. Paths and their letter case must match. Alt text can use the same
+substitutions as prose. See [adding images](writing-stories.md#images).
 
 ## A web game
 
