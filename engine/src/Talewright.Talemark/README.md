@@ -90,6 +90,18 @@ in declaration order followed by END; each node includes its id, title, tags and
 Reachability follows diverts and hub offers only. It does not evaluate conditions or decide whether a
 player can meet them.
 
+## Scene details (Preview)
+
+`StoryMap.SceneDetails(scene)` returns Preview details for a `SceneDefinition` from a successfully compiled
+story. For a scene node, resolve its `SceneId` against that same story and pass the resulting scene; END has
+no scene details. The API takes a scene object rather than a free-form id, so it has no unknown-id case.
+
+The result includes title, tags, `@requires`, `@once`, `@priority`, hub settings, ordered prose templates,
+effects with enclosing `{if}` conditions and entry check or choice skill check outcomes, plus choices and
+entry checks. Choice labels and prose remain compiled templates; nothing is rendered or evaluated.
+Speakers are unique in first-seen order. Block conditions are described, not evaluated, and an `{else}`
+context is formatted as a negation.
+
 ## Files
 
 | File | Contents |
@@ -109,6 +121,7 @@ player can meet them.
 | `Model/StoryDiverts.cs` | Preview: `StoryDiverts`, every divert and hub offer in a story. |
 | `Model/StoryCondition.cs` | Preview: formatted conditions and unique state reads for diverts and hub offers. |
 | `Model/StoryMap.cs` | Preview: public read-only story map API with nodes and reachability. |
+| `Model/StorySceneDetails.cs` | Preview: compiled metadata, prose, effects, choices, entry checks and speakers for one scene. |
 | `Diagnostics/Diagnostic.cs` | `Diagnostic`, `DiagnosticSeverity`, `SourceLocation`, `DiagnosticBag`. |
 
 ## Diagnostic codes

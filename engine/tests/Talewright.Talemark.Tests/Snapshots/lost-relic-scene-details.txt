@@ -1,0 +1,11 @@
+scene|dream.spiral|Answer the Spiral|tags=dream,keeper|requires=|once=true|priority=20|hub=|hub-limit=
+prose|0|step:51:1|condition=|paragraph({spiral:first-name#capitalize} turns without moving. {spiral:pronoun#capitalize} {spiral:pronoun#one-many("has","have")} a question; the answer should be yours.)
+prose|1|step:54:1|condition=|speech(spiral:What is the watchword?)
+prose|3|step:57:1|condition=var:watchword == ""|speech(spiral:A retired word leaves no echo. Silence is an honest answer.)
+prose|5|step:60:1|condition=not var:watchword == "" and var:watch-note == ""|speech(spiral:"{var:watchword}"? A suggestion, never recorded. You have not yet agreed on who should answer.)
+prose|7|step:63:1|condition=not var:watchword == "" and not var:watch-note == "" and var:watchword == var:watch-note|speech(spiral:"{var:watchword}". The living voice and the written word agree. I know you.)
+prose|8|step:65:1|condition=not var:watchword == "" and not var:watch-note == "" and not var:watchword == var:watch-note|speech(spiral:The page says "{var:watch-note}"; you say "{var:watchword}". You changed the word, not the ink.)
+prose|9|step:70:1|condition=|paragraph({spiral:pronoun#capitalize} opens {spiral:pronoun:possessive-pronoun:determiner} palm.)
+effect|10|step:72:1|condition=|outcome=-|choice=c0|TakeItem { Character = spiral, Item = glyph-mark, Quantity = NumberLiteral { Type = Number, Value = 1 } };GiveItem { Character = player, Item = glyph-mark, Quantity = NumberLiteral { Type = Number, Value = 1 } };ChangeVariable { Variable = marks, Op = Add, Amount = NumberLiteral { Type = Number, Value = 1 } }
+choice|10|step:72:1|c0|label=Accept the spiral mark|condition=|effects=TakeItem { Character = spiral, Item = glyph-mark, Quantity = NumberLiteral { Type = Number, Value = 1 } };GiveItem { Character = player, Item = glyph-mark, Quantity = NumberLiteral { Type = Number, Value = 1 } };ChangeVariable { Variable = marks, Op = Add, Amount = NumberLiteral { Type = Number, Value = 1 } }|diverts=dream.spiral/step:72:1|check=-
+speakers|spiral

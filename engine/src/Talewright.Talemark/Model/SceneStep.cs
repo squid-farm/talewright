@@ -19,14 +19,21 @@ public sealed record CheckStep(string Id, SourceRange Source, CheckBranch Check)
 /// <summary>Shared source-order and structural-flow walks for validation, inspection and story maps.</summary>
 public static class SceneSteps
 {
-    public static IEnumerable<SceneStep> Walk(IEnumerable<SceneStep> steps)
+    public static IEnumerable<SceneStep> Walk(IEnumerable<SceneStep> steps) =>
+        WalkWithBlocks(steps).Select(entry => entry.Step);
+
+    internal static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks)> WalkWithBlocks(
+        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition>? blocks = null)
     {
+        blocks ??= [];
         foreach (var step in steps)
         {
-            yield return step;
+            yield return (step, blocks);
             if (step is ConditionalStep branch)
             {
-                foreach (var child in Walk(branch.Then).Concat(Walk(branch.Else)))
+                foreach (var child in WalkWithBlocks(branch.Then, [.. blocks, new(branch.Condition, false)]))
+                    yield return child;
+                foreach (var child in WalkWithBlocks(branch.Else, [.. blocks, new(branch.Condition, true)]))
                     yield return child;
             }
         }

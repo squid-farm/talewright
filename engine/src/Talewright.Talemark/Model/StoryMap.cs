@@ -66,4 +66,13 @@ public sealed class StoryMap
             diverts,
             reachability.Diverts.HubOffers);
     }
+
+    /// <summary>Returns Preview details for a scene, including compiled templates and effects.</summary>
+    /// <param name="scene">A scene from a successfully compiled story.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="scene"/> is null.</exception>
+    public static StorySceneDetails SceneDetails(SceneDefinition scene)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
+        return StorySceneDetails.From(scene);
+    }
 }
