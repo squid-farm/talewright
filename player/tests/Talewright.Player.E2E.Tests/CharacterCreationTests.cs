@@ -7,22 +7,19 @@ namespace Talewright.Player.E2E.Tests;
 
 public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
-    private static StoryFixture Fixture() => TestStories.Linear with
+    private static StoryFixture Fixture(params string[] pronouns)
     {
-        Tale = TestStories.Linear.Tale.Replace("Mara's", "{player:first-name#possessive}"),
-        Yaml = TestStories.DefaultYaml.Replace("id: player-test", $"id: creation-{Guid.NewGuid():N}")
-            .Replace("  start: start", """
-              start: start
-              creation:
-                name: true
-                pronouns: [they, she]
-                stats:
-                  str: [8, 12, 16]
-                presets:
-                  explorer: {label: Explorer, stats: {str: 12}}
-                  scholar: {label: Scholar, stats: {str: 8}}
-            """),
-    };
+        var manifest = TestStories.DefaultManifest($"creation-{Guid.NewGuid():N}", creationName: true);
+        manifest.CreationPronouns(pronouns.Length == 0 ? ["they", "she"] : pronouns);
+        manifest.CreationStat("str", 8, 12, 16);
+        manifest.CreationPreset("explorer", "Explorer", new Dictionary<string, int> { ["str"] = 12 });
+        manifest.CreationPreset("scholar", "Scholar", new Dictionary<string, int> { ["str"] = 8 });
+        return TestStories.Linear with
+        {
+            Tale = TestStories.Linear.Tale.Replace("Mara's", "{player:first-name#possessive}"),
+            Yaml = manifest.Build(),
+        };
+    }
 
     [Theory]
     [InlineData("she", "she/her/herself", "she/her/herself")]
@@ -32,13 +29,11 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
     public async Task Full_pronoun_labels_keep_keyword_values_and_survive_save_load(
         string keyword, string label, string storyForms)
     {
-        var fixture = Fixture();
+        var fixture = Fixture(new[] { keyword }.Concat(new[] { "she", "he", "they", "it" }.Where(value => value != keyword)).ToArray());
         fixture = fixture with
         {
             Tale = TestStories.Linear.Tale.Replace("Mara's",
                 "{player:pronoun}/{player:pronoun:object}/{player:pronoun:reflexive}"),
-            Yaml = fixture.Yaml.Replace("pronouns: [they, she]", $"pronouns: [{keyword}, " +
-                string.Join(", ", new[] { "she", "he", "they", "it" }.Where(value => value != keyword)) + "]"),
         };
         await Upload(fixture);
         if (PlayerTarget.IsDesktop)

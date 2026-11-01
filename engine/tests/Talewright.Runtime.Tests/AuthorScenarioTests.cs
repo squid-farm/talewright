@@ -5,58 +5,50 @@ using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public sealed class AuthorScenarioTests
 {
     private const string Extensions = "talewright-builtins-v1";
-    private const string Tale = """
-        === start
-        Count {var:count}. {player:first-name}.
-        * [Go] -> check
-        * [Stay] -> start
-        === check
-        ::: skill-check athletics dc 10
-        success: -> finish
-        failure: -> finish
-        :::
-        === finish
-        * [Return] -> start
-        """;
+    private static readonly string Tale = BuildTale();
 
-    private static StoryDefinition Story(string tale = Tale) =>
+    private static ManifestFaker BuildManifest()
+    {
+        var manifest = new ManifestFaker("portable", "Portable", "start")
+        {
+            Version = "1.0.0",
+            CreationName = true,
+        };
+        manifest.CreationPronouns("she", "they");
+        manifest.CreationStat("str", 8, 12, 16);
+        manifest.CreationPreset("explorer", "Explorer", new Dictionary<string, int> { ["str"] = 12 });
+        manifest.Flag("ready");
+        manifest.Number("count", 0);
+        manifest.Character("player", "Tester");
+        manifest.Character("guide", "Guide");
+        manifest.Item("rope", "Rope");
+        manifest.Faction("guild", "Guild");
+        manifest.Trigger("ready", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), 10), once: true);
+        return manifest;
+    }
+
+    private static string BuildTale() => string.Join('\n',
+        SceneFaker.Header("start"),
+        $"Count {SubstitutionFaker.Variable(new TaleVariableRef("count"))}. {SubstitutionFaker.Character(TaleCharacterRef.Player, "first-name")}.",
+        ChoiceFaker.Create("check", "Go"),
+        ChoiceFaker.Create("start", "Stay"),
+        SceneFaker.Header("check"),
+        SkillCheckFaker.Entry("athletics", 10, successTarget: "finish", failureTarget: "finish"),
+        SceneFaker.Header("finish"),
+        ChoiceFaker.Create("start", "Return"));
+
+    private static StoryDefinition Story(string? tale = null) =>
         StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = """
-                game:
-                  id: portable
-                  title: Portable
-                  version: 1.0.0
-                  start: start
-                  creation:
-                    name: true
-                    pronouns: [she, they]
-                    stats:
-                      str: [8, 12, 16]
-                    presets:
-                      explorer: {label: Explorer, stats: {str: 12}}
-                flags: [ready]
-                vars: {count: 0}
-                characters:
-                  player: {first-name: Tester}
-                  guide: {first-name: Guide}
-                items:
-                  rope: {name: Rope}
-                factions:
-                  guild: {name: Guild}
-                triggers:
-                  - id: ready
-                    when: flag:ready
-                    do: var:count += 10
-                    once: true
-                """,
-            ["main.tale"] = tale,
+            ["story.talewright.yaml"] = BuildManifest().Build(),
+            ["main.tale"] = tale ?? Tale,
         })).Story ?? throw new InvalidOperationException("Invalid scenario test fixture.");
 
     private static AuthorSession Start(StoryDefinition? story = null)

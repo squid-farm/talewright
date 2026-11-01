@@ -8,9 +8,11 @@ public sealed class StoryDivertsTests
 {
     private static CompilationResult Compile(string tale)
     {
+        var manifest = TestStories.DefaultManifest();
+        manifest.Flag("ready");
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = TestStories.DefaultYaml + "\nflags: [ready]\n",
+            ["story.talewright.yaml"] = manifest.Build(),
             ["main.tale"] = tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

@@ -5,14 +5,22 @@ using System.Threading.Channels;
 using Talewright.Cli;
 using Talewright.Authoring;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
-    private const string Manifest = "game:\n  id: lsp-test\n  title: LSP test\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+    private static readonly string Manifest = BuildManifest();
     private const string Valid = "=== start\nHello.\n-> END\n";
     private const string Invalid = "=== start\nHello.\n* [Missing] -> missing\n";
+
+    private static string BuildManifest()
+    {
+        var manifest = new ManifestFaker("lsp-test", "LSP test", "start");
+        manifest.Character("player", "Ada");
+        return manifest.Build(trailingNewline: true);
+    }
 
     [Fact]
     public async Task Lifecycle_and_unknown_requests_follow_json_rpc()

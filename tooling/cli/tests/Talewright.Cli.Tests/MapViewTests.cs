@@ -5,22 +5,23 @@ using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Runtime;
+using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
 public sealed class MapViewTests
 {
-    private const string Yaml = """
-        game:
-          id: map
-          title: Map test
-          start: start
-          randomness: off
-        flags: [ready, lit]
-        vars: {visits: 0}
-        characters:
-          player: {first-name: Mara, stats: {athletics: 2}}
-        """;
+    private static readonly string Yaml = BuildManifest();
+
+    private static string BuildManifest()
+    {
+        var manifest = new ManifestFaker("map", "Map test", "start") { Randomness = "off" };
+        manifest.Flag("ready");
+        manifest.Flag("lit");
+        manifest.Number("visits", 0);
+        manifest.Character("player", "Mara", stats: new Dictionary<string, int> { ["athletics"] = 2 });
+        return manifest.Build();
+    }
 
     private const string Tale = """
         === start
@@ -66,11 +67,11 @@ public sealed class MapViewTests
     private static MapView Build(string tale = Tale)
         => MapView.Build(CompileStory(tale));
 
-    private static StoryDefinition CompileStory(string tale, string yaml = Yaml)
+    private static StoryDefinition CompileStory(string tale, string? yaml = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml ?? Yaml,
             ["main.tale"] = tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

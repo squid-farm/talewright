@@ -4,30 +4,35 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public sealed class AuthorReloadTests
 {
-    private const string Yaml = """
-        game:
-          id: reload
-          title: Reload
-          start: start
-        flags: [ready, rewarded]
-        vars: {count: 0}
-        characters:
-          player: {first-name: Tester}
-        triggers:
-          - id: reward
-            when: flag:ready
-            do: "var:count += 10"
-            once: false
-          - id: once
-            when: flag:ready
-            do: "set flag:rewarded"
-            once: true
-        """;
+    private static readonly string Yaml = BuildManifest().Build();
+
+    private static ManifestFaker BuildManifest(
+        bool includeItems = false,
+        string playerName = "Tester",
+        int initialCount = 0,
+        int triggerIncrement = 10)
+    {
+        var manifest = new ManifestFaker("reload", "Reload", "start");
+        manifest.Flag("ready");
+        manifest.Flag("rewarded");
+        manifest.Number("count", initialCount);
+        manifest.Character("player", playerName);
+        manifest.Trigger("reward", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), triggerIncrement));
+        manifest.Trigger("once", "flag:ready", EffectFaker.Set(new TaleFlagRef("rewarded")), once: true);
+        if (includeItems)
+        {
+            manifest.Item("pants", "pants", nameAgreement: "plural");
+            manifest.Item("armor", "armor", uncountable: true);
+        }
+
+        return manifest;
+    }
     private const string Tale = """
         === start
         ~ set flag:ready
@@ -43,11 +48,11 @@ public sealed class AuthorReloadTests
         * [Return] -> current
         """;
 
-    private static StoryDefinition Compile(string tale = Tale, string yaml = Yaml, CompilerOptions? options = null)
+    private static StoryDefinition Compile(string tale = Tale, string? yaml = null, CompilerOptions? options = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml, ["main.tale"] = tale,
+            ["story.talewright.yaml"] = yaml ?? Yaml, ["main.tale"] = tale,
         }), options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
@@ -83,12 +88,7 @@ public sealed class AuthorReloadTests
     [Fact]
     public void Item_name_assignment_copies_only_text_and_survives_history_and_save()
     {
-        var yaml = Yaml + """
-
-            items:
-              pants: {name: pants, name-agreement: plural}
-              armor: {name: armor, uncountable: true}
-            """;
+        var yaml = BuildManifest(includeItems: true).Build();
         var story = Compile("""
             === start
             ~ var:word = item:pants
@@ -115,7 +115,7 @@ public sealed class AuthorReloadTests
     [Fact]
     public void Item_helpers_remain_engine_owned_during_author_reload()
     {
-        var yaml = Yaml + "\nitems:\n  pants: {name: pants, name-agreement: plural}\n";
+        var yaml = BuildManifest(includeItems: true).Build();
         var tale = Tale.Replace("[Travel]", "[{item:pants#the#capitalize}]")
             .Replace("Old passage.", "{item:pants#this#capitalize} {item:pants#one-many(\"is\", \"are\")} old.");
         var original = AuthorSession.Create(Compile(tale, yaml), new("start"), seed: 42);
@@ -216,9 +216,9 @@ public sealed class AuthorReloadTests
         var original = AuthorSession.Create(Compile(), new("current"), seed: 42);
         foreach (var yaml in new[]
         {
-            Yaml.Replace("first-name: Tester", "first-name: Someone"),
-            Yaml.Replace("count: 0", "count: 1"),
-            Yaml.Replace("count += 10", "count += 9"),
+            BuildManifest(playerName: "Someone").Build(),
+            BuildManifest(initialCount: 1).Build(),
+            BuildManifest(triggerIncrement: 9).Build(),
         })
         {
             Assert.Throws<AuthorReloadException>(() => original.Reload(Compile(yaml: yaml)));

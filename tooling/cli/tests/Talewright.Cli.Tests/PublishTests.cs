@@ -3,6 +3,7 @@ using System.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
@@ -16,9 +17,11 @@ public sealed class PublishTests : IDisposable
     public PublishTests()
     {
         Directory.CreateDirectory(Path.Combine(Story, "chapters"));
-        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"),
-            "game:\n  id: publish\n  title: Publish\n  start: a\ncharacters:\n  player: {first-name: Tester}\n");
-        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), "=== a\nHello.\n-> END");
+        var manifest = new ManifestFaker("publish", "Publish", "a");
+        manifest.Character("player", "Tester");
+        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
+        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), string.Join('\n',
+            SceneFaker.Header("a"), "Hello.", DivertFaker.To("END")));
         File.WriteAllText(Path.Combine(Story, "private-notes.txt"), "Not story content");
     }
 

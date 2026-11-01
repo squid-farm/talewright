@@ -4,35 +4,38 @@ using Talewright.Narrative.Rendering;
 using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public sealed class OrderedSceneTests
 {
-    private const string Manifest = """
-        game: {id: order, title: Order, start: start, randomness: off, seed: 42}
-        characters:
-          player: {first-name: Ada}
-        vars: {gold: 10}
-        flags: [ready, rewarded, broke]
-        items:
-          rope: Rope
-        triggers:
-          - id: broke
-            when: var:gold == 0
-            do: set flag:broke
-            once: false
-          - id: reward
-            when: flag:ready
-            do: set flag:rewarded
-            once: true
-        """;
+    private static readonly string Manifest = BuildManifest().Build();
 
-    private static StoryDefinition Compile(string tale, string manifest = Manifest)
+    private static ManifestFaker BuildManifest(bool includeArrived = false)
+    {
+        var manifest = new ManifestFaker("order", "Order", "start", 42) { Randomness = "off" };
+        manifest.Character("player", "Ada");
+        manifest.Number("gold", 10);
+        manifest.Flag("ready");
+        manifest.Flag("rewarded");
+        manifest.Flag("broke");
+        manifest.Item("rope", "Rope");
+        manifest.Trigger("broke", "var:gold == 0", EffectFaker.Set(new TaleFlagRef("broke")));
+        manifest.Trigger("reward", "flag:ready", EffectFaker.Set(new TaleFlagRef("rewarded")), once: true);
+        if (includeArrived)
+        {
+            manifest.Trigger("arrived", "visited(start)", EffectFaker.Increase(new TaleVariableRef("gold"), 7), once: true);
+        }
+
+        return manifest;
+    }
+
+    private static StoryDefinition Compile(string tale, string? manifest = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = manifest,
+            ["story.talewright.yaml"] = manifest ?? Manifest,
             ["main.tale"] = tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -87,13 +90,7 @@ public sealed class OrderedSceneTests
     public void Visit_trigger_results_are_visible_before_the_first_authored_line()
     {
         var story = Compile("=== start\nGold {var:gold}.\n* [Again] -> start",
-            Manifest + """
-
-              - id: arrived
-                when: visited(start)
-                do: var:gold += 7
-                once: true
-            """);
+            BuildManifest(includeArrived: true).Build());
         var session = new StorySession(story);
         Assert.Equal("Gold 17.", Text(session.Start()));
         Assert.Equal("Gold 17.", Text(session.Choose("c0")));

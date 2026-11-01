@@ -2,36 +2,42 @@ namespace Talewright.Testing;
 
 public static class TestStories
 {
-    public const string DefaultYaml = """
-        game:
-          id: player-test
-          title: Player Test
-          start: start
-          randomness: off
-          seed: 42
-        characters:
-          player:
-            first-name: Mara
-            last-name: Burns
-            pronouns: she
-            stats: { athletics: 2 }
-          guide:
-            first-name: Tomas
-            pronouns: he
-            stats: { survival: 4 }
-        factions:
-          guild: { name: Test Guild, standing: 0 }
-        items:
-          rope: { name: Test rope }
-          charm: { name: Test charm, modifiers: { wis: 2 } }
-          relic: { name: Test relic, modifiers: { cha: 2 } }
-        vars: { visits: 0 }
-        triggers:
-          - id: wary
-            when: faction:guild <= unfriendly
-            do: set flag:wary
-            once: true
-        """;
+    public static readonly string DefaultYaml = DefaultManifest().Build();
+
+    public static ManifestFaker DefaultManifest(
+        string id = "player-test",
+        string randomness = "off",
+        bool? creationName = null)
+    {
+        var manifest = new ManifestFaker(id, "Player Test", "start", 42)
+        {
+            Randomness = randomness,
+            CreationName = creationName,
+        };
+        manifest.Character("player", "Mara", "Burns",
+            new Dictionary<string, int> { ["athletics"] = 2 }, "she");
+        manifest.Character("guide", "Tomas", pronouns: "he",
+            stats: new Dictionary<string, int> { ["survival"] = 4 });
+        manifest.Faction("guild", "Test Guild");
+        manifest.Item("rope", "Test rope");
+        manifest.Item("charm", "Test charm", new Dictionary<string, int> { ["wis"] = 2 });
+        manifest.Item("relic", "Test relic", new Dictionary<string, int> { ["cha"] = 2 });
+        manifest.Number("visits", 0);
+        manifest.Trigger("wary", "faction:guild <= unfriendly", EffectFaker.Set(new TaleFlagRef("wary")), once: true);
+        return manifest;
+    }
+
+    public static ManifestFaker ExpressionManifest(string id, string title, string start)
+    {
+        var manifest = new ManifestFaker(id, title, start);
+        manifest.Character("player", "Mara", "Burns", pronouns: "she");
+        manifest.Faction("river", "River Guild", 12);
+        manifest.Item("lantern", "Lantern");
+        manifest.Flag("ready");
+        manifest.Number("coins", 5);
+        manifest.Text("weather", "rain");
+        return manifest;
+    }
 
     public static readonly StoryFixture Linear = new("linear", DefaultYaml, """
         === start
@@ -188,13 +194,18 @@ public static class TestStories
         -> END
         """);
 
-    public static readonly StoryFixture Long = new("long", DefaultYaml,
-        "=== start\n@title Long beginning\n" +
-        string.Join("\n\n", Enumerable.Range(1, 60).Select(i => $"Paragraph {i}: readable text for scrolling.")) +
-        "\n* [Next passage] -> next\n=== next\n@title New passage\nThe new passage is visible.\n* [End the story] -> END\n");
+    public static readonly StoryFixture Long = new("long", DefaultYaml, string.Join('\n',
+        SceneFaker.Header("start"),
+        SceneFaker.Title("Long beginning"),
+        string.Join("\n\n", Enumerable.Range(1, 60).Select(i => $"Paragraph {i}: readable text for scrolling.")),
+        ChoiceFaker.Create("next", "Next passage"),
+        SceneFaker.Header("next"),
+        SceneFaker.Title("New passage"),
+        "The new passage is visible.",
+        ChoiceFaker.Create("END", "End the story")));
 
     public static readonly StoryFixture Seeded = new("seeded",
-        DefaultYaml.Replace("randomness: off", "randomness: checks-only", StringComparison.Ordinal), """
+        DefaultManifest(randomness: "checks-only").Build(), """
         === start
         * [Roll once] skill-check athletics dc 12
           success: -> won
@@ -217,31 +228,22 @@ public static class TestStories
     {
         var skill = actor == "guide" ? "guide survival" : "athletics";
         var dc = success ? 1 : 100;
-        var tale = entry
-            ? $$"""
-                === start
-                Entry check.
-                ::: skill-check {{skill}} dc {{dc}}
-                success: { give player rope } -> won
-                failure: { player:hp -= 2 } -> lost
-                :::
-                """
-            : $$"""
-                === start
-                Choice check.
-                * [Try the check] skill-check {{skill}} dc {{dc}}
-                  success: { give player rope } -> won
-                  failure: { player:hp -= 2 } -> lost
-                """;
-        return new StoryFixture(id, DefaultYaml, tale + """
-
-            === won
-            Check succeeded.
-            -> END
-            === lost
-            Check failed.
-            -> END
-            """);
+        var giveRope = EffectFaker.Give(TaleCharacterRef.Player, new TaleItemRef("rope"));
+        var loseHealth = EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 2);
+        var check = entry
+            ? SkillCheckFaker.Entry(skill, dc, giveRope, loseHealth, "won", "lost")
+            : SkillCheckFaker.Choice("Try the check", skill, dc, "won", "lost", giveRope, loseHealth);
+        var tale = string.Join('\n',
+            SceneFaker.Header("start"),
+            entry ? "Entry check." : "Choice check.",
+            check,
+            SceneFaker.Header("won"),
+            "Check succeeded.",
+            DivertFaker.To("END"),
+            SceneFaker.Header("lost"),
+            "Check failed.",
+            DivertFaker.To("END"));
+        return new StoryFixture(id, DefaultYaml, tale);
     }
 
     public static IReadOnlyList<StoryFixture> All { get; } =

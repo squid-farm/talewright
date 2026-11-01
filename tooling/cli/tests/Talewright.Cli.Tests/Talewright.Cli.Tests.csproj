@@ -5,6 +5,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Talewright.Cli/Talewright.Cli.csproj" />
+    <ProjectReference Include="../../../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../../../../apps/desktop/DesktopLaunchOptions.cs" Link="DesktopLaunchOptions.cs" />

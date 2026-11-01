@@ -4,6 +4,7 @@ using Talewright.Core.Events;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
@@ -14,27 +15,23 @@ public sealed class DebuggerTests : IDisposable
     public DebuggerTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), """
-            game:
-              id: debug
-              title: Debug
-              start: scene1
-            flags: [ready]
-            vars: {count: 0}
-            items:
-              rope: {name: Rope}
-            factions:
-              guild: {name: Guild}
-            characters:
-              player: {first-name: Mara}
-              guide: {first-name: Robin}
-            """);
-        File.WriteAllText(Path.Combine(_root, "main.tale"), string.Join("\n", Enumerable.Range(1, 1000).Select(i => $$"""
-            === scene{{i}}
-            @title Chapter {{i}}
-            * [Prepared] (requires: flag:ready) -> END
-            * [Wait] -> END
-            """)));
+        var manifest = new ManifestFaker("debug", "Debug", "scene1");
+        manifest.Flag("ready");
+        manifest.Number("count", 0);
+        manifest.Item("rope", "Rope");
+        manifest.Faction("guild", "Guild");
+        manifest.Character("player", "Mara");
+        manifest.Character("guide", "Robin");
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), manifest.Build());
+        var ready = new TaleFlagRef("ready");
+        var tale = Enumerable.Range(1, 1000).SelectMany(index => new[]
+        {
+            SceneFaker.Header($"scene{index}"),
+            SceneFaker.Title($"Chapter {index}"),
+            ChoiceFaker.Create("END", "Prepared", ready.ToString()),
+            ChoiceFaker.Create("END", "Wait"),
+        });
+        File.WriteAllText(Path.Combine(_root, "main.tale"), string.Join('\n', tale));
     }
 
     [Fact]

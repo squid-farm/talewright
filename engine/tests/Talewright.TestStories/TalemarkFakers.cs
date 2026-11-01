@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using Talewright.Core.Identity;
 
 namespace Talewright.Testing;
@@ -34,6 +36,13 @@ public sealed record TaleCharacterRef
     public string Id { get; }
     public string Field(string name) => $"{Id}:{FakerIdentifier.Require(name, nameof(name))}";
     public override string ToString() => Id;
+}
+
+public sealed record TaleFactionRef
+{
+    public TaleFactionRef(string id) => Id = FakerIdentifier.Require(id, nameof(id));
+    public string Id { get; }
+    public override string ToString() => $"faction:{Id}";
 }
 
 internal static class FakerIdentifier
@@ -123,6 +132,10 @@ public static class IfFaker
     public static string Open(TaleFlagRef flag) => Open(FakerArgument.Required(flag).ToString());
     public static string Inline(string condition, string content) => Open(condition) + FakerArgument.Required(content) + Close;
     public static string Inline(TaleFlagRef flag, string content) => Inline(FakerArgument.Required(flag).ToString(), content);
+    public static string Inline(string condition, string content, string elseContent) =>
+        Open(condition) + FakerArgument.Required(content) + Else + FakerArgument.Required(elseContent) + Close;
+    public static string Inline(TaleFlagRef flag, string content, string elseContent) =>
+        Inline(FakerArgument.Required(flag).ToString(), content, elseContent);
     public static string Block(string condition, string content) => $"{Open(condition)}\n{FakerArgument.Required(content)}\n{Close}";
     public static string Block(TaleFlagRef flag, string content) => Block(FakerArgument.Required(flag).ToString(), content);
 }
@@ -178,22 +191,57 @@ public static class MarkupFaker
 {
     public const string EmphasisDelimiter = "*";
     public const string StrongDelimiter = "**";
+    public const string CodeDelimiter = "`";
     public const string LinkClose = ")";
 
     public static string Strong(string text) => StrongDelimiter + FakerArgument.Required(text) + StrongDelimiter;
     public static string EmphasisOpen(string text) => EmphasisDelimiter + FakerArgument.Required(text);
     public static string Emphasis(string text) => EmphasisOpen(text) + EmphasisDelimiter;
+    public static string Code(string text) => CodeDelimiter + FakerArgument.Required(text) + CodeDelimiter;
     public static string LinkOpen(string label) => $"[{FakerArgument.Required(label)}](";
     public static string Link(string label, string target) => LinkOpen(label) + FakerArgument.Required(target) + LinkClose;
 }
 
+public static class ImageFaker
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    public static string Call(string path, string? alt = null) =>
+        alt is null
+            ? $"{{image({JsonSerializer.Serialize(FakerArgument.Required(path), JsonOptions)})}}"
+            : $"{{image({JsonSerializer.Serialize(FakerArgument.Required(path), JsonOptions)}, {JsonSerializer.Serialize(alt, JsonOptions)})}}";
+}
+
 public static class SkillCheckFaker
 {
-    public static string Choice(string label, string skill, int difficulty, string success, string failure) =>
+    public static string Choice(
+        string label,
+        string skill,
+        int difficulty,
+        string success,
+        string failure,
+        string? successEffect = null,
+        string? failureEffect = null) =>
         FormattableString.Invariant(
-            $"{ChoiceFaker.Open(label)} skill-check {FakerArgument.Required(skill)} dc {difficulty}\n  success: {DivertFaker.To(success)}\n  failure: {DivertFaker.To(failure)}");
+            $"{ChoiceFaker.Open(label)} skill-check {FakerArgument.Required(skill)} dc {difficulty}\n  success: {Outcome(successEffect, success)}\n  failure: {Outcome(failureEffect, failure)}");
 
-    public static string Entry(string skill, int difficulty, string successEffect, string failureEffect) =>
+    public static string Entry(
+        string skill,
+        int difficulty,
+        string? successEffect = null,
+        string? failureEffect = null,
+        string? successTarget = null,
+        string? failureTarget = null) =>
         FormattableString.Invariant(
-            $"::: skill-check {FakerArgument.Required(skill)} dc {difficulty}\nsuccess: {EffectFaker.Inline(successEffect)}\nfailure: {EffectFaker.Inline(failureEffect)}\n:::");
+            $"::: skill-check {FakerArgument.Required(skill)} dc {difficulty}\nsuccess: {Outcome(successEffect, successTarget)}\nfailure: {Outcome(failureEffect, failureTarget)}\n:::");
+
+    private static string Outcome(string? effect, string? target)
+    {
+        var formattedEffect = effect is null ? "" : EffectFaker.Inline(effect) + (target is null ? "" : " ");
+        var formattedTarget = target is null ? "" : DivertFaker.To(target);
+        return formattedEffect + formattedTarget;
+    }
 }

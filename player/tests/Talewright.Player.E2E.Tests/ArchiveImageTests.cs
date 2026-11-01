@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using Talewright.Player.Library;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Player.E2E.Tests;
 
@@ -157,10 +158,12 @@ public sealed class ArchiveImageTests
         var input = new MemoryStream();
         using (var output = new ZipArchive(input, ZipArchiveMode.Create, leaveOpen: true))
         {
+            var manifest = new ManifestFaker("archive", "Archive", "start");
+            manifest.Character("player", "Tester");
             using (var writer = new StreamWriter(output.CreateEntry(StorySource.ManifestFileName).Open()))
-                writer.Write("game:\n  id: archive\n  title: Archive\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+                writer.Write(manifest.Build());
             using (var writer = new StreamWriter(output.CreateEntry("main.tale").Open()))
-                writer.Write("=== start\nArchive text.\n-> END");
+                writer.Write(string.Join('\n', SceneFaker.Header("start"), "Archive text.", DivertFaker.To("END")));
             using var image = output.CreateEntry("images/large.png").Open();
             var block = new byte[64 * 1024];
             for (var remaining = imageBytes; remaining > 0; remaining -= Math.Min(block.Length, remaining))

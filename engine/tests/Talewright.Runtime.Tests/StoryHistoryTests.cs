@@ -4,41 +4,47 @@ using Talewright.Core.Identity;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public class StoryHistoryTests
 {
-    private const string Yaml = """
-        game:
-          id: history
-          title: History
-          version: 1
-          start: a
-        characters:
-          player: { first-name: Tester, stats: { athletics: 2 } }
-        triggers:
-          - id: first
-            when: var:visits >= 1
-            do: var:trigger-count += 1
-            once: true
-        """;
+    private static readonly string Yaml = BuildManifest().Build();
+    private static readonly string Tale = BuildTale();
 
-    private const string Tale = """
-        === a
-        ~ var:visits += 1
-        Visits: {var:visits}; triggers: {var:trigger-count}.
-        * [Try] skill-check athletics dc 12
-          success: { player:hp -= 1 } -> a
-          failure: { player:hp -= 2 } -> a
-        * [Finish] -> END
-        """;
+    private static ManifestFaker BuildManifest(bool declareVariables = false, bool? undo = null)
+    {
+        var manifest = new ManifestFaker("history", "History", "a")
+        {
+            Version = "1",
+            Undo = undo,
+        };
+        manifest.Character("player", "Tester", stats: new Dictionary<string, int> { ["athletics"] = 2 });
+        if (declareVariables)
+        {
+            manifest.Number("visits", 0);
+            manifest.Number("trigger-count", 0);
+        }
 
-    private static StoryDefinition Compile(string yaml = Yaml, string tale = Tale, CompilerOptions? options = null)
+        manifest.Trigger("first", "var:visits >= 1", EffectFaker.Increase(new TaleVariableRef("trigger-count"), 1), once: true);
+        return manifest;
+    }
+
+    private static string BuildTale() => string.Join('\n',
+        SceneFaker.Header("a"),
+        EffectFaker.Line(EffectFaker.Increase(new TaleVariableRef("visits"), 1)),
+        $"Visits: {SubstitutionFaker.Variable(new TaleVariableRef("visits"))}; triggers: {SubstitutionFaker.Variable(new TaleVariableRef("trigger-count"))}.",
+        SkillCheckFaker.Choice("Try", "athletics", 12, "a", "a",
+            EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 1),
+            EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 2)),
+        ChoiceFaker.Create("END", "Finish"));
+
+    private static StoryDefinition Compile(string? yaml = null, string? tale = null, CompilerOptions? options = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml, ["main.tale"] = tale,
+            ["story.talewright.yaml"] = yaml ?? Yaml, ["main.tale"] = tale ?? Tale,
         }), options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
@@ -353,7 +359,8 @@ public class StoryHistoryTests
     [Fact]
     public void Choice_limit_accepts_exact_boundary_and_rejects_the_next_choice()
     {
-        var history = new StoryHistory(Compile(Yaml + "\nvars: { visits: 0 }", "=== a\n* [Again] -> a"), 7);
+        var history = new StoryHistory(Compile(BuildManifest(declareVariables: true).Build(),
+            string.Join('\n', SceneFaker.Header("a"), ChoiceFaker.Create("a", "Again"))), 7);
         for (var i = 0; i < StoryHistory.MaxChoices; i++)
         {
             history.Choose("c0");
@@ -402,7 +409,7 @@ public class StoryHistoryTests
     [Fact]
     public void Undo_can_be_disabled_without_disabling_saves()
     {
-        var history = new StoryHistory(Compile(Yaml.Replace("  start: a", "  start: a\n  undo: false")), 7);
+        var history = new StoryHistory(Compile(BuildManifest(undo: false).Build()), 7);
         history.Choose("c0");
         Assert.False(history.CanBack);
         Assert.Throws<InvalidOperationException>(() => history.Back());

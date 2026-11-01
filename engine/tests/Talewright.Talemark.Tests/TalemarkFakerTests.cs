@@ -41,9 +41,13 @@ public sealed class TalemarkFakerTests
             ChoiceFaker.Create("END", "Go", ready.ToString(), EffectFaker.Increase(count, 1)));
         Assert.Equal("**strong**", MarkupFaker.Strong("strong"));
         Assert.Equal("*emphasis*", MarkupFaker.Emphasis("emphasis"));
+        Assert.Equal("`code`", MarkupFaker.Code("code"));
         Assert.Equal("*a ", MarkupFaker.EmphasisOpen("a "));
         Assert.Equal("[a](", MarkupFaker.LinkOpen("a"));
         Assert.Equal("[a](target)", MarkupFaker.Link("a", "target"));
+        Assert.Equal("{image(\"portrait.png\", \"A portrait\")}", ImageFaker.Call("portrait.png", "A portrait"));
+        Assert.Equal("{image(\"portrait\\\\\\\".png\", \"A \\\"portrait\\\"\")}",
+            ImageFaker.Call("portrait\\\".png", "A \"portrait\""));
     }
 
     [Fact]
@@ -136,6 +140,41 @@ public sealed class TalemarkFakerTests
             vars: {x: 1, count: 1}
             flags: [ready]
             """, manifest.Build());
+    }
+
+    [Fact]
+    public void Manifest_builds_factions_modifiers_pronouns_and_triggers()
+    {
+        var manifest = new ManifestFaker("faker-test", "Faker test", "start", 42)
+        {
+            Randomness = "off",
+            Undo = false,
+            CreationName = true,
+        };
+        var ready = new TaleFlagRef("ready");
+        manifest.Character("player", "Tester", pronouns: "they");
+        manifest.Faction("guild", "Test Guild", 3);
+        manifest.Item("charm", "Test charm", new Dictionary<string, int> { ["wis"] = 2 });
+        manifest.Trigger("welcome", "faction:guild >= friendly", EffectFaker.Set(ready), once: true);
+
+        var yaml = manifest.Build();
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml,
+            ["main.tale"] = $"{SceneFaker.Header("start")}\n{DivertFaker.To("END")}",
+        });
+        var compiled = StoryCompiler.Compile(source);
+
+        Assert.Contains("randomness: off", yaml);
+        Assert.Contains("undo: false", yaml);
+        Assert.Contains("creation:", yaml);
+        Assert.Contains("pronouns: they", yaml);
+        Assert.Contains("factions:", yaml);
+        Assert.Contains("modifiers: { wis: 2 }", yaml);
+        Assert.Contains("once: true", yaml);
+        Assert.True(compiled.Success, string.Join(Environment.NewLine, compiled.Diagnostics));
+        Assert.Equal(3, compiled.Story!.World.Factions[new FactionId("guild")].InitialStanding);
+        Assert.True(Assert.Single(compiled.Story.Triggers).Once);
     }
 
     [Fact]

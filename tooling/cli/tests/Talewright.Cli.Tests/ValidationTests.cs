@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Talewright.Cli;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
@@ -12,9 +13,11 @@ public sealed class ValidationTests : IDisposable
     public ValidationTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
-            "game:\n  id: cli\n  title: CLI\n  version: 1\n  start: a\ncharacters:\n  player: { first-name: Tester }\n");
-        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== a\nHello.\n-> END");
+        var manifest = new ManifestFaker("cli", "CLI", "a") { Version = "1" };
+        manifest.Character("player", "Tester");
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
+        File.WriteAllText(Path.Combine(_root, "main.tale"), string.Join('\n',
+            SceneFaker.Header("a"), "Hello.", DivertFaker.To("END")));
     }
 
     private (int Code, string Output, string Error) Run(params string[] options)

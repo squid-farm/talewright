@@ -3,18 +3,13 @@ using Talewright.Narrative.Templates;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Testing;
 
 namespace Talewright.Talemark.Tests;
 
 public sealed class ImageCompilationTests
 {
-    private const string Manifest = """
-        game:
-          id: images
-          title: Images
-          start: start
-        characters: {player: {first-name: Ada}}
-        """;
+    private static readonly string Manifest = TestStories.DefaultManifest("images").Build();
 
     private static StorySource Source(string call, params string[] paths) =>
         new(new Dictionary<string, string>
