@@ -1,5 +1,6 @@
 using System.Reflection;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Player.E2E.Tests;
 
@@ -8,32 +9,39 @@ internal sealed class ImageStoryFiles : IDisposable
     public string Root { get; } = Path.Combine(Path.GetTempPath(), "talewright-images-" + Guid.NewGuid().ToString("N"));
     public string TalePath => Path.Combine(Root, "main.tale");
     public string ImagePath => Path.Combine(Root, "images", "photo.jpeg");
-    public const string Tale = """
-        === start
-        Before {image("photo.jpeg", "A camp")} after. {var:greeting}
+    public static readonly string Tale = BuildTale();
 
-        > player: Dialogue {image("pixel.png", "A pixel")}.
-
-        **{image("photo.jpeg", "Strong camp")}** *{image("photo.jpeg", "Emphasized camp")}*
-
-        `{image("pixel.webp", "Code pixel")}`
-
-        {if true}{image("photo.jpeg", "Conditional camp")}{/if}
-
-        {image("photo.jpeg", "Repeated camp")}{image("photo.jpeg", "Repeated camp")}
-
-        * [Continue {image("photo.jpeg", "Choice camp")}] -> next
-        === next
-        Next passage.
-        {image("photo.jpeg", "Next camp")}
-        * [Finish] -> END
-        """;
+    private static string BuildTale()
+    {
+        var photo = ImageFaker.Call("photo.jpeg", "A camp");
+        var pixel = ImageFaker.Call("pixel.png", "A pixel");
+        var repeated = ImageFaker.Call("photo.jpeg", "Repeated camp");
+        return string.Join('\n',
+            SceneFaker.Header("start"),
+            $"Before {photo} after. {SubstitutionFaker.Variable(new TaleVariableRef("greeting"))}",
+            "",
+            SceneFaker.Speaker(new TaleCharacterRef("player"), $"Dialogue {pixel}."),
+            "",
+            $"{MarkupFaker.Strong(ImageFaker.Call("photo.jpeg", "Strong camp"))} {MarkupFaker.Emphasis(ImageFaker.Call("photo.jpeg", "Emphasized camp"))}",
+            "",
+            MarkupFaker.Code(ImageFaker.Call("pixel.webp", "Code pixel")),
+            "",
+            IfFaker.Inline("true", ImageFaker.Call("photo.jpeg", "Conditional camp")),
+            "",
+            repeated + repeated,
+            "",
+            ChoiceFaker.Create("next", $"Continue {ImageFaker.Call("photo.jpeg", "Choice camp")}"),
+            SceneFaker.Header("next"),
+            "Next passage.",
+            ImageFaker.Call("photo.jpeg", "Next camp"),
+            ChoiceFaker.Create("END", "Finish"));
+    }
 
     public ImageStoryFiles()
     {
         Directory.CreateDirectory(Path.Combine(Root, "images"));
-        File.WriteAllText(Path.Combine(Root, StorySource.ManifestFileName),
-            "game:\n  id: image-test\n  title: Folder images\n  start: start\n  undo: true\n");
+        var manifest = new ManifestFaker("image-test", "Folder images", "start") { Undo = true };
+        File.WriteAllText(Path.Combine(Root, StorySource.ManifestFileName), manifest.Build(trailingNewline: true));
         Directory.CreateDirectory(Path.Combine(Root, "characters"));
         File.WriteAllText(Path.Combine(Root, "characters", "player.talewright.yaml"),
             "characters:\n  player: {first-name: Tester, inventory: [camera]}\n");

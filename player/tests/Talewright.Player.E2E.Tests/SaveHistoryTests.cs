@@ -17,7 +17,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
 {
     private static StoryFixture Fixture() => TestStories.Linear with
     {
-        Yaml = TestStories.DefaultYaml.Replace("id: player-test", $"id: save-{Guid.NewGuid():N}"),
+        Yaml = TestStories.DefaultManifest($"save-{Guid.NewGuid():N}").Build(),
     };
 
     [Fact]

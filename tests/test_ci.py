@@ -14,7 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
 sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
 from publish_samples import normalize_base_path
-from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, smoke, verify, verify_desktop_archive
+from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, MAP_ASSETS, smoke, verify, verify_desktop_archive
 import ui_test_image_plan
 
 
@@ -174,6 +174,7 @@ class PackageBoundaryTests(unittest.TestCase):
                              "debug-assets/index.html",
                              "debug-assets/debugger.css",
                              "debug-assets/_content/Talewright.Player/talewright.css",
+                             *MAP_ASSETS,
                              "publish-assets/web/Talewright.Host.Web.csproj",
                              "publish-assets/desktop/Talewright.Host.Desktop.csproj",
                              "publish-assets/standalone/web/App.razor",
@@ -338,7 +339,8 @@ class PackageBoundaryTests(unittest.TestCase):
         prefix = "tools/net10.0/any/"
         required = ["Talewright.Debugger.dll", "debug-assets/index.html",
                     "debug-assets/debugger.css",
-                    "debug-assets/_content/Talewright.Player/talewright.css"]
+                    "debug-assets/_content/Talewright.Player/talewright.css", *MAP_ASSETS]
+        assets = len(required)
         for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
             extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
             required.append(f"runtimes/{rid}/native/Photino.Native.{extension}")
@@ -357,7 +359,7 @@ class PackageBoundaryTests(unittest.TestCase):
                 with self.assertRaises(ValueError) as failure:
                     verify(directory, "1.2.3")
                 self.assertIn("missing", str(failure.exception))
-                self.assertIn(missing if missing in required[:4] else missing.split("/")[1],
+                self.assertIn(missing if missing in required[:assets] else missing.split("/")[1],
                               str(failure.exception))
 
     def test_missing_tool_entry_point_fails(self):

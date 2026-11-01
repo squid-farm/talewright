@@ -1,6 +1,7 @@
 @using Microsoft.JSInterop
 @using Talewright.Core.State
 @inject IJSRuntime JS
+@inject MapExportDialog ExportDialog
 @implements IDisposable
 
 <p>Every scene, divert and hub offer from the last successful compilation. Scenes the start scene can't reach through diverts and hub offers are drawn in a separate area on the right; reachability doesn't check whether conditions can be met.</p>
@@ -35,6 +36,14 @@
         }
     </section>
 }
+<div class="map-export-controls" aria-label="Export story map">
+    <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("svg")'>Export SVG</button>
+    <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("png")'>Export PNG</button>
+    @if (_exportStatus is not null)
+    {
+        <p role="status">@_exportStatus</p>
+    }
+</div>
 
 @code {
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
@@ -51,11 +60,17 @@
     private MapScenePreview? _preview;
     private string? _error;
     private string? _previewError;
+    private string? _pendingExportPath;
+    private string? _pendingExportFormat;
+    private string? _exportStatus;
+    private bool _mapReady;
+    private bool _exporting;
 
     protected override void OnParametersSet()
     {
         if (!ReferenceEquals(Story, _rendered))
         {
+            _mapReady = false;
             _view = MapView.Build(Story);
             if (_selectedScene is { } selected && !Story.Scenes.Any(scene => scene.Id == selected))
             {
@@ -81,6 +96,8 @@
                 await JS.InvokeVoidAsync("talewrightMap.render", _host, _view,
                     Session is null ? null : MapRunView.Build(Story, _view, Session), _reference);
                 _error = null;
+                _mapReady = true;
+                StateHasChanged();
             }
             catch (JSException ex)
             {
@@ -103,6 +120,57 @@
             _error = $"The map route could not be updated: {ex.Message}";
             StateHasChanged();
         }
+    }
+
+    private async Task ExportAsync(string format)
+    {
+        if (!_mapReady || _reference is null || _exporting)
+            return;
+
+        _exporting = true;
+        _exportStatus = null;
+        try
+        {
+            var path = await ExportDialog.ChoosePathAsync(format);
+            if (path is null)
+                return;
+
+            _pendingExportPath = path;
+            _pendingExportFormat = format;
+            await JS.InvokeVoidAsync("talewrightMap.exportMap", _host, format, _reference,
+                MapExportLimits.Padding, MapExportLimits.MaxPngDimension, MapExportLimits.MaxPngPixels);
+            _exportStatus = $"Saved map to {path}";
+        }
+        catch (JSException ex)
+        {
+            _exportStatus = $"Map export failed: {ex.Message}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            _exportStatus = $"Map export failed: {ex.Message}";
+        }
+        finally
+        {
+            _pendingExportPath = null;
+            _pendingExportFormat = null;
+            _exporting = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public MapPngExportSize CheckPngExportSize(int width, int height) =>
+        MapExportLimits.CheckPngSize(width, height);
+
+    [JSInvokable]
+    public async Task SaveMapExport(string format, IJSStreamReference reference)
+    {
+        if (_pendingExportPath is null || !string.Equals(format, _pendingExportFormat, StringComparison.Ordinal))
+            throw new InvalidOperationException("There is no matching map export in progress.");
+
+        await using var streamReference = reference;
+        await using var contents = await streamReference.OpenReadStreamAsync(long.MaxValue);
+        await MapExportFiles.SaveAsync(_pendingExportPath, format, contents);
     }
 
     [JSInvokable]

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Talewright.Core.Events;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
@@ -13,27 +14,31 @@ public class TextVariableTests
     [InlineData(true)]
     public void Text_history_preserves_values_events_narrative_redo_and_failed_restore_isolation(bool implicitDeclarations)
     {
+        var weather = new TaleVariableRef("weather");
+        var copy = new TaleVariableRef("copy");
+        var manifest = new ManifestFaker("text-history", "Text history", "a");
+        manifest.Character("player", "Tester");
+        if (!implicitDeclarations)
+        {
+            manifest.Text(weather.Id, "");
+            manifest.Text(copy.Id, "");
+        }
+
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = """
-                game:
-                  id: text-history
-                  title: Text history
-                  start: a
-                characters:
-                  player: { first-name: Tester }
-                """ + (implicitDeclarations ? "" : "\nvars:\n  weather: \"\"\n  copy: \"\""),
-            ["main.tale"] = """
-                === a
-                Initial [{var:weather}].
-                * [Storm] { var:weather = "雪"; var:copy = var:weather } -> b
-                === b
-                Weather: {var:weather}. Copy: {var:copy}.
-                * [Clear] { var:weather = "" } -> c
-                === c
-                Weather: [{var:weather}]. Copy: {var:copy}.
-                -> END
-                """,
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = string.Join('\n',
+                SceneFaker.Header("a"),
+                $"Initial [{SubstitutionFaker.Variable(weather)}].",
+                ChoiceFaker.Create("b", "Storm", effect: string.Join("; ",
+                    EffectFaker.Assign(weather, "\"雪\""),
+                    EffectFaker.Assign(copy, weather.ToString()))),
+                SceneFaker.Header("b"),
+                $"Weather: {SubstitutionFaker.Variable(weather)}. Copy: {SubstitutionFaker.Variable(copy)}.",
+                ChoiceFaker.Create("c", "Clear", effect: EffectFaker.Assign(weather, "\"\"")),
+                SceneFaker.Header("c"),
+                $"Weather: [{SubstitutionFaker.Variable(weather)}]. Copy: {SubstitutionFaker.Variable(copy)}.",
+                DivertFaker.To("END")),
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var history = new StoryHistory(result.Story!, 42);

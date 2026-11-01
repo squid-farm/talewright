@@ -25,6 +25,12 @@ public sealed record TaleItem
 /// </summary>
 public sealed record TaleCast(string Player, IReadOnlyList<TaleCharacter> Companions, IReadOnlyList<TaleItem> Items)
 {
+    public static TaleVariableRef Chapter { get; } = new("chapter");
+    public static TaleVariableRef Gold { get; } = new("gold");
+    public static TaleVariableRef Trust { get; } = new("trust");
+    public static TaleFlagRef Scouted { get; } = new("scouted");
+    public static TaleFlagRef Alarm { get; } = new("alarm");
+
     public static TaleCast Create(int seed, int companions = 3, int items = 4)
     {
         var characters = new Faker<TaleCharacter>("en")
@@ -43,53 +49,58 @@ public sealed record TaleCast(string Player, IReadOnlyList<TaleCharacter> Compan
 
     public IReadOnlyList<string> Requirements =>
     [
-        "player:dex >= 12", "var:gold >= 5", "flag:scouted", "not flag:alarm",
-        .. Items.Select(item => $"player has {item.Id}"),
-        .. Companions.Select(companion => $"{companion.Id}:survival >= 3"),
+        ExpressionFaker.AtLeast(TaleCharacterRef.Player.Field("dex"), 12),
+        ExpressionFaker.AtLeast(Gold, 5),
+        Scouted.ToString(),
+        ExpressionFaker.Not(Alarm),
+        .. Items.Select(item => ExpressionFaker.HasItem(TaleCharacterRef.Player, new TaleItemRef(item.Id))),
+        .. Companions.Select(companion => ExpressionFaker.AtLeast(new TaleCharacterRef(companion.Id).Field("survival"), 3)),
     ];
 
     public IReadOnlyList<string> Effects =>
     [
-        "var:gold += 5", "set flag:scouted", "set flag:alarm", "var:trust += 1", "player:hp -= 1",
-        .. Items.Select(item => $"give player {item.Id}"),
+        EffectFaker.Increase(Gold, 5),
+        EffectFaker.Set(Scouted),
+        EffectFaker.Set(Alarm),
+        EffectFaker.Increase(Trust, 1),
+        EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 1),
+        .. Items.Select(item => EffectFaker.Give(TaleCharacterRef.Player, new TaleItemRef(item.Id))),
     ];
 
     public IReadOnlyList<string> Substitutions =>
     [
-        "{player:first-name}", "{var:gold}",
-        .. Companions.Select(companion => $"{{{companion.Id}:first-name}}"),
-        .. Items.Select(item => $"{{item:{item.Id}}}"),
+        SubstitutionFaker.Character(TaleCharacterRef.Player, "first-name"),
+        SubstitutionFaker.Variable(Gold),
+        .. Companions.Select(companion => SubstitutionFaker.Character(new TaleCharacterRef(companion.Id), "first-name")),
+        .. Items.Select(item => SubstitutionFaker.Item(new TaleItemRef(item.Id))),
     ];
 
     public string Manifest(string id, string start, int seed)
     {
-        var text = new StringBuilder($$"""
-            game:
-              id: {{id}}
-              title: {{id}}
-              version: 1.0.0
-              start: {{start}}
-              seed: {{seed}}
-              ruleset:
-                base: generic
-            flags: [scouted, alarm]
-            vars: {chapter: 0, gold: 0, trust: 0}
-            items:
-
-            """);
+        var manifest = new ManifestFaker(id, id, start, seed)
+        {
+            Version = "1.0.0",
+            BaseRuleset = "generic",
+        };
+        manifest.Flag(Scouted.Id);
+        manifest.Flag(Alarm.Id);
+        manifest.Number(Chapter.Id, 0);
+        manifest.Number(Gold.Id, 0);
+        manifest.Number(Trust.Id, 0);
+        manifest.IncludeItemsSection();
         foreach (var item in Items)
         {
-            text.Append($"  {item.Id}: {{ name: {item.Name} }}\n");
+            manifest.Item(item.Id, item.Name);
         }
 
-        text.Append($"characters:\n  player:\n    first-name: {Player}\n    stats: {{ dex: 12 }}\n");
+        manifest.Character(TaleCharacterRef.Player.Id, Player, stats: new Dictionary<string, int> { ["dex"] = 12 });
         foreach (var companion in Companions)
         {
-            text.Append($"  {companion.Id}:\n    first-name: {companion.FirstName}\n    last-name: {companion.LastName}\n")
-                .Append($"    stats: {{ survival: {companion.Survival} }}\n");
+            manifest.Character(companion.Id, companion.FirstName, companion.LastName,
+                new Dictionary<string, int> { ["survival"] = companion.Survival });
         }
 
-        return text.ToString();
+        return manifest.Build(trailingNewline: true);
     }
 }
 
@@ -148,10 +159,10 @@ public sealed class TaleFaker
     /// <summary>A scene with a title, prose and the given lines. Lines starting with <c>@</c> are metadata.</summary>
     public string Scene(string id, params string[] lines)
     {
-        var text = new StringBuilder($"=== {id}\n");
-        if (!lines.Any(line => line.StartsWith("@title ", StringComparison.Ordinal)))
+        var text = new StringBuilder(SceneFaker.Header(id)).Append('\n');
+        if (!lines.Any(line => line.StartsWith(SceneFaker.TitlePrefix, StringComparison.Ordinal)))
         {
-            text.Append($"@title {Title()}\n");
+            text.Append(SceneFaker.Title(Title())).Append('\n');
         }
 
         foreach (var line in lines.Where(line => line.StartsWith('@')))
@@ -175,11 +186,11 @@ public sealed class TaleFaker
     public string Choice(string target, string? label = null, bool gated = false, string? requires = null)
     {
         requires ??= gated && Chance(ChoiceRequires) ? Requirement() : null;
-        var effect = Chance(ChoiceEffects) ? $" {{ {Effect()} }}" : "";
-        return $"* [{label ?? Label()}]{(requires is null ? "" : $" (requires: {requires})")}{effect} -> {target}";
+        var effect = Chance(ChoiceEffects) ? Effect() : null;
+        return ChoiceFaker.Create(target, label ?? Label(), requires, effect);
     }
 
-    public static string Divert(string target) => $"-> {target}";
+    public static string Divert(string target) => DivertFaker.To(target);
 
     public string Prose()
     {
@@ -195,7 +206,7 @@ public sealed class TaleFaker
 
             if (Chance(InlineIf))
             {
-                sentences.Add($"{{if flag:scouted}}{Sentence()}{{/if}}");
+                sentences.Add(IfFaker.Inline(TaleCast.Scouted, Sentence()));
             }
 
             text.AppendJoin(' ', sentences).Append("\n\n");
@@ -203,7 +214,7 @@ public sealed class TaleFaker
 
         if (Chance(SpeakerLine))
         {
-            text.Append($"> {Pick(Cast.Companions).Id}: {Sentence()}\n\n");
+            text.Append(SceneFaker.Speaker(new TaleCharacterRef(Pick(Cast.Companions).Id), Sentence())).Append("\n\n");
         }
 
         return text.ToString();
@@ -226,7 +237,7 @@ public sealed class TaleFaker
         if (Chance(Bold))
         {
             var index = Bogus.Random.Number(words.Length - 1);
-            words[index] = $"**{words[index]}**";
+            words[index] = MarkupFaker.Strong(words[index]);
         }
 
         var text = string.Join(' ', words);

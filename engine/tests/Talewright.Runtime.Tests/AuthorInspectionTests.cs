@@ -6,6 +6,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
@@ -14,28 +15,28 @@ public sealed class AuthorInspectionTests
     private static readonly EntityId Guide = new("guide");
     private static readonly StatId Strength = new("str");
     private static readonly VarId Count = new("count");
-    private const string Yaml = """
-        game:
-          id: inspection
-          title: Inspection
-          start: start
-          randomness: checks-only
-        flags: [ready, unused]
-        vars: {count: 0, untouched: 0}
-        characters:
-          player: {first-name: Mara, last-name: Vale, inventory: {rope: 1}}
-          guide: {first-name: Robin, last-name: North, pronouns: they, stats: {str: 14}, inventory: {rope: 2}}
-        items:
-          rope: {name: Rope, modifiers: {str: 2}}
-        factions:
-          guild: {name: Guild, standing: -5}
-        """;
+    private static readonly string Yaml = CreateManifest().Build();
 
-    private static StoryDefinition Compile(string tale, string yaml = Yaml, NamedPredicateRegistry? predicates = null)
+    private static ManifestFaker CreateManifest()
+    {
+        var manifest = new ManifestFaker("inspection", "Inspection", "start", 42) { Randomness = "checks-only" };
+        manifest.Flag("ready");
+        manifest.Flag("unused");
+        manifest.Number("count", 0);
+        manifest.Number("untouched", 0);
+        manifest.Character("player", "Mara", "Vale", inventory: new Dictionary<string, int> { ["rope"] = 1 });
+        manifest.Character("guide", "Robin", "North", new Dictionary<string, int> { ["str"] = 14 }, "they",
+            new Dictionary<string, int> { ["rope"] = 2 });
+        manifest.Item("rope", "Rope", new Dictionary<string, int> { ["str"] = 2 });
+        manifest.Faction("guild", "Guild", -5);
+        return manifest;
+    }
+
+    private static StoryDefinition Compile(string tale, string? yaml = null, NamedPredicateRegistry? predicates = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml ?? Yaml,
             ["main.tale"] = tale,
         }), predicates is null ? null : new CompilerOptions { Predicates = predicates });
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -103,19 +104,14 @@ public sealed class AuthorInspectionTests
     [Fact]
     public void Inspection_includes_all_characters_false_flags_zero_variables_and_unvisited_scenes()
     {
+        var manifest = CreateManifest();
+        manifest.Trigger("ready", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), 1), once: true);
         var story = Compile("""
             === start
             * [Change] { set flag:ready; var:count += 1; take guide rope } -> next
             === next
             -> END
-            """, Yaml + """
-
-            triggers:
-              - id: ready
-                when: flag:ready
-                do: var:count += 1
-                once: true
-            """);
+            """, manifest.Build());
         var session = Start(story);
         var before = session.Inspect();
         var guide = Assert.Single(before.FindCharacters("NORTH"));
@@ -344,6 +340,9 @@ public sealed class AuthorInspectionTests
     [Fact]
     public void Entry_effects_and_trigger_cascades_reference_actual_events_and_historical_conditions()
     {
+        var manifest = CreateManifest();
+        manifest.Trigger("count", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), 1), once: true);
+        manifest.Trigger("reward", "var:count >= 1", EffectFaker.Give(new TaleCharacterRef("guide"), new TaleItemRef("rope")));
         var story = Compile("""
             === start
             {if flag:ready}
@@ -352,18 +351,7 @@ public sealed class AuthorInspectionTests
             ~ set flag:ready
             * [Lower] { clear flag:ready } -> start
             * [Wait] -> END
-            """, Yaml + """
-
-            triggers:
-              - id: count
-                when: flag:ready
-                do: var:count += 1
-                once: true
-              - id: reward
-                when: var:count >= 1
-                do: give guide rope
-                once: false
-            """);
+            """, manifest.Build());
         var session = Start(story);
         var excluded = Assert.Single(session.Decisions, d => d.Kind == DecisionKind.Branch && d.Subject == "step:2:1");
         Assert.Equal(DecisionReason.ConditionFalse, excluded.Reason);
@@ -398,21 +386,16 @@ public sealed class AuthorInspectionTests
     public void Observed_and_unobserved_normal_and_author_runs_have_identical_events_frames_and_predicate_calls(bool author)
     {
         var calls = 0;
+        var manifest = CreateManifest();
+        manifest.Trigger("counted", "@Counted", EffectFaker.Increase(new TaleVariableRef("count"), 1), once: true);
         var story = Compile("""
             === start
             ~ var:count += 1
             * [Try] (requires: @Counted) skill-check athletics dc 12
-              success: { set flag:ready } -> start
-              failure: -> start
+            success: { set flag:ready } -> start
+            failure: -> start
             * [End] -> END
-            """, Yaml + """
-
-            triggers:
-              - id: counted
-                when: "@Counted"
-                do: var:count += 1
-                once: true
-            """, new NamedPredicateRegistry().Register("Counted", _ => { calls++; return true; }));
+            """, manifest.Build(), new NamedPredicateRegistry().Register("Counted", _ => { calls++; return true; }));
         (IReadOnlyList<GameEvent> Events, StoryFrame[] Frames, RuleDecision[] Decisions) Play(bool capture)
         {
             var frames = new List<StoryFrame>();
@@ -500,13 +483,14 @@ public sealed class AuthorInspectionTests
     [Fact]
     public void Cascade_limit_is_observed_before_the_error_and_observer_errors_are_not_swallowed()
     {
-        var triggers = string.Join("\n", Enumerable.Range(0, 40).Reverse().Select(i => $"""
-              - id: chain-{i}
-                when: flag:chain-{i}
-                do: set flag:chain-{i + 1}
-                once: true
-            """));
-        var story = Compile("=== start\n~ set flag:chain-0\n-> END", Yaml + "\ntriggers:\n" + triggers);
+        var manifest = CreateManifest();
+        foreach (var i in Enumerable.Range(0, 40).Reverse())
+        {
+            manifest.Trigger($"chain-{i}", new TaleFlagRef($"chain-{i}").ToString(),
+                EffectFaker.Set(new TaleFlagRef($"chain-{i + 1}")), once: true);
+        }
+
+        var story = Compile("=== start\n~ set flag:chain-0\n-> END", manifest.Build());
         var decisions = new List<RuleDecision>();
         var session = new StorySession(story, 42, grammar: null, character: null, decisions.Add);
         Assert.Contains("did not settle", Assert.Throws<InvalidOperationException>(() => session.Start()).Message);

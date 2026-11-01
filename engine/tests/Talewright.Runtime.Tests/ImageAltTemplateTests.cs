@@ -1,5 +1,6 @@
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
@@ -8,28 +9,22 @@ public sealed class ImageAltTemplateTests
     [Fact]
     public void Rendered_alt_is_what_display_history_and_load_failure_share()
     {
+        var manifest = new ManifestFaker("alt-history", "Alt history", "gate");
+        manifest.Character("player", "Ada");
+        manifest.Character("guide", "Bea");
+        manifest.Text("place", "South");
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = """
-                game:
-                  id: alt-history
-                  title: Alt history
-                  version: 1
-                  start: gate
-                characters:
-                  player: { first-name: Ada }
-                  guide: { first-name: Bea }
-                vars:
-                  place: "South"
-                """,
-            ["main.tale"] = """
-                === gate
-                {image("portrait", "{guide:first-name} at the {var:place} gate")}
-                * [Enter {image("portrait", "{var:place}")}] { var:place = "North" } -> later
-                === later
-                {image("portrait", "{var:place} gate")}
-                * [Done] -> END
-                """,
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = string.Join('\n',
+                SceneFaker.Header("gate"),
+                ImageFaker.Call("portrait", $"{SubstitutionFaker.Character(new TaleCharacterRef("guide"), "first-name")} at the {SubstitutionFaker.Variable(new TaleVariableRef("place"))} gate"),
+                ChoiceFaker.Create("later",
+                    $"Enter {ImageFaker.Call("portrait", SubstitutionFaker.Variable(new TaleVariableRef("place")))}",
+                    effect: EffectFaker.Assign(new TaleVariableRef("place"), "\"North\"")),
+                SceneFaker.Header("later"),
+                ImageFaker.Call("portrait", $"{SubstitutionFaker.Variable(new TaleVariableRef("place"))} gate"),
+                ChoiceFaker.Create("END", "Done")),
         }, ["images/portrait.png"]));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var history = new StoryHistory(result.Story!, 1);

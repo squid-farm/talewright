@@ -122,7 +122,9 @@ public sealed class RealisticStory
     {
         var fake = Faker(part: 1, chapter);
         var id = $"c{chapter}";
-        var text = new StringBuilder(fake.Scene($"{id}.open", $"~ var:chapter = {chapter}", TaleFaker.Divert($"{id}.s0.fork")));
+        var text = new StringBuilder(fake.Scene($"{id}.open",
+            EffectFaker.Line(EffectFaker.Assign(TaleCast.Chapter, chapter)),
+            TaleFaker.Divert($"{id}.s0.fork")));
         var after = chapter < _profile.Chapters - 1 ? $"c{chapter + 1}.open" : "finale";
         for (var segment = 0; segment < _profile.SegmentsPerChapter; segment++)
         {
@@ -143,8 +145,8 @@ public sealed class RealisticStory
         var lengths = Enumerable.Range(0, fake.Between(_profile.PathsPerBranch)).Select(_ => fake.Between(_profile.PathLength)).ToArray();
         var check = fake.Chance(_profile.BranchSkillCheck);
         var fork = lengths.Select((_, path) => check && path == lengths.Length - 1
-            ? $"* [{fake.Label()}] skill-check {fake.Pick(Skills)} dc {fake.Bogus.Random.Number(10, 15)}\n" +
-              $"  success: -> {id}.p{path}.0\n  failure: -> {id}.retry"
+            ? SkillCheckFaker.Choice(fake.Label(), fake.Pick(Skills), fake.Bogus.Random.Number(10, 15),
+                $"{id}.p{path}.0", $"{id}.retry")
             : fake.Choice($"{id}.p{path}.0", gated: path > 0));
         text.Append(fake.Scene($"{id}.fork", [.. fork]));
 
@@ -168,7 +170,7 @@ public sealed class RealisticStory
                 var lines = new List<string>();
                 if (!last && fake.Chance(_profile.EarlyExit))
                 {
-                    lines.Add($"{{if flag:alarm}}\n-> {id}.join\n{{/if}}");
+                    lines.Add(IfFaker.Block(TaleCast.Alarm, TaleFaker.Divert($"{id}.join")));
                 }
 
                 var target = last ? $"{id}.join" : $"{id}.p{path}.{step + 1}";
@@ -192,7 +194,7 @@ public sealed class RealisticStory
 
         var leave = fake.Chance(0.5) ? TaleFaker.Divert(next) : fake.Choice(next);
         text.Append(fake.Chance(0.3)
-            ? fake.Scene($"{id}.join", "~ clear flag:alarm", leave)
+            ? fake.Scene($"{id}.join", EffectFaker.Line(EffectFaker.Clear(TaleCast.Alarm)), leave)
             : fake.Scene($"{id}.join", leave));
         return text.ToString();
     }
@@ -202,8 +204,8 @@ public sealed class RealisticStory
         var hub = $"{chapter}.town";
         var text = new StringBuilder(fake.Scene(
             hub,
-            $"@hub any({chapter}-town, a{act}-rumor)",
-            $"@hub-limit {fake.Between(_profile.HubLimit)}",
+            SceneFaker.HubAny($"{chapter}-town", $"a{act}-rumor"),
+            SceneFaker.HubLimit(fake.Between(_profile.HubLimit)),
             fake.Choice($"{chapter}.s1.fork", "Move on")));
 
         var storylets = fake.Between(_profile.StoryletsPerHub);
@@ -213,7 +215,9 @@ public sealed class RealisticStory
             var lines = Storylet(fake, $"{chapter}-town");
             if (fake.Chance(_profile.EntryCheck))
             {
-                lines.Add("::: skill-check perception dc 12\nsuccess: { var:gold += 5 }\nfailure: { player:hp -= 1 }\n:::");
+                lines.Add(SkillCheckFaker.Entry("perception", 12,
+                    EffectFaker.Increase(TaleCast.Gold, 5),
+                    EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 1)));
             }
 
             if (fake.Chance(_profile.StoryletFollowUp))
@@ -245,7 +249,9 @@ public sealed class RealisticStory
         {
             var lines = Storylet(fake, $"a{act}-rumor");
             // A rumor is offered by every hub in its act, so it returns to whichever hub the player came from.
-            lines.AddRange(Enumerable.Range(first, last - first).Select(chapter => $"{{if var:chapter == {chapter}}}\n-> c{chapter}.town\n{{/if}}"));
+            lines.AddRange(Enumerable.Range(first, last - first).Select(chapter =>
+                IfFaker.Block(ExpressionFaker.EqualTo(TaleCast.Chapter, chapter),
+                    TaleFaker.Divert($"c{chapter}.town"))));
             lines.Add(TaleFaker.Divert($"c{last}.town"));
             text.Append(fake.Scene($"a{act}.rumor.{index}", [.. lines]));
         }
@@ -257,10 +263,17 @@ public sealed class RealisticStory
     private string Finale()
     {
         var fake = Faker(part: 4, 0);
-        string?[] requirements = ["var:trust >= 3", "var:gold >= 20", $"player has {_cast.Items[0].Id}", "flag:scouted", null];
+        string?[] requirements =
+        [
+            ExpressionFaker.AtLeast(TaleCast.Trust, 3),
+            ExpressionFaker.AtLeast(TaleCast.Gold, 20),
+            ExpressionFaker.HasItem(TaleCharacterRef.Player, new TaleItemRef(_cast.Items[0].Id)),
+            TaleCast.Scouted.ToString(),
+            null,
+        ];
         var text = new StringBuilder(fake.Scene(
             "finale",
-            ["@title Finale", .. requirements.Select((requires, index) => fake.Choice($"ending.{index}", requires: requires))]));
+            [SceneFaker.Title("Finale"), .. requirements.Select((requires, index) => fake.Choice($"ending.{index}", requires: requires))]));
         for (var index = 0; index < requirements.Length; index++)
         {
             text.Append(fake.Scene($"ending.{index}", TaleFaker.Divert("END")));
@@ -272,15 +285,15 @@ public sealed class RealisticStory
 
     private List<string> Storylet(TaleFaker fake, string tag)
     {
-        List<string> metadata = [$"@tags {tag}", $"@priority {fake.Bogus.Random.Number(0, 20)}"];
+        List<string> metadata = [SceneFaker.Tags(tag), SceneFaker.Priority(fake.Bogus.Random.Number(0, 20))];
         if (fake.Chance(_profile.OnceStorylet))
         {
-            metadata.Add("@once");
+            metadata.Add(SceneFaker.Once);
         }
 
         if (fake.Chance(_profile.StoryletRequires))
         {
-            metadata.Add($"@requires {fake.Requirement()}");
+            metadata.Add(SceneFaker.Requires(fake.Requirement()));
         }
 
         return metadata;

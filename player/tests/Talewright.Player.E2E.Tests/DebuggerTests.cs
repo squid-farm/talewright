@@ -1,3 +1,5 @@
+using System.Xml.Linq;
+
 namespace Talewright.Player.E2E.Tests;
 
 [Trait("Host", "Linux")]
@@ -48,6 +50,8 @@ public sealed class DebuggerTests
             await driver.PressAsync("Right");
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 1 hub offer, 1 unreachable.");
             Assert.DoesNotContain("Scene setup", snapshot.Content);
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export SVG");
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export PNG");
             Assert.Equal("Map", Focused(snapshot).Name);
 
             await driver.PressAsync("Tab");
@@ -692,6 +696,127 @@ public sealed class DebuggerTests
         }
         finally
         {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // Test-only deviation: exports bypass the native save dialog. See MapExportDialog.TestExportDirectoryVariable.
+    private static string MapExportPath(string extension) =>
+        Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_MAP_EXPORT_DIRECTORY")
+            ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py."),
+            $"story-map.{extension}");
+
+    [Fact]
+    public async Task Native_map_exports_full_svg_and_png_with_the_current_run()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-map-export-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-map-export", Guid.NewGuid().ToString("N"));
+        var svgPath = MapExportPath("svg");
+        var pngPath = MapExportPath("png");
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: map-export\n  title: Map Export\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                * [Continue] -> next
+                === next
+                @title Ending
+                @hub fire
+                * [Finish] -> END
+                === camp
+                @title Offered camp
+                @tags fire
+                -> next
+                === orphan
+                @title Unreachable scene
+                -> END
+                """);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            await WaitFor(driver, "Beginning");
+            await driver.ChooseAsync("Continue");
+            await WaitFor(driver, "Ending");
+            await driver.ActivateAsync("Map");
+            await WaitFor(driver, "Current scene: next");
+
+            await driver.ClickAsync("Export SVG");
+            await WaitFor(driver, $"Saved map to {svgPath}");
+            var svg = System.Xml.Linq.XDocument.Load(svgPath);
+            XNamespace svgNamespace = "http://www.w3.org/2000/svg";
+            var labels = svg.Descendants(svgNamespace + "text").Select(node => node.Value).ToArray();
+            Assert.Contains("start", labels);
+            Assert.Contains("next", labels);
+            Assert.Contains("camp", labels);
+            Assert.Contains("orphan", labels);
+            Assert.Contains("END", labels);
+            Assert.Contains(labels, label => label.Contains("CURRENT", StringComparison.Ordinal));
+            Assert.Contains(labels, label => label.Contains("#fire", StringComparison.Ordinal));
+
+            await driver.ClickAsync("Export PNG");
+            await WaitFor(driver, $"Saved map to {pngPath}");
+            var png = await File.ReadAllBytesAsync(pngPath);
+            Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png[..8]);
+            var width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4));
+            var height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4));
+            Assert.Equal(int.Parse(svg.Root!.Attribute("width")!.Value), width);
+            Assert.Equal(int.Parse(svg.Root.Attribute("height")!.Value), height);
+            Assert.InRange(width, 1, 8192);
+            Assert.InRange(height, 1, 8192);
+            Assert.True((long)width * height <= 16_777_216);
+        }
+        finally
+        {
+            File.Delete(svgPath);
+            File.Delete(pngPath);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Native_map_rejects_oversized_png_and_can_export_the_same_map_as_svg()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-map-large-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-map-large", Guid.NewGuid().ToString("N"));
+        var pngPath = MapExportPath("png");
+        var svgPath = MapExportPath("svg");
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: map-large\n  title: Large Map\n  start: scene0\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"),
+                string.Join("\n", Enumerable.Range(0, 120).Select(index =>
+                    $"=== scene{index}\n* [Continue] -> {(index == 119 ? "END" : $"scene{index + 1}")}\n")));
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ActivateAsync("Map");
+            await WaitFor(driver, "120 scenes, 120 diverts");
+            await driver.ClickAsync("Export PNG");
+            await WaitFor(driver, "Map export failed:", "Use SVG export");
+            Assert.False(File.Exists(pngPath));
+            await driver.ClickAsync("Export SVG");
+            await WaitFor(driver, $"Saved map to {svgPath}");
+            var labels = XDocument.Load(svgPath).Descendants(XName.Get("text", "http://www.w3.org/2000/svg"))
+                .Select(node => node.Value).ToArray();
+            Assert.Contains("scene0", labels);
+            Assert.Contains("scene119", labels);
+        }
+        finally
+        {
+            File.Delete(pngPath);
+            File.Delete(svgPath);
             Directory.Delete(root, recursive: true);
         }
     }

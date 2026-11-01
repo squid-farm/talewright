@@ -7,19 +7,7 @@ namespace Talewright.Talemark.Tests;
 
 public sealed class StoryDivertConditionsTests
 {
-    private const string Manifest = """
-        game: { id: conditions, title: Conditions, start: start }
-        characters:
-          player: { first-name: Mara, last-name: Burns, pronouns: she }
-        factions:
-          river: { name: River Guild, standing: 12 }
-        items:
-          lantern: { name: Lantern }
-        flags: [ready]
-        vars:
-          coins: 5
-          weather: "rain"
-        """;
+    private static readonly string Manifest = TestStories.ExpressionManifest("conditions", "Conditions", "start").Build();
 
     private static readonly CompilerOptions Options = new()
     {

@@ -5,22 +5,23 @@ using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Authoring;
+using Talewright.Testing;
 
 namespace Talewright.Authoring.Tests;
 
 public class StoryAnalysisTests
 {
-    private const string Manifest = """
-        game:
-          id: analysis
-          title: Analysis
-          start: first
-        characters:
-          player: {first-name: Ada}
-        """;
+    private static readonly string Manifest = BuildManifest();
 
-    private static StorySource Source(string tale = "=== first\n-> END", string yaml = Manifest) => new(
-        new Dictionary<string, string> { ["story.talewright.yaml"] = yaml, ["main.tale"] = tale });
+    private static string BuildManifest()
+    {
+        var manifest = new ManifestFaker("analysis", "Analysis", "first");
+        manifest.Character("player", "Ada");
+        return manifest.Build();
+    }
+
+    private static StorySource Source(string tale = "=== first\n-> END", string? yaml = null) => new(
+        new Dictionary<string, string> { ["story.talewright.yaml"] = yaml ?? Manifest, ["main.tale"] = tale });
 
     [Fact]
     public void Choice_availability_warning_matches_compiler_and_clears_after_an_unconditional_exit()

@@ -4,37 +4,38 @@ using Talewright.Narrative.Rendering;
 using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
 public sealed class TextlessChoiceTests
 {
-    private const string Tale = """
-        === start
-        Visits {var:visits}.
-        * [Open] (requires: flag:ready) -> final
-        * -> road
-        === road
-        The road.
-        * (requires: not flag:ready) { set flag:ready; var:visits += 1 } -> start
-        * [Stop] -> final
-        === final
-        The end.
-        * -> END
-        """;
+    private static readonly TaleFlagRef Ready = new("ready");
+    private static readonly TaleVariableRef Visits = new("visits");
+    private static readonly string Tale = string.Join('\n',
+        SceneFaker.Header("start"),
+        $"Visits {SubstitutionFaker.Variable(Visits)}.",
+        ChoiceFaker.Create("final", "Open", Ready.ToString()),
+        ChoiceFaker.Create("road"),
+        SceneFaker.Header("road"),
+        "The road.",
+        ChoiceFaker.Create("start", requires: ExpressionFaker.Not(Ready),
+            effect: string.Join("; ", EffectFaker.Set(Ready), EffectFaker.Increase(Visits, 1))),
+        ChoiceFaker.Create("final", "Stop"),
+        SceneFaker.Header("final"),
+        "The end.",
+        ChoiceFaker.Create("END"));
 
-    private static StoryDefinition Compile(string tale = Tale)
+    private static StoryDefinition Compile(string? tale = null)
     {
+        var manifest = new ManifestFaker("textless", "Textless", "start", 42) { Randomness = "off" };
+        manifest.Character("player", "Ada");
+        manifest.Flag("ready");
+        manifest.Number("visits", 0);
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = """
-                game: {id: textless, title: Textless, start: start, randomness: off, seed: 42}
-                characters:
-                  player: {first-name: Ada}
-                flags: [ready]
-                vars: {visits: 0}
-                """,
-            ["main.tale"] = tale,
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = tale ?? Tale,
         }));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;

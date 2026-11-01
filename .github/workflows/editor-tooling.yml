@@ -29,6 +29,20 @@ jobs:
           name: nx-ci-plan
           path: artifacts/ci
       - run: npm ci --prefix tooling/vscode-talewright
+      - uses: actions/cache@v4
+        with:
+          path: tooling/vscode-talewright/.vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('tooling/vscode-talewright/tests/vscode-path.mjs', 'tooling/vscode-talewright/package-lock.json') }}
+      # test-electron leaves its tar child running when a download stalls, which hangs node --test.
+      # Fetch VS Code up front with a hard per-attempt limit so a stall retries instead.
+      - name: Prefetch VS Code
+        working-directory: tooling/vscode-talewright
+        run: |
+          for attempt in 1 2 3; do
+            timeout 180 node --input-type=module -e "const { vscodePath } = await import('./tests/vscode-path.mjs'); console.log(await vscodePath()); process.exit(0);" && exit 0
+            echo "VS Code download attempt $attempt failed or timed out" >&2
+          done
+          exit 1
       - run: python3 .github/scripts/nx_ci.py run editor
       - uses: actions/upload-artifact@v4
         id: extension

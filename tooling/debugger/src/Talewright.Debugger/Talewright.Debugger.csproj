@@ -4,6 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.Cli.Tests" />
     <PackageReference Include="Photino.Blazor" Version="4.0.13" />
     <ProjectReference Include="../../../../player/src/Talewright.Player/Talewright.Player.csproj" />
     <ProjectReference Include="../../../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />

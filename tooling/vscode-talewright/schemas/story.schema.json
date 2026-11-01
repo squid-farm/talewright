@@ -139,18 +139,6 @@
         }
       ]
     },
-    "booleanOrYesNoScalar": {
-      "oneOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "string",
-          "enum": ["true", "false", "yes", "no"],
-          "description": "The compiler also accepts the lowercase yes/no scalar forms."
-        }
-      ]
-    },
     "integerMap": {
       "type": "object",
       "propertyNames": {
@@ -472,7 +460,7 @@
           "description": "Talemark effect applied when the trigger activates."
         },
         "once": {
-          "$ref": "#/definitions/booleanOrYesNoScalar",
+          "$ref": "#/definitions/booleanScalar",
           "default": false,
           "description": "When true, the trigger fires at most once."
         }

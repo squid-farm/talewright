@@ -1,4 +1,5 @@
 using Talewright.Talemark.Compilation;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
@@ -6,40 +7,41 @@ public sealed class RicherHubTests
 {
     private static StoryHistory History(string hub, string extra = "")
     {
+        var manifest = new ManifestFaker("hubs", "Hubs", "hub");
+        manifest.Character("player", "Tester");
         var source = new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = "game:\n  id: hubs\n  title: Hubs\n  start: hub\ncharacters:\n  player: {first-name: Tester}\n",
-            ["main.tale"] = $$"""
-                === hub
-                @hub {{hub}}
-                @hub-limit 2
-                @tags a,b
-                @priority 999
-                * [Explicit] -> END
-                {{extra}}
-                === blocked
-                @tags a,b
-                @priority 100
-                @requires false
-                -> hub
-                === first
-                @tags a,b
-                @priority 10
-                @once
-                -> hub
-                === second
-                @tags a,b
-                @priority 10
-                -> hub
-                === third
-                @tags a
-                @priority 9
-                -> hub
-                === fourth
-                @tags a,b
-                @priority 8
-                -> hub
-                """,
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = string.Join('\n',
+                SceneFaker.Header("hub"),
+                SceneFaker.Hub(hub),
+                SceneFaker.HubLimit(2),
+                SceneFaker.Tags("a", "b"),
+                SceneFaker.Priority(999),
+                ChoiceFaker.Create("END", "Explicit"),
+                extra,
+                SceneFaker.Header("blocked"),
+                SceneFaker.Tags("a", "b"),
+                SceneFaker.Priority(100),
+                SceneFaker.Requires("false"),
+                DivertFaker.To("hub"),
+                SceneFaker.Header("first"),
+                SceneFaker.Tags("a", "b"),
+                SceneFaker.Priority(10),
+                SceneFaker.Once,
+                DivertFaker.To("hub"),
+                SceneFaker.Header("second"),
+                SceneFaker.Tags("a", "b"),
+                SceneFaker.Priority(10),
+                DivertFaker.To("hub"),
+                SceneFaker.Header("third"),
+                SceneFaker.Tags("a"),
+                SceneFaker.Priority(9),
+                DivertFaker.To("hub"),
+                SceneFaker.Header("fourth"),
+                SceneFaker.Tags("a", "b"),
+                SceneFaker.Priority(8),
+                DivertFaker.To("hub")),
         });
         var compiled = StoryCompiler.Compile(source);
         Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));

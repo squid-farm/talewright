@@ -598,6 +598,29 @@ public class CompilerTests
         Assert.Equal("story.talewright.yaml", error.Location.File);
     }
 
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("True", true)]
+    [InlineData("false", false)]
+    public void Trigger_once_accepts_true_or_false(string value, bool expected)
+    {
+        var story = Ok("=== a\n-> END", Yaml.Replace("once: true", $"once: {value}"));
+
+        Assert.Equal(expected, Assert.Single(story.Triggers).Once);
+    }
+
+    [Theory]
+    [InlineData("yes")]
+    [InlineData("no")]
+    [InlineData("on")]
+    [InlineData("banana")]
+    public void Trigger_once_rejects_non_boolean_words(string value)
+    {
+        var error = Error("=== a\n-> END", "TW4003", Yaml.Replace("once: true", $"once: {value}"));
+
+        Assert.Equal("once must be true or false.", error.Message);
+    }
+
     [Fact]
     public void Rejects_duplicate_trigger_ids()
     {

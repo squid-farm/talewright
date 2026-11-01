@@ -772,7 +772,12 @@ internal sealed class StoryYamlReader
                 continue;
             }
 
-            triggers.Add(new RawTrigger(id, when, At(Get(map, "when")!), effects, At(Get(map, "do")!), Scalar(Get(map, "once")) is "true" or "yes"));
+            var once = Get(map, "once") is { } onceNode
+                ? bool.TryParse(Scalar(onceNode), out var onceValue)
+                    ? onceValue
+                    : Error(onceNode, "TW4003", "once must be true or false.", false)
+                : false;
+            triggers.Add(new RawTrigger(id, when, At(Get(map, "when")!), effects, At(Get(map, "do")!), once));
         }
     }
 

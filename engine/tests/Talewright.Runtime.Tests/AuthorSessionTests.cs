@@ -5,6 +5,7 @@ using Talewright.Narrative.Rendering;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
+using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
 
@@ -16,28 +17,30 @@ public sealed class AuthorSessionTests
     private static readonly FlagId Ready = new("ready");
     private static readonly VarId Count = new("count");
     private static readonly FactionId Guild = new("guild");
-    private const string Yaml = """
-        game:
-          id: author
-          title: Author test
-          start: start
-          randomness: checks-only
-        flags: [ready, fired]
-        vars: {count: 0}
-        characters:
-          player: {first-name: Mara, inventory: {rope: 2}}
-          guide: {first-name: Guide, stats: {str: 11}}
-        items:
-          rope: {name: Rope, modifiers: {str: 2}}
-        factions:
-          guild: {name: Guild, standing: 0}
-        """;
+    private static readonly string Yaml = CreateManifest().Build();
 
-    private static StoryDefinition Compile(string tale, string yaml = Yaml, CompilerOptions? options = null)
+    private static ManifestFaker CreateManifest(string start = "start", bool creationName = false)
+    {
+        var manifest = new ManifestFaker("author", "Author test", start, 42)
+        {
+            Randomness = "checks-only",
+            CreationName = creationName ? true : null,
+        };
+        manifest.Flag("ready");
+        manifest.Flag("fired");
+        manifest.Number("count", 0);
+        manifest.Character("player", "Mara", inventory: new Dictionary<string, int> { ["rope"] = 2 });
+        manifest.Character("guide", "Guide", stats: new Dictionary<string, int> { ["str"] = 11 });
+        manifest.Item("rope", "Rope", new Dictionary<string, int> { ["str"] = 2 });
+        manifest.Faction("guild", "Guild");
+        return manifest;
+    }
+
+    private static StoryDefinition Compile(string tale, string? yaml = null, CompilerOptions? options = null)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = yaml,
+            ["story.talewright.yaml"] = yaml ?? Yaml,
             ["main.tale"] = tale,
         }), options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -60,7 +63,7 @@ public sealed class AuthorSessionTests
             {if @Observe}Scene {{i}}.{/if}
             ~ var:count += 1
             -> {{(i == 1000 ? "END" : $"scene{i + 1}")}}
-            """)), Yaml.Replace("start: start", "start: scene1"), options);
+            """)), CreateManifest("scene1").Build(), options);
         var session = AuthorSession.Create(story, new SceneId("scene1000"), seed: 42);
 
         Assert.True(session.IsSynthetic);
@@ -114,22 +117,14 @@ public sealed class AuthorSessionTests
     [Fact]
     public void Setup_primes_true_triggers_but_entry_rising_edges_and_leveling_run_normally()
     {
+        var manifest = CreateManifest();
+        manifest.Trigger("ready", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), 1));
+        manifest.Trigger("leveled", "player:level >= 2", EffectFaker.Set(new TaleFlagRef("fired")), once: true);
         var story = Compile("""
             === start
             * [Lower] { clear flag:ready } -> start
             * [Raise] { set flag:ready; player:xp += 150 } -> start
-            """, Yaml + """
-
-            triggers:
-              - id: ready
-                when: flag:ready
-                do: var:count += 1
-                once: false
-              - id: leveled
-                when: player:level >= 2
-                do: set flag:fired
-                once: true
-            """);
+            """, manifest.Build());
         var session = Start(story, new AuthorSetup { Flags = new Dictionary<FlagId, bool> { [Ready] = true } });
         Assert.Empty(session.Events.OfType<TriggerFired>());
         session.Choose("c0");
@@ -221,13 +216,13 @@ public sealed class AuthorSessionTests
     [Fact]
     public void Setup_and_character_inputs_are_snapshotted_and_reentry_is_independent()
     {
+        var manifest = CreateManifest(creationName: true);
+        manifest.CreationStat("str", 8, 12, 16);
         var story = Compile("""
             === start
             {player:first-name}: {player:str}. {var:count}.
             * [Next] { var:count += 1 } -> start
-            """, Yaml.Replace("  start: start",
-                "  start: start\n  creation:\n    name: true\n    stats:\n      str: [8, 12, 16]",
-                StringComparison.Ordinal));
+            """, manifest.Build());
         var variables = new Dictionary<VarId, int> { [Count] = 9 };
         var stats = new List<AuthorStatValue> { new(EntityId.Player, Strength, 16) };
         var creationStats = new Dictionary<string, int> { ["str"] = 12 };
@@ -319,19 +314,20 @@ public sealed class AuthorSessionTests
     [Fact]
     public void Failed_trigger_cascade_preserves_the_active_candidate()
     {
-        var triggers = string.Join("\n", Enumerable.Range(0, 40).Reverse().Select(i => $"""
-              - id: chain-{i}
-                when: flag:chain-{i}
-                do: set flag:chain-{i + 1}
-                once: true
-            """));
+        var manifest = CreateManifest();
+        foreach (var i in Enumerable.Range(0, 40).Reverse())
+        {
+            manifest.Trigger($"chain-{i}", new TaleFlagRef($"chain-{i}").ToString(),
+                EffectFaker.Set(new TaleFlagRef($"chain-{i + 1}")), once: true);
+        }
+
         var story = Compile("""
             === start
             * [Enter] -> bad
             === bad
             ~ set flag:chain-0
             -> END
-            """, Yaml + "\ntriggers:\n" + triggers);
+            """, manifest.Build());
         var session = Start(story);
         var events = session.Events;
         var checkpoint = session.Checkpoint;
