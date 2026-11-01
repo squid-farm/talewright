@@ -28,8 +28,9 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 
 ### GitHub Pages
 
-Every `main` push that passes Build publishes this host, with all bundled samples, to
-GitHub Pages at the root of the custom domain, <https://play.trytalewright.com/>. The workflow
+Each valid version-tag push that passes Build publishes that tagged host, with all bundled samples, to
+GitHub Pages at the root of the custom domain, <https://play.trytalewright.com/>. The root serves the
+most recently deployed eligible tag, including previews; pushes to `main` do not deploy it. The workflow
 publishes with base path `/`, smoke-tests the result at the root and uploads only `wwwroot`. See
 [releasing and CI](../../docs/developer/releasing.md) for repository settings.
 

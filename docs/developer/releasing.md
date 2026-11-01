@@ -11,8 +11,8 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 
 | Trigger | What happens |
 |---|---|
-| Push to `main` | **Publish Samples** builds the web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). |
-| Valid version-tag push | **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. All publishing jobs use environment `release`. |
+| Push to `main` | Full verification only; the hosted player is not deployed. |
+| Valid version-tag push | After verification, **Publish Samples** builds that tagged web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). The root represents the most recently deployed eligible tag, including previews. **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. Package publishing jobs use environment `release`. |
 | PR / manual | Validation only. |
 
 The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
@@ -21,8 +21,9 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
 
 ## Repository settings
 
-1. **Settings > Pages > Source:** GitHub Actions, and allow `main` in the `github-pages` environment's
-   deployment rules. The custom domain is `play.trytalewright.com`; the workflow publishes at the site root (`/`).
+1. **Settings > Pages > Source:** GitHub Actions, and allow `v*` tags in the `github-pages`
+   environment's deployment rules. The custom domain is `play.trytalewright.com`; the workflow
+   publishes at the site root (`/`). Invalid public tags fail validation before deployment.
 2. Keep the **release** environment's reviewer approval and `v*` tag deployment restriction.
    Store `VSCE_PAT` (Marketplace publisher `squid-farm`, **Marketplace > Manage** scope) and
    `NUGET_USER` (nuget.org username) as **environment secrets**, not repository secrets.
