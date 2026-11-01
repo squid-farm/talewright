@@ -439,7 +439,9 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var inlines = _discoverEffects is null ? InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics) : [];
+        var inlines = _discoverEffects is null
+            ? InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics, cancellationToken: _cancellationToken)
+            : [];
         if (inlines.Count > 0)
         {
             var start = scene.Paragraph.Locate(0);
@@ -478,14 +480,15 @@ internal sealed partial class TaleParser
                 var partial = body[(colon + 1)..];
                 var whitespace = partial.Length - partial.TrimStart().Length;
                 InlineParser.Parse(SourceText.Single(partial.Trim(), At(indent + colon + 2 + whitespace)),
-                    _symbols, new DiagnosticBag());
+                    _symbols, new DiagnosticBag(), cancellationToken: _cancellationToken);
             }
             return;
         }
 
         var text = body[(colon + 1)..];
         var lead = text.Length - text.TrimStart().Length;
-        var inlines = InlineParser.Parse(SourceText.Single(text.Trim(), At(indent + 1 + colon + 1 + lead)), _symbols, _diagnostics);
+        var inlines = InlineParser.Parse(SourceText.Single(text.Trim(), At(indent + 1 + colon + 1 + lead)),
+            _symbols, _diagnostics, cancellationToken: _cancellationToken);
         var start = At(indent);
         _scene!.CurrentSteps.Add(new ProseStep(StepId(start), SpanFrom(start), new SpeechTemplate(speaker, inlines)));
     }
@@ -565,7 +568,7 @@ internal sealed partial class TaleParser
                 if (_discoverEffects is null && unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1)))
                 {
                     ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
-                        rest.Length, false, _diagnostics, _symbols);
+                        rest.Length, false, _diagnostics, _symbols, _cancellationToken);
                 }
                 else if (_discoverEffects is null && unclosedBrace >= 0)
                 {
@@ -578,7 +581,8 @@ internal sealed partial class TaleParser
 
             var labelText = rest[(pos + 1)..close];
             label = _discoverEffects is null
-                ? InlineParser.Parse(SourceText.Single(labelText, At(indent + 1 + pos + 1)), _symbols, _diagnostics)
+                ? InlineParser.Parse(SourceText.Single(labelText, At(indent + 1 + pos + 1)), _symbols, _diagnostics,
+                    cancellationToken: _cancellationToken)
                 : [];
             pos = SkipSpaces(rest, close + 1);
         }

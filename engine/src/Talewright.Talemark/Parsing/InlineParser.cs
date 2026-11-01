@@ -1,5 +1,6 @@
 using System.Text;
 using Markdig;
+using Markdig.Helpers;
 using Markdig.Parsers;
 using Markdig.Parsers.Inlines;
 using Markdig.Syntax;
@@ -61,14 +62,16 @@ internal sealed class SourceText
             return _locations[index];
         }
 
-        for (var i = _lines.Count - 1; i >= 0; i--)
+        var low = 0;
+        var high = _lines.Count;
+        while (low < high)
         {
-            if (offset >= _lines[i].Start)
-            {
-                return _lines[i].Location.Offset(offset - _lines[i].Start);
-            }
+            var middle = low + (high - low) / 2;
+            if (_lines[middle].Start <= offset) low = middle + 1;
+            else high = middle;
         }
 
+        if (low > 0) return _lines[low - 1].Location.Offset(offset - _lines[low - 1].Start);
         return _lines.Count > 0 ? _lines[0].Location : SourceLocation.None;
     }
 
@@ -107,9 +110,10 @@ internal static class InlineParser
     private const char PlaceholderStart = '\uE000';
     private const char PlaceholderEnd = '\uE001';
 
-    private static readonly MarkdownPipeline Pipeline = BuildPipeline();
+    private static readonly MarkdownPipeline Pipeline = BuildPipeline(cancellable: false);
+    private static readonly MarkdownPipeline CancellablePipeline = BuildPipeline(cancellable: true);
 
-    private static MarkdownPipeline BuildPipeline()
+    private static MarkdownPipeline BuildPipeline(bool cancellable)
     {
         var builder = new MarkdownPipelineBuilder();
         builder.UsePreciseSourceLocation();
@@ -119,7 +123,78 @@ internal static class InlineParser
 
         // No raw HTML or autolinks in story text.
         builder.InlineParsers.RemoveAll(p => p is AutolinkInlineParser);
+        if (cancellable)
+        {
+            // Markdig owns both line-processing passes, so its parser hooks must share the revision token.
+            builder.BlockParsers.RemoveAll(p => p is ParagraphBlockParser);
+            builder.BlockParsers.Add(new CancellableParagraphBlockParser());
+            builder.InlineParsers.RemoveAll(p => p is LineBreakInlineParser);
+            builder.InlineParsers.Add(new CancellableLineBreakInlineParser());
+        }
         return builder.Build();
+    }
+
+    internal sealed class MarkdownCancellationContext(
+        CancellationToken token, Action? onBlockLine = null, Action? onInlineLine = null) : MarkdownParserContext
+    {
+        private int _remaining = 64;
+
+        internal void CheckBlock()
+        {
+            onBlockLine?.Invoke();
+            Check();
+        }
+
+        internal void CheckInline()
+        {
+            onInlineLine?.Invoke();
+            Check();
+        }
+
+        internal void ThrowIfCancellationRequested() => token.ThrowIfCancellationRequested();
+
+        private void Check()
+        {
+            if (--_remaining != 0) return;
+            token.ThrowIfCancellationRequested();
+            _remaining = 64;
+        }
+    }
+
+    private sealed class CancellableParagraphBlockParser : ParagraphBlockParser
+    {
+        public override BlockState TryOpen(BlockProcessor processor)
+        {
+            MarkdownCancellation(processor.Context).CheckBlock();
+            return base.TryOpen(processor);
+        }
+
+        public override BlockState TryContinue(BlockProcessor processor, Block block)
+        {
+            MarkdownCancellation(processor.Context).CheckBlock();
+            return base.TryContinue(processor, block);
+        }
+    }
+
+    private sealed class CancellableLineBreakInlineParser : LineBreakInlineParser
+    {
+        public override bool Match(InlineProcessor processor, ref StringSlice slice)
+        {
+            MarkdownCancellation(processor.Context).CheckInline();
+            return base.Match(processor, ref slice);
+        }
+    }
+
+    private static MarkdownCancellationContext MarkdownCancellation(MarkdownParserContext? context) =>
+        context as MarkdownCancellationContext
+        ?? throw new InvalidOperationException("Missing cancellation context for Markdown parsing.");
+
+    internal static MarkdownDocument ParseMarkdown(string text, MarkdownCancellationContext? cancellation)
+    {
+        cancellation?.ThrowIfCancellationRequested();
+        var document = Markdown.Parse(text, cancellation is null ? Pipeline : CancellablePipeline, cancellation);
+        cancellation?.ThrowIfCancellationRequested();
+        return document;
     }
 
     private abstract record Piece;
@@ -132,8 +207,11 @@ internal static class InlineParser
 
     private sealed record EndIfPiece(SourceLocation Location) : Piece;
 
-    private sealed class Context(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics, bool allowImages)
+    private sealed class Context(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics, bool allowImages,
+        CancellationToken cancellationToken)
     {
+        private int _remaining = 64;
+
         public SourceText Source { get; } = source;
         public StorySymbols Symbols { get; } = symbols;
         public DiagnosticBag Diagnostics { get; } = diagnostics;
@@ -141,18 +219,29 @@ internal static class InlineParser
         // Map Markdig's masked offsets back to authored text for migration diagnostics.
         public List<(int Offset, int Delta, int Start, int Length)> MaskedOffsets { get; } = [];
         public bool AllowImages { get; } = allowImages;
+        public CancellationToken CancellationToken { get; } = cancellationToken;
+
+        public void Check()
+        {
+            if (--_remaining != 0) return;
+            CancellationToken.ThrowIfCancellationRequested();
+            _remaining = 64;
+        }
     }
 
     /// <summary>Parses prose. Errors are reported to <paramref name="diagnostics"/>; the result is still usable.</summary>
     public static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
-        bool allowImages = true)
+        bool allowImages = true, CancellationToken cancellationToken = default)
     {
-        var context = new Context(source, symbols, diagnostics, allowImages);
+        cancellationToken.ThrowIfCancellationRequested();
+        var context = new Context(source, symbols, diagnostics, allowImages, cancellationToken);
         var masked = Mask(context);
-        var document = Markdown.Parse(masked, Pipeline);
+        var markdownCancellation = cancellationToken.CanBeCanceled ? new MarkdownCancellationContext(cancellationToken) : null;
+        var document = ParseMarkdown(masked, markdownCancellation);
         var pieces = new List<Piece>();
         foreach (var block in document)
         {
+            context.Check();
             if (block is ParagraphBlock { Inline: { } inline })
             {
                 if (pieces.Count > 0)
@@ -164,7 +253,9 @@ internal static class InlineParser
             }
         }
 
-        return Fold(pieces, context);
+        var result = Fold(pieces, context);
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 
     /// <summary>Replaces each balanced <c>{…}</c> with a placeholder and parses its contents.</summary>
@@ -173,8 +264,14 @@ internal static class InlineParser
         var text = context.Source.Text;
         var result = new StringBuilder(text.Length);
         var i = 0;
+        var nextCancellationCheck = 0;
         while (i < text.Length)
         {
+            if (i >= nextCancellationCheck)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                nextCancellationCheck = i + Math.Min(512, text.Length - i);
+            }
             var c = text[i];
             if (c == '\\' && i + 1 < text.Length && text[i + 1] is '{' or '}')
             {
@@ -204,7 +301,8 @@ internal static class InlineParser
                     }
                     else
                     {
-                        ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics, context.Symbols);
+                        ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics,
+                            context.Symbols, context.CancellationToken);
                     }
 
                     break;
@@ -247,7 +345,8 @@ internal static class InlineParser
                     var lead = inner.Length - inner.TrimStart().Length;
                     context.Symbols.Analysis?.Tokens.Add(new("image",
                         new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 1 + lead + 5))));
-                    var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics, context.Symbols);
+                    var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics,
+                        context.Symbols, context.CancellationToken);
                     fragment = media is null ? null : new InlinePiece(media);
                 }
             }
@@ -276,6 +375,7 @@ internal static class InlineParser
             i = close + 1;
         }
 
+        context.CancellationToken.ThrowIfCancellationRequested();
         return result.ToString();
     }
 
@@ -338,6 +438,7 @@ internal static class InlineParser
     {
         for (var inline = container.FirstChild; inline is not null; inline = inline.NextSibling)
         {
+            context.Check();
             switch (inline)
             {
                 case LiteralInline literal:
@@ -364,9 +465,10 @@ internal static class InlineParser
                 }
 
                 case LinkInline { IsImage: true } image:
-                    var alt = PlainText(image);
+                    var alt = PlainText(image, context);
                     for (var index = 0; index < context.MaskedOffsets.Count; index++)
                     {
+                        context.Check();
                         var fragment = context.MaskedOffsets[index];
                         alt = alt.Replace($"{PlaceholderStart}{index}{PlaceholderEnd}", context.Source.Text.Substring(fragment.Start, fragment.Length));
                     }
@@ -392,7 +494,8 @@ internal static class InlineParser
         var start = 0;
         while (start < text.Length)
         {
-            var open = text.IndexOf(PlaceholderStart, start);
+            context.Check();
+            var open = FindPlaceholder(text, PlaceholderStart, start, context);
             if (open < 0)
             {
                 pieces.Add(new InlinePiece(new TextTemplate(text[start..])));
@@ -404,7 +507,7 @@ internal static class InlineParser
                 pieces.Add(new InlinePiece(new TextTemplate(text[start..open])));
             }
 
-            var close = text.IndexOf(PlaceholderEnd, open);
+            var close = FindPlaceholder(text, PlaceholderEnd, open, context);
             var index = int.Parse(text.AsSpan(open + 1, close - open - 1));
             if (context.Fragments[index] is { } piece)
             {
@@ -415,15 +518,29 @@ internal static class InlineParser
         }
     }
 
-    private static string PlainText(ContainerInline container)
+    private static int FindPlaceholder(string text, char marker, int start, Context context)
+    {
+        while (start < text.Length)
+        {
+            context.Check();
+            var count = Math.Min(1024, text.Length - start);
+            var index = text.IndexOf(marker, start, count);
+            if (index >= 0) return index;
+            start += count;
+        }
+        return -1;
+    }
+
+    private static string PlainText(ContainerInline container, Context context)
     {
         var builder = new StringBuilder();
         for (var inline = container.FirstChild; inline is not null; inline = inline.NextSibling)
         {
+            context.Check();
             builder.Append(inline switch
             {
                 LiteralInline l => l.Content.ToString(),
-                ContainerInline c => PlainText(c),
+                ContainerInline c => PlainText(c, context),
                 _ => string.Empty,
             });
         }
@@ -444,6 +561,7 @@ internal static class InlineParser
         var output = new List<TemplateInline>();
         while (position < pieces.Count)
         {
+            context.Check();
             var piece = pieces[position++];
             switch (piece)
             {

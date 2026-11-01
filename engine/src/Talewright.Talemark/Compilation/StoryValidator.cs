@@ -15,30 +15,12 @@ namespace Talewright.Talemark.Compilation;
 /// </summary>
 internal static class StoryValidator
 {
-    private struct CancellationCheckpoint
-    {
-        private readonly CancellationToken _cancellationToken;
-        private int _remaining;
-
-        public CancellationCheckpoint(CancellationToken cancellationToken)
-        {
-            _cancellationToken = cancellationToken;
-            _remaining = 64;
-        }
-
-        public void Check()
-        {
-            if (--_remaining != 0) return;
-            _cancellationToken.ThrowIfCancellationRequested();
-            _remaining = 64;
-        }
-    }
-
     /// <summary>Returns the reachability TW3009 used, or null when the story has errors.</summary>
     public static StoryReachability? Validate(StoryManifest manifest, IReadOnlyList<ParsedScene> scenes, DiagnosticBag diagnostics,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
         var byId = new Dictionary<SceneId, ParsedScene>();
         foreach (var scene in scenes)
         {
@@ -58,6 +40,7 @@ internal static class StoryValidator
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var tag in scene.Tags)
             {
+                checkpoint?.Check();
                 if (!byTag.TryGetValue(tag, out var ids))
                 {
                     byTag[tag] = ids = [];
@@ -69,12 +52,12 @@ internal static class StoryValidator
         foreach (var (scene, location) in scenes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CheckExits(scene, location, diagnostics, cancellationToken);
+            CheckExits(scene, location, diagnostics, cancellationToken, checkpoint);
             if (scene.HubLimit is not null && scene.Hub is null)
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
             }
-            if (scene.Hub is { } hub && !StoryDiverts.ResolveTags(hub, byTag).Any(id => id != scene.Id))
+            if (scene.Hub is { } hub && !StoryDiverts.ResolveTags(hub, byTag, checkpoint).Any(id => id != scene.Id))
             {
                 diagnostics.Warning("TW3008", $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
             }
@@ -89,7 +72,7 @@ internal static class StoryValidator
 
         cancellationToken.ThrowIfCancellationRequested();
         var definitions = scenes.Select(scene => scene.Definition).ToArray();
-        var reachability = StoryReachability.Find(definitions, StoryDiverts.From(definitions), start);
+        var reachability = StoryReachability.Find(definitions, StoryDiverts.From(definitions, checkpoint), start, checkpoint);
         foreach (var (scene, location) in scenes)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -103,32 +86,31 @@ internal static class StoryValidator
     }
 
     private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, CancellationCheckpoint? checkpoint)
     {
         var seenChoice = false;
-        var checkpoint = new CancellationCheckpoint(cancellationToken);
-        CheckSteps(scene.Steps, ref seenChoice, diagnostics, ref checkpoint);
+        CheckSteps(scene.Steps, ref seenChoice, diagnostics, checkpoint);
         cancellationToken.ThrowIfCancellationRequested();
-        var hasReachableChoice = SceneSteps.Reachable(scene.Steps).OfType<ChoiceStep>().Any();
+        var hasReachableChoice = SceneSteps.Reachable(scene.Steps, checkpoint).OfType<ChoiceStep>().Any();
         cancellationToken.ThrowIfCancellationRequested();
-        if (!SceneSteps.Targets(scene.Steps).Any()
+        if (!SceneSteps.Targets(scene.Steps, checkpoint).Any()
             && !hasReachableChoice && scene.Hub is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
         }
         if ((hasReachableChoice || scene.Hub is not null) &&
-            CanReachEndWithoutChoice(scene.Steps, ref checkpoint))
+            CanReachEndWithoutChoice(scene.Steps, checkpoint))
         {
             diagnostics.Warning("TW3013", $"Scene '{scene.Id}' may have no available choice. Add an unconditional choice such as '* -> target' or '* [The end] -> END'.", location);
         }
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private static bool CanReachEndWithoutChoice(IReadOnlyList<SceneStep> steps, ref CancellationCheckpoint checkpoint)
+    private static bool CanReachEndWithoutChoice(IReadOnlyList<SceneStep> steps, CancellationCheckpoint? checkpoint)
     {
         foreach (var step in steps)
         {
-            checkpoint.Check();
+            checkpoint?.Check();
             if (step is ChoiceStep { Choice.Requires: null })
             {
                 return false;
@@ -137,17 +119,17 @@ internal static class StoryValidator
             {
                 var canReachEnd = branch.Condition switch
                 {
-                    BoolLiteral { Value: true } => CanReachEndWithoutChoice(branch.Then, ref checkpoint),
-                    BoolLiteral { Value: false } => CanReachEndWithoutChoice(branch.Else, ref checkpoint),
-                    _ => CanReachEndWithoutChoice(branch.Then, ref checkpoint) ||
-                         CanReachEndWithoutChoice(branch.Else, ref checkpoint),
+                    BoolLiteral { Value: true } => CanReachEndWithoutChoice(branch.Then, checkpoint),
+                    BoolLiteral { Value: false } => CanReachEndWithoutChoice(branch.Else, checkpoint),
+                    _ => CanReachEndWithoutChoice(branch.Then, checkpoint) ||
+                         CanReachEndWithoutChoice(branch.Else, checkpoint),
                 };
                 if (!canReachEnd)
                 {
                     return false;
                 }
             }
-            else if (!SceneSteps.CanContinue(step))
+            else if (!SceneSteps.CanContinue(step, checkpoint))
             {
                 return false;
             }
@@ -156,12 +138,12 @@ internal static class StoryValidator
     }
 
     private static void CheckSteps(IReadOnlyList<SceneStep> steps, ref bool seenChoice, DiagnosticBag diagnostics,
-        ref CancellationCheckpoint checkpoint)
+        CancellationCheckpoint? checkpoint)
     {
         var reachable = true;
         foreach (var step in steps)
         {
-            checkpoint.Check();
+            checkpoint?.Check();
             if (!reachable)
             {
                 diagnostics.Warning("TW3012", "This line cannot run: an earlier step always leaves this block.", step.Source.Start);
@@ -172,8 +154,8 @@ internal static class StoryValidator
             }
             if (step is ConditionalStep branch)
             {
-                CheckSteps(branch.Then, ref seenChoice, diagnostics, ref checkpoint);
-                CheckSteps(branch.Else, ref seenChoice, diagnostics, ref checkpoint);
+                CheckSteps(branch.Then, ref seenChoice, diagnostics, checkpoint);
+                CheckSteps(branch.Else, ref seenChoice, diagnostics, checkpoint);
             }
             if (step is ChoiceStep choice)
             {
@@ -186,7 +168,7 @@ internal static class StoryValidator
                     diagnostics.Error("TW3003", "Every choice and each choice skill-check outcome needs its own '-> target' or '-> END'. There is no scene fallback.", step.Source.Start);
                 }
             }
-            reachable &= SceneSteps.CanContinue(step);
+            reachable &= SceneSteps.CanContinue(step, checkpoint);
         }
     }
 }

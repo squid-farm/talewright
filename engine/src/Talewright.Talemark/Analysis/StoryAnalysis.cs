@@ -80,7 +80,9 @@ public static class StoryAnalyzer
         var collector = new AnalysisCollector(source, options);
         var result = StoryCompiler.CompileForAnalysis(source, options, collector, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
+        var analysis = new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
+        cancellationToken.ThrowIfCancellationRequested();
+        return analysis;
     }
 }
 
