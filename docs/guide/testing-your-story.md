@@ -82,6 +82,25 @@ Pending, rejected or restart-required disk changes are labeled; they cannot repl
 adopted successfully. When no compiler mapping is available (for example, a C#-defined scene), the
 viewer explains that instead of guessing a file. Source viewing is debugger-only and cannot edit files.
 
+### Explore and export the story map
+
+The **Map** tab lays out every scene, divert and hub offer from the last successful compilation. Select a
+scene to see its diverts and hub offers, or follow a choice to its target. The map separates scenes
+unreachable from the start by following diverts and hub offers; it does not decide whether a condition
+can be met. The preview shows prose and eligible choices without running entry effects or skill checks.
+
+During a synthetic playtest, visited scenes and taken diverts or hub offers are highlighted in route order.
+The map updates when you choose, jump, or move Back and Forward. Use **Export SVG** or **Export PNG** to
+save the full map with that current route presentation to a path you choose. Exports use the same drawing
+primitives as the on-screen map; SVG stays sharp at any scale.
+
+PNG export is capped at 8192 pixels per side and 16,777,216 total pixels (64 MiB of RGBA pixels), so a very
+large map fails before allocating its pixel canvas. The error recommends SVG for a full-resolution image.
+The map's layout and zoom libraries are bundled with the debugger, so it works without network access;
+their license notices are included in the debugger distribution.
+
+![The Lost Relic's full story map, with the route from camp.arrival through camp.hub to trail.river highlighted](../images/author-debugger-map.png)
+
 ### Change state without starting over
 
 Open **Live edit values**, enable the fields you want to change, and click **Apply live edit batch**.

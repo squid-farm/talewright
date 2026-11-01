@@ -20,8 +20,11 @@ internal static class Program
             using var files = new PhysicalFileProvider(Path.Combine(AppContext.BaseDirectory, "debug-assets"));
             var builder = PhotinoBlazorAppBuilder.CreateDefault(files, args);
             builder.Services.AddSingleton(new WorkbenchModel(Path.GetFullPath(args[0])));
+            var mapExportDialog = new MapExportDialog();
+            builder.Services.AddSingleton(mapExportDialog);
             builder.RootComponents.Add<Workbench>("app");
             var app = builder.Build();
+            mapExportDialog.Attach(app.MainWindow);
             app.MainWindow.SetTitle("Talewright Author Debugger").SetSize(1400, 950)
                 .SetUseOsDefaultSize(false).Center();
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
