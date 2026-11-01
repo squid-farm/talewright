@@ -126,11 +126,12 @@ the story. See the [CLI reference](cli.md#output-contract).
 
 ## Editor and C# project messages
 
-These messages are for authors setting up editor integration or building C# extensions. If you are
-writing a regular `.tale` story with the built-in rules, you can skip this section.
+These messages concern editor integration and C# extensions. `TWLSP005` can also appear while
+editing an ordinary `.tale` story.
 
 | Code | Meaning | Usual fix |
 |---|---|---|
 | TW5001 | A C# project uses custom story rules or features that the editor has not been told about. | Configure compiler options or export [authoring metadata](../developer/authoring-analysis.md#c-project-registrations). Editors do not automatically build or run C# project code. |
-| TW5002 | The language server cannot analyze the story with its configured metadata. | Fix the reported metadata file/data error and refresh it. See [language-server configuration](../developer/language-server.md). |
+| TW5002 | The language server cannot analyze the story. | Check the reported error. Fix invalid metadata or inaccessible story files; if the problem persists, inspect the Talewright Language Server output. See [language-server configuration](../developer/language-server.md). |
 | TWLSP004 | The language server cannot read or parse `talewright.lint.json`. | Fix the reported configuration error; live analysis continues with default rule settings until the file is valid. |
+| TWLSP005 | The editor is showing the first 500 problems in a file and has hidden additional diagnostics. | Fix the displayed problems to reveal the rest, or use CLI validation or lint for the uncapped results. |
