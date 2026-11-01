@@ -188,6 +188,22 @@ test('ordinary prose, Markdown, comments and escaped braces are not Talemark com
   assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
 });
 
+test('choice conditions highlight only the exact (requires: marker', () => {
+  const exact = '* [Go] (requires: flag:ready) -> END';
+  hasScope(exact, 'requires', 'keyword.control.tale');
+  hasScope(exact, '(requires:', 'punctuation.section.condition.begin.tale');
+  for (const variant of [
+    '* [Go] ( requires : flag:ready) -> END',
+    '* [Go] (requires : flag:ready) -> END',
+    '* [Go] ( requires: flag:ready) -> END',
+  ]) {
+    const offset = variant.indexOf('requires');
+    const token = tokens(variant).tokens.find(token => token.startIndex <= offset && token.endIndex > offset);
+    assert.ok(!token.scopes.includes('keyword.control.tale'), `${variant}: ${token.scopes.join(', ')}`);
+    assert.ok(!tokens(variant).tokens.some(token => token.scopes.includes('punctuation.section.condition.begin.tale')), variant);
+  }
+});
+
 test('unterminated edits recover before the next scene', () => {
   for (const line of [
     '{player:first-name', '{if var:count == "unfinished', '* [unfinished',

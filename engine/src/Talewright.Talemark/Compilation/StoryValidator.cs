@@ -43,9 +43,11 @@ internal static class StoryValidator
             }
         }
 
-        foreach (var (scene, location) in scenes)
+        foreach (var parsed in scenes)
         {
-            CheckExits(scene, location, diagnostics);
+            var scene = parsed.Definition;
+            var location = parsed.Location;
+            CheckExits(scene, location, diagnostics, parsed.DroppedMalformedChoice);
             if (scene.HubLimit is not null && scene.Hub is null)
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
@@ -76,13 +78,15 @@ internal static class StoryValidator
         return reachability;
     }
 
-    private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics)
+    private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics,
+        bool droppedMalformedChoice)
     {
         var seenChoice = false;
         CheckSteps(scene.Steps, ref seenChoice, diagnostics);
         var hasReachableChoice = SceneSteps.Reachable(scene.Steps).OfType<ChoiceStep>().Any();
+        // A choice rejected before it became a step is not, by itself, a dead end. Other scenes still report.
         if (!SceneSteps.Targets(scene.Steps).Any()
-            && !hasReachableChoice && scene.Hub is null)
+            && !hasReachableChoice && scene.Hub is null && !droppedMalformedChoice)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
         }

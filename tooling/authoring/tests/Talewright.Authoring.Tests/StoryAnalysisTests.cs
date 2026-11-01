@@ -157,17 +157,17 @@ public class StoryAnalysisTests
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >")]
-    [InlineData("* [Go] {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=")]
-    [InlineData("* (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >")]
-    [InlineData("* {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=")]
-    [InlineData("* [Go] skill-check athletics dc 12\nsuccess: {set flag:ready", ExpressionContextKind.Effects, "set flag:ready")]
-    public void Unclosed_choice_expressions_keep_partial_context(string choice, ExpressionContextKind kind, string text)
+    [InlineData("* [Go] (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >", "TW1011")]
+    [InlineData("* [Go] {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=", "TW1011")]
+    [InlineData("* (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >", "TW1011")]
+    [InlineData("* {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=", "TW1011")]
+    [InlineData("* [Go] skill-check athletics dc 12\nsuccess: {set flag:ready", ExpressionContextKind.Effects, "set flag:ready", "TW1009")]
+    public void Unclosed_choice_expressions_keep_partial_context(string choice, ExpressionContextKind kind, string text, string code)
     {
         var source = Source("=== first\n" + choice);
         var analysis = StoryAnalyzer.Analyze(source);
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
-        Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == "TW1011");
+        Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == code);
         var expression = Assert.Single(analysis.Expressions, context => context.Kind == kind);
         Assert.Equal(kind, expression.Kind);
         Assert.Equal(text, expression.Text);

@@ -291,8 +291,8 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
-| `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
-| `* (requires: expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
+| `* [label] (requires: expr) { effects } -> target` | Choice. One optional `(requires:)` and one optional `{ effects }`, in either order, before `->` or `skill-check`. Hidden when `requires` is false. |
+| `* (requires: expr) { effects } -> target`         | Textless choice displayed as **Continue**. The same single clauses are optional, in either order. |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
@@ -331,6 +331,19 @@ Omit a choice's label to show **Continue**, including alongside other choices:
 An omitted label needs an explicit `->` destination and cannot be used with a choice skill check.
 An explicitly empty `[]` is not the textless shortcut. **Continue** is currently English for both
 textless choices and automatic scene continuations.
+
+Before that terminal `->` or `skill-check`, a choice accepts at most one condition and one effect
+block. Both orders are valid, and either clause may be omitted:
+
+```tale
+* [Read] (requires: player:int >= 12) { player:hp -= 2 } -> temple.hall
+* [Shove] { player:hp -= 2 } (requires: player:str >= 10) -> temple.hall
+```
+
+A second `(requires:)` or `{ effects }` is an error. Talemark does not keep only the last copy.
+The condition marker is exactly `(requires:` with nothing between `(`, `requires` and `:`.
+`( requires : …)` is not that marker. Text after the divert, or after the skill check's DC, is a
+misplaced clause: it is not part of the scene id or the number expression.
 
 A scene-level `->` leaves immediately, showing the prose already rendered with a single **Continue**
 (or as the final frame for `-> END`). Put conditional early exits **before** the choices:
