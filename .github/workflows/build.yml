@@ -52,7 +52,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: nx-ci-plan
-          path: artifacts/ci/plan.json
+          path: |
+            artifacts/ci/plan.json
+            artifacts/ci/selection.json
           if-no-files-found: error
 
   build:

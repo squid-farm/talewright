@@ -16,7 +16,10 @@ from test_nx_selection import NO_IMPACT_FILES, affected_graph
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
-from nx_ci import GROUPS, TARGETS, make_plan, nx, verify_results, verify_unit_reports
+from nx_ci import (
+    CHECK_TARGETS, GROUPS, TARGETS, make_plan, nx, verify_results, verify_unit_reports,
+    with_complete_checks,
+)
 
 
 class UnitReportTests(unittest.TestCase):
@@ -289,6 +292,77 @@ class CiRoutingTests(unittest.TestCase):
             )
             self.assertNotEqual(0, result.returncode)
             self.assertFalse(manifest.exists())
+
+
+class PullRequestChecksTests(unittest.TestCase):
+    """Pull requests run every workspace check while other groups stay affected."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.checks = json.loads(nx(
+            "run-many", "--all", "--exclude=talewright-workspace",
+            "-t", *CHECK_TARGETS, "--dry-run", "--graph=stdout", capture=True,
+        ).stdout)
+        cls.all_checks = make_plan(cls.checks)["checks"]
+
+    def test_every_workspace_check_is_known(self):
+        self.assertEqual({
+            ("Talewright.Benchmarks", "budget"), ("talewright-ci-tests", "ci-check"),
+            ("talewright-docs", "check"), ("talewright-e2e-runner", "check"),
+            ("talewright-performance-tooling", "check"),
+        }, {(task["project"], task["target"]) for task in self.all_checks})
+
+    def test_pull_requests_select_all_checks_and_affected_other_groups(self):
+        for files in (
+            NO_IMPACT_FILES,
+            ("docs/developer/architecture.md",),
+            ("engine/src/Talewright.Rules/Talewright.Rules.csproj",),
+            ("benchmarks/Talewright.BenchmarkDotNet/Program.cs",),
+        ):
+            with self.subTest(files=files):
+                affected = affected_graph(*files)
+                plan = make_plan(with_complete_checks(affected, self.checks))
+                expected = make_plan(affected)
+                for group in set(GROUPS) - {"checks"}:
+                    self.assertEqual(expected[group], plan[group])
+                checks = [(task["project"], task["target"]) for task in plan["checks"]]
+                self.assertEqual(len(checks), len(set(checks)), "Duplicated check tasks")
+                self.assertTrue(all(task in plan["checks"] for task in self.all_checks))
+                prerequisites = set(self.checks["tasks"]["tasks"])
+                for task in expected["checks"]:
+                    self.assertTrue(
+                        task in plan["checks"]
+                        or f"{task['project']}:{task['target']}" in prerequisites,
+                        f"Omitted {task}",
+                    )
+                self.assertFalse(any(
+                    task["target"] == "build:release" and task not in expected["checks"]
+                    for task in plan["checks"]
+                ), "Check prerequisites must stay with Nx, not the plan")
+
+    def test_selection_writes_plan_scopes_and_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "plan.json"
+            summary = Path(directory) / "summary.md"
+            output = Path(directory) / "output"
+            subprocess.run(
+                [sys.executable, ROOT / ".github/scripts/nx_ci.py", "select",
+                 "--base=HEAD", "--head=HEAD", f"--plan={manifest}"],
+                cwd=ROOT, text=True, capture_output=True, check=True,
+                env=dict(os.environ, NX_DAEMON="false", GITHUB_STEP_SUMMARY=str(summary),
+                         GITHUB_OUTPUT=str(output)),
+            )
+            plan = json.loads(manifest.read_text())
+            self.assertEqual(self.all_checks, plan["checks"])
+            self.assertFalse(any(plan[group] for group in set(GROUPS) - {"checks"}))
+            scopes = json.loads((Path(directory) / "selection.json").read_text())["scopes"]
+            self.assertEqual("complete", scopes["checks"])
+            self.assertEqual({"affected"}, {scopes[g] for g in set(GROUPS) - {"checks"}})
+            self.assertIn('"checks": true', output.read_text())
+            text = summary.read_text()
+            self.assertIn("Every workspace check task runs on pull requests", text)
+            self.assertIn("| checks | Complete |", text)
+            self.assertIn("| browser | Affected | Not selected |", text)
 
 
 class InfrastructureSelectionTests(unittest.TestCase):

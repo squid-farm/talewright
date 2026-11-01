@@ -32,15 +32,23 @@ Preview the PR task graph using the actual base and head revisions:
 
 ```sh
 python3 .github/scripts/nx_ci.py select --base=origin/main --head=HEAD
-cat artifacts/ci/plan.json
+cat artifacts/ci/plan.json artifacts/ci/selection.json
 ```
+
+Pull requests always run the complete lightweight `checks` group: every workspace `ci-check`, `check`
+and `budget` task, regardless of what changed. Build, unit, browser, Linux desktop and editor groups keep
+Nx affected selection. Selection merges a `run-many --all` graph for the check targets into the affected
+graph before routing, so check prerequisites stay with Nx and affected `build:release` tasks already
+built by a check are not duplicated. Full verification is unchanged.
 
 ## Actions summaries
 
 Selection appends a GitHub Actions job summary with full versus affected mode, available revisions,
 and the selected projects/targets grouped by environment. An empty graph is explicitly reported as
 no impact. A conservative workspace fallback is identified from the Nx graph, not from a second
-changed-path classifier. The existing plan JSON and selection outputs keep their original shape.
+changed-path classifier. Each environment row shows its scope: **Full**, **Affected**, or **Complete**
+for pull-request checks. The plan JSON and selection outputs keep their original shape; the uploaded
+`nx-ci-plan` artifact also contains `selection.json`, which records the same per-environment scopes.
 
 Each work job reports the router's target batches after execution, including Nx prerequisites:
 projects, outcome, and monotonic elapsed seconds. These are **batch**, not per-project timings;
@@ -161,7 +169,7 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit. Also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
 | `tests / linux-desktop` | Accessibility/chooser probe, complete regular native regression suite, then focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
-| `tests / checks` | Applicable CI/selection regression tests, documentation-link checks, performance-report Python tests, and bounded performance budgets. |
+| `tests / checks` | Every CI/selection regression test, documentation-link check, performance-report Python test, and bounded performance budget on every PR, plus any affected leaf compilation. |
 
 “Regular” browser/native coverage excludes `RealCorpus`, just as before this change. PR E2E is not
 reduced to a tiny smoke subset when core changes are affected: the full regular regression matrix is
@@ -174,9 +182,8 @@ unselected jobs. Failures, cancellations, missing results, unexpected execution/
 errors fail closed. Browser matrix fail-fast remains disabled, so every browser produces evidence.
 NuGet/sample publication additionally requires the aggregate.
 
-For a no-impact PR, `build` and all Tests work jobs skip. The reusable Tests workflow still runs
-its planning and verification jobs and returns success; the top-level **CI verification** check
-therefore succeeds rather than being skipped or left pending. Mixed metadata/source changes retain
+For a no-impact PR, `build` and all Tests work jobs except `checks` skip. A failed `checks` job fails
+**CI verification**; the skipped groups remain valid because they were not selected. Mixed metadata/source changes retain
 the source change's affected tasks. Full-verification events do not use these exclusions to select
 projects: they still run every regular verification target.
 
@@ -203,7 +210,8 @@ verification plan. A release still uses the existing publication approvals and p
 
 ### Run the full pipeline on a branch without deploying
 
-PR checks select affected projects; a green PR run is not evidence that every check ran.
+PR runs select affected build, unit, browser, Linux desktop and editor work; only the lightweight
+`checks` group is complete. A green PR run is not evidence that every check ran.
 Before merging a CI repair, dispatch **Build** on the pushed repair branch and require a passing
 full run at its final commit:
 
@@ -248,7 +256,8 @@ E2E project as a substitute for the host-aware runners.
 
 `tests/test_nx_selection.py` validates the inferred graph against MSBuild references and explicit
 contracts, affected selections, Release prerequisites, browser configurations, and disabled caching.
-`tests/test_nx_ci.py` checks environment routing, full/fallback equivalence, invalid Git revisions,
+`tests/test_nx_ci.py` checks environment routing, complete PR checks with affected other groups,
+full/fallback equivalence, invalid Git revisions,
 and success/failure/cancellation/skip aggregation. It also executes an isolated real Nx workspace:
 a prerequisite must finish before its consumer; forcing that prerequisite to exit nonzero must return
 failure without executing the consumer. These tests need the pinned Nx installation, not UI libraries.
