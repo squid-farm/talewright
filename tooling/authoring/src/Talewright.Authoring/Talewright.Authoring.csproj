@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.LanguageServer" />
+    <InternalsVisibleTo Include="Talewright.Authoring.Tests" />
     <ProjectReference Include="../../../../engine/src/Talewright.Talemark/Talewright.Talemark.csproj" />
     <EmbeddedResource Include="../../../vscode-talewright/schemas/story.schema.json" LogicalName="Talewright.Authoring.story.schema.json" />
   </ItemGroup>

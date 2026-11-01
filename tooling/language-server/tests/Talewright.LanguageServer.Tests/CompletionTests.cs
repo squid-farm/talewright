@@ -117,6 +117,7 @@ public sealed partial class ServerTests
         await client.Open("other.tale", "=== other\n~ var:weather = \"stormy\"\n-> END", 1);
         var text = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("weather"));
         Assert.Equal("Variable: text", text.GetProperty("detail").GetString());
+        await client.Diagnostics("other.tale", 1);
         Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
         await client.Change("other.tale", "=== other\n~ var:weather = 1\n-> END", 2);
         var number = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("weather"));
@@ -128,6 +129,7 @@ public sealed partial class ServerTests
         var partial = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("weather"));
         Assert.Equal("Variable: unresolved", partial.GetProperty("detail").GetString());
         await client.Change("other.tale", "=== other\n~ var:weather = \"recovered\"\n-> END", 5);
+        await client.Diagnostics("other.tale", 5);
         Assert.Contains("(text)", Text(await Hover(client, "start.tale", marked)));
     }
 

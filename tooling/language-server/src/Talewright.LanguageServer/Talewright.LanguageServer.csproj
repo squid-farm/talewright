@@ -7,6 +7,7 @@
     <Description>Editor-neutral Talemark and story.talewright.yaml live diagnostics over LSP stdio.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.LanguageServer.Tests" />
     <ProjectReference Include="../../../authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
   </ItemGroup>
 </Project>
