@@ -375,16 +375,22 @@ is [#404](https://github.com/squid-farm/talewright/issues/404).
   character that is not escaped and not inside an inline construct or code span.
 - A run of one marks emphasis and a run of two marks strong. A run of three or more is literal, so
   write `**_both_**` instead of `***both***`.
-- A word character is a Unicode letter or digit. A run **can open** when the next character
-  exists, is not whitespace, and the previous character is not a word character. A run
-  **can close** when the previous character exists, is not whitespace, and the next character is
-  not a word character. The start and end of a unit count as non-word characters.
-- Scan left to right with a stack of open runs. A run that can close, and that matches the
-  innermost open run in both character and length, closes that run. Otherwise a run that can open
-  is pushed. Otherwise it is literal. Open runs left at the end of the unit are literal.
-- So `2*3*4`, `snake_case` and `word*inner*word` are literal. Nested spans work. A run that does
-  not match the innermost open run never closes an outer run, so spans cannot cross. That run
-  opens a new span if it can open; otherwise it is literal.
+- A word character is a Unicode letter or digit. Treat the start and end of a text unit as
+  boundary characters that are both non-word and non-whitespace. A run **can open** when its next
+  character is not a boundary and not whitespace, and its previous character is not a word
+  character. A run **can close** when its previous character is not a boundary and not whitespace,
+  and its next character is not a word character.
+- Scan left to right with a stack of open runs:
+  1. If a run can close and matches the innermost open run in both character and length, it closes
+     that run.
+  2. Otherwise, if it can close and matches any farther-out open run, it is literal; it neither
+     closes that outer run nor opens a new span.
+  3. Otherwise, if it can open, push it. This includes a run that can close but matches no open
+     run; if it remains unmatched at the end of the unit, it is literal.
+  4. Otherwise, it is literal. Any open runs left at the end of the unit are also literal.
+- So `2*3*4`, `snake_case` and `word*inner*word` are literal. Nested spans work. Crossing spans
+  are literal at the crossing run and never close an outer span or reinterpret that run as an
+  opener.
 - Spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
 
 ### Code spans
@@ -424,11 +430,26 @@ left open.
 
 Headings, setext underlines, thematic breaks, lists, block quotes inside prose, reference
 definitions, links, autolinks, HTML, entities and numeric character references are literal text.
-None of them consumes or hides author text. The one exception is the legacy image form. Within
-one line of a text unit, the scanner looks for `![`, then alt text with no unescaped `[`, `]` or
-`{`, then `](`, then a path with no whitespace, `(` or `)`, then `)`. That form reports TW1015, and
-the replacement is `{image("path", "alt")}` with the source text quoted as written. Anything else,
-such as nested brackets in the alt, is literal text.
+None of them consumes or hides author text. The one exception is the simple legacy image form.
+TW1015 matches only this exact, single-line shape, with no whitespace between its delimiters:
+
+1. `![`
+2. Alt text, possibly empty, containing no backslash, `[`, `]`, `{`, `}`, CR or LF. Other
+   characters, including quotes and whitespace, are allowed.
+3. `](`
+4. A nonempty path containing no whitespace, `(`, `)`, backslash, double quote, `{`, `}` or
+   line break.
+5. `)`
+
+The scanner looks for `![` from left to right. If the following text does not match the shape,
+that `!` is literal and scanning resumes at the next character; a later independent `![` can
+still match.
+The matcher does not balance or unescape brackets or parentheses. A nested bracket in alt text,
+an escape such as `![a\]](p)`, a nested parenthesis such as `![a](p(q))`, or any line break makes
+the whole candidate literal. It does not decode Markdown escapes or entities. The captures contain
+no backslashes by definition. In the replacement, the alt is otherwise preserved, with each `"`
+escaped as `\"`; the path is inserted verbatim. Thus `![A "torch"](torch)` suggests
+`{image("torch", "A \"torch\"")}`. TW1015 points at the opening `!`.
 
 ### Image alt text
 
@@ -439,9 +460,9 @@ TW1014. Missing-alt warnings are decided from the authored alt, as today.
 
 ### Example corpus
 
-This corpus is the implementation contract for #401. *Current* is the Markdig behavior measured
-before #401; a ⏎ marks a line break in the source. `[I: ...]` is emphasis, `[B: ...]` is strong and
-`[C: ...]` is code.
+This 38-example corpus is the implementation contract for #401. *Current* is the Markdig behavior
+measured before #401; a ⏎ marks a line break in the source. `[I: ...]` is emphasis, `[B: ...]` is
+strong and `[C: ...]` is code.
 
 | # | Input | Current | Approved |
 |---|---|---|---|
@@ -480,6 +501,9 @@ before #401; a ⏎ marks a line break in the source. `[I: ...]` is emphasis, `[B
 | 33 | ``` {image("portrait", "`code` and \\ slash")} ``` | Alt ``` `code` and \ slash ```. | Alt `code and \ slash`. |
 | 34 | `{image("portrait", "a \* b")}` | TW1014. | Alt `a * b`. |
 | 35 | `![A torch](torch)` | TW1015. | Same. |
+| 36 | `![a [b]](p)` | TW1015. | Literal. |
+| 37 | `![a\]](p)` | TW1015. | Literal. |
+| 38 | `![a](p(q))` | TW1015. | Literal. |
 
 ## Dotted-prefix completion
 
