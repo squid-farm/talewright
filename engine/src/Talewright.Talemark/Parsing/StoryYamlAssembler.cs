@@ -21,7 +21,7 @@ internal static class StoryYamlAssembler
         YamlNode? triggers = null;
         SourceLocation? triggerLocation = null;
         void Duplicate(string kind, string id, YamlNode node, SourceLocation first) =>
-            yaml.Diagnostics.Error("TW4007", $"{kind} '{id}' is declared more than once (first at {first}).", yaml.At(node));
+            yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"{kind} '{id}' is declared more than once (first at {first}).", yaml.At(node));
         void Collect(YamlMappingNode document)
         {
             yaml.CheckKeys(document, "game", "characters", "factions", "items", "flags", "vars", "triggers");
@@ -56,7 +56,7 @@ internal static class StoryYamlAssembler
             if (Get(document, "triggers") is { } triggerNode)
             {
                 if (triggerLocation is { } first)
-                    yaml.Diagnostics.Error("TW4007", $"Only one 'triggers' section is allowed (first at {first}).", yaml.At(triggerNode));
+                    yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"Only one 'triggers' section is allowed (first at {first}).", yaml.At(triggerNode));
                 else
                 {
                     triggers = triggerNode;
@@ -71,14 +71,14 @@ internal static class StoryYamlAssembler
         {
             if (file.EndsWith("/" + StorySource.ManifestFileName, StringComparison.Ordinal))
             {
-                yaml.Diagnostics.Error("TW4002",
+                yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration,
                     $"'{StorySource.ManifestFileName}' is reserved for the single root story configuration; found additional manifest '{file}'.",
                     new SourceLocation(file, 1, 1));
                 continue;
             }
             if (!file.Contains('/'))
             {
-                yaml.Diagnostics.Error("TW4002",
+                yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration,
                     $"Only '{StorySource.ManifestFileName}' is allowed at the story root; found extra configuration file '{file}'.",
                     new SourceLocation(file, 1, 1));
                 continue;
@@ -86,7 +86,7 @@ internal static class StoryYamlAssembler
             if (yaml.Parse(file, text) is not { } document) continue;
             analysis?.Manifest(document, file);
             if (Get(document, "game") is { } game)
-                yaml.Diagnostics.Error("TW4002", "'game:' is allowed only in the root story configuration.", yaml.At(game));
+                yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "'game:' is allowed only in the root story configuration.", yaml.At(game));
             Collect(document);
         }
         var assembled = new YamlMappingNode();

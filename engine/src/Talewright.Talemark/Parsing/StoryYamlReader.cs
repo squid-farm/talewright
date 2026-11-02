@@ -29,7 +29,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var gameNode = Get(root, "game");
         if (gameNode is null)
         {
-            _yaml.Diagnostics.Error("TW4002", "The root story configuration must declare a 'game:' mapping.", _yaml.At(root));
+            _yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "The root story configuration must declare a 'game:' mapping.", _yaml.At(root));
         }
         var game = gameNode is null ? new YamlMappingNode() : _yaml.Mapping(gameNode, "game") ?? new YamlMappingNode();
         _yaml.CheckKeys(game, "id", "title", "version", "start", "randomness", "seed", "undo", "ruleset", "creation");
@@ -58,7 +58,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             {
                 "off" => RandomnessMode.Off,
                 "checks-only" => RandomnessMode.ChecksOnly,
-                var other => _yaml.Error(randomness, "TW4003", $"randomness must be 'off' or 'checks-only', not '{other}'.", RandomnessMode.ChecksOnly),
+                var other => _yaml.Error(randomness, CompilerDiagnosticCodes.InvalidConfigurationValue, $"randomness must be 'off' or 'checks-only', not '{other}'.", RandomnessMode.ChecksOnly),
             };
         }
 
@@ -66,14 +66,14 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         {
             manifest.Seed = ulong.TryParse(Scalar(seed), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
                 ? value
-                : _yaml.Error<ulong?>(seed, "TW4003", "seed must be a non-negative whole number.", null);
+                : _yaml.Error<ulong?>(seed, CompilerDiagnosticCodes.InvalidConfigurationValue, "seed must be a non-negative whole number.", null);
         }
 
         if (Get(game, "undo") is { } undo)
         {
             manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
                 ? enabled
-                : _yaml.Error(undo, "TW4003", "undo must be true or false.", true);
+                : _yaml.Error(undo, CompilerDiagnosticCodes.InvalidConfigurationValue, "undo must be true or false.", true);
         }
 
         ReadTriggers(Get(root, "triggers"), manifest.Triggers);
@@ -115,7 +115,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
 
             if (!ids.Add(id))
             {
-                _yaml.Diagnostics.Error("TW4007", $"Trigger id '{id}' is declared more than once.", _yaml.At(idNode ?? item));
+                _yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"Trigger id '{id}' is declared more than once.", _yaml.At(idNode ?? item));
                 continue;
             }
 
@@ -129,7 +129,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             var once = Get(map, "once") is { } onceNode
                 ? bool.TryParse(Scalar(onceNode), out var onceValue)
                     ? onceValue
-                    : _yaml.Error(onceNode, "TW4003", "once must be true or false.", false)
+                    : _yaml.Error(onceNode, CompilerDiagnosticCodes.InvalidConfigurationValue, "once must be true or false.", false)
                 : false;
             triggers.Add(new RawTrigger(id, when, _yaml.At(Get(map, "when")!), effects, _yaml.At(Get(map, "do")!), once));
         }

@@ -29,7 +29,7 @@ public sealed class RunCommand : Command<RunSettings>
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or Win32Exception)
         {
-            return CommandLine.Failure("TWCLI002", $"Player launch failed: {ex.Message}", false,
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Player launch failed: {ex.Message}", false,
                 writers.Output, writers.Error);
         }
     }

@@ -31,7 +31,7 @@ internal static class StoryValidator
         var start = new SceneId(manifest.Start);
         if (manifest.Start.Length > 0 && !byId.ContainsKey(start))
         {
-            diagnostics.Error("TW3007", $"Start scene '{manifest.Start}' does not exist.", manifest.StartLocation);
+            diagnostics.Error(CompilerDiagnosticCodes.MissingStartScene, $"Start scene '{manifest.Start}' does not exist.", manifest.StartLocation);
         }
 
         var byTag = new Dictionary<string, HashSet<SceneId>>(StringComparer.Ordinal);
@@ -56,11 +56,11 @@ internal static class StoryValidator
             CheckExits(scene, location, parsed.DroppedMalformedChoice, diagnostics, cancellationToken, checkpoint);
             if (scene.HubLimit is not null && scene.Hub is null)
             {
-                diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
+                diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "@hub-limit requires @hub in the same scene.", location);
             }
             if (scene.Hub is { } hub && !StoryDiverts.ResolveTags(hub, byTag, checkpoint).Any(id => id != scene.Id))
             {
-                diagnostics.Warning("TW3008", $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
+                diagnostics.Warning(CompilerDiagnosticCodes.EmptyHub, $"Hub '{scene.Id}' has no other scenes matching its tags, so it offers nothing.", location);
             }
         }
 
@@ -79,7 +79,7 @@ internal static class StoryValidator
             cancellationToken.ThrowIfCancellationRequested();
             if (!reachability.IsReached(scene.Id))
             {
-                diagnostics.Warning("TW3009", $"Scene '{scene.Id}' can never be reached from '{start}'.", location);
+                diagnostics.Warning(CompilerDiagnosticCodes.UnreachableScene, $"Scene '{scene.Id}' can never be reached from '{start}'.", location);
             }
         }
 
@@ -97,12 +97,12 @@ internal static class StoryValidator
         if (!droppedMalformedChoice && !SceneSteps.Targets(scene.Steps, checkpoint).Any()
             && !hasReachableChoice && scene.Hub is null)
         {
-            diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
+            diagnostics.Error(CompilerDiagnosticCodes.DeadEndScene, $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);
         }
         if ((hasReachableChoice || scene.Hub is not null) &&
             CanReachEndWithoutChoice(scene.Steps, checkpoint))
         {
-            diagnostics.Warning("TW3013", $"Scene '{scene.Id}' may have no available choice. Add an unconditional choice such as '* -> target' or '* [The end] -> END'.", location);
+            diagnostics.Warning(CompilerDiagnosticCodes.MayHaveNoAvailableChoice, $"Scene '{scene.Id}' may have no available choice. Add an unconditional choice such as '* -> target' or '* [The end] -> END'.", location);
         }
         cancellationToken.ThrowIfCancellationRequested();
     }
@@ -147,11 +147,11 @@ internal static class StoryValidator
             checkpoint?.Check();
             if (!reachable)
             {
-                diagnostics.Warning("TW3012", "This line cannot run: an earlier step always leaves this block.", step.Source.Start);
+                diagnostics.Warning(CompilerDiagnosticCodes.UnreachableStep, "This line cannot run: an earlier step always leaves this block.", step.Source.Start);
             }
             if (seenChoice && step is not (ChoiceStep or ConditionalStep))
             {
-                diagnostics.Error("TW3011", "Choices must be the final block of a scene. Move prose, effects, diverts and checks before the first choice.", step.Source.Start);
+                diagnostics.Error(CompilerDiagnosticCodes.StepAfterChoice, "Choices must be the final block of a scene. Move prose, effects, diverts and checks before the first choice.", step.Source.Start);
             }
             if (step is ConditionalStep branch)
             {
@@ -166,7 +166,7 @@ internal static class StoryValidator
                     : choice.Choice.Divert is null;
                 if (missingTarget)
                 {
-                    diagnostics.Error("TW3003", "Every choice and each choice skill-check outcome needs its own '-> target' or '-> END'. There is no scene fallback.", step.Source.Start);
+                    diagnostics.Error(CompilerDiagnosticCodes.MissingChoiceTarget, "Every choice and each choice skill-check outcome needs its own '-> target' or '-> END'. There is no scene fallback.", step.Source.Start);
                 }
             }
             reachable &= SceneSteps.CanContinue(step, checkpoint);

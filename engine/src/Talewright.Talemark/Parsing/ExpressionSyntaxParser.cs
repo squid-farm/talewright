@@ -120,7 +120,7 @@ internal sealed class ExpressionSyntaxParser
         foreach (var token in _tokens)
         {
             if (token.ErrorOffset is not { } offset) continue;
-            _diagnostics.Error("TW1001", token.Value, _locate(offset));
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidExpression, token.Value, _locate(offset));
             invalid = true;
         }
 
@@ -133,7 +133,7 @@ internal sealed class ExpressionSyntaxParser
         get
         {
             var token = TokenAt(_position);
-            if (token.ErrorOffset is { } offset) Fail("TW1001", token.Value, offset);
+            if (token.ErrorOffset is { } offset) Fail(CompilerDiagnosticCodes.InvalidExpression, token.Value, offset);
             return token;
         }
     }
@@ -155,7 +155,7 @@ internal sealed class ExpressionSyntaxParser
     {
         if (Peek.Kind != TokenKind.End)
         {
-            Fail("TW1001", $"Unexpected '{Peek.Text}'.", Peek.Offset);
+            Fail(CompilerDiagnosticCodes.InvalidExpression, $"Unexpected '{Peek.Text}'.", Peek.Offset);
         }
     }
 
@@ -164,7 +164,7 @@ internal sealed class ExpressionSyntaxParser
         if (Peek.Kind != kind)
         {
             var found = Peek.Kind == TokenKind.End ? "end of expression" : Peek.Value;
-            Fail("TW1001", $"Expected {what} but found '{found}'.", Peek.Offset);
+            Fail(CompilerDiagnosticCodes.InvalidExpression, $"Expected {what} but found '{found}'.", Peek.Offset);
         }
 
         return Next();
@@ -189,7 +189,7 @@ internal sealed class ExpressionSyntaxParser
     {
         if (_nestingDepth == MaximumNestingDepth)
         {
-            Fail("TW1016", $"Expression is nested more than {MaximumNestingDepth} levels deep.", opener.Offset);
+            Fail(CompilerDiagnosticCodes.NestingLimitExceeded, $"Expression is nested more than {MaximumNestingDepth} levels deep.", opener.Offset);
         }
 
         _nestingDepth++;
@@ -339,7 +339,7 @@ internal sealed class ExpressionSyntaxParser
                 Next();
                 return int.TryParse(token.Text, out var number)
                     ? new NumberExpressionNode(number, Span(token))
-                    : Fail<ExpressionNode>("TW1002", $"Number '{token.Text}' is too large.", token.Offset);
+                    : Fail<ExpressionNode>(CompilerDiagnosticCodes.NumberTooLarge, $"Number '{token.Text}' is too large.", token.Offset);
             case TokenKind.String:
                 Next();
                 return new TextExpressionNode(token.Value, Span(token));
@@ -357,9 +357,9 @@ internal sealed class ExpressionSyntaxParser
             case TokenKind.Identifier:
                 return ParseIdentifier();
             case TokenKind.Error:
-                return Fail<ExpressionNode>("TW1001", $"Unexpected '{token.Text}'.", token.Offset);
+                return Fail<ExpressionNode>(CompilerDiagnosticCodes.InvalidExpression, $"Unexpected '{token.Text}'.", token.Offset);
             default:
-                return Fail<ExpressionNode>("TW1001",
+                return Fail<ExpressionNode>(CompilerDiagnosticCodes.InvalidExpression,
                     token.Kind == TokenKind.End ? "Expression is incomplete." : $"Unexpected '{token.Text}'.",
                     token.Offset);
         }
@@ -463,14 +463,14 @@ internal sealed class ExpressionSyntaxParser
                 index = SkipSpace(text, index + 1, endOffset);
                 if (index >= endOffset || text[index] != '"')
                 {
-                    Fail("TW2006",
+                    Fail(CompilerDiagnosticCodes.InvalidModifier,
                         $"Write the argument to '#{name}' in double quotes, such as #{name}(\"value\").", index);
                 }
 
                 var literal = QuotedStringSyntax.Read(text, index, endOffset);
                 if (literal.Error is { } error)
                 {
-                    Fail("TW2006", error, literal.ErrorOffset);
+                    Fail(CompilerDiagnosticCodes.InvalidModifier, error, literal.ErrorOffset);
                 }
 
                 argument = literal.Value;
@@ -479,7 +479,7 @@ internal sealed class ExpressionSyntaxParser
                 {
                     if (index >= endOffset || text[index] != ',')
                     {
-                        Fail("TW2006",
+                        Fail(CompilerDiagnosticCodes.InvalidModifier,
                             "'#one-many' requires exactly two quoted strings: #one-many(\"singular\", \"plural\").",
                             index);
                     }
@@ -487,13 +487,13 @@ internal sealed class ExpressionSyntaxParser
                     index = SkipSpace(text, index + 1, endOffset);
                     if (index >= endOffset || text[index] != '"')
                     {
-                        Fail("TW2006", "Write the plural (second) argument to '#one-many' in double quotes.", index);
+                        Fail(CompilerDiagnosticCodes.InvalidModifier, "Write the plural (second) argument to '#one-many' in double quotes.", index);
                     }
 
                     literal = QuotedStringSyntax.Read(text, index, endOffset);
                     if (literal.Error is { } pluralError)
                     {
-                        Fail("TW2006", pluralError, literal.ErrorOffset);
+                        Fail(CompilerDiagnosticCodes.InvalidModifier, pluralError, literal.ErrorOffset);
                     }
 
                     pluralArgument = literal.Value;
@@ -502,13 +502,13 @@ internal sealed class ExpressionSyntaxParser
 
                 if (index >= endOffset || text[index] != ')')
                 {
-                    Fail("TW2006", $"Expected ')' after the argument to '#{name}'.", index);
+                    Fail(CompilerDiagnosticCodes.InvalidModifier, $"Expected ')' after the argument to '#{name}'.", index);
                 }
 
                 index = SkipSpace(text, index + 1, endOffset);
                 if (index < endOffset && text[index] != '#')
                 {
-                    Fail("TW2006", $"Expected '#' or the end of the substitution after '#{name}(…)'.", index);
+                    Fail(CompilerDiagnosticCodes.InvalidModifier, $"Expected '#' or the end of the substitution after '#{name}(…)'.", index);
                 }
             }
 
@@ -532,7 +532,7 @@ internal sealed class ExpressionSyntaxParser
             var ns = Expect(TokenKind.Identifier, "'flag'");
             if (!ns.Is("flag"))
             {
-                Fail("TW1003", $"'{first.Text}' only works on flags: {first.Text} flag:<id>.", ns.Offset);
+                Fail(CompilerDiagnosticCodes.MalformedEffect, $"'{first.Text}' only works on flags: {first.Text} flag:<id>.", ns.Offset);
             }
 
             Expect(TokenKind.Colon, "':'");
@@ -560,7 +560,7 @@ internal sealed class ExpressionSyntaxParser
         var op = Next();
         if (op.Kind is not (TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign))
         {
-            Fail("TW1003", $"Expected '=', '+=' or '-=' but found '{op.Text}'.", op.Offset);
+            Fail(CompilerDiagnosticCodes.MalformedEffect, $"Expected '=', '+=' or '-=' but found '{op.Text}'.", op.Offset);
         }
 
         var amount = ParseSum();

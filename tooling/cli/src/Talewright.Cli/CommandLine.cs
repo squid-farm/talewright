@@ -24,7 +24,7 @@ public static class CommandLine
     {
         if (args.Length == 0)
         {
-            return Failure("TWCLI001", "Choose a command. Use 'talewright --help' for available commands.", false, output, error);
+            return Failure(CliDiagnosticCodes.InvalidCommandOrOptions, "Choose a command. Use 'talewright --help' for available commands.", false, output, error);
         }
 
         // Spectre's version shortcut otherwise ignores extra arguments and case sensitivity.
@@ -32,7 +32,7 @@ public static class CommandLine
              args[0].Equals("-v", StringComparison.OrdinalIgnoreCase)) &&
             (args.Length != 1 || args[0] is not ("--version" or "-v")))
         {
-            return Failure("TWCLI001", "Use 'talewright --version' or 'talewright -v' without other arguments.",
+            return Failure(CliDiagnosticCodes.InvalidCommandOrOptions, "Use 'talewright --version' or 'talewright -v' without other arguments.",
                 false, output, error);
         }
 
@@ -111,7 +111,7 @@ public static class CommandLine
         }
         catch (Exception ex) when (ex is CommandParseException or CommandRuntimeException)
         {
-            return Failure("TWCLI001", message, false, output, error);
+            return Failure(CliDiagnosticCodes.InvalidCommandOrOptions, message, false, output, error);
         }
     }
 
@@ -194,7 +194,7 @@ public sealed class ValidateCommand : Command<ValidationSettings>
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            return CommandLine.Failure("TWCLI002", $"Couldn't read story '{settings.Root}': {ex.Message}", json, writers.Output, writers.Error);
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Couldn't read story '{settings.Root}': {ex.Message}", json, writers.Output, writers.Error);
         }
 
         var result = StoryCompiler.Compile(source);
@@ -204,7 +204,7 @@ public sealed class ValidateCommand : Command<ValidationSettings>
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return CommandLine.Failure("TWCLI002", $"Couldn't measure story '{settings.Root}': {ex.Message}",
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Couldn't measure story '{settings.Root}': {ex.Message}",
                 json, writers.Output, writers.Error);
         }
         var success = result.Success && (!settings.WarningsAsErrors || !result.Warnings.Any());
@@ -243,7 +243,7 @@ public sealed class InvocationFailureCommand : Command<InvocationFailureSettings
     public override int Execute(CommandContext context, InvocationFailureSettings settings, CancellationToken cancellationToken)
     {
         var failure = (InvocationFailure)context.Data!;
-        return CommandLine.Failure("TWCLI001", failure.Message, settings.Format == "json", failure.Output, failure.Error);
+        return CommandLine.Failure(CliDiagnosticCodes.InvalidCommandOrOptions, failure.Message, settings.Format == "json", failure.Output, failure.Error);
     }
 }
 

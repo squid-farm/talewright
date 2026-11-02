@@ -4,6 +4,7 @@ using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using YamlDotNet.RepresentationModel;
 using static Talewright.Talemark.Parsing.StoryYamlContext;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -33,7 +34,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
             : _yaml.Identifier(baseNode, "ruleset id") ?? Rulesets.Generic.GenericRuleset.Id;
         if (!_options.Rulesets.TryGetValue(baseId, out var factory))
         {
-            _yaml.Error(Get(map, "base")!, "TW4004", $"Unknown ruleset '{baseId}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
+            _yaml.Error(Get(map, "base")!, CompilerDiagnosticCodes.UnknownRuleset, $"Unknown ruleset '{baseId}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
             factory = _options.Rulesets[Rulesets.Generic.GenericRuleset.Id];
         }
 
@@ -54,7 +55,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                 }
                 else
                 {
-                    _yaml.Error(item, "TW4005", $"Cannot disable '{id}': the '{baseId}' ruleset has no such stat.", 0);
+                    _yaml.Error(item, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Cannot disable '{id}': the '{baseId}' ruleset has no such stat.", 0);
                 }
             }
         }
@@ -78,14 +79,14 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                 var category = Scalar(Get(stat, "category")) ?? "custom";
                 if (!Enum.TryParse<StatCategory>(category, ignoreCase: true, out var parsedCategory))
                 {
-                    _yaml.Error(Get(stat, "category")!, "TW4003", $"Unknown stat category '{category}'. Use attribute, skill, resource, progression or custom.", 0);
+                    _yaml.Error(Get(stat, "category")!, CompilerDiagnosticCodes.InvalidConfigurationValue, $"Unknown stat category '{category}'. Use attribute, skill, resource, progression or custom.", 0);
                 }
 
                 var min = _yaml.Int(Get(stat, "min")) ?? 0;
                 var max = _yaml.Int(Get(stat, "max")) ?? int.MaxValue;
                 if (min > max)
                 {
-                    _yaml.Error(Get(stat, "min") ?? stat, "TW4003", $"Stat '{id}' minimum ({min}) must not be greater than its maximum ({max}).", 0);
+                    _yaml.Error(Get(stat, "min") ?? stat, CompilerDiagnosticCodes.InvalidConfigurationValue, $"Stat '{id}' minimum ({min}) must not be greater than its maximum ({max}).", 0);
                     continue;
                 }
 
@@ -98,7 +99,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                 {
                     if (parsedCategory != StatCategory.Skill)
                     {
-                        _yaml.Error(attributeNode, "TW4003", $"'governing-attribute' is only allowed on stats with category: skill; '{id}' is not a skill.", 0);
+                        _yaml.Error(attributeNode, CompilerDiagnosticCodes.InvalidConfigurationValue, $"'governing-attribute' is only allowed on stats with category: skill; '{id}' is not a skill.", 0);
                     }
                     governingAttributes[definition.Id] = attributeNode;
                 }
@@ -121,11 +122,11 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
             if (!ruleset.StatsById.TryGetValue(target, out var attribute))
             {
                 var reason = baseRuleset.HasStat(target) ? "disabled" : "unknown";
-                _yaml.Error(targetNode, "TW4005", $"Stat '{skill}' governing-attribute target '{target}' is {reason}. Reference an enabled stat with category: attribute.", 0);
+                _yaml.Error(targetNode, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Stat '{skill}' governing-attribute target '{target}' is {reason}. Reference an enabled stat with category: attribute.", 0);
             }
             else if (attribute.Category != StatCategory.Attribute)
             {
-                _yaml.Error(targetNode, "TW4003", $"Stat '{skill}' governing-attribute target '{target}' must have category: attribute.", 0);
+                _yaml.Error(targetNode, CompilerDiagnosticCodes.InvalidConfigurationValue, $"Stat '{skill}' governing-attribute target '{target}' must have category: attribute.", 0);
             }
         }
 

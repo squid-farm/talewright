@@ -225,7 +225,7 @@ public sealed class StoryWorkspace
             shared.CancellationToken.ThrowIfCancellationRequested();
             if (_missingMetadata)
             {
-                analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5001",
+                analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error, AuthoringDiagnosticCodes.CustomFeaturesUnavailable,
                     "Project authoring metadata is missing. Explicitly supply the project's CompilerOptions or exported authoring metadata; editing never loads project assemblies.",
                     new SourceLocation(StorySource.ManifestFileName, 1, 1)));
             }
