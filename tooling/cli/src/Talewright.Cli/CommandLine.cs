@@ -63,6 +63,9 @@ public static class CommandLine
             config.AddCommand<LintCommand>("lint")
                 .WithDescription("Check a story with configurable Talemark-aware lint rules.")
                 .WithData(writers);
+            config.AddCommand<NewStoryCommand>("new")
+                .WithDescription("Create a runnable starter story folder.")
+                .WithData(writers);
             config.AddCommand<PublishCommand>("publish")
                 .WithDescription("Publish a validated story archive or complete deployable game.")
                 .WithData(writers);

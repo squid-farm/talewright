@@ -46,6 +46,7 @@ public sealed class CommandLineTests
     [InlineData("lint", "unused", "-v")]
     [InlineData("debug", "unused", "--version")]
     [InlineData("run", "unused", "--version")]
+    [InlineData("new", "unused", "--version")]
     [InlineData("publish", "unused", "-v")]
     public void Invalid_version_invocations_are_rejected(params string[] args)
     {

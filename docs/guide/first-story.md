@@ -6,6 +6,11 @@ need a text editor. Follow [Getting started](getting-started.md) to set up VS Co
 Talewright extension on Linux x64, or use another plain-text editor. Both paths can play the story
 in the [web player](https://play.trytalewright.com/).
 
+> **Want a quick playable starting point?** With the [CLI installed](cli-installation.md), run
+> `talewright new night-ferry --title "The Night Ferry"` to create a complete, valid starter story.
+> Open that folder in your editor and use `talewright run night-ferry` to play it. To learn how the
+> manifest and scenes fit together, continue with the manual walkthrough below.
+
 ## 1. Create the story folder
 
 Make a folder called `night-ferry` and open it in your editor. In VS Code, use **File > Open Folder**
