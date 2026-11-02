@@ -163,9 +163,11 @@ guarantees for arbitrary author code. For comparisons, record the runtime,
 corpus, CPU, power source and power mode, and run without other build/test work.
 
 The default slow-input ladder analyzes paragraphs with substitutions and inline
-conditions, single-line substitutions, nested block conditions, unmatched
-emphasis, unclosed links, and both plain choices and choices with requirements
-and effects at 1, 5, 10, 20, 50, 100, 500 and 1,000 elements. The opt-in
+conditions, single-line substitutions, nested block conditions, nested
+parentheses, unary prefixes, unmatched emphasis, unclosed links, and both plain
+choices and choices with requirements and effects at 1, 5, 10, 20, 50, 100, 500
+and 1,000 elements. Sizes past a nesting limit must recover with exactly one
+TW1016 and no other error. The opt-in
 extension adds 10,000 for each shape. A process-isolated language-server test
 compiles and analyzes the 10,000-level nested-condition, parenthesis and
 unary-prefix cases, verifying one TW1016 diagnostic and no spurious TW1005.
