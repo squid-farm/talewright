@@ -138,7 +138,7 @@ void MeasureRealisticCorpus()
                 throw new InvalidOperationException("The realistic corpus compiled to an unexpected scene count.");
             }
         });
-    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 91);
+    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 72);
 }
 
 void MeasureSlowShape(SlowInputShape shape, string name)
@@ -159,7 +159,7 @@ void MeasureSlowShape(SlowInputShape shape, string name)
             _ => 0,
         };
         // Broken lines must stay well below the cost of analysing the valid choice they approximate.
-        double? allocationCeiling = shape == SlowInputShape.BrokenChoiceLines && size >= 1_000 ? 150 : null;
+        double? allocationCeiling = shape == SlowInputShape.BrokenChoiceLines && size >= 1_000 ? 104 : null;
         MeasureAnalysis($"Slow {name} {size}", source, 1, allocationCeiling: allocationCeiling,
             expectedNestingDiagnostic: size > nestingLimit, expectedChoiceErrors: expectedChoiceErrors);
     }

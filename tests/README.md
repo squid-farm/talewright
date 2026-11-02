@@ -175,7 +175,7 @@ choices with requirements and effects, broken choice lines, and one unclosed
 choice label of the requested length at 1, 5, 10, 20, 50, 100, 500 and 1,000
 elements. Broken choice lines must report one TW1011 per line, and the unclosed
 label must report one TW1011. At 1,000 lines and above, broken choice lines also
-fail if any measured analysis allocation exceeds 150 bytes per source byte, which
+fail if any measured analysis allocation exceeds 104 bytes per source byte, which
 keeps recovery well below the cost of analyzing the valid choice it approximates.
 Sizes past a nesting limit must recover with exactly one
 TW1016 and no other error. The opt-in
@@ -250,6 +250,27 @@ measured maximum allocations of 34,392,056 bytes (48.44 B/source byte) for
 compile and 58,589,424 bytes (82.53 B/source byte) for analysis; both passed
 the active ceilings of **54** and **91 B/source byte**, down from **55** and
 **95**.
+
+#### #398 on-request completion sites
+
+`StoryAnalysis` no longer precomputes every expression completion site; it keeps
+each expression's site inputs and builds sites only for the position a request
+asks about. A Release run on the same machine and corpus compared `origin/main`
+(`7278267`) with the #398 branch:
+
+| Workload | Main allocated bytes (B/source byte) | #398 allocated bytes (B/source byte) |
+|---|---:|---:|
+| Analyze realistic 20 chapters | 58,572,912 (82.50, max 83.21) | 46,057,272 (64.87, max 65.90) |
+| Slow broken choice lines 1,000 | 8,160,256 (133.43) | 5,696,576 (93.14, max 94.36) |
+| Slow choices 1,000 | 4,195,368 | 4,243,840 |
+| Slow choices with expressions 1,000 | 25.92 MB | 17.27 MB |
+
+Retained managed bytes for one realistic `StoryAnalysis` rose from 11,979,544 to
+12,190,248 (+1.8%) because expression site inputs are kept instead of finished
+sites. The position index is built on the first site query (about 16 ms and
+605 KB for this corpus); later `CompletionSitesAt` queries took about 10 µs
+instead of a 450 µs scan. The ceilings were lowered to **72** (realistic
+analysis) and **104 B/source byte** (broken choice lines), from **91** and **150**.
 
 Any later PR in #392 that lowers a workload's allocation must lower its ceiling
 to the new measured maximum plus 10% (rounding up as needed). No PR may raise a

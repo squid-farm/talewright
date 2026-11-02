@@ -1,6 +1,7 @@
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Formatting;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
@@ -138,7 +139,8 @@ public sealed class StorySceneDetailsTests
         var analysis = StoryAnalyzer.Analyze(storySource);
         Assert.Empty(analysis.Diagnostics);
         Assert.Contains(analysis.Expressions, expression => expression.Kind == ExpressionContextKind.Condition);
-        Assert.Contains(analysis.CompletionSites,
+        var lastCondition = new SourceLocation("main.tale", 2, source.Split('\n')[1].Length - 3);
+        Assert.Contains(analysis.CompletionSitesAt(lastCondition),
             site => site.Range.Start.Line == 2 && site.Range.Start.Column > 50_000);
 
         var details = Details(Compile(storySource), "start");

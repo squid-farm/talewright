@@ -213,7 +213,7 @@ public sealed class StoryCompletionTests
         });
         var analysis = StoryAnalyzer.Analyze(source);
         Assert.True(StoryCompletion.Complete(analysis, position).Any(item => item.Label == expected),
-            $"At {position}: {string.Join("; ", analysis.CompletionSites.Select(site => $"{site.Text} {site.Range}"))}");
+            $"At {position}: {string.Join("; ", analysis.CompletionSitesAt(position).Select(site => $"{site.Text} {site.Range}"))}");
     }
 
     [Fact]

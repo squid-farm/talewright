@@ -70,18 +70,21 @@ internal readonly record struct CompletionSiteSource(SourceRange Region, Complet
         Site is not null ? [Site] : Expression!.Sites(symbols);
 }
 
-/// <summary>Finds the site sources whose regions contain a position, preserving analysis order.</summary>
-internal sealed class CompletionSiteIndex
+/// <summary>
+/// Finds the site sources whose regions contain a position, preserving analysis order. The position index is
+/// built on the first query, so analyses that are never queried do not pay for it.
+/// </summary>
+internal sealed class CompletionSiteIndex(CompletionSiteSource[] sources)
 {
-    private readonly CompletionSiteSource[] _sources;
-    private readonly Dictionary<string, FileSources> _files = new(StringComparer.Ordinal);
+    private readonly CompletionSiteSource[] _sources = sources;
+    private Dictionary<string, FileSources>? _files;
 
     // Sources sorted by region start; MaxEnds[i] is the furthest region end among the first i + 1 entries.
     private sealed record FileSources(int[] Order, SourceLocation[] Starts, SourceLocation[] MaxEnds);
 
-    internal CompletionSiteIndex(IReadOnlyList<CompletionSiteSource> sources)
+    private Dictionary<string, FileSources> Build()
     {
-        _sources = sources.ToArray();
+        var files = new Dictionary<string, FileSources>(StringComparer.Ordinal);
         foreach (var group in Enumerable.Range(0, _sources.Length).GroupBy(index => _sources[index].Region.Start.File))
         {
             var order = group.OrderBy(index => _sources[index].Region.Start, Comparer<SourceLocation>.Create(Compare))
@@ -94,14 +97,16 @@ internal sealed class CompletionSiteIndex
                 starts[index] = region.Start;
                 maxEnds[index] = index > 0 && Compare(maxEnds[index - 1], region.End) > 0 ? maxEnds[index - 1] : region.End;
             }
-            _files.Add(group.Key, new(order, starts, maxEnds));
+            files.Add(group.Key, new(order, starts, maxEnds));
         }
+        return files;
     }
 
     /// <summary>Sites whose range contains <paramref name="position"/>, including a range ending there.</summary>
     internal IReadOnlyList<CompletionSite> At(SourceLocation position, IReadOnlyList<AuthoringSymbol> symbols)
     {
-        if (position.File is null || !_files.TryGetValue(position.File, out var file)) return [];
+        var files = LazyInitializer.EnsureInitialized(ref _files, Build);
+        if (position.File is null || !files.TryGetValue(position.File, out var file)) return [];
         var low = 0;
         var high = file.Starts.Length;
         while (low < high)
@@ -124,6 +129,9 @@ internal sealed class CompletionSiteIndex
                     result.Add(site);
         return result;
     }
+
+    internal IEnumerable<CompletionSite> All(IReadOnlyList<AuthoringSymbol> symbols) =>
+        _sources.SelectMany(source => source.Sites(symbols));
 
     private static int Compare(SourceLocation left, SourceLocation right) =>
         left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);
