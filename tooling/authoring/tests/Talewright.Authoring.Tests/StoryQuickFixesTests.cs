@@ -61,7 +61,7 @@ public sealed class StoryQuickFixesTests
     [InlineData("game: {id: x}\n", "true", "\nflags:\n  - 'true'\n")]
     [InlineData("flags: []\n", "false", "'false'")]
     [InlineData("flags: [ready]\n", "Null", ", 'Null'")]
-    [InlineData("flags:\n  - ready\n", "yes", "  - 'yes'\n")]
+    [InlineData("flags:\n  - ready\n", "yes", "  - yes\n")]
     [InlineData("flags: [ready]\n", "true-ish", ", true-ish")]
     public void Yaml_keyword_spellings_are_quoted_in_every_list_shape(string manifest, string item, string newText)
     {

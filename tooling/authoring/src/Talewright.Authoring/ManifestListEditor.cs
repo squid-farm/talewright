@@ -128,11 +128,10 @@ internal static class ManifestListEditor
         return new(new(new(point, point), insertion), null);
     }
 
-    // Identifiers cannot look numeric, but plain keyword spellings would resolve to booleans or null
-    // under YAML 1.2 core or YAML 1.1 schemas.
+    // YAML 1.2 core resolves these plain spellings as booleans or null.
     private static readonly HashSet<string> ReservedScalars = new(StringComparer.OrdinalIgnoreCase)
     {
-        "true", "false", "null", "yes", "no", "on", "off", "y", "n"
+        "true", "false", "null"
     };
 
     private static string FormatScalar(string item) => ReservedScalars.Contains(item) ? $"'{item}'" : item;
