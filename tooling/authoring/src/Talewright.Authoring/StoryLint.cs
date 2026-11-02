@@ -17,8 +17,8 @@ public sealed record StoryLintRule(string Id, string Description, LintSeverity D
 
 public static class StoryLintRules
 {
-    public const string SceneIdStyle = "TWL001";
-    public const string StoryIdStyle = "TWL002";
+    public const string SceneIdStyle = AuthoringDiagnosticCodes.SceneIdStyle;
+    public const string StoryIdStyle = AuthoringDiagnosticCodes.StoryIdStyle;
 
     private static readonly Regex StoryIdPattern = new(@"\A[a-z0-9]+(?:-[a-z0-9]+)*\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -284,7 +284,7 @@ public static class StoryLintAnalyzer
         configuration ??= LintConfiguration.Defaults;
         var findings = new List<StoryLintDiagnostic>();
         var invalidSceneIdLocations = analysis.Diagnostics
-            .Where(diagnostic => diagnostic.Code == "TW1008")
+            .Where(diagnostic => diagnostic.Code == CompilerDiagnosticCodes.InvalidSceneId)
             .Select(diagnostic => (diagnostic.Location.File, diagnostic.Location.Line))
             .ToHashSet();
 

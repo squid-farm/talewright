@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Talewright.LanguageServer/Talewright.LanguageServer.csproj" />
     <ProjectReference Include="../../../cli/src/Talewright.Cli/Talewright.Cli.csproj" />
+    <ProjectReference Include="../../../authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
+    <ProjectReference Include="../../../../engine/src/Talewright.Talemark/Talewright.Talemark.csproj" />
     <ProjectReference Include="../../../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>
 </Project>

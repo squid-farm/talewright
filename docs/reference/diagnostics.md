@@ -2,6 +2,10 @@
 
 Every problem Talewright reports has a code and a location:
 
+Diagnostic codes are defined in assembly-owned catalogs: `CompilerDiagnosticCodes`,
+`AuthoringDiagnosticCodes`, `LanguageServerDiagnosticCodes` and `CliDiagnosticCodes`.
+These catalogs are the source of truth; the reference tables are checked against them.
+
 ```text
 chapters/03-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 └── file ─────────────┘ │  │         └ code ┘ └ message ──────────────┘
@@ -129,6 +133,10 @@ the story. See the [CLI reference](cli.md#output-contract).
 
 These messages concern editor integration and C# extensions. `TWLSP005` can also appear while
 editing an ordinary `.tale` story.
+
+The language server also writes the `TWLSP001`, `TWLSP002` and `TWLSP003` prefixes to stderr
+for startup, background-request and analysis failures. These are log prefixes, not diagnostics
+shown to the user, and are defined separately in `LanguageServerLogCodes`.
 
 | Code | Meaning | Usual fix |
 |---|---|---|

@@ -420,7 +420,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             TaleParser.Parse(file, text, symbols, diagnostics, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
-                diagnostic.Code is "TW2010" or "TW2011" or "TW2012" or "TW2013" or "TW2014"));
+                diagnostic.Code is CompilerDiagnosticCodes.UnsafeImagePath or CompilerDiagnosticCodes.UnsupportedImageFormat or CompilerDiagnosticCodes.MissingImage or CompilerDiagnosticCodes.AmbiguousImagePath or CompilerDiagnosticCodes.MissingImageAlt));
         }
     }
 }

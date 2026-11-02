@@ -222,7 +222,7 @@ internal static class ImageSyntax
         }
 
         void Error(string message, int offset) =>
-            diagnostics.Error("TW1014", message, source.Locate(offset));
+            diagnostics.Error(CompilerDiagnosticCodes.InvalidImageCall, message, source.Locate(offset));
     }
 
     private static bool HasTemplate(string text, CancellationToken cancellationToken)

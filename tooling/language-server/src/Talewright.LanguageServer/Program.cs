@@ -16,6 +16,6 @@ try
 }
 catch (Exception exception) when (exception is IOException or InvalidDataException or System.Text.Json.JsonException)
 {
-    Console.Error.WriteLine($"TWLSP001: {exception.Message}");
+    Console.Error.WriteLine($"{LanguageServerLogCodes.StartupFailure}: {exception.Message}");
     return 1;
 }
