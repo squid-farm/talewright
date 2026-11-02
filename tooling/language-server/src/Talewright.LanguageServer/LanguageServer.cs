@@ -26,6 +26,8 @@ public sealed class LanguageServer
     private bool _requiresMetadata;
     private bool _hoverMarkdown;
     private bool _inlayRefreshSupported;
+    private bool _documentChangesSupported;
+    private bool _createFileOperationSupported;
     private bool _inlayRefreshPending;
     private const string InlayRefreshId = "talewright/inlayHintRefresh";
 
@@ -68,10 +70,11 @@ public sealed class LanguageServer
     }
     private readonly record struct DiagnosticPosition(int Line, int Character);
     private sealed record ProtocolError(int Code, string Message);
-    private enum Feature { Completion, Hover, Definition, InlayHints }
+    private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions }
     private const int DiagnosticLimit = 200;
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
-        Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown)
+        Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown,
+        bool documentChangesSupported, bool createFileOperationSupported)
     {
         public JsonElement Id { get; } = id;
         public string Key { get; } = key;
@@ -79,12 +82,15 @@ public sealed class LanguageServer
         public string Path { get; } = path;
         public string Root { get; } = document.Root;
         public string Text { get; } = document.Text;
+        public int Version { get; } = document.Version;
         public Story Story { get; set; } = story;
         public long Generation { get; set; } = story.Generation;
         public Feature Feature { get; } = feature;
         public SourceLocation Position { get; } = position;
         public SourceLocation End { get; } = end;
         public bool Markdown { get; } = markdown;
+        public bool DocumentChangesSupported { get; } = documentChangesSupported;
+        public bool CreateFileOperationSupported { get; } = createFileOperationSupported;
         public CancellationTokenSource Cancellation { get; } = new();
     }
 
@@ -239,6 +245,7 @@ public sealed class LanguageServer
                         hoverProvider = true,
                         definitionProvider = true,
                         inlayHintProvider = true,
+                        codeActionProvider = new { codeActionKinds = new[] { "quickfix" }, resolveProvider = false },
                         completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(", "\"", "/" } },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
@@ -286,6 +293,10 @@ public sealed class LanguageServer
                     if (!hasId) throw new ArgumentException("inlayHint requires a request id.");
                     await StartSemanticAsync(id, parameters, Feature.InlayHints, cancellationToken);
                     break;
+                case "textDocument/codeAction":
+                    if (!hasId) throw new ArgumentException("codeAction requires a request id.");
+                    await StartSemanticAsync(id, parameters, Feature.CodeActions, cancellationToken);
+                    break;
                 case "textDocument/didChange":
                     Change(parameters);
                     break;
@@ -320,6 +331,18 @@ public sealed class LanguageServer
             workspaceCapabilities.TryGetProperty("inlayHint", out var inlayHint) &&
             inlayHint.TryGetProperty("refreshSupport", out var refreshSupport))
             _inlayRefreshSupported = refreshSupport.GetBoolean();
+        if (parameters.TryGetProperty("capabilities", out clientCapabilities) &&
+            clientCapabilities.TryGetProperty("workspace", out workspaceCapabilities) &&
+            workspaceCapabilities.TryGetProperty("workspaceEdit", out var workspaceEdit))
+        {
+            _documentChangesSupported = workspaceEdit.TryGetProperty("documentChanges", out var documentChanges) &&
+                documentChanges.ValueKind == JsonValueKind.True;
+            _createFileOperationSupported = _documentChangesSupported &&
+                workspaceEdit.TryGetProperty("resourceOperations", out var resourceOperations) &&
+                resourceOperations.ValueKind == JsonValueKind.Array &&
+                resourceOperations.EnumerateArray().Any(operation =>
+                    operation.ValueKind == JsonValueKind.String && operation.GetString() == "create");
+        }
         if (parameters.TryGetProperty("capabilities", out var capabilities) &&
             capabilities.TryGetProperty("textDocument", out var textDocument) &&
             textDocument.TryGetProperty("hover", out var hover) &&
@@ -369,9 +392,10 @@ public sealed class LanguageServer
                 throw new ArgumentException($"{feature} position is outside the current document.");
             return new(Relative(story.Root, path), line + 1, character + 1);
         }
-        var position = Position(kind == Feature.InlayHints
+        var isRangeRequest = kind is Feature.InlayHints or Feature.CodeActions;
+        var position = Position(isRangeRequest
             ? parameters.GetProperty("range").GetProperty("start") : parameters.GetProperty("position"));
-        var end = kind == Feature.InlayHints ? Position(parameters.GetProperty("range").GetProperty("end")) : position;
+        var end = isRangeRequest ? Position(parameters.GetProperty("range").GetProperty("end")) : position;
         if (Compare(position, end) > 0) throw new ArgumentException($"{feature} range is reversed.");
         if (story.MetadataError is { } error)
         {
@@ -386,8 +410,15 @@ public sealed class LanguageServer
             return;
         }
         if (story.Pending is null) Schedule(story);
-        var request = new PendingRequest(id, key, $"textDocument/{(kind == Feature.InlayHints ? "inlayHint" : feature.ToLowerInvariant())}",
-            path, document, story, kind, position, end, _hoverMarkdown);
+        var method = kind switch
+        {
+            Feature.InlayHints => "textDocument/inlayHint",
+            Feature.CodeActions => "textDocument/codeAction",
+            _ => $"textDocument/{feature.ToLowerInvariant()}"
+        };
+        var request = new PendingRequest(id, key, method,
+            path, document, story, kind, position, end, _hoverMarkdown,
+            _documentChangesSupported, _createFileOperationSupported);
         _requests.Add(key, request);
         var previous = (kind is Feature.Hover or Feature.Definition) &&
             story.PublishedAnalysis is { } published &&
@@ -454,6 +485,21 @@ public sealed class LanguageServer
             return new(null, ErrorCode: -32001, ErrorMessage: $"{request.Feature} unavailable: {unavailable.Message}");
 
         var position = request.Position;
+        if (request.Feature == Feature.CodeActions)
+        {
+            var diagnostics = analysis.Diagnostics.Where(diagnostic =>
+                diagnostic.Code == "TW2002" && diagnostic.Location.File == position.File &&
+                Compare(position, diagnostic.Location) <= 0 && Compare(diagnostic.Location, request.End) <= 0);
+            var lines = new LineMap(request.Text);
+            var actions = diagnostics.SelectMany(diagnostic =>
+                StoryQuickFixes.ForMissingScene(analysis, diagnostic)
+                    .Where(fix => fix.Kind != StoryQuickFixKind.CreateFile ||
+                        request.CreateFileOperationSupported &&
+                        !File.Exists(Path.GetFullPath(fix.File, request.Root)) &&
+                        !Directory.Exists(Path.GetFullPath(fix.File, request.Root)))
+                    .Select(fix => ToCodeAction(fix, diagnostic, request, lines))).ToArray();
+            return new(actions, previous);
+        }
         if (request.Feature == Feature.InlayHints)
         {
             var hints = StoryPreview.Get(analysis, position.File)
@@ -515,6 +561,67 @@ public sealed class LanguageServer
                 }
             }).ToArray()
         }, previous);
+    }
+
+    private static object ToCodeAction(StoryQuickFix fix, Diagnostic diagnostic, PendingRequest request, LineMap lines)
+    {
+        var file = Path.GetFullPath(fix.File, request.Root);
+        var uri = UriFromPath(file);
+        var diagnosticItem = ToDiagnostic(diagnostic, lines);
+        var start = lines.Position(fix.Range.Start);
+        var end = lines.Position(fix.Range.End);
+        var edit = new
+        {
+            range = new
+            {
+                start = new { line = start.Line, character = start.Character },
+                end = new { line = end.Line, character = end.Character }
+            },
+            newText = fix.NewText
+        };
+
+        if (fix.Kind == StoryQuickFixKind.CreateFile)
+        {
+            return new
+            {
+                title = fix.Title,
+                kind = "quickfix",
+                diagnostics = new[] { diagnosticItem },
+                edit = new
+                {
+                    documentChanges = new object[]
+                    {
+                        new { kind = "create", uri, options = new { overwrite = false, ignoreIfExists = false } },
+                        new { textDocument = new { uri, version = (int?)null }, edits = new[] { edit } }
+                    }
+                },
+                command = new { title = fix.Title, command = "vscode.open", arguments = new object[] { uri } }
+            };
+        }
+
+        object workspaceEdit = request.DocumentChangesSupported
+            ? new
+            {
+                documentChanges = new object[]
+                {
+                    new
+                    {
+                        textDocument = new { uri, version = (int?)request.Version },
+                        edits = new[] { edit }
+                    }
+                }
+            }
+            : new
+            {
+                changes = new Dictionary<string, object[]> { [uri] = [edit] }
+            };
+        return new
+        {
+            title = fix.Title,
+            kind = "quickfix",
+            diagnostics = new[] { diagnosticItem },
+            edit = workspaceEdit
+        };
     }
 
     private async Task CompleteRequestAsync(RequestFinished finished, CancellationToken cancellationToken)
