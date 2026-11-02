@@ -93,6 +93,8 @@ var slowShapes = new (SlowInputShape Shape, string Name)[]
     (SlowInputShape.ParagraphLines, "paragraph lines"),
     (SlowInputShape.InlineSubstitutions, "inline substitutions"),
     (SlowInputShape.NestedConditions, "nested conditions"),
+    (SlowInputShape.NestedParentheses, "nested parentheses"),
+    (SlowInputShape.UnaryPrefixes, "unary prefixes"),
     (SlowInputShape.UnmatchedEmphasis, "unmatched emphasis"),
     (SlowInputShape.UnclosedLinks, "unclosed links"),
     (SlowInputShape.Choices, "choices"),
@@ -101,13 +103,19 @@ var slowShapes = new (SlowInputShape Shape, string Name)[]
 int[] slowSizes = includeStress
     ? [1, 5, 10, 20, 50, 100, 500, 1_000, 10_000]
     : [1, 5, 10, 20, 50, 100, 500, 1_000];
-Console.WriteLine("Slow-input timings are report-only; 10,000 is opt-in. Recursive expression shapes are disabled until #396.");
+Console.WriteLine("Slow-input timings are report-only; 10,000 is opt-in. Inputs past a nesting limit must recover with one TW1016.");
 foreach (var (shape, name) in slowShapes)
 {
     foreach (var size in slowSizes)
     {
         var source = SlowInputStories.Create(shape, size);
-        MeasureAnalysis($"Slow {name} {size}", source, 1);
+        var nestingLimit = shape switch
+        {
+            SlowInputShape.NestedConditions => 64,
+            SlowInputShape.NestedParentheses or SlowInputShape.UnaryPrefixes => 256,
+            _ => int.MaxValue,
+        };
+        MeasureAnalysis($"Slow {name} {size}", source, 1, expectedNestingDiagnostic: size > nestingLimit);
     }
 }
 Console.WriteLine(FormattableString.Invariant($"Harness total, excluding build: {Stopwatch.GetElapsedTime(harnessStarted).TotalSeconds:F2} s"));
@@ -119,16 +127,21 @@ StoryDefinition Compile(StorySource source)
     return result.Story ?? throw new InvalidOperationException(string.Join("\n", result.Diagnostics));
 }
 
-void MeasureAnalysis(string name, StorySource source, int expectedScenes, double? allocationCeiling = null)
+void MeasureAnalysis(string name, StorySource source, int expectedScenes, double? allocationCeiling = null,
+    bool expectedNestingDiagnostic = false)
 {
     var sourceBytes = PerformanceSource.Utf8ByteCount(source);
     Measure(name, () => StoryAnalyzer.Analyze(source), sourceBytes: sourceBytes, allocationCeiling: allocationCeiling,
         validate: analysis =>
         {
-            if (analysis.Scenes.Count != expectedScenes || analysis.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
+            var errors = analysis.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+            var expectedErrors = expectedNestingDiagnostic
+                ? errors.Count == 1 && errors[0].Code == "TW1016"
+                : errors.Count == 0;
+            if (analysis.Scenes.Count != expectedScenes || !expectedErrors)
             {
                 throw new InvalidOperationException(
-                    $"{name} produced {analysis.Scenes.Count} scenes instead of {expectedScenes}, or has errors:\n{string.Join("\n", analysis.Diagnostics)}");
+                    $"{name} produced {analysis.Scenes.Count} scenes instead of {expectedScenes}, or has unexpected errors:\n{string.Join("\n", analysis.Diagnostics)}");
             }
         });
 }

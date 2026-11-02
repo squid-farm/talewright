@@ -39,18 +39,100 @@ public static class ExpressionEvaluator
 
     public static Value Evaluate(Expr expr, EvaluationContext context)
     {
-        if (context.Trace is not { } observe)
+        ArgumentNullException.ThrowIfNull(expr);
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (expr is not (UnaryExpr or BinaryExpr))
         {
-            return EvaluateCore(expr, context);
+            var value = EvaluateAtom(expr, context);
+            context.Trace?.Invoke(new ExpressionTrace(expr, value, Array.Empty<ExpressionTrace>()));
+            return value;
         }
 
-        var children = new List<ExpressionTrace>();
-        var value = EvaluateCore(expr, context with { Trace = children.Add });
-        observe(new ExpressionTrace(expr, value, children.AsReadOnly()));
-        return value;
+        var frames = new Stack<EvaluationFrame>();
+        frames.Push(new EvaluationFrame(expr, context.Trace is not null));
+        var returnedValue = default(Value);
+        ExpressionTrace? returnedTrace = null;
+
+        while (frames.TryPeek(out var frame))
+        {
+            switch (frame.Expression)
+            {
+                case UnaryExpr unary when frame.State == 0:
+                    frame.State = 1;
+                    frames.Push(new EvaluationFrame(unary.Operand, context.Trace is not null));
+                    break;
+                case UnaryExpr unary:
+                    if (frame.Children is not null) frame.Children.Add(returnedTrace!);
+                    returnedValue = unary.Op switch
+                    {
+                        UnaryOp.Not => Value.Of(!returnedValue.Bool),
+                        UnaryOp.Negate => Value.Of(Arithmetic.Saturate(-(long)returnedValue.Number)),
+                        _ => throw new NotSupportedException(unary.Op.ToString()),
+                    };
+                    Complete(frame, returnedValue);
+                    break;
+                case BinaryExpr binary when frame.State == 0:
+                    frame.State = 1;
+                    frames.Push(new EvaluationFrame(binary.Left, context.Trace is not null));
+                    break;
+                case BinaryExpr binary when frame.State == 1:
+                    frame.Left = returnedValue;
+                    if (frame.Children is not null) frame.Children.Add(returnedTrace!);
+                    if (binary.Op == BinaryOp.And && !returnedValue.Bool)
+                    {
+                        if (frame.Children is not null) frame.Children.Add(ExpressionTrace.NotEvaluated(binary.Right));
+                        returnedValue = Value.Of(false);
+                        Complete(frame, returnedValue);
+                    }
+                    else if (binary.Op == BinaryOp.Or && returnedValue.Bool)
+                    {
+                        if (frame.Children is not null) frame.Children.Add(ExpressionTrace.NotEvaluated(binary.Right));
+                        returnedValue = Value.Of(true);
+                        Complete(frame, returnedValue);
+                    }
+                    else
+                    {
+                        frame.State = 2;
+                        frames.Push(new EvaluationFrame(binary.Right, context.Trace is not null));
+                    }
+                    break;
+                case BinaryExpr binary:
+                    if (frame.Children is not null) frame.Children.Add(returnedTrace!);
+                    returnedValue = ApplyBinary(binary, frame.Left, returnedValue, context);
+                    Complete(frame, returnedValue);
+                    break;
+                default:
+                    returnedValue = EvaluateAtom(frame.Expression, context);
+                    Complete(frame, returnedValue);
+                    break;
+            }
+        }
+
+        if (context.Trace is { } observe)
+        {
+            observe(returnedTrace!);
+        }
+        return returnedValue;
+
+        void Complete(EvaluationFrame completed, Value value)
+        {
+            returnedTrace = completed.Children is null
+                ? null
+                : new ExpressionTrace(completed.Expression, value, completed.Children.AsReadOnly());
+            frames.Pop();
+        }
     }
 
-    private static Value EvaluateCore(Expr expr, EvaluationContext context)
+    private sealed class EvaluationFrame(Expr expression, bool trace)
+    {
+        public Expr Expression { get; } = expression;
+        public int State { get; set; }
+        public Value Left { get; set; }
+        public List<ExpressionTrace>? Children { get; } = trace ? [] : null;
+    }
+
+    private static Value EvaluateAtom(Expr expr, EvaluationContext context)
     {
         var state = context.State;
         return expr switch
@@ -74,38 +156,12 @@ public static class ExpressionEvaluator
             HasItem e => Value.Of(state.GetItemCount(e.Character, e.Item) > 0),
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
-            UnaryExpr { Op: UnaryOp.Not } e => Value.Of(!Evaluate(e.Operand, context).Bool),
-            UnaryExpr { Op: UnaryOp.Negate } e => Value.Of(Arithmetic.Saturate(-(long)Evaluate(e.Operand, context).Number)),
-            BinaryExpr e => Binary(e, context),
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };
     }
 
-    private static Value Binary(BinaryExpr e, EvaluationContext context)
+    private static Value ApplyBinary(BinaryExpr e, Value left, Value right, EvaluationContext context)
     {
-        // Short-circuit boolean operators.
-        if (e.Op == BinaryOp.And)
-        {
-            if (!Evaluate(e.Left, context).Bool)
-            {
-                context.Trace?.Invoke(ExpressionTrace.NotEvaluated(e.Right));
-                return Value.Of(false);
-            }
-            return Value.Of(Evaluate(e.Right, context).Bool);
-        }
-
-        if (e.Op == BinaryOp.Or)
-        {
-            if (Evaluate(e.Left, context).Bool)
-            {
-                context.Trace?.Invoke(ExpressionTrace.NotEvaluated(e.Right));
-                return Value.Of(true);
-            }
-            return Value.Of(Evaluate(e.Right, context).Bool);
-        }
-
-        var left = Evaluate(e.Left, context);
-        var right = Evaluate(e.Right, context);
         return e.Op switch
         {
             BinaryOp.Add => Value.Of(Arithmetic.Saturate((long)left.Number + right.Number)),
@@ -118,6 +174,8 @@ public static class ExpressionEvaluator
             BinaryOp.LessOrEqual => Value.Of(Compare(left, right, context) <= 0),
             BinaryOp.Greater => Value.Of(Compare(left, right, context) > 0),
             BinaryOp.GreaterOrEqual => Value.Of(Compare(left, right, context) >= 0),
+            BinaryOp.And => Value.Of(left.Bool && right.Bool),
+            BinaryOp.Or => Value.Of(left.Bool || right.Bool),
             _ => throw new NotSupportedException(e.Op.ToString()),
         };
     }

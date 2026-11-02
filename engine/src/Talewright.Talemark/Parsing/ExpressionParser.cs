@@ -28,6 +28,8 @@ namespace Talewright.Talemark.Parsing;
 /// </remarks>
 internal sealed class ExpressionParser
 {
+    internal const int MaximumNestingDepth = 256;
+
     private static readonly string[] Keywords = ["and", "or", "not", "has", "true", "false", "visited"];
 
     private readonly List<Token> _tokens;
@@ -35,6 +37,7 @@ internal sealed class ExpressionParser
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
     private int _pos;
+    private int _nestingDepth;
 
     private ExpressionParser(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
         Func<int, SourceLocation>? locate = null)
@@ -391,6 +394,24 @@ internal sealed class ExpressionParser
         throw new ParseException();
     }
 
+    private Expr ParseNested(Token opener, Func<Expr> parse)
+    {
+        if (_nestingDepth == MaximumNestingDepth)
+        {
+            Fail("TW1016", $"Expression is nested more than {MaximumNestingDepth} levels deep.", opener.Offset);
+        }
+
+        _nestingDepth++;
+        try
+        {
+            return parse();
+        }
+        finally
+        {
+            _nestingDepth--;
+        }
+    }
+
     private Expr ParseOr()
     {
         var left = ParseAnd();
@@ -430,7 +451,7 @@ internal sealed class ExpressionParser
         if (IsKeyword("not"))
         {
             var op = Next();
-            var operand = ParseNot();
+            var operand = ParseNested(op, ParseNot);
             if (operand.Type != ExprType.Bool)
             {
                 Fail("TW2003", "'not' needs a true/false condition.", op.Offset);
@@ -530,7 +551,7 @@ internal sealed class ExpressionParser
                 return new NumberLiteral(int.MinValue);
             }
 
-            var operand = ParseUnary();
+            var operand = ParseNested(op, ParseUnary);
             if (operand.Type != ExprType.Number)
             {
                 Fail("TW2003", "'-' needs a number.", op.Offset);
@@ -551,6 +572,10 @@ internal sealed class ExpressionParser
         while (_tokens[position].Kind == TokenKind.LeftParen)
         {
             parentheses++;
+            if (parentheses + _nestingDepth + 1 > MaximumNestingDepth)
+            {
+                return false;
+            }
             position++;
         }
 
@@ -593,10 +618,13 @@ internal sealed class ExpressionParser
 
                 return new NamedPredicate(token.Text);
             case TokenKind.LeftParen:
-                Next();
-                var inner = ParseOr();
-                Expect(TokenKind.RightParen, "')'");
-                return inner;
+                var open = Next();
+                return ParseNested(open, () =>
+                {
+                    var inner = ParseOr();
+                    Expect(TokenKind.RightParen, "')'");
+                    return inner;
+                });
             case TokenKind.Identifier:
                 return ParseIdentifier();
             case TokenKind.Error:

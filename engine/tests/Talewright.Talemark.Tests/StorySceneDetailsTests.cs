@@ -1,4 +1,5 @@
 using Talewright.Narrative.Templates;
+using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Formatting;
 using Talewright.Talemark.Model;
@@ -54,11 +55,16 @@ public sealed class StorySceneDetailsTests
 
     private static StoryDefinition Compile(string tale)
     {
-        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        return Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = TestStories.DefaultYaml,
             ["main.tale"] = tale,
         }));
+    }
+
+    private static StoryDefinition Compile(StorySource source)
+    {
+        var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
     }
@@ -117,6 +123,27 @@ public sealed class StorySceneDetailsTests
         Assert.NotEmpty(details.Prose);
         Assert.IsType<SpeechTemplate>(details.Prose[0].Template);
         Assert.Empty(details.Prose[0].Condition.Parts);
+    }
+
+    [Fact]
+    public void Details_walk_long_flat_conditions_without_recursion()
+    {
+        var source = $"=== start\n@requires {string.Join(" and ", Enumerable.Repeat("true", 10_000))}\n-> END";
+        var storySource = new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = TestStories.DefaultYaml,
+            ["main.tale"] = source,
+        });
+
+        var analysis = StoryAnalyzer.Analyze(storySource);
+        Assert.Empty(analysis.Diagnostics);
+        Assert.Contains(analysis.Expressions, expression => expression.Kind == ExpressionContextKind.Condition);
+        Assert.Contains(analysis.CompletionSites,
+            site => site.Range.Start.Line == 2 && site.Range.Start.Column > 50_000);
+
+        var details = Details(Compile(storySource), "start");
+
+        Assert.Equal(10_000, details.Requires.Text.Split(" and ").Length);
     }
 
     [Fact]

@@ -8,17 +8,27 @@
     }
     @if (Trace.Children.Count > 0)
     {
-        <ul>
-            @foreach (var child in Trace.Children)
-            {
-                <ExpressionView Trace="child" />
-            }
-        </ul>
+        @if (Depth < MaximumDisplayDepth)
+        {
+            <ul>
+                @foreach (var child in Trace.Children)
+                {
+                    <ExpressionView Trace="child" Depth="@(Depth + 1)" />
+                }
+            </ul>
+        }
+        else
+        {
+            <span>Additional expression details omitted.</span>
+        }
     }
 </li>
 
 @code {
+    private const int MaximumDisplayDepth = 64;
+
     [Parameter, EditorRequired] public ExpressionTrace Trace { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
     private string? _talemark;
     private string? _unavailable;
 

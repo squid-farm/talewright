@@ -6,11 +6,16 @@ using Talewright.Cli;
 using Talewright.Authoring;
 using Talewright.Talemark.Compilation;
 using Talewright.Testing;
+using Xunit.Abstractions;
 
 namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public ServerTests(ITestOutputHelper output) => _output = output;
+
     private static readonly string Manifest = BuildManifest();
     private const string Valid = "=== start\nHello.\n-> END\n";
     private const string Invalid = "=== start\nHello.\n* [Missing] -> missing\n";
@@ -48,6 +53,76 @@ public sealed partial class ServerTests
         await client.Send("exit", new { });
         await client.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(1, client.Process.ExitCode);
+    }
+
+    [Fact]
+    public async Task Deep_inputs_report_diagnostics_and_the_server_answers_a_later_request()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const int depth = 100_000;
+
+        for (var version = 1; version <= 4; version++)
+        {
+            var tale = version switch
+            {
+                1 => $"=== start\n@requires {new string('(', depth)}true{new string(')', depth)}\n-> END\n",
+                2 => $"=== start\n@requires {new string('-', depth)}1\n-> END\n",
+                3 => "=== start\n" + string.Concat(Enumerable.Repeat("{if true}\n", depth))
+                    + "inside\n" + string.Concat(Enumerable.Repeat("{/if}\n", depth)) + "-> END\n",
+                4 => "=== start\n" + string.Concat(Enumerable.Repeat("{if true}", depth))
+                    + "hidden" + string.Concat(Enumerable.Repeat("{/if}", depth)) + " visible\n-> END\n",
+                _ => throw new ArgumentOutOfRangeException(nameof(version), version, null),
+            };
+            if (version == 1)
+                await client.Open("start.tale", tale, version);
+            else
+                await client.Change("start.tale", tale, version);
+
+            var diagnostics = await client.Diagnostics("start.tale", version);
+            Assert.Contains(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW1016");
+        }
+
+        var response = await client.Request("textDocument/signatureHelp", new { });
+        Assert.Equal(-32601, response.GetProperty("error").GetProperty("code").GetInt32());
+        Assert.False(client.Process.HasExited);
+    }
+
+    [Fact]
+    public async Task Ten_thousand_level_slow_input_ladder_reports_recovery_timings_without_gating()
+    {
+        await using var client = new Client();
+        var first = SlowInputStories.Create(SlowInputShape.NestedConditions, 10_000);
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName),
+            first.Files[StorySource.ManifestFileName]);
+        await client.Initialize();
+
+        var shapes = new[]
+        {
+            SlowInputShape.NestedConditions,
+            SlowInputShape.NestedParentheses,
+            SlowInputShape.UnaryPrefixes,
+        };
+        for (var index = 0; index < shapes.Length; index++)
+        {
+            var source = SlowInputStories.Create(shapes[index], 10_000);
+            var text = source.Files["main.tale"];
+            var version = index + 1;
+            var timer = Stopwatch.StartNew();
+            if (version == 1)
+                await client.Open("start.tale", text, version);
+            else
+                await client.Change("start.tale", text, version);
+            var diagnostics = await client.Diagnostics("start.tale", version);
+            timer.Stop();
+
+            Assert.Single(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW1016");
+            Assert.DoesNotContain(diagnostics,
+                diagnostic => diagnostic.GetProperty("code").GetString() == "TW1005");
+            _output.WriteLine(
+                $"{shapes[index]} at 10,000 levels: language-server analysis "
+                + $"{timer.Elapsed.TotalMilliseconds:F1} ms.");
+        }
     }
 
     [Theory]
