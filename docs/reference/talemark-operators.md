@@ -151,7 +151,8 @@ From tightest to loosest:
 
 Arithmetic at the same level groups left to right: `8 - 3 - 1` is `(8 - 3) - 1`.
 `not player:hp > 0` means `not (player:hp > 0)`. Use parentheses when the intended grouping
-is not obvious. In a substitution, the value expression is evaluated before the `#` chain.
+is not obvious. Expressions allow at most 256 nested groups and prefix operators combined
+(TW1016 beyond the limit). In a substitution, the value expression is evaluated before the `#` chain.
 `#upper#lower` applies upper case, then lower case.
 
 ### Modifier arguments

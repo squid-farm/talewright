@@ -111,6 +111,20 @@ public class ExpressionFormatterTests
         }
     }
 
+    [Fact]
+    public void Formats_long_left_deep_expressions_without_recursion()
+    {
+        Expr expression = new NumberLiteral(0);
+        for (var index = 0; index < 10_000; index++)
+            expression = new BinaryExpr(BinaryOp.Add, expression, new NumberLiteral(1));
+
+        var formatted = ExpressionFormatter.Format(expression);
+
+        Assert.Equal(10_001, formatted.Split(" + ").Length);
+        Assert.StartsWith("0 + 1 + 1", formatted);
+        Assert.EndsWith(" + 1", formatted);
+    }
+
     public static IEnumerable<object[]> OperatorBoundaries()
     {
         string[] arithmetic = ["+", "-", "*", "/"];

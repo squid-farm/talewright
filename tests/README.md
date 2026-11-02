@@ -163,14 +163,16 @@ guarantees for arbitrary author code. For comparisons, record the runtime,
 corpus, CPU, power source and power mode, and run without other build/test work.
 
 The default slow-input ladder analyzes paragraphs with substitutions and inline
-conditions, single-line substitutions, nested block conditions, unmatched
-emphasis, unclosed links, and both plain choices and choices with requirements
-and effects at 1, 5, 10, 20, 50, 100, 500 and 1,000 elements. The opt-in
-extension adds 10,000 for each shape. Reusable generators
-also cover deeply nested parentheses and unary prefixes, but the harness does
-not parse those crash-prone shapes until #396. These timing reports are not
-proof of linear CPU work; fixing issues should add deterministic work or
-structural assertions and allocation bounds where applicable.
+conditions, single-line substitutions, nested block conditions, nested
+parentheses, unary prefixes, unmatched emphasis, unclosed links, and both plain
+choices and choices with requirements and effects at 1, 5, 10, 20, 50, 100, 500
+and 1,000 elements. Sizes past a nesting limit must recover with exactly one
+TW1016 and no other error. The opt-in
+extension adds 10,000 for each shape. A process-isolated language-server test
+compiles and analyzes the 10,000-level nested-condition, parenthesis and
+unary-prefix cases, verifying one TW1016 diagnostic and no spurious TW1005.
+Their elapsed times are reported for observation only, not used as a shared-CI
+threshold.
 
 One post-#416 `--slow-input-stress` run on the calibration machine described
 below reported these median / p95 times (milliseconds) and median allocations:

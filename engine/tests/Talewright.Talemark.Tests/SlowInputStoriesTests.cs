@@ -96,17 +96,6 @@ public sealed class SlowInputStoriesTests
     }
 
     [Fact]
-    public void Recursive_expression_shapes_can_be_generated_without_parsing_them()
-    {
-        const int depth = 10_000;
-        var parentheses = SlowInputStories.Create(SlowInputShape.NestedParentheses, depth).Files["main.tale"];
-        var unary = SlowInputStories.Create(SlowInputShape.UnaryPrefixes, depth).Files["main.tale"];
-
-        Assert.Contains(new string('(', depth) + "1" + new string(')', depth), parentheses);
-        Assert.Contains(new string('-', depth) + "1", unary);
-    }
-
-    [Fact]
     public void Choice_ladder_reaches_the_requested_number_of_parsed_choices()
     {
         var result = StoryCompiler.Compile(SlowInputStories.Create(SlowInputShape.Choices, 1_000));

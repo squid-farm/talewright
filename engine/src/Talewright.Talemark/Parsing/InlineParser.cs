@@ -109,6 +109,9 @@ internal static class InlineParser
 {
     private const char PlaceholderStart = '\uE000';
     private const char PlaceholderEnd = '\uE001';
+    private const int MaximumInlineConditionDepth = 64;
+    private const string MarkdigDepthLimitMessage =
+        "Markdown elements in the input are too deeply nested - depth limit exceeded. Input is most likely not sensible or is a very large table.";
 
     private static readonly MarkdownPipeline Pipeline = BuildPipeline(cancellable: false);
     private static readonly MarkdownPipeline CancellablePipeline = BuildPipeline(cancellable: true);
@@ -201,7 +204,7 @@ internal static class InlineParser
 
     private sealed record InlinePiece(TemplateInline Inline) : Piece;
 
-    private sealed record IfPiece(Expr Condition, SourceLocation Location) : Piece;
+    private sealed record IfPiece(Expr Condition, SourceLocation Location, SourceLocation StartLocation) : Piece;
 
     private sealed record ElsePiece(SourceLocation Location) : Piece;
 
@@ -237,7 +240,17 @@ internal static class InlineParser
         var context = new Context(source, symbols, diagnostics, allowImages, cancellationToken);
         var masked = Mask(context);
         var markdownCancellation = cancellationToken.CanBeCanceled ? new MarkdownCancellationContext(cancellationToken) : null;
-        var document = ParseMarkdown(masked, markdownCancellation);
+        MarkdownDocument document;
+        try
+        {
+            document = ParseMarkdown(masked, markdownCancellation);
+        }
+        catch (ArgumentException exception) when (exception.Message == MarkdigDepthLimitMessage)
+        {
+            diagnostics.Error("TW1016", "Markdown is nested too deeply for safe parsing.", source.Locate(0));
+            return [];
+        }
+
         var pieces = new List<Piece>();
         foreach (var block in document)
         {
@@ -426,7 +439,9 @@ internal static class InlineParser
         {
             var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3), context.Symbols, context.Diagnostics,
                 locate: offset => context.Source.Locate(sourceOffset + lead + 3 + offset));
-            return condition is null ? null : new IfPiece(condition, location);
+            return condition is null
+                ? null
+                : new IfPiece(condition, location, context.Source.Locate(sourceOffset - 1));
         }
 
         var substitution = ExpressionParser.ParseSubstitution(inner, location, context.Symbols, context.Diagnostics,
@@ -551,58 +566,106 @@ internal static class InlineParser
     /// <summary>Folds <c>{if}</c>/<c>{else}</c>/<c>{/if}</c> markers into <see cref="ConditionalInlineTemplate"/>s.</summary>
     private static IReadOnlyList<TemplateInline> Fold(List<Piece> pieces, Context context)
     {
-        var position = 0;
-        var result = FoldUntilEnd(pieces, ref position, context, nested: false, out _);
-        return result;
-    }
-
-    private static List<TemplateInline> FoldUntilEnd(List<Piece> pieces, ref int position, Context context, bool nested, out Piece? terminator)
-    {
         var output = new List<TemplateInline>();
-        while (position < pieces.Count)
+        var frames = new Stack<InlineConditionalFrame>();
+        var suppressedDepth = 0;
+        SourceLocation suppressedLocation = SourceLocation.None;
+
+        void Add(TemplateInline inline)
+        {
+            if (frames.TryPeek(out var frame))
+                (frame.InElse ? frame.Else : frame.Then).Add(inline);
+            else
+                output.Add(inline);
+        }
+
+        void Close(InlineConditionalFrame frame)
+        {
+            Add(new ConditionalInlineTemplate(frame.Open.Condition, frame.Then, frame.Else));
+        }
+
+        foreach (var piece in pieces)
         {
             context.Check();
-            var piece = pieces[position++];
             switch (piece)
             {
                 case InlinePiece inline:
-                    output.Add(inline.Inline);
+                    if (suppressedDepth == 0) Add(inline.Inline);
                     break;
                 case IfPiece open:
                 {
-                    var then = FoldUntilEnd(pieces, ref position, context, nested: true, out var end);
-                    var otherwise = new List<TemplateInline>();
-                    if (end is ElsePiece)
+                    if (suppressedDepth > 0)
                     {
-                        otherwise = FoldUntilEnd(pieces, ref position, context, nested: true, out end);
-                        if (end is ElsePiece extra)
-                        {
-                            context.Diagnostics.Error("TW1005", "A second {else} in the same {if}.", extra.Location);
-                        }
+                        suppressedDepth++;
+                        break;
                     }
 
-                    if (end is null)
+                    if (frames.Count == MaximumInlineConditionDepth)
                     {
-                        context.Diagnostics.Error("TW1005", "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.", open.Location);
+                        context.Diagnostics.Error("TW1016",
+                            $"Conditions are nested more than {MaximumInlineConditionDepth} levels deep.", open.StartLocation);
+                        suppressedDepth = 1;
+                        suppressedLocation = open.Location;
+                        break;
                     }
 
-                    output.Add(new ConditionalInlineTemplate(open.Condition, then, otherwise));
+                    frames.Push(new InlineConditionalFrame(open));
                     break;
                 }
-
-                case ElsePiece or EndIfPiece when nested:
-                    terminator = piece;
-                    return output;
-                case ElsePiece stray:
-                    context.Diagnostics.Error("TW1005", "{else} without an {if} in the same paragraph and formatting.", stray.Location);
+                case ElsePiece alternative when suppressedDepth == 0:
+                    if (!frames.TryPeek(out var frame))
+                    {
+                        context.Diagnostics.Error("TW1005", "{else} without an {if} in the same paragraph and formatting.", alternative.Location);
+                    }
+                    else if (frame.InElse)
+                    {
+                        context.Diagnostics.Error("TW1005", "A second {else} in the same {if}.", alternative.Location);
+                        frames.Pop();
+                        Close(frame);
+                    }
+                    else
+                    {
+                        frame.InElse = true;
+                    }
                     break;
-                case EndIfPiece stray:
-                    context.Diagnostics.Error("TW1005", "{/if} without an {if} in the same paragraph and formatting.", stray.Location);
+                case EndIfPiece end:
+                    if (suppressedDepth > 0)
+                    {
+                        suppressedDepth--;
+                    }
+                    else if (frames.TryPop(out var closed))
+                    {
+                        Close(closed);
+                    }
+                    else
+                    {
+                        context.Diagnostics.Error("TW1005", "{/if} without an {if} in the same paragraph and formatting.", end.Location);
+                    }
                     break;
             }
         }
 
-        terminator = null;
+        if (suppressedDepth > 0)
+        {
+            context.Diagnostics.Error("TW1005",
+                "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.",
+                suppressedLocation);
+        }
+        while (frames.TryPop(out var unclosed))
+        {
+            context.Diagnostics.Error("TW1005",
+                "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.",
+                unclosed.Open.Location);
+        }
+
         return output;
+    }
+
+    private sealed class InlineConditionalFrame(IfPiece open)
+    {
+        public IfPiece Open { get; } = open;
+        public List<TemplateInline> Then { get; } = [];
+        public List<TemplateInline> Else { get; } = [];
+        public bool InElse { get; set; }
     }
 }

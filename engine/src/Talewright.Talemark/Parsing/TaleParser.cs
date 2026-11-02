@@ -26,6 +26,8 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 /// </remarks>
 internal sealed partial class TaleParser
 {
+    private const int MaximumBlockConditionDepth = 64;
+
     private readonly string _file;
     private readonly string _text;
     private readonly StorySymbols _symbols;
@@ -186,6 +188,11 @@ internal sealed partial class TaleParser
         }
 
         FlushParagraph();
+        if (_scene.SuppressedConditionDepth > 0)
+        {
+            _diagnostics.Error("TW1005", "{if} block is never closed with {/if}.", _scene.SuppressedConditionLocation);
+            _scene.SuppressedConditionDepth = 0;
+        }
         while (_scene.Frames.Count > 0)
         {
             _diagnostics.Error("TW1005", "{if} block is never closed with {/if}.", _scene.Frames.Peek().Location);
@@ -203,6 +210,12 @@ internal sealed partial class TaleParser
     private void ParseSceneLine(string line, int indent)
     {
         var scene = _scene!;
+        if (scene.SuppressedConditionDepth > 0)
+        {
+            SkipSuppressedBlockLine(line);
+            return;
+        }
+
         if (line.Length == 0)
         {
             FlushParagraph();
@@ -414,11 +427,37 @@ internal sealed partial class TaleParser
             return;
         }
 
+        if (scene.Frames.Count == MaximumBlockConditionDepth)
+        {
+            _diagnostics.Error("TW1016",
+                $"Conditions are nested more than {MaximumBlockConditionDepth} levels deep.", At(indent));
+            scene.SuppressedConditionDepth = 1;
+            scene.SuppressedConditionLocation = At(indent);
+            return;
+        }
+
         var lead = line[1..^1].Length - line[1..^1].TrimStart().Length;
         var condition = ExpressionParser.ParseCondition(directive[3..], At(indent + 1 + 3), _symbols, _diagnostics,
             At(indent + 1 + lead + 3))
             ?? new BoolLiteral(false);
         scene.Frames.Push(new Frame(condition, At(indent)));
+    }
+
+    private void SkipSuppressedBlockLine(string line)
+    {
+        if (!IsBlockDirective(line, out var directive))
+        {
+            return;
+        }
+
+        if (directive.StartsWith("if ", StringComparison.Ordinal))
+        {
+            _scene!.SuppressedConditionDepth++;
+        }
+        else if (directive == "/if")
+        {
+            _scene!.SuppressedConditionDepth--;
+        }
     }
 
     private void CloseFrame()
@@ -962,6 +1001,8 @@ internal sealed partial class TaleParser
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
         public Stack<Frame> Frames { get; } = new();
+        public int SuppressedConditionDepth { get; set; }
+        public SourceLocation SuppressedConditionLocation { get; set; }
         public SourceText Paragraph { get; set; } = new();
 
         public List<SceneStep> CurrentSteps =>
