@@ -231,7 +231,7 @@ internal sealed partial class TaleParser
 
         scene.HeaderDone = true;
 
-        if (IsBlockDirective(line, out var directive))
+        if (IsBlockDirective(line, _cancellationToken, out var directive))
         {
             FlushParagraph();
             ParseBlockDirective(directive, indent, line);
@@ -381,10 +381,16 @@ internal sealed partial class TaleParser
 
     // ---- block conditionals ----------------------------------------------------------------------------------------
 
-    private static bool IsBlockDirective(string line, out string directive)
+    private static bool IsBlockDirective(string line, CancellationToken cancellationToken, out string directive)
     {
         directive = string.Empty;
-        if (line[0] != '{' || InlineParser.FindClosingBrace(line, 0) != line.Length - 1)
+        if (line[0] != '{')
+        {
+            return false;
+        }
+
+        var scan = DelimiterScanner.Scan(line, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
+        if (!scan.TryGetClose(0, out var close) || close != line.Length - 1)
         {
             return false;
         }
@@ -447,7 +453,7 @@ internal sealed partial class TaleParser
 
     private void SkipSuppressedBlockLine(string line)
     {
-        if (!IsBlockDirective(line, out var directive))
+        if (!IsBlockDirective(line, _cancellationToken, out var directive))
         {
             return;
         }
@@ -969,8 +975,8 @@ internal sealed partial class TaleParser
         DivertTarget? divert = null;
         if (pos < text.Length && text[pos] == '{')
         {
-            var end = InlineParser.FindClosingBrace(text, pos);
-            if (end < 0)
+            var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, pos, _cancellationToken);
+            if (!scan.TryGetClose(pos, out var end))
             {
                 _symbols.Analysis?.Expression(ExpressionContextKind.Effects, text[(pos + 1)..], At(column + pos + 1));
                 _diagnostics.Error("TW1009", "Outcome effect block is missing its closing '}'.", At(column + pos));

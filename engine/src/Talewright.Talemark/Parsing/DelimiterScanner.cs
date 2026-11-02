@@ -133,8 +133,6 @@ internal static class DelimiterScanner
 
         var workUnits = 0;
         var braceDepth = 0;
-        var inString = false;
-        var stringSlot = -1;
 
         for (var offset = startOffset; offset < text.Length; offset++)
         {
@@ -142,28 +140,21 @@ internal static class DelimiterScanner
             workUnits++;
             var current = text[offset];
 
-            if (inString)
-            {
-                if (current == '\\' && offset + 1 < text.Length)
-                {
-                    offset++;
-                    workUnits++;
-                }
-                else if (current == '"')
-                {
-                    pairs[stringSlot] = pairs[stringSlot] with { CloseOffset = offset };
-                    inString = false;
-                    stringSlot = -1;
-                }
-
-                continue;
-            }
-
             if (UsesQuotedStrings(mode, braceDepth) && current == '"')
             {
-                inString = true;
-                stringSlot = pairs.Count;
-                pairs.Add(new(DelimiterKind.QuotedString, offset, Unclosed));
+                var literal = QuotedStringSyntax.Scan(text, offset, text.Length, cancellationToken: cancellationToken,
+                    checkpoint: checkpoint);
+                workUnits += literal.WorkUnits;
+                pairs.Add(new(DelimiterKind.QuotedString, offset,
+                    literal.Closed ? literal.End - 1 : Unclosed));
+                if (!literal.Closed)
+                {
+                    unclosedSlots++;
+                    (issues ??= []).Add(new(DelimiterKind.QuotedString, offset, DelimiterIssueKind.UnclosedOpener));
+                    break;
+                }
+
+                offset = literal.End - 1;
                 continue;
             }
 
@@ -213,12 +204,6 @@ internal static class DelimiterScanner
 
             var opener = PopOpener(openers, topOfKind, ref braceDepth);
             pairs[opener.Slot] = pairs[opener.Slot] with { CloseOffset = offset };
-        }
-
-        if (inString)
-        {
-            unclosedSlots++;
-            (issues ??= []).Add(new(DelimiterKind.QuotedString, pairs[stringSlot].OpenOffset, DelimiterIssueKind.UnclosedOpener));
         }
 
         while (openers.Count > 0)
@@ -273,11 +258,14 @@ internal static class DelimiterScanner
         var next = text[offset + 1];
         return mode switch
         {
-            DelimiterScanMode.ReaderText => braceDepth == 0 && next is '\\' or '{' or '}',
-            DelimiterScanMode.ChoiceLabel => braceDepth == 0 && next is '\\' or '{' or '}' or '[' or ']' or '*' or '_' or '`',
+            DelimiterScanMode.ReaderText or DelimiterScanMode.ChoiceLabel =>
+                braceDepth == 0 && IsReaderTextEscape(next),
             _ => false,
         };
     }
+
+    internal static bool IsReaderTextEscape(char character) =>
+        character is '\\' or '{' or '}' or '[' or ']' or '*' or '_' or '`';
 
     private static bool TryGetDelimiter(
         char character,

@@ -304,11 +304,17 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
   - `StoryYamlReader`: `story.talewright.yaml` → manifest (uses YamlDotNet's node model, not reflection-based
     deserialisation, for trimming and precise error locations).
   - `TaleParser`: line-based parser for `.tale` structure: `=== scene` headers, `@directives`, `~ effects`,
-    `* choices`, `-> diverts`, `::: skill-check` blocks, `{if}` blocks, speech lines, paragraphs.
+    `* choices`, `-> diverts`, `::: skill-check` blocks, `{if}` blocks, speech lines, paragraphs. It owns this
+    line-level grammar and asks the shared delimiter scanner to find code-group and choice-label boundaries.
   - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes
     constructs, escapes, code spans and bounded formatting directly; unsupported Markdown remains literal.
+  - `DelimiterScanner`: pairs enclosing delimiters and quoted strings; it does not parse the meaning inside them.
+    Its modes reflect which delimiters matter in reader text, choice labels and code groups. The same quoted-string
+    boundary logic is shared with `QuotedStringSyntax`, which also decodes escapes for the lexer and image arguments.
+    Reader-text escape characters are defined once and used by the scanner and reader-text consumers.
   - `ExpressionParser` + `Lexer`: recursive-descent parser for conditions, numbers, substitutions and effects,
-    with type checking (TW2xxx).
+    with type checking (TW2xxx). The lexer owns token boundaries; `ExpressionParser` owns expression and effect
+    grammar. `QuotedStringSyntax` provides the shared quoted-string boundary and decoding rules.
   - `StorySymbols`: what's declared (stats, characters, items, factions, flags, vars, scenes), for resolving
     names.
 - **`Model/StoryDefinition.cs`**: the compiled story. `StoryDefinition` (Id, Title, Start, Randomness, Seed,

@@ -217,12 +217,6 @@ internal static class InlineParser
         _ = ParseWithWork(source, symbols, new DiagnosticBag(), cancellationToken: cancellationToken);
     }
 
-    public static int FindClosingBrace(string text, int open)
-    {
-        var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, open);
-        return scan.TryGetClose(open, out var close) ? close : -1;
-    }
-
     private static List<Token> Tokenize(Context context, string text, IReadOnlyList<DelimiterPair> bracePairs)
     {
         var tokens = new List<Token>();
@@ -266,7 +260,7 @@ internal static class InlineParser
             if (current == '\\' && index + 1 < text.Length)
             {
                 var next = text[index + 1];
-                if (next == '\\' || next is '{' or '}' or '[' or ']' or '*' or '_' or '`')
+                if (DelimiterScanner.IsReaderTextEscape(next))
                 {
                     AppendText(next, index, 2);
                     index += 2;
