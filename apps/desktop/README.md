@@ -19,7 +19,8 @@ and play. Startup errors show diagnostics and a retry action for that same story
 Use `--` before a path beginning with `-`; unknown options and invalid combinations
 exit with code 2 before opening a window. `--help` prints usage.
 
-Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's equivalent).
+Linux needs WebKitGTK 4.1 and libnotify; see the
+[Linux desktop setup commands](../../docs/guide/getting-started.md#linux-desktop-setup).
 Manual saves use per-user local application data under `Talewright/saves` (normally
 `$XDG_DATA_HOME/Talewright/saves`, or `~/.local/share/Talewright/saves` on Linux).
 Slot replacement is explicit and atomic; incompatible/corrupt loads leave the current playthrough intact.
