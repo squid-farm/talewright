@@ -1,9 +1,62 @@
 using System.Text.Json;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
 
 public sealed partial class ServerTests
 {
+    [Fact]
+    public async Task Missing_flag_action_edits_the_unsaved_manifest_with_its_own_version_and_range()
+    {
+        await using var client = new Client();
+        await client.Initialize(capabilities: new
+        {
+            workspace = new { workspaceEdit = new { documentChanges = true } }
+        });
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 7);
+        await client.Diagnostics(StorySource.ManifestFileName, 7);
+
+        const string text = "=== start\n{if flag:missing}Never.{/if}\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2004");
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("Declare flag 'missing'", action.GetProperty("title").GetString());
+        Assert.Equal("TW2004", action.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        var documentEdit = action.GetProperty("edit").GetProperty("documentChanges")[0];
+        Assert.Equal(client.UriOf(StorySource.ManifestFileName),
+            documentEdit.GetProperty("textDocument").GetProperty("uri").GetString());
+        Assert.Equal(7, documentEdit.GetProperty("textDocument").GetProperty("version").GetInt32());
+        var edit = documentEdit.GetProperty("edits")[0];
+        Assert.Equal(", missing", edit.GetProperty("newText").GetString());
+        Assert.Equal(4, edit.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(13, edit.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
+    }
+
+    [Fact]
+    public async Task Unsafe_manifest_shape_returns_a_disabled_flag_action_with_a_reason()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\nflags: not-a-list\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
+
+        const string text = "=== start\n{if flag:missing}Never.{/if}\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2004");
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("Declare flag 'missing'", action.GetProperty("title").GetString());
+        Assert.Contains("not a YAML list", action.GetProperty("disabled").GetProperty("reason").GetString());
+        Assert.False(action.TryGetProperty("edit", out _));
+    }
+
     [Fact]
     public async Task Missing_scene_code_actions_append_or_create_a_file_without_overwriting()
     {

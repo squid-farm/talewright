@@ -256,6 +256,12 @@ For a `TW2002` missing-scene diagnostic in a `.tale` file, the Quick Fix menu of
 **Create scene in a new file** (creating and opening an adjacent `<scene-id>.tale`
 file). The new-file action is not offered when that file already exists.
 
+For an undeclared flag reported by `TW2004`, the Quick Fix menu offers
+**Declare flag `<id>`**. It appends the declaration to the root manifest's
+`flags` list without reserializing YAML, preserving existing comments and
+formatting and using an open manifest buffer (including unsaved edits). When
+the manifest cannot be edited safely, the action is disabled with a reason.
+
 Editors that don't use the SchemaStore catalog can use the same schema with this
 modeline at the top of `story.talewright.yaml`:
 

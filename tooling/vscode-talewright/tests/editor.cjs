@@ -439,6 +439,35 @@ async function testLiveDiagnostics() {
     assert.equal((target.range ?? target.targetRange).start.line, 1);
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await waitForCompiler(document, items => items.length > 0);
+
+    const manifestBuffer = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
+    await vscode.window.showTextDocument(manifestBuffer);
+    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n';
+    const flagManifestEdit = new vscode.WorkspaceEdit();
+    flagManifestEdit.replace(manifestBuffer.uri,
+      new vscode.Range(manifestBuffer.positionAt(0), manifestBuffer.positionAt(manifestBuffer.getText().length)),
+      flagManifest);
+    assert.equal(await vscode.workspace.applyEdit(flagManifestEdit), true);
+    assert.equal(manifestBuffer.isDirty, true, 'Exercise an unsaved root-manifest overlay');
+
+    const undeclaredFlag = new vscode.WorkspaceEdit();
+    undeclaredFlag.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n{if flag:missingFlag}Never.{/if}\n-> END\n');
+    assert.equal(await vscode.workspace.applyEdit(undeclaredFlag), true);
+    await waitForCompiler(document, items => items.some(item => item.code === 'TW2004'));
+    const flagDiagnostic = vscode.languages.getDiagnostics(document.uri)
+      .find(item => item.source === 'talewright' && item.code === 'TW2004');
+    assert.ok(flagDiagnostic, 'Undeclared flag must have a compiler diagnostic');
+    const flagActions = await vscode.commands.executeCommand(
+      'vscode.executeCodeActionProvider', document.uri, flagDiagnostic.range, vscode.CodeActionKind.QuickFix.value);
+    const declareFlag = flagActions.find(action => action.title === "Declare flag 'missingFlag'");
+    assert.ok(declareFlag, 'Missing flag must offer a declaration quick fix');
+    assert.equal(await vscode.workspace.applyEdit(declareFlag.edit), true);
+    assert.equal(manifestBuffer.getText(), flagManifest.replace('[ready]', '[ready, missingFlag]'));
+    assert.equal(manifestBuffer.isDirty, true, 'The flag quick fix must preserve and edit the unsaved manifest buffer');
+    await waitForCompiler(document, items => !items.some(item => item.code === 'TW2004'));
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await vscode.window.showTextDocument(document);
     console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion, source-aware Markdown hover and supporting-file navigation.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
