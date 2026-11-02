@@ -43,7 +43,7 @@ export function synchronize(dialog, open, pending) {
         dialog.querySelector("button").focus();
     }
     if (open && dialog.dataset.busy !== "true" && pending !== state.pending) {
-        const target = pending ? dialog.querySelector('[aria-label="Confirm load"] button') :
+        const target = pending ? dialog.querySelector(`[aria-label="Confirm ${pending}"] button`) :
             dialog.querySelector("button");
         target?.focus();
         state.pending = pending;

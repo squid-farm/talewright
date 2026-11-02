@@ -15,9 +15,9 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | Component | Job |
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
-| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
+| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
-| `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
+| `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, import/export, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
 | `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
@@ -133,6 +133,12 @@ The web host uses `PageTitle`; the desktop host updates its native window title.
 Register `ISaveStore` for the host: `FileSaveStore` on desktop or the scoped
 `IndexedDbSaveStore` from `Talewright.Player.Saves` on web. `TalewrightApp` supplies it to `StoryPlayer`;
 custom consumers without a store still play normally but have no save controls.
+Register `ISaveFileExporter` to enable export: `BrowserSaveFileExporter` on web or
+`LocalSaveFileExporter` with a native save-file chooser on desktop. Hosts without an exporter still
+support importing and normal saves. Import validates the existing save format and full replay against
+the current story before writing a named slot; a name collision requires explicit confirmation.
+Import does not load the save or replace the separate Quick Save checkpoint. Export reads the stored
+bytes unchanged; canceled dialogs do not write a file.
 **Quick Save** writes/replaces one dedicated checkpoint for the story, without named-save
 overwrite confirmation. It uses the same atomic storage, summary and persisted-progress
 load guard as named saves. The dialog marks it **Quick Save checkpoint**, independently of

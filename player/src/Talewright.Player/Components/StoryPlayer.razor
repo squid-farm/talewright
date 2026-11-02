@@ -1,6 +1,7 @@
 @* Plays one compiled story with bounded transcript presentation and a character sheet. *@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
 
 <div class="tw-player">
@@ -13,9 +14,12 @@
     @if (SaveStore is not null)
     {
         <SavedGamesPanel Open="_showSaves" Busy="_busy" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
-                         Message="@_saveMessage" Error="_saveError" PendingLoad="@_pendingLoad"
+                         Message="@_saveMessage" Error="_saveError" PendingLoad="@_pendingLoad" PendingImport="@(_pendingImport?.Slot)"
+                         ImportKey="_importKey" CanExport="@(SaveExporter is not null)"
                          OnSave="SaveAsync" OnRetry="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
-                         OnLoad="RequestLoadAsync" OnConfirmLoad="ConfirmLoadAsync" OnCancelLoad="CloseSaves" OnClose="CloseSaves" />
+                         OnLoad="RequestLoadAsync" OnConfirmLoad="ConfirmLoadAsync" OnCancelLoad="CloseSaves"
+                         OnImport="ImportAsync" OnConfirmImport="ConfirmImportAsync" OnCancelImport="CancelImport"
+                         OnExport="ExportAsync" OnClose="CloseSaves" />
     }
     @if (_showHistory)
     {
@@ -68,6 +72,9 @@
     [Parameter]
     public ISaveStore? SaveStore { get; set; }
 
+    [Parameter]
+    public ISaveFileExporter? SaveExporter { get; set; }
+
     private IReadOnlyList<HistoryFrame> _transcript => _session.Transcript;
     private ElementReference _transcriptElement;
     private StoryHistory _session = default!;
@@ -87,6 +94,8 @@
     private string? _saveMessage;
     private IReadOnlyList<SaveEntry> _slots = [];
     private string? _pendingLoad;
+    private ValidatedSaveImport? _pendingImport;
+    private int _importKey;
 
     protected override void OnParametersSet()
     {
@@ -117,6 +126,7 @@
         _restoreReadingPosition = false;
         _pendingOverwrite = null;
         _pendingLoad = null;
+        _pendingImport = null;
         _saveMessage = null;
         _slots = [];
         _focusLatest = true;
@@ -151,6 +161,7 @@
         CloseHistory();
         _showSaves = true;
         _pendingLoad = null;
+        _pendingImport = null;
         await RefreshSlotsAsync();
     }
 
@@ -158,6 +169,7 @@
     {
         _showSaves = false;
         _pendingLoad = null;
+        _pendingImport = null;
         _pendingOverwrite = null;
     }
 
@@ -255,6 +267,97 @@
             _showSaves = false;
             _saveMessage = $"Loaded '{SaveEntry.DisplayNameFor(slot)}'.";
             _focusLatest = true;
+        }
+    }
+
+    private Task ExportAsync(string slot) => SaveOperationAsync(async generation =>
+    {
+        var story = Story;
+        var data = slot == SaveEntry.QuickSlot
+            ? await SaveStore!.ReadQuickAsync(story.Id)
+            : await SaveStore!.ReadAsync(story.Id, slot);
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        var name = SaveEntry.DisplayNameFor(slot);
+        var exported = await SaveExporter!.ExportAsync(SaveFileName.Create(story.Title, name), data);
+        if (generation == _generation)
+        {
+            _saveMessage = exported ? $"Export requested for '{name}'." : "Export canceled.";
+        }
+    });
+
+    private async Task ImportAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            await SaveOperationAsync(async generation =>
+            {
+                var story = Story;
+                var slot = _slot.Trim();
+                _pendingOverwrite = null;
+                SaveNames.Validate(story.Id, slot);
+                if (args.File.Size > StoryHistory.MaxSaveBytes)
+                {
+                    throw new InvalidDataException("This saved game is too large to import (maximum 2 MiB). Choose another save.");
+                }
+
+                await using var input = args.File.OpenReadStream(StoryHistory.MaxSaveBytes);
+                using var buffer = new MemoryStream();
+                await input.CopyToAsync(buffer);
+                var data = buffer.ToArray();
+                if (generation != _generation)
+                {
+                    return;
+                }
+
+                var pending = ValidatedSaveImport.Prepare(story, slot, data);
+                var slots = await SaveStore!.ListAsync(story.Id);
+                if (generation != _generation)
+                {
+                    return;
+                }
+
+                if (slots.Contains(slot, StringComparer.Ordinal))
+                {
+                    _pendingImport = pending;
+                    return;
+                }
+
+                await ImportValidatedAsync(pending, overwrite: false, generation);
+            });
+        }
+        finally
+        {
+            _importKey++;
+        }
+    }
+
+    private Task ConfirmImportAsync()
+    {
+        var pending = _pendingImport ?? throw new InvalidOperationException("Choose a save before confirming an import.");
+        return SaveOperationAsync(generation => ImportValidatedAsync(pending, overwrite: true, generation));
+    }
+
+    private void CancelImport() => _pendingImport = null;
+
+    private async Task ImportValidatedAsync(ValidatedSaveImport pending, bool overwrite, int generation)
+    {
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        await pending.StoreAsync(SaveStore!, overwrite);
+        if (generation == _generation)
+        {
+            _pendingImport = null;
+            _slots = _slots.Where(entry => entry.Slot != pending.Slot)
+                .Append(pending.Describe())
+                .OrderBy(entry => entry.Slot, StringComparer.Ordinal).ToArray();
+            _saveMessage = $"Imported '{pending.Slot}'.";
         }
     }
 

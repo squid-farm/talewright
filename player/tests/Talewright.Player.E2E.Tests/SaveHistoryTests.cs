@@ -237,7 +237,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.Equal(dark ? "rgb(38, 35, 31)" : "rgb(240, 235, 224)",
             await dialog.EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));
         await Page.Keyboard.PressAsync("Shift+Tab");
-        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Save game", Exact = true })).ToBeFocusedAsync();
+        await Expect(Page.GetByLabel("Import save file", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Refresh saves" })).ToHaveCountAsync(0);
@@ -277,6 +277,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.PressAsync("Tab");
         var native = Assert.IsType<NativePlayerDriver>(Driver);
         Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Save game");
+        await Driver.PressAsync("Tab");
+        Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Import save file");
         await Driver.PressAsync("Tab");
         Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Close saves");
         await Driver.PressAsync("Escape");

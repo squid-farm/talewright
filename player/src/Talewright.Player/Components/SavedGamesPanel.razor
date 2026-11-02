@@ -22,6 +22,15 @@
             <button type="button" class="tw-choice" disabled="@Busy" @onclick="OnConfirmLoad">Load save</button>
         </section>
     }
+    else if (PendingImport is not null)
+    {
+        <section aria-label="Confirm import">
+            <h3>Replace save “@PendingImport”?</h3>
+            <p>The existing save will be replaced by the imported file.</p>
+            <button type="button" class="tw-choice" disabled="@Busy" @onclick="OnCancelImport">Keep existing save</button>
+            <button type="button" class="tw-choice" disabled="@Busy" @onclick="OnConfirmImport">Replace with imported save</button>
+        </section>
+    }
     else
     {
         <fieldset class="tw-save-form" disabled="@Busy">
@@ -34,6 +43,8 @@
                 <button type="button" @onclick="() => OnSave.InvokeAsync(true)">Confirm overwrite</button>
                 <button type="button" @onclick="OnCancelOverwrite">Cancel overwrite</button>
             }
+            <p>To import a save, enter its destination name above and choose the file.</p>
+            <InputFile @key="ImportKey" OnChange="OnImport" aria-label="Import save file" />
         </fieldset>
         <section class="tw-save-section">
             <h3 id="saved-games-heading">Saved games</h3>
@@ -69,6 +80,10 @@
                             <span class="tw-error">@entry.Warning</span>
                         }
                         <button type="button" disabled="@Busy" @onclick="() => OnLoad.InvokeAsync(entry.Slot)">Load @entry.DisplayName</button>
+                        @if (CanExport)
+                        {
+                            <button type="button" disabled="@Busy" @onclick="() => OnExport.InvokeAsync(entry.Slot)">Export @entry.DisplayName</button>
+                        }
                     </li>
                 }
             </ul>
@@ -85,6 +100,9 @@
     [Parameter] public EventCallback<string> SlotChanged { get; set; }
     [Parameter] public string? PendingOverwrite { get; set; }
     [Parameter] public string? PendingLoad { get; set; }
+    [Parameter] public string? PendingImport { get; set; }
+    [Parameter] public int ImportKey { get; set; }
+    [Parameter] public bool CanExport { get; set; }
     [Parameter, EditorRequired] public IReadOnlyList<SaveEntry> Slots { get; set; } = [];
     [Parameter] public EventCallback<bool> OnSave { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
@@ -92,6 +110,10 @@
     [Parameter] public EventCallback<string> OnLoad { get; set; }
     [Parameter] public EventCallback OnConfirmLoad { get; set; }
     [Parameter] public EventCallback OnCancelLoad { get; set; }
+    [Parameter] public EventCallback<InputFileChangeEventArgs> OnImport { get; set; }
+    [Parameter] public EventCallback OnConfirmImport { get; set; }
+    [Parameter] public EventCallback OnCancelImport { get; set; }
+    [Parameter] public EventCallback<string> OnExport { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     private ElementReference _dialog;
     private IJSObjectReference? _module;
@@ -114,7 +136,8 @@
         }
         if (_initialized)
         {
-            await _module!.InvokeVoidAsync("synchronize", _dialog, Open, PendingLoad);
+            var pending = PendingLoad is not null ? "load" : PendingImport is not null ? "import" : null;
+            await _module!.InvokeVoidAsync("synchronize", _dialog, Open, pending);
         }
     }
 
