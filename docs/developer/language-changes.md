@@ -70,7 +70,7 @@ Identifier characters belong to `IdentifierRules`, and text-modifier names belon
 
 Two tests enforce this:
 
-- [TalemarkVocabularyGuardTests](../../tooling/language-server/tests/Talewright.LanguageServer.Tests/TalemarkVocabularyGuardTests.cs) fails on any string literal that equals a vocabulary spelling.
+- [TalemarkVocabularyGuardTests](../../tooling/language-server/tests/Talewright.LanguageServer.Tests/TalemarkVocabularyGuardTests.cs) fails on any string or character literal whose decoded value, as Roslyn reads it, equals a vocabulary spelling.
   - It covers the Talemark, authoring and language-server sources.
   - Single punctuation characters are checked only in the expression-language files it lists.
   - Remaining exemptions name the issue that removes them.

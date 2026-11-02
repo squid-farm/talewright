@@ -1,5 +1,6 @@
 using System.Reflection;
-using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
@@ -83,17 +84,22 @@ public sealed class TalemarkVocabularyGuardTests
     }
 
     [Fact]
-    public void Literal_scanner_checks_verbatim_and_raw_values_but_ignores_comments_and_interpolation()
+    public void Literal_scanner_checks_decoded_values_but_ignores_comments_and_interpolated_text()
     {
         const string source = """"
             // "and"
             var a = "and"; var b = ':'; var c = $"{x} and"; var d = @"or"; var raw = """and""";
             var e = "Expected ')' here"; /* "not" */ var f = '\'';
-            var verbatimInterpolated = $@"{(a ? "x" : "y")} {{";
-            var ordinaryInterpolated = $"{(a ? "x" : "y")} {{"; var h = "or";
+            var g = $"{(a ? "x" : "y")} {{"; var h = "\u0061nd"; var i = "\x6Fr";
+            var j = """
+                not
+                """;
             """";
 
-        Assert.Equal([(2, "and"), (2, ":"), (2, "or"), (2, "and"), (3, "Expected ')' here"), (3, "'"), (5, "or")], Literals(source));
+        Assert.Equal(
+            [(2, "and"), (2, ":"), (2, "or"), (2, "and"), (3, "Expected ')' here"), (3, "'"),
+                (4, "x"), (4, "y"), (4, "and"), (4, "or"), (5, "not")],
+            Literals(source));
     }
 
     private static (HashSet<string> Words, HashSet<string> Punctuation) Spellings()
@@ -115,183 +121,18 @@ public sealed class TalemarkVocabularyGuardTests
                 .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 .Any(part => part is "bin" or "obj" or "Vocabulary"));
 
-    /// <summary>Values of regular, verbatim, raw and character literals, skipping comments and interpolated strings.</summary>
+    /// <summary>Decoded values of every string and character literal token, as the C# compiler sees them.</summary>
+    /// <remarks>Comments are trivia and interpolated-string text is not a literal token, so neither is reported.</remarks>
     private static List<(int Line, string Value)> Literals(string source)
     {
-        var literals = new List<(int, string)>();
-        var line = 1;
-        var i = 0;
-        while (i < source.Length)
-        {
-            var c = source[i];
-            if (c == '\n')
-            {
-                line++;
-                i++;
-            }
-            else if (c == '/' && At(i + 1) == '/')
-            {
-                while (i < source.Length && source[i] != '\n') i++;
-            }
-            else if (c == '/' && At(i + 1) == '*')
-            {
-                i += 2;
-                while (i < source.Length && !(source[i] == '*' && At(i + 1) == '/')) line += source[i++] == '\n' ? 1 : 0;
-                i += 2;
-            }
-            else if (c == '@' && At(i + 1) == '"')
-            {
-                var start = line;
-                var (value, end) = ReadVerbatim(i);
-                literals.Add((start, value));
-                i = end;
-            }
-            else if (c is '$' or '@')
-            {
-                i = SkipSpecialString(i);
-            }
-            else if (c == '"' && At(i + 1) == '"' && At(i + 2) == '"')
-            {
-                var start = line;
-                var (value, end) = ReadRaw(i);
-                literals.Add((start, value));
-                i = end;
-            }
-            else if (c is '"' or '\'')
-            {
-                var start = line;
-                var (value, end) = ReadQuoted(i, c);
-                literals.Add((start, value));
-                i = end;
-            }
-            else
-            {
-                i++;
-            }
-        }
-
-        return literals;
-
-        char At(int index) => index < source.Length ? source[index] : '\0';
-
-        (string Value, int End) ReadVerbatim(int start)
-        {
-            var value = new StringBuilder();
-            var index = start + 2;
-            while (index < source.Length)
-            {
-                if (source[index] == '"' && At(index + 1) == '"')
-                {
-                    value.Append('"');
-                    index += 2;
-                }
-                else if (source[index] == '"')
-                {
-                    return (value.ToString(), index + 1);
-                }
-                else
-                {
-                    if (source[index] == '\n') line++;
-                    value.Append(source[index++]);
-                }
-            }
-
-            return (value.ToString(), index);
-        }
-
-        (string Value, int End) ReadRaw(int start)
-        {
-            var delimiterLength = 0;
-            while (At(start + delimiterLength) == '"') delimiterLength++;
-            var contentStart = start + delimiterLength;
-            for (var index = contentStart; index < source.Length;)
-            {
-                if (source[index] != '"')
-                {
-                    if (source[index++] == '\n') line++;
-                    continue;
-                }
-
-                var quoteCount = 0;
-                while (At(index + quoteCount) == '"') quoteCount++;
-                if (quoteCount >= delimiterLength)
-                {
-                    return (source[contentStart..index], index + delimiterLength);
-                }
-
-                index += quoteCount;
-            }
-
-            return (source[contentStart..], source.Length);
-        }
-
-        (string Value, int End) ReadQuoted(int start, char quote)
-        {
-            var value = new StringBuilder();
-            var index = start + 1;
-            while (index < source.Length && source[index] != quote && source[index] != '\n')
-            {
-                if (source[index] == '\\' && index + 1 < source.Length)
-                {
-                    value.Append(source[index + 1] switch { 'n' => '\n', 't' => '\t', 'r' => '\r', '0' => '\0', var other => other });
-                    index += 2;
-                }
-                else
-                {
-                    value.Append(source[index++]);
-                }
-            }
-
-            return (value.ToString(), index + 1);
-        }
-
-        int SkipSpecialString(int start)
-        {
-            var index = start;
-            var verbatim = false;
-            while (index < source.Length && source[index] is '$' or '@')
-            {
-                verbatim |= source[index] == '@';
-                index++;
-            }
-
-            if (index >= source.Length || source[index] != '"') return index;
-            var quotes = 0;
-            while (index < source.Length && source[index] == '"')
-            {
-                quotes++;
-                index++;
-            }
-
-            if (quotes >= 3)
-            {
-                var close = source.IndexOf(new string('"', quotes), index, StringComparison.Ordinal);
-                var stop = close < 0 ? source.Length : close + quotes;
-                line += source.AsSpan(index, stop - index).Count('\n');
-                return stop;
-            }
-
-            if (quotes == 2) return index;
-            var interpolated = source[start] == '$' || At(start + 1) == '$';
-            var depth = 0;
-            while (index < source.Length)
-            {
-                var current = source[index];
-                if (current == '\n') line++;
-                if (interpolated && current == '{' && depth == 0 && At(index + 1) == '{') index += 2;
-                else if (interpolated && current == '{') { depth++; index++; }
-                else if (depth > 0 && current == '}') { depth--; index++; }
-                else if (depth > 0 && current is '"' or '\'' or '$' or '@')
-                    index = current is '"' or '\'' ? ReadQuoted(index, current).End : SkipSpecialString(index);
-                else if (depth > 0) index++;
-                else if (!verbatim && current == '\\') index += 2;
-                else if (current == '"' && verbatim && At(index + 1) == '"') index += 2;
-                else if (current == '"') return index + 1;
-                else index++;
-            }
-
-            return index;
-        }
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        return tree.GetRoot().DescendantTokens()
+            .Where(token => token.Kind() is SyntaxKind.StringLiteralToken or SyntaxKind.Utf8StringLiteralToken
+                or SyntaxKind.CharacterLiteralToken or SyntaxKind.SingleLineRawStringLiteralToken
+                or SyntaxKind.MultiLineRawStringLiteralToken or SyntaxKind.Utf8SingleLineRawStringLiteralToken
+                or SyntaxKind.Utf8MultiLineRawStringLiteralToken)
+            .Select(token => (token.GetLocation().GetLineSpan().StartLinePosition.Line + 1, token.ValueText))
+            .ToList();
     }
 
     private static string RepositoryRoot()
