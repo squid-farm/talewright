@@ -410,6 +410,8 @@ internal static class InlineParser
             return;
         }
 
+        TokenBuffer? expressionTokens = null;
+        var errorStart = start;
         if (context.Symbols.Analysis is { } analysis)
         {
             var incomplete = text[start..];
@@ -424,13 +426,18 @@ internal static class InlineParser
 
             var expressionStart = start + expressionOffset;
             var expressionSource = context.Source;
-            analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
+            expressionTokens = analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
                 incomplete[expressionOffset..], expressionSource.Locate(expressionStart),
                 offset => expressionSource.Locate(expressionStart + offset));
+            errorStart = expressionStart;
         }
 
-        ExpressionParser.ReportStringErrors(text[start..], offset => context.Source.Locate(start + offset),
-            context.Diagnostics);
+        if (expressionTokens is null)
+            ExpressionParser.ReportStringErrors(text[start..], offset => context.Source.Locate(start + offset),
+                context.Diagnostics);
+        else
+            ExpressionParser.ReportStringErrors(expressionTokens, offset => context.Source.Locate(errorStart + offset),
+                context.Diagnostics);
         context.Diagnostics.Error("TW1004", "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(open));
     }
 

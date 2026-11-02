@@ -682,9 +682,11 @@ internal sealed partial class TaleParser
                     _diagnostics.Error("TW1011", "Duplicate '(requires:)' condition. A choice accepts only one.", At(column));
                 if (!clauseScan.TryGetClose(pos, out var end))
                 {
-                    ExpressionParser.ReportStringErrors(rest[(pos + 10)..],
+                    var expression = rest[(pos + 10)..];
+                    var tokens = _symbols.Analysis?.Expression(ExpressionContextKind.Condition, expression, At(column + 10))
+                        ?? Lexer.Tokenize(expression);
+                    ExpressionParser.ReportStringErrors(tokens,
                         offset => At(column + 10 + offset), _diagnostics);
-                    _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[(pos + 10)..], At(column + 10));
                     _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
                     NoteDroppedChoice(scene);
                     return;
@@ -702,9 +704,11 @@ internal sealed partial class TaleParser
                     _diagnostics.Error("TW1011", "Duplicate effect block. A choice accepts only one.", At(column));
                 if (!clauseScan.TryGetClose(pos, out var end))
                 {
-                    ExpressionParser.ReportStringErrors(rest[(pos + 1)..],
+                    var expression = rest[(pos + 1)..];
+                    var tokens = _symbols.Analysis?.Expression(ExpressionContextKind.Effects, expression, At(column + 1))
+                        ?? Lexer.Tokenize(expression);
+                    ExpressionParser.ReportStringErrors(tokens,
                         offset => At(column + 1 + offset), _diagnostics);
-                    _symbols.Analysis?.Expression(ExpressionContextKind.Effects, rest[(pos + 1)..], At(column + 1));
                     _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
                     NoteDroppedChoice(scene);
                     return;
@@ -872,7 +876,8 @@ internal sealed partial class TaleParser
                 analysis.Reference("", At(column + offset + 1), AuthoringSymbolKind.Stat);
             var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
             if (dcStart >= 0)
-                analysis.Expression(ExpressionContextKind.Number, text[(dcStart + 4)..], At(column + dcStart + 4));
+                analysis.Expression(ExpressionContextKind.Number, text[(dcStart + 4)..], At(column + dcStart + 4),
+                    cacheForReuse: true);
             else if (text.EndsWith(" dc", StringComparison.Ordinal))
                 analysis.Expression(ExpressionContextKind.Number, string.Empty, At(column + text.Length));
         }

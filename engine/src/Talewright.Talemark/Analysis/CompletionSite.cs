@@ -29,10 +29,10 @@ internal static class ExpressionCompletion
         ["independent"] = "Independent possessive that stands alone, such as hers or theirs.",
     };
 
-    internal static IEnumerable<CompletionSite> Sites(string text, ExpressionContextKind kind, Func<int, int, SourceRange> map,
+    internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
         IReadOnlyList<AuthoringSymbol> symbols)
     {
-        var tokens = Lexer.Tokenize(text);
+        var text = tokens.Source;
         var offsets = new HashSet<int> { text.Length };
         foreach (var token in tokens)
         {
@@ -59,7 +59,7 @@ internal static class ExpressionCompletion
                      predicate.Offset + 1 == start)
                 end += predicate.Text.Length;
             if (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '-' or '.')) continue;
-            var before = tokens.GetRange(Math.Max(0, tokenIndex - 2), Math.Min(2, tokenIndex)).ToArray();
+            var before = tokens.Slice(Math.Max(0, tokenIndex - 2), Math.Min(2, tokenIndex));
             AuthoringSymbolKind[] kinds = [];
             string[] keywords = [];
             IReadOnlyDictionary<string, string>? details = null;
@@ -76,11 +76,11 @@ internal static class ExpressionCompletion
                 }
             }
             else if (kind != ExpressionContextKind.Number && tokenIndex >= 6 &&
-                     tokens.GetRange(tokenIndex - 6, 6).ToArray() is [{ Kind: TokenKind.Identifier } possessor,
+                     tokens.Slice(tokenIndex - 6, 6) is [{ Kind: TokenKind.Identifier } possessor,
                          { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "pronoun" },
                          { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "possessive-pronoun" },
                          { Kind: TokenKind.Colon }] &&
-                     symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == possessor.Text))
+                     symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && possessor.Is(symbol.Name)))
             {
                 keywords = ExpressionParser.PossessiveProperties;
                 details = PossessivePropertyDetails;
@@ -94,10 +94,10 @@ internal static class ExpressionCompletion
                      tokens[tokenIndex - 4] is { Kind: TokenKind.Identifier } owner &&
                      tokens[tokenIndex - 3].Kind == TokenKind.Colon)
             {
-                if (owner.Text == "faction")
+                if (owner.Is("faction"))
                     keywords = ["name", "tier"];
-                else if (kind != ExpressionContextKind.Number && member.Text == "pronoun" &&
-                         symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text))
+                else if (kind != ExpressionContextKind.Number && member.Is("pronoun") &&
+                         symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)))
                 {
                     keywords = ExpressionParser.PronounProperties;
                     details = PronounFormDetails;
@@ -112,7 +112,7 @@ internal static class ExpressionCompletion
                     "faction" => [AuthoringSymbolKind.Faction],
                     "item" when kind is ExpressionContextKind.Substitution or ExpressionContextKind.Condition
                         => [AuthoringSymbolKind.Item],
-                    _ when symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == ns.Text)
+                    _ when symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && ns.Is(symbol.Name))
                         => [AuthoringSymbolKind.Stat],
                     _ => []
                 };
@@ -168,25 +168,36 @@ internal static class ExpressionCompletion
         }
     }
 
-    private static bool IsAgreementReference(List<Token> tokens, IReadOnlyList<AuthoringSymbol> symbols)
+    private static bool IsAgreementReference(TokenBuffer tokens, IReadOnlyList<AuthoringSymbol> symbols)
     {
-        var hash = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
+        var hash = tokens.FindHash();
         if (hash < 0) return false;
-        var reference = tokens.Take(hash).Where(token => token.Kind is not (TokenKind.LeftParen or TokenKind.RightParen)).ToArray();
-        if (reference is [{ Kind: TokenKind.Identifier, Text: "item" }, { Kind: TokenKind.Colon },
-                { Kind: TokenKind.Identifier } item])
-            return symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && symbol.Name == item.Text);
-        if (reference is not [{ Kind: TokenKind.Identifier } owner, { Kind: TokenKind.Colon },
-                { Kind: TokenKind.Identifier, Text: "pronoun" }, ..] ||
-            !symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && symbol.Name == owner.Text))
-            return false;
-        return reference[3..] switch
+        Span<int> reference = stackalloc int[7];
+        var count = 0;
+        for (var index = 0; index < hash; index++)
         {
-            [] => true,
-            [{ Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "subject" or "object" or "reflexive" }] => true,
-            [{ Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "possessive-pronoun" },
-                { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "determiner" or "independent" }] => true,
-            _ => false,
-        };
+            if (tokens[index].Kind is TokenKind.LeftParen or TokenKind.RightParen) continue;
+            if (count == reference.Length) return false;
+            reference[count++] = index;
+        }
+        if (count < 3 || tokens[reference[0]].Kind != TokenKind.Identifier ||
+            tokens[reference[1]].Kind != TokenKind.Colon ||
+            tokens[reference[2]].Kind != TokenKind.Identifier)
+            return false;
+        var owner = tokens[reference[0]];
+        var member = tokens[reference[2]];
+        if (owner.Is("item") && count == 3)
+            return symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && member.Is(symbol.Name));
+        if (!member.Is("pronoun") ||
+            !symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)))
+            return false;
+        if (count == 3) return true;
+        if (count < 5 || tokens[reference[3]].Kind != TokenKind.Colon) return false;
+        var property = tokens[reference[4]];
+        if (property.Kind != TokenKind.Identifier) return false;
+        if (count == 5) return property.Text is "subject" or "object" or "reflexive";
+        return count == 7 && property.Is("possessive-pronoun") &&
+            tokens[reference[5]].Kind == TokenKind.Colon &&
+            tokens[reference[6]] is { Kind: TokenKind.Identifier, Text: "determiner" or "independent" };
     }
 }
