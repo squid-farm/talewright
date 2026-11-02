@@ -1,8 +1,8 @@
 # Get the story-checking tools
 
-Talewright has an optional tool that checks your story for mistakes and makes a ZIP file to share
-with friends. It also opens the **Author Debugger**, a window where you can jump to a scene and try
-different choices without playing from the beginning.
+Talewright has an optional tool that checks your story for mistakes, plays a story folder, and makes
+a ZIP file to share with friends. It also opens the **Author Debugger**, a window where you can jump
+to a scene and try different choices without playing from the beginning.
 
 The command-line tool, or **CLI**, runs commands you enter in a terminal.
 The tool works with any text editor; VS Code is optional.
@@ -120,8 +120,9 @@ Keep the quotation marks around the path.
 The tool reports mistakes with the file and line to look at. Start with the first message, fix it
 in your text editor, save the file, and run the same instruction again.
 
-You can use `debug` instead of `validate` to open the Author Debugger. It may need extra computer
-setup; checking your story does not require opening the debugger.
+You can use `run` instead of `validate` to play the story from its beginning, or `debug` to open the
+Author Debugger. Both windows may need extra computer setup; checking your story does not require
+opening either window.
 
 ### If you use VS Code
 

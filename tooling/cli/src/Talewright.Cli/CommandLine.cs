@@ -11,13 +11,16 @@ namespace Talewright.Cli;
 
 public static class CommandLine
 {
-    public static int Run(string[] args, TextWriter output, TextWriter error)
+    public static int Run(string[] args, TextWriter output, TextWriter error,
+        CancellationToken cancellationToken = default)
         => Run(args, output, error, new CliInput(Console.In, Console.IsInputRedirected,
             Console.IsOutputRedirected || !ReferenceEquals(output, Console.Out),
-            Console.IsErrorRedirected || !ReferenceEquals(error, Console.Error)));
+            Console.IsErrorRedirected || !ReferenceEquals(error, Console.Error)),
+            cancellationToken: cancellationToken);
 
     internal static int Run(string[] args, TextWriter output, TextWriter error, CliInput input,
-        PublishCommand.Operations? publication = null)
+        PublishCommand.Operations? publication = null, NativeHostLauncher.Operations? nativeLaunch = null,
+        CancellationToken cancellationToken = default)
     {
         if (args.Length == 0)
         {
@@ -50,7 +53,10 @@ public static class CommandLine
                 Ansi = AnsiSupport.No,
                 ColorSystem = ColorSystemSupport.NoColors,
             }));
-            var writers = new CommandWriters(output, error, input, publication ?? PublishCommand.Operations.Default);
+            var writers = new CommandWriters(output, error, input, publication ?? PublishCommand.Operations.Default)
+            {
+                NativeLaunch = nativeLaunch ?? NativeHostLauncher.Operations.Default,
+            };
             config.AddCommand<ValidateCommand>("validate")
                 .WithDescription("Validate a story folder with stable human or JSON diagnostics.")
                 .WithData(writers);
@@ -63,14 +69,22 @@ public static class CommandLine
             config.AddCommand<DebugCommand>("debug")
                 .WithDescription("Open the local native author workbench for a story folder.")
                 .WithData(writers);
+            config.AddCommand<RunCommand>("run")
+                .WithDescription("Play a story folder in a native window.")
+                .WithData(writers);
         });
         try
         {
-            return app.Run(args);
+            return app.Run(args, cancellationToken);
         }
         catch (Exception ex) when (ex is CommandParseException or CommandRuntimeException)
         {
             return ReportInvocationFailure(args, ex.Message, output, error);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            error.WriteLine("Canceled.");
+            return 130;
         }
     }
 
@@ -123,7 +137,10 @@ internal sealed record CliInput(TextReader Reader, bool IsInputRedirected, bool 
 }
 
 internal sealed record CommandWriters(TextWriter Output, TextWriter Error, CliInput Input,
-    PublishCommand.Operations Publication);
+    PublishCommand.Operations Publication)
+{
+    public NativeHostLauncher.Operations NativeLaunch { get; init; } = NativeHostLauncher.Operations.Default;
+}
 
 public abstract class CliSettings : CommandSettings
 {

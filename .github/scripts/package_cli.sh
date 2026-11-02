@@ -74,6 +74,16 @@ for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension
   publish-assets/player/talewright.css; do
   test -s "$output/$file" || { echo "Missing CLI archive asset: $file" >&2; exit 1; }
 done
+for file in player-assets/player.html debug-host/player-assets/player.html \
+  publish-assets/player/Preferences/PlayerPreferencesBootstrap.js \
+  publish-assets/player/Preferences/PlayerPreferences.js \
+  publish-assets/player/Components/MediaView.razor.js \
+  publish-assets/player/Components/PlayerToolbar.razor.js \
+  publish-assets/player/Components/SavedGamesPanel.razor.js \
+  publish-assets/player/Components/StoryPlayer.razor.js \
+  publish-assets/player/Saves/IndexedDbSaveStore.js; do
+  test -s "$output/$file" || { echo "Missing CLI archive asset: $file" >&2; exit 1; }
+done
 python3 - "$output" <<'PY'
 import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])

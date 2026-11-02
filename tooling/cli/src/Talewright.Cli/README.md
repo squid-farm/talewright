@@ -1,13 +1,14 @@
 # Talewright.Cli
 
-The `talewright` command-line tool: `validate`, `debug` and `publish`.
+The `talewright` command-line tool: `validate`, `lint`, `run`, `debug` and `publish`.
 
 - **Using it:** see the [CLI reference](../../../../docs/reference/cli.md).
 - **Run from source:** `dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostRelic`
-- **Code:** commands live in `CommandLine.cs`, `PublishCommand.cs` and `DebugCommand.cs`; `PublishAssets/` holds the templates. Templates ship inside the tool package, so
+- **Code:** commands live in `CommandLine.cs`, `LintCommand.cs`, `RunCommand.cs`, `DebugCommand.cs`
+  and `PublishCommand.cs`; `PublishAssets/` holds the templates. Templates ship inside the tool package, so
   installed tools need no source checkout.
 
-All three commands accept `--non-interactive` after the command name. It guarantees no CLI prompts,
+All commands accept `--non-interactive` after the command name. It guarantees no CLI prompts,
 not overwrite permission or a different validation mode. Only `publish` asks a CLI question today:
 existing outputs require terminal confirmation (default No) or explicit `--force`.
 
@@ -19,4 +20,10 @@ These are separate filesystem operations, not compare-and-swap or crash-durabili
 Tests supply `CliInput` terminal flags/readers and `PublishCommand.Operations` build/archive delegates.
 The public injected-writer entry point treats custom stdout or stderr writers as noninteractive, avoiding
 unexpected reads from process stdin. Prompts and cancellation use the injected error writer.
-The debugger's shared settings do not change its GUI confirmations or scenario behavior.
+The native player's and debugger's shared settings do not change their GUI confirmations or scenario
+behavior. They use the same child-process launcher and native prerequisites; the player starts only
+after validation succeeds.
+
+The Linux native suite includes `NativeCliRunTests` for real player startup, save/reload, window close,
+and Ctrl+C/task termination. Run it with
+`python3 player/tests/run_e2e.py linux --filter 'FullyQualifiedName~NativeCliRunTests'`.

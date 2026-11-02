@@ -10,5 +10,6 @@
     <ProjectReference Include="../../../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
     <Content Update="wwwroot/**" TargetPath="debug-assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../../../player/src/Talewright.Player/wwwroot/talewright.css" Link="debug-assets/_content/Talewright.Player/talewright.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="PlayerAssets/player.html" Link="player-assets/player.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

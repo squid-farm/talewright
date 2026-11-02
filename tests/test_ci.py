@@ -14,7 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
 sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
 from publish_samples import normalize_base_path
-from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, MAP_ASSETS, smoke, verify, verify_desktop_archive
+from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, MAP_ASSETS, PLAYER_ASSETS, smoke, verify, verify_desktop_archive
 import ui_test_image_plan
 
 
@@ -183,9 +183,7 @@ class PackageBoundaryTests(unittest.TestCase):
                              "publish-assets/standalone/web/wwwroot/index.html",
                              "publish-assets/standalone/desktop/App.razor",
                              "publish-assets/standalone/desktop/Program.cs",
-                             "publish-assets/player/talewright.css",
-                             "publish-assets/player/Components/StoryPlayer.razor.js",
-                             "publish-assets/player/Saves/IndexedDbSaveStore.js",
+                             *PLAYER_ASSETS,
                              "publish-assets/launchers/start.sh",
                              "publish-assets/launchers/start.command",
                              "publish-assets/launchers/start.cmd",
