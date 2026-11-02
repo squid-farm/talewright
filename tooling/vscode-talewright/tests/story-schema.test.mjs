@@ -234,7 +234,10 @@ test('pronoun and displayed-name agreement are independent, explicit grammar fie
 });
 
 test('schema rejects unknown keys at every closed reader mapping', async () => {
-  const source = await read('engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs');
+  const directory = 'engine/src/Talewright.Talemark/Parsing/';
+  const readerFiles = (await readdir(new URL(directory, root)))
+    .filter(file => file.startsWith('StoryYaml') && file.endsWith('.cs'));
+  const source = (await Promise.all(readerFiles.map(file => read(`${directory}${file}`)))).join('\n');
   const readerSets = [...source.matchAll(/CheckKeys\(\w+,\s*((?:"[^"]+"\s*,?\s*)+)\);/g)]
     .map(match => [...match[1].matchAll(/"([^"]+)"/g)].map(key => key[1]).sort());
   assert.ok(readerSets.length > 0, 'reader CheckKeys lists should be discoverable');
@@ -291,6 +294,32 @@ test('shared compiler/schema manifest fixtures cover supported forms and diagnos
     } else {
       assertInvalid(validateManifest, manifest, fixture.file);
     }
+  }
+});
+
+test('schema rejects null for each optional manifest container', () => {
+  const base = {
+    game: { id: 'null-containers', title: 'Null containers', start: 'beginning' },
+    characters: { player: { 'first-name': 'Ada' } },
+  };
+  assertValid(validateManifest, base, 'base manifest');
+  const paths = [
+    ['game', 'ruleset'], ['game', 'ruleset', 'disable'], ['game', 'ruleset', 'stats'],
+    ['game', 'creation'], ['game', 'creation', 'pronouns'], ['game', 'creation', 'stats'],
+    ['game', 'creation', 'stats', 'str'], ['game', 'creation', 'presets'],
+    ['game', 'creation', 'presets', 'explorer'], ['game', 'creation', 'presets', 'explorer', 'stats'],
+    ['characters'], ['characters', 'player'], ['characters', 'player', 'stats'],
+    ['characters', 'player', 'inventory'], ['items'], ['items', 'coin', 'modifiers'],
+    ['factions'], ['flags'], ['vars'], ['triggers'],
+  ];
+  for (const path of paths) {
+    const manifest = structuredClone(base);
+    let parent = manifest;
+    for (const key of path.slice(0, -1)) parent = parent[key] ??= {};
+    parent[path.at(-1)] = null;
+    assertInvalid(validateManifest, manifest, path.join('.'));
+    assert.ok(validateManifest.errors.some(error => error.instancePath === `/${path.join('/')}`),
+      `${path.join('.')} should be rejected at its own location: ${ajv.errorsText(validateManifest.errors)}`);
   }
 });
 

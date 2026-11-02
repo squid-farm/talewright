@@ -1,0 +1,13 @@
+game:
+  id: empty-containers
+  title: Empty containers
+  start: beginning
+  ruleset: {disable: [], stats: []}
+  creation: {pronouns: [], stats: {}, presets: {}}
+characters:
+  player: {first-name: Ada, stats: {}, inventory: []}
+items: {}
+factions: {}
+flags: []
+vars: {}
+triggers: []

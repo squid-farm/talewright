@@ -165,6 +165,10 @@ accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
 This applies to `game.undo`, `game.creation.name`, item `uncountable`, and
 trigger `once`.
 
+Optional mappings and lists may be omitted. Where empty containers are allowed,
+write `{}` or `[]` explicitly. YAML null values (`null`, `~`, or a key with no
+value or nested content) are not empty containers and produce TW4003.
+
 Faction entries must be objects, unlike the shorthand allowed for items:
 `guild: {}` is valid and defaults the name to `guild` and standing to `0`;
 `guild: Explorers Guild` is invalid.

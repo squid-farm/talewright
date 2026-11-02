@@ -1,6 +1,9 @@
 [
   { "file": "defaults.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "empty-optional-containers.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "null-optional-containers.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
+  { "file": "null-nested-containers.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
   { "file": "text-variables.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "invalid-variable-shapes.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
   { "file": "faction-shorthand.yaml", "schemaValid": false, "compilerCodes": ["TW4003"], "diagnosticLocations": [{ "line": 8, "column": 10 }] },
