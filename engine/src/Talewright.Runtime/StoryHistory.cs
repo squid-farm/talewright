@@ -22,24 +22,26 @@ public sealed class StoryHistory
     private readonly List<string> _choices = [];
     private StorySession _session;
     private List<HistoryFrame> _frames;
+    private ReplayCursor _timeline;
 
     public StoryHistory(StoryDefinition story, ulong? seed = null, CharacterSelection? character = null)
     {
         Character = CharacterSelection.Validate(story, character);
         Story = story;
+        _timeline = new ReplayCursor(0, 0);
         _session = new StorySession(story, seed, character: Character);
         _frames = [new HistoryFrame(_session.Start())];
     }
 
     private StoryHistory(StoryDefinition story, CharacterSelection? character, StorySession session,
-        List<HistoryFrame> frames, IEnumerable<string> choices, int cursor)
+        List<HistoryFrame> frames, IEnumerable<string> choices, ReplayCursor timeline)
     {
         Story = story;
         Character = character;
         _session = session;
         _frames = frames;
         _choices.AddRange(choices);
-        Cursor = cursor;
+        _timeline = timeline;
     }
 
     public StoryDefinition Story { get; }
@@ -49,9 +51,9 @@ public sealed class StoryHistory
     public IReadOnlyList<GameEvent> Events => _session.Events;
     public StoryFrame Current => _session.Current!;
     public IReadOnlyList<HistoryFrame> Transcript => _frames.AsReadOnly();
-    public int Cursor { get; private set; }
-    public bool CanBack => Story.UndoEnabled && Cursor > 0;
-    public bool CanForward => Story.UndoEnabled && Cursor < _choices.Count;
+    public int Cursor => _timeline.Position;
+    public bool CanBack => Story.UndoEnabled && _timeline.CanBack;
+    public bool CanForward => Story.UndoEnabled && _timeline.CanForward;
 
     /// <summary>Forks validated player replay inputs into isolated synthetic author tooling, retaining redo.</summary>
     public AuthorSession ForkAuthor(bool captureDecisions = true) =>
@@ -70,9 +72,9 @@ public sealed class StoryHistory
         var frame = _session.Choose(key);
         _frames[^1] = _frames[^1] with { Chosen = choice.Label };
         _frames.Add(new HistoryFrame(frame));
-        _choices.RemoveRange(Cursor, _choices.Count - Cursor);
+        _choices.RemoveRange(_timeline.Position, _timeline.Length - _timeline.Position);
         _choices.Add(key);
-        Cursor++;
+        _timeline = _timeline.AfterAppend();
     }
 
     public void Back()
@@ -82,7 +84,7 @@ public sealed class StoryHistory
             throw new InvalidOperationException("There is no previous choice to restore.");
         }
 
-        MoveTo(Cursor - 1);
+        MoveTo(_timeline.Back());
     }
 
     public void Forward()
@@ -92,15 +94,15 @@ public sealed class StoryHistory
             throw new InvalidOperationException("There is no next choice to restore.");
         }
 
-        MoveTo(Cursor + 1);
+        MoveTo(_timeline.Forward());
     }
 
-    private void MoveTo(int cursor)
+    private void MoveTo(ReplayCursor timeline)
     {
-        var (session, frames) = Replay(Story, Seed, _choices.Take(cursor), Character);
+        var (session, frames) = Replay(Story, Seed, _choices.Take(timeline.Position), Character);
         _session = session;
         _frames = frames;
-        Cursor = cursor;
+        _timeline = timeline;
     }
 
     public byte[] Save(SaveSummary? summary = null)
@@ -247,13 +249,14 @@ public sealed class StoryHistory
         {
             throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
         }
+        var timeline = new ReplayCursor(save.Cursor, save.Choices.Length);
         var (session, frames) = Replay(story, save.Seed, save.Choices, character);
-        if (save.Cursor < save.Choices.Length)
+        if (timeline.CanForward)
         {
-            (session, frames) = Replay(story, save.Seed, save.Choices.Take(save.Cursor), character);
+            (session, frames) = Replay(story, save.Seed, save.Choices.Take(timeline.Position), character);
         }
 
-        return new StoryHistory(story, character, session, frames, save.Choices, save.Cursor);
+        return new StoryHistory(story, character, session, frames, save.Choices, timeline);
     }
 
     private static (StorySession Session, List<HistoryFrame> Frames) Replay(

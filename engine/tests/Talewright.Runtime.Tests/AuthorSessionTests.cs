@@ -340,6 +340,44 @@ public sealed class AuthorSessionTests
     }
 
     [Fact]
+    public void Back_forward_and_branch_replay_author_commands_without_retaining_redo()
+    {
+        var story = Compile("""
+            === start
+            * [Left] { var:count += 1 } -> left
+            * [Right] { var:count += 10 } -> right
+            === left
+            * [Finish] { var:count += 100 } -> END
+            === right
+            * [Finish] { var:count += 1000 } -> END
+            """);
+        var session = Start(story);
+
+        session.Choose("c0");
+        session.Choose("c0");
+        Assert.Equal(101, session.State.GetVariable(Count));
+        session.Back();
+        Assert.Equal(1, session.State.GetVariable(Count));
+        Assert.True(session.CanForward);
+        session.Forward();
+        Assert.Equal(101, session.State.GetVariable(Count));
+        session.Back();
+        session.Back();
+        Assert.Equal(0, session.State.GetVariable(Count));
+
+        session.Choose("c1");
+        Assert.Equal(10, session.State.GetVariable(Count));
+        Assert.False(session.CanForward);
+        Assert.Single(session.Commands);
+        session.Choose("c0");
+
+        Assert.Equal(1010, session.State.GetVariable(Count));
+        Assert.Equal(2, session.Cursor);
+        Assert.Equal(2, session.Results.Count);
+        Assert.False(session.CanForward);
+    }
+
+    [Fact]
     public void Fresh_jump_discards_old_progress_and_does_not_inherit_setup_or_character()
     {
         var story = Compile("""

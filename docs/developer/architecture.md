@@ -137,6 +137,13 @@ exposes the compiled definition and event history as public contracts. The Playe
 or `Effect`, or execute `SceneDefinition.Steps`; `StorySession` owns scene execution. `StoryPlayer` uses
 `StoryHistory` for transcript, Back/Forward and save orchestration; presentation does not reimplement replay.
 
+`Talewright.Runtime` also owns the headless `AuthorSession` API for synthetic scene starts, state edits,
+jumps and reload checkpoints. `StoryHistory.ForkAuthor` adapts a player's validated choice history into
+that author timeline; the debugger consumes the API and does not own its replay semantics. `StorySession`
+retains internal author hooks for setup, entry-boundary capture and live refresh because those operations
+must share engine event and scene execution. Keep debugger/UI dependencies out of Runtime and keep player
+saves and author command/scenario formats distinct.
+
 ---
 
 ## 2. Invariants
