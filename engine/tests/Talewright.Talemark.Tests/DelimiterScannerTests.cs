@@ -124,6 +124,21 @@ public sealed class DelimiterScannerTests
         Assert.Equal(2, result.Issues.Count);
     }
 
+    [Theory]
+    [InlineData("\"quoted } ) ] and \\\" quote\"", true)]
+    [InlineData("\"unknown \\q escape }\"", true)]
+    [InlineData("\"unclosed } ) ]", false)]
+    public void Quoted_string_scan_and_decode_share_the_same_boundary(string text, bool closed)
+    {
+        var scanned = QuotedStringSyntax.Scan(text, 0, text.Length);
+        var decoded = QuotedStringSyntax.Read(text, 0, text.Length);
+
+        Assert.Equal(closed, scanned.Closed);
+        Assert.Equal(scanned.End, decoded.End);
+        Assert.Equal(scanned.Closed, decoded.Closed);
+        Assert.Equal(scanned.Error, decoded.Error);
+    }
+
     [Fact]
     public void Seeded_generated_regions_are_deterministic_and_dispose_each_delimiter_once()
     {

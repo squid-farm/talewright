@@ -137,10 +137,10 @@ internal static class ImageSyntax
                     cancellationToken.ThrowIfCancellationRequested();
                     nextCancellationCheck = i + Math.Min(1024, end - i);
                 }
-                var c = text[i];
-                if (c == '"')
+                var unit = QuotedStringSyntax.ReadUnit(text, i, end);
+                if (unit.ClosingQuote)
                 {
-                    i++;
+                    i = unit.End;
                     locations.Add(source.Locate(i));
                     decoded = plain.ToString();
                     var authored = templateText.ToString();
@@ -151,17 +151,18 @@ internal static class ImageSyntax
                     return true;
                 }
 
-                if (c == '\\')
+                if (unit.Escaped)
                 {
-                    if (i + 1 >= end || text[i + 1] is not ('"' or '\\' or '{' or '}' or '[' or ']' or '*' or '_' or '`'))
+                    if (unit.End == i + 1 ||
+                        (unit.Character != '"' && !DelimiterScanner.IsReaderTextEscape(unit.Character)))
                     {
                         AnalyzePartial(trimTrailingCall: false);
                         Error("Unknown image string escape. Use '\\\"', '\\\\', or a reader-text escape such as '\\{' or '\\*'.", i);
                         return false;
                     }
 
-                    var next = text[++i];
-                    i++;
+                    var next = unit.Character;
+                    i = unit.End;
                     if (next is '"' or '\\')
                     {
                         templateText.Append(next);
@@ -179,10 +180,11 @@ internal static class ImageSyntax
                     continue;
                 }
 
+                var c = unit.Character;
                 templateText.Append(c);
                 plain.Append(c);
                 locations.Add(source.Locate(i));
-                i++;
+                i = unit.End;
             }
 
             AnalyzePartial(trimTrailingCall: true);
@@ -233,7 +235,8 @@ internal static class ImageSyntax
                 cancellationToken.ThrowIfCancellationRequested();
                 nextCancellationCheck = i + Math.Min(1024, text.Length - i);
             }
-            if (text[i] == '\\' && i + 1 < text.Length && text[i + 1] is '{' or '}')
+            if (text[i] == '\\' && i + 1 < text.Length &&
+                DelimiterScanner.IsReaderTextEscape(text[i + 1]))
             {
                 i++;
                 continue;

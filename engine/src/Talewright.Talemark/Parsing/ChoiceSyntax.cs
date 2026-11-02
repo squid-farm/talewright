@@ -59,7 +59,7 @@ internal static class ChoiceSyntax
                 continue;
             }
             if (!inUnclosedEffect && current == '\\' && index + 1 < text.Length &&
-                text[index + 1] is '\\' or '{' or '}' or '[' or ']' or '*' or '_' or '`')
+                DelimiterScanner.IsReaderTextEscape(text[index + 1]))
             {
                 index++;
                 work++;
@@ -87,7 +87,7 @@ internal static class ChoiceSyntax
             {
                 var closed = TryGetClose(index, out var braceEnd);
                 if (!inUnclosedEffect && IsBoundary(text, index) &&
-                    LooksLikeEffect(text, index + 1, closed ? braceEnd : text.Length, checkpoint, ref work))
+                    LooksLikeEffect(text, index + 1, closed ? braceEnd : text.Length, scan, checkpoint, ref work))
                 {
                     marker = "{";
                 }
@@ -198,8 +198,8 @@ internal static class ChoiceSyntax
     private static bool IsBoundary(string text, int index) =>
         index > 0 && char.IsWhiteSpace(text[index - 1]);
 
-    private static bool LooksLikeEffect(string text, int start, int end, CancellationCheckpoint? checkpoint,
-        ref int work)
+    private static bool LooksLikeEffect(string text, int start, int end, DelimiterScanResult scan,
+        CancellationCheckpoint? checkpoint, ref int work)
     {
         var index = start;
         while (index < end && char.IsWhiteSpace(text[index]))
@@ -232,30 +232,9 @@ internal static class ChoiceSyntax
             work++;
             if (text[index] == '"')
             {
-                var quoteEnd = index + 1;
-                var closed = false;
-                while (quoteEnd < end)
-                {
-                    checkpoint?.Check();
-                    if (text[quoteEnd] == '\\' && quoteEnd + 1 < end)
-                    {
-                        quoteEnd += 2;
-                        work += 2;
-                    }
-                    else if (text[quoteEnd++] == '"')
-                    {
-                        work++;
-                        closed = true;
-                        break;
-                    }
-                    else
-                    {
-                        work++;
-                    }
-                }
-                if (!closed)
+                if (!scan.TryGetClose(index, out var quoteEnd) || quoteEnd >= end)
                     return false;
-                index = quoteEnd - 1;
+                index = quoteEnd;
             }
             else if (text[index] == '=' && (index + 1 == end || text[index + 1] != '=') &&
                      text[index - 1] is not ('=' or '!' or '<' or '>'))

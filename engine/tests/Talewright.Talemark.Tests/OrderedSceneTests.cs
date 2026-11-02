@@ -12,7 +12,9 @@ public sealed class OrderedSceneTests
             game: {id: order, title: Order, start: start}
             characters:
               player: {first-name: Ada}
-            vars: {gold: 10}
+            vars:
+              gold: 10
+              text: ""
             flags: [ready]
             """,
         ["chapter.tale"] = tale,
@@ -143,6 +145,22 @@ public sealed class OrderedSceneTests
             """);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Equal(2, SceneSteps.Walk(result.Story!.Scenes[0].Steps).OfType<CheckStep>().Count());
+    }
+
+    [Fact]
+    public void Choice_and_outcome_effects_ignore_delimiters_inside_quoted_text()
+    {
+        var result = Compile("""
+            === start
+            ::: skill-check athletics dc 1
+            success: { var:text = "success } ) ] and \" quote" }
+            failure: { var:text = "failure { ( [ and \\ slash" }
+            :::
+            * [Write] { var:text = "choice } ) ] and \" quote" } -> END
+            """);
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Empty(result.Diagnostics);
     }
 
     [Fact]
