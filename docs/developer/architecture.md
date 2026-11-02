@@ -21,15 +21,143 @@ Contents:
 
 ## 1. The big picture
 
+Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of _scenes_. Each
+scene has prose (a template), optional requirements, effects, skill checks, choices and diverts. Nothing about
+"which scene comes next" is hard-wired into the engine: scenes say where to go (`-> scene`, "rails"), or a hub scene
+offers every storylet whose requirements currently hold ("hubs"). The same mechanism will later drive
+open-world locations.
+
+### System overview
+
+Two paths share one compiler. Authoring tools analyse story files while they are edited; players compile the
+story when it loads and then play it. Neither path persists compiled stories.
+
+```mermaid
+flowchart TD
+  files[/"Story folder or .zip<br/>story.talewright.yaml + *.tale + images/"/]
+
+  subgraph authoring["Authoring tools (development only)"]
+    vsix["VS Code extension"]
+    lsp["Talewright.LanguageServer"]
+    cli["talewright CLI<br/>new · validate · lint · run · debug · publish"]
+    auth["Talewright.Authoring<br/>workspace, analysis, lint"]
+    dbg["Talewright.Debugger<br/>live-refresh player"]
+  end
+
+  subgraph play["Presentation (Talewright.Player package)"]
+    web["Host.Web<br/>Blazor WASM, static files"]
+    desk["Host.Desktop<br/>Photino native window"]
+    player["Talewright.Player<br/>Blazor RCL"]
+  end
+
+  subgraph engine["Headless engine (Talewright package)"]
+    rt["Talewright.Runtime<br/>StorySession, StoryHistory"]
+    tm["Talewright.Talemark<br/>compiler"]
+  end
+
+  files -- "edit + analyse" --> authoring
+  files -- "load + play" --> play
+  vsix -- "stdio LSP" --> lsp --> auth
+  vsix -- "runs" --> cli
+  cli --> auth
+  cli -- "run / debug" --> dbg
+  cli -- "publish: generate a host" --> play
+  dbg --> player
+  web --> player
+  desk --> player
+  auth --> tm
+  player --> rt --> tm
+```
+
+`publish` generates a standalone web or desktop host project with the story embedded. Releases ship the
+`Talewright` and `Talewright.Player` NuGet packages, the CLI and the VS Code extension; see [releasing](releasing.md).
+
+### Layers
+
+| Layer                 | Projects                                                              | One-line job                                                                         |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **RPG engine**        | `Talewright.Core`, `Talewright.Rulesets.Generic`                      | Who exists, what they have, what has happened. Pure state + events.                  |
+| **Rules engine**      | `Talewright.Rules`                                                    | Evaluate conditions, apply effects, resolve checks, fire triggers, select storylets. |
+| **Template renderer** | `Talewright.Narrative`                                                | Turn a typed template AST + state into a presentation-agnostic document.             |
+| **Compiler**          | `Talewright.Talemark`, `Talewright.Graphs`                            | Text → typed `StoryDefinition` or diagnostics. The only place that parses strings.   |
+| **Orchestrator**      | `Talewright.Runtime`                                                  | `StorySession` runs the loop (choice → events → rules → render → frame).             |
+| **Presentation**      | `Talewright.Player`, `Talewright.Host.Desktop`, `Talewright.Host.Web` | Blazor UI and the two native/web shells.                                             |
+| **Tooling**           | `Talewright.Authoring`, `.LanguageServer`, `.Cli`, `.Debugger`        | Editor analysis, lint, validate/run/publish. Never shipped inside a story.           |
+
+`Talewright.Authoring` is a development-tool library above the compiler. It owns
+unsaved workspaces, analysis scheduling, explicit project metadata integration,
+and the shared Talemark-aware lint rules/configuration consumed by the CLI and editor.
+The compiler exposes parser-backed partial analysis without depending on this
+library. Authoring is excluded from the shipped engine and player packages; see
+[shared authoring analysis](authoring-analysis.md) and the [language server](language-server.md).
+
+`Talewright.Graphs` is an independent directed-graph library. It has no project or
+package references, so the graph model never depends on Talewright types. `Talewright.Talemark`
+references it to find which scenes the start scene can reach (TW3009).
+
+### Dependency graph
+
+Solid arrows are `ProjectReference`s in shipped projects (tests, benchmarks and `examples/` are omitted).
+Dotted arrows are process or packaging relationships, not compile references. Nothing points upward: the
+engine never knows about the UI or the tooling.
+
+```mermaid
+flowchart TD
+  subgraph tooling["Tooling"]
+    vsix["vscode-talewright"]
+    cli["Cli"]
+    lsp["LanguageServer"]
+    dbg["Debugger"]
+    auth["Authoring"]
+  end
+  subgraph presentation["Presentation"]
+    desk["Host.Desktop"]
+    web["Host.Web"]
+    player["Player"]
+  end
+  pkg[["Talewright<br/>(packaging shell)"]]
+  subgraph engine["Engine"]
+    rt["Runtime"]
+    tm["Talemark"]
+    gen["Rulesets.Generic"]
+    nar["Narrative"]
+    graphs["Graphs"]
+    rules["Rules"]
+    core["Core"]
+  end
+
+  vsix -. "spawns" .-> lsp
+  vsix -. "runs" .-> cli
+  cli --> auth & tm & rt & player & dbg
+  lsp --> auth
+  dbg --> player & rt
+  auth --> tm
+  desk --> player & rt
+  web --> player & rt
+  player --> rt
+  player --> pkg
+  pkg -. "bundles all seven" .-> engine
+  rt --> tm & nar & rules & core
+  tm --> gen & nar & rules & graphs & core
+  nar --> rules & core
+  rules --> core
+  gen --> core
+```
+
+`Narrative` references `Rules` because inline conditionals `{if …}` use the same typed expression trees and
+evaluator as everything else.
+
 ### NuGet distribution
 
-Project boundaries and the dependency graph below remain intact. The
-`packaging/Talewright/Talewright.csproj` shell references all six headless projects and
-packages their existing assemblies together as `Talewright`; it contains no engine
-implementation. `Talewright.Player` retains its direct Runtime project reference,
-and its published package depends on `Talewright`. Both packages share one version.
-The component projects are not separately published. Namespaces and assembly
-identities are independent of source paths; packaging is independent of code organization.
+The `packaging/Talewright/Talewright.csproj` shell privately references all seven engine projects
+(Core, Graphs, Rules, Narrative, Rulesets.Generic, Talemark, Runtime) and packages their existing assemblies
+together as `Talewright`; it contains no engine implementation. `Talewright.Player` retains its direct Runtime
+project reference, and its published package depends on `Talewright`. Both packages share one version.
+The component projects are not separately published. Namespaces and assembly identities are independent of
+source paths; packaging is independent of code organization.
+
+Ordinary story authors need no NuGet project dependencies. C# customizers normally
+install only `Talewright.Player`; headless/custom-UI consumers install `Talewright`.
 
 ### Repository areas
 
@@ -48,77 +176,10 @@ The workspace is organized by responsibility, not by implementation language:
 
 The root solution mirrors these areas. Shared story fixtures are in
 `engine/tests/Talewright.TestStories`; the separate player E2E solution remains
-opt-in. Root build defaults, Nx, and CI coordinate all areas. See
+opt-in. Root build defaults, [Nx and CI](nx-ci.md) coordinate all areas. See
 [Contributing](../../CONTRIBUTING.md#repository-layout) for paths and commands.
 
-Ordinary story authors need no NuGet project dependencies. C# customizers normally
-install only `Talewright.Player`; headless/custom-UI consumers install `Talewright`.
-
-Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of _scenes_. Each
-scene has prose (a template), optional requirements, effects, skill checks, choices and diverts. Nothing about
-"which scene comes next" is hard-wired into the engine: scenes say where to go (`-> scene`, "rails"), or a hub scene
-offers every storylet whose requirements currently hold ("hubs"). The same mechanism will later drive
-open-world locations.
-
-The three tiers you asked for map onto projects like this:
-
-| Your tier             | Projects                                                              | One-line job                                                                         |
-| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **RPG engine**        | `Talewright.Core`, `Talewright.Rulesets.Generic`                      | Who exists, what they have, what has happened. Pure state + events.                  |
-| **Rules engine**      | `Talewright.Rules`                                                    | Evaluate conditions, apply effects, resolve checks, fire triggers, select storylets. |
-| **Template renderer** | `Talewright.Narrative`                                                | Turn a typed template AST + state into a presentation-agnostic document.             |
-| **Presentation**      | `Talewright.Player`, `Talewright.Host.Desktop`, `Talewright.Host.Web` | Blazor UI and the two native/web shells.                                             |
-
-Two more projects glue it together:
-
-- `Talewright.Talemark` is the **compiler**: it turns `.tale` + `story.talewright.yaml` text into the typed objects the other
-  layers use. It is the _only_ place that parses strings, and it runs once when a story loads.
-- `Talewright.Runtime` is the **orchestrator**: `StorySession` runs the loop (choice → events → rules → render →
-  frame), referencing Core, Rules, Narrative, and Talemark. Talemark also references the typed compiler
-  dependencies it needs, including Core, Rules, Narrative, Rulesets.Generic, and Graphs.
-
-`Talewright.Authoring` is a development-tool library above the compiler. It owns
-unsaved workspaces, analysis scheduling, explicit project metadata integration,
-and the shared Talemark-aware lint rules/configuration consumed by the CLI and editor.
-The compiler exposes parser-backed partial analysis without depending on this
-library. Authoring is excluded from the shipped engine and player packages; see
-[shared authoring analysis](authoring-analysis.md).
-
-`Talewright.Graphs` is an independent directed-graph library. It has no project or
-package references, so the graph model never depends on Talewright types. `Talewright.Talemark`
-references it to find which scenes the start scene can reach (TW3009).
-
-### Dependency graph
-
-Arrows mean "references". Nothing points upward; the engine never knows about the UI.
-
-```
-        Host.Desktop   Host.Web
-              \          /
-               ▼        ▼
-             Talewright.Player   (Blazor RCL; also references aggregate packaging shell)
-                     │
-                     ▼
-             Talewright.Runtime  (StorySession, EventNarrator)
-                     │
-                     ▼
-             Talewright.Talemark ─────────────────► Talewright.Rulesets.Generic
-             (compiler, StoryDefinition)                │
-               │            │                           │
-               ▼            ▼                           │
-   Talewright.Narrative ─► Talewright.Rules             │
-                               │                        │
-                               ▼                        ▼
-                           Talewright.Core ◄────────────┘
-```
-
-`Talewright.Talemark` also references `Talewright.Graphs`, which references nothing.
-
-(`Narrative` references `Rules` because inline conditionals `{if …}` use the same typed expression trees and
-evaluator as everything else. The source `Talewright.Player` project directly references Runtime and the
-aggregate `Talewright` packaging project; the latter is a distribution shell, not an additional runtime layer.)
-
-### The data that flows between tiers
+### The data that flows between layers
 
 | Boundary             | Type                                                                | Defined in |
 | -------------------- | ------------------------------------------------------------------- | ---------- |
@@ -266,6 +327,24 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
 
 Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → CompilationResult(Story?, Diagnostics)`.
 
+```mermaid
+flowchart TD
+  src[/"StorySource<br/>path → text, image path catalogue"/]
+  yaml["StoryYamlReader<br/>story.talewright.yaml → manifest"]
+  world["Ruleset factory + WorldDefinition<br/>(CompilerOptions.Rulesets)"]
+  disc["Discovery pass: TaleParser.Discover per .tale<br/>scene ids, auto-declared flags/vars"]
+  parse["Parse pass: TaleParser.Parse per .tale<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
+  val["StoryValidator<br/>structure + StoryReachability (Graphs)"]
+  ok(["StoryDefinition"])
+  err(["Diagnostics only (Story = null)"])
+  src --> yaml --> world --> disc --> parse --> val
+  val -- "no errors" --> ok
+  val -- "any error" --> err
+```
+
+Each `.tale` file is parsed twice: discovery runs first so forward references resolve. The player compiles
+at story load, including in WebAssembly, so parser cost is load-time cost; see [performance](performance.md).
+
 - **`Compilation/`**
   - `StorySource`: a dictionary of relative path → text, plus an immutable `ImagePaths` catalogue of
     story-root-relative paths under `images/`. Image bytes are not read or decoded.
@@ -273,35 +352,12 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     Factories: `FromDirectory`, `FromZip(stream)` (a
     single wrapping top-level folder is stripped). `ReadTitle()` peeks at `story.talewright.yaml` without compiling (used
     by the library screen).
-  - `StoryImageResolver`: the shared path-only lookup for future compiler and CLI image checks.
-    It takes a `StorySource`, a path relative to `images/`, optional alt text, the reference's
-    source location, and a `DiagnosticBag`. It returns a `ResolvedStoryImage` with a
-    story-root-relative path and effective alt text, or null with an error.
-    Paths match case-sensitively; explicit extensions recognize PNG, JPEG and WebP regardless
-    of extension casing, but the filename must still match exactly. Extensionless paths try
-    `.png`, `.jpg`, `.jpeg`, then `.webp`, warning and listing matches if ambiguous.
-    Absolute paths, parent traversal, backslashes, web addresses, empty path segments,
-    query strings and fragments are rejected. No files are downloaded.
-    Missing, empty or whitespace-only alt text warns and uses Humanizer.Core 3.0.10 to
-    turn the filename into words, then applies invariant sentence case. For example,
-    `old_map-v2.png` becomes `Old map v2`; punctuation-only names become `Image`.
-    Author-written literal alt text is preserved after escape decoding. Alt that contains a
-    template is parsed with the prose template language and rendered later. All diagnostics point
-    to the reference. Ordinary compilation, `talewright validate` and editor analysis use this resolver
-    for well-formed image calls. Compiled `MediaTemplate` nodes store the selected
-    story-root-relative path and either that literal alt or the alt template. Editor completion also reuses
-    the resolver's supported safe-path catalogue. Lookup diagnostics point to the
-    path's authored opening quote, and malformed calls receive only parser diagnostics.
-    This adds no image rendering, byte decoding or image size checks.
-    Bundled web/desktop samples include image resources so their source catalogue
-    remains complete. `EmbeddedStoryLibrary` records image resource names without
-    opening their streams. Existing exports copy actual safe, supported image files
-    into story ZIPs and embed staged files under `stories/Published/` in standalone
-    hosts, preserving the same catalogue and lookup after export. Image rendering
-    and the remaining deployment acceptance under #179 stay separate.
+  - `StoryImageResolver`: the shared, path-only image lookup used by compilation, `talewright validate`,
+    editor analysis and completion. It never reads or decodes image bytes. Path rules, alt-text defaults and
+    export behaviour are in the [Talemark README](../../engine/src/Talewright.Talemark/README.md#story-images).
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
-    `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `game.ruleset.base:`). Tier 1 extension in M2 means
-    "pass your own options".
+    `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `game.ruleset.base:`). C# extension means
+    "pass your own options"; see [C# extensions](csharp-extensions.md).
   - `StoryCompiler`: orchestrates. Order: read `story.talewright.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
     every `.tale` for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
     validate → assemble `StoryDefinition`. Any error ⇒ `Story` is null.
@@ -401,18 +457,21 @@ templates (including a relative web base path); project changes use `XDocument` 
 
 ## 4. Life of a story
 
-```
-samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Compile
-  story.talewright.yaml           ───────►  StorySource            ──────►  CompilationResult
-  chapters/*.tale                (path → text)                    ├─ Diagnostics (shown if errors)
-                                                                  └─ StoryDefinition
-                                                                          │
-                                         new StorySession(story, seed) ◄──┘
-                                                 │ Start()
-                                                 ▼
-                                            StoryFrame ──► StoryPlayer renders it
-                                                 ▲                 │ player clicks
-                                                 └── Choose(key) ◄─┘
+```mermaid
+flowchart LR
+  lib["IStoryLibrary.OpenAsync<br/>embedded · folder · .zip"]
+  loaded["LoadedStory<br/>StorySource + lazy images"]
+  comp["StoryCompiler.Compile"]
+  diag["DiagnosticList"]
+  def["StoryDefinition"]
+  create["CharacterCreator<br/>(optional)"]
+  hist["StoryHistory<br/>wraps StorySession"]
+  ui["StoryPlayer<br/>transcript + choices"]
+  lib --> loaded --> comp
+  comp -- "errors" --> diag
+  comp -- "success" --> def --> create --> hist
+  hist -- "StoryFrame" --> ui
+  ui -- "choice key" --> hist
 ```
 
 1. **Load.** The host's `IStoryLibrary.OpenAsync` hands back a disposable `LoadedStory`: `StorySource` plus
@@ -460,6 +519,29 @@ samples/LostRelic/               IStoryLibrary.OpenAsync        StoryCompiler.Co
    Filter requirements/once/self, order by priority then declaration order, and apply `@hub-limit` only
    to generated choices. A scene divert never acts as a fallback for choices or hubs.
 
+One choice, end to end:
+
+```mermaid
+sequenceDiagram
+  participant UI as StoryPlayer
+  participant H as StoryHistory
+  participant S as StorySession
+  participant L as EventLog / GameState
+  participant T as TriggerEngine + leveling
+  participant X as SceneExecutor
+  UI->>H: Choose(key)
+  H->>S: Choose(key)
+  S->>L: Append ChoiceMade, effects, DiceRolled, SkillCheckResolved
+  S->>T: AfterBatch() until settled
+  T->>L: Append trigger and level events
+  S->>S: EventNarrator.Describe(new events) → notes
+  S->>X: Enter(target scene)
+  X->>L: Append SceneEntered, step effects
+  X->>X: TemplateRenderer renders prose and choice labels
+  S-->>H: StoryFrame (Document, notes, Choices)
+  H-->>UI: HistoryFrame appended to transcript
+```
+
 **Choosing** (`Choose(key)`):
 
 1. Append `ChoiceMade`.
@@ -478,6 +560,25 @@ player save format itself is unchanged.
 
 Invalid keys throw `InvalidOperationException` listing the valid ones. The UI only ever sends keys it was given.
 
+**Saves, restore and Back/Forward.** Saves store replay inputs, never the event log or state:
+
+```mermaid
+flowchart LR
+  subgraph save["Save bytes (JSON)"]
+    direction TB
+    f1["format + story id/version"]
+    f2["content fingerprint"]
+    f3["seed + character selection"]
+    f4["choice keys + cursor"]
+  end
+  hist["StoryHistory"] -- "Save()" --> save --> store["ISaveStore<br/>FileSaveStore · IndexedDbSaveStore"]
+  store -- "bytes" --> restore["StoryHistory.Restore"]
+  restore -- "validate all, then replay<br/>keys into a fresh StorySession" --> hist2["new StoryHistory<br/>(swapped in only on success)"]
+```
+
+Back and Forward use the same replay: `StoryHistory` rebuilds a session from the seed and the first
+_cursor_ choice keys.
+
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
 format/story versions and source/extension fingerprint. Unknown/corrupt/incompatible saves are rejected,
@@ -490,7 +591,7 @@ stories. Pre-v1 format and replay contracts may change without support for previ
 
 This is how the "dating sim doesn't want strength" requirement is met, and where a community author plugs in.
 
-| I want to…                                        | Today (no code, story.talewright.yaml)                                                              | With C# (Tier 1, polished in M2)                                           |
+| I want to…                                        | Today (no code, story.talewright.yaml)                                                              | With C# (`Talewright` / `Talewright.Player` packages)                      |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Remove default stats                              | `game: { ruleset: { base: generic, disable: [str, con] } }`                              | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
 | Start from nothing                                | `game: { ruleset: { base: none } }`                                                      | `new RulesetBuilder("mine")`                                               |
@@ -505,8 +606,9 @@ This is how the "dating sim doesn't want strength" requirement is met, and where
 | Different story source (database, HTTP)           | —                                                                                        | implement `IStoryLibrary` and register it in the host                      |
 | Different UI (console, Unity, MAUI)               | —                                                                                        | consume `IStorySession` + `RenderedDocument`; ignore `Talewright.Player`   |
 
-The C# column already works if you reference the projects and pass a custom `CompilerOptions`
-(`Rulesets`, `Predicates`, `Modifiers`); what M2 adds is packaging (NuGet) and a template project.
+The C# column works by installing the NuGet packages and passing a custom `CompilerOptions`
+(`Rulesets`, `Predicates`, `Modifiers`); see [C# extensions](csharp-extensions.md) and the
+[C# story example](../../examples/CSharpStory/README.md).
 
 Things that are deliberately **not** extension points yet: the `.tale` syntax itself, the event set (adding an
 event means touching `GameState.Apply`), and save formats.
@@ -525,7 +627,7 @@ event means touching `GameState.Apply`), and save formats.
 | What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Talemark syntax reference](../reference/talemark-syntax.md#1-storytalewrightyaml)                                                                       |
 | How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Talemark syntax reference](../reference/talemark-syntax.md)                                                                     |
 | How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
-| What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx src/`                                                                  |
+| What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx engine/src tooling`                                                                  |
 | Where do "Gained: X" lines come from?      | `EventNarrator.Describe`                                                                                      |
 | Where is the HTML?                         | `Talewright.Player/Components/*.razor`                                                                        |
 | Where are the styles?                      | `Talewright.Player/wwwroot/talewright.css`                                                                    |
@@ -537,7 +639,7 @@ event means touching `GameState.Apply`), and save formats.
 
 ## 8. Testing
 
-One xUnit test project per engine project, under `tests/` (the generic ruleset is tested in `Talewright.Core.Tests`):
+One xUnit test project per engine project, under `engine/tests/` (the generic ruleset is tested in `Talewright.Core.Tests`):
 
 | Project                      | What it covers                                                                                                                                                                              |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
