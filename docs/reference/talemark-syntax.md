@@ -5,8 +5,9 @@ in subfolders, and any number of `*.tale` files.
 **Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
 It lets you mix prose with bold, italic and code formatting, dialogue, choices and story rules. The
 YAML manifest is a separate settings file for the story's characters and world; it is not Talemark
-source. Talemark supports some Markdown-style formatting, but a `.tale` file is not a general
-Markdown document.
+source. Talemark is not Markdown: it has its own small
+[reader-text grammar](talemark-operators.md#reader-text-grammar) for bold, italic and code, and a
+`.tale` file is not a general Markdown document.
 
 New to Talewright? Start with the [author guide](../guide/README.md). The examples below are a quick
 start; the rest of this page is the full reference. You can use the examples as patterns and look up
@@ -371,6 +372,12 @@ Several conditional diverts may precede the choices; the first reached divert en
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
 by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 
+**Formatting rules are changing.** Prose is currently parsed with Markdig, so some Markdown-only
+behavior leaks through: a line followed by `---` can vanish, and `&amp;` becomes `&`. The approved
+[reader-text grammar](talemark-operators.md#reader-text-grammar) keeps only bold, italic and code,
+at word boundaries, and shows everything else exactly as written. It ships in
+[#401](https://github.com/squid-farm/talewright/issues/401). Avoid relying on other Markdown.
+
 ## 3. Substitutions
 
 `{reference#modifier#modifier…}`
@@ -529,6 +536,8 @@ Alt text uses the same template language as prose, rendered with the state where
 That shows the guide's first name. An unescaped `{` makes the whole alt a template, so `{if}`
 and prose formatting work too. The rendered alt is plain text, since an image description cannot
 keep bold or italic. Alt with no unescaped `{` stays literal, including `*` and backticks.
+That is changing: alt text will always be reader text, so `"**The guide**"` will read
+`The guide` ([#401](https://github.com/squid-farm/talewright/issues/401)).
 There is no nested `{image(...)}`. Describe the picture in words. A reference the story does not
 know, such as an unknown character, is an error at that reference.
 

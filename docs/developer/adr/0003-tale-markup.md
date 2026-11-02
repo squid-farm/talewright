@@ -1,6 +1,8 @@
 # ADR 0003: Talemark authoring compiled to a typed model
 
-**Status:** Accepted
+**Status:** Accepted. The Markdig portion is superseded by
+[ADR 0006](0006-talemark-reader-text.md): Talemark owns its reader-text grammar, and Markdig is
+being removed. The rest of this decision stands.
 
 Authors need something light. The engine wants strong typing and no string parsing at runtime.
 

@@ -59,10 +59,106 @@ Do not add quotes to those forms expecting them to be removed.
 Image calls use `{image("path", "alt text")}`. The path is a literal string. Alt text uses the
 same template language as prose, including `\{` and `\}` for literal braces. Both arguments
 decode `\"` and `\\`. Unknown image escapes produce TW1014. A nested `{image(...)}` in alt text
-also produces TW1014.
+also produces TW1014. **Approved, not implemented:** alt text will always be read as reader text,
+with the reader-text escapes, even when it contains no `{`. See the
+[reader-text grammar](#reader-text-grammar).
 
 The manifest is YAML, not Talemark: YAML quoting and escaping still apply there. A Talemark
 expression stored in YAML must first survive YAML decoding.
+
+## Construct families and argument slots
+
+Every Talemark construct belongs to one family. The family decides where the construct can appear,
+what it produces, and how it reads its arguments. New syntax must fit an existing family, or the
+[language-change checklist](../developer/language-changes.md) proposal must explain why a new family
+is needed.
+
+| Family | Recognized by | Where | Produces | Examples |
+|---|---|---|---|---|
+| Line directive | The first characters of a trimmed line. One directive per line. | Scene bodies; metadata directly after `===`. | Story structure: a scene, metadata, choice, speech, effect batch, check block, divert or comment. | `=== camp`, `@title`, `* [Go] -> hall`, `> guide: Hi.`, `~ set flag:x`, `::: skill-check`, `-> hall`, `// note` |
+| Reader text | The default content of a text unit. | Paragraphs, speech text, choice labels, image alt text. | Formatted text shown to the reader. | `**Danger** ahead` |
+| Inline construct | `{` and its matching `}` inside reader text. | Any reader text. | Substituted text, a conditional branch, or media. | `{player:first-name}`, `{if flag:x}`, `{image("map")}` |
+| Expression | An expression slot. | Substitutions, `{if}`, `@requires`, `(requires: ...)`, assignment values, quantities and check DCs. | A typed value: number, boolean, text or tier. Never changes state. | `player:hp > 0`, `visited(camp)` |
+| Text manipulator | `#name` after a substitution's value. | The end of a substitution only. | Text. Applied left to right. Never changes state. | `#capitalize`, `#one-many("is", "are")` |
+| Effect | A statement in a `~` line or a choice `{ ... }` block, separated by `;`. | Effect lines and choice effects. | A state change, with no value. | `set flag:x`, `give player rope 2`, `var:coins += 1` |
+| Clause | A fixed word, or a word followed by `:`, attached to a directive. | Choices and checks. | Modifies its directive. | `(requires: ...)`, `success:`, `skill-check perception dc 12` |
+
+### Argument slots
+
+Every position that holds author input has exactly one slot kind. The slot kind, never the content,
+decides how that input is read. Quotes only delimit an argument; they do not decide whether `*` or
+`{` has meaning inside it. **If a slot accepts substitutions, it is reader text.**
+
+| Slot kind | How it is read | Delimited by | Escapes | Current slots |
+|---|---|---|---|---|
+| Name | One bare identifier using the [shared name rules](#names-and-values). | The construct's punctuation or whitespace. | None. | Scene IDs, `visited(...)`, effect targets, item and character IDs. |
+| Tag | Nonempty text without commas, trimmed. Not a story name. | Commas, or the end of the line. | None. | `@tags` values and `@hub` tags. |
+| Integer literal | A whole number; each slot sets its own range. | End of line. | None. | `@priority` (any integer) and `@hub-limit` (positive). |
+| Expression | The [expression grammar](#value-and-expression-operators) and binding order. | The construct: braces, parentheses or end of line. | Only inside its string literals. | `{if ...}`, substitutions, `@requires`, `(requires: ...)`, assignment values. |
+| Literal text | Exact text after decoding quote escapes. No substitutions or formatting. | Double quotes. | `\"` and `\\`; any other escape is an error. | Image paths, expression string literals, modifier arguments. |
+| Reader text | The [reader-text grammar](#reader-text-grammar): formatting and inline constructs. | A text-unit boundary, or double quotes when inside other syntax. | Reader-text escapes, plus `\"` when quoted. | Prose, speech text, choice labels, image alt text. |
+| Plain line text | The rest of the line, trimmed. No substitutions or formatting. | End of line. | None. | `@title`. |
+
+Decided in [#189](https://github.com/squid-farm/talewright/issues/189): reader text inside syntax
+uses double quotes. Speech and choice labels have not moved to quotes yet; that work belongs to
+[#184](https://github.com/squid-farm/talewright/issues/184).
+
+### Callable construct contract
+
+A *callable* is any named construct that takes arguments or works like a method: predicates,
+text manipulators, the image constructor, `@hub` groups, effect commands and check clauses.
+Each callable documents the following in this registry before it ships:
+
+1. **Family and result**: which family it belongs to, and the value, text, media or state change
+   it produces.
+2. **Contexts**: where it is valid. Anything else is a diagnostic, never silent text.
+3. **Name**: spelling and case sensitivity. Names follow the shared identifier rules unless a
+   registration contract says otherwise.
+4. **Arguments**: an ordered list of slots. For each, give its slot kind, whether it is required,
+   its default, which values it accepts and who validates them. Accepted values belong to the
+   callable, not to a global reserved-word list.
+5. **Timing and mutation**: when it is evaluated. Expressions, predicates and manipulators never
+   change state; only effects do.
+6. **Composition**: chaining, nesting and precedence, or a note that it is structural.
+7. **Diagnostics**: codes and source ranges for malformed, incomplete and obsolete forms,
+   including partial input while typing.
+8. **Editor surface**: completion, hover and highlighting for its name and finite arguments.
+
+**Shape guideline for new callables.** Expression-family callables (predicates, manipulators and
+constructors) use `name(arg, arg)`. Arguments are separated by commas. Text arguments are
+double-quoted, and names are bare. Whitespace is allowed around `(`, `,` and `)`. A callable with
+no arguments omits the parentheses, as in `#capitalize` or `@CanPickLock`. Effects are statements,
+not calls: they keep the word-command shape `verb target [value]`. Clauses keep their label words.
+New callables follow this guideline. Existing exceptions are listed below rather than changed silently.
+
+| Callable | Family and result | Arguments (slot kind) | Contexts | Notes |
+|---|---|---|---|---|
+| `visited(scene)` | Expression predicate; boolean. | One scene name. | Expressions. | Whitespace before `(` is accepted. |
+| `character has item` | Expression predicate; boolean. | Character name, item name. | Expressions. | Infix word, not a call. |
+| `@Name` | Expression predicate; boolean. | None. | Expressions. | Registered by a C# story project. |
+| `#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, `#possessive` | Text manipulator; text. | None. | End of a substitution. | Chain left to right. |
+| `#one-many("singular", "plural")` | Text manipulator; text. | Two literal-text arguments, both required. | Pronoun and item-name references. | Only multi-argument modifier. |
+| `image("path", "alt")` | Inline construct; media. | Literal-text path, required; reader-text alt, optional. | The whole content of a `{ }` in reader text. | Not an expression; no `#` chaining. |
+| `all(tag, ...)`, `any(tag, ...)` | `@hub` argument; tag group. | One or more distinct tags. | `@hub` only. | `(` must follow immediately today. |
+| `set flag:id`, `clear flag:id` | Effect. | One flag reference. | Effects. | Word command. |
+| `give`/`take character item [n]` | Effect. | Character name, item name, optional number expression (default 1). | Effects. | Space-separated arguments. |
+| `skill-check [actor] skill dc n` | Clause. | Optional character name, skill name, number expression. | Choices and `:::` blocks. | Keyword sequence. |
+
+Known inconsistencies, recorded for follow-up rather than changed here:
+
+- Boolean queries have three spellings: a call (`visited(camp)`), an infix word (`player has rope`)
+  and a sigil (`@CanPickLock`). Any unification belongs to [#184](https://github.com/squid-farm/talewright/issues/184).
+- `visited`, modifiers and `image` accept whitespace before `(`; `@hub all(`/`any(` do not.
+  Aligning them belongs to #184.
+- Tags are not story names. `@tags` accepts spaces inside a tag, such as `@tags north gate`
+  giving one tag. `@hub` rejects tags containing whitespace, parentheses or commas. Aligning tag
+  rules belongs to #184.
+- Modifier names are scanned up to `#` or `(` instead of with the shared name rules. Registration
+  and extensibility belong to [#193](https://github.com/squid-farm/talewright/issues/193).
+- General multi-argument modifiers are not implemented; only `#one-many` takes arguments
+  (#184, #193).
+- Image alt text is read as reader text only when it contains `{`. The approved rule makes it always
+  reader text in [#401](https://github.com/squid-farm/talewright/issues/401).
 
 ## Structural markers
 
@@ -78,7 +174,7 @@ there is no general escape for a line directive today. Do not assume that `\@` o
 | `@` | Scene metadata directly after its header. `title` takes text; `requires` a condition; `tags` comma-separated tags; `priority` an integer; `once` no argument; `hub` a tag or `all(...)`/`any(...)`; `hub-limit` a positive integer with `hub`. | `@requires player:hp > 0` | TW1006 misplaced, duplicate or invalid metadata; TW1002 invalid priority; expression errors for conditions. |
 | `->` | Immediate divert in a scene, choice or check outcome; takes one scene ID or `END`. Later scene steps do not run. Conditional early exits precede choices; there is no fallback/gather. | `-> camp.arrival` | TW1010 missing target; TW1008 invalid ID; TW2002 unknown target; TW3011 after choices. |
 | `*` | Choice at the start of a line (`* ` or `*[`). A prose `[label]` is optional with an explicit `->` target; omitted labels display **Continue**. Optional `(requires: condition)` and `{ effects }` work on either form. A choice skill check needs a label. This is not multiplication in this context. | `* -> hall` | TW1011 malformed choice or textless choice without a divert; TW3003 no usable target. |
-| `[` `]` | Bound a choice label; its contents are reader text with substitutions and formatting. The current label scanner skips backslash-escaped closing brackets. | `* [Hello {player:first-name}] -> hall` | TW1011 missing closing bracket. |
+| `[` `]` | Bound a choice label; its contents are reader text with substitutions and formatting. Balanced inner brackets are literal text; the scanner skips backslash-escaped brackets and inline constructs. | `* [Open [the] door] -> hall` | TW1011 missing closing bracket. |
 | `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
 | `~` | Effect batch at the start of a line; executes in source order. Triggers settle after the whole semicolon-separated batch. | `~ var:coins += 1` | TW1003 malformed effect; TW3011 after choices; name/type errors. |
 | `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed effect block. |
@@ -194,7 +290,8 @@ Wrong targets, missing strings and extra arguments produce TW2006.
 
 The approved form is `{image("path", "alt text")}`, with optional alt text, in every
 narrative-template context. The path stays literal. Alt text is rendered with the prose template
-language where the image appears. It constructs media; it is not an expression function returning text.
+language where the image appears; under the approved [reader-text grammar](#reader-text-grammar)
+it is always reader text. It constructs media; it is not an expression function returning text.
 The value is the media node, with no arithmetic precedence or `#` chaining. Its strings decode
 `\"` and `\\` once. Alt text also treats `\{` and `\}` as literal braces. Quoted paths can contain
 filename punctuation without becoming story identifiers.
@@ -211,8 +308,10 @@ Plain-string fields are a separate model boundary, not an image-specific prohibi
 
 ## Prose formatting and legacy images
 
-These are current formatting delimiters, not a promise of general Markdown support.
-The formatting design is still being considered in
+These formatting delimiters work today. Their current implementation uses Markdig; it is not a
+promise of general Markdown support. The approved replacement is the
+[reader-text grammar](#reader-text-grammar) below.
+Broader typography and presentation remain in
 [#200](https://github.com/squid-farm/talewright/issues/200).
 
 | Marker | Meaning, arguments and context | Binding and escaping | Canonical example | Diagnostics |
@@ -221,7 +320,166 @@ The formatting design is still being considered in
 | `*...*`, `_..._` | Italic prose, choice labels or dialogue. A leading `* ` is a choice instead. | Same formatting stage and escaping. | `*Quietly*` | Same unmatched-marker behavior. |
 | Backticks | Inline code text. Brace substitutions are still recognized before code formatting. | Backtick-delimited span after brace parsing. | `` `torch` `` | Not a block-code or brace-escape syntax. |
 | `![alt](path)` | Rejected legacy Markdown image form. | Detected after brace parsing, with the diagnostic mapped back to the author's source. | Replace `![A torch](torch)` with `{image("torch", "A torch")}`. | TW1015 names the quoted replacement. |
-| `[text](target)` | Legacy link parsing keeps the label text but discards the destination; not a working hyperlink feature. | Inline parsing after brace parsing. | `[Go](https://example.org)` | No target validation or hyperlink guarantee. |
+| `[text](target)` | Current Markdig parsing keeps the label text but discards the destination; not a working hyperlink feature. Approved to become literal text. | Inline parsing after brace parsing. | `[Go](https://example.org)` | No target validation or hyperlink guarantee. |
+
+## Reader-text grammar
+
+**Approved, not implemented.** [ADR 0006](../developer/adr/0006-talemark-reader-text.md) records
+the decision. [#400](https://github.com/squid-farm/talewright/issues/400) adds the bounded scanner and
+[#401](https://github.com/squid-farm/talewright/issues/401) replaces Markdig with these rules.
+Until #401 ships, the current behavior above and in the corpus's *Current* column applies.
+CommonMark is not the specification. Anything not listed here is literal text.
+
+### Text units
+
+Reader text is parsed one *text unit* at a time:
+
+- **Paragraph**: consecutive prose lines, ended by a blank line or a line directive. A `//`
+  comment line is skipped without ending the paragraph. Each line is trimmed, and lines are joined
+  by a single space.
+- **Speech text**: the rest of a `>` line after the speaker's `:`.
+- **Choice label**: the contents of the label brackets.
+- **Image alt text**: the second quoted argument of `image(...)`.
+
+Formatting, code spans and inline conditions never cross a text unit's boundary. An inline
+construct may span lines only inside a paragraph. Block directives, including block `{if}` lines,
+are single lines.
+
+### Order of recognition
+
+1. Line directives decide the text units.
+2. Within a unit, a single left-to-right scan recognizes escapes, then inline constructs, then
+   code spans, then emphasis and strong delimiters. Inline constructs are atoms: a `*`, `_` or
+   backtick inside `{ }` is never formatting. Code spans hide formatting but not inline constructs
+   or escapes.
+3. Inline `{if}`, `{else}` and `{/if}` pair only with markers in the same formatting span or code
+   span. Otherwise they report TW1005. Inline conditions nest at most 64 deep (TW1016).
+
+### Escapes
+
+A backslash followed by one of `\`, `{`, `}`, `[`, `]`, `*`, `_` or a backtick produces that
+character literally. Escapes work the same way inside code spans. In a quoted reader-text slot
+such as alt text, `\"` is also an escape. Escapes are decoded once: finding the closing quote does
+not decode anything.
+
+In unquoted reader text, any other backslash is literal, so `C:\stories` and `\.` display as
+written. A quoted slot is strict: an unknown escape is that construct's error, such as TW1014 for
+alt text. A trailing `\` on a paragraph line followed by another line of the same paragraph is a
+hard line break. On a paragraph's last line, or in speech text and labels, it is a literal
+backslash. Trailing spaces never create a break. Line directives have no escape; that proposal
+is [#404](https://github.com/squid-farm/talewright/issues/404).
+
+### Emphasis and strong
+
+- `*` and `_` are the only delimiter characters. A *run* is a maximal sequence of the same
+  character that is not escaped and not inside an inline construct or code span.
+- A run of one marks emphasis and a run of two marks strong. A run of three or more is literal, so
+  write `**_both_**` instead of `***both***`.
+- A word character is a Unicode letter or digit. A run **can open** when the next character
+  exists, is not whitespace, and the previous character is not a word character. A run
+  **can close** when the previous character exists, is not whitespace, and the next character is
+  not a word character. The start and end of a unit count as non-word characters.
+- Scan left to right with a stack of open runs. A run that can close, and that matches the
+  innermost open run in both character and length, closes that run. Otherwise a run that can open
+  is pushed. Otherwise it is literal. Open runs left at the end of the unit are literal.
+- So `2*3*4`, `snake_case` and `word*inner*word` are literal. Nested spans work. A run that does
+  not match the innermost open run never closes an outer run, so spans cannot cross. That run
+  opens a new span if it can open; otherwise it is literal.
+- Spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
+
+### Code spans
+
+A run of *n* backticks opens a code span, which closes at the next run of exactly *n* backticks.
+An unmatched run is literal. Inside, emphasis and strong do not apply. Inline constructs and
+escapes still do. If the content both begins and ends with a space and is not all spaces, one
+space is removed from each end. A line join inside a paragraph is a space.
+
+### Quotes, parentheses and brackets
+
+In reader text, `"`, `'`, `(`, `)`, `[` and `]` are typography, not strings or groups. Only a
+choice label's own brackets have structure. The label scanner counts nested unescaped `[` and `]`,
+skips escaped characters, and skips inline constructs, including their quoted strings. The label
+ends at the bracket that balances the opening one, so `[Open [the] door]` displays
+`Open [the] door`. An unbalanced inner bracket needs `\[` or `\]`; otherwise TW1011 reports the
+missing `]`. Choice-clause order is unchanged and remains with
+[#384](https://github.com/squid-farm/talewright/issues/384).
+
+### Inline constructs and recovery
+
+`{` opens an inline construct, which ends at its matching `}`. Nested braces and quoted strings
+inside it are skipped. Within a paragraph the construct may span lines, and newlines count as
+whitespace. That preserves current multiline conditions and arguments. Talemark adds no
+continuation character and no single-line rule; the broader multiline policy is deliberately
+left open.
+
+- An unclosed `{` reports one TW1004 at the brace. The rest of the text unit is literal text, and
+  editor analysis still analyzes the partial expression.
+- A stray `}` is literal text without a diagnostic.
+- An error inside a closed construct reports at the author's source position, and scanning
+  continues after the `}`.
+- Every diagnostic maps to the original source line and column, including multiline paragraphs
+  and quoted alt text.
+
+### Unsupported Markdown
+
+Headings, setext underlines, thematic breaks, lists, block quotes inside prose, reference
+definitions, links, autolinks, HTML, entities and numeric character references are literal text.
+None of them consumes or hides author text. The one exception is the legacy image form. Within
+one line of a text unit, the scanner looks for `![`, then alt text with no unescaped `[`, `]` or
+`{`, then `](`, then a path with no whitespace, `(` or `)`, then `)`. That form reports TW1015, and
+the replacement is `{image("path", "alt")}` with the source text quoted as written. Anything else,
+such as nested brackets in the alt, is literal text.
+
+### Image alt text
+
+Alt text always uses this grammar, whether or not it contains `{`. The reader sees plain text:
+formatting is dropped, code-span text is kept, and a hard break becomes a space. Its escapes are
+`\"` plus the reader-text escapes; other escapes report TW1014, and a nested `{image(...)}` reports
+TW1014. Missing-alt warnings are decided from the authored alt, as today.
+
+### Example corpus
+
+This corpus is the implementation contract for #401. *Current* is the Markdig behavior measured
+before #401; a ⏎ marks a line break in the source. `[I: ...]` is emphasis, `[B: ...]` is strong and
+`[C: ...]` is code.
+
+| # | Input | Current | Approved |
+|---|---|---|---|
+| 1 | `Lost line` ⏎ `---` | The paragraph disappears (setext heading). | `Lost line ---` |
+| 2 | `Lost line` ⏎ `-` | The paragraph disappears. | `Lost line -` |
+| 3 | `[Inventory]: empty` | Disappears (reference definition). | Literal. |
+| 4 | `[the inn][1] is here` | `the inn][1] is here` | Literal. |
+| 5 | `[Go](https://example.org) now` | `Go now` | Literal. |
+| 6 | `&amp; &copy; &#65;` | `& © A` | Literal. |
+| 7 | `<b>tag</b>`, `https://example.org` | Literal. | Literal. |
+| 8 | `# Not heading`, `- not list`, `1. not list` | Literal. | Literal. |
+| 9 | `2*3*4 and snake_case_name` | `2[I: 3]4 and snake_case_name` | Literal. |
+| 10 | `word*inner*word` | `word[I: inner]word` | Literal. |
+| 11 | `***both***` | Bold italic `both`. | Literal; write `**_both_**`. |
+| 12 | `**bold *italic* bold**` | `[B: bold [I: italic] bold]` | Same. |
+| 13 | `*a **b* c**` | `[I: a b c]` | `*a [B: b* c]` |
+| 14 | `**unclosed and *also` | Literal. | Literal. |
+| 15 | `_under_ and __strong__` | `[I: under] and [B: strong]` | Same. |
+| 16 | ``` `code {player:first-name} **x**` ``` | `[C: code Ada **x**]` | Same. |
+| 17 | ``` `a \{b\} c` ``` | `[C: a \{b\} c]` | `[C: a {b} c]` |
+| 18 | ```` `` a`b `` ```` | ``` [C: a`b] ``` | Same. |
+| 19 | `\* \_ \[ \] \{ \} \\` | `* _ [ ] { } \` | Same. |
+| 20 | `\. \# \> \& \a` | `. # > & \a` | Literal, backslashes kept. |
+| 21 | `line one\` ⏎ `line two` | Hard break. | Same. |
+| 22 | `She said "hi" (quietly) [aside]` | Literal. | Same. |
+| 23 | `* [Open [the] door] -> END` | Label `Open [the] door`. | Same. |
+| 24 | `* [Open [door] -> END` | TW1011. | Same. |
+| 25 | `* [Say "hi" (quietly)] -> END` | Label `Say "hi" (quietly)`. | Same. |
+| 26 | `* [Open \] door] -> END` | Label `Open ] door`. | Same. |
+| 27 | `Hello {player:first-name` | TW1004. | Same; the rest is literal. |
+| 28 | `Close } stray` | Literal. | Same. |
+| 29 | `{if true}**a{else}b**{/if}` | TW1005. | Same. |
+| 30 | `{if flag:a and` ⏎ `flag:b}Both.{/if}` | Works. | Same. |
+| 31 | `{image("portrait", "**The guide**")}` | Alt `**The guide**`. | Alt `The guide`. |
+| 32 | `{image("portrait", "**{guide:first-name}**")}` | Alt `Bea`. | Same. |
+| 33 | ``` {image("portrait", "`code` and \\ slash")} ``` | Alt ``` `code` and \ slash ```. | Alt `code and \ slash`. |
+| 34 | `{image("portrait", "a \* b")}` | TW1014. | Alt `a * b`. |
+| 35 | `![A torch](torch)` | TW1015. | Same. |
 
 ## Dotted-prefix completion
 
@@ -246,6 +504,11 @@ The language server uses the shared authoring completion provider.
 | Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
+| [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401); package removed in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers migrated in [#403](https://github.com/squid-farm/talewright/issues/403). Not implemented: Markdig still parses prose. |
+| Alt text always reader text | Approved in #399; implemented by #401. Today alt is a template only when it contains an unescaped `{`. |
+| Choice-clause order | Both accepted orders are kept; [#384](https://github.com/squid-farm/talewright/issues/384) owns choice-line parsing and TW1011. |
+| Line-directive escape | Not approved. Optional and decision-gated in [#404](https://github.com/squid-farm/talewright/issues/404). |
+| [Callable construct contract](#callable-construct-contract) | Documentation contract for new callables. Existing inconsistencies are recorded for [#184](https://github.com/squid-farm/talewright/issues/184) and [#193](https://github.com/squid-farm/talewright/issues/193); no syntax changed. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
 
 Unimplemented contracts need scoped implementation issues agreed with the project manager before coding.

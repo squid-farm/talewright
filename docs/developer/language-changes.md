@@ -22,6 +22,12 @@ meanings and the difference between implemented and decided syntax.
   literal backslashes and literal braces in examples.
 - [ ] For each modifier, define accepted argument values, omitted/default behavior and error cases.
   Values belong to that modifier, not to a global reserved-word list.
+- [ ] Place the construct in a [construct family](../reference/talemark-operators.md#construct-families-and-argument-slots)
+  and give every argument a slot kind from that section, such as name, expression, literal text or
+  reader text. If a slot accepts substitutions, it is reader text; never infer the kind from the
+  argument's content.
+  For a callable, complete the [callable construct contract](../reference/talemark-operators.md#callable-construct-contract)
+  and follow its shape guideline, or justify the exception.
 - [ ] Define errors and source ranges for malformed, incomplete and obsolete spellings.
   Pre-1.0 changes need no compatibility mode; old forms must name their replacement.
 - [ ] Check identifier collisions, hyphen/subtraction ambiguity and interactions with nested

@@ -65,7 +65,8 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 ```
 
 - `=== dock` starts a scene called `dock`. `@title` gives it a heading.
-- Plain lines are prose. Markdown like `**bold**` and `*italics*` works.
+- Plain lines are prose. `**bold**`, `*italics*` and `` `code` `` formatting work; Talemark is not
+  Markdown, so other Markdown is not supported.
 - `> ferryman:` is a line of dialogue spoken by the `ferryman` character.
 - `{player:first-name}` is replaced with the player's name, "Ada".
 - Lines starting with `*` are **choices**: the label goes in `[brackets]`, and `->` names the scene to go
