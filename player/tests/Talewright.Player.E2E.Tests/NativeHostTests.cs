@@ -40,7 +40,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
-    public async Task Settings_dialog_exposes_theme_choices_on_desktop()
+    public async Task Settings_dialog_exposes_focused_theme_control_on_desktop()
     {
         await Driver.StartAsync();
         await Driver.OpenBundledAsync();
@@ -48,13 +48,15 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
 
-        var snapshot = await Assert.IsType<NativePlayerDriver>(Driver).SnapshotAsync();
-        foreach (var label in new[] { "Settings", "Theme", "System", "Light", "Dark", "Close settings" })
-        {
-            Assert.Contains(label, snapshot.Content);
-        }
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var snapshot = await native.SnapshotAsync();
+        var dialog = Assert.Single(snapshot.Descendants(), node => node.Role == "dialog" && node.Name == "Settings");
+        var theme = Assert.Single(dialog.Descendants(), node => node.Role == "combo box" && node.Name == "Theme");
+        Assert.True(theme.Focused);
+        Assert.Contains(dialog.Descendants(), node => node.Role == "push button" && node.Name == "Close settings");
 
         await Driver.PressAsync("Escape");
+        await AssertState(state => Assert.True(state.PassageVisible));
     }
 
     [Fact]

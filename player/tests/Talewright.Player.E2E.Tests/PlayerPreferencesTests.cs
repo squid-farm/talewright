@@ -13,7 +13,7 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
     {
         await Page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Dark });
         await Upload(TestStories.Linear);
-        await Driver.ClickAsync("Start story");
+        await Observe(new(null, "First passage"));
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
 
@@ -23,6 +23,7 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         var toggle = Page.GetByRole(AriaRole.Button, new() { Name = "More actions", Exact = true });
         await Expect(dialog).ToBeVisibleAsync();
         await Expect(theme).ToBeFocusedAsync();
+        await Expect(theme.Locator("option")).ToHaveTextAsync(["System", "Light", "Dark"]);
         Assert.True(await dialog.EvaluateAsync<bool>("element => element.matches(':modal')"));
 
         await Page.Keyboard.PressAsync("Tab");
@@ -68,7 +69,7 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
     {
         await Page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Light });
         await Upload(TestStories.Linear);
-        await Driver.ClickAsync("Start story");
+        await Observe(new(null, "First passage"));
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
         await Page.GetByLabel("Theme", new() { Exact = true }).SelectOptionAsync("Dark");
@@ -77,6 +78,7 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         Assert.Equal("rgb(28, 26, 23)", await Page.Locator("body").EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor"));
         await Driver.ClickAsync("Saves");
         var saves = Page.Locator(".tw-saves");
+        await Expect(saves).ToBeVisibleAsync();
         Assert.Equal("rgb(38, 35, 31)", await saves.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor"));
         Assert.Equal("rgb(232, 226, 214)", await saves.EvaluateAsync<string>("element => getComputedStyle(element).color"));
         await Page.Keyboard.PressAsync("Escape");

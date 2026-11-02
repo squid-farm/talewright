@@ -88,7 +88,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
             release.SetResult();
             await Expect(toggle).ToBeEnabledAsync();
             await toggle.ClickAsync();
-            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Settings", Exact = true })).ToBeFocusedAsync();
         }
         finally
         {
@@ -103,7 +103,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         await Upload(TestStories.Linear);
         await AssertState(state => Assert.True(state.PassageFocused));
         await Driver.ClickAsync("More actions");
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Settings", Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Shift+Tab");
         await Page.Keyboard.PressAsync("Shift+Tab");
         var saves = Page.GetByRole(AriaRole.Button, new() { Name = "Saves", Exact = true });
@@ -129,7 +129,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         var toggleBounds = (await toggle.BoundingBoxAsync())!;
         var backBounds = (await back.BoundingBoxAsync())!;
         Assert.True(toggleBounds.Y >= backBounds.Y + backBounds.Height, "The controls wrap onto a second row.");
-        foreach (var name in new[] { "Restart", "Library" })
+        foreach (var name in new[] { "Settings", "Restart", "Library" })
         {
             var action = Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
             await Expect(action).ToBeVisibleAsync();
@@ -209,7 +209,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeHiddenAsync();
         await toggle.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restart", Exact = true })).ToBeFocusedAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Settings", Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Escape");
         await Expect(toggle).ToBeFocusedAsync();
         await Expect(toggle).ToHaveAttributeAsync("aria-expanded", "false");
