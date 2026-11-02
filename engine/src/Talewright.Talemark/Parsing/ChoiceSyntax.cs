@@ -2,7 +2,7 @@ namespace Talewright.Talemark.Parsing;
 
 /// <param name="Marker">The clause marker to suggest placing <c>]</c> before, when exactly one is plausible.</param>
 /// <param name="Offset">Offset of <paramref name="Marker"/>, or -1.</param>
-/// <param name="WorkUnits">Characters examined, for linear-time tests.</param>
+/// <param name="WorkUnits">Characters examined and delimiter-pair comparisons, for linear-time tests.</param>
 /// <param name="LabelEnd">Where the intended label most likely ends: the first clause-like marker, or the end of the text.</param>
 internal readonly record struct ChoiceLabelHint(string? Marker, int Offset, int WorkUnits, int LabelEnd);
 
@@ -20,6 +20,31 @@ internal static class ChoiceSyntax
         string? candidate = null;
         var inProseQuote = false;
         var inUnclosedEffect = false;
+        var pairIndex = 0;
+
+        bool TryGetClose(int openOffset, out int closeOffset)
+        {
+            while (pairIndex < scan.Pairs.Count)
+            {
+                checkpoint?.Check();
+                work++;
+                var pair = scan.Pairs[pairIndex];
+                if (pair.OpenOffset < openOffset)
+                {
+                    pairIndex++;
+                    continue;
+                }
+                if (pair.OpenOffset == openOffset)
+                {
+                    closeOffset = pair.CloseOffset;
+                    return true;
+                }
+                break;
+            }
+
+            closeOffset = -1;
+            return false;
+        }
 
         for (var index = open + 1; index < text.Length; index++)
         {
@@ -28,7 +53,7 @@ internal static class ChoiceSyntax
             var current = text[index];
             if (inUnclosedEffect && current == '"')
             {
-                if (!scan.TryGetClose(index, out var quoteEnd))
+                if (!TryGetClose(index, out var quoteEnd))
                     return Ambiguous();
                 index = quoteEnd;
                 continue;
@@ -50,7 +75,7 @@ internal static class ChoiceSyntax
 
             if (current == '[')
             {
-                if (!scan.TryGetClose(index, out var bracketEnd))
+                if (!TryGetClose(index, out var bracketEnd))
                     return Ambiguous();
                 index = bracketEnd;
                 continue;
@@ -60,9 +85,9 @@ internal static class ChoiceSyntax
             var markerOffset = index;
             if (current == '{')
             {
-                var closed = scan.TryGetClose(index, out var braceEnd);
+                var closed = TryGetClose(index, out var braceEnd);
                 if (!inUnclosedEffect && IsBoundary(text, index) &&
-                    LooksLikeEffect(text, index + 1, closed ? braceEnd : text.Length, scan, checkpoint, ref work))
+                    LooksLikeEffect(text, index + 1, closed ? braceEnd : text.Length, checkpoint, ref work))
                 {
                     marker = "{";
                 }
@@ -173,8 +198,8 @@ internal static class ChoiceSyntax
     private static bool IsBoundary(string text, int index) =>
         index > 0 && char.IsWhiteSpace(text[index - 1]);
 
-    private static bool LooksLikeEffect(string text, int start, int end, DelimiterScanResult scan,
-        CancellationCheckpoint? checkpoint, ref int work)
+    private static bool LooksLikeEffect(string text, int start, int end, CancellationCheckpoint? checkpoint,
+        ref int work)
     {
         var index = start;
         while (index < end && char.IsWhiteSpace(text[index]))
@@ -207,9 +232,30 @@ internal static class ChoiceSyntax
             work++;
             if (text[index] == '"')
             {
-                if (!scan.TryGetClose(index, out var quoteEnd))
+                var quoteEnd = index + 1;
+                var closed = false;
+                while (quoteEnd < end)
+                {
+                    checkpoint?.Check();
+                    if (text[quoteEnd] == '\\' && quoteEnd + 1 < end)
+                    {
+                        quoteEnd += 2;
+                        work += 2;
+                    }
+                    else if (text[quoteEnd++] == '"')
+                    {
+                        work++;
+                        closed = true;
+                        break;
+                    }
+                    else
+                    {
+                        work++;
+                    }
+                }
+                if (!closed)
                     return false;
-                index = quoteEnd;
+                index = quoteEnd - 1;
             }
             else if (text[index] == '=' && (index + 1 == end || text[index + 1] != '=') &&
                      text[index - 1] is not ('=' or '!' or '<' or '>'))

@@ -366,6 +366,7 @@ public sealed class ChoiceDiagnosticsTests
         var inputs = new[]
         {
             "[" + new string('x', 100_000),
+            "[" + string.Concat(Enumerable.Repeat("[x]", 10_000)),
             "[" + string.Concat(Enumerable.Repeat("{var:count}", 9_000)) + " -> END",
             "[" + string.Concat(Enumerable.Repeat("{var:count}", 9_000)) + " {var:count " + new string('x', 10_000),
             "[" + string.Concat(Enumerable.Repeat("\\[", 50_000)) + " -> END",
