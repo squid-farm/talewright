@@ -21,6 +21,7 @@ internal sealed class SourceText
     private readonly List<(int Start, SourceLocation Location)> _lines = [];
     private readonly StringBuilder _text = new();
     private readonly SourceLocation[]? _locations;
+    private string? _frozen;
 
     internal SourceText()
     {
@@ -29,15 +30,21 @@ internal sealed class SourceText
     private SourceText(string text, SourceLocation[] locations)
     {
         _text.Append(text);
+        _frozen = text;
         _locations = locations;
     }
 
-    public string Text => _text.ToString();
+    /// <summary>The paragraph text, built once after the last append.</summary>
+    public string Text => _frozen ??= _text.ToString();
 
     public bool IsEmpty => _text.Length == 0;
 
+    /// <summary>Line-map comparisons made by <see cref="Locate"/>; lets tests prove lookups stay logarithmic.</summary>
+    internal long Probes { get; private set; }
+
     public void AppendLine(string line, SourceLocation location)
     {
+        _frozen = null;
         if (_text.Length > 0)
         {
             _text.Append('\n');
@@ -66,6 +73,7 @@ internal sealed class SourceText
         var high = _lines.Count;
         while (low < high)
         {
+            Probes++;
             var middle = low + (high - low) / 2;
             if (_lines[middle].Start <= offset) low = middle + 1;
             else high = middle;
@@ -330,15 +338,16 @@ internal static class InlineParser
 
                 if (context.Symbols.Analysis is { } analysis)
                 {
-                    analysis.InlineRange(context.Source, i + 1, text.Length);
                     var incomplete = text[(i + 1)..];
                     var lead = incomplete.Length - incomplete.TrimStart().Length;
                     var condition = incomplete[lead..].StartsWith("if ", StringComparison.Ordinal);
                     var offset = condition ? lead + 3 : 0;
                     if (condition)
                         analysis.Tokens.Add(new("if", new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 3 + lead))));
+                    var expressionStart = i + 1 + offset;
                     analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
-                        incomplete[offset..], context.Source.Locate(i + 1).Offset(offset));
+                        incomplete[offset..], context.Source.Locate(expressionStart),
+                        position => context.Source.Locate(expressionStart + position));
                 }
                 ExpressionParser.ReportStringErrors(text[(i + 1)..],
                     offset => context.Source.Locate(i + 1 + offset), context.Diagnostics);
@@ -382,7 +391,6 @@ internal static class InlineParser
                         collector.Tokens.Add(new(keyword, new(context.Source.Locate(i + 1 + lead),
                             context.Source.Locate(i + 1 + lead + keyword.Length))));
                 }
-                context.Symbols.Analysis?.InlineRange(context.Source, i + 1, close);
                 fragment = ParseFragment(inner, location, context, i + 1);
                 if (fragment is InlinePiece { Inline: SubstitutionTemplate substitution })
                     context.Symbols.Analysis?.Substitutions.Add(new(

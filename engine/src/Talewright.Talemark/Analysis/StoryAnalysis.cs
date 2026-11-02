@@ -88,7 +88,6 @@ public static class StoryAnalyzer
 
 internal sealed class AnalysisCollector(StorySource source, CompilerOptions options)
 {
-    private readonly Dictionary<(string File, int Line), List<(SourceText Source, int Start, int End)>> _inlineRanges = [];
     private readonly Dictionary<string, string[]> _lines = new(StringComparer.Ordinal);
     private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
     private readonly Dictionary<string, int[]> _manifestLineStarts = new(StringComparer.Ordinal);
@@ -132,14 +131,6 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
     }
 
-    internal void InlineRange(SourceText sourceText, int start, int end)
-    {
-        var location = sourceText.Locate(start);
-        var key = (location.File, location.Line);
-        if (!_inlineRanges.TryGetValue(key, out var ranges)) _inlineRanges.Add(key, ranges = []);
-        ranges.Add((sourceText, start, end));
-    }
-
     internal static SourceRange Range(SourceLocation start, string text)
     {
         var lines = text.ReplaceLineEndings("\n").Split('\n');
@@ -147,25 +138,14 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             new SourceLocation(start.File, start.Line + lines.Length - 1, lines[^1].Length + 1));
     }
 
-    internal void Expression(ExpressionContextKind kind, string text, SourceLocation location)
+    // Prose callers pass their paragraph mapping as locate, so positions come straight from the line map.
+    internal void Expression(ExpressionContextKind kind, string text, SourceLocation location,
+        Func<int, SourceLocation>? locate = null)
     {
-        var range = Range(location, text);
-        SourceText? inlineSource = null;
-        var inlineOffset = 0;
-        _scalars.TryGetValue(location, out var scalar);
-        if (scalar is not null) range = scalar.Range(0, text.Length);
-        if (_inlineRanges.TryGetValue((location.File, location.Line), out var ranges))
-        {
-            var inline = ranges.LastOrDefault(candidate =>
-                location.Column >= candidate.Source.Locate(candidate.Start).Column &&
-                location.Column - candidate.Source.Locate(candidate.Start).Column + text.Length <= candidate.End - candidate.Start);
-            if (inline.Source is not null)
-            {
-                inlineSource = inline.Source;
-                inlineOffset = inline.Start + location.Column - inline.Source.Locate(inline.Start).Column;
-                range = new(inlineSource.Locate(inlineOffset), inlineSource.Locate(inlineOffset + text.Length));
-            }
-        }
+        YamlScalarSource? scalar = null;
+        if (locate is null) _scalars.TryGetValue(location, out scalar);
+        var range = locate is not null ? new SourceRange(locate(0), locate(text.Length)) :
+            scalar is not null ? scalar.Range(0, text.Length) : Range(location, text);
         Expressions.Add(new(kind, text, range));
         SourceLocation[]? boundaries = null;
         SourceRange Map(int offset, int length)
@@ -176,8 +156,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 return new(point, point.Offset(length));
             }
             if (scalar is not null) return scalar.Range(offset, length);
-            if (inlineSource is not null)
-                return new(inlineSource.Locate(inlineOffset + offset), inlineSource.Locate(inlineOffset + offset + length));
+            if (locate is not null) return new(locate(offset), locate(offset + length));
             if (boundaries is null)
             {
                 boundaries = new SourceLocation[text.Length + 1];
