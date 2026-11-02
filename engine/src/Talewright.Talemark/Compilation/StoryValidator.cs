@@ -49,10 +49,11 @@ internal static class StoryValidator
             }
         }
 
-        foreach (var (scene, location) in scenes)
+        foreach (var parsed in scenes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CheckExits(scene, location, diagnostics, cancellationToken, checkpoint);
+            var (scene, location) = parsed;
+            CheckExits(scene, location, parsed.DroppedMalformedChoice, diagnostics, cancellationToken, checkpoint);
             if (scene.HubLimit is not null && scene.Hub is null)
             {
                 diagnostics.Error("TW1006", "@hub-limit requires @hub in the same scene.", location);
@@ -85,15 +86,15 @@ internal static class StoryValidator
         return reachability;
     }
 
-    private static void CheckExits(SceneDefinition scene, SourceLocation location, DiagnosticBag diagnostics,
-        CancellationToken cancellationToken, CancellationCheckpoint? checkpoint)
+    private static void CheckExits(SceneDefinition scene, SourceLocation location, bool droppedMalformedChoice,
+        DiagnosticBag diagnostics, CancellationToken cancellationToken, CancellationCheckpoint? checkpoint)
     {
         var seenChoice = false;
         CheckSteps(scene.Steps, ref seenChoice, diagnostics, checkpoint);
         cancellationToken.ThrowIfCancellationRequested();
         var hasReachableChoice = SceneSteps.Reachable(scene.Steps, checkpoint).OfType<ChoiceStep>().Any();
         cancellationToken.ThrowIfCancellationRequested();
-        if (!SceneSteps.Targets(scene.Steps, checkpoint).Any()
+        if (!droppedMalformedChoice && !SceneSteps.Targets(scene.Steps, checkpoint).Any()
             && !hasReachableChoice && scene.Hub is null)
         {
             diagnostics.Error("TW3002", $"Scene '{scene.Id}' is a dead end: add choices, a '-> target', or '-> END'.", location);

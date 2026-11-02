@@ -271,6 +271,13 @@ internal static class InlineParser
         return result;
     }
 
+    internal static void AnalyzePartial(SourceText source, StorySymbols symbols, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _ = Mask(new Context(source, symbols, new DiagnosticBag(), true, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
     /// <summary>Replaces each balanced <c>{…}</c> with a placeholder and parses its contents.</summary>
     private static string Mask(Context context)
     {

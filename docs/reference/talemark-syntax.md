@@ -321,6 +321,12 @@ its own `-> target` or `-> END`. Choices are the scene's final block: after the 
 more choices, conditions containing only choices, comments and blank lines are allowed. Choice
 requirements and enclosing conditions are evaluated when reached; choice effects run when chosen.
 
+Each choice can have at most one requirement and one effect block, in either order. Both must
+come before its divert or `skill-check`. Spell the condition's opening marker exactly
+`(requires:`; whitespace may follow the colon, but not separate `(`, `requires` and `:`.
+An unclosed label reports TW1011 at its opening `[`. When there is one clear clause boundary,
+the diagnostic may suggest where to insert `]`.
+
 Omit a choice's label to show **Continue**, including alongside other choices:
 
 ```tale

@@ -188,6 +188,17 @@ test('ordinary prose, Markdown, comments and escaped braces are not Talemark com
   assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
 });
 
+test('choice conditions highlight only the exact requires marker', () => {
+  const valid = '* [Continue] (requires: flag:ready) -> END';
+  hasScope(valid, 'requires', 'keyword.control.tale');
+  hasScope(valid, '(requires:', 'punctuation.section.condition.begin.tale');
+  for (const spelling of ['( requires:', '(requires :', '( requires :']) {
+    const line = `* [Continue] ${spelling} flag:ready) -> END`;
+    const token = tokens(line).tokens.find(item => item.startIndex <= line.indexOf('(') && item.endIndex > line.indexOf('('));
+    assert.ok(!token.scopes.includes('punctuation.section.condition.begin.tale'), line);
+  }
+});
+
 test('speaker names use the shared identifier fixture', async () => {
   const fixture = JSON.parse(await readFile(new URL('./fixtures/identifiers.json', import.meta.url), 'utf8'));
   const speaker = id => tokens(`> ${id}: Hello.`).tokens

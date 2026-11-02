@@ -144,6 +144,51 @@ public sealed class DelimiterScannerTests
     }
 
     [Fact]
+    public void Close_lookup_finds_every_matched_opener_and_no_unmatched_one()
+    {
+        var random = new Random(41_384);
+        const string alphabet = "()[]{}\"\\ab";
+        var text = new string(Enumerable.Range(0, 4_000)
+            .Select(_ => alphabet[random.Next(alphabet.Length)])
+            .ToArray());
+
+        var result = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup);
+
+        Assert.Equal(result.Pairs.OrderBy(pair => pair.OpenOffset), result.Pairs);
+        foreach (var pair in result.Pairs)
+        {
+            Assert.True(result.TryGetClose(pair.OpenOffset, out var close));
+            Assert.Equal(pair.CloseOffset, close);
+            Assert.True(result.TryGetOpen(pair.CloseOffset, out var open));
+            Assert.Equal(pair.OpenOffset, open);
+        }
+        foreach (var issue in result.Issues)
+        {
+            Assert.False(result.TryGetClose(issue.Offset, out _));
+        }
+        Assert.False(result.TryGetClose(text.Length, out _));
+    }
+
+    [Fact]
+    public void Earlier_results_are_unchanged_by_later_scans()
+    {
+        var first = DelimiterScanner.Scan("[a {b} (c)", DelimiterScanMode.CodeGroup);
+        var pairs = first.Pairs.ToArray();
+        var issues = first.Issues.ToArray();
+
+        var second = DelimiterScanner.Scan("((((]]]]{\"x\"}", DelimiterScanMode.CodeGroup);
+        var empty = DelimiterScanner.Scan("plain", DelimiterScanMode.CodeGroup);
+
+        Assert.Equal(pairs, first.Pairs);
+        Assert.Equal(issues, first.Issues);
+        Assert.True(first.TryGetClose(3, out var close));
+        Assert.Equal(5, close);
+        Assert.NotEmpty(second.Pairs);
+        Assert.Empty(empty.Pairs);
+        Assert.Empty(empty.Issues);
+    }
+
+    [Fact]
     public void Adversarial_shapes_have_linear_work_up_to_one_hundred_thousand_characters()
     {
         var inputs = new[]

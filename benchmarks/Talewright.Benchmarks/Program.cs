@@ -10,19 +10,39 @@ using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
 
-if (args.Length > 1 || args.Length == 1 && args[0] != "--slow-input-stress")
+if (args.Length > 1 || args.Length == 1 &&
+    args[0] is not ("--slow-input-stress" or "--choice-recovery-stress" or "--realistic-only"))
 {
-    Console.Error.WriteLine("Usage: Talewright.Benchmarks [--slow-input-stress]");
+    Console.Error.WriteLine("Usage: Talewright.Benchmarks [--slow-input-stress | --choice-recovery-stress | --realistic-only]");
     return 2;
 }
 
 var includeStress = args.Length == 1;
+var choiceRecoveryOnly = args is ["--choice-recovery-stress"];
+var realisticOnly = args is ["--realistic-only"];
+int[] slowSizes = includeStress
+    ? [1, 5, 10, 20, 50, 100, 500, 1_000, 10_000]
+    : [1, 5, 10, 20, 50, 100, 500, 1_000];
 var harnessStarted = Stopwatch.GetTimestamp();
 Console.WriteLine($"Runtime: {RuntimeInformation.FrameworkDescription}; OS: {RuntimeInformation.OSDescription}; CPU: {RuntimeInformation.ProcessArchitecture}");
 Console.WriteLine("Seven measured iterations after one warmup; p95 is the maximum of seven. Allocations are current-thread managed bytes.");
 Console.WriteLine("Source bytes are UTF-8 bytes of all supplied text, including the manifest; paths and images are excluded.");
 Console.WriteLine("Workload\tMedian ms\tp95 ms\tMedian allocated MiB\tMedian allocated bytes\tMax allocated bytes\tSource bytes\tMedian B/source byte\tMax B/source byte\tTime budget ms\tAllocation ceiling B/source byte");
 var failed = false;
+if (realisticOnly)
+{
+    MeasureRealisticCorpus();
+    Console.WriteLine(FormattableString.Invariant($"Harness total, excluding build: {Stopwatch.GetElapsedTime(harnessStarted).TotalSeconds:F2} s"));
+    return failed ? 1 : 0;
+}
+if (choiceRecoveryOnly)
+{
+    MeasureSlowShape(SlowInputShape.BrokenChoiceLines, "broken choice lines");
+    MeasureSlowShape(SlowInputShape.UnclosedChoiceLabel, "unclosed choice label");
+    Console.WriteLine(FormattableString.Invariant($"Harness total, excluding build: {Stopwatch.GetElapsedTime(harnessStarted).TotalSeconds:F2} s"));
+    return failed ? 1 : 0;
+}
+
 foreach (var scenes in new[] { 100, 1_000, 10_000 })
 {
     var source = BenchmarkStories.CreateSceneLoop(scenes);
@@ -73,20 +93,7 @@ foreach (var scenes in new[] { 100, 1_000, 10_000 })
     }, 2_000);
 }
 
-var profile = new RealisticStoryProfile { Chapters = 20 };
-var realistic = RealisticStory.Create(profile);
-var realisticSource = realistic.ToSource();
-var realisticBytes = PerformanceSource.Utf8ByteCount(realisticSource);
-Console.WriteLine($"Realistic corpus: {profile.Chapters} chapters, seed {profile.Seed}, {realistic.SceneCount} scenes, {realisticSource.Files.Count} files, {realisticBytes} UTF-8 source bytes including manifest.");
-Measure("Compile realistic 20 chapters", () => Compile(realisticSource), sourceBytes: realisticBytes, allocationCeiling: 55,
-    validate: story =>
-    {
-        if (story.Scenes.Count != realistic.SceneCount)
-        {
-            throw new InvalidOperationException("The realistic corpus compiled to an unexpected scene count.");
-        }
-    });
-MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 95);
+MeasureRealisticCorpus();
 
 var slowShapes = new (SlowInputShape Shape, string Name)[]
 {
@@ -99,24 +106,13 @@ var slowShapes = new (SlowInputShape Shape, string Name)[]
     (SlowInputShape.UnclosedLinks, "unclosed links"),
     (SlowInputShape.Choices, "choices"),
     (SlowInputShape.ChoicesWithExpressions, "choices with expressions"),
+    (SlowInputShape.BrokenChoiceLines, "broken choice lines"),
+    (SlowInputShape.UnclosedChoiceLabel, "unclosed choice label"),
 };
-int[] slowSizes = includeStress
-    ? [1, 5, 10, 20, 50, 100, 500, 1_000, 10_000]
-    : [1, 5, 10, 20, 50, 100, 500, 1_000];
-Console.WriteLine("Slow-input timings are report-only; 10,000 is opt-in. Inputs past a nesting limit must recover with one TW1016.");
+Console.WriteLine("Slow-input timings are report-only; 10,000 is opt-in. Inputs past a nesting limit must recover with one TW1016; broken choices must report TW1011.");
 foreach (var (shape, name) in slowShapes)
 {
-    foreach (var size in slowSizes)
-    {
-        var source = SlowInputStories.Create(shape, size);
-        var nestingLimit = shape switch
-        {
-            SlowInputShape.NestedConditions => 64,
-            SlowInputShape.NestedParentheses or SlowInputShape.UnaryPrefixes => 256,
-            _ => int.MaxValue,
-        };
-        MeasureAnalysis($"Slow {name} {size}", source, 1, expectedNestingDiagnostic: size > nestingLimit);
-    }
+    MeasureSlowShape(shape, name);
 }
 Console.WriteLine(FormattableString.Invariant($"Harness total, excluding build: {Stopwatch.GetElapsedTime(harnessStarted).TotalSeconds:F2} s"));
 return failed ? 1 : 0;
@@ -127,8 +123,50 @@ StoryDefinition Compile(StorySource source)
     return result.Story ?? throw new InvalidOperationException(string.Join("\n", result.Diagnostics));
 }
 
+void MeasureRealisticCorpus()
+{
+    var profile = new RealisticStoryProfile { Chapters = 20 };
+    var realistic = RealisticStory.Create(profile);
+    var realisticSource = realistic.ToSource();
+    var realisticBytes = PerformanceSource.Utf8ByteCount(realisticSource);
+    Console.WriteLine($"Realistic corpus: {profile.Chapters} chapters, seed {profile.Seed}, {realistic.SceneCount} scenes, {realisticSource.Files.Count} files, {realisticBytes} UTF-8 source bytes including manifest.");
+    Measure("Compile realistic 20 chapters", () => Compile(realisticSource), sourceBytes: realisticBytes, allocationCeiling: 55,
+        validate: story =>
+        {
+            if (story.Scenes.Count != realistic.SceneCount)
+            {
+                throw new InvalidOperationException("The realistic corpus compiled to an unexpected scene count.");
+            }
+        });
+    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 95);
+}
+
+void MeasureSlowShape(SlowInputShape shape, string name)
+{
+    foreach (var size in slowSizes)
+    {
+        var source = SlowInputStories.Create(shape, size);
+        var nestingLimit = shape switch
+        {
+            SlowInputShape.NestedConditions => 64,
+            SlowInputShape.NestedParentheses or SlowInputShape.UnaryPrefixes => 256,
+            _ => int.MaxValue,
+        };
+        var expectedChoiceErrors = shape switch
+        {
+            SlowInputShape.BrokenChoiceLines => size,
+            SlowInputShape.UnclosedChoiceLabel => 1,
+            _ => 0,
+        };
+        // Broken lines must stay well below the cost of analysing the valid choice they approximate.
+        double? allocationCeiling = shape == SlowInputShape.BrokenChoiceLines && size >= 1_000 ? 150 : null;
+        MeasureAnalysis($"Slow {name} {size}", source, 1, allocationCeiling: allocationCeiling,
+            expectedNestingDiagnostic: size > nestingLimit, expectedChoiceErrors: expectedChoiceErrors);
+    }
+}
+
 void MeasureAnalysis(string name, StorySource source, int expectedScenes, double? allocationCeiling = null,
-    bool expectedNestingDiagnostic = false)
+    bool expectedNestingDiagnostic = false, int expectedChoiceErrors = 0)
 {
     var sourceBytes = PerformanceSource.Utf8ByteCount(source);
     Measure(name, () => StoryAnalyzer.Analyze(source), sourceBytes: sourceBytes, allocationCeiling: allocationCeiling,
@@ -137,7 +175,9 @@ void MeasureAnalysis(string name, StorySource source, int expectedScenes, double
             var errors = analysis.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
             var expectedErrors = expectedNestingDiagnostic
                 ? errors.Count == 1 && errors[0].Code == "TW1016"
-                : errors.Count == 0;
+                : expectedChoiceErrors > 0
+                    ? errors.Count == expectedChoiceErrors && errors.All(error => error.Code == "TW1011")
+                    : errors.Count == 0;
             if (analysis.Scenes.Count != expectedScenes || !expectedErrors)
             {
                 throw new InvalidOperationException(

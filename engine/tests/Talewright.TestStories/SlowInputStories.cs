@@ -15,6 +15,8 @@ public enum SlowInputShape
     ChoicesWithExpressions,
     NestedParentheses,
     UnaryPrefixes,
+    BrokenChoiceLines,
+    UnclosedChoiceLabel,
 }
 
 /// <summary>Reproducible authoring inputs for measuring and testing known slow shapes.</summary>
@@ -91,6 +93,23 @@ public static class SlowInputStories
                 }
                 break;
             }
+            case SlowInputShape.BrokenChoiceLines:
+            {
+                var line = ChoiceFaker.Create("start", $"Go {SubstitutionFaker.Variable(count)}",
+                    new TaleFlagRef("a").ToString(), EffectFaker.Set(new TaleFlagRef("b")));
+                line = line.Remove(line.IndexOf(']'), 1);
+                for (var i = 0; i < size; i++)
+                {
+                    tale.Append(line).Append('\n');
+                }
+                break;
+            }
+            case SlowInputShape.UnclosedChoiceLabel:
+            {
+                var line = ChoiceFaker.Create("start", new string('a', size));
+                tale.Append(line.Remove(line.IndexOf(']'), 1)).Append('\n');
+                break;
+            }
             case SlowInputShape.NestedParentheses:
             {
                 var expression = string.Concat(
@@ -109,7 +128,8 @@ public static class SlowInputStories
                 throw new ArgumentOutOfRangeException(nameof(shape), shape, "Unknown slow-input shape.");
         }
 
-        if (shape is not (SlowInputShape.Choices or SlowInputShape.ChoicesWithExpressions))
+        if (shape is not (SlowInputShape.Choices or SlowInputShape.ChoicesWithExpressions or
+            SlowInputShape.BrokenChoiceLines or SlowInputShape.UnclosedChoiceLabel))
         {
             tale.Append(DivertFaker.To("END")).Append('\n');
         }

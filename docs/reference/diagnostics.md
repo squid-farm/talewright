@@ -23,9 +23,9 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1006 | Bad scene metadata (`@title`, `@hub`, `@hub-limit`, ...). | Put metadata directly after the `===` line, once each. `@hub-limit` needs `@hub`. |
 | TW1007 | Malformed dialogue line. | `> who: text`, where `who` is a character id. |
 | TW1008 | Invalid scene id. | Use the shared ASCII identifier form: start with a letter or `_`, then use letters, digits, `_`, and single `.` or `-` separators, e.g. `temple.entrance`. |
-| TW1009 | Skill check outcomes are missing or misplaced. | Every check needs both `success:` and `failure:` lines directly below it. |
+| TW1009 | Skill check outcomes are missing or misplaced, or an outcome effect block is unclosed. | Put both `success:` and `failure:` lines directly below the check and close each outcome's `{ effects }`. |
 | TW1010 | `->` without a target. | `-> scene.id` or `-> END`. |
-| TW1011 | Malformed choice. | `* [label] (requires: ...) { effects } -> target` or `* -> target` for **Continue**. A textless choice needs `->`; check for missing `]`, `)` or `}`. |
+| TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires: ...) { effects } -> target` or `* -> target` for **Continue**. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires:` exactly and close `]`, `)` and `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
 | TW1014 | Malformed image call, image string escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Use `\"` or `\\` for embedded quotes or backslashes. In alt text, `\{` and `\}` are literal braces. Describe a picture in words instead of nesting `{image(...)}`. |
