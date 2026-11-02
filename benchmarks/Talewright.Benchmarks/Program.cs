@@ -130,7 +130,7 @@ void MeasureRealisticCorpus()
     var realisticSource = realistic.ToSource();
     var realisticBytes = PerformanceSource.Utf8ByteCount(realisticSource);
     Console.WriteLine($"Realistic corpus: {profile.Chapters} chapters, seed {profile.Seed}, {realistic.SceneCount} scenes, {realisticSource.Files.Count} files, {realisticBytes} UTF-8 source bytes including manifest.");
-    Measure("Compile realistic 20 chapters", () => Compile(realisticSource), sourceBytes: realisticBytes, allocationCeiling: 55,
+    Measure("Compile realistic 20 chapters", () => Compile(realisticSource), sourceBytes: realisticBytes, allocationCeiling: 54,
         validate: story =>
         {
             if (story.Scenes.Count != realistic.SceneCount)
@@ -138,7 +138,7 @@ void MeasureRealisticCorpus()
                 throw new InvalidOperationException("The realistic corpus compiled to an unexpected scene count.");
             }
         });
-    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 95);
+    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 91);
 }
 
 void MeasureSlowShape(SlowInputShape shape, string name)
