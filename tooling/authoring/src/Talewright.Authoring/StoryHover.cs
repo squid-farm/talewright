@@ -80,7 +80,7 @@ public static class StoryHover
 
     private static AuthoringHover? GetContext(StoryAnalysis analysis, SourceLocation position)
     {
-        if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is "TW5001" or "TW5002"))
+        if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is AuthoringDiagnosticCodes.CustomFeaturesUnavailable or AuthoringDiagnosticCodes.StoryAnalysisUnavailable))
             throw new InvalidOperationException("Hover is unavailable until project authoring metadata is supplied and valid.");
         var declaration = analysis.Symbols.FirstOrDefault(symbol => symbol.Declaration is { } range && Contains(range, position));
         if (declaration is not null) return Describe(analysis, declaration, declaration.Declaration!);

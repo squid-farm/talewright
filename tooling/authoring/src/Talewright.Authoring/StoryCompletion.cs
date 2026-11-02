@@ -10,7 +10,7 @@ public static class StoryCompletion
 {
     public static IReadOnlyList<AuthoringCompletion> Complete(StoryAnalysis analysis, SourceLocation position)
     {
-        if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is "TW5001" or "TW5002"))
+        if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is AuthoringDiagnosticCodes.CustomFeaturesUnavailable or AuthoringDiagnosticCodes.StoryAnalysisUnavailable))
             throw new InvalidOperationException("Semantic completion is unavailable until project authoring metadata is supplied and valid.");
         var sites = analysis.CompletionSitesAt(position);
         var result = new List<AuthoringCompletion>();

@@ -52,7 +52,7 @@ internal static class VariableDiscovery
         } while (changed && unresolved.Count > 0);
 
         foreach (var declaration in first.Where(declaration => unresolved.Contains(declaration.Id)))
-            diagnostics.Error("TW2007",
+            diagnostics.Error(CompilerDiagnosticCodes.UnresolvedVariableType,
                 $"Cannot infer an integer or text type for variable '{declaration.Id}'. Declare an initial value under 'vars' in story.talewright.yaml.",
                 declaration.Location);
         return unresolved;

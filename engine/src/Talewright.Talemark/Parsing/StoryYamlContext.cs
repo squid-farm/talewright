@@ -25,13 +25,13 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
         }
         catch (YamlException ex)
         {
-            Diagnostics.Error("TW4001", $"Invalid YAML: {ex.InnerException?.Message ?? ex.Message}", new SourceLocation(sourceFile, (int)ex.Start.Line, (int)ex.Start.Column));
+            Diagnostics.Error(CompilerDiagnosticCodes.InvalidYaml, $"Invalid YAML: {ex.InnerException?.Message ?? ex.Message}", new SourceLocation(sourceFile, (int)ex.Start.Line, (int)ex.Start.Column));
             return null;
         }
 
         if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
         {
-            Diagnostics.Error("TW4001", "A story configuration file must contain one mapping (key: value pairs).", new SourceLocation(sourceFile, 1, 1));
+            Diagnostics.Error(CompilerDiagnosticCodes.InvalidYaml, "A story configuration file must contain one mapping (key: value pairs).", new SourceLocation(sourceFile, 1, 1));
             return null;
         }
         void Register(YamlNode node)
@@ -56,13 +56,13 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
         var node = Get(map, key);
         if (node is null)
         {
-            Diagnostics.Error("TW4002", $"Missing required '{key}'.", At(map));
+            Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, $"Missing required '{key}'.", At(map));
             return null;
         }
 
         if (Scalar(node) is not { Length: > 0 } value)
         {
-            Diagnostics.Error("TW4003", $"'{key}' must be a single value.", At(node));
+            Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"'{key}' must be a single value.", At(node));
             return null;
         }
 
@@ -82,7 +82,7 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
         if (value is null || !IdentifierRules.IsValid(value))
         {
             var found = value is null ? "a non-string value" : $"'{value}'";
-            return Error<string?>(node, "TW4003",
+            return Error<string?>(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
                 $"Invalid {what} {found}. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators.", null);
         }
 
@@ -101,7 +101,7 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
             return value;
         }
 
-        Diagnostics.Error("TW4003", $"Expected a whole number but found '{Scalar(node) ?? node.NodeType.ToString()}'.", At(node));
+        Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"Expected a whole number but found '{Scalar(node) ?? node.NodeType.ToString()}'.", At(node));
         return null;
     }
 
@@ -112,7 +112,7 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
             return map;
         }
 
-        Diagnostics.Error("TW4003", $"'{what}' must be a mapping (key: value pairs).", At(node));
+        Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"'{what}' must be a mapping (key: value pairs).", At(node));
         return null;
     }
 
@@ -123,7 +123,7 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
             return seq.Children;
         }
 
-        Diagnostics.Error("TW4003", $"'{what}' must be a list.", At(node));
+        Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"'{what}' must be a list.", At(node));
         return [];
     }
 
@@ -136,11 +136,11 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
                 if (name == "plural" && (allowed.Contains("agreement") || allowed.Contains("name-agreement")))
                 {
                     var replacement = allowed.Contains("agreement") ? "agreement" : "name-agreement";
-                    Error(key, "TW4003", $"The obsolete 'plural' key is no longer supported. Use '{replacement}: singular' or '{replacement}: plural' for grammar, not population.", 0);
+                    Error(key, CompilerDiagnosticCodes.InvalidConfigurationValue, $"The obsolete 'plural' key is no longer supported. Use '{replacement}: singular' or '{replacement}: plural' for grammar, not population.", 0);
                     continue;
                 }
 
-                Diagnostics.Warning("TW4006", $"Unknown key '{name}' (ignored). Expected one of: {string.Join(", ", allowed)}.", At(key));
+                Diagnostics.Warning(CompilerDiagnosticCodes.UnknownConfigurationKey, $"Unknown key '{name}' (ignored). Expected one of: {string.Join(", ", allowed)}.", At(key));
             }
         }
     }

@@ -22,7 +22,7 @@ internal static class ExpressionParser
         foreach (var token in tokens)
         {
             if (token.ErrorOffset is not { } offset) continue;
-            diagnostics.Error("TW1001", token.Value, locate(offset));
+            diagnostics.Error(CompilerDiagnosticCodes.InvalidExpression, token.Value, locate(offset));
             invalid = true;
         }
 

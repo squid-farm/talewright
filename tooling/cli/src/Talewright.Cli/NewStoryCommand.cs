@@ -39,7 +39,7 @@ public sealed class NewStoryCommand : Command<NewStorySettings>
         }
         catch (Exception ex) when (IsFileSystemError(ex))
         {
-            return CommandLine.Failure("TWCLI002", $"Couldn't resolve story folder '{settings.Folder}': {ex.Message}",
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Couldn't resolve story folder '{settings.Folder}': {ex.Message}",
                 false, writers.Output, writers.Error);
         }
 
@@ -50,13 +50,13 @@ public sealed class NewStoryCommand : Command<NewStorySettings>
             var message = settings.Id is null
                 ? $"Couldn't derive a valid story ID from folder '{folderName}'. Supply one with --id."
                 : $"Story ID '{id}' must use lowercase kebab-case (letters and numbers separated by single hyphens).";
-            return CommandLine.Failure("TWCLI001", message, false, writers.Output, writers.Error);
+            return CommandLine.Failure(CliDiagnosticCodes.InvalidCommandOrOptions, message, false, writers.Output, writers.Error);
         }
 
         var title = settings.Title ?? DeriveTitle(folderName.Length > 0 ? folderName : id);
         if (string.IsNullOrWhiteSpace(title))
         {
-            return CommandLine.Failure("TWCLI001", "Story title cannot be empty.", false,
+            return CommandLine.Failure(CliDiagnosticCodes.InvalidCommandOrOptions, "Story title cannot be empty.", false,
                 writers.Output, writers.Error);
         }
 
@@ -70,21 +70,21 @@ public sealed class NewStoryCommand : Command<NewStorySettings>
 
             if (File.Exists(manifestPath) || Directory.Exists(manifestPath))
             {
-                return CommandLine.Failure("TWCLI002",
+                return CommandLine.Failure(CliDiagnosticCodes.IoFailure,
                     $"Story folder '{root}' already contains '{StorySource.ManifestFileName}'; no files were changed.",
                     false, writers.Output, writers.Error);
             }
 
             if (Directory.EnumerateFiles(root, "*.tale", SearchOption.AllDirectories).Any())
             {
-                return CommandLine.Failure("TWCLI002",
+                return CommandLine.Failure(CliDiagnosticCodes.IoFailure,
                     $"Story folder '{root}' already contains a .tale file; no files were changed.",
                     false, writers.Output, writers.Error);
             }
 
             if (File.Exists(scenePath) || Directory.Exists(scenePath))
             {
-                return CommandLine.Failure("TWCLI002",
+                return CommandLine.Failure(CliDiagnosticCodes.IoFailure,
                     $"Story folder '{root}' already contains '{SceneFileName}'; no files were changed.",
                     false, writers.Output, writers.Error);
             }
@@ -98,7 +98,7 @@ public sealed class NewStoryCommand : Command<NewStorySettings>
             var cleanupMessage = cleanupFailure is null
                 ? ""
                 : $" Cleanup also failed: {cleanupFailure}";
-            return CommandLine.Failure("TWCLI002",
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure,
                 $"Couldn't create story in '{root}': {ex.Message}.{cleanupMessage}",
                 false, writers.Output, writers.Error);
         }

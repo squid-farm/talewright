@@ -45,7 +45,7 @@ public static class StoryCompiler
 
         if (!source.Files.ContainsKey(StorySource.ManifestFileName))
         {
-            diagnostics.Error("TW4002", "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
+            diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
             analysis?.DiscoverWithoutManifest(cancellationToken);
             return new CompilationResult(null, diagnostics.Items);
         }
@@ -64,7 +64,7 @@ public static class StoryCompiler
         cancellationToken.ThrowIfCancellationRequested();
         if (taleFiles.Count == 0)
         {
-            diagnostics.Error("TW3001", "The story has no .tale files.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
+            diagnostics.Error(CompilerDiagnosticCodes.TextOutsideSceneOrNoFiles, "The story has no .tale files.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
         }
 
         var scenes = new Dictionary<SceneId, SourceLocation>();
@@ -96,7 +96,7 @@ public static class StoryCompiler
                 analysis?.Scene(id, location);
                 if (!scenes.TryAdd(id, location))
                 {
-                    diagnostics.Error("TW3010", $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
+                    diagnostics.Error(CompilerDiagnosticCodes.DuplicateScene, $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
                 }
             }, cancellationToken);
         }

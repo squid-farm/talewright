@@ -113,7 +113,7 @@ internal sealed partial class TaleParser
             {
                 if (trimmed.Length > 0)
                 {
-                    _diagnostics.Error("TW3001", "Text before the first scene. Start a scene with '=== scene.id'.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.TextOutsideSceneOrNoFiles, "Text before the first scene. Start a scene with '=== scene.id'.", At(indent));
                 }
 
                 AdvanceLine();
@@ -177,7 +177,7 @@ internal sealed partial class TaleParser
         _scene = new SceneBuilder(new SceneId(id), location);
         if (!IdentifierRules.IsValid(id) || id == "END")
         {
-            _diagnostics.Error("TW1008", $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators (e.g. temple.entrance).", location);
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneId, $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators (e.g. temple.entrance).", location);
         }
     }
 
@@ -191,12 +191,12 @@ internal sealed partial class TaleParser
         FlushParagraph();
         if (_scene.SuppressedConditionDepth > 0)
         {
-            _diagnostics.Error("TW1005", "{if} block is never closed with {/if}.", _scene.SuppressedConditionLocation);
+            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{if} block is never closed with {/if}.", _scene.SuppressedConditionLocation);
             _scene.SuppressedConditionDepth = 0;
         }
         while (_scene.Frames.Count > 0)
         {
-            _diagnostics.Error("TW1005", "{if} block is never closed with {/if}.", _scene.Frames.Peek().Location);
+            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{if} block is never closed with {/if}.", _scene.Frames.Peek().Location);
             CloseFrame();
         }
 
@@ -277,13 +277,13 @@ internal sealed partial class TaleParser
 
         if (line.StartsWith("success:", StringComparison.Ordinal) || line.StartsWith("failure:", StringComparison.Ordinal))
         {
-            _diagnostics.Error("TW1009", "success:/failure: lines must directly follow a skill-check choice or be inside a '::: skill-check' block.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "success:/failure: lines must directly follow a skill-check choice or be inside a '::: skill-check' block.", At(indent));
             return;
         }
 
         if (line[0] == '@' && IsMetadataKey(line))
         {
-            _diagnostics.Error("TW1006", "Metadata (@title, @tags, …) must come directly after the '===' line.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "Metadata (@title, @tags, …) must come directly after the '===' line.", At(indent));
             return;
         }
 
@@ -311,7 +311,7 @@ internal sealed partial class TaleParser
         var scene = _scene!;
         if (key is "hub" or "hub-limit" && !scene.HubDirectives.Add(key))
         {
-            _diagnostics.Error("TW1006", $"Duplicate @{key} directive.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, $"Duplicate @{key} directive.", At(indent));
             return true;
         }
         switch (key)
@@ -341,7 +341,7 @@ internal sealed partial class TaleParser
                 }
                 else
                 {
-                    _diagnostics.Error("TW1002", "@priority needs a whole number.", At(valueColumn));
+                    _diagnostics.Error(CompilerDiagnosticCodes.NumberTooLarge, "@priority needs a whole number.", At(valueColumn));
                 }
 
                 return true;
@@ -356,7 +356,7 @@ internal sealed partial class TaleParser
                 if (tags.Any(t => string.IsNullOrWhiteSpace(t) || t.Any(c => char.IsWhiteSpace(c) || c is '(' or ')' or ',')) ||
                     tags.Distinct(StringComparer.Ordinal).Count() != tags.Length)
                 {
-                    _diagnostics.Error("TW1006", "@hub needs a tag or all(tag, tag)/any(tag, tag) with distinct nonempty tags.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "@hub needs a tag or all(tag, tag)/any(tag, tag) with distinct nonempty tags.", At(indent));
                 }
                 else
                 {
@@ -370,7 +370,7 @@ internal sealed partial class TaleParser
                 }
                 else
                 {
-                    _diagnostics.Error("TW1006", "@hub-limit needs a positive whole number.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "@hub-limit needs a positive whole number.", At(indent));
                 }
                 return true;
             default:
@@ -415,7 +415,7 @@ internal sealed partial class TaleParser
         {
             if (scene.Frames.Count == 0 || scene.Frames.Peek().InElse)
             {
-                _diagnostics.Error("TW1005", "{else} without a matching {if}.", At(indent));
+                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{else} without a matching {if}.", At(indent));
                 return;
             }
 
@@ -427,7 +427,7 @@ internal sealed partial class TaleParser
         {
             if (scene.Frames.Count == 0)
             {
-                _diagnostics.Error("TW1005", "{/if} without a matching {if}.", At(indent));
+                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{/if} without a matching {if}.", At(indent));
                 return;
             }
 
@@ -437,7 +437,7 @@ internal sealed partial class TaleParser
 
         if (scene.Frames.Count == MaximumBlockConditionDepth)
         {
-            _diagnostics.Error("TW1016",
+            _diagnostics.Error(CompilerDiagnosticCodes.NestingLimitExceeded,
                 $"Conditions are nested more than {MaximumBlockConditionDepth} levels deep.", At(indent));
             scene.SuppressedConditionDepth = 1;
             scene.SuppressedConditionLocation = At(indent);
@@ -514,14 +514,14 @@ internal sealed partial class TaleParser
         var who = colon > 0 ? body[..colon].Trim() : string.Empty;
         if (who.Length == 0 || !IdentifierRules.IsValid(who))
         {
-            _diagnostics.Error("TW1007", "Speech lines look like '> who: text', where who is a character id.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedDialogue, "Speech lines look like '> who: text', where who is a character id.", At(indent));
             return;
         }
 
         var speaker = new EntityId(who);
         if (!_symbols.World.Characters.ContainsKey(speaker))
         {
-            _diagnostics.Error("TW2001", $"Unknown character '{who}'. Declare it under characters in story.talewright.yaml.", At(indent + 1 + body.IndexOf(who, StringComparison.Ordinal)));
+            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{who}'. Declare it under characters in story.talewright.yaml.", At(indent + 1 + body.IndexOf(who, StringComparison.Ordinal)));
             if (_symbols.Analysis is not null)
             {
                 var partial = body[(colon + 1)..];
@@ -577,13 +577,13 @@ internal sealed partial class TaleParser
 
         if (id.Length == 0)
         {
-            _diagnostics.Error("TW1010", "Divert needs a target: '-> scene.id' or '-> END'.", location);
+            _diagnostics.Error(CompilerDiagnosticCodes.MissingDivertTarget, "Divert needs a target: '-> scene.id' or '-> END'.", location);
             return null;
         }
 
         if (!IdentifierRules.IsValid(id))
         {
-            _diagnostics.Error("TW1008",
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneId,
                 $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators.",
                 location);
             return null;
@@ -591,7 +591,7 @@ internal sealed partial class TaleParser
 
         if (!_symbols.Scenes.Contains(new SceneId(id)))
         {
-            _diagnostics.Error("TW2002", $"Unknown scene '{id}'.", location);
+            _diagnostics.Error(CompilerDiagnosticCodes.UnknownScene, $"Unknown scene '{id}'.", location);
             return null;
         }
 
@@ -650,7 +650,7 @@ internal sealed partial class TaleParser
                     var message = "Choice label is missing its closing ']'.";
                     if (hint.Marker is not null)
                         message += $" Place ']' before '{hint.Marker}'.";
-                    _diagnostics.Error("TW1011", message, At(indent + 1 + pos));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, message, At(indent + 1 + pos));
                 }
                 return;
             }
@@ -679,7 +679,7 @@ internal sealed partial class TaleParser
             if (remaining.StartsWith("(requires:", StringComparison.Ordinal))
             {
                 if (hasRequires)
-                    _diagnostics.Error("TW1011", "Duplicate '(requires:)' condition. A choice accepts only one.", At(column));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Duplicate '(requires:)' condition. A choice accepts only one.", At(column));
                 if (!clauseScan.TryGetClose(pos, out var end))
                 {
                     var expression = rest[(pos + 10)..];
@@ -687,7 +687,7 @@ internal sealed partial class TaleParser
                         ?? Lexer.Tokenize(expression);
                     ExpressionParser.ReportStringErrors(tokens,
                         offset => At(column + 10 + offset), _diagnostics);
-                    _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "'(requires:' is missing its closing ')'.", At(column));
                     NoteDroppedChoice(scene);
                     return;
                 }
@@ -701,7 +701,7 @@ internal sealed partial class TaleParser
             else if (remaining[0] == '{')
             {
                 if (hasEffects)
-                    _diagnostics.Error("TW1011", "Duplicate effect block. A choice accepts only one.", At(column));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Duplicate effect block. A choice accepts only one.", At(column));
                 if (!clauseScan.TryGetClose(pos, out var end))
                 {
                     var expression = rest[(pos + 1)..];
@@ -709,7 +709,7 @@ internal sealed partial class TaleParser
                         ?? Lexer.Tokenize(expression);
                     ExpressionParser.ReportStringErrors(tokens,
                         offset => At(column + 1 + offset), _diagnostics);
-                    _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Effect block is missing its closing '}'.", At(column));
                     NoteDroppedChoice(scene);
                     return;
                 }
@@ -743,7 +743,7 @@ internal sealed partial class TaleParser
             {
                 if (label is null)
                 {
-                    _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
                     NoteDroppedChoice(scene);
                     return;
                 }
@@ -764,7 +764,7 @@ internal sealed partial class TaleParser
                 _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[expressionStart..expressionEnd],
                     At(indent + 1 + expressionStart));
                 var spelling = ChoiceSyntax.Excerpt(rest.AsSpan(pos, expressionStart - pos));
-                _diagnostics.Error("TW1011",
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
                     $"Choice conditions use the exact marker '(requires:)'. '{spelling}' is not recognized.", At(column));
                 NoteDroppedChoice(scene);
                 return;
@@ -778,7 +778,7 @@ internal sealed partial class TaleParser
                 var bareTarget = IdentifierRules.IsValid(remaining.ToString())
                     ? " Insert '->' before the target."
                     : "";
-                _diagnostics.Error("TW1011", $"Unexpected '{excerpt}' in choice.{bareTarget} {help}", At(column));
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, $"Unexpected '{excerpt}' in choice.{bareTarget} {help}", At(column));
                 NoteDroppedChoice(scene);
                 return;
             }
@@ -786,7 +786,7 @@ internal sealed partial class TaleParser
 
         if (label is null && !hasDivert)
         {
-            _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Textless choices need '-> target' or '-> END'.", At(indent));
             NoteDroppedChoice(scene);
             return;
         }
@@ -811,7 +811,7 @@ internal sealed partial class TaleParser
         var location = At(indent);
         if (!spec.StartsWith("skill-check", StringComparison.Ordinal))
         {
-            _diagnostics.Error("TW1012", "Only '::: skill-check' blocks are supported.", location);
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidBlock, "Only '::: skill-check' blocks are supported.", location);
             return;
         }
 
@@ -883,27 +883,27 @@ internal sealed partial class TaleParser
         }
         if (_symbols.World.Ruleset.SkillCheckRule is null)
         {
-            _diagnostics.Error("TW3005", $"The '{_symbols.World.Ruleset.Id}' ruleset has no skill-check rule, so skill-check cannot be used.", At(column));
+            _diagnostics.Error(CompilerDiagnosticCodes.SkillChecksUnsupported, $"The '{_symbols.World.Ruleset.Id}' ruleset has no skill-check rule, so skill-check cannot be used.", At(column));
             return null;
         }
 
         if (dc is < 1 or > 2 || dc == words.Length - 1)
         {
-            _diagnostics.Error("TW1013", "Skill checks look like 'skill-check [actor] skill dc 12'.", At(column));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheck, "Skill checks look like 'skill-check [actor] skill dc 12'.", At(column));
             return null;
         }
 
         var actor = dc == 2 ? new EntityId(words[0]) : EntityId.Player;
         if (!_symbols.World.Characters.ContainsKey(actor))
         {
-            _diagnostics.Error("TW2001", $"Unknown character '{actor}'.", At(column));
+            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{actor}'.", At(column));
             return null;
         }
 
         var skill = new StatId(words[dc - 1]);
         if (!_symbols.World.Ruleset.HasStat(skill))
         {
-            _diagnostics.Error("TW2001", $"Unknown stat '{skill}' (ruleset '{_symbols.World.Ruleset.Id}').", At(column));
+            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown stat '{skill}' (ruleset '{_symbols.World.Ruleset.Id}').", At(column));
             return null;
         }
 
@@ -962,12 +962,12 @@ internal sealed partial class TaleParser
 
         if (insideBlock && !closed)
         {
-            _diagnostics.Error("TW1012", "'::: skill-check' block is never closed with ':::'.", checkLocation);
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidBlock, "'::: skill-check' block is never closed with ':::'.", checkLocation);
         }
 
         if (!sawSuccess || !sawFailure)
         {
-            _diagnostics.Error("TW1009", "A skill check needs both a 'success:' and a 'failure:' line.", checkLocation);
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "A skill check needs both a 'success:' and a 'failure:' line.", checkLocation);
         }
 
         return (success, failure);
@@ -984,7 +984,7 @@ internal sealed partial class TaleParser
             if (!scan.TryGetClose(pos, out var end))
             {
                 _symbols.Analysis?.Expression(ExpressionContextKind.Effects, text[(pos + 1)..], At(column + pos + 1));
-                _diagnostics.Error("TW1009", "Outcome effect block is missing its closing '}'.", At(column + pos));
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "Outcome effect block is missing its closing '}'.", At(column + pos));
                 return null;
             }
 
@@ -996,7 +996,7 @@ internal sealed partial class TaleParser
         {
             if (!text[pos..].StartsWith("->", StringComparison.Ordinal))
             {
-                _diagnostics.Error("TW1009", "Outcomes look like 'success: { effects } -> target'.", At(column + pos));
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "Outcomes look like 'success: { effects } -> target'.", At(column + pos));
                 return null;
             }
 
@@ -1027,7 +1027,7 @@ internal sealed partial class TaleParser
         if (remaining[0] == '(' && ChoiceSyntax.TryReadSpacedRequires(text, pos, _cancellationToken, out _))
         {
             var terminal = afterCheck ? "the skill check" : "the divert";
-            _diagnostics.Error("TW1011",
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
                 $"Choice conditions use the exact marker '(requires:)' and cannot follow {terminal}.", At(column + pos));
             return;
         }
@@ -1049,7 +1049,7 @@ internal sealed partial class TaleParser
                 "Divert is misplaced after the skill check. Outcomes belong on 'success:' and 'failure:' lines.",
             _ => $"Unexpected '{ChoiceSyntax.Excerpt(remaining)}' after the {(afterCheck ? "skill check" : "divert")}.",
         };
-        _diagnostics.Error("TW1011", message, At(column + pos));
+        _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, message, At(column + pos));
     }
 
     private static int SkipSpaces(string text, int pos)

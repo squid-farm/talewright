@@ -29,7 +29,7 @@ public sealed class LintCommand : Command<LintSettings>
         var writers = (CommandWriters)context.Data!;
         if (settings.Format is not ("human" or "json"))
         {
-            return CommandLine.Failure("TWCLI001", "--format requires 'human' or 'json'.",
+            return CommandLine.Failure(CliDiagnosticCodes.InvalidCommandOrOptions, "--format requires 'human' or 'json'.",
                 false, writers.Output, writers.Error);
         }
 
@@ -41,7 +41,7 @@ public sealed class LintCommand : Command<LintSettings>
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            return CommandLine.Failure("TWCLI002", $"Couldn't read story '{settings.Root}': {ex.Message}",
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Couldn't read story '{settings.Root}': {ex.Message}",
                 json, writers.Output, writers.Error);
         }
 
@@ -53,12 +53,12 @@ public sealed class LintCommand : Command<LintSettings>
         }
         catch (LintConfigurationException ex)
         {
-            return CommandLine.Failure("TWCLI003", $"Invalid lint configuration: {ex.Message}",
+            return CommandLine.Failure(CliDiagnosticCodes.InvalidLintConfiguration, $"Invalid lint configuration: {ex.Message}",
                 json, writers.Output, writers.Error);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            return CommandLine.Failure("TWCLI002", $"Couldn't read lint configuration in '{settings.Root}': {ex.Message}",
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Couldn't read lint configuration in '{settings.Root}': {ex.Message}",
                 json, writers.Output, writers.Error);
         }
 
