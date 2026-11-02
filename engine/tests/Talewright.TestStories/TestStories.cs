@@ -42,7 +42,7 @@ public static class TestStories
     public static readonly StoryFixture Linear = new("linear", DefaultYaml, """
         === start
         @title First passage
-        Mara's **bold** *gentle* `code` and ***combined*** words.
+        Mara's **bold** *gentle* `code` and **_combined_** words.
 
         > guide: Hello, {player:name}.
 

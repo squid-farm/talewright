@@ -178,6 +178,10 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
   hasScope('_door!_', 'door!', 'markup.italic.markdown');
   hasScope('**(door)**', '(door)', 'markup.bold.markdown');
   hasScope('__door!__', 'door!', 'markup.bold.markdown');
+  for (const line of ['**_combined_**', '__*combined*__', '_**combined**_', '*__combined__*']) {
+    hasScope(line, 'combined', 'markup.bold.markdown');
+    hasScope(line, 'combined', 'markup.italic.markdown');
+  }
   hasScope('Use ``a`b`` here.', 'a`b', 'markup.inline.raw.string.markdown');
   hasScope(String.raw`\*literal\*`, String.raw`\*`, 'constant.character.escape.tale');
   hasScope('![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale');

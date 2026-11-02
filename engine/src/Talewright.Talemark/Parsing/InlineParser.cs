@@ -689,7 +689,8 @@ internal static class InlineParser
         {
             TokenKind.Text => EndsWithNonWhitespaceCharacter(previous.Text!),
             TokenKind.Construct => previous.Piece is InlinePiece,
-            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose or
+                TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
     }
@@ -702,7 +703,8 @@ internal static class InlineParser
         {
             TokenKind.Text => StartsWithNonWhitespaceCharacter(next.Text!),
             TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
-            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose or
+                TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
     }
