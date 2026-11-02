@@ -14,7 +14,7 @@ No Blazor or Photino dependencies.
 | [Talewright.Talemark](../../engine/src/Talewright.Talemark/README.md) | Talemark source loading, compilation, validation, diagnostics |
 | [Runtime](../../engine/src/Talewright.Runtime/README.md) | Story sessions, frames, event narration |
 
-- **Dependencies:** Markdig and YamlDotNet are package dependencies, not bundled. Component project
+- **Dependencies:** YamlDotNet is a package dependency, not bundled. Component project
   references are private, so consumers install one package, not seven.
 - **Which package:** `Talewright` for headless tooling or a custom frontend; `Talewright.Player` for the
   supplied Blazor UI (it brings this package in). Story authors need neither.
