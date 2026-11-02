@@ -5,6 +5,7 @@ import json
 import os
 import re
 import struct
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -356,6 +357,65 @@ def condition_terms(condition):
     return set() if "||" in (condition or "") else {
         term.strip() for term in (condition or "").split("&&")
     }
+
+
+class PerformanceHistoryPublicationTests(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "Performance publication runs on a Linux runner")
+    def test_publication_does_not_change_the_shared_git_identity(self):
+        steps = read_workflow(WORKFLOWS / "performance.yml")["jobs"]["publish-results"]["steps"]
+        script = next(step["run"] for step in steps
+                      if step.get("name") == "Publish run summary and durable trend history")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, remote, history = root / "repo", root / "remote.git", root / "history"
+            environment = {key: value for key, value in os.environ.items()
+                           if not key.startswith("GIT_") and key != "HISTORY_PATH"}
+            environment.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=root, env=environment, check=True,
+                                      capture_output=True, text=True).stdout.strip()
+
+            git("init", "-q", str(repo))
+            git("init", "-q", "--bare", str(remote))
+            git("-C", str(repo), "config", "user.name", "Developer")
+            git("-C", str(repo), "config", "user.email", "developer@example.invalid")
+            git("-C", str(repo), "remote", "add", "origin", str(remote))
+            git("-C", str(repo), "commit", "-qm", "seed", "--allow-empty")
+            git("-C", str(repo), "worktree", "add", "--detach", str(history), "HEAD")
+            original_config = git("-C", str(repo), "config", "--local", "--list")
+            for name in ("index.md", "reports/report.md", "runs/run.json"):
+                path = history / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"{name}\n", encoding="utf-8")
+
+            publish_environment = {**environment, "HISTORY_PATH": str(history), "GITHUB_RUN_ID": "42"}
+            result = subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=repo,
+                                    env=publish_environment, capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual(original_config, git("-C", str(repo), "config", "--local", "--list"))
+            identity = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+            self.assertEqual(f"{identity} | {identity}",
+                             git("-C", str(history), "show", "-s", "--format=%an <%ae> | %cn <%ce>"))
+            self.assertEqual(git("-C", str(history), "rev-parse", "HEAD"),
+                             git("--git-dir", str(remote), "rev-parse", "refs/heads/performance-results"))
+
+            git("-C", str(repo), "commit", "-qm", "developer follow-up", "--allow-empty")
+            developer = "Developer <developer@example.invalid>"
+            self.assertEqual(f"{developer} | {developer}",
+                             git("-C", str(repo), "show", "-s", "--format=%an <%ae> | %cn <%ce>"))
+            head = git("-C", str(repo), "rev-parse", "HEAD")
+            for value in (None, ""):
+                with self.subTest(history_path=value):
+                    missing_environment = {**environment, "GITHUB_RUN_ID": "42"}
+                    if value is not None:
+                        missing_environment["HISTORY_PATH"] = value
+                    result = subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=repo,
+                                            env=missing_environment, capture_output=True, text=True)
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertIn("HISTORY_PATH must be set", result.stderr)
+                    self.assertEqual(original_config, git("-C", str(repo), "config", "--local", "--list"))
+                    self.assertEqual(head, git("-C", str(repo), "rev-parse", "HEAD"))
 
 
 class PublicationSafeguardTests(unittest.TestCase):

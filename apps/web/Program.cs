@@ -15,6 +15,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Bundled samples are embedded in this assembly; players can also open a .zip from the library screen.
 builder.Services.AddSingleton<IStoryLibrary>(new EmbeddedStoryLibrary(typeof(App).Assembly, enableImages: true));
 builder.Services.AddScoped<ISaveStore, IndexedDbSaveStore>();
+builder.Services.AddScoped<ISaveFileExporter, BrowserSaveFileExporter>();
 builder.Services.AddScoped<PlayerPreferencesStore>();
 
 await builder.Build().RunAsync();

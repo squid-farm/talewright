@@ -42,11 +42,15 @@ def verify_desktop_archive(path):
                 executable = "Talewright.Host.Desktop" + (".exe" if os_name == "win" else "")
                 required.update(f"{rid}/{name}" for name in [
                     executable, native, runtime, "Talewright.Host.Desktop.dll",
+                    "THIRD-PARTY-NOTICES.txt",
                     "wwwroot/index.html", "wwwroot/_content/Talewright.Player/talewright.css",
                     "wwwroot/_content/Talewright.Player/Components/StoryPlayer.razor.js",
                     "wwwroot/_content/Talewright.Player/Saves/IndexedDbSaveStore.js"])
                 if os_name == "win":
                     required.add(f"{rid}/WebView2Loader.dll")
+                    required.add(f"{rid}/nfd.dll")
+                elif os_name == "osx":
+                    required.add(f"{rid}/libnfd.dylib")
                 config = json.loads(archive.read(f"{rid}/Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
                 frameworks = config.get("includedFrameworks", [])
                 if "framework" in config or "frameworks" in config or not any(
@@ -107,6 +111,7 @@ def verify(directory, version):
                                   "tools/net10.0/any/publish-assets/standalone/web/wwwroot/index.html",
                                   "tools/net10.0/any/publish-assets/standalone/desktop/App.razor",
                                   "tools/net10.0/any/publish-assets/standalone/desktop/Program.cs",
+                                  "tools/net10.0/any/publish-assets/desktop/THIRD-PARTY-NOTICES.txt",
                                   "tools/net10.0/any/publish-assets/player/talewright.css",
                                   "tools/net10.0/any/publish-assets/player/Components/StoryPlayer.razor.js",
                                   "tools/net10.0/any/publish-assets/player/Saves/IndexedDbSaveStore.js",

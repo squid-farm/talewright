@@ -177,6 +177,7 @@ class PackageBoundaryTests(unittest.TestCase):
                              *MAP_ASSETS,
                              "publish-assets/web/Talewright.Host.Web.csproj",
                              "publish-assets/desktop/Talewright.Host.Desktop.csproj",
+                             "publish-assets/desktop/THIRD-PARTY-NOTICES.txt",
                              "publish-assets/standalone/web/App.razor",
                              "publish-assets/standalone/web/Program.cs",
                              "publish-assets/standalone/web/wwwroot/index.html",
@@ -377,6 +378,21 @@ class PackageBoundaryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "missing tools/"):
                 verify(directory, "1.2.3")
 
+    def test_missing_desktop_dialog_notice_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.write_package(directory, "Talewright")
+            self.write_package(directory, "Talewright.Player")
+            tool = self.write_package(directory, "Talewright.Cli")
+            with ZipFile(tool) as package:
+                entries = {name: package.read(name) for name in package.namelist()
+                           if not name.endswith("publish-assets/desktop/THIRD-PARTY-NOTICES.txt")}
+            with ZipFile(tool, "w") as package:
+                for name, content in entries.items():
+                    package.writestr(name, content)
+            with self.assertRaisesRegex(ValueError, "missing .*THIRD-PARTY-NOTICES.txt"):
+                verify(directory, "1.2.3")
+
 
 class DesktopArchiveTests(unittest.TestCase):
     def write_archive(self, path, *, missing=None, executable=True, self_contained=True):
@@ -388,13 +404,17 @@ class DesktopArchiveTests(unittest.TestCase):
             for cpu in ["x64", "arm64"]:
                 prefix = f"{os_name}-{cpu}/"
                 for name in ["Talewright.Host.Desktop" + (".exe" if os_name == "win" else ""),
-                             "Talewright.Host.Desktop.dll", native, runtime, "wwwroot/index.html",
+                             "Talewright.Host.Desktop.dll", native, runtime, "THIRD-PARTY-NOTICES.txt",
+                             "wwwroot/index.html",
                              "wwwroot/_content/Talewright.Player/talewright.css",
                              "wwwroot/_content/Talewright.Player/Components/StoryPlayer.razor.js",
                              "wwwroot/_content/Talewright.Player/Saves/IndexedDbSaveStore.js"]:
                     files[prefix + name] = ""
                 if os_name == "win":
                     files[prefix + "WebView2Loader.dll"] = ""
+                    files[prefix + "nfd.dll"] = ""
+                elif os_name == "osx":
+                    files[prefix + "libnfd.dylib"] = ""
                 framework = {"name": "Microsoft.NETCore.App", "version": "10.0.13"}
                 options = {"includedFrameworks": [framework]} if self_contained else {"framework": framework}
                 files[prefix + "Talewright.Host.Desktop.runtimeconfig.json"] = json.dumps({"runtimeOptions": options})
@@ -412,6 +432,9 @@ class DesktopArchiveTests(unittest.TestCase):
             verify_desktop_archive(path)
             for change, error in [
                     ({"missing": "win-arm64/coreclr.dll"}, "missing"),
+                    ({"missing": "win-x64/nfd.dll"}, "missing"),
+                    ({"missing": "osx-arm64/libnfd.dylib"}, "missing"),
+                    ({"missing": "linux-x64/THIRD-PARTY-NOTICES.txt"}, "missing"),
                     ({"self_contained": False}, "installed .NET"),
                     ({"executable": False}, "executable permissions")]:
                 with self.subTest(change=change):

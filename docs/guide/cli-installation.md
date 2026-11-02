@@ -154,12 +154,13 @@ For a download you have already unpacked, choose **Select Existing Executable** 
   [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
   list what each computer needs.
 - **The Author Debugger will not open?** It needs a desktop window and your computer's web-viewing
-  components. Windows may need **Microsoft Edge WebView2**; Linux needs additional packages.
-  You can still check and share your story without the debugger.
+  components. Windows may need **Microsoft Edge WebView2**; Linux needs
+  [WebKitGTK and libnotify](getting-started.md#linux-desktop-setup). You can still check and share
+  your story without the debugger.
 
 Checking a story and making a story ZIP do **not** require installing .NET developer tools.
-Making a separate website or desktop game still needs extra developer setup; a ZIP for the web
-player is the simpler way to share.
+Making a separate website or desktop game requires the .NET 10 SDK; a ZIP for the web player is
+the simpler way to share. See [which .NET version you need](getting-started.md#which-net-version-do-i-need).
 
 Still stuck? [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
 Include your operating system, the Talewright version, what you tried, and the exact error message.

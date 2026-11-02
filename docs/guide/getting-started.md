@@ -109,6 +109,65 @@ After setup, the Command Palette offers:
 These are not a Play button or VS Code's F5 debugger. To play from the beginning, open a story
 ZIP in the browser player. The Author Debugger is a separate testing window.
 
+## Linux desktop setup
+
+The desktop player, Author Debugger and published Linux desktop games need **WebKitGTK 4.1**,
+the `libnotify` library and a graphical desktop session (X11 or Wayland). They use your system's
+libraries; Talewright does not install them for you. Published games do not currently check for
+missing libraries before launch.
+
+Open a terminal and run the command for your distribution. It may ask for your administrator
+password:
+
+**Debian, Ubuntu and Linux Mint:**
+
+```bash
+sudo apt install libwebkit2gtk-4.1-0 libnotify4
+```
+
+**Fedora:**
+
+```bash
+sudo dnf install webkit2gtk4.1 libnotify
+```
+
+**Arch Linux:** after updating your system:
+
+```bash
+sudo pacman -S webkit2gtk-4.1 libnotify
+```
+
+Package names and availability can vary between distribution releases. On another distribution,
+look for packages providing `libwebkit2gtk-4.1.so.0` and `libnotify.so.4`. WebKitGTK 4.1 is the
+GTK 3/libsoup 3 API; a WebKitGTK 4.0 or GTK 4 package is not a substitute. Linux x64 is the only
+desktop target runtime-tested so far; the Fedora and Arch commands use their package names but
+have not been runtime-tested by Talewright.
+
+The [web player](https://play.trytalewright.com/) and published web games use your browser instead
+and do not need these desktop libraries.
+
+## Which .NET version do I need?
+
+| What you are doing | .NET requirement |
+|---|---|
+| Writing with the VS Code extension or playing in a browser | No .NET installation. |
+| Using the portable CLI download, including its Author Debugger | No separate .NET installation; the download includes its runtime. The debugger still needs the desktop libraries above on Linux. |
+| Installing the CLI as a .NET tool | The .NET 10 SDK to install it, and the .NET 10 runtime to run it. The SDK includes that runtime. |
+| Building from source or publishing a standalone web or desktop game | The .NET 10 SDK, version 10.0.100 or later in the 10.0 series. Publishing also needs internet access to obtain build dependencies. |
+| Playing a published desktop game | No separate .NET installation; the game includes its .NET runtime. Linux still needs the desktop libraries above. |
+
+If you need the SDK, install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0),
+not just the runtime. To see what is already installed, run:
+
+```bash
+dotnet --list-sdks
+dotnet --list-runtimes
+```
+
+Look for a `10.0.x` SDK and a `Microsoft.NETCore.App 10.0.x` runtime where required. If `dotnet`
+is not found, it may not be installed or may not be on your PATH; the browser player and portable
+downloads still work without it.
+
 ## Use another editor and the browser player
 
 Any editor that saves plain text works. On Mac, use TextEdit's plain-text mode.

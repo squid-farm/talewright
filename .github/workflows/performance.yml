@@ -157,10 +157,12 @@ jobs:
         env:
           HISTORY_PATH: ${{ runner.temp }}/performance-history
         run: |
-          git -C "$HISTORY_PATH" config user.name github-actions[bot]
-          git -C "$HISTORY_PATH" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          : "${HISTORY_PATH:?HISTORY_PATH must be set}"
           git -C "$HISTORY_PATH" add index.md reports runs
-          git -C "$HISTORY_PATH" commit -m "Record performance run $GITHUB_RUN_ID"
+          git -C "$HISTORY_PATH" \
+            -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Record performance run $GITHUB_RUN_ID"
           git -C "$HISTORY_PATH" push origin HEAD:refs/heads/performance-results
       - uses: actions/upload-artifact@v4
         with:

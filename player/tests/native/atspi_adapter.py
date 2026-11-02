@@ -82,7 +82,15 @@ class Desktop:
                      and (pattern is None or re.fullmatch(pattern, normalized(node.name)))), None)
 
     def click(self, **query):
-        node = self.wait(lambda: self.find(**query), f"activate {query}")
+        def enabled():
+            node = self.find(**query)
+            if node is None:
+                return None
+            state = node.getState()
+            return node if (state.contains(pyatspi.STATE_ENABLED)
+                            and state.contains(pyatspi.STATE_SENSITIVE)) else None
+
+        node = self.wait(enabled, f"enabled activation target {query}")
         actions = node.queryAction()
         if actions.nActions == 0 or not actions.doAction(0):
             raise RuntimeError(f"Control does not support activation: {query}")
@@ -103,9 +111,9 @@ class Desktop:
             raise RuntimeError("No window belongs to the Photino process")
         return window
 
-    def upload(self, path):
+    def upload(self, path, control_name="Story archive"):
         Path(path).resolve(strict=True)
-        self.click(name="Story archive", role="push button")
+        self.click(name=control_name, role="push button")
         self.wait(lambda: self.find(role="file chooser"), "file chooser")
         self.key("Control_L", pyatspi.KEY_PRESS)
         try:

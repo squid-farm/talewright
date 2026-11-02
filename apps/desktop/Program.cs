@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor;
+using Photino.NET;
 using Talewright.Player.Library;
 using Talewright.Player.Preferences;
+using Talewright.Player.Saves;
 using Talewright.Runtime.Saves;
 
 namespace Talewright.Host.Desktop;
@@ -43,10 +45,14 @@ internal static class Program
         var options = new DesktopOptions(paths.Count > 0 ? $"1|{Path.GetFullPath(paths[0])}" : null, launch.LibraryEnabled);
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<ISaveStore>(new FileSaveStore(FileSaveStore.DefaultRoot));
+        PhotinoWindow? window = null;
+        builder.Services.AddSingleton<ISaveFileExporter>(new LocalSaveFileExporter(name =>
+            DesktopSaveFileDialog.ChooseAsync(window ?? throw new InvalidOperationException("The desktop window is not ready."), name)));
         builder.Services.AddScoped<PlayerPreferencesStore>();
         builder.RootComponents.Add<App>("app");
 
         var app = builder.Build();
+        window = app.MainWindow;
         options.SetTitle = title => app.MainWindow.SetTitle(title);
         app.MainWindow
             .SetTitle("Talewright")

@@ -731,7 +731,8 @@ It uses `/usr/bin/python3` so a Python virtualenv does not hide the distro's GI/
 Each case generates its own ZIP bytes or CLI directory directly from the C# fixtures, starts a fresh
 Photino process through a JSON-lines adapter, and removes its temporary story files on disposal.
 Tests locate controls by accessible roles/names and activate actions or actual keyboard events; no OCR or
-coordinate-based clicking is used. Archive selection invokes the GTK location entry's own accessible
+coordinate-based clicking is used. Button activation waits for the AT-SPI enabled and sensitive states,
+not just presence in the accessibility tree. Archive selection invokes the GTK location entry's own accessible
 activation action (rather than sending Enter to the globally focused window) and waits
 for the chooser to close; accepting an AT-SPI action alone does not mean GTK opened the selected file.
 All native cases run serially. App logs, accessibility-tree dumps,
@@ -746,6 +747,16 @@ native test filters fail explicitly. Neither the native runner nor the browser s
 missing engine. The WebKit sandbox is not disabled.
 CI runs this probe before the full native suite so a broken chooser fails once instead of timing out
 separately in every upload-dependent scenario.
+
+Save-export tests use the test-only `TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY` override: they
+exercise the export action, suggested filename and saved bytes but bypass the native save dialog.
+For a real-dialog check on each desktop platform:
+
+1. Save a game, open **Saves**, and export it. Confirm the native dialog suggests a filename
+   containing the story title and save name. Cancel and confirm no export was created.
+2. Export again, choose a directory and filename, and confirm the resulting file contains the
+   original save bytes. Repeat with an existing destination and verify that the dialog requests
+   confirmation before replacing it.
 
 ## Stable, programmatically supplied stories
 

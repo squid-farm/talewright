@@ -20,7 +20,7 @@
              Link="publish-assets/web/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../../../apps/web/wwwroot/**"
              Link="publish-assets/web/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Pack="false" Include="../../../../apps/desktop/*.cs;../../../../apps/desktop/*.razor;../../../../apps/desktop/*.csproj"
+    <None Pack="false" Include="../../../../apps/desktop/*.cs;../../../../apps/desktop/*.razor;../../../../apps/desktop/*.csproj;../../../../apps/desktop/THIRD-PARTY-NOTICES.txt"
              Link="publish-assets/desktop/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../../../apps/desktop/wwwroot/**"
              Link="publish-assets/desktop/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

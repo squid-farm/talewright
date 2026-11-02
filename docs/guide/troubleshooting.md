@@ -39,15 +39,18 @@ saves over to a new version is planned ([#39](https://github.com/squid-farm/tale
 ## My saves disappeared (web)
 
 Web saves live in your browser for that site. Clearing browsing data, private windows and switching
-browsers or devices all lose them. Use the desktop player if you need saves to stick around. Exporting
-saves to a file for backup is planned ([#84](https://github.com/squid-farm/talewright/issues/84)).
+browsers or devices all lose them. Export a save file before clearing data or moving devices, then
+import it into the same story on the other player. See
+[backing up and moving saves](playing-and-saving.md#backing-up-and-moving-saves). If no backup exists,
+cleared browser saves cannot be recovered by the player.
 
 ## The desktop player or debugger won't start on Linux
 
-Install WebKitGTK 4.1: `sudo apt install libwebkit2gtk-4.1-0` (Debian, Ubuntu, Mint) or your
-distribution's equivalent. You also need a graphical desktop session (X11 or Wayland); the
-debugger cannot open from a remote terminal or SSH session without one. Players of published Linux games
-need it too; removing that step is being explored ([#85](https://github.com/squid-farm/talewright/issues/85)).
+Install WebKitGTK 4.1 and libnotify using the
+[Linux desktop setup commands](getting-started.md#linux-desktop-setup). You also need a graphical
+desktop session (X11 or Wayland); the debugger cannot open from a remote terminal or SSH session
+without one. Published Linux games need the same libraries but do not check for them before launch.
+The browser player and published web games do not need them.
 
 ## The debugger says it can't watch your story folder
 
@@ -72,8 +75,10 @@ administrator.
 
 ## `dotnet` isn't found
 
-Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the SDK, not just the
-runtime), then open a new terminal.
+If you are building from source, publishing a standalone game or installing the CLI as a .NET tool,
+install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the SDK, not just the
+runtime), then open a new terminal. See [which .NET version you need](getting-started.md#which-net-version-do-i-need)
+for the portable CLI and player requirements.
 
 ## Still stuck?
 

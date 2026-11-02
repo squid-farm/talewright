@@ -129,6 +129,13 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
         await CommandAsync("upload", new { path });
     }
 
+    public async Task UploadSaveAsync(string name, byte[] content)
+    {
+        var path = Path.Combine(_temporary, Path.GetFileName(name));
+        await File.WriteAllBytesAsync(path, content);
+        await CommandAsync("upload", new { path, control_name = "Import save file" });
+    }
+
     public async Task OpenBundledAsync() => await CommandAsync("click", new { pattern = @".* Built-in$", role = "push button" });
     public async Task ClickAsync(string name) =>
         await CommandAsync("click", new { name, role = "push button" });
