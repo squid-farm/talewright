@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import json
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -35,9 +36,33 @@ def nodes(root):
                          (node.getChildAtIndex(index) for index in reversed(range(count))) if child is not None)
 
 
+def descendants(parent):
+    rows = subprocess.check_output(["ps", "-eo", "pid=,ppid="], text=True).splitlines()
+    children = {}
+    for row in rows:
+        pid, ppid = map(int, row.split())
+        children.setdefault(ppid, []).append(pid)
+    found = set()
+    pending = [parent]
+    while pending:
+        for pid in children.get(pending.pop(), []):
+            found.add(pid)
+            pending.append(pid)
+    return found
+
+
+def running(pid):
+    try:
+        status = Path(f"/proc/{pid}/stat").read_text()
+    except FileNotFoundError:
+        return False
+    return status.rsplit(")", 1)[1].strip().split()[0] != "Z"
+
+
 class Desktop:
-    def __init__(self, executable, output, paths):
+    def __init__(self, executable, output, paths, child_window):
         self.output = output
+        self.child_window = child_window
         output.mkdir(parents=True, exist_ok=True)
         self.log = (output / "app.log").open("w")
         command = ["dotnet", str(executable)] if executable.suffix == ".dll" else [str(executable)]
@@ -48,8 +73,9 @@ class Desktop:
 
     def root(self):
         desktop = pyatspi.Registry.getDesktop(0)
+        pids = descendants(self.process.pid) if self.child_window else {self.process.pid}
         for application in desktop:
-            if application and application.get_process_id() == self.process.pid:
+            if application and application.get_process_id() in pids:
                 return application
         return None
 
@@ -104,12 +130,33 @@ class Desktop:
         pyatspi.Registry.generateKeyboardEvent(entries[0].keycode, None, event)
 
     def window_id(self):
+        root = self.root()
+        if root is None:
+            raise RuntimeError("No accessible application owns the Photino window")
+        pid = root.get_process_id()
         windows = subprocess.check_output(["wmctrl", "-lp"], text=True).splitlines()
         window = next((line.split()[0] for line in windows
-                       if len(line.split()) >= 3 and line.split()[2] == str(self.process.pid)), None)
+                       if len(line.split()) >= 3 and line.split()[2] == str(pid)), None)
         if window is None:
             raise RuntimeError("No window belongs to the Photino process")
         return window
+
+    def cancel(self, signum):
+        if not self.child_window:
+            raise RuntimeError("Cancellation verification requires a child-window launcher")
+        child_pids = descendants(self.process.pid)
+        root = self.root()
+        if root is None or root.get_process_id() not in child_pids:
+            raise RuntimeError("No native player child was found before cancellation")
+        self.process.send_signal(signum)
+        result = self.process.wait(timeout=20)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and any(running(pid) for pid in child_pids):
+            time.sleep(0.1)
+        remaining = [pid for pid in child_pids if running(pid)]
+        if remaining:
+            raise RuntimeError(f"Native player processes survived cancellation: {remaining}")
+        return result
 
     def upload(self, path, control_name="Story archive"):
         Path(path).resolve(strict=True)
@@ -200,7 +247,8 @@ def serve(args):
                 if command == "launch":
                     if app is not None:
                         raise RuntimeError("An app is already running")
-                    app = Desktop(args.executable.resolve(strict=True), args.output, arguments["paths"])
+                    app = Desktop(args.executable.resolve(strict=True), args.output, arguments["paths"],
+                                  args.child_window)
                 elif app is None:
                     raise RuntimeError("Launch the app first")
                 elif command == "snapshot":
@@ -237,6 +285,8 @@ def serve(args):
                 elif command == "close-window":
                     subprocess.run(["wmctrl", "-ic", app.window_id()], check=True)
                     result = app.process.wait(timeout=20)
+                elif command == "cancel":
+                    result = app.cancel({"interrupt": signal.SIGINT, "terminate": signal.SIGTERM}[arguments["signal"]])
                 elif command == "close":
                     try:
                         app.close()
@@ -291,6 +341,7 @@ def main():
     adapter = subcommands.add_parser("adapter")
     adapter.add_argument("--executable", type=Path, required=True)
     adapter.add_argument("--output", type=Path, required=True)
+    adapter.add_argument("--child-window", action="store_true")
     session = subcommands.add_parser("session")
     session.add_argument("--output", type=Path, required=True)
     session.add_argument("command", nargs=argparse.REMAINDER)

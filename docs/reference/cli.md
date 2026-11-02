@@ -1,6 +1,6 @@
 # CLI reference
 
-The `talewright` command validates, lints, debugs and publishes stories. It is an optional tool for
+The `talewright` command validates, lints, runs, debugs and publishes stories. It is an optional tool for
 authors who want to make a standalone web or desktop game; you do not need it to share a story zip
 with friends. See [Get the story-checking tools](../guide/cli-installation.md) to install a
 standalone download or the .NET tool.
@@ -9,6 +9,7 @@ standalone download or the .NET tool.
 |---|---|
 | `talewright validate <story>` | Checks a story folder for errors and warnings. |
 | `talewright lint <story>` | Checks compiler diagnostics and configurable Talemark-aware rules. |
+| `talewright run [story]` | Validates and plays a story folder in a native window. |
 | `talewright debug <story>` | Opens the Author Debugger. |
 | `talewright publish <story>` | Builds a story zip, web game or desktop game. |
 
@@ -31,9 +32,9 @@ talewright publish path/to/story --output story.zip --non-interactive --force
 
 `--non-interactive` guarantees that the CLI never asks a question, even if a script runner provides a
 terminal. It does **not** imply `--force`, skip validation, or change diagnostics, logging or JSON.
-There is no `--ci` alias. `validate` and `debug` do not ask CLI questions today; they accept the option
-for the same contract. `debug` still opens its graphical workbench; this option does not change
-confirmation dialogs inside that window.
+There is no `--ci` alias. `validate`, `run` and `debug` do not ask CLI questions today; they accept the
+option for the same contract. `run` and `debug` still open their graphical windows; this option does
+not change confirmation dialogs inside those windows.
 
 ## validate
 
@@ -121,6 +122,26 @@ same policy as `validate`, and warnings otherwise pass by default.
 
 Invalid configuration, including unknown rule IDs or malformed suppression paths, is an explicit
 operational error (`TWCLI003`, exit 2).
+
+## run
+
+```bash
+talewright run path/to/story
+talewright run
+```
+
+Plays a story folder from its configured start in the normal player. Omit the folder to use the current
+directory. The command validates first, reporting diagnostics as `validate` does; compiler errors
+exit 1 without opening a window. A ZIP or publishing step is not needed.
+
+The window opens only that story, with normal player saves and no Library navigation or debugger
+panels. It uses the same per-user save location as the desktop player. The command stays open until
+the window closes; Ctrl+C or stopping the task closes the window. Cancellation exits 130.
+
+**Requirements.** A graphical desktop and the OS webview: WebKitGTK 4.1 on Linux
+(`libwebkit2gtk-4.1-0`), WebView2 on Windows, WKWebView on macOS. There's no browser fallback.
+Linux x64 is runtime-tested; Windows, macOS and other architectures are built but not runtime-verified.
+Missing folders, assets or prerequisites, and native launch failures, exit 2 with `TWCLI002`.
 
 ## debug
 

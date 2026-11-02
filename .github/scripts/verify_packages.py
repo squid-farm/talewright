@@ -28,6 +28,15 @@ MAP_ASSETS = ("debug-assets/map/map.js",
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Graphs", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
 ENGINE_FRAMEWORKS = ("net8.0", "net9.0", "net10.0")
+PLAYER_ASSETS = ("player-assets/player.html",
+                 "publish-assets/player/talewright.css",
+                 "publish-assets/player/Preferences/PlayerPreferencesBootstrap.js",
+                 "publish-assets/player/Preferences/PlayerPreferences.js",
+                 "publish-assets/player/Components/MediaView.razor.js",
+                 "publish-assets/player/Components/PlayerToolbar.razor.js",
+                 "publish-assets/player/Components/SavedGamesPanel.razor.js",
+                 "publish-assets/player/Components/StoryPlayer.razor.js",
+                 "publish-assets/player/Saves/IndexedDbSaveStore.js")
 
 
 def verify_desktop_archive(path):
@@ -104,6 +113,7 @@ def verify(directory, version):
                                   "tools/net10.0/any/debug-assets/debugger.css",
                                   *[f"tools/net10.0/any/{asset}" for asset in MAP_ASSETS],
                                   "tools/net10.0/any/debug-assets/_content/Talewright.Player/talewright.css",
+                                  *[f"tools/net10.0/any/{asset}" for asset in PLAYER_ASSETS],
                                   "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
                                   "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
                                   "tools/net10.0/any/publish-assets/standalone/web/App.razor",
@@ -112,9 +122,6 @@ def verify(directory, version):
                                   "tools/net10.0/any/publish-assets/standalone/desktop/App.razor",
                                   "tools/net10.0/any/publish-assets/standalone/desktop/Program.cs",
                                   "tools/net10.0/any/publish-assets/desktop/THIRD-PARTY-NOTICES.txt",
-                                  "tools/net10.0/any/publish-assets/player/talewright.css",
-                                  "tools/net10.0/any/publish-assets/player/Components/StoryPlayer.razor.js",
-                                  "tools/net10.0/any/publish-assets/player/Saves/IndexedDbSaveStore.js",
                                   "tools/net10.0/any/publish-assets/launchers/start.sh",
                                   "tools/net10.0/any/publish-assets/launchers/start.command",
                                   "tools/net10.0/any/publish-assets/launchers/start.cmd",

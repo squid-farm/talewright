@@ -12,6 +12,11 @@ For the author workflow, see [Testing your story](../../../../docs/guide/testing
 
 How it's built:
 
+- **Normal play.** The same native host has a separate play-only mode for `talewright run`. It uses
+  the shared player and file-backed saves, with its own `player-assets` shell and the Player files
+  already shipped in `publish-assets/player`. Its distinct `player.html` host page avoids the
+  debugger's development static-web-assets overlay. There is no debugger model, debugger panel,
+  or Library navigation.
 - **Session.** `WorkbenchModel` adapts the [author-session API](../../../../engine/src/Talewright.Runtime/README.md#live-editing-and-author-navigation)
   to UI fields and inspection snapshots. The workbench reuses Player rendering and creation components,
   has its own `debug-assets` root, and never writes player save storage. Explicit file imports
