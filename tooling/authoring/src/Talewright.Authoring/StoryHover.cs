@@ -4,6 +4,7 @@ using Talewright.Core.World;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring;
 
@@ -13,56 +14,6 @@ public sealed record AuthoringHover(SourceRange Range, string Markdown, string P
 public static class StoryHover
 {
     private static readonly JsonDocument Schema = LoadSchema();
-
-    private static readonly IReadOnlyDictionary<string, string> Syntax = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["title"] = "Scene title shown to players.",
-        ["requires"] = "Boolean condition controlling whether this scene is available.",
-        ["tags"] = "Comma-separated scene tags.",
-        ["priority"] = "Integer priority used when selecting an available scene.",
-        ["once"] = "Marks a scene as available only once.",
-        ["hub"] = "Offers available storylets matching a tag, all(tag, tag), or any(tag, tag).",
-        ["hub-limit"] = "Positive maximum number of choices offered by this hub.",
-        ["END"] = "Ends the story instead of diverting to another scene.",
-        ["==="] = "Declares a scene: === scene.id. Put scene metadata immediately after this header.",
-        ["->"] = "Diverts to a scene ID, or END to finish the story, as soon as this line is reached. Later lines do not run.",
-        ["~"] = "Effects: applies semicolon-separated effects when this line is reached, then runs triggers before the next line.",
-        ["*choice"] = "Choice: * [label] with optional conditions and effects, followed by a divert or skill check. Omit the label with * -> target to show Continue.",
-        ["::: skill-check"] = "Entry skill-check block, rolled when this line is reached: ::: skill-check [actor] stat dc number, followed by success/failure outcomes and a closing :::.",
-        ["skill-check"] = "skill-check [actor] stat dc number: resolves a check using the selected ruleset, with success/failure outcomes.",
-        ["if"] = "Begins conditional text with {if condition}. Close it with {/if}; {else} is optional.",
-        ["else"] = "Alternative text for the preceding {if condition}.",
-        ["/if"] = "Closes the current conditional text block.",
-        ["visited"] = "visited(scene): true when the scene has been visited.",
-        ["flag"] = "flag:id: a declared boolean story flag.",
-        ["var"] = "var:id: a story variable with a fixed integer or text type.",
-        ["faction"] = "faction:id: numeric standing; faction:id:tier selects its reputation tier and faction:id:name its display name.",
-        ["item"] = "item:id: the item's display name. #a, #the, #this, #that and #possessive use its name grammar; #one-many(\"singular\", \"plural\") selects from name-agreement, not quantity. Copying the name to a text variable copies text only.",
-        ["image"] = "image(\"path\", \"alt text\"): inserts image media in narrative text, dialogue or choices. The path is a literal string relative to images/. Alt text is optional and uses the same substitutions as prose. File lookup and image rendering are separate features.",
-        ["set"] = "set flag:id: sets a flag to true.",
-        ["clear"] = "clear flag:id: sets a flag to false.",
-        ["give"] = "give character item [quantity]: adds inventory; quantity is a numeric expression and defaults to one.",
-        ["take"] = "take character item [quantity]: removes inventory; quantity is a numeric expression and defaults to one.",
-        ["has"] = "character has item: tests whether a character holds an item.",
-        ["and"] = "Boolean conjunction: both conditions must be true.",
-        ["or"] = "Boolean disjunction: either condition may be true.",
-        ["not"] = "Negates a boolean condition.",
-        ["true"] = "Boolean true literal.",
-        ["false"] = "Boolean false literal.",
-        ["+"] = "Adds numeric operands.",
-        ["-"] = "Subtracts numeric operands, or negates a number.",
-        ["*"] = "Multiplies numeric operands.",
-        ["/"] = "Divides numeric operands.",
-        ["="] = "Assigns a value of the target's type. Text variables require text; numeric targets require numbers.",
-        ["+="] = "Adds a numeric value to an effect target.",
-        ["-="] = "Subtracts a numeric value from an effect target.",
-        ["=="] = "Tests two compatible values for equality.",
-        ["!="] = "Tests two compatible values for inequality.",
-        ["<"] = "Tests whether the left value is smaller.",
-        ["<="] = "Tests whether the left value is smaller or equal.",
-        [">"] = "Speech marker at line start; in expressions, tests whether the left value is larger.",
-        [">="] = "Tests whether the left value is larger or equal."
-    };
 
     public static AuthoringHover? Get(StoryAnalysis analysis, SourceLocation position)
     {
@@ -90,37 +41,30 @@ public static class StoryHover
             var symbol = (site.Candidates ?? analysis.Symbols).FirstOrDefault(candidate =>
                 site.Kinds.Contains(candidate.Kind) && candidate.Name == site.Text);
             if (symbol is not null) return Describe(analysis, symbol, site.Range);
-            if (site.Kinds.Contains(AuthoringSymbolKind.Directive) && Syntax.TryGetValue(site.Text, out var directive))
-                return Help(site.Text, directive, site.Range);
+            if (site.Kinds.Contains(AuthoringSymbolKind.Directive) &&
+                AuthoringSyntaxVocabulary.TryGetDirectiveHelp(site.Text, out var directive))
+                return Help(site.Text, directive.Description, site.Range);
             if (site.Keywords.Contains(site.Text))
             {
-                var description = site.KeywordDetails?.GetValueOrDefault(site.Text) ?? site.Text switch
-                {
-                    "first-name" or "last-name" => "Character name part used in substitutions.",
-                    "name" => "Character full name or faction display name used in substitutions.",
-                    "tier" => "Faction standing tier, such as hostile or friendly.",
-                    "pronoun" => "Character pronoun properties: :subject, :object, :reflexive, :possessive-pronoun:determiner or :possessive-pronoun:independent. The bare pronoun gives the subject form. Use #one-many(\"singular\", \"plural\") to select wording from effective pronoun agreement.",
-                    _ => null,
-                };
+                var description = site.KeywordDetails?.GetValueOrDefault(site.Text);
+                if (description is null && AuthoringSyntaxVocabulary.TryGetKeywordHelp(site.Text, out var keyword))
+                    description = keyword.Description;
                 if (description is not null) return Help(site.Text, description, site.Range);
             }
-            if (site.Text == "END" && site.Keywords.Contains("END")) return Help("END", Syntax["END"], site.Range);
         }
         foreach (var token in analysis.Tokens.Where(token => Contains(token.Range, position)))
         {
             var unresolvedReference = sites.Any(site =>
                 site.Text == token.Text && Contains(site.Range, position) &&
                 site.Kinds.Any(kind => kind != AuthoringSymbolKind.Directive) &&
-                !site.Keywords.Any(keyword => keyword.TrimEnd(':', '(') == site.Text));
+                !site.Keywords.Any(keyword => AuthoringSyntaxVocabulary.CompletionMatchesToken(keyword, site.Text)));
             if (token.ManifestPath is { } path)
             {
                 var description = SchemaHelp(path);
                 if (description is not null) return Help(token.Text, description, token.Range);
             }
-            else if (!unresolvedReference &&
-                     token.Text is not ("title" or "requires" or "tags" or "priority" or "once" or "hub" or "hub-limit" or "END") &&
-                     Syntax.TryGetValue(token.Text, out var help))
-                return Help(token.Text == "*choice" ? "*" : token.Text, help, token.Range);
+            else if (!unresolvedReference && AuthoringSyntaxVocabulary.TryGetHelp(token.Kind, out var help))
+                return Help(help.Spelling, help.Description, token.Range);
         }
         return null;
     }
@@ -230,9 +174,10 @@ public static class StoryHover
         if (scene.Tags.Count > 0) yield return ("Tags", string.Join(", ", scene.Tags.Order(StringComparer.Ordinal)));
         if (authoredScene.HasExplicitPriority)
             yield return ("Priority", scene.Priority.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        if (scene.Once) yield return ("Once", "true");
+        if (scene.Once) yield return ("Once", bool.TrueString.ToLowerInvariant());
         if (scene.Hub is { } hub)
-            yield return ("Hub", hub.Tags.Count == 1 && !hub.MatchAll ? hub.Tags[0] : $"{(hub.MatchAll ? "all" : "any")}({string.Join(", ", hub.Tags)})");
+            yield return ("Hub", hub.Tags.Count == 1 && !hub.MatchAll
+                ? hub.Tags[0] : AuthoringSyntaxVocabulary.FormatHubSelector(hub.Tags, hub.MatchAll));
         if (scene.HubLimit is { } limit) yield return ("Hub limit", limit.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 

@@ -90,12 +90,27 @@ class NxSelectionTests(unittest.TestCase):
         selected = self.assert_selected(
             graph,
             "talewright-editor:test",
+            "talewright-editor:compiler-contract",
             "talewright-editor:package-check",
             "talewright-editor:editor-smoke",
         )
         self.assertFalse(any(":e2e-" in task for task in selected))
         self.assertNotIn("Talewright.Core.Tests:test", selected)
         self.assertNotIn("Talewright.Runtime.Tests:test", selected)
+
+    def test_vocabulary_contract_inputs_select_editor_checks(self):
+        for changed in (
+            "tooling/vscode-talewright/tests/fixtures/vocabulary.json",
+            "docs/reference/talemark-syntax.md",
+        ):
+            with self.subTest(changed=changed):
+                selected = self.assert_selected(
+                    affected_graph(changed),
+                    "talewright-editor:test",
+                    "talewright-editor:compiler-contract",
+                )
+                self.assertNotIn("Talewright.Talemark.Tests:test", selected)
+                self.assertFalse(any(":e2e-" in task for task in selected))
 
     def test_snippet_changes_select_the_compiler_contract(self):
         graph = affected_graph("tooling/vscode-talewright/snippets/tale.json")
@@ -280,6 +295,10 @@ class NxSelectionTests(unittest.TestCase):
             command = graph["graph"]["nodes"][project]["data"]["targets"]["compiler-contract"]["options"]["command"]
             self.assertIn("--no-build", command)
             self.assertIn("--no-restore", command)
+        editor_command = graph["graph"]["nodes"]["talewright-editor"]["data"]["targets"]["compiler-contract"]["options"]["command"]
+        self.assertIn("FullyQualifiedName~EditorVocabularyContractTests", editor_command)
+        talemark_command = graph["graph"]["nodes"]["Talewright.Talemark.Tests"]["data"]["targets"]["test"]["options"]["command"]
+        self.assertIn("FullyQualifiedName!~EditorVocabularyContractTests", talemark_command)
 
     def test_inferred_graph_covers_project_references_and_explicit_contracts(self):
         environment = dict(os.environ, NX_DAEMON="false")

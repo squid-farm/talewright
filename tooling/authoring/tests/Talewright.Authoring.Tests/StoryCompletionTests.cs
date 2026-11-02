@@ -72,6 +72,31 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("@req|", "requires", "@req|uires flag:ready", "@requires", 2, 5)]
+    [InlineData("@requires fla|", "flag:", "@requires fla|g:ready", "@requires flag:", 11, 14)]
+    [InlineData("@requires vis|", "visited(", "@requires vis|ited(second)", "@requires visited(", 11, 14)]
+    [InlineData("-> |", "END", "-> E|ND", "-> END", 4, 4)]
+    [InlineData("{player:pro|}", "pronoun", "{player:pro|noun}", "{player:pronoun}", 9, 12)]
+    [InlineData("{player:pronoun:ob|}", "object", "{player:pronoun:ob|ject}", "{player:pronoun:object}", 17, 19)]
+    [InlineData("{item:rope#one-|}", "one-many", "{item:rope#one-|many(\"is\", \"are\")}", "{item:rope#one-many}", 12, 16)]
+    [InlineData("{ima|", "image(", "{im|age(\"maps/camp\", \"Map\")}", "{image(", 2, 5)]
+    public void Syntax_completion_and_hover_share_the_same_help(string partial, string label, string complete,
+        string edited, int startColumn, int endColumn)
+    {
+        var (completionAnalysis, completionPosition) = Analyze("=== first\n" + partial);
+        var completion = Assert.Single(StoryCompletion.Complete(completionAnalysis, completionPosition),
+            item => item.Label == label);
+        var (hoverAnalysis, hoverPosition) = Analyze("=== first\n" + complete);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(hoverAnalysis, hoverPosition));
+
+        Assert.EndsWith("\n\n" + completion.Detail, hover.PlainText);
+        Assert.Equal(new SourceLocation("main.tale", 2, startColumn), completion.Range.Start);
+        Assert.Equal(new SourceLocation("main.tale", 2, endColumn), completion.Range.End);
+        var source = partial.Replace("|", "");
+        Assert.Equal(edited, Apply(source, startColumn, endColumn, completion.NewText));
+    }
+
+    [Theory]
     [InlineData("Normal prose sec|")]
     [InlineData("// -> sec|")]
     [InlineData("=== sec|")]

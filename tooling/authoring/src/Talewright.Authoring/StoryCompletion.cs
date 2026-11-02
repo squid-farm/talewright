@@ -1,5 +1,6 @@
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring;
 
@@ -21,16 +22,20 @@ public static class StoryCompletion
             var symbols = (site.Candidates ?? analysis.Symbols).Where(symbol => site.Kinds.Contains(symbol.Kind))
                 .Select(symbol => (symbol.Name, Detail: $"{symbol.Kind}: {symbol.Type}"));
             foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword =>
-                         (keyword, site.KeywordDetails?.GetValueOrDefault(keyword) ?? "Talemark syntax"))))
+                         (keyword, KeywordDetail(site, keyword)))))
             {
                 if (!name.StartsWith(prefix, site.IsImagePath ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)) continue;
                 var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;
-                if (site.IsImagePath) newText = newText.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                if (site.IsImagePath) newText = AuthoringSyntaxVocabulary.EscapeQuotedText(newText);
                 result.Add(new(name, detail, site.Range, newText));
             }
         }
         return result.Distinct().OrderBy(item => item.Label, StringComparer.Ordinal).ToArray();
     }
+
+    private static string KeywordDetail(CompletionSite site, string keyword) =>
+        site.KeywordDetails?.GetValueOrDefault(keyword) ??
+        (AuthoringSyntaxVocabulary.TryGetKeywordHelp(keyword, out var help) ? help.Description : "Talemark syntax");
 
     private static int Compare(SourceLocation left, SourceLocation right) =>
         left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);

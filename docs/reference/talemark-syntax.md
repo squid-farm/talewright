@@ -398,7 +398,8 @@ by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 
 **Reader text is not Markdown.** Talemark implements its own small
 [reader-text grammar](talemark-operators.md#reader-text-grammar): word-boundary bold and italic,
-code spans and inline constructs. Unsupported Markdown-like syntax, including links, entities,
+code spans and inline constructs. Italic may use `*emphasis*` or `_emphasis_`; bold may use
+`**strong**` or `__strong__`. Unsupported Markdown-like syntax, including links, entities,
 headings and lists, remains literal text.
 
 ## 3. Substitutions

@@ -25,7 +25,7 @@ CANDIDATES = {
     "nuget": (
         [["dotnet", "restore", PROJECT, "--force", "--no-http-cache"]],
         [["dotnet", "test", PROJECT, "--no-restore", "--configuration", "Release",
-          "--filter", "FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests"]],
+          "--filter", "FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests&FullyQualifiedName!~EditorVocabularyContractTests"]],
     ),
 }
 

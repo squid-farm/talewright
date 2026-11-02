@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
@@ -17,10 +18,8 @@ public sealed class TalemarkVocabularyGuardTests
     // so finished migrations remove their exemption.
     private static readonly Dictionary<string, string> PendingFiles = new(StringComparer.Ordinal)
     {
-        ["tooling/authoring/src/Talewright.Authoring/StoryHover.cs"] =
-            "Hover help keyed by spelling; sourced from the vocabulary in #471 part 3.",
         ["engine/src/Talewright.Talemark/Analysis/StoryAnalysis.cs"] =
-            "Manifest symbol types; authoring token kinds are owned in #471 part 3.",
+            "Manifest symbol types are a separate vocabulary owned in #474.",
         ["engine/src/Talewright.Talemark/Compilation/StorySource.cs"] =
             "Manifest keys are a separate vocabulary owned in #474.",
         ["engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs"] =
@@ -44,6 +43,9 @@ public sealed class TalemarkVocabularyGuardTests
         "engine/src/Talewright.Talemark/Parsing/ChoiceSyntax.cs",
         "engine/src/Talewright.Talemark/Formatting/ExpressionFormatter.cs",
         "engine/src/Talewright.Talemark/Analysis/CompletionSite.cs",
+        "engine/src/Talewright.Talemark/Vocabulary/AuthoringSyntaxVocabulary.cs",
+        "tooling/authoring/src/Talewright.Authoring/StoryCompletion.cs",
+        "tooling/authoring/src/Talewright.Authoring/StoryPreview.cs",
     ];
 
     private static readonly string[] LineMarkerFiles =
@@ -75,6 +77,9 @@ public sealed class TalemarkVocabularyGuardTests
         Assert.Contains("->", words);
         Assert.Contains("(requires:", words);
         Assert.Contains("skill-check", words);
+        Assert.Contains("one-many", words);
+        Assert.Contains("capitalize", words);
+        Assert.Contains("a", punctuation);
         Assert.Contains("#", punctuation);
         Assert.Contains("\\", punctuation);
         Assert.Contains("\"", punctuation);
@@ -170,6 +175,8 @@ public sealed class TalemarkVocabularyGuardTests
             .Select(field => field.IsLiteral ? field.GetRawConstantValue() : field.IsInitOnly ? field.GetValue(null) : null)
             .Select(value => value switch { string text => text, char character => character.ToString(), _ => null })
             .OfType<string>()
+            .Concat(TextModifierRegistry.CreateDefault().Names)
+            .Append(OneManyTextModifier.ModifierName)
             .ToArray();
         var lineMarkers = vocabularyTypes
             .Where(type => type.Name is "SceneVocabulary" or "TextVocabulary")
@@ -183,9 +190,14 @@ public sealed class TalemarkVocabularyGuardTests
 
     private static IEnumerable<string> SourceFiles(string sourceRoot) =>
         Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(path => !Path.GetRelativePath(sourceRoot, path)
-                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                .Any(part => part is "bin" or "obj" or "Vocabulary"));
+            .Where(path =>
+            {
+                var parts = Path.GetRelativePath(sourceRoot, path)
+                    .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var definition = parts.Contains("Vocabulary") && Path.GetFileName(path) is
+                    "ExpressionVocabulary.cs" or "SceneVocabulary.cs" or "TextVocabulary.cs";
+                return !definition && !parts.Any(part => part is "bin" or "obj");
+            });
 
     /// <summary>Decoded values of every string and character literal token, as the C# compiler sees them.</summary>
     /// <remarks>Comments are trivia and interpolated-string text is not a literal token, so neither is reported.</remarks>

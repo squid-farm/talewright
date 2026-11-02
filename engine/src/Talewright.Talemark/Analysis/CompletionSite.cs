@@ -2,6 +2,7 @@ using Talewright.Core.Identity;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Parsing;
 using Talewright.Narrative.Templates;
+using Talewright.Talemark.Vocabulary;
 using static Talewright.Talemark.Vocabulary.ExpressionVocabulary;
 
 namespace Talewright.Talemark.Analysis;
@@ -17,20 +18,12 @@ public sealed record CompletionSite(string Text, SourceRange Range, IReadOnlyLis
 
 internal static class ExpressionCompletion
 {
-    private static readonly IReadOnlyDictionary<string, string> PronounFormDetails = new Dictionary<string, string>
-    {
-        [SubjectForm] = "Pronoun form: subject, such as she, he or they.",
-        [ObjectForm] = "Pronoun form: object, such as her, him or them.",
-        [PossessivePronoun] = "Possessive pronoun properties: determiner (her, their) or independent (hers, theirs).",
-        [ReflexiveForm] = "Pronoun form: reflexive, such as herself or themselves.",
-        [OneManyTextModifier.ModifierName] = "Agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement (including singular they) or item name-agreement, never inventory quantity or uncountable.",
-    };
+    private static readonly IReadOnlyDictionary<string, string> PronounFormDetails =
+        AuthoringSyntaxVocabulary.KeywordDetails(SubjectForm, ObjectForm, PossessivePronoun, ReflexiveForm,
+            OneManyTextModifier.ModifierName);
 
-    private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails = new Dictionary<string, string>
-    {
-        [Determiner] = "Possessive determiner before a noun, such as her or their.",
-        [Independent] = "Independent possessive that stands alone, such as hers or theirs.",
-    };
+    private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails =
+        AuthoringSyntaxVocabulary.KeywordDetails(Determiner, Independent);
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
         IReadOnlyList<AuthoringSymbol> symbols)

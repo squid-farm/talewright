@@ -18,7 +18,7 @@
         "{workspaceRoot}/docs/reference/diagnostics.md"
       ],
       "options": {
-        "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests'",
+        "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests&FullyQualifiedName!~EditorVocabularyContractTests'",
         "cwd": "engine/tests/Talewright.Talemark.Tests"
       }
     }

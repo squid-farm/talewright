@@ -61,7 +61,11 @@ Identical characters in unrelated syntaxes, such as Talemark escapes and legacy 
 After that:
 
 - Binding and analysis switch on the typed value.
-- The formatter, completion and messages read spellings back from the vocabulary.
+- The formatter, completion and messages read spellings back from the vocabulary. Authoring tokens carry an
+  `AuthoringTokenKind`, and [`AuthoringSyntaxVocabulary`](../../engine/src/Talewright.Talemark/Vocabulary/AuthoringSyntaxVocabulary.cs)
+  supplies shared spellings and descriptions to hover and completion, including examples composed from owned spellings.
+  It also provides completion triggers, quoted-content escaping, and formatting for modifier and hub-selector text
+  used by authoring tools.
 - No code compares against a hand-typed copy.
 
 To add a term:
@@ -69,16 +73,27 @@ To add a term:
 1. Add its constant to the appropriate vocabulary type.
 2. If it selects behavior, map it to an exhaustive typed value (for example `SceneMetadataKey`).
 3. Use the constant from parsing through formatting, completion and authoring where applicable.
+   Add or update the typed authoring-help entry when the term is exposed in hover or completion.
+4. Update the [editor vocabulary cases](../../tooling/vscode-talewright/tests/fixtures/vocabulary.json)
+   with a representative source example, expected TextMate scopes and an exact syntax-reference example.
+   Compound spellings can specify separate scopes; intentionally unhighlighted characters use the root scope.
 
-Identifier characters belong to `IdentifierRules`, and text-modifier names belong to their modifier (for example `OneManyTextModifier.ModifierName`).
+Identifier characters belong to `IdentifierRules`, and text-modifier names belong to their modifier or registry
+(for example `OneManyTextModifier.ModifierName` and `TextModifierRegistry`).
 
-Two tests enforce this:
+Complementary tests enforce these boundaries:
 
 - [TalemarkVocabularyGuardTests](../../tooling/language-server/tests/Talewright.LanguageServer.Tests/TalemarkVocabularyGuardTests.cs) fails on any string or character literal whose decoded value, as Roslyn reads it, equals a vocabulary spelling.
-  - It covers the Talemark, authoring and language-server sources.
-  - Expression punctuation is checked in the expression-language files it lists; reader-text delimiters, escape and quote markers, and single-character line markers are checked only in their parser files.
+  - It covers the Talemark, authoring and language-server sources, including authoring-help projections but excluding the vocabulary definitions themselves; built-in modifier names come from the runtime registry.
+  - Single-character spellings are checked only in the listed expression, authoring and reader-text parser files,
+    not in unrelated path, YAML or Markdown handling.
   - Remaining exemptions name the issue that removes them.
 - [ExpressionVocabularyTests](../../engine/tests/Talewright.Talemark.Tests/ExpressionVocabularyTests.cs) checks that every typed expression value has a spelling that maps back, and every lexer symbol produces its declared token. Scene metadata uses an exhaustive `SceneMetadataKey` mapping.
+- [EditorVocabularyContractTests](../../engine/tests/Talewright.Talemark.Tests/EditorContracts/EditorVocabularyContractTests.cs)
+  checks fixture coverage against the vocabulary and built-in modifier registry, and requires each documented example
+  to occur in the syntax reference. The editor's `compiler-contract` target runs it alongside manifest contracts.
+- The [TextMate vocabulary contract](../../tooling/vscode-talewright/tests/grammar.test.mjs) tokenizes the same
+  examples with the real grammar and checks every non-whitespace character against its expected scope.
 
 ## Verification and review
 

@@ -424,7 +424,8 @@ internal static class InlineParser
             {
                 analysis.Tokens.Add(new(SceneVocabulary.If,
                     new(context.Source.Locate(start + lead),
-                        context.Source.Locate(start + lead + SceneVocabulary.If.Length))));
+                        context.Source.Locate(start + lead + SceneVocabulary.If.Length)))
+                    { Kind = AuthoringTokenKind.If });
             }
 
             var expressionStart = start + expressionOffset;
@@ -466,7 +467,8 @@ internal static class InlineParser
             var lead = inner.Length - inner.TrimStart().Length;
             context.Symbols.Analysis?.Tokens.Add(new(ExpressionVocabulary.Image,
                 new(context.Source.Locate(sourceOffset + lead),
-                    context.Source.Locate(sourceOffset + lead + ExpressionVocabulary.Image.Length))));
+                    context.Source.Locate(sourceOffset + lead + ExpressionVocabulary.Image.Length)))
+                { Kind = AuthoringTokenKind.Image });
             var media = ImageSyntax.Parse(context.Source, sourceOffset, close, true, context.Diagnostics,
                 context.Symbols, context.CancellationToken);
             return media is null ? null : new InlinePiece(media);
@@ -480,7 +482,8 @@ internal static class InlineParser
         {
             context.Symbols.Analysis?.Tokens.Add(new(keyword,
                 new(context.Source.Locate(sourceOffset + leading),
-                    context.Source.Locate(sourceOffset + leading + keyword.Length))));
+                    context.Source.Locate(sourceOffset + leading + keyword.Length)))
+                { Kind = AuthoringSyntaxVocabulary.ConditionalKind(keyword) });
         }
 
         var fragment = ParseFragment(inner, location, context, sourceOffset);
