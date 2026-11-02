@@ -91,10 +91,17 @@ workspace trust. See [server setup and other editors](https://github.com/squid-f
 
 ## CLI actions (separate CLI installation required)
 
-The Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**) provides **Talewright: Validate Story**, **Talewright: Publish Story ZIP**,
-**Talewright: Open Author Debugger**, and **Talewright: Run Story**. These run the existing `talewright` CLI in a visible,
-interactive task terminal. The bundled language server provides live editor help; it is **not**
+The Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**) provides **Talewright: New Story**,
+**Talewright: Validate Story**, **Talewright: Publish Story ZIP**, **Talewright: Open Author Debugger**, and
+**Talewright: Run Story**. Validation, publishing, debugging, and play run the existing `talewright` CLI
+in a visible, interactive task terminal. New Story invokes `talewright new` directly. The bundled
+language server provides live editor help; it is **not**
 the CLI and does not include the native player or debugger.
+
+**New Story** uses the sole empty workspace folder directly, or asks you to choose a folder. If another
+workspace is open, you can open the created story in the current window or a new one. On success, the
+extension opens `story.tale`; CLI errors, including the refusal to overwrite an existing story, are shown
+without modification.
 
 Run **Talewright: Set Up CLI**, install the CLI separately and put `talewright` on PATH, or set `talewright.cli.executablePath`
 to its absolute executable path (paths with spaces are supported). No source builds, downloads

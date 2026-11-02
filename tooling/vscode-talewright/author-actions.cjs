@@ -1,6 +1,10 @@
 const vscode = require('vscode');
 const path = require('node:path');
-const { cliExecutable, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
+const { readdir } = require('node:fs/promises');
+const { cliExecutable, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
+
+const PENDING_NEW_STORY = 'pendingNewStory';
+const PENDING_NEW_STORY_MAX_AGE = 5 * 60 * 1000;
 
 function contains(root, file) {
   const relative = path.relative(root, file);
@@ -58,6 +62,99 @@ async function saveStory(root) {
   return true;
 }
 
+async function selectNewStoryRoot() {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.length === 1 && folders[0].uri.scheme === 'file') {
+    const root = folders[0].uri.fsPath;
+    if ((await readdir(root)).length === 0) return path.resolve(root);
+  }
+  const defaultFolder = folders.find(folder => folder.uri.scheme === 'file');
+  const [selected] = await vscode.window.showOpenDialog({
+    title: 'Choose a folder for your new Talewright story',
+    defaultUri: defaultFolder?.uri,
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+  }) ?? [];
+  if (!selected) return undefined;
+  if (selected.scheme !== 'file' || !path.isAbsolute(selected.fsPath)) {
+    throw new Error('Choose a local folder for the new story.');
+  }
+  return path.resolve(selected.fsPath);
+}
+
+async function openStoryStart(root) {
+  const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'story.tale')));
+  await vscode.window.showTextDocument(document);
+}
+
+async function openCreatedStory(root, context) {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.some(folder => folder.uri.scheme === 'file'
+      && contains(path.resolve(folder.uri.fsPath), path.resolve(root)))) {
+    await openStoryStart(root);
+    return;
+  }
+
+  let newWindow = false;
+  if (folders.length) {
+    const choice = await vscode.window.showQuickPick([
+      { label: 'Open in Current Window', newWindow: false },
+      { label: 'Open in New Window', newWindow: true },
+    ], { placeHolder: 'Choose how to open the new story' });
+    if (!choice) {
+      vscode.window.showInformationMessage(`Story created in ${root}. Open the folder when you are ready to edit.`);
+      return;
+    }
+    newWindow = choice.newWindow;
+  }
+
+  const pending = { root: path.resolve(root), createdAt: Date.now() };
+  await context.globalState.update(PENDING_NEW_STORY, pending);
+  try {
+    const opened = await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), newWindow);
+    if (opened === false) throw new Error(`VS Code could not open the new story folder: ${root}`);
+  } catch (error) {
+    await context.globalState.update(PENDING_NEW_STORY, undefined);
+    throw error;
+  }
+}
+
+async function createNewStory(context) {
+  if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
+  const root = await selectNewStoryRoot();
+  if (!root) return;
+  if (!vscode.workspace.isTrusted) throw new Error('Workspace trust was revoked. No CLI command was started.');
+  try {
+    await executeCli(root, ['new', root]);
+  } catch (error) {
+    const output = [error.stderr, error.stdout]
+      .filter(value => typeof value === 'string' && value.trim())
+      .join('\n')
+      .trim();
+    if (output) throw Object.assign(new Error(output), { code: error.code });
+    throw error;
+  }
+  await openCreatedStory(root, context);
+}
+
+async function openPendingNewStory(context) {
+  const pending = context.globalState.get(PENDING_NEW_STORY);
+  if (!pending) return;
+  const age = Date.now() - pending.createdAt;
+  if (typeof pending.root !== 'string' || typeof pending.createdAt !== 'number'
+      || age < 0 || age > PENDING_NEW_STORY_MAX_AGE) {
+    await context.globalState.update(PENDING_NEW_STORY, undefined);
+    return;
+  }
+  const root = path.resolve(pending.root);
+  if (!(vscode.workspace.workspaceFolders ?? []).some(folder =>
+    folder.uri.scheme === 'file' && path.resolve(folder.uri.fsPath) === root)) return;
+  const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'story.tale')));
+  await vscode.window.showTextDocument(document);
+  await context.globalState.update(PENDING_NEW_STORY, undefined);
+}
+
 async function createTask(command, requested, definition, scope) {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
   const root = await selectStory(requested);
@@ -113,6 +210,14 @@ function registerAuthorActions(context) {
       }
     }));
   }
+  context.subscriptions.push(vscode.commands.registerCommand('talewright.newStory', async () => {
+    try {
+      await createNewStory(context);
+    } catch (error) {
+      await report(error);
+    }
+  }));
+  const pendingStory = openPendingNewStory(context).catch(report);
   context.subscriptions.push(vscode.tasks.registerTaskProvider('talewright', {
     provideTasks: () => [],
     resolveTask: async task => {
@@ -147,6 +252,7 @@ function registerAuthorActions(context) {
       }
     },
   }));
+  return pendingStory;
 }
 
 module.exports = { registerAuthorActions };

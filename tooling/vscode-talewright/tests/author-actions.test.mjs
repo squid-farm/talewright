@@ -9,7 +9,12 @@ const toolsSource = await readFile(new URL('../cli-tools.cjs', import.meta.url),
 
 function host(options = {}) {
   const uri = file => ({ scheme: 'file', fsPath: file });
-  const calls = { tasks: [], errors: [], picks: [], dialogs: [], messages: [], warnings: [], updates: [], urls: [], fetches: [], sdk: [], runtimeChecks: [], commands: new Map() };
+  const calls = {
+    tasks: [], errors: [], picks: [], dialogs: [], openDialogs: [], messages: [], warnings: [], updates: [],
+    urls: [], fetches: [], sdk: [], cli: [], runtimeChecks: [], openFolders: [], openedDocuments: [],
+    shownDocuments: [], commands: new Map(),
+  };
+  const globalState = options.state ?? new Map();
   const roots = options.roots ?? ['/workspace/My Story'];
   const documents = options.documents ?? [];
   const vscode = {
@@ -40,19 +45,38 @@ function host(options = {}) {
         const relative = path.relative(folder.uri.fsPath, resource.fsPath);
         return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
       }),
+      openTextDocument: async resource => {
+        calls.openedDocuments.push(resource);
+        return { uri: resource };
+      },
     },
     window: {
       activeTextEditor: options.active ? { document: { uri: uri(options.active) } } : undefined,
       showErrorMessage: async (message, ...actions) => { calls.errors.push(message); calls.errorActions = actions; return options.errorChoice; },
       showInformationMessage: async message => { calls.messages.push(message); return options.infoChoice; },
-      showQuickPick: async (choices, settings) => { calls.picks.push(choices); calls.pickSettings = settings; return choices[options.pick]; },
+      showQuickPick: async (choices, settings) => {
+        calls.picks.push(choices);
+        calls.pickSettings = settings;
+        const pick = options.pickSequence ? options.pickSequence.shift() : options.pick;
+        return choices[pick];
+      },
       showWarningMessage: async message => { calls.warnings.push(message); options.onConsent?.(vscode); return options.saveChoice; },
-      showOpenDialog: async () => options.selected ? [uri(options.selected)] : undefined,
+      showOpenDialog: async settings => {
+        calls.openDialogs.push(settings);
+        return options.selected ? [uri(options.selected)] : undefined;
+      },
+      showTextDocument: async document => { calls.shownDocuments.push(document); return {}; },
       showSaveDialog: async settings => { calls.dialogs.push(settings); return options.output ? uri(options.output) : undefined; },
     },
     commands: {
       registerCommand: (id, handler) => { calls.commands.set(id, handler); return {}; },
-      executeCommand: async id => calls.commands.get(id)(),
+      executeCommand: async (id, ...args) => {
+        if (id === 'vscode.openFolder') {
+          calls.openFolders.push(args);
+          return options.openFolderResult ?? true;
+        }
+        return calls.commands.get(id)(...args);
+      },
     },
     tasks: {
       registerTaskProvider: (type, provider) => { calls.provider = provider; return {}; },
@@ -89,14 +113,26 @@ function host(options = {}) {
         if (options.dotnetError) throw Object.assign(new Error(options.dotnetError), { code: options.dotnetError });
         return { stdout: options.runtimes ?? 'Microsoft.NETCore.App 10.0.0 [/usr/share/dotnet/shared/Microsoft.NETCore.App]' };
       }
-      calls.sdk.push(args);
-      if (options.sdkError) throw Object.assign(new Error(options.sdkError), { code: options.sdkError });
-      return { stdout: options.sdks ?? '' };
+      if (args[0] === 'dotnet') {
+        calls.sdk.push(args);
+        if (options.sdkError) throw Object.assign(new Error(options.sdkError), { code: options.sdkError });
+        return { stdout: options.sdks ?? '' };
+      }
+      calls.cli.push(args);
+      if (options.cliError) {
+        throw Object.assign(new Error(options.cliError), {
+          code: options.cliErrorCode ?? 1,
+          stderr: options.cliStderr ?? options.cliError,
+          stdout: options.cliStdout ?? '',
+        });
+      }
+      return { stdout: options.cliStdout ?? '', stderr: options.cliStderr ?? '' };
     } },
     'node:fs/promises': {
       access: async file => { if (!files.includes(file)) throw Object.assign(new Error('missing'), { code: 'ENOENT' }); },
       stat: async () => ({ isFile: () => true }),
       readFile: async () => JSON.stringify({ version: options.version ?? '0.1.0-preview.1' }),
+      readdir: async () => options.directoryEntries ?? [],
     },
   };
   const globals = {
@@ -117,9 +153,19 @@ function host(options = {}) {
   vm.runInNewContext(toolsSource, { ...globals, require: name => dependencies[name], module: tools });
   dependencies['./cli-tools.cjs'] = tools.exports;
   vm.runInNewContext(source, { ...globals, require: name => dependencies[name], module });
-  module.exports.registerAuthorActions({ subscriptions: [], extensionPath: '/extension' });
+  const activation = module.exports.registerAuthorActions({
+    subscriptions: [],
+    extensionPath: '/extension',
+    globalState: {
+      get: key => globalState.get(key),
+      update: async (key, value) => {
+        if (value === undefined) globalState.delete(key);
+        else globalState.set(key, value);
+      },
+    },
+  });
   const run = name => calls.commands.get(`talewright.${name}`)();
-  return { calls, run };
+  return { calls, run, activation, state: globalState };
 }
 
 test('workspace-scoped debugger tasks resolve relative or absolute stories across open folders', async () => {
@@ -178,6 +224,78 @@ test('validation runs the CLI in a visible process task with separate space-safe
   assert.equal(task.presentationOptions.focus, true);
   assert.equal(task.presentationOptions.reveal, 1);
   assert.equal(calls.errors.length, 0);
+});
+
+test('New Story uses one empty workspace folder and opens the generated start scene', async () => {
+  const { calls, run } = host({ folders: ['/workspace'], directoryEntries: [] });
+  await run('newStory');
+  assert.deepEqual(Array.from(calls.cli[0][1]), ['new', '/workspace']);
+  assert.equal(calls.cli[0][2].cwd, '/workspace');
+  assert.equal(calls.openDialogs.length, 0);
+  assert.equal(calls.openFolders.length, 0);
+  assert.equal(calls.openedDocuments[0].fsPath, '/workspace/story.tale');
+  assert.equal(calls.shownDocuments.length, 1);
+  assert.equal(calls.errors.length, 0);
+});
+
+test('New Story asks for a folder and offers current or new window when needed', async () => {
+  for (const [pick, newWindow] of [[0, false], [1, true]]) {
+    const { calls, run, state } = host({
+      folders: ['/workspace'], directoryEntries: ['README.md'],
+      selected: '/exports/New Story', pickSequence: [pick],
+    });
+    await run('newStory');
+    assert.equal(calls.openDialogs.length, 1);
+    assert.equal(calls.openDialogs[0].canSelectFolders, true);
+    assert.equal(calls.openDialogs[0].canSelectFiles, false);
+    assert.deepEqual(Array.from(calls.cli[0][1]), ['new', '/exports/New Story']);
+    assert.equal(calls.openFolders[0][0].fsPath, '/exports/New Story');
+    assert.equal(calls.openFolders[0][1], newWindow);
+    assert.equal(state.size, 1);
+    assert.equal(calls.errors.length, 0);
+  }
+});
+
+test('New Story opens the chosen folder in an empty window and restores story.tale on activation', async () => {
+  const created = host({ folders: [], selected: '/exports/New Story' });
+  await created.run('newStory');
+  assert.equal(created.calls.openFolders[0][0].fsPath, '/exports/New Story');
+  assert.equal(created.calls.openFolders[0][1], false);
+  const reopened = host({ folders: ['/exports/New Story'], state: created.state });
+  await reopened.activation;
+  assert.equal(reopened.calls.openedDocuments[0].fsPath, '/exports/New Story/story.tale');
+  assert.equal(reopened.calls.shownDocuments.length, 1);
+  assert.equal(reopened.state.size, 0);
+});
+
+test('New Story surfaces CLI output unchanged and offers CLI setup when unavailable', async () => {
+  const failed = host({
+    folders: ['/workspace'], directoryEntries: ['README.md'], selected: '/exports/Story',
+    cliError: 'The target folder already contains a story.', cliStderr: 'The target folder already contains a story.',
+  });
+  await failed.run('newStory');
+  assert.match(failed.calls.errors[0], /The target folder already contains a story\./);
+  assert.equal(failed.calls.openFolders.length, 0);
+  assert.equal(failed.calls.openedDocuments.length, 0);
+
+  const missing = host({ folders: [], selected: '/exports/Story', files: [] });
+  await missing.run('newStory');
+  assert.match(missing.calls.errors[0], /CLI not found/);
+  assert.deepEqual(missing.calls.errorActions, ['Set Up CLI']);
+  assert.equal(missing.calls.cli.length, 0);
+});
+
+test('New Story does not launch when the picker is cancelled or workspace trust is absent', async () => {
+  const cancelled = host({ folders: [] });
+  await cancelled.run('newStory');
+  assert.equal(cancelled.calls.cli.length, 0);
+  assert.equal(cancelled.calls.errors.length, 0);
+
+  const untrusted = host({ trusted: false });
+  await untrusted.run('newStory');
+  assert.match(untrusted.calls.errors[0], /Trust this workspace/);
+  assert.equal(untrusted.calls.openDialogs.length, 0);
+  assert.equal(untrusted.calls.cli.length, 0);
 });
 
 test('Run Story executes talewright run as a visible, space-safe player task', async () => {

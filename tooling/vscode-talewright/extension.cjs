@@ -7,7 +7,7 @@ const { registerAuthorActions } = require('./author-actions.cjs');
 let client;
 
 async function activate(context) {
-  registerAuthorActions(context);
+  await registerAuthorActions(context);
   context.subscriptions.push(vscode.commands.registerCommand('talewright.togglePreviewHints', async () => {
     const configuration = vscode.workspace.getConfiguration('editor', {
       uri: vscode.window.activeTextEditor?.document.uri, languageId: 'tale',
