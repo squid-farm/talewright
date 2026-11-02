@@ -91,14 +91,15 @@ workspace trust. See [server setup and other editors](https://github.com/squid-f
 
 ## CLI actions (separate CLI installation required)
 
-The Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**) provides **Talewright: Validate Story**, **Talewright: Publish Story ZIP**
-and **Talewright: Open Author Debugger**. These run the existing `talewright` CLI in a visible,
+The Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**) provides **Talewright: Validate Story**, **Talewright: Publish Story ZIP**,
+**Talewright: Open Author Debugger**, and **Talewright: Run Story**. These run the existing `talewright` CLI in a visible,
 interactive task terminal. The bundled language server provides live editor help; it is **not**
-the CLI and does not include the native debugger.
+the CLI and does not include the native player or debugger.
 
 Run **Talewright: Set Up CLI**, install the CLI separately and put `talewright` on PATH, or set `talewright.cli.executablePath`
 to its absolute executable path (paths with spaces are supported). No source builds, downloads
-or installation run automatically. See the [author setup guide](https://github.com/squid-farm/talewright/blob/main/docs/guide/cli-installation.md)
+or installation run automatically. **Run Story also requires the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)**; the extension checks for it and does not install it.
+See the [author setup guide](https://github.com/squid-farm/talewright/blob/main/docs/guide/cli-installation.md)
 for download instructions and [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
 for system requirements and source builds.
 
@@ -150,8 +151,12 @@ remain in the task terminal; a started task is not a success notification.
   prerequisites are required: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.
   Linux x64 is the installed-extension verification platform; other hosts are not verified here.
   See [CLI/debugger prerequisites](https://github.com/squid-farm/talewright/blob/main/docs/reference/cli.md).
+- **Run Story** runs `talewright run <story>` in the native player from the story's configured
+  start. It requires the .NET 10 Runtime and the separately installed CLI; missing prerequisites
+  are reported with setup guidance, never installed automatically. The task stays alive while play
+  is open; use **Tasks: Terminate Task** to close the player.
 
-For repeated debugging, manually add this task to your workspace's `.vscode/tasks.json`;
+For repeated play or debugging, manually add these tasks to your workspace's `.vscode/tasks.json`;
 the extension never creates or edits that file:
 
 ```json
@@ -161,6 +166,12 @@ the extension never creates or edits that file:
     "label": "Debug my story",
     "type": "talewright",
     "command": "debug",
+    "story": ".",
+    "problemMatcher": []
+  }, {
+    "label": "Play my story",
+    "type": "talewright",
+    "command": "run",
     "story": ".",
     "problemMatcher": []
   }]
