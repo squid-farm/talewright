@@ -37,7 +37,7 @@ internal sealed class ExpressionBinder
             var value = binder.Bind(syntax.Root);
             if (expectedType is { } expected && value.Type != expected)
             {
-                binder.Fail("TW2003",
+                binder.Fail(CompilerDiagnosticCodes.TypeMismatch,
                     $"Expected a {Describe(expected)} expression but found a {Describe(value.Type)}.",
                     syntax.Root.Span.Start);
             }
@@ -65,7 +65,7 @@ internal sealed class ExpressionBinder
                 {
                     if (value is not (PronounRef or ItemNameRef) || call.Argument is null || call.PluralArgument is null)
                     {
-                        binder.Fail("TW2006",
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
                             "Use '#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on pronoun or item-name references only.",
                             call.Offset);
                     }
@@ -76,12 +76,12 @@ internal sealed class ExpressionBinder
 
                 if (call.Argument is not null)
                 {
-                    binder.Fail("TW2006", $"Modifier '#{call.Name}' does not take an argument.", call.Offset);
+                    binder.Fail(CompilerDiagnosticCodes.InvalidModifier, $"Modifier '#{call.Name}' does not take an argument.", call.Offset);
                 }
 
                 if (!symbols.Modifiers.TryGet(call.Name, out var modifier))
                 {
-                    binder.Fail("TW2006",
+                    binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
                         $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => "#" + name))}.",
                         call.Offset);
                 }
@@ -127,7 +127,7 @@ internal sealed class ExpressionBinder
 
     private Expr Bind(ExpressionNode node) => node switch
     {
-        ErrorExpressionNode => Fail<Expr>("TW1001", "Expression is incomplete.", node.Span.Start),
+        ErrorExpressionNode => Fail<Expr>(CompilerDiagnosticCodes.InvalidExpression, "Expression is incomplete.", node.Span.Start),
         NumberExpressionNode number => new NumberLiteral(number.Value),
         TextExpressionNode text => new TextLiteral(text.Value),
         BooleanExpressionNode boolean => new BoolLiteral(boolean.Value),
@@ -150,7 +150,7 @@ internal sealed class ExpressionBinder
             return new TierLiteral(tier);
         }
 
-        return Fail<Expr>("TW2001",
+        return Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty,
             $"Unknown name '{value}'. References look like 'player:dex', 'faction:{{id}}', 'flag:{{id}}' or 'var:{{id}}'.",
             name.Name.Start);
     }
@@ -160,7 +160,7 @@ internal sealed class ExpressionBinder
         var name = Text(predicate.Name);
         if (!_symbols.Predicates.Contains(name))
         {
-            Fail("TW2005",
+            Fail(CompilerDiagnosticCodes.UnknownPredicate,
                 $"Named predicate '@{name}' is not registered. Named predicates are provided by C# story projects.",
                 predicate.Span.Start);
         }
@@ -174,7 +174,7 @@ internal sealed class ExpressionBinder
         var scene = new SceneId(name);
         if (!_symbols.Scenes.Contains(scene))
         {
-            Fail("TW2002", $"Unknown scene '{name}'.", visited.Scene.Start);
+            Fail(CompilerDiagnosticCodes.UnknownScene, $"Unknown scene '{name}'.", visited.Scene.Start);
         }
 
         return new Visited(scene);
@@ -199,12 +199,12 @@ internal sealed class ExpressionBinder
                     var oldId = dot < 0 ? string.Empty : path[..dot];
                     if (member is null && oldMember is "name" or "tier")
                     {
-                        Fail("TW2001",
+                        Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
                             $"Unknown faction '{path}'. Dotted property access is no longer supported; use 'faction:{oldId}:{oldMember}' for its {oldMember} property.",
                             reference.Name.Start + dot);
                     }
 
-                    Fail("TW2001", $"Unknown faction '{path}'.", reference.Name.Start);
+                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{path}'.", reference.Name.Start);
                 }
 
                 if (member is null) return new StandingRef(faction);
@@ -212,7 +212,7 @@ internal sealed class ExpressionBinder
                 {
                     "tier" => new StandingTierRef(faction),
                     "name" => new FactionNameRef(faction),
-                    _ => Fail<Expr>("TW2001",
+                    _ => Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty,
                         $"Unknown faction property '{member}'. Use 'faction:{path}:tier' or 'faction:{path}:name'.",
                         reference.Member!.Value.Start),
                 };
@@ -221,7 +221,7 @@ internal sealed class ExpressionBinder
             case "item":
                 if (member is not null)
                 {
-                    Fail("TW2001", $"Item names are referenced as 'item:{path}'; '.' only groups words inside names.",
+                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Item names are referenced as 'item:{path}'; '.' only groups words inside names.",
                         reference.Member!.Value.Start);
                 }
 
@@ -230,14 +230,14 @@ internal sealed class ExpressionBinder
             {
                 if (member is not null)
                 {
-                    Fail("TW2001", $"Flag references do not have properties; use 'flag:{path}'.",
+                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Flag references do not have properties; use 'flag:{path}'.",
                         reference.Member!.Value.Start);
                 }
 
                 var flag = new FlagId(path);
                 if (!_symbols.Flags.Contains(flag))
                 {
-                    Fail("TW2004", $"Flag '{path}' is never set by any effect and is not declared in story.talewright.yaml.",
+                    Fail(CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable, $"Flag '{path}' is never set by any effect and is not declared in story.talewright.yaml.",
                         reference.Name.Start);
                 }
 
@@ -248,21 +248,21 @@ internal sealed class ExpressionBinder
             {
                 if (member is not null)
                 {
-                    Fail("TW2001", $"Variable references do not have properties; use 'var:{path}'.",
+                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Variable references do not have properties; use 'var:{path}'.",
                         reference.Member!.Value.Start);
                 }
 
                 var variable = new VarId(path);
                 if (_symbols.UnresolvedVariables.Contains(variable))
                 {
-                    Fail("TW2007",
+                    Fail(CompilerDiagnosticCodes.UnresolvedVariableType,
                         $"Cannot infer the type of variable '{path}'. Declare an initial value under 'vars' in story.talewright.yaml.",
                         reference.Name.Start);
                 }
 
                 if (!_symbols.Variables.Contains(variable))
                 {
-                    Fail("TW2004", $"Variable '{path}' is never assigned by any effect and is not declared in story.talewright.yaml.",
+                    Fail(CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable, $"Variable '{path}' is never assigned by any effect and is not declared in story.talewright.yaml.",
                         reference.Name.Start);
                 }
 
@@ -277,7 +277,7 @@ internal sealed class ExpressionBinder
         {
             if (path != "pronoun")
             {
-                Fail("TW2001", $"Unknown character property '{path}:{member}'.", reference.Member!.Value.Start);
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character property '{path}:{member}'.", reference.Member!.Value.Start);
             }
 
             return new PronounRef(character, ParsePronounForm(member, subMember, reference));
@@ -301,7 +301,7 @@ internal sealed class ExpressionBinder
             {
                 "determiner" => PronounForm.Possessive,
                 "independent" => PronounForm.PossessivePronoun,
-                _ => Fail<PronounForm>("TW2001",
+                _ => Fail<PronounForm>(CompilerDiagnosticCodes.UnknownNameOrProperty,
                     $"Unknown possessive pronoun property '{subMember}'. Use 'determiner' or 'independent'.",
                     reference.SubMember!.Value.Start),
             };
@@ -312,7 +312,7 @@ internal sealed class ExpressionBinder
             "subject" => PronounForm.Subject,
             "object" => PronounForm.Object,
             "reflexive" => PronounForm.Reflexive,
-            _ => Fail<PronounForm>("TW2001",
+            _ => Fail<PronounForm>(CompilerDiagnosticCodes.UnknownNameOrProperty,
                 $"Unknown pronoun property '{property}'. Use {string.Join(", ", ExpressionParser.PronounProperties)}.",
                 reference.Member!.Value.Start),
         };
@@ -323,7 +323,7 @@ internal sealed class ExpressionBinder
         var stat = new StatId(Text(path));
         return _symbols.World.Ruleset.HasStat(stat)
             ? new StatRef(character, stat)
-            : Fail<Expr>("TW2001", $"Unknown property '{Text(path)}' on '{Text(ns)}'.", path.Start);
+            : Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown property '{Text(path)}' on '{Text(ns)}'.", path.Start);
     }
 
     private Expr BindUnary(UnaryExpressionNode unary)
@@ -333,7 +333,7 @@ internal sealed class ExpressionBinder
         {
             if (operand.Type != ExprType.Bool)
             {
-                Fail("TW2003", "'not' needs a true/false condition.", unary.OperatorSpan.Start);
+                Fail(CompilerDiagnosticCodes.TypeMismatch, "'not' needs a true/false condition.", unary.OperatorSpan.Start);
             }
 
             return new UnaryExpr(UnaryOp.Not, operand);
@@ -341,7 +341,7 @@ internal sealed class ExpressionBinder
 
         if (operand.Type != ExprType.Number)
         {
-            Fail("TW2003", "'-' needs a number.", unary.OperatorSpan.Start);
+            Fail(CompilerDiagnosticCodes.TypeMismatch, "'-' needs a number.", unary.OperatorSpan.Start);
         }
 
         return operand is NumberLiteral number
@@ -391,7 +391,7 @@ internal sealed class ExpressionBinder
         {
             if (left.Type != ExprType.Bool || right.Type != ExprType.Bool)
             {
-                Fail("TW2003", $"'{op.ToString().ToLowerInvariant()}' needs true/false conditions on both sides.",
+                Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{op.ToString().ToLowerInvariant()}' needs true/false conditions on both sides.",
                     binary.OperatorSpan.Start);
             }
         }
@@ -399,7 +399,7 @@ internal sealed class ExpressionBinder
         {
             if (left.Type != ExprType.Number || right.Type != ExprType.Number)
             {
-                Fail("TW2003", "Arithmetic needs numbers on both sides.", binary.OperatorSpan.Start);
+                Fail(CompilerDiagnosticCodes.TypeMismatch, "Arithmetic needs numbers on both sides.", binary.OperatorSpan.Start);
             }
         }
         else
@@ -415,14 +415,14 @@ internal sealed class ExpressionBinder
 
             if (left.Type != right.Type)
             {
-                Fail("TW2003",
+                Fail(CompilerDiagnosticCodes.TypeMismatch,
                     $"Cannot compare a {Describe(left.Type)} with a {Describe(right.Type)}.",
                     binary.OperatorSpan.Start);
             }
 
             if (left.Type is ExprType.Bool or ExprType.Text && op is not (BinaryOp.Equal or BinaryOp.NotEqual))
             {
-                Fail("TW2003", $"Only == and != can compare {Describe(left.Type)} values.",
+                Fail(CompilerDiagnosticCodes.TypeMismatch, $"Only == and != can compare {Describe(left.Type)} values.",
                     binary.OperatorSpan.Start);
             }
         }
@@ -432,7 +432,7 @@ internal sealed class ExpressionBinder
 
     private Effect Bind(EffectSyntax effect) => effect switch
     {
-        ErrorEffectSyntax => Fail<Effect>("TW1001", "Expression is incomplete.", effect.Span.Start),
+        ErrorEffectSyntax => Fail<Effect>(CompilerDiagnosticCodes.InvalidExpression, "Expression is incomplete.", effect.Span.Start),
         SetFlagEffectSyntax setFlag => new SetFlag(new FlagId(Text(setFlag.Flag)), setFlag.Set),
         GiveTakeEffectSyntax giveTake => BindGiveTake(giveTake),
         AssignmentEffectSyntax assignment => BindAssignment(assignment),
@@ -449,7 +449,7 @@ internal sealed class ExpressionBinder
             quantity = Bind(quantitySyntax);
             if (quantity.Type != ExprType.Number)
             {
-                Fail("TW2003", "Item quantity must be a number.", quantitySyntax.Span.Start);
+                Fail(CompilerDiagnosticCodes.TypeMismatch, "Item quantity must be a number.", quantitySyntax.Span.Start);
             }
         }
 
@@ -465,7 +465,7 @@ internal sealed class ExpressionBinder
         var variable = new VarId(targetName);
         if (ns == "var" && _symbols.UnresolvedVariables.Contains(variable))
         {
-            Fail("TW2007",
+            Fail(CompilerDiagnosticCodes.UnresolvedVariableType,
                 $"Cannot infer the type of variable '{targetName}'. Declare an initial value under 'vars' in story.talewright.yaml.",
                 effect.Target.Start);
         }
@@ -482,13 +482,13 @@ internal sealed class ExpressionBinder
         {
             if (op != AssignOp.Set)
             {
-                Fail("TW2003", $"Text variable '{targetName}' supports '=' only, not '{AssignmentText(effect.Operator)}'.",
+                Fail(CompilerDiagnosticCodes.TypeMismatch, $"Text variable '{targetName}' supports '=' only, not '{AssignmentText(effect.Operator)}'.",
                     effect.Target.Start);
             }
 
             if (amount.Type != ExprType.Text)
             {
-                Fail("TW2003", $"Text variable '{targetName}' needs text, not {Describe(amount.Type)}.",
+                Fail(CompilerDiagnosticCodes.TypeMismatch, $"Text variable '{targetName}' needs text, not {Describe(amount.Type)}.",
                     effect.Amount.Span.Start);
             }
 
@@ -497,7 +497,7 @@ internal sealed class ExpressionBinder
 
         if (amount.Type != ExprType.Number)
         {
-            Fail("TW2003", ns == "var"
+            Fail(CompilerDiagnosticCodes.TypeMismatch, ns == "var"
                 ? $"Variable '{targetName}' has a fixed integer type and needs a number, not {Describe(amount.Type)}."
                 : "Only numbers can be assigned to stats or faction standings.", effect.Amount.Span.Start);
         }
@@ -506,9 +506,9 @@ internal sealed class ExpressionBinder
         {
             "faction" => _symbols.World.Factions.ContainsKey(new FactionId(targetName))
                 ? new ChangeStanding(new FactionId(targetName), op, amount)
-                : Fail<Effect>("TW2001", $"Unknown faction '{targetName}'.", effect.Target.Start),
+                : Fail<Effect>(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{targetName}'.", effect.Target.Start),
             "var" => new ChangeVariable(variable, op, amount),
-            "flag" => Fail<Effect>("TW1003", "Use 'set flag:x' or 'clear flag:x' for flags.", effect.Namespace.Start),
+            "flag" => Fail<Effect>(CompilerDiagnosticCodes.MalformedEffect, "Use 'set flag:x' or 'clear flag:x' for flags.", effect.Namespace.Start),
             _ => new ChangeStat(Character(effect.Namespace), Stat(effect.Target), op, amount),
         };
     }
@@ -519,7 +519,7 @@ internal sealed class ExpressionBinder
         var id = new EntityId(name);
         if (!_symbols.World.Characters.ContainsKey(id))
         {
-            Fail("TW2001", $"Unknown character '{name}'.", span.Start);
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{name}'.", span.Start);
         }
 
         return id;
@@ -531,7 +531,7 @@ internal sealed class ExpressionBinder
         var id = new ItemId(name);
         if (!_symbols.World.Items.ContainsKey(id))
         {
-            Fail("TW2001", $"Unknown item '{name}'.", span.Start);
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown item '{name}'.", span.Start);
         }
 
         return id;
@@ -543,7 +543,7 @@ internal sealed class ExpressionBinder
         var id = new StatId(name);
         if (!_symbols.World.Ruleset.HasStat(id))
         {
-            Fail("TW2001", $"Unknown stat '{name}' (not in ruleset '{_symbols.World.Ruleset.Id}').", span.Start);
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown stat '{name}' (not in ruleset '{_symbols.World.Ruleset.Id}').", span.Start);
         }
 
         return id;

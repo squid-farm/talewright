@@ -166,7 +166,7 @@ public sealed class LanguageServer
                     var failure = await task.ContinueWith(completed => completed.Exception, CancellationToken.None,
                         TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                     if (failure is not null)
-                        await _errors.WriteLineAsync($"TWLSP002: {request.Method}: {failure.GetBaseException().Message}");
+                        await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {failure.GetBaseException().Message}");
                 }
             }
             finally
@@ -218,7 +218,7 @@ public sealed class LanguageServer
         {
             _inlayRefreshPending = false;
             if (message.TryGetProperty("error", out var refreshError))
-                await _errors.WriteLineAsync($"TWLSP002: inlay hint refresh: {refreshError}");
+                await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: inlay hint refresh: {refreshError}");
             return;
         }
         if (!message.TryGetProperty("method", out var methodElement) ||
@@ -320,7 +320,7 @@ public sealed class LanguageServer
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
             or InvalidOperationException or KeyNotFoundException or JsonException)
         {
-            await _errors.WriteLineAsync($"TWLSP002: {method}: {exception.Message}");
+            await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {method}: {exception.Message}");
             if (hasId) await ErrorAsync(id, -32602, exception.Message, cancellationToken);
             else await NotifyAsync("window/showMessage", new { type = 1, message = $"Talewright: {exception.Message}" }, cancellationToken);
         }
@@ -486,20 +486,20 @@ public sealed class LanguageServer
 
     private static SemanticResult CalculateSemantic(PendingRequest request, StoryAnalysis analysis, StoryAnalysis? previous)
     {
-        if (analysis.Diagnostics.FirstOrDefault(diagnostic => diagnostic.Code is "TW5001" or "TW5002") is { } unavailable)
+        if (analysis.Diagnostics.FirstOrDefault(diagnostic => diagnostic.Code is AuthoringDiagnosticCodes.CustomFeaturesUnavailable or AuthoringDiagnosticCodes.StoryAnalysisUnavailable) is { } unavailable)
             return new(null, ErrorCode: -32001, ErrorMessage: $"{request.Feature} unavailable: {unavailable.Message}");
 
         var position = request.Position;
         if (request.Feature == Feature.CodeActions)
         {
             var diagnostics = analysis.Diagnostics.Where(diagnostic =>
-                (diagnostic.Code is "TW2002" or "TW2004") && diagnostic.Location.File == position.File &&
+                (diagnostic.Code is CompilerDiagnosticCodes.UnknownScene or CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable) && diagnostic.Location.File == position.File &&
                 Compare(position, diagnostic.Location) <= 0 && Compare(diagnostic.Location, request.End) <= 0);
             var lines = new LineMap(request.Text);
             var actions = new List<object>();
             foreach (var diagnostic in diagnostics)
             {
-                if (diagnostic.Code == "TW2002")
+                if (diagnostic.Code == CompilerDiagnosticCodes.UnknownScene)
                 {
                     actions.AddRange(StoryQuickFixes.ForMissingScene(analysis, diagnostic)
                         .Where(fix => fix.Kind != StoryQuickFixKind.CreateFile ||
@@ -666,27 +666,27 @@ public sealed class LanguageServer
         if (!_requests.TryGetValue(request.Key, out var active) || !ReferenceEquals(active, request))
         {
             if (finished.Task.Exception is { } failure)
-                await _errors.WriteLineAsync($"TWLSP002: {request.Method}: {failure.GetBaseException().Message}");
+                await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {failure.GetBaseException().Message}");
             request.Cancellation.Dispose();
             return;
         }
         if (finished.Task.Exception is { } unexpected)
         {
             var failure = unexpected.GetBaseException();
-            await _errors.WriteLineAsync($"TWLSP002: {request.Method}: {failure.Message}");
+            await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {failure.Message}");
             await FinishRequestErrorAsync(request, -32603, $"Request failed: {failure.Message}", cancellationToken);
             return;
         }
         if (finished.Task.IsCanceled)
         {
-            await _errors.WriteLineAsync($"TWLSP002: {request.Method}: request task cancelled unexpectedly.");
+            await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: request task cancelled unexpectedly.");
             await FinishRequestErrorAsync(request, -32603, "Request task cancelled unexpectedly.", cancellationToken);
             return;
         }
         var result = await finished.Task;
         if (result.ErrorCode is { } code)
         {
-            if (result.Error is { } error) await _errors.WriteLineAsync($"TWLSP002: {request.Method}: {error.Message}");
+            if (result.Error is { } error) await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {error.Message}");
             await FinishRequestErrorAsync(request, code, result.ErrorMessage!, cancellationToken);
             return;
         }
@@ -973,7 +973,7 @@ public sealed class LanguageServer
         if (completed.Error is { } error)
         {
             story.PublishedAnalysis = null;
-            await _errors.WriteLineAsync($"TWLSP003: {error.Message}");
+            await _errors.WriteLineAsync($"{LanguageServerLogCodes.AnalysisFailure}: {error.Message}");
             await NotifyAsync("window/showMessage", new { type = 1, message = $"Talewright analysis failed: {error.Message}" }, cancellationToken);
             var manifest = Path.Combine(story.Root, StorySource.ManifestFileName);
             var lintConfiguration = Path.Combine(story.Root, LintConfiguration.FileName);
@@ -982,7 +982,7 @@ public sealed class LanguageServer
             foreach (var path in errorPaths.Distinct(PathComparer).Where(Owns).ToArray())
             {
                 var diagnostics = PathComparer.Equals(path, manifest)
-                    ? new[] { ToDiagnostic(new Diagnostic(DiagnosticSeverity.Error, "TW5002",
+                    ? new[] { ToDiagnostic(new Diagnostic(DiagnosticSeverity.Error, AuthoringDiagnosticCodes.StoryAnalysisUnavailable,
                         $"Cannot analyze story: {error.Message}", new(StorySource.ManifestFileName, 1, 1)), new LineMap("")) }
                     : PathComparer.Equals(path, lintConfiguration) && story.LintConfigurationError is { } configurationError
                         ? new[] { ToLintConfigurationDiagnostic(configurationError.Message) }
@@ -1075,7 +1075,7 @@ public sealed class LanguageServer
         {
             range = new { start = point, end = point },
             severity = 3,
-            code = "TWLSP005",
+            code = LanguageServerDiagnosticCodes.DiagnosticsCapped,
             source = "talewright",
             message = $"Showing the first {DiagnosticLimit} problems in this file; {ordered.Length - DiagnosticLimit} more are hidden. Fix these to see the rest."
         };
@@ -1116,7 +1116,7 @@ public sealed class LanguageServer
     {
         range = new { start = new { line = 0, character = 0 }, end = new { line = 0, character = 0 } },
         severity = 1,
-        code = "TWLSP004",
+        code = LanguageServerDiagnosticCodes.InvalidLintConfiguration,
         source = "talewright",
         message = $"Invalid lint configuration: {message}"
     };

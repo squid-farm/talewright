@@ -29,7 +29,7 @@ public static partial class StoryImageResolver
     {
         if (!IsSafePath(path))
         {
-            diagnostics.Error("TW2010",
+            diagnostics.Error(CompilerDiagnosticCodes.UnsafeImagePath,
                 $"Unsafe image path '{path}'. Use a relative path inside images/ with / separators, no parent traversal, and no web address.",
                 location);
             return null;
@@ -38,7 +38,7 @@ public static partial class StoryImageResolver
         var extension = System.IO.Path.GetExtension(path);
         if (extension.Length > 0 && !Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
         {
-            diagnostics.Error("TW2011",
+            diagnostics.Error(CompilerDiagnosticCodes.UnsupportedImageFormat,
                 $"Unsupported image format '{extension}' in '{path}'. Use .png, .jpg, .jpeg, or .webp.", location);
             return null;
         }
@@ -48,13 +48,13 @@ public static partial class StoryImageResolver
             : Extensions.Select(ext => "images/" + path + ext).Where(source.ImagePaths.Contains).ToArray();
         if (matches.Length == 0)
         {
-            diagnostics.Error("TW2012", $"Image '{path}' was not found in the story's images/ folder. Paths are case-sensitive.", location);
+            diagnostics.Error(CompilerDiagnosticCodes.MissingImage, $"Image '{path}' was not found in the story's images/ folder. Paths are case-sensitive.", location);
             return null;
         }
 
         if (matches.Length > 1)
         {
-            diagnostics.Warning("TW2013",
+            diagnostics.Warning(CompilerDiagnosticCodes.AmbiguousImagePath,
                 $"Image '{path}' matches multiple files: {string.Join(", ", matches)}. Using '{matches[0]}'; include an extension to choose explicitly.",
                 location);
         }
@@ -62,7 +62,7 @@ public static partial class StoryImageResolver
         if (string.IsNullOrWhiteSpace(altText))
         {
             altText = FallbackAltText(matches[0]);
-            diagnostics.Warning("TW2014", $"Image '{path}' has no alt text. Using '{altText}'; supply descriptive alt text.", location);
+            diagnostics.Warning(CompilerDiagnosticCodes.MissingImageAlt, $"Image '{path}' has no alt text. Using '{altText}'; supply descriptive alt text.", location);
         }
 
         return new ResolvedStoryImage(matches[0], altText);

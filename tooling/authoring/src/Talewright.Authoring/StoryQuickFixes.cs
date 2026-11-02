@@ -18,7 +18,7 @@ public static class StoryQuickFixes
 {
     public static StoryQuickFixResult ForMissingFlag(StoryAnalysis analysis, Diagnostic diagnostic)
     {
-        if (diagnostic.Code != "TW2004" ||
+        if (diagnostic.Code != CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable ||
             !diagnostic.Location.File.EndsWith(".tale", StringComparison.OrdinalIgnoreCase))
             return new([]);
 
@@ -46,7 +46,7 @@ public static class StoryQuickFixes
 
     public static IReadOnlyList<StoryQuickFix> ForMissingScene(StoryAnalysis analysis, Diagnostic diagnostic)
     {
-        if (diagnostic.Code != "TW2002" ||
+        if (diagnostic.Code != CompilerDiagnosticCodes.UnknownScene ||
             !analysis.Source.Files.TryGetValue(diagnostic.Location.File, out var sourceText) ||
             !diagnostic.Location.File.EndsWith(".tale", StringComparison.OrdinalIgnoreCase))
             return [];

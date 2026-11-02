@@ -28,7 +28,7 @@ public static class StoryPreview
 
     public static IReadOnlyList<SubstitutionPreview> Get(StoryAnalysis analysis, string file)
     {
-        if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is "TW5001" or "TW5002"))
+        if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is AuthoringDiagnosticCodes.CustomFeaturesUnavailable or AuthoringDiagnosticCodes.StoryAnalysisUnavailable))
             throw new InvalidOperationException("Preview is unavailable until project authoring metadata is supplied and valid.");
         if (analysis.World is not { } world) return [];
         var state = GameState.CreateInitial(world, 0);

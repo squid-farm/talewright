@@ -26,7 +26,7 @@ public sealed class DebugCommand : Command<DebugSettings>
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or Win32Exception)
         {
-            return CommandLine.Failure("TWCLI002", $"Debugger launch failed: {ex.Message}", false, writers.Output, writers.Error);
+            return CommandLine.Failure(CliDiagnosticCodes.IoFailure, $"Debugger launch failed: {ex.Message}", false, writers.Output, writers.Error);
         }
     }
 }

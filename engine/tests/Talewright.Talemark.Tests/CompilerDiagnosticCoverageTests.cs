@@ -24,7 +24,6 @@ public sealed class CompilerDiagnosticCoverageTests
           player: {first-name: Ada}
         """;
 
-    private static readonly Regex CompilerCodePattern = new("\"(?<code>TW[0-9]{4})\"", RegexOptions.CultureInvariant);
     private static readonly Regex ReferenceRowPattern = new(
         @"(?m)^\|[^\w|]*(?<code>TW[0-9]{4})\s*\|\s*(?<meaning>[^|\r\n]+)\|",
         RegexOptions.CultureInvariant);
@@ -112,20 +111,12 @@ public sealed class CompilerDiagnosticCoverageTests
     public void Compiler_codes_have_documented_meanings_and_passing_behavioral_cases()
     {
         var root = RepositoryRoot();
-        var compilerDirectory = Path.Combine(root, "engine", "src", "Talewright.Talemark");
-        var compilerCodes = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var path in Directory.EnumerateFiles(compilerDirectory, "*.cs", SearchOption.AllDirectories))
-        {
-            var parts = Path.GetRelativePath(compilerDirectory, path)
-                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (parts.Any(part => part is "bin" or "obj"))
-            {
-                continue;
-            }
-            compilerCodes.UnionWith(ExtractCompilerCodes(File.ReadAllText(path)));
-        }
-
-        Assert.NotEmpty(compilerCodes);
+        var compilerCodes = typeof(CompilerDiagnosticCodes)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.DeclaredOnly)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .ToHashSet(StringComparer.Ordinal);
         var reference = File.ReadAllText(Path.Combine(root, "docs", "reference", "diagnostics.md"));
         var failures = CheckContract(compilerCodes, ExtractDocumentedCodes(reference), Cases);
         Assert.True(failures.Count == 0, string.Join("\n", failures));
@@ -228,10 +219,6 @@ public sealed class CompilerDiagnosticCoverageTests
         }
         return failures;
     }
-
-    private static HashSet<string> ExtractCompilerCodes(string source) =>
-        CompilerCodePattern.Matches(source).Select(match => match.Groups["code"].Value)
-            .ToHashSet(StringComparer.Ordinal);
 
     private static HashSet<string> ExtractDocumentedCodes(string reference) =>
         ReferenceRowPattern.Matches(reference)

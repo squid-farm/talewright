@@ -397,7 +397,7 @@ internal static class InlineParser
         {
             if (!context.AllowImages)
             {
-                context.Diagnostics.Error("TW1014",
+                context.Diagnostics.Error(CompilerDiagnosticCodes.InvalidImageCall,
                     "Image alt text cannot contain {image(...)}. Write the description as text.",
                     context.Source.Locate(open));
             }
@@ -438,7 +438,7 @@ internal static class InlineParser
         else
             ExpressionParser.ReportStringErrors(expressionTokens, offset => context.Source.Locate(errorStart + offset),
                 context.Diagnostics);
-        context.Diagnostics.Error("TW1004", "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(open));
+        context.Diagnostics.Error(CompilerDiagnosticCodes.UnclosedInlineConstruct, "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(open));
     }
 
     private static Piece? ParseConstruct(Context context, string text, int open, int close)
@@ -450,7 +450,7 @@ internal static class InlineParser
         {
             if (!context.AllowImages)
             {
-                context.Diagnostics.Error("TW1014",
+                context.Diagnostics.Error(CompilerDiagnosticCodes.InvalidImageCall,
                     "Image alt text cannot contain {image(...)}. Write the description as text.",
                     context.Source.Locate(open));
                 return null;
@@ -651,7 +651,7 @@ internal static class InlineParser
                 token.Kind = TokenKind.FormatDelimiter;
                 if (depthReported) continue;
 
-                context.Diagnostics.Error("TW1016",
+                context.Diagnostics.Error(CompilerDiagnosticCodes.NestingLimitExceeded,
                     $"Formatting spans are nested more than {MaximumFormattingDepth} levels deep.",
                     context.Source.Locate(token.Start));
                 depthReported = true;
@@ -789,7 +789,7 @@ internal static class InlineParser
                     {
                         var replacement =
                             $"{{image({ImageSyntax.Quote(token.LegacyPath!)}, {ImageSyntax.Quote(token.LegacyAlt!)})}}";
-                        context.Diagnostics.Error("TW1015",
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.LegacyImageSyntax,
                             $"Markdown images are no longer supported. Use {replacement} instead.",
                             context.Source.Locate(token.Start));
                     }
@@ -868,7 +868,7 @@ internal static class InlineParser
 
                     if (frames.Count == MaximumInlineConditionDepth)
                     {
-                        context.Diagnostics.Error("TW1016",
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.NestingLimitExceeded,
                             $"Conditions are nested more than {MaximumInlineConditionDepth} levels deep.", open.StartLocation);
                         suppressedDepth = 1;
                         suppressedLocation = open.Location;
@@ -880,11 +880,11 @@ internal static class InlineParser
                 case ElsePiece alternative when suppressedDepth == 0:
                     if (!frames.TryPeek(out var frame))
                     {
-                        context.Diagnostics.Error("TW1005", "{else} without an {if} in the same paragraph and formatting.", alternative.Location);
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{else} without an {if} in the same paragraph and formatting.", alternative.Location);
                     }
                     else if (frame.InElse)
                     {
-                        context.Diagnostics.Error("TW1005", "A second {else} in the same {if}.", alternative.Location);
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "A second {else} in the same {if}.", alternative.Location);
                         frames.Pop();
                         Close(frame);
                     }
@@ -904,7 +904,7 @@ internal static class InlineParser
                     }
                     else
                     {
-                        context.Diagnostics.Error("TW1005", "{/if} without an {if} in the same paragraph and formatting.", end.Location);
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{/if} without an {if} in the same paragraph and formatting.", end.Location);
                     }
                     break;
             }
@@ -912,13 +912,13 @@ internal static class InlineParser
 
         if (suppressedDepth > 0)
         {
-            context.Diagnostics.Error("TW1005",
+            context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
                 "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.",
                 suppressedLocation);
         }
         while (frames.TryPop(out var unclosed))
         {
-            context.Diagnostics.Error("TW1005",
+            context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
                 "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.",
                 unclosed.Open.Location);
         }

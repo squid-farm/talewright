@@ -136,7 +136,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
-            error.WriteLine($"TWCLI002: Publication failed: {ex.Message}");
+            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
             return 2;
         }
 
@@ -199,7 +199,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or Win32Exception)
         {
-            error.WriteLine($"TWCLI002: Publication failed: {ex.Message}");
+            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
             return 2;
         }
         finally
@@ -405,7 +405,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or Win32Exception)
         {
-            error.WriteLine($"TWCLI002: Publication failed: {ex.Message}");
+            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
             return 2;
         }
         finally
