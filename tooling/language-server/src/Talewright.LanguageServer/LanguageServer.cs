@@ -74,7 +74,8 @@ public sealed class LanguageServer
     private const int DiagnosticLimit = 200;
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
         Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown,
-        bool documentChangesSupported, bool createFileOperationSupported)
+        bool documentChangesSupported, bool createFileOperationSupported,
+        IReadOnlyDictionary<string, int> documentVersions)
     {
         public JsonElement Id { get; } = id;
         public string Key { get; } = key;
@@ -91,6 +92,7 @@ public sealed class LanguageServer
         public bool Markdown { get; } = markdown;
         public bool DocumentChangesSupported { get; } = documentChangesSupported;
         public bool CreateFileOperationSupported { get; } = createFileOperationSupported;
+        public IReadOnlyDictionary<string, int> DocumentVersions { get; } = documentVersions;
         public CancellationTokenSource Cancellation { get; } = new();
     }
 
@@ -416,9 +418,12 @@ public sealed class LanguageServer
             Feature.CodeActions => "textDocument/codeAction",
             _ => $"textDocument/{feature.ToLowerInvariant()}"
         };
+        var documentVersions = _documents
+            .Where(pair => PathComparer.Equals(pair.Value.Root, document.Root))
+            .ToDictionary(pair => Relative(document.Root, pair.Key), pair => pair.Value.Version, PathComparer);
         var request = new PendingRequest(id, key, method,
             path, document, story, kind, position, end, _hoverMarkdown,
-            _documentChangesSupported, _createFileOperationSupported);
+            _documentChangesSupported, _createFileOperationSupported, documentVersions);
         _requests.Add(key, request);
         var previous = (kind is Feature.Hover or Feature.Definition) &&
             story.PublishedAnalysis is { } published &&
@@ -488,17 +493,29 @@ public sealed class LanguageServer
         if (request.Feature == Feature.CodeActions)
         {
             var diagnostics = analysis.Diagnostics.Where(diagnostic =>
-                diagnostic.Code == "TW2002" && diagnostic.Location.File == position.File &&
+                (diagnostic.Code is "TW2002" or "TW2004") && diagnostic.Location.File == position.File &&
                 Compare(position, diagnostic.Location) <= 0 && Compare(diagnostic.Location, request.End) <= 0);
             var lines = new LineMap(request.Text);
-            var actions = diagnostics.SelectMany(diagnostic =>
-                StoryQuickFixes.ForMissingScene(analysis, diagnostic)
-                    .Where(fix => fix.Kind != StoryQuickFixKind.CreateFile ||
-                        request.CreateFileOperationSupported &&
-                        !File.Exists(Path.GetFullPath(fix.File, request.Root)) &&
-                        !Directory.Exists(Path.GetFullPath(fix.File, request.Root)))
-                    .Select(fix => ToCodeAction(fix, diagnostic, request, lines))).ToArray();
-            return new(actions, previous);
+            var actions = new List<object>();
+            foreach (var diagnostic in diagnostics)
+            {
+                if (diagnostic.Code == "TW2002")
+                {
+                    actions.AddRange(StoryQuickFixes.ForMissingScene(analysis, diagnostic)
+                        .Where(fix => fix.Kind != StoryQuickFixKind.CreateFile ||
+                            request.CreateFileOperationSupported &&
+                            !File.Exists(Path.GetFullPath(fix.File, request.Root)) &&
+                            !Directory.Exists(Path.GetFullPath(fix.File, request.Root)))
+                        .Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
+                    continue;
+                }
+
+                var result = StoryQuickFixes.ForMissingFlag(analysis, diagnostic);
+                actions.AddRange(result.Fixes.Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
+                if (result.DisabledReason is { } reason)
+                    actions.Add(ToDisabledCodeAction(result.Title ?? "Declare missing flag", reason, diagnostic, lines));
+            }
+            return new(actions.ToArray(), previous);
         }
         if (request.Feature == Feature.InlayHints)
         {
@@ -563,13 +580,17 @@ public sealed class LanguageServer
         }, previous);
     }
 
-    private static object ToCodeAction(StoryQuickFix fix, Diagnostic diagnostic, PendingRequest request, LineMap lines)
+    private static object ToCodeAction(StoryQuickFix fix, Diagnostic diagnostic, PendingRequest request,
+        StoryAnalysis analysis, LineMap diagnosticLines)
     {
         var file = Path.GetFullPath(fix.File, request.Root);
         var uri = UriFromPath(file);
-        var diagnosticItem = ToDiagnostic(diagnostic, lines);
-        var start = lines.Position(fix.Range.Start);
-        var end = lines.Position(fix.Range.End);
+        var diagnosticItem = ToDiagnostic(diagnostic, diagnosticLines);
+        var editLines = analysis.Source.Files.TryGetValue(fix.File, out var sourceText)
+            ? new LineMap(sourceText)
+            : diagnosticLines;
+        var start = editLines.Position(fix.Range.Start);
+        var end = editLines.Position(fix.Range.End);
         var edit = new
         {
             range = new
@@ -606,7 +627,13 @@ public sealed class LanguageServer
                 {
                     new
                     {
-                        textDocument = new { uri, version = (int?)request.Version },
+                        textDocument = new
+                        {
+                            uri,
+                            version = request.DocumentVersions.TryGetValue(fix.File, out var version)
+                                ? (int?)version
+                                : null
+                        },
                         edits = new[] { edit }
                     }
                 }
@@ -623,6 +650,14 @@ public sealed class LanguageServer
             edit = workspaceEdit
         };
     }
+
+    private static object ToDisabledCodeAction(string title, string reason, Diagnostic diagnostic, LineMap lines) => new
+    {
+        title,
+        kind = "quickfix",
+        diagnostics = new[] { ToDiagnostic(diagnostic, lines) },
+        disabled = new { reason }
+    };
 
     private async Task CompleteRequestAsync(RequestFinished finished, CancellationToken cancellationToken)
     {

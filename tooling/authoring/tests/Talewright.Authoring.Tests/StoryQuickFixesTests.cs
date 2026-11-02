@@ -7,6 +7,119 @@ namespace Talewright.Authoring.Tests;
 
 public sealed class StoryQuickFixesTests
 {
+    [Theory]
+    [InlineData(
+        "game:\n  id: quick-fix\n  title: Quick Fix\n  version: 1\n  start: start\ncharacters:\n  player: {first-name: Ada}\n",
+        "\nflags:\n  - missing\n")]
+    [InlineData(
+        "game:\n  id: quick-fix\n  title: Quick Fix\n  version: 1\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n",
+        ", missing")]
+    public void Missing_flag_adds_a_declaration_to_the_root_manifest(string manifest, string newText)
+    {
+        var analysis = AnalyzeFlag(manifest, "=== start\n{if flag:missing}Never.{/if}\n-> END\n");
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var result = StoryQuickFixes.ForMissingFlag(analysis, diagnostic);
+
+        var fix = Assert.Single(result.Fixes);
+        Assert.Null(result.DisabledReason);
+        Assert.Equal("Declare flag 'missing'", fix.Title);
+        Assert.Equal(StoryQuickFixKind.TextEdit, fix.Kind);
+        Assert.Equal(StorySource.ManifestFileName, fix.File);
+        Assert.Equal(newText, fix.NewText);
+        Assert.Equal(fix.Range.Start, fix.Range.End);
+    }
+
+    [Fact]
+    public void Missing_flag_appends_to_a_block_list_without_rewriting_comments_or_crlf()
+    {
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\nflags:\r\n  # keep this comment\r\n  - ready # keep this too\r\nitems: {}\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
+        var analysis = AnalyzeFlag(manifest, "=== start\r\n{if flag:missing}Never.{/if}\r\n-> END\r\n");
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var result = StoryQuickFixes.ForMissingFlag(analysis, diagnostic);
+        var fix = Assert.Single(result.Fixes);
+
+        Assert.Equal("  - missing\r\n", fix.NewText);
+        Assert.Equal(new SourceLocation(StorySource.ManifestFileName, 8, 1), fix.Range.Start);
+        Assert.Equal(fix.Range.Start, fix.Range.End);
+    }
+
+    [Fact]
+    public void Missing_flag_section_preserves_a_missing_final_newline()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}";
+        var analysis = AnalyzeFlag(manifest, "=== start\n{if flag:missing}Never.{/if}\n-> END\n");
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingFlag(analysis, diagnostic).Fixes);
+
+        Assert.Equal("\n\nflags:\n  - missing", fix.NewText);
+    }
+
+    [Theory]
+    [InlineData("game: {id: x}\n", "true", "\nflags:\n  - 'true'\n")]
+    [InlineData("flags: []\n", "false", "'false'")]
+    [InlineData("flags: [ready]\n", "Null", ", 'Null'")]
+    [InlineData("flags:\n  - ready\n", "yes", "  - yes\n")]
+    [InlineData("flags: [ready]\n", "true-ish", ", true-ish")]
+    public void Yaml_keyword_spellings_are_quoted_in_every_list_shape(string manifest, string item, string newText)
+    {
+        var result = ManifestListEditor.Append(manifest, StorySource.ManifestFileName, "flags", item);
+
+        Assert.Null(result.Reason);
+        Assert.Equal(newText, result.Edit!.NewText);
+    }
+
+    [Fact]
+    public void Applying_a_reserved_flag_fix_declares_it_as_a_string()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\nflags: []\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n{if flag:true}Never.{/if}\n-> END\n";
+        var analysis = AnalyzeFlag(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingFlag(analysis, diagnostic).Fixes);
+        var edited = AnalyzeFlag(ApplyInsertion(manifest, fix), story);
+
+        Assert.Contains("flags: ['true']", ApplyInsertion(manifest, fix));
+        Assert.Empty(edited.Diagnostics);
+    }
+
+    [Fact]
+    public void Malformed_yaml_is_not_edited_and_returns_a_reason()
+    {
+        var result = ManifestListEditor.Append("flags: [unfinished", StorySource.ManifestFileName, "flags", "missing");
+
+        Assert.Null(result.Edit);
+        Assert.Contains("invalid YAML", result.Reason);
+    }
+
+    [Theory]
+    [InlineData("flags: not-a-list")]
+    [InlineData("flags: [invalid value]")]
+    public void Unsupported_flag_sections_return_a_disabled_reason(string flags)
+    {
+        var manifest = $"game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n{flags}\ncharacters:\n  player: {{first-name: Ada}}\n";
+        var analysis = AnalyzeFlag(manifest, "=== start\n{if flag:missing}Never.{{/if}}\n-> END\n");
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var result = StoryQuickFixes.ForMissingFlag(analysis, diagnostic);
+
+        Assert.Empty(result.Fixes);
+        Assert.NotNull(result.DisabledReason);
+    }
+
+    [Fact]
+    public void An_effect_declared_flag_does_not_get_a_declaration_fix()
+    {
+        var analysis = AnalyzeFlag(
+            "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n",
+            "=== start\n~ set flag:missing\n{if flag:missing}Seen.{/if}\n-> END\n");
+
+        Assert.DoesNotContain(analysis.Diagnostics, item => item.Code == "TW2004");
+    }
+
     [Fact]
     public void Missing_scene_offers_append_and_new_file_actions()
     {
@@ -93,4 +206,19 @@ public sealed class StoryQuickFixesTests
         foreach (var (additionalFile, additionalText) in additionalFiles) files.Add(additionalFile, additionalText);
         return StoryAnalyzer.Analyze(new StorySource(files));
     }
+
+    private static string ApplyInsertion(string text, StoryQuickFix fix)
+    {
+        Assert.Equal(fix.Range.Start, fix.Range.End);
+        var lines = text.Split('\n');
+        var offset = lines.Take(fix.Range.Start.Line - 1).Sum(line => line.Length + 1) + fix.Range.Start.Column - 1;
+        return text.Insert(offset, fix.NewText);
+    }
+
+    private static StoryAnalysis AnalyzeFlag(string manifest, string text) =>
+        StoryAnalyzer.Analyze(new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = text
+        }));
 }

@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Authoring;
@@ -7,10 +8,42 @@ namespace Talewright.Authoring;
 public enum StoryQuickFixKind { TextEdit, CreateFile }
 
 public sealed record StoryQuickFix(string Title, StoryQuickFixKind Kind, string File, SourceRange Range, string NewText);
+public sealed record StoryQuickFixResult(
+    IReadOnlyList<StoryQuickFix> Fixes,
+    string? DisabledReason = null,
+    string? Title = null);
 
 /// <summary>Creates source-aware quick fixes for common Talemark compiler diagnostics.</summary>
 public static class StoryQuickFixes
 {
+    public static StoryQuickFixResult ForMissingFlag(StoryAnalysis analysis, Diagnostic diagnostic)
+    {
+        if (diagnostic.Code != "TW2004" ||
+            !diagnostic.Location.File.EndsWith(".tale", StringComparison.OrdinalIgnoreCase))
+            return new([]);
+
+        var flag = analysis.CompletionSitesAt(diagnostic.Location)
+            .FirstOrDefault(site => site.Range.Start == diagnostic.Location &&
+                site.Kinds.Contains(AuthoringSymbolKind.Flag) &&
+                IdentifierRules.IsValid(site.Text))?.Text;
+        if (flag is null || analysis.Symbols.Any(symbol =>
+                symbol.Kind == AuthoringSymbolKind.Flag && symbol.Name == flag))
+            return new([]);
+
+        var title = $"Declare flag '{flag}'";
+        if (!analysis.Source.Files.TryGetValue(StorySource.ManifestFileName, out var manifest))
+            return new([], $"Cannot declare '{flag}' because the root story manifest is unavailable.", title);
+
+        var edit = ManifestListEditor.Append(manifest, StorySource.ManifestFileName, "flags", flag);
+        if (edit.Edit is not { } textEdit)
+            return new([], edit.Reason ?? $"Cannot safely declare '{flag}' in the root story manifest.", title);
+
+        return new([
+            new(title, StoryQuickFixKind.TextEdit, StorySource.ManifestFileName,
+                textEdit.Range, textEdit.NewText)
+        ], Title: title);
+    }
+
     public static IReadOnlyList<StoryQuickFix> ForMissingScene(StoryAnalysis analysis, Diagnostic diagnostic)
     {
         if (diagnostic.Code != "TW2002" ||
