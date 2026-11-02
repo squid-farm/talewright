@@ -57,9 +57,10 @@ public sealed class ImageAltTemplateTests
             === gate
             {image("portrait", "{guide:first-name} at the {var:place} gate")}
             > guide: {image("portrait", "{if flag:met}{guide:first-name}{else}a stranger{/if}")}
+            {image("portrait", "**The guide**")}
             * [Enter {image("portrait", "**{guide:first-name}**")}] -> END
             """);
-        Assert.Equal(["Bea at the South gate", "a stranger"], Alts(story));
+        Assert.Equal(["Bea at the South gate", "a stranger", "The guide"], Alts(story));
         var scene = story.GetScene(new SceneId("gate"));
         var speech = Assert.IsType<SpeechTemplate>(CompilerTests.Templates(scene)[1]);
         var speechAlt = Assert.IsType<MediaTemplate>(Assert.Single(speech.Inlines)).AltTemplate;
@@ -80,9 +81,10 @@ public sealed class ImageAltTemplateTests
             === gate
             {image("portrait", "\{guide:first-name\} meets {guide:first-name}")}
             {image("portrait", "Say \"{guide:first-name}\" and \\")}
+            {image("portrait", "a \* \_ \` \[door\] b")}
             -> END
             """);
-        Assert.Equal(["{guide:first-name} meets Bea", "Say \"Bea\" and \\"], Alts(story));
+        Assert.Equal(["{guide:first-name} meets Bea", "Say \"Bea\" and \\", "a * _ ` [door] b"], Alts(story));
     }
 
     [Theory]

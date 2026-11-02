@@ -49,7 +49,8 @@ Write a reusable engine for tabletop-style text RPGs and visual novels in which:
 | GoRogue / RogueSharp | Roguelike grids/maps, not narrative |
 
 Reusable pieces:
-- **Markdig** (MIT, C#): extensible Markdown parser, the base for `.tale`.
+- **Talemark reader-text parser:** the bounded inline grammar defined in the
+  [reader-text reference](../reference/talemark-operators.md#reader-text-grammar).
 - **YamlDotNet**: `story.talewright.yaml` and front matter.
 - **Photino.Blazor** (v4.x): cross-platform desktop host.
 - **NRules** was considered and **rejected for the core**. It compiles expression trees at runtime, which is slow under WASM interpretation and adds a heavy dependency. A small custom typed predicate evaluator is simpler and faster for storylet selection.
@@ -113,7 +114,7 @@ for actual project references, public contracts, and implemented types.
  └──────────────┘   └───────────────┘   └──────────────────────┘
         ▲ compiled from
  ┌──────┴────────────────────────────────────┐
- │ Talewright.Talemark compiler (.tale + yaml)   │  Markdig + YamlDotNet → typed StoryDefinition + diagnostics
+ │ Talewright.Talemark compiler (.tale + yaml)   │  Talemark reader text + YamlDotNet → typed StoryDefinition + diagnostics
  └───────────────────────────────────────────┘
 ```
 
@@ -158,7 +159,7 @@ for actual project references, public contracts, and implemented types.
 - **Grammar provider seam:** the `IGrammar` interface ships with English first, which keeps localization possible later.
 
 ### 4.5 Talemark compiler (`Talewright.Talemark`)
-- Markdig pipeline plus custom extensions, YAML front matter and `story.talewright.yaml`.
+- Talemark reader-text parser, line directives, inline constructs and `story.talewright.yaml`.
 - **Validation against the schema:** every path and name, stat type and comparison type, every divert target and every item/faction id is checked. Unreachable or dead-end scenes produce warnings.
 - **Diagnostics** carry file, line, column, code and message. Shared diagnostics feed CLI validation/lint, MSBuild, and the VS Code language server (M3, shipped).
 - Output: an immutable typed `StoryDefinition`, which can be serialized to a compact bundle for publishing later.
@@ -251,7 +252,7 @@ src/
   Talewright.Rules/             predicates, evaluator, storylets, modifiers, triggers, skill checks
   Talewright.Narrative/         template AST, document model, renderer, grammar/pronouns
   Talewright.Rulesets.Generic/  default d20-ish attributes & skills (opt-out)
-  Talewright.Talemark/              .tale + story.talewright.yaml compiler (Markdig, YamlDotNet), diagnostics
+  Talewright.Talemark/              .tale + story.talewright.yaml compiler (reader-text parser, YamlDotNet), diagnostics
   Talewright.Runtime/           IStorySession facade, command handling, frame production
   Talewright.Player/            Razor Class Library (UI)
   Talewright.Host.Desktop/      Photino.Blazor host
@@ -267,7 +268,7 @@ samples/
 The authoritative spec is the [Talemark syntax reference](../reference/talemark-syntax.md). Summary:
 - A story is a folder: `story.talewright.yaml` (schema, characters, factions, items, triggers) + `*.tale` files.
 - A `.tale` file holds many scenes (`=== scene.id` + `@title/@requires/@tags/@priority/@once/@hub` metadata).
-- Prose is inline Markdown with `{player:first-name#possessive}` substitutions and `{if}/{else}/{/if}` conditionals.
+- Prose uses Talemark reader text with `{player:first-name#possessive}` substitutions and `{if}/{else}/{/if}` conditionals.
 - `> who: text` speaker lines, `~ effect` lines, `* [label] (requires: expr) { effects } -> target` choices, `-> target` diverts.
 - `skill-check` on a choice or as a `::: skill-check` block.
 
@@ -382,7 +383,7 @@ GitHub instead of recreating a local board.
 | rules-skill-checks | Skill-check resolution via ruleset + RNG, per-story randomness config | rules-predicates, core-rng, ruleset-generic | done |
 | narrative-model | Template AST + RenderedDocument model (incl. MediaPlaceholder) | solution-skeleton | done |
 | narrative-renderer | Renderer: substitutions, conditionals, modifier pipeline, English grammar (possessive, a/an, capitalize), pronoun sets | narrative-model, rules-predicates | done |
-| tale-compiler | Markdig + YAML front matter + story.talewright.yaml → StoryDefinition; v0 directives; diagnostics with line/col; schema validation | narrative-model, rules-storylets, rules-skill-checks, ruleset-generic | done |
+| tale-compiler | Talemark reader-text parser + YAML manifest → StoryDefinition; v0 directives; diagnostics with line/col; schema validation | narrative-model, rules-storylets, rules-skill-checks, ruleset-generic | done |
 | runtime-session | IStorySession: commands → events → triggers → selection → render → StoryFrame | tale-compiler, narrative-renderer, rules-modifiers-triggers | done |
 | player-rcl | Blazor RCL: transcript, choices, ruleset-driven character sheet, theme | runtime-session | done |
 | host-desktop | Photino.Blazor host: open story folder/zip | player-rcl | done |

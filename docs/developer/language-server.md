@@ -80,8 +80,8 @@ is cancelled when superseded and checks for cancellation between files and
 scenes and periodically while processing buffered prose, nested scene steps,
 hub offers, and reachability graphs. A newer analysis for that story waits only
 for the cancelled run to unwind. Superseded results do not publish diagnostics.
-Cancellation is cooperative: a single expression, or a Markdown inline
-construct being processed by Markdig, can finish before the next checkpoint.
+Cancellation is cooperative: a single expression or inline construct can
+finish before the next checkpoint.
 
 Hover and definition may use the last published analysis when the requested
 document's text is unchanged. Cross-file semantic information may therefore be

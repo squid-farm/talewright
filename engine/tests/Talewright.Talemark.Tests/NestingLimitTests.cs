@@ -145,15 +145,28 @@ public sealed class NestingLimitTests
         Assert.True(diagnostic.Location.Line == 2);
     }
 
-    [Fact]
-    public void Markdig_nesting_failure_becomes_a_located_diagnostic()
+    [Theory]
+    [InlineData(64, true)]
+    [InlineData(65, false)]
+    [InlineData(66, false)]
+    [InlineData(1_000, false)]
+    public void Formatting_observes_the_depth_limit(int depth, bool expectedSuccess)
     {
-        var opens = new string('[', 15_000);
-        var closes = new string(']', 15_000);
-        var result = Compile($"=== start\nordinary {opens}middle{closes}\n-> END");
-        var diagnostic = Assert.Single(result.Diagnostics, item => item.Code == "TW1016");
+        var inline = string.Concat(Enumerable.Repeat("*word ", depth)) + "middle " +
+            string.Concat(Enumerable.Repeat("word* ", depth));
+        var result = Compile($"=== start\n{inline}\n-> END");
 
-        Assert.Equal("Markdown is nested too deeply for safe parsing.", diagnostic.Message);
-        Assert.Equal(new SourceLocation("main.tale", 2, 1), diagnostic.Location);
+        Assert.True(expectedSuccess == result.Success, string.Join("\n", result.Diagnostics));
+        if (expectedSuccess)
+        {
+            Assert.DoesNotContain(result.Diagnostics, item => item.Code == "TW1016");
+        }
+        else
+        {
+            var diagnostic = Assert.Single(result.Diagnostics, item => item.Code == "TW1016");
+            Assert.Equal("Formatting spans are nested more than 64 levels deep.", diagnostic.Message);
+            Assert.Equal(new SourceLocation("main.tale", 2, 64 * 6 + 1), diagnostic.Location);
+            Assert.DoesNotContain(result.Diagnostics, item => item.Code == "TW1005");
+        }
     }
 }

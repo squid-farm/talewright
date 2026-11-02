@@ -255,7 +255,7 @@ public class CompilerTests
     }
 
     [Fact]
-    public void Renders_markdown_substitutions_and_grammar()
+    public void Renders_reader_text_substitutions_and_formatting()
     {
         var story = Ok("""
             === a

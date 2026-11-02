@@ -92,7 +92,7 @@ internal static class ImageSyntax
 
             var quote = i;
             var offsets = new List<int>();
-            var literal = QuotedStringSyntax.Read(text, i, end, offsets);
+            var literal = QuotedStringSyntax.Read(text, i, end, offsets, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             i = literal.End;
             if (literal.Error == QuotedStringSyntax.InvalidEscape)
@@ -144,22 +144,19 @@ internal static class ImageSyntax
                     locations.Add(source.Locate(i));
                     decoded = plain.ToString();
                     var authored = templateText.ToString();
-                    if (HasTemplate(authored, cancellationToken))
-                    {
-                        var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics,
-                            allowImages: false, cancellationToken: cancellationToken);
-                        if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
-                    }
+                    var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics,
+                        allowImages: false, cancellationToken: cancellationToken);
+                    if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
 
                     return true;
                 }
 
                 if (c == '\\')
                 {
-                    if (i + 1 >= end || text[i + 1] is not ('"' or '\\' or '{' or '}'))
+                    if (i + 1 >= end || text[i + 1] is not ('"' or '\\' or '{' or '}' or '[' or ']' or '*' or '_' or '`'))
                     {
                         AnalyzePartial(trimTrailingCall: false);
-                        Error("Unknown image string escape. Use '\\\"' for a quote, '\\\\' for a backslash, or '\\{' and '\\}' for literal braces in alt text.", i);
+                        Error("Unknown image string escape. Use '\\\"', '\\\\', or a reader-text escape such as '\\{' or '\\*'.", i);
                         return false;
                     }
 

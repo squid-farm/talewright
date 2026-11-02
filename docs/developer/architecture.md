@@ -305,8 +305,8 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     deserialisation, for trimming and precise error locations).
   - `TaleParser`: line-based parser for `.tale` structure: `=== scene` headers, `@directives`, `~ effects`,
     `* choices`, `-> diverts`, `::: skill-check` blocks, `{if}` blocks, speech lines, paragraphs.
-  - `InlineParser`: prose → inline template AST. Masks `{…}` substitutions, lets Markdig parse emphasis, then
-    restores the substitutions. Only the paragraph parser is enabled so `#`, `>`, lists etc. are not reinterpreted.
+  - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes
+    constructs, escapes, code spans and bounded formatting directly; unsupported Markdown remains literal.
   - `ExpressionParser` + `Lexer`: recursive-descent parser for conditions, numbers, substitutions and effects,
     with type checking (TW2xxx).
   - `StorySymbols`: what's declared (stats, characters, items, factions, flags, vars, scenes), for resolving

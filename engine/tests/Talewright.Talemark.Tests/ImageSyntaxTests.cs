@@ -195,13 +195,34 @@ public sealed class ImageSyntaxTests
     [InlineData("![The camp](camp)", """{image("camp", "The camp")}""")]
     [InlineData("![Joel's camp](maps/camp)", """{image("maps/camp", "Joel's camp")}""")]
     [InlineData("""![A "quote"](camp)""", """{image("camp", "A \"quote\"")}""")]
-    [InlineData("![{player:first-name}'s camp](camp)", """{image("camp", "{player:first-name}'s camp")}""")]
     public void Markdown_images_name_the_escaped_replacement(string old, string replacement)
     {
         var result = Compile("=== start\n" + old + "\n-> END");
         var error = Assert.Single(result.Errors, error => error.Code == "TW1015");
         Assert.Equal(new SourceLocation("main.tale", 2, 1), error.Location);
         Assert.Contains(replacement, error.Message);
+    }
+
+    [Fact]
+    public void Markdown_image_with_an_inline_construct_is_literal_not_a_legacy_image_candidate()
+    {
+        var result = Compile("=== start\n![{player:first-name}'s camp](camp)\n-> END");
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, error => error.Code == "TW1015");
+    }
+
+    [Theory]
+    [InlineData("![a [b]](p)")]
+    [InlineData(@"![a\]](p)")]
+    [InlineData("![a](p(q))")]
+    [InlineData("![a](p q)")]
+    public void Malformed_markdown_image_candidates_remain_literal(string candidate)
+    {
+        var result = Compile($"=== start\n{candidate}\n-> END");
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, error => error.Code == "TW1015");
     }
 
     [Fact]
