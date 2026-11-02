@@ -85,38 +85,15 @@ public sealed class AnalysisCancellationTests
         Assert.InRange(lookups, 1, 64);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Markdown_stops_during_block_and_inline_line_processing(bool inline)
+    [Fact]
+    public void Reader_text_parser_stops_before_scanning_when_token_is_cancelled()
     {
         using var cancellation = new CancellationTokenSource();
-        var visits = 0;
-        void CancelOnFirstLine()
-        {
-            if (++visits == 1) cancellation.Cancel();
-        }
+        cancellation.Cancel();
+        var source = SourceText.Single(new string('x', 4096), new("main.tale", 1, 1));
 
-        var context = new InlineParser.MarkdownCancellationContext(cancellation.Token,
-            onBlockLine: inline ? null : CancelOnFirstLine,
-            onInlineLine: inline ? CancelOnFirstLine : null);
-        var text = string.Join('\n', Enumerable.Repeat("ordinary *prose*.", 512));
-
-        Assert.Throws<OperationCanceledException>(() => InlineParser.ParseMarkdown(text, context));
-        Assert.InRange(visits, 1, 64);
-    }
-
-    [Theory]
-    [InlineData("First line\nsecond *emphasis*.")]
-    [InlineData("**Strong\nacross lines** and `code\nspan`.")]
-    [InlineData("Hard break  \nnext line and [link](https://example.test).")]
-    public void Cancellable_markdown_pipeline_preserves_uncancelled_output(string text)
-    {
-        using var cancellation = new CancellationTokenSource();
-        var normal = InlineParser.ParseMarkdown(text, null);
-        var cancellable = InlineParser.ParseMarkdown(text, new(cancellation.Token));
-
-        Assert.Equal(Markdig.Markdown.ToHtml(normal), Markdig.Markdown.ToHtml(cancellable));
+        Assert.Throws<OperationCanceledException>(() =>
+            InlineParser.ParseWithWork(source, Symbols(), new DiagnosticBag(), cancellationToken: cancellation.Token));
     }
 
     [Fact]

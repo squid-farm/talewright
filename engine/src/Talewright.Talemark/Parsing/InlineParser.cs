@@ -1,14 +1,8 @@
 using System.Text;
-using Markdig;
-using Markdig.Helpers;
-using Markdig.Parsers;
-using Markdig.Parsers.Inlines;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
-using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -34,12 +28,10 @@ internal sealed class SourceText
         _locations = locations;
     }
 
-    /// <summary>The paragraph text, built once after the last append.</summary>
     public string Text => _frozen ??= _text.ToString();
 
     public bool IsEmpty => _text.Length == 0;
 
-    /// <summary>Line-map comparisons made by <see cref="Locate"/>; lets tests prove lookups stay logarithmic.</summary>
     internal long Probes { get; private set; }
 
     public void AppendLine(string line, SourceLocation location)
@@ -98,114 +90,48 @@ internal sealed class SourceText
     }
 }
 
-/// <summary>
-/// Turns one paragraph (or choice label, or speech line) of prose into <see cref="TemplateInline"/>s.
-/// </summary>
-/// <remarks>
-/// <para>
-/// Strategy: every balanced <c>{…}</c> is swapped for a private-use placeholder (<c>U+E000 n U+E001</c>) so
-/// Markdig never sees our syntax, Markdig parses the inline Markdown (emphasis, code, line breaks, images),
-/// and then the walker splits text runs on the placeholders and swaps the parsed substitutions or
-/// <c>{if}</c>/<c>{else}</c>/<c>{/if}</c> markers back in.
-/// </para>
-/// <para>
-/// Inline conditionals are folded per formatting container, so <c>*{if x}a*{/if}</c> (a conditional that
-/// crosses an emphasis boundary) is reported as an error rather than guessed at.
-/// </para>
-/// </remarks>
+internal sealed record InlineParseResult(IReadOnlyList<TemplateInline> Inlines, int WorkUnits);
+
+/// <summary>Parses Talemark reader text directly into its inline template tree.</summary>
 internal static class InlineParser
 {
-    private const char PlaceholderStart = '\uE000';
-    private const char PlaceholderEnd = '\uE001';
     private const int MaximumInlineConditionDepth = 64;
-    private const string MarkdigDepthLimitMessage =
-        "Markdown elements in the input are too deeply nested - depth limit exceeded. Input is most likely not sensible or is a very large table.";
+    private const int MaximumFormattingDepth = 64;
+    private const int CancellationInterval = 512;
 
-    private static readonly MarkdownPipeline Pipeline = BuildPipeline(cancellable: false);
-    private static readonly MarkdownPipeline CancellablePipeline = BuildPipeline(cancellable: true);
-
-    private static MarkdownPipeline BuildPipeline(bool cancellable)
+    private enum TokenKind
     {
-        var builder = new MarkdownPipelineBuilder();
-        builder.UsePreciseSourceLocation();
-
-        // Block structure is handled by TaleParser; Markdig only ever sees one paragraph.
-        builder.BlockParsers.RemoveAll(p => p is not ParagraphBlockParser);
-
-        // No raw HTML or autolinks in story text.
-        builder.InlineParsers.RemoveAll(p => p is AutolinkInlineParser);
-        if (cancellable)
-        {
-            // Markdig owns both line-processing passes, so its parser hooks must share the revision token.
-            builder.BlockParsers.RemoveAll(p => p is ParagraphBlockParser);
-            builder.BlockParsers.Add(new CancellableParagraphBlockParser());
-            builder.InlineParsers.RemoveAll(p => p is LineBreakInlineParser);
-            builder.InlineParsers.Add(new CancellableLineBreakInlineParser());
-        }
-        return builder.Build();
+        Text,
+        SoftBreak,
+        HardBreak,
+        Construct,
+        LegacyImage,
+        FormatDelimiter,
+        FormatOpen,
+        FormatClose,
+        CodeDelimiter,
+        CodeOpen,
+        CodeClose,
     }
 
-    internal sealed class MarkdownCancellationContext(
-        CancellationToken token, Action? onBlockLine = null, Action? onInlineLine = null) : MarkdownParserContext
+    private sealed class Token(TokenKind kind, int start, int length, string? text = null)
     {
-        private int _remaining = 64;
-
-        internal void CheckBlock()
-        {
-            onBlockLine?.Invoke();
-            Check();
-        }
-
-        internal void CheckInline()
-        {
-            onInlineLine?.Invoke();
-            Check();
-        }
-
-        internal void ThrowIfCancellationRequested() => token.ThrowIfCancellationRequested();
-
-        private void Check()
-        {
-            if (--_remaining != 0) return;
-            token.ThrowIfCancellationRequested();
-            _remaining = 64;
-        }
-    }
-
-    private sealed class CancellableParagraphBlockParser : ParagraphBlockParser
-    {
-        public override BlockState TryOpen(BlockProcessor processor)
-        {
-            MarkdownCancellation(processor.Context).CheckBlock();
-            return base.TryOpen(processor);
-        }
-
-        public override BlockState TryContinue(BlockProcessor processor, Block block)
-        {
-            MarkdownCancellation(processor.Context).CheckBlock();
-            return base.TryContinue(processor, block);
-        }
-    }
-
-    private sealed class CancellableLineBreakInlineParser : LineBreakInlineParser
-    {
-        public override bool Match(InlineProcessor processor, ref StringSlice slice)
-        {
-            MarkdownCancellation(processor.Context).CheckInline();
-            return base.Match(processor, ref slice);
-        }
-    }
-
-    private static MarkdownCancellationContext MarkdownCancellation(MarkdownParserContext? context) =>
-        context as MarkdownCancellationContext
-        ?? throw new InvalidOperationException("Missing cancellation context for Markdown parsing.");
-
-    internal static MarkdownDocument ParseMarkdown(string text, MarkdownCancellationContext? cancellation)
-    {
-        cancellation?.ThrowIfCancellationRequested();
-        var document = Markdown.Parse(text, cancellation is null ? Pipeline : CancellablePipeline, cancellation);
-        cancellation?.ThrowIfCancellationRequested();
-        return document;
+        public TokenKind Kind { get; set; } = kind;
+        public int Start { get; } = start;
+        public int Length { get; } = length;
+        public int End => Start + Length;
+        public string? Text { get; set; } = text;
+        public string? LegacyAlt { get; set; }
+        public string? LegacyPath { get; set; }
+        public Piece? Piece { get; set; }
+        public int RunLength { get; set; }
+        public TextStyle Style { get; set; }
+        public bool CanOpen { get; set; }
+        public bool CanClose { get; set; }
+        public bool InCode { get; set; }
+        public int NextRun { get; set; } = -1;
+        public int Mate { get; set; } = -1;
+        public int TrimOffset { get; set; } = -1;
     }
 
     private abstract record Piece;
@@ -218,241 +144,356 @@ internal static class InlineParser
 
     private sealed record EndIfPiece(SourceLocation Location) : Piece;
 
-    private sealed class Context(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics, bool allowImages,
+    private sealed class Context(
+        SourceText source,
+        StorySymbols symbols,
+        DiagnosticBag diagnostics,
+        bool allowImages,
         CancellationToken cancellationToken)
     {
-        private int _remaining = 64;
+        private int _remaining = CancellationInterval;
 
         public SourceText Source { get; } = source;
         public StorySymbols Symbols { get; } = symbols;
         public DiagnosticBag Diagnostics { get; } = diagnostics;
-        public List<Piece?> Fragments { get; } = [];
-        // Map Markdig's masked offsets back to authored text for migration diagnostics.
-        public List<(int Offset, int Delta, int Start, int Length)> MaskedOffsets { get; } = [];
         public bool AllowImages { get; } = allowImages;
         public CancellationToken CancellationToken { get; } = cancellationToken;
+        public int WorkUnits { get; set; }
 
         public void Check()
         {
+            WorkUnits++;
             if (--_remaining != 0) return;
             CancellationToken.ThrowIfCancellationRequested();
-            _remaining = 64;
+            _remaining = CancellationInterval;
+        }
+
+        public void CheckCharacters(int count)
+        {
+            WorkUnits += count;
+            _remaining -= count;
+            if (_remaining > 0) return;
+            CancellationToken.ThrowIfCancellationRequested();
+            _remaining = CancellationInterval;
         }
     }
 
-    /// <summary>Parses prose. Errors are reported to <paramref name="diagnostics"/>; the result is still usable.</summary>
-    public static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
+    private sealed class FormattingFrame(TextStyle style)
+    {
+        public TextStyle Style { get; } = style;
+        public List<Piece> Pieces { get; } = [];
+        public int TrimStart { get; set; } = -1;
+        public int TrimEnd { get; set; } = -1;
+    }
+
+    internal static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
+        bool allowImages = true, CancellationToken cancellationToken = default) =>
+        ParseWithWork(source, symbols, diagnostics, allowImages, cancellationToken).Inlines;
+
+    internal static InlineParseResult ParseWithWork(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
         bool allowImages = true, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var context = new Context(source, symbols, diagnostics, allowImages, cancellationToken);
-        var masked = Mask(context);
-        var markdownCancellation = cancellationToken.CanBeCanceled ? new MarkdownCancellationContext(cancellationToken) : null;
-        MarkdownDocument document;
-        try
-        {
-            document = ParseMarkdown(masked, markdownCancellation);
-        }
-        catch (ArgumentException exception) when (exception.Message == MarkdigDepthLimitMessage)
-        {
-            diagnostics.Error("TW1016", "Markdown is nested too deeply for safe parsing.", source.Locate(0));
-            return [];
-        }
-
-        var pieces = new List<Piece>();
-        foreach (var block in document)
+        var text = source.Text;
+        var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
+        context.WorkUnits += scan.WorkUnits;
+        var bracePairs = new List<DelimiterPair>();
+        foreach (var pair in scan.Pairs)
         {
             context.Check();
-            if (block is ParagraphBlock { Inline: { } inline })
-            {
-                if (pieces.Count > 0)
-                {
-                    pieces.Add(new InlinePiece(new TextTemplate(" ")));
-                }
-
-                Walk(inline, pieces, context);
-            }
+            if (pair.Kind == DelimiterKind.Brace) bracePairs.Add(pair);
         }
-
-        var result = Fold(pieces, context);
+        var tokens = Tokenize(context, text, bracePairs);
+        PairCodeSpans(context, text, tokens);
+        PairFormatting(context, text, tokens);
+        var inlines = BuildTemplate(context, text, tokens);
         cancellationToken.ThrowIfCancellationRequested();
-        return result;
+        return new(inlines, context.WorkUnits);
     }
 
     internal static void AnalyzePartial(SourceText source, StorySymbols symbols, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        _ = Mask(new Context(source, symbols, new DiagnosticBag(), true, cancellationToken));
-        cancellationToken.ThrowIfCancellationRequested();
+        _ = ParseWithWork(source, symbols, new DiagnosticBag(), cancellationToken: cancellationToken);
     }
 
-    /// <summary>Replaces each balanced <c>{…}</c> with a placeholder and parses its contents.</summary>
-    private static string Mask(Context context)
+    public static int FindClosingBrace(string text, int open)
     {
-        var text = context.Source.Text;
-        var result = new StringBuilder(text.Length);
-        var i = 0;
-        var nextCancellationCheck = 0;
-        while (i < text.Length)
+        var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, open);
+        return scan.TryGetClose(open, out var close) ? close : -1;
+    }
+
+    private static List<Token> Tokenize(Context context, string text, IReadOnlyList<DelimiterPair> bracePairs)
+    {
+        var tokens = new List<Token>();
+        var textBuffer = new StringBuilder();
+        var textStart = -1;
+        var textEnd = -1;
+        var braceIndex = 0;
+
+        void AppendText(char value, int sourceStart, int sourceLength)
         {
-            if (i >= nextCancellationCheck)
+            if (textStart < 0) textStart = sourceStart;
+            textBuffer.Append(value);
+            textEnd = sourceStart + sourceLength;
+        }
+
+        void FlushText()
+        {
+            if (textBuffer.Length == 0) return;
+            tokens.Add(new(TokenKind.Text, textStart, textEnd - textStart, textBuffer.ToString()));
+            textBuffer.Clear();
+            textStart = -1;
+            textEnd = -1;
+        }
+
+        void AddToken(Token token)
+        {
+            FlushText();
+            tokens.Add(token);
+        }
+
+        var nextCancellationCheck = 0;
+        for (var index = 0; index < text.Length;)
+        {
+            if (index >= nextCancellationCheck)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
-                nextCancellationCheck = i + Math.Min(512, text.Length - i);
+                nextCancellationCheck = index + CancellationInterval;
             }
-            var c = text[i];
-            if (c == '\\' && i + 1 < text.Length && text[i + 1] is '{' or '}')
+
+            var current = text[index];
+            if (current == '\\' && index + 1 < text.Length)
             {
-                // Keep the escape for Markdig, which turns "\{" into a literal "{".
-                result.Append(c).Append(text[i + 1]);
-                i += 2;
+                var next = text[index + 1];
+                if (next == '\\' || next is '{' or '}' or '[' or ']' or '*' or '_' or '`')
+                {
+                    AppendText(next, index, 2);
+                    index += 2;
+                    context.CheckCharacters(2);
+                    continue;
+                }
+
+                if (next == '\n')
+                {
+                    AddToken(new(TokenKind.HardBreak, index, 2));
+                    index += 2;
+                    context.CheckCharacters(2);
+                    continue;
+                }
+
+                AppendText(current, index, 1);
+                index++;
+                context.CheckCharacters(1);
                 continue;
             }
 
-            if (c != '{')
+            if (current == '{')
             {
-                result.Append(c);
-                i++;
+                while (braceIndex < bracePairs.Count && bracePairs[braceIndex].OpenOffset < index)
+                {
+                    context.Check();
+                    braceIndex++;
+                }
+
+                if (braceIndex < bracePairs.Count && bracePairs[braceIndex].OpenOffset == index)
+                {
+                    var close = bracePairs[braceIndex++].CloseOffset;
+                    AddToken(new(TokenKind.Construct, index, close + 1 - index)
+                    {
+                        Piece = ParseConstruct(context, text, index, close),
+                    });
+                    index = close + 1;
+                    while (braceIndex < bracePairs.Count && bracePairs[braceIndex].OpenOffset < index)
+                    {
+                        context.Check();
+                        braceIndex++;
+                    }
+
+                    continue;
+                }
+
+                FlushText();
+                ParseUnclosedConstruct(context, text, index);
+                tokens.Add(new(TokenKind.Text, index, text.Length - index, text[index..]));
+                return tokens;
+            }
+
+            if (current == '!' && TryReadLegacyImage(context, text, index,
+                    out var imageEnd, out var alt, out var path))
+            {
+                AddToken(new(TokenKind.LegacyImage, index, imageEnd - index, text[index..imageEnd])
+                {
+                    LegacyAlt = alt,
+                    LegacyPath = path,
+                });
+                context.CheckCharacters(imageEnd - index);
+                index = imageEnd;
                 continue;
             }
 
-            var close = FindClosingBrace(text, i);
-            if (close < 0)
+            if (current == '\n')
             {
-                if (ImageSyntax.IsCall(text.AsSpan(i + 1)))
-                {
-                    if (!context.AllowImages)
-                    {
-                        context.Diagnostics.Error("TW1014",
-                            "Image alt text cannot contain {image(...)}. Write the description as text.",
-                            context.Source.Locate(i));
-                    }
-                    else
-                    {
-                        ImageSyntax.Parse(context.Source, i + 1, text.Length, false, context.Diagnostics,
-                            context.Symbols, context.CancellationToken);
-                    }
-
-                    break;
-                }
-
-                if (context.Symbols.Analysis is { } analysis)
-                {
-                    var incomplete = text[(i + 1)..];
-                    var lead = incomplete.Length - incomplete.TrimStart().Length;
-                    var condition = incomplete[lead..].StartsWith("if ", StringComparison.Ordinal);
-                    var offset = condition ? lead + 3 : 0;
-                    if (condition)
-                        analysis.Tokens.Add(new("if", new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 3 + lead))));
-                    var expressionStart = i + 1 + offset;
-                    analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
-                        incomplete[offset..], context.Source.Locate(expressionStart),
-                        position => context.Source.Locate(expressionStart + position));
-                }
-                ExpressionParser.ReportStringErrors(text[(i + 1)..],
-                    offset => context.Source.Locate(i + 1 + offset), context.Diagnostics);
-                context.Diagnostics.Error("TW1004", "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(i));
-                result.Append(text, i, text.Length - i);
-                break;
+                AddToken(new(TokenKind.SoftBreak, index, 1));
+                index++;
+                context.CheckCharacters(1);
+                continue;
             }
 
-            var inner = text[(i + 1)..close];
-            var location = context.Source.Locate(i + 1);
-            var image = ImageSyntax.IsCall(inner);
-            Piece? fragment;
-            if (image)
+            if (current is '*' or '_')
             {
-                if (!context.AllowImages)
+                var end = index + 1;
+                while (end < text.Length && text[end] == current)
                 {
-                    context.Diagnostics.Error("TW1014",
-                        "Image alt text cannot contain {image(...)}. Write the description as text.",
-                        context.Source.Locate(i));
-                    fragment = null;
+                    end++;
+                    context.CheckCharacters(1);
+                }
+                var length = end - index;
+                if (length <= 2)
+                {
+                    AddToken(new(TokenKind.FormatDelimiter, index, length)
+                    {
+                        RunLength = length,
+                        Style = current == '*'
+                            ? length == 1 ? TextStyle.Emphasis : TextStyle.Strong
+                            : length == 1 ? TextStyle.Emphasis : TextStyle.Strong,
+                        Text = current.ToString(),
+                    });
                 }
                 else
                 {
-                    var lead = inner.Length - inner.TrimStart().Length;
-                    context.Symbols.Analysis?.Tokens.Add(new("image",
-                        new(context.Source.Locate(i + 1 + lead), context.Source.Locate(i + 1 + lead + 5))));
-                    var media = ImageSyntax.Parse(context.Source, i + 1, close, true, context.Diagnostics,
-                        context.Symbols, context.CancellationToken);
-                    fragment = media is null ? null : new InlinePiece(media);
+                    AddToken(new(TokenKind.Text, index, length, text[index..end]));
                 }
+
+                context.CheckCharacters(1);
+                index = end;
+                continue;
+            }
+
+            if (current == '`')
+            {
+                var end = index + 1;
+                while (end < text.Length && text[end] == '`')
+                {
+                    end++;
+                    context.CheckCharacters(1);
+                }
+                AddToken(new(TokenKind.CodeDelimiter, index, end - index)
+                {
+                    RunLength = end - index,
+                });
+                context.CheckCharacters(1);
+                index = end;
+                continue;
+            }
+
+            AppendText(current, index, 1);
+            index++;
+            context.CheckCharacters(1);
+        }
+
+        FlushText();
+        return tokens;
+    }
+
+    private static void ParseUnclosedConstruct(Context context, string text, int open)
+    {
+        var start = open + 1;
+        if (ImageSyntax.IsCall(text.AsSpan(start)))
+        {
+            if (!context.AllowImages)
+            {
+                context.Diagnostics.Error("TW1014",
+                    "Image alt text cannot contain {image(...)}. Write the description as text.",
+                    context.Source.Locate(open));
             }
             else
             {
-                if (context.Symbols.Analysis is { } collector)
-                {
-                    var trimmed = inner.Trim();
-                    var lead = inner.Length - inner.TrimStart().Length;
-                    var keyword = trimmed.StartsWith("if ", StringComparison.Ordinal) ? "if" :
-                        trimmed is "else" or "/if" ? trimmed : null;
-                    if (keyword is not null)
-                        collector.Tokens.Add(new(keyword, new(context.Source.Locate(i + 1 + lead),
-                            context.Source.Locate(i + 1 + lead + keyword.Length))));
-                }
-                fragment = ParseFragment(inner, location, context, i + 1);
-                if (fragment is InlinePiece { Inline: SubstitutionTemplate substitution })
-                    context.Symbols.Analysis?.Substitutions.Add(new(
-                        new(context.Source.Locate(i), context.Source.Locate(close + 1)), substitution));
+                ImageSyntax.Parse(context.Source, start, text.Length, false, context.Diagnostics,
+                    context.Symbols, context.CancellationToken);
             }
-            context.Fragments.Add(fragment);
-            var placeholder = $"{PlaceholderStart}{context.Fragments.Count - 1}{PlaceholderEnd}";
-            result.Append(placeholder);
-            context.MaskedOffsets.Add((result.Length, close + 1 - result.Length, i, close + 1 - i));
-            i = close + 1;
+
+            return;
         }
 
-        context.CancellationToken.ThrowIfCancellationRequested();
-        return result.ToString();
+        if (context.Symbols.Analysis is { } analysis)
+        {
+            var incomplete = text[start..];
+            var lead = incomplete.Length - incomplete.TrimStart().Length;
+            var condition = incomplete[lead..].StartsWith("if ", StringComparison.Ordinal);
+            var expressionOffset = condition ? lead + 3 : 0;
+            if (condition)
+            {
+                analysis.Tokens.Add(new("if",
+                    new(context.Source.Locate(start + lead), context.Source.Locate(start + lead + 2))));
+            }
+
+            var expressionStart = start + expressionOffset;
+            analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
+                incomplete[expressionOffset..], context.Source.Locate(expressionStart),
+                offset => context.Source.Locate(expressionStart + offset));
+        }
+
+        ExpressionParser.ReportStringErrors(text[start..], offset => context.Source.Locate(start + offset),
+            context.Diagnostics);
+        context.Diagnostics.Error("TW1004", "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(open));
     }
 
-    /// <summary>Index of the <c>}</c> matching the <c>{</c> at <paramref name="open"/>, honouring nesting and strings.</summary>
-    public static int FindClosingBrace(string text, int open)
+    private static Piece? ParseConstruct(Context context, string text, int open, int close)
     {
-        var depth = 0;
-        var inString = false;
-        for (var i = open; i < text.Length; i++)
+        var sourceOffset = open + 1;
+        var inner = text[sourceOffset..close];
+        var location = context.Source.Locate(sourceOffset);
+        if (ImageSyntax.IsCall(inner))
         {
-            var c = text[i];
-            if (inString && c == '\\')
+            if (!context.AllowImages)
             {
-                i++;
+                context.Diagnostics.Error("TW1014",
+                    "Image alt text cannot contain {image(...)}. Write the description as text.",
+                    context.Source.Locate(open));
+                return null;
             }
-            else if (c == '"')
-            {
-                inString = !inString;
-            }
-            else if (!inString && c == '{')
-            {
-                depth++;
-            }
-            else if (!inString && c == '}' && --depth == 0)
-            {
-                return i;
-            }
+
+            var lead = inner.Length - inner.TrimStart().Length;
+            context.Symbols.Analysis?.Tokens.Add(new("image",
+                new(context.Source.Locate(sourceOffset + lead), context.Source.Locate(sourceOffset + lead + 5))));
+            var media = ImageSyntax.Parse(context.Source, sourceOffset, close, true, context.Diagnostics,
+                context.Symbols, context.CancellationToken);
+            return media is null ? null : new InlinePiece(media);
         }
 
-        return -1;
+        var trimmed = inner.Trim();
+        var leading = inner.Length - inner.TrimStart().Length;
+        var keyword = trimmed.StartsWith("if ", StringComparison.Ordinal) ? "if" :
+            trimmed is "else" or "/if" ? trimmed : null;
+        if (keyword is not null)
+        {
+            context.Symbols.Analysis?.Tokens.Add(new(keyword,
+                new(context.Source.Locate(sourceOffset + leading),
+                    context.Source.Locate(sourceOffset + leading + keyword.Length))));
+        }
+
+        var fragment = ParseFragment(inner, location, context, sourceOffset);
+        if (fragment is InlinePiece { Inline: SubstitutionTemplate substitution })
+        {
+            context.Symbols.Analysis?.Substitutions.Add(new(
+                new(context.Source.Locate(open), context.Source.Locate(close + 1)), substitution));
+        }
+
+        return fragment;
     }
 
     private static Piece? ParseFragment(string inner, SourceLocation location, Context context, int sourceOffset)
     {
         var trimmed = inner.Trim();
         var lead = inner.Length - inner.TrimStart().Length;
-        if (trimmed == "else")
-        {
-            return new ElsePiece(location);
-        }
-
-        if (trimmed == "/if")
-        {
-            return new EndIfPiece(location);
-        }
+        if (trimmed == "else") return new ElsePiece(location);
+        if (trimmed == "/if") return new EndIfPiece(location);
 
         if (trimmed.StartsWith("if ", StringComparison.Ordinal))
         {
-            var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3), context.Symbols, context.Diagnostics,
+            var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3),
+                context.Symbols, context.Diagnostics,
                 locate: offset => context.Source.Locate(sourceOffset + lead + 3 + offset));
             return condition is null
                 ? null
@@ -464,121 +505,270 @@ internal static class InlineParser
         return substitution is null ? null : new InlinePiece(substitution);
     }
 
-    private static void Walk(ContainerInline container, List<Piece> pieces, Context context)
+    private static bool TryReadLegacyImage(Context context, string text, int start,
+        out int end, out string alt, out string path)
     {
-        for (var inline = container.FirstChild; inline is not null; inline = inline.NextSibling)
+        end = start;
+        alt = "";
+        path = "";
+        if (start + 1 >= text.Length || text[start] != '!' || text[start + 1] != '[') return false;
+
+        var altStart = start + 2;
+        var cursor = altStart;
+        while (cursor < text.Length && text[cursor] != ']')
         {
             context.Check();
-            switch (inline)
+            var c = text[cursor];
+            if (c is '\\' or '[' or '{' or '}' or '\r' or '\n') return false;
+            cursor++;
+        }
+
+        if (cursor >= text.Length || cursor + 1 >= text.Length || text[cursor + 1] != '(') return false;
+        var altEnd = cursor;
+        var pathStart = cursor + 2;
+        cursor = pathStart;
+        while (cursor < text.Length && text[cursor] != ')')
+        {
+            context.Check();
+            var c = text[cursor];
+            if (char.IsWhiteSpace(c) || c is '(' or '\\' or '"' or '{' or '}' or '\r' or '\n') return false;
+            cursor++;
+        }
+
+        if (cursor >= text.Length || cursor == pathStart) return false;
+        alt = text[altStart..altEnd];
+        path = text[pathStart..cursor];
+        end = cursor + 1;
+        return true;
+    }
+
+    private static void PairCodeSpans(Context context, string text, List<Token> tokens)
+    {
+        var nextOfLength = new Dictionary<int, int>();
+        for (var index = tokens.Count - 1; index >= 0; index--)
+        {
+            context.Check();
+            var token = tokens[index];
+            if (token.Kind != TokenKind.CodeDelimiter) continue;
+            if (nextOfLength.TryGetValue(token.RunLength, out var next))
+                token.NextRun = next;
+            nextOfLength[token.RunLength] = index;
+        }
+
+        var activeClose = -1;
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            context.Check();
+            var token = tokens[index];
+            if (activeClose >= 0)
             {
-                case LiteralInline literal:
-                    AddText(literal.Content.ToString(), pieces, context);
-                    break;
-                case HtmlEntityInline entity:
-                    AddText(entity.Transcoded.ToString(), pieces, context);
-                    break;
-                case CodeInline code:
-                    var codePieces = new List<Piece>();
-                    AddText(code.Content, codePieces, context);
-                    pieces.Add(new InlinePiece(new StyledTemplate(TextStyle.Code, Fold(codePieces, context))));
-                    break;
-                case LineBreakInline lineBreak:
-                    pieces.Add(new InlinePiece(lineBreak.IsHard ? new LineBreakTemplate() : new TextTemplate(" ")));
-                    break;
-                case EmphasisInline emphasis:
+                token.InCode = true;
+                if (index == activeClose)
                 {
-                    var style = emphasis.DelimiterCount >= 2 ? TextStyle.Strong : TextStyle.Emphasis;
-                    var children = new List<Piece>();
-                    Walk(emphasis, children, context);
-                    pieces.Add(new InlinePiece(new StyledTemplate(style, Fold(children, context))));
-                    break;
+                    token.Kind = TokenKind.CodeClose;
+                    activeClose = -1;
+                }
+                else if (token.Kind == TokenKind.CodeDelimiter)
+                {
+                    token.Kind = TokenKind.Text;
+                    token.Text = text.Substring(token.Start, token.Length);
                 }
 
-                case LinkInline { IsImage: true } image:
-                    var alt = PlainText(image, context);
-                    for (var index = 0; index < context.MaskedOffsets.Count; index++)
+                continue;
+            }
+
+            if (token.Kind != TokenKind.CodeDelimiter || token.NextRun < 0) continue;
+            var close = tokens[token.NextRun];
+            token.Kind = TokenKind.CodeOpen;
+            token.Mate = token.NextRun;
+            close.Kind = TokenKind.CodeClose;
+            close.Mate = index;
+            activeClose = token.NextRun;
+
+            var contentStart = token.End;
+            var contentLength = close.Start - contentStart;
+            if (contentLength > 1 && text[contentStart] == ' ' && text[close.Start - 1] == ' ' &&
+                text.AsSpan(contentStart + 1, contentLength - 2).ContainsAnyExcept(' '))
+            {
+                token.TrimOffset = contentStart;
+                close.TrimOffset = close.Start - 1;
+            }
+        }
+    }
+
+    private static void PairFormatting(Context context, string text, List<Token> tokens)
+    {
+        var openers = new List<(int Token, int Kind, int PreviousOfKind, bool Overflow)>();
+        Span<int> topOfKind = [-1, -1, -1, -1];
+        var depthReported = false;
+
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            context.Check();
+            var token = tokens[index];
+            if (token.Kind != TokenKind.FormatDelimiter || token.InCode) continue;
+            var delimiter = text[token.Start];
+            var kind = (delimiter == '_' ? 2 : 0) + token.RunLength - 1;
+            token.CanOpen = !IsWordLikeBefore(tokens, index) && IsWordLikeAfter(tokens, index);
+            token.CanClose = IsWordLikeBefore(tokens, index) && !IsWordLikeAfter(tokens, index);
+
+            if (token.CanClose && topOfKind[kind] >= 0)
+            {
+                var matching = topOfKind[kind];
+                if (matching != openers.Count - 1) continue;
+                var opener = openers[^1];
+                openers.RemoveAt(openers.Count - 1);
+                topOfKind[kind] = opener.PreviousOfKind;
+                if (opener.Overflow) continue;
+                tokens[opener.Token].Kind = TokenKind.FormatOpen;
+                tokens[opener.Token].Mate = index;
+                token.Kind = TokenKind.FormatClose;
+                token.Mate = opener.Token;
+                continue;
+            }
+
+            if (!token.CanOpen) continue;
+            var overflow = openers.Count >= MaximumFormattingDepth;
+            if (overflow && !depthReported)
+            {
+                context.Diagnostics.Error("TW1016",
+                    $"Formatting spans are nested more than {MaximumFormattingDepth} levels deep.",
+                    context.Source.Locate(token.Start));
+                depthReported = true;
+            }
+
+            openers.Add((index, kind, topOfKind[kind], overflow));
+            topOfKind[kind] = openers.Count - 1;
+        }
+    }
+
+    private static bool IsWordLikeBefore(IReadOnlyList<Token> tokens, int index)
+    {
+        if (index == 0) return false;
+        var previous = tokens[index - 1];
+        return previous.Kind switch
+        {
+            TokenKind.Text => EndsWithWordCharacter(previous.Text!),
+            TokenKind.Construct => previous.Piece is InlinePiece,
+            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            _ => false,
+        };
+    }
+
+    private static bool IsWordLikeAfter(IReadOnlyList<Token> tokens, int index)
+    {
+        if (index + 1 >= tokens.Count) return false;
+        var next = tokens[index + 1];
+        return next.Kind switch
+        {
+            TokenKind.Text => StartsWithWordCharacter(next.Text!),
+            TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
+            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            _ => false,
+        };
+    }
+
+    private static bool StartsWithWordCharacter(string text)
+    {
+        if (text.Length == 0) return false;
+        if (text.Length > 1 && char.IsHighSurrogate(text[0]) && char.IsLowSurrogate(text[1]) &&
+            Rune.TryCreate(text[0], text[1], out var rune))
+            return Rune.IsLetterOrDigit(rune);
+        return Rune.TryCreate(text[0], out var first) && Rune.IsLetterOrDigit(first);
+    }
+
+    private static bool EndsWithWordCharacter(string text)
+    {
+        if (text.Length == 0) return false;
+        var last = text[^1];
+        if (char.IsLowSurrogate(last) && text.Length > 1 && char.IsHighSurrogate(text[^2]) &&
+            Rune.TryCreate(text[^2], last, out var rune))
+            return Rune.IsLetterOrDigit(rune);
+        return Rune.TryCreate(last, out var final) && Rune.IsLetterOrDigit(final);
+    }
+
+    private static IReadOnlyList<TemplateInline> BuildTemplate(Context context, string text, List<Token> tokens)
+    {
+        var root = new List<Piece>();
+        var frames = new Stack<FormattingFrame>();
+
+        List<Piece> Current() => frames.TryPeek(out var frame) ? frame.Pieces : root;
+
+        void CloseFrame()
+        {
+            var frame = frames.Pop();
+            var children = Fold(frame.Pieces, context);
+            Current().Add(new InlinePiece(new StyledTemplate(frame.Style, children)));
+        }
+
+        foreach (var token in tokens)
+        {
+            context.Check();
+            switch (token.Kind)
+            {
+                case TokenKind.Text:
+                    AddText(token, Current(), frames);
+                    break;
+                case TokenKind.SoftBreak:
+                    Current().Add(new InlinePiece(new TextTemplate(" ")));
+                    break;
+                case TokenKind.HardBreak:
+                    Current().Add(new InlinePiece(frames.TryPeek(out var frame) && frame.Style == TextStyle.Code
+                        ? new TextTemplate(" ")
+                        : new LineBreakTemplate()));
+                    break;
+                case TokenKind.Construct:
+                    if (token.Piece is { } construct) Current().Add(construct);
+                    break;
+                case TokenKind.LegacyImage:
+                    if (!frames.TryPeek(out var activeFrame) || activeFrame.Style != TextStyle.Code)
                     {
-                        context.Check();
-                        var fragment = context.MaskedOffsets[index];
-                        alt = alt.Replace($"{PlaceholderStart}{index}{PlaceholderEnd}", context.Source.Text.Substring(fragment.Start, fragment.Length));
+                        var replacement =
+                            $"{{image({ImageSyntax.Quote(token.LegacyPath!)}, {ImageSyntax.Quote(token.LegacyAlt!)})}}";
+                        context.Diagnostics.Error("TW1015",
+                            $"Markdown images are no longer supported. Use {replacement} instead.",
+                            context.Source.Locate(token.Start));
                     }
-                    var replacement = $"{{image({ImageSyntax.Quote(image.Url ?? "")}, {ImageSyntax.Quote(alt)})}}";
-                    context.Diagnostics.Error("TW1015",
-                        $"Markdown images are no longer supported. Use {replacement} instead.",
-                        context.Source.Locate(image.Span.Start + context.MaskedOffsets
-                            .LastOrDefault(offset => offset.Offset <= image.Span.Start).Delta));
+                    Current().Add(new InlinePiece(new TextTemplate(token.Text!)));
                     break;
-                case ContainerInline other:
-                    // Links (and anything else with children): keep the text, drop the target. Stories have no links in v0.
-                    Walk(other, pieces, context);
+                case TokenKind.FormatOpen:
+                    frames.Push(new FormattingFrame(token.Style));
                     break;
-                default:
-                    AddText(inline.ToString() ?? string.Empty, pieces, context);
+                case TokenKind.CodeOpen:
+                    frames.Push(new FormattingFrame(TextStyle.Code)
+                    {
+                        TrimStart = token.TrimOffset,
+                        TrimEnd = tokens[token.Mate].TrimOffset,
+                    });
+                    break;
+                case TokenKind.FormatClose:
+                case TokenKind.CodeClose:
+                    CloseFrame();
+                    break;
+                case TokenKind.FormatDelimiter:
+                    Current().Add(new InlinePiece(new TextTemplate(text.Substring(token.Start, token.Length))));
+                    break;
+                case TokenKind.CodeDelimiter:
+                    Current().Add(new InlinePiece(new TextTemplate(text.Substring(token.Start, token.Length))));
                     break;
             }
         }
+
+        return Fold(root, context);
     }
 
-    private static void AddText(string text, List<Piece> pieces, Context context)
+    private static void AddText(Token token, List<Piece> pieces, Stack<FormattingFrame> frames)
     {
-        var start = 0;
-        while (start < text.Length)
+        var value = token.Text!;
+        if (frames.TryPeek(out var frame) && frame.Style == TextStyle.Code)
         {
-            context.Check();
-            var open = FindPlaceholder(text, PlaceholderStart, start, context);
-            if (open < 0)
-            {
-                pieces.Add(new InlinePiece(new TextTemplate(text[start..])));
-                return;
-            }
-
-            if (open > start)
-            {
-                pieces.Add(new InlinePiece(new TextTemplate(text[start..open])));
-            }
-
-            var close = FindPlaceholder(text, PlaceholderEnd, open, context);
-            var index = int.Parse(text.AsSpan(open + 1, close - open - 1));
-            if (context.Fragments[index] is { } piece)
-            {
-                pieces.Add(piece);
-            }
-
-            start = close + 1;
-        }
-    }
-
-    private static int FindPlaceholder(string text, char marker, int start, Context context)
-    {
-        while (start < text.Length)
-        {
-            context.Check();
-            var count = Math.Min(1024, text.Length - start);
-            var index = text.IndexOf(marker, start, count);
-            if (index >= 0) return index;
-            start += count;
-        }
-        return -1;
-    }
-
-    private static string PlainText(ContainerInline container, Context context)
-    {
-        var builder = new StringBuilder();
-        for (var inline = container.FirstChild; inline is not null; inline = inline.NextSibling)
-        {
-            context.Check();
-            builder.Append(inline switch
-            {
-                LiteralInline l => l.Content.ToString(),
-                ContainerInline c => PlainText(c, context),
-                _ => string.Empty,
-            });
+            if (value.Length > 0 && token.Start == frame.TrimStart && value[0] == ' ') value = value[1..];
+            if (value.Length > 0 && token.End - 1 == frame.TrimEnd && value[^1] == ' ') value = value[..^1];
         }
 
-        return builder.ToString();
+        if (value.Length > 0) pieces.Add(new InlinePiece(new TextTemplate(value)));
     }
 
-    /// <summary>Folds <c>{if}</c>/<c>{else}</c>/<c>{/if}</c> markers into <see cref="ConditionalInlineTemplate"/>s.</summary>
     private static IReadOnlyList<TemplateInline> Fold(List<Piece> pieces, Context context)
     {
         var output = new List<TemplateInline>();
@@ -594,10 +784,8 @@ internal static class InlineParser
                 output.Add(inline);
         }
 
-        void Close(InlineConditionalFrame frame)
-        {
+        void Close(InlineConditionalFrame frame) =>
             Add(new ConditionalInlineTemplate(frame.Open.Condition, frame.Then, frame.Else));
-        }
 
         foreach (var piece in pieces)
         {
@@ -608,7 +796,6 @@ internal static class InlineParser
                     if (suppressedDepth == 0) Add(inline.Inline);
                     break;
                 case IfPiece open:
-                {
                     if (suppressedDepth > 0)
                     {
                         suppressedDepth++;
@@ -626,7 +813,6 @@ internal static class InlineParser
 
                     frames.Push(new InlineConditionalFrame(open));
                     break;
-                }
                 case ElsePiece alternative when suppressedDepth == 0:
                     if (!frames.TryPeek(out var frame))
                     {

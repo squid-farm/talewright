@@ -145,9 +145,9 @@
                   "end": "\"|(?=$)",
                   "name": "string.quoted.double.tale",
                   "patterns": [
-                    {"match": "\\\\[\"\\\\{}]", "name": "constant.character.escape.tale"},
+                    {"match": "\\\\[\"\\\\{}\\[\\]*_`]", "name": "constant.character.escape.tale"},
                     {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"},
-                    {"include": "#template"}
+                    {"include": "#inline"}
                   ]
                 }
               ]
@@ -234,59 +234,51 @@
     },
     "inline": {
       "patterns": [
+        {"match": "\\\\[{}\\[\\]*_`]","name": "constant.character.escape.tale"},
         {"include": "#template"},
         {
-          "comment": "Delimiters open only when a closing run follows on the line; unmatched delimiters stay literal.",
-          "begin": "\\*\\*(?=\\S)(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?(?:[^\\s*\\\\]|\\\\.)\\*{2,3}(?!\\*)))",
-          "end": "(?<=\\S)\\*\\*(?!\\*)|(?=$)",
+          "begin": "(`+)(?=(?:(?!\\1(?!`))(?:\\\\.|.))*\\1(?!`))",
+          "beginCaptures": {"1": {"name": "punctuation.definition.raw.begin.markdown"}},
+          "end": "\\1(?!`)|(?=$)",
+          "endCaptures": {"0": {"name": "punctuation.definition.raw.end.markdown"}},
+          "name": "markup.inline.raw.string.markdown",
+          "patterns": [
+            {"include": "#template"},
+            {"match": "\\\\[{}\\[\\]*_`]","name": "constant.character.escape.tale"}
+          ]
+        },
+        {
+          "comment": "Strong delimiters pair only at reader-text word boundaries.",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=[\\p{L}\\p{N}])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)[\\p{L}\\p{N}]\\*\\*(?![\\p{L}\\p{N}*]))",
+          "end": "(?<=[\\p{L}\\p{N}])\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(?<!\\w)__(?=\\S)(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?(?:[^\\s\\\\]|\\\\.)__(?!\\w)))",
-          "end": "(?<=\\S)__(?!\\w)|(?=$)",
+          "comment": "Underscore strong uses the same word-boundary rules.",
+          "begin": "(?<![\\p{L}\\p{N}_])__(?!_)(?=[\\p{L}\\p{N}])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)[\\p{L}\\p{N}]__(?![\\p{L}\\p{N}_]))",
+          "end": "(?<=[\\p{L}\\p{N}])__(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "comment": "A single * closes emphasis only alone or before a ** run, never inside a ** closer.",
-          "begin": "(?:(?<!\\*)|(?<=\\*\\*))\\*(?=[^\\s*])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?(?:[^\\s*\\\\]|\\\\.)\\*(?:\\*\\*)?(?!\\*)))",
-          "end": "(?<=[^\\s*])\\*(?=(?:\\*\\*)?(?!\\*))|(?=$)",
+          "comment": "A single star marks emphasis only at reader-text word boundaries.",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*(?!\\*)(?=[\\p{L}\\p{N}])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)[\\p{L}\\p{N}]\\*(?![\\p{L}\\p{N}*]))",
+          "end": "(?<=[\\p{L}\\p{N}])\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(?<!\\w)_(?=\\S)(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?(?:[^\\s\\\\]|\\\\.)_(?!\\w)))",
-          "end": "(?<=\\S)_(?!\\w)|(?=$)",
+          "comment": "Underscore emphasis uses the same word-boundary rules.",
+          "begin": "(?<![\\p{L}\\p{N}_])_(?!_)(?=[\\p{L}\\p{N}])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)[\\p{L}\\p{N}]_(?![\\p{L}\\p{N}_]))",
+          "end": "(?<=[\\p{L}\\p{N}])_(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
-        {"include": "text.html.markdown#escape"},
-        {"include": "text.html.markdown#raw"},
-        {"match": "!\\[[^\\]]*\\]\\([^)]*\\)", "name": "invalid.deprecated.image.tale"},
-        {"include": "#link"}
-      ]
-    },
-    "link": {
-      "comment": "Inline link with a Talemark-aware label; the compiler renders label text (including substitutions) and drops the target.",
-      "begin": "(\\[)(?=(?:[^\\[\\]\\\\]|\\\\.|\\[[^\\[\\]]*\\])*\\]\\()",
-      "beginCaptures": {"1": {"name": "punctuation.definition.link.title.begin.markdown"}},
-      "end": "(\\])(\\()[ \\t]*(?:(<)([^<>]*)(>)|((?:[^\\s()]|\\([^\\s()]*\\))*))[ \\t]*(\"[^\"]*\"|'[^']*')?[ \\t]*(\\))|(?=$)",
-      "endCaptures": {
-        "1": {"name": "punctuation.definition.link.title.end.markdown"},
-        "2": {"name": "punctuation.definition.metadata.markdown"},
-        "3": {"name": "punctuation.definition.link.markdown"},
-        "4": {"name": "markup.underline.link.markdown"},
-        "5": {"name": "punctuation.definition.link.markdown"},
-        "6": {"name": "markup.underline.link.markdown"},
-        "7": {"name": "string.other.link.description.title.markdown"},
-        "8": {"name": "punctuation.definition.metadata.markdown"}
-      },
-      "name": "meta.link.inline.markdown",
-      "contentName": "string.other.link.title.markdown",
-      "patterns": [
-        {"begin": "\\[", "end": "\\]|(?=$)", "patterns": [{"include": "#inline"}]},
-        {"include": "#inline"}
+        {
+          "match": "!\\[[^\\[\\]{}\\\\\\r\\n]*\\]\\([^\\s()\"{}\\\\\\r\\n]+\\)",
+          "name": "invalid.deprecated.image.tale"
+        }
       ]
     }
   }
