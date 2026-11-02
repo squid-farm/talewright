@@ -1,19 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import { test } from 'node:test';
 import textmate from 'vscode-textmate';
 import oniguruma from 'vscode-oniguruma';
-import { vscodePath } from './vscode-path.mjs';
 
 const wasm = await readFile(new URL('../node_modules/vscode-oniguruma/release/onig.wasm', import.meta.url));
 await oniguruma.loadWASM(wasm.buffer.slice(wasm.byteOffset, wasm.byteOffset + wasm.byteLength));
-const executable = await vscodePath();
-// macOS keeps app resources beside Contents/MacOS rather than beside the executable.
-const appRoot = process.platform === 'darwin'
-  ? path.join(path.dirname(executable), '..', 'Resources', 'app')
-  : path.join(path.dirname(executable), 'resources', 'app');
-const markdownPath = path.join(appRoot, 'extensions/markdown-basics/syntaxes/markdown.tmLanguage.json');
 const registry = new textmate.Registry({
   onigLib: Promise.resolve({
     createOnigScanner: patterns => new oniguruma.OnigScanner(patterns),
@@ -22,7 +14,7 @@ const registry = new textmate.Registry({
   loadGrammar: async scope => {
     const file = scope === 'text.tale'
       ? new URL('../syntaxes/tale.tmLanguage.json', import.meta.url)
-      : scope === 'text.html.markdown' ? markdownPath : null;
+      : null;
     return file ? textmate.parseRawGrammar(await readFile(file, 'utf8'), 'grammar.json') : null;
   },
 });
@@ -104,6 +96,7 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['*emphasis* and **strong**', 'strong', 'markup.bold.markdown'],
     ['**{player:first-name}**', 'first-name', 'variable.other.member.tale'],
     ['Use `code` here.', 'code', 'markup.inline.raw.string.markdown'],
+    ['Use ``a`b`` here.', 'a`b', 'markup.inline.raw.string.markdown'],
     ['![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale'],
     ['{image("maps/camp", "A camp")}', 'image', 'support.function.image.tale'],
     ['{image("maps/camp", "A } camp")}', 'camp"', 'string.quoted.double.tale'],
@@ -111,10 +104,12 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['* [{image("camp", "A ] camp")} Go] -> END', 'A ] camp', 'string.quoted.double.tale'],
     ['> guide: {image("camp", "Camp")}', 'image', 'support.function.image.tale'],
     ['{image("camp", "{player:first-name} at the gate")}', 'first-name', 'variable.other.member.tale'],
+    ['{image("camp", "**The guide**")}', 'The guide', 'markup.bold.markdown'],
+    [String.raw`{image("camp", "a \* b")}`, String.raw`\*`, 'constant.character.escape.tale'],
+    [String.raw`{image("camp", "a \[door\]")}`, String.raw`\[`, 'constant.character.escape.tale'],
     ['{image("camp", "\\{literal\\}")}', '\\{', 'constant.character.escape.tale'],
     ['{image("{player:name}", "Camp")}', 'player', 'string.quoted.double.tale'],
     ['{image:name}', 'name', 'variable.other.member.tale'],
-    ['[label](https://example.org)', 'label', 'meta.link.inline.markdown'],
     ['Literal \\{player:first-name\\}', '\\{', 'constant.character.escape.tale'],
     ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'and', 'keyword.operator.word.tale'],
     ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
@@ -123,27 +118,16 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['{if visited(start) and player:hp > 0}Yes{/if}', 'hp', 'variable.other.member.tale'],
     ['__snake__case__ after', 'case', 'markup.bold.markdown'],
     ['_snake_case_words_ after', 'case_words', 'markup.italic.markdown'],
-    ['**bold**text', 'bold', 'markup.bold.markdown'],
-    ['*it*text', 'it', 'markup.italic.markdown'],
-    ['*a**b**c*', 'b', 'markup.bold.markdown'],
-    ['*a**b**c*', 'c', 'markup.italic.markdown'],
+    ['**bold** text', 'bold', 'markup.bold.markdown'],
+    ['*it* text', 'it', 'markup.italic.markdown'],
     ['**a*b** after', 'b', 'markup.bold.markdown'],
-    ['***both*** after', 'both', 'markup.bold.markdown'],
-    ['***both*** after', 'both', 'markup.italic.markdown'],
     ['**real \\** still bold** after', 'still bold', 'markup.bold.markdown'],
     ['*real \\* still italic* after', 'still italic', 'markup.italic.markdown'],
     ['__real \\__ still bold__ after', 'still bold', 'markup.bold.markdown'],
     ['_real \\_ still italic_ after', 'still italic', 'markup.italic.markdown'],
-    ['*real `code*` still italic* after', 'still italic', 'markup.italic.markdown'],
-    ['**literal \\}** after', 'literal', 'markup.bold.markdown'],
-    ['__literal \\}__ after', 'literal', 'markup.bold.markdown'],
-    ['*literal \\}* after', 'literal', 'markup.italic.markdown'],
-    ['_literal \\}_ after', 'literal', 'markup.italic.markdown'],
+    ['**bold *italic* bold**', 'italic', 'markup.italic.markdown'],
+    ['**bold *italic* bold**', 'bold', 'markup.bold.markdown'],
     ['[Hello {player:first-name}](https://example.org)', 'first-name', 'variable.other.member.tale'],
-    ['[Hello {player:first-name}](https://example.org)', 'first-name', 'string.other.link.title.markdown'],
-    ['[Hello {player:first-name}](https://example.org)', 'example.org', 'markup.underline.link.markdown'],
-    ['[{if flag:met}Old friend{else}Stranger{/if}](https://example.org "title")', 'if', 'keyword.control.conditional.tale'],
-    ['[{if flag:met}Old friend{else}Stranger{/if}](https://example.org "title")', 'met', 'variable.other.member.tale'],
     ['[**Bold** {player:name} [x]](<https://example.org>)', 'Bold', 'markup.bold.markdown'],
     ['[**Bold** {player:name} [x]](<https://example.org>)', 'name', 'variable.other.member.tale'],
   ]) hasScope(line, text, scope);
@@ -153,7 +137,7 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
   assert.ok(!pathToken.scopes.includes('variable.other.member.tale'), pathToken.scopes.join(', '));
 });
 
-test('ordinary prose, Markdown, comments and escaped braces are not Talemark commands', () => {
+test('ordinary prose, unsupported Markdown, comments and escaped braces follow Talemark syntax', () => {
   for (const line of [
     '*emphasis*', '**strong**', 'A -> sign in prose', 'Write @title here.',
     'Literal \\{player:first-name\\}', '// * [choice] -> END',
@@ -175,6 +159,10 @@ test('ordinary prose, Markdown, comments and escaped braces are not Talemark com
     ['*literal \\}* after', 'after'], ['_literal \\}_ after', 'after'],
     ['An *unfinished `code*` after', 'after'],
     ['2 * 3 and 4*', '3'], ['a ** b', 'b'], ['[{player:name}](https://example.org) after', 'after'],
+    ['word*inner*word', 'inner'], ['2*3*4', '3'], ['snake_case', 'case'],
+    ['**bold**text', 'bold'], ['*it*text', 'it'], ['***both***', 'both'],
+    ['`unfinished code', 'unfinished'],
+    ['[label](https://example.org)', 'label'], ['&amp; &#65;', '&amp;'],
   ]) {
     const offset = line.indexOf(text);
     const token = tokens(line).tokens.find(token => token.startIndex <= offset && token.endIndex > offset);
@@ -182,6 +170,14 @@ test('ordinary prose, Markdown, comments and escaped braces are not Talemark com
   }
   hasScope('**a*b** after', '*b', 'markup.bold.markdown');
   assert.ok(!tokens('**a*b** after').tokens.some(token => token.scopes.includes('markup.italic.markdown')), 'unmatched * inside strong stays literal');
+  hasScope('**bold *italic* bold**', 'italic', 'markup.italic.markdown');
+  hasScope('**bold *italic* bold**', 'bold', 'markup.bold.markdown');
+  hasScope('Use ``a`b`` here.', 'a`b', 'markup.inline.raw.string.markdown');
+  hasScope(String.raw`\*literal\*`, String.raw`\*`, 'constant.character.escape.tale');
+  hasScope('![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale');
+  for (const line of ['![a [b]](p)', String.raw`![a\]](p)`, '![a](p(q))']) {
+    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.deprecated.image.tale')), line);
+  }
   const requires = '* [Continue] (requires: visited(start) and player:hp > 0) -> END';
   const close = requires.indexOf(') ->');
   const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);

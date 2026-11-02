@@ -372,17 +372,17 @@ would hide some; their requirements may change later.
 **Conditional structure.** A block `{if}` selects one branch once, when reached. Its nested steps run in
 order without retesting that condition. Inline conditions are evaluated when their prose line renders.
 Block and inline conditions each allow 64 nested `{if}` levels; expressions allow 256 nested groups
-and prefix operators combined. Deeper Markdown constructs may also be rejected with TW1016.
+and prefix operators combined. Formatting spans allow 64 nested levels. Exceeding any limit reports
+TW1016.
 Several conditional diverts may precede the choices; the first reached divert ends execution.
 
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
 by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 
-**Formatting rules are changing.** Prose is currently parsed with Markdig, so some Markdown-only
-behavior leaks through: a line followed by `---` can vanish, and `&amp;` becomes `&`. The approved
-[reader-text grammar](talemark-operators.md#reader-text-grammar) keeps only bold, italic and code,
-at word boundaries, and shows everything else exactly as written. It ships in
-[#401](https://github.com/squid-farm/talewright/issues/401). Avoid relying on other Markdown.
+**Reader text is not Markdown.** Talemark implements its own small
+[reader-text grammar](talemark-operators.md#reader-text-grammar): word-boundary bold and italic,
+code spans and inline constructs. Unsupported Markdown-like syntax, including links, entities,
+headings and lists, remains literal text.
 
 ## 3. Substitutions
 
@@ -539,11 +539,11 @@ Alt text uses the same template language as prose, rendered with the state where
 {image("portrait", "{guide:first-name} at the gate")}
 ```
 
-That shows the guide's first name. An unescaped `{` makes the whole alt a template, so `{if}`
-and prose formatting work too. The rendered alt is plain text, since an image description cannot
-keep bold or italic. Alt with no unescaped `{` stays literal, including `*` and backticks.
-That is changing: alt text will always be reader text, so `"**The guide**"` will read
-`The guide` ([#401](https://github.com/squid-farm/talewright/issues/401)).
+That shows the guide's first name. Alt text always uses the reader-text grammar, so `{if}`,
+substitutions, formatting and code spans work even when no substitution is present. The rendered
+alt is plain text, since an image description cannot keep bold or italic. For example,
+`"**The guide**"` reads `The guide`. Use `\"` for a quote and the reader-text escapes for literal
+delimiters; an unknown escape is TW1014.
 There is no nested `{image(...)}`. Describe the picture in words. A reference the story does not
 know, such as an unknown character, is an error at that reference.
 

@@ -57,10 +57,9 @@ titles, dialogue and choice labels still use their current unquoted forms:
 `@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`.
 Do not add quotes to those forms expecting them to be removed.
 Image calls use `{image("path", "alt text")}`. The path is a literal string. Alt text uses the
-same template language as prose, including `\{` and `\}` for literal braces. Both arguments
-decode `\"` and `\\`. Unknown image escapes produce TW1014. A nested `{image(...)}` in alt text
-also produces TW1014. **Approved, not implemented:** alt text will always be read as reader text,
-with the reader-text escapes, even when it contains no `{`. See the
+same reader-text grammar as prose, including `\{`, `\}`, `\*`, `\_`, `\[` and `\]` for literal
+delimiters. Both arguments decode `\"` and `\\`; alt text also accepts backtick escapes. Unknown
+image escapes produce TW1014. A nested `{image(...)}` in alt text also produces TW1014. See the
 [reader-text grammar](#reader-text-grammar).
 
 The manifest is YAML, not Talemark: YAML quoting and escaping still apply there. A Talemark
@@ -308,9 +307,8 @@ Plain-string fields are a separate model boundary, not an image-specific prohibi
 
 ## Prose formatting and legacy images
 
-These formatting delimiters work today. Their current implementation uses Markdig; it is not a
-promise of general Markdown support. The approved replacement is the
-[reader-text grammar](#reader-text-grammar) below.
+These formatting delimiters use Talemark's
+[reader-text grammar](#reader-text-grammar) below, not a general Markdown parser.
 Broader typography and presentation remain in
 [#200](https://github.com/squid-farm/talewright/issues/200).
 
@@ -320,11 +318,11 @@ Broader typography and presentation remain in
 | `*...*`, `_..._` | Italic prose, choice labels or dialogue. A leading `* ` is a choice instead. | Same formatting stage and escaping. | `*Quietly*` | Same unmatched-marker behavior. |
 | Backticks | Inline code text. Brace substitutions are still recognized before code formatting. | Backtick-delimited span after brace parsing. | `` `torch` `` | Not a block-code or brace-escape syntax. |
 | `![alt](path)` | Rejected legacy Markdown image form. | Detected after brace parsing, with the diagnostic mapped back to the author's source. | Replace `![A torch](torch)` with `{image("torch", "A torch")}`. | TW1015 names the quoted replacement. |
-| `[text](target)` | Current Markdig parsing keeps the label text but discards the destination; not a working hyperlink feature. Approved to become literal text. | Inline parsing after brace parsing. | `[Go](https://example.org)` | No target validation or hyperlink guarantee. |
+| `[text](target)` | Literal reader text; it is not a hyperlink feature. | No link parsing or target validation. | `[Go](https://example.org)` | None. |
 
 ## Reader-text grammar
 
-**Approved, not implemented.** [ADR 0006](../developer/adr/0006-talemark-reader-text.md) records
+**Implemented.** [ADR 0006](../developer/adr/0006-talemark-reader-text.md) records
 the decision. [#400](https://github.com/squid-farm/talewright/issues/400) adds the bounded scanner and
 [#401](https://github.com/squid-farm/talewright/issues/401) replaces Markdig with these rules.
 Until #401 ships, the current behavior above and in the corpus's *Current* column applies.
@@ -391,7 +389,8 @@ is [#404](https://github.com/squid-farm/talewright/issues/404).
 - So `2*3*4`, `snake_case` and `word*inner*word` are literal. Nested spans work. Crossing spans
   are literal at the crossing run and never close an outer span or reinterpret that run as an
   opener.
-- Spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
+- Matched spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
+  Unmatched opening runs remain literal and do not count toward this limit.
 
 ### Code spans
 
@@ -528,8 +527,8 @@ The language server uses the shared authoring completion provider.
 | Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
-| [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401); package removed in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers migrated in [#403](https://github.com/squid-farm/talewright/issues/403). Not implemented: Markdig still parses prose. |
-| Alt text always reader text | Approved in #399; implemented by #401. Today alt is a template only when it contains an unescaped `{`. |
+| [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Package removal remains in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers are tracked by [#403](https://github.com/squid-farm/talewright/issues/403). |
+| Alt text always reader text | Approved in [#399](https://github.com/squid-farm/talewright/issues/399); implemented in [#401](https://github.com/squid-farm/talewright/issues/401). |
 | Choice clauses | Both orders remain accepted; [#384](https://github.com/squid-farm/talewright/issues/384) diagnoses duplicate, incomplete and misplaced clauses. |
 | Line-directive escape | Not approved. Optional and decision-gated in [#404](https://github.com/squid-farm/talewright/issues/404). |
 | [Callable construct contract](#callable-construct-contract) | Documentation contract for new callables. Existing inconsistencies are recorded for [#184](https://github.com/squid-farm/talewright/issues/184) and [#193](https://github.com/squid-farm/talewright/issues/193); no syntax changed. |

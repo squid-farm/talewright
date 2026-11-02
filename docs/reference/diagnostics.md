@@ -28,9 +28,9 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires: ...) { effects } -> target` or `* -> target` for **Continue**. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires:` exactly and close `]`, `)` and `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
-| TW1014 | Malformed image call, image string escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Use `\"` or `\\` for embedded quotes or backslashes. In alt text, `\{` and `\}` are literal braces. Describe a picture in words instead of nesting `{image(...)}`. |
-| TW1015 | Old Markdown image syntax. | Replace `![alt](path)` with `{image("path", "alt")}`; the message gives the escaped replacement. |
-| TW1016 | Expression, conditional or Markdown nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions allow 64. |
+| TW1014 | Malformed image call, image string escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Use `\"` or `\\` for string escapes; alt text also accepts reader-text escapes such as `\{`, `\}` and `\*`. Describe a picture in words instead of nesting `{image(...)}`. |
+| TW1015 | The simple legacy `![alt](path)` image form. | Replace it with `{image("path", "alt")}`; the message gives the escaped replacement. |
+| TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |
 
 ## TW2xxx: names and types
 

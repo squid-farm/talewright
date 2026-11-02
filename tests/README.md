@@ -228,6 +228,29 @@ would yield approximately 47.19/80.85 B/source byte if MB meant decimal
 megabytes, or 49.48/84.78 if it meant MiB. The issue does not record the raw
 values or unit interpretation, so these are not an exact before/after comparison.
 
+#### #401 reader-text parser comparison
+
+One side-by-side Release run compared pre-#401 `origin/main` (`d7a08d7`) with
+the #401 parser (`799fc3e`) on .NET 10.0.14, Linux Mint 22.3 x64, using the
+same 20-chapter corpus (946 scenes, 22 files, 709,952 UTF-8 source bytes
+including the manifest). Each timing row uses one warmup and seven measured
+iterations; allocations are current-thread managed bytes.
+
+| Workload | Main median / p95 ms | #401 median / p95 ms | Main median / max allocated bytes | #401 median / max allocated bytes | Main / #401 max B/source byte | Main / #401 retained managed bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| Compile | 42.81 / 45.73 | 47.28 / 51.96 | 34,348,288 / 34,348,312 | 34,389,960 / 34,390,032 | 48.38 / 48.44 | 4,695,240 / 4,698,008 |
+| Analyze | 102.57 / 108.21 | 112.07 / 161.91 | 58,545,192 / 58,545,584 | 58,586,888 / 58,587,304 | 82.46 / 82.52 | 11,979,272 / 11,981,592 |
+
+Retained managed bytes are the full-GC heap delta for one returned
+`StoryDefinition` or `StoryAnalysis`, with the source held constant and the
+result kept alive; they are not peak RSS. Timings are report-only and should
+not be treated as a controlled comparison. The allocation ceiling ratchet uses
+the maximum observed #401 ratios plus 10%, rounded up. A second #401 run
+measured maximum allocations of 34,392,056 bytes (48.44 B/source byte) for
+compile and 58,589,424 bytes (82.53 B/source byte) for analysis; both passed
+the active ceilings of **54** and **91 B/source byte**, down from **55** and
+**95**.
+
 Any later PR in #392 that lowers a workload's allocation must lower its ceiling
 to the new measured maximum plus 10% (rounding up as needed). No PR may raise a
 ceiling without the lead's approval.
