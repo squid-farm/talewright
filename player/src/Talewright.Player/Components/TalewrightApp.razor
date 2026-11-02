@@ -2,10 +2,17 @@
    Hosts render just this component; everything else is shared between desktop and web. *@
 @inject IStoryLibrary Library
 @inject IServiceProvider Services
+@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 @using Microsoft.Extensions.DependencyInjection
 @using Talewright.Runtime.Saves
 @implements IAsyncDisposable
 
+@if (!_preferencesReady)
+{
+    <div class="tw-app" aria-busy="true"></div>
+}
+else
+{
 <div class="tw-app">
     @if (_story is not null)
     {
@@ -100,6 +107,7 @@
         </section>
     }
 </div>
+}
 
 @code {
     /// <summary>Library id of a story to open immediately (the desktop host passes this for a command-line path).</summary>
@@ -128,12 +136,16 @@
     private bool _disposed;
     private CharacterSelection? _character;
     private bool _showLibrary;
+    private bool _preferencesReady;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
     private string? _failedTitle;
 
     protected override async Task OnInitializedAsync()
     {
+        await Preferences.InitializeAsync();
+        _preferencesReady = true;
+
         if (!LibraryEnabled && AutoStartStoryId is null)
         {
             throw new InvalidOperationException("A story must be selected when the library is disabled.");

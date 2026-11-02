@@ -1,6 +1,6 @@
 const toolbars = new WeakMap();
 
-export function initialize(bar, toggle, menu, confirmation) {
+export function initialize(bar, toggle, menu, confirmation, settings = null) {
     let frame = null;
     const resize = new ResizeObserver(() => {
         if (frame !== null) {
@@ -35,10 +35,28 @@ export function initialize(bar, toggle, menu, confirmation) {
         confirmation.close();
         toggle.focus();
     };
+    const settingsCancel = event => {
+        event.preventDefault();
+        closeSettings(settings, toggle);
+    };
+    const settingsKeydown = event => {
+        if (event.key !== "Tab") return;
+        const controls = [...settings.querySelectorAll("button:not(:disabled), select:not(:disabled)")]
+            .filter(element => element.getClientRects().length);
+        const index = controls.indexOf(document.activeElement);
+        if (index < 0 || (!event.shiftKey && index === controls.length - 1) ||
+            (event.shiftKey && index === 0)) {
+            event.preventDefault();
+            (controls[event.shiftKey ? controls.length - 1 : 0] ?? settings).focus();
+        }
+    };
     bar.addEventListener("keydown", escape);
     document.addEventListener("pointerdown", outside);
     confirmation.addEventListener("cancel", cancel);
-    toolbars.set(bar, { resize, escape, outside, cancel, confirmation, cancelResize: () => cancelAnimationFrame(frame) });
+    settings?.addEventListener("cancel", settingsCancel);
+    settings?.addEventListener("keydown", settingsKeydown);
+    toolbars.set(bar, { resize, escape, outside, cancel, confirmation, settings, settingsCancel, settingsKeydown,
+        cancelResize: () => cancelAnimationFrame(frame) });
 }
 
 export function focusMenu(menu) {
@@ -56,6 +74,19 @@ export function closeConfirmation(dialog, toggle) {
     toggle.focus();
 }
 
+export function openSettings(menu, dialog) {
+    menu.hidden = true;
+    dialog.showModal();
+    dialog.querySelector("select").focus();
+}
+
+export function closeSettings(dialog, toggle) {
+    if (dialog.open) {
+        dialog.close();
+    }
+    toggle.focus();
+}
+
 export function dispose(bar) {
     const state = toolbars.get(bar);
     state.resize.disconnect();
@@ -63,6 +94,8 @@ export function dispose(bar) {
     bar.removeEventListener("keydown", state.escape);
     document.removeEventListener("pointerdown", state.outside);
     state.confirmation.removeEventListener("cancel", state.cancel);
+    state.settings?.removeEventListener("cancel", state.settingsCancel);
+    state.settings?.removeEventListener("keydown", state.settingsKeydown);
     document.documentElement.style.removeProperty("--tw-toolbar-offset");
     toolbars.delete(bar);
 }

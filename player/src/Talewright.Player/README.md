@@ -16,7 +16,7 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore`. |
-| `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Restart/Library, and modal Restart confirmation. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
+| `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
 | `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
 | `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
@@ -25,6 +25,15 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | `MediaView` | Viewport-lazy image lease and independent decode/presentation. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |
 | `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
+
+## Player preferences
+
+The shared player currently exposes a per-device System / Light / Dark theme setting in the
+toolbar's More actions menu. `PlayerPreferencesStore` owns the versioned preferences record and
+persists it in browser storage, shared across stories. Hosts register it as a scoped service;
+web hosts should load `PlayerPreferencesBootstrap.js` before the player stylesheet to apply a
+saved theme before first paint. The desktop host initializes the same store before rendering
+the player.
 
 ## Story libraries (`Library/StoryLibraries.cs`)
 
@@ -40,6 +49,7 @@ libraries. The compiler's source and pure renderer never own image I/O or resour
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
+Register `PlayerPreferencesStore` as a scoped service in hosts that render `TalewrightApp`.
 
 ### Image host coverage and ownership
 

@@ -40,6 +40,26 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Settings_dialog_exposes_focused_theme_control_on_desktop()
+    {
+        await Driver.StartAsync();
+        await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var snapshot = await native.SnapshotAsync();
+        var dialog = Assert.Single(snapshot.Descendants(), node => node.Role == "dialog" && node.Name == "Settings");
+        var theme = Assert.Single(dialog.Descendants(), node => node.Role == "combo box" && node.Name == "Theme");
+        Assert.True(theme.Focused);
+        Assert.Contains(dialog.Descendants(), node => node.Role == "push button" && node.Name == "Close settings");
+
+        await Driver.PressAsync("Escape");
+        await AssertState(state => Assert.True(state.PassageVisible));
+    }
+
+    [Fact]
     public async Task Folder_and_multiple_cli_paths_are_available_in_library()
     {
         var directory = Path.Combine(_fixtures, "linear");
