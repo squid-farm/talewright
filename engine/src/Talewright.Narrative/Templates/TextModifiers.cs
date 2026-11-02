@@ -28,7 +28,10 @@ public sealed class DelegateTextModifier(string name, Func<string, ModifierConte
 
 public sealed record OneManyTextModifier(string Singular, string Plural) : ITextModifier
 {
-    public string Name => "one-many";
+    /// <summary>The modifier name written after <c>#</c>.</summary>
+    public const string ModifierName = "one-many";
+
+    public string Name => ModifierName;
 
     public string Apply(string text, ModifierContext context) => context.IsPlural ? Plural : Singular;
 }

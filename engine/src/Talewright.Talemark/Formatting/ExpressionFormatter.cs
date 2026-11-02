@@ -3,6 +3,8 @@ using System.Text;
 using Talewright.Core.Identity;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Parsing;
+using Talewright.Talemark.Vocabulary;
+using static Talewright.Talemark.Vocabulary.ExpressionVocabulary;
 
 namespace Talewright.Talemark.Formatting;
 
@@ -43,7 +45,7 @@ public static class ExpressionFormatter
             var precedence = Precedence(current);
             var wrap = precedence < action.ParentPrecedence
                 || action.GroupEqual && precedence == action.ParentPrecedence;
-            if (wrap) pending.Push(FormatAction.ForText(")"));
+            if (wrap) pending.Push(FormatAction.ForText(CloseParen.ToString()));
 
             switch (current)
             {
@@ -62,7 +64,7 @@ public static class ExpressionFormatter
                     break;
             }
 
-            if (wrap) pending.Push(FormatAction.ForText("("));
+            if (wrap) pending.Push(FormatAction.ForText(OpenParen.ToString()));
         }
 
         return output.ToString();
@@ -71,39 +73,37 @@ public static class ExpressionFormatter
     private static string Atom(Expr expression) => expression switch
     {
         NumberLiteral number => number.Value.ToString(CultureInfo.InvariantCulture),
-        BoolLiteral boolean => boolean.Value ? "true" : "false",
+        BoolLiteral boolean => boolean.Value ? True : False,
         TextLiteral literal => Quote(literal.Value),
         TierLiteral tier => TierName(tier.Tier.Id),
-        StatRef stat => $"{Character(stat.Character)}:{StatName(stat.Stat.Value)}",
-        StandingRef standing => $"faction:{Name(standing.Faction.Value)}",
-        StandingTierRef standing => $"faction:{Name(standing.Faction.Value)}:tier",
-        FlagRef flag => $"flag:{Name(flag.Flag.Value)}",
-        VarRef variable => $"var:{Name(variable.Variable.Value)}",
-        TextVarRef variable => $"var:{Name(variable.Variable.Value)}",
-        NameRef name => $"{Character(name.Character)}:{name.Part switch
-        {
-            NamePart.First => "first-name",
-            NamePart.Last => "last-name",
-            NamePart.Full => "name",
-            _ => throw Invalid("Unknown name part."),
-        }}",
-        PronounRef pronoun => $"{Character(pronoun.Character)}:pronoun{pronoun.Form switch
-        {
-            PronounForm.Subject => "",
-            PronounForm.Object => ":object",
-            PronounForm.Possessive => ":possessive-pronoun:determiner",
-            PronounForm.PossessivePronoun => ":possessive-pronoun:independent",
-            PronounForm.Reflexive => ":reflexive",
-            _ => throw Invalid("Unknown pronoun form."),
-        }}",
-        FactionNameRef faction => $"faction:{Name(faction.Faction.Value)}:name",
-        ItemNameRef item => $"item:{Name(item.Item.Value)}",
-        HasItem item => $"{Character(item.Character)} has {Name(item.Item.Value)}",
-        Visited visited => $"visited({Name(visited.Scene.Value)})",
-        NamedPredicate predicate => $"@{Name(predicate.Name)}",
+        StatRef stat => Reference(Character(stat.Character), StatName(stat.Stat.Value)),
+        StandingRef standing => Reference(Faction, Name(standing.Faction.Value)),
+        StandingTierRef standing => Reference(Faction, Name(standing.Faction.Value), Tier),
+        FlagRef flag => Reference(Flag, Name(flag.Flag.Value)),
+        VarRef variable => Reference(Var, Name(variable.Variable.Value)),
+        TextVarRef variable => Reference(Var, Name(variable.Variable.Value)),
+        NameRef name => Reference(Character(name.Character),
+            TryGetSpelling(name.Part, out var part) ? part : throw Invalid("Unknown name part.")),
+        PronounRef pronoun => PronounReference(Character(pronoun.Character), pronoun.Form),
+        FactionNameRef faction => Reference(Faction, Name(faction.Faction.Value), ExpressionVocabulary.Name),
+        ItemNameRef item => Reference(Item, Name(item.Item.Value)),
+        HasItem item => $"{Character(item.Character)} {Has} {Name(item.Item.Value)}",
+        Visited visited => $"{VisitedCall}{Name(visited.Scene.Value)}{CloseParen}",
+        NamedPredicate predicate => $"{PredicateMarker}{Name(predicate.Name)}",
         UnaryExpr or BinaryExpr => throw new InvalidOperationException("Composite expressions are formatted separately."),
         _ => throw new NotSupportedException($"Expression kind '{expression.GetType().Name}' has no Talemark spelling."),
     };
+
+    private static string Reference(params string[] parts) => string.Join(Separator, parts);
+
+    private static string PronounReference(string character, PronounForm form)
+    {
+        if (form == PronounForm.Subject) return Reference(character, Pronoun);
+        if (TryGetPronounSpelling(form, out var property)) return Reference(character, Pronoun, property);
+        return TryGetPossessiveSpelling(form, out var possessive)
+            ? Reference(character, Pronoun, PossessivePronoun, possessive)
+            : throw Invalid("Unknown pronoun form.");
+    }
 
     private static string UnaryPrefix(UnaryExpr expression)
     {
@@ -113,12 +113,8 @@ public static class ExpressionFormatter
             throw Invalid($"Unary '{expression.Op}' requires a {expected} operand.");
         }
 
-        return expression.Op switch
-        {
-            UnaryOp.Not => "not ",
-            UnaryOp.Negate => "-",
-            _ => throw Invalid("Unknown unary operator."),
-        };
+        if (!TryGetSpelling(expression.Op, out var spelling)) throw Invalid("Unknown unary operator.");
+        return expression.Op == UnaryOp.Not ? spelling + " " : spelling;
     }
 
     private static string BinaryOperator(BinaryExpr expression)
@@ -138,22 +134,7 @@ public static class ExpressionFormatter
             throw Invalid($"Binary '{expression.Op}' cannot combine {left} and {right} operands.");
         }
 
-        return expression.Op switch
-        {
-            BinaryOp.Add => "+",
-            BinaryOp.Subtract => "-",
-            BinaryOp.Multiply => "*",
-            BinaryOp.Divide => "/",
-            BinaryOp.Equal => "==",
-            BinaryOp.NotEqual => "!=",
-            BinaryOp.Less => "<",
-            BinaryOp.LessOrEqual => "<=",
-            BinaryOp.Greater => ">",
-            BinaryOp.GreaterOrEqual => ">=",
-            BinaryOp.And => "and",
-            BinaryOp.Or => "or",
-            _ => throw Invalid("Unknown binary operator."),
-        };
+        return TryGetSpelling(expression.Op, out var spelling) ? spelling : throw Invalid("Unknown binary operator.");
     }
 
     private readonly record struct FormatAction(Expr? Expression, string? Text, int ParentPrecedence, bool GroupEqual)
@@ -198,7 +179,7 @@ public static class ExpressionFormatter
     private static string Character(EntityId character)
     {
         var name = Name(character.Value);
-        if (name is "faction" or "item" or "flag" or "var" or "true" or "false" or "visited" or "not")
+        if (name is Faction or Item or Flag or Var or True or False or ExpressionVocabulary.Visited or Not)
         {
             throw Invalid($"Character name '{name}' is reserved in Talemark expressions.");
         }
@@ -209,7 +190,7 @@ public static class ExpressionFormatter
     private static string StatName(string value)
     {
         var name = Name(value);
-        if (name is "first-name" or "last-name" or "name" or "pronoun")
+        if (CharacterProperties.Contains(name))
         {
             throw Invalid($"Stat name '{name}' resolves to a text property in Talemark.");
         }
@@ -220,7 +201,7 @@ public static class ExpressionFormatter
     private static string TierName(string value)
     {
         var name = Name(value);
-        if (name is "true" or "false" or "visited" or "not")
+        if (name is True or False or ExpressionVocabulary.Visited or Not)
         {
             throw Invalid($"Tier name '{name}' is reserved in Talemark expressions.");
         }

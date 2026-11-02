@@ -49,6 +49,33 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 | Docs and examples | Registry, syntax reference, diagnostics, guides, snippets, shipped samples and test-story fixtures. Label any remaining decided-versus-current gap with its implementation issue. |
 | Runtime/player, when affected | Rendering, state changes, persistence, accessibility and host behavior; avoid claiming a parser-only change supplies them. |
 
+### Grammar spellings
+
+Each Talemark spelling lives once, in [`Talewright.Talemark.Vocabulary`](../../engine/src/Talewright.Talemark/Vocabulary/).
+That includes keywords, reference namespaces, properties, operators and punctuation.
+The parser turns text into a typed value at the boundary, such as `BinaryOp`, `AssignOp`, `ReferenceNamespace` or `PronounForm`.
+After that:
+
+- Binding and analysis switch on the typed value.
+- The formatter, completion and messages read spellings back from the vocabulary.
+- No code compares against a hand-typed copy.
+
+To add a term:
+
+1. Add its constant to the vocabulary.
+2. For an operator or property, add its table entry as well.
+3. Use the constant from both the parser and the printer.
+
+Identifier characters belong to `IdentifierRules`, and text-modifier names belong to their modifier (for example `OneManyTextModifier.ModifierName`).
+
+Two tests enforce this:
+
+- [TalemarkVocabularyGuardTests](../../tooling/language-server/tests/Talewright.LanguageServer.Tests/TalemarkVocabularyGuardTests.cs) fails on any string or character literal whose decoded value, as Roslyn reads it, equals a vocabulary spelling.
+  - It covers the Talemark, authoring and language-server sources.
+  - Single punctuation characters are checked only in the expression-language files it lists.
+  - Remaining exemptions name the issue that removes them.
+- [ExpressionVocabularyTests](../../engine/tests/Talewright.Talemark.Tests/ExpressionVocabularyTests.cs) checks two things: every typed value has a spelling that maps back, and every lexer symbol produces its declared token.
+
 ## Verification and review
 
 - [ ] Test canonical examples and invalid inputs, not just token acceptance. Cover quoted punctuation,

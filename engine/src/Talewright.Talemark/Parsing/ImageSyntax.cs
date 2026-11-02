@@ -3,6 +3,7 @@ using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -11,8 +12,8 @@ internal static class ImageSyntax
     internal static bool IsCall(ReadOnlySpan<char> text)
     {
         var trimmed = text.TrimStart();
-        return trimmed.StartsWith("image", StringComparison.Ordinal)
-            && trimmed[5..].TrimStart().StartsWith("(", StringComparison.Ordinal);
+        return trimmed.StartsWith(ExpressionVocabulary.Image, StringComparison.Ordinal)
+            && trimmed[ExpressionVocabulary.Image.Length..].TrimStart() is [ExpressionVocabulary.OpenParen, ..];
     }
 
     internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
@@ -23,7 +24,7 @@ internal static class ImageSyntax
         var text = source.Text;
         var i = start;
         SkipSpace();
-        i += "image".Length;
+        i += ExpressionVocabulary.Image.Length;
         SkipSpace();
         i++;
         SkipSpace();
@@ -38,7 +39,7 @@ internal static class ImageSyntax
         SkipSpace();
         var alt = "";
         IReadOnlyList<TemplateInline>? altTemplate = null;
-        if (i < end && text[i] == ',')
+        if (i < end && text[i] == ExpressionVocabulary.ArgumentSeparator)
         {
             i++;
             SkipSpace();
@@ -46,7 +47,7 @@ internal static class ImageSyntax
             SkipSpace();
         }
 
-        if (i >= end || text[i] != ')')
+        if (i >= end || text[i] != ExpressionVocabulary.CloseParen)
         {
             Error("Expected ')' after the image arguments. Write {image(\"path\", \"alt text\")}.", i);
             return null;
@@ -84,7 +85,7 @@ internal static class ImageSyntax
         bool ReadString(out string value)
         {
             value = "";
-            if (i >= end || text[i] != '"')
+            if (i >= end || text[i] != QuotedStringSyntax.QuoteMark)
             {
                 Error("Image arguments must be in double quotes. Write {image(\"path\", \"alt text\")}.", i);
                 return false;
@@ -118,7 +119,7 @@ internal static class ImageSyntax
         {
             decoded = "";
             template = null;
-            if (i >= end || text[i] != '"')
+            if (i >= end || text[i] != QuotedStringSyntax.QuoteMark)
             {
                 Error("Image arguments must be in double quotes. Write {image(\"path\", \"alt text\")}.", i);
                 return false;
@@ -154,7 +155,7 @@ internal static class ImageSyntax
                 if (unit.Escaped)
                 {
                     if (unit.End == i + 1 ||
-                        (unit.Character != '"' && !DelimiterScanner.IsReaderTextEscape(unit.Character)))
+                        (unit.Character != QuotedStringSyntax.QuoteMark && !DelimiterScanner.IsReaderTextEscape(unit.Character)))
                     {
                         AnalyzePartial(trimTrailingCall: false);
                         Error("Unknown image string escape. Use '\\\"', '\\\\', or a reader-text escape such as '\\{' or '\\*'.", i);
@@ -163,7 +164,7 @@ internal static class ImageSyntax
 
                     var next = unit.Character;
                     i = unit.End;
-                    if (next is '"' or '\\')
+                    if (next is QuotedStringSyntax.QuoteMark or QuotedStringSyntax.EscapeMark)
                     {
                         templateText.Append(next);
                         plain.Append(next);
@@ -201,7 +202,7 @@ internal static class ImageSyntax
                 var authored = templateText.ToString();
                 var count = locations.Count;
                 var endAt = i;
-                if (trimTrailingCall && authored.EndsWith(')'))
+                if (trimTrailingCall && authored.EndsWith(ExpressionVocabulary.CloseParen))
                 {
                     authored = authored[..^1];
                     count--;

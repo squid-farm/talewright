@@ -6,6 +6,7 @@ using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -61,7 +62,7 @@ internal sealed class ExpressionBinder
             var modifiers = new List<ITextModifier>();
             foreach (var call in syntax.Modifiers)
             {
-                if (call.Name == "one-many")
+                if (call.Name == OneManyTextModifier.ModifierName)
                 {
                     if (value is not (PronounRef or ItemNameRef) || call.Argument is null || call.PluralArgument is null)
                     {
@@ -82,7 +83,7 @@ internal sealed class ExpressionBinder
                 if (!symbols.Modifiers.TryGet(call.Name, out var modifier))
                 {
                     binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
-                        $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => "#" + name))}.",
+                        $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
                         call.Offset);
                 }
 
@@ -187,9 +188,9 @@ internal sealed class ExpressionBinder
         var member = reference.Member is { } memberSpan ? Text(memberSpan) : null;
         var subMember = reference.SubMember is { } subMemberSpan ? Text(subMemberSpan) : null;
 
-        switch (ns)
+        switch (reference.Kind)
         {
-            case "faction":
+            case ReferenceNamespace.Faction:
             {
                 var faction = new FactionId(path);
                 if (!_symbols.World.Factions.ContainsKey(faction))
@@ -197,7 +198,7 @@ internal sealed class ExpressionBinder
                     var dot = path.LastIndexOf('.');
                     var oldMember = dot < 0 ? string.Empty : path[(dot + 1)..];
                     var oldId = dot < 0 ? string.Empty : path[..dot];
-                    if (member is null && oldMember is "name" or "tier")
+                    if (member is null && oldMember is ExpressionVocabulary.Name or ExpressionVocabulary.Tier)
                     {
                         Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
                             $"Unknown faction '{path}'. Dotted property access is no longer supported; use 'faction:{oldId}:{oldMember}' for its {oldMember} property.",
@@ -210,15 +211,15 @@ internal sealed class ExpressionBinder
                 if (member is null) return new StandingRef(faction);
                 return member switch
                 {
-                    "tier" => new StandingTierRef(faction),
-                    "name" => new FactionNameRef(faction),
+                    ExpressionVocabulary.Tier => new StandingTierRef(faction),
+                    ExpressionVocabulary.Name => new FactionNameRef(faction),
                     _ => Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty,
                         $"Unknown faction property '{member}'. Use 'faction:{path}:tier' or 'faction:{path}:name'.",
                         reference.Member!.Value.Start),
                 };
             }
 
-            case "item":
+            case ReferenceNamespace.Item:
                 if (member is not null)
                 {
                     Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Item names are referenced as 'item:{path}'; '.' only groups words inside names.",
@@ -226,7 +227,7 @@ internal sealed class ExpressionBinder
                 }
 
                 return new ItemNameRef(Item(reference.Name));
-            case "flag":
+            case ReferenceNamespace.Flag:
             {
                 if (member is not null)
                 {
@@ -244,7 +245,7 @@ internal sealed class ExpressionBinder
                 return new FlagRef(flag);
             }
 
-            case "var":
+            case ReferenceNamespace.Variable:
             {
                 if (member is not null)
                 {
@@ -275,7 +276,7 @@ internal sealed class ExpressionBinder
         var character = Character(reference.Namespace);
         if (member is not null)
         {
-            if (path != "pronoun")
+            if (path != ExpressionVocabulary.Pronoun)
             {
                 Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character property '{path}:{member}'.", reference.Member!.Value.Start);
             }
@@ -283,39 +284,28 @@ internal sealed class ExpressionBinder
             return new PronounRef(character, ParsePronounForm(member, subMember, reference));
         }
 
-        return path switch
-        {
-            "first-name" => new NameRef(character, NamePart.First),
-            "last-name" => new NameRef(character, NamePart.Last),
-            "name" => new NameRef(character, NamePart.Full),
-            "pronoun" => new PronounRef(character, PronounForm.Subject),
-            _ => ResolveStat(character, reference.Name, reference.Namespace),
-        };
+        if (ExpressionVocabulary.TryGetNamePart(path, out var part)) return new NameRef(character, part);
+        return path == ExpressionVocabulary.Pronoun
+            ? new PronounRef(character, PronounForm.Subject)
+            : ResolveStat(character, reference.Name, reference.Namespace);
     }
 
     private PronounForm ParsePronounForm(string property, string? subMember, ReferenceExpressionNode reference)
     {
-        if (property == "possessive-pronoun")
+        if (property == ExpressionVocabulary.PossessivePronoun)
         {
-            return subMember switch
-            {
-                "determiner" => PronounForm.Possessive,
-                "independent" => PronounForm.PossessivePronoun,
-                _ => Fail<PronounForm>(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                    $"Unknown possessive pronoun property '{subMember}'. Use 'determiner' or 'independent'.",
-                    reference.SubMember!.Value.Start),
-            };
+            return ExpressionVocabulary.TryGetPossessiveForm(subMember, out var possessive)
+                ? possessive
+                : Fail<PronounForm>(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                    $"Unknown possessive pronoun property '{subMember}'. Use '{ExpressionVocabulary.Determiner}' or '{ExpressionVocabulary.Independent}'.",
+                    reference.SubMember!.Value.Start);
         }
 
-        return property switch
-        {
-            "subject" => PronounForm.Subject,
-            "object" => PronounForm.Object,
-            "reflexive" => PronounForm.Reflexive,
-            _ => Fail<PronounForm>(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                $"Unknown pronoun property '{property}'. Use {string.Join(", ", ExpressionParser.PronounProperties)}.",
-                reference.Member!.Value.Start),
-        };
+        return ExpressionVocabulary.TryGetPronounForm(property, out var form)
+            ? form
+            : Fail<PronounForm>(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown pronoun property '{property}'. Use {string.Join(", ", ExpressionVocabulary.PronounProperties)}.",
+                reference.Member!.Value.Start);
     }
 
     private Expr ResolveStat(EntityId character, ExpressionSpan path, ExpressionSpan ns)
@@ -329,24 +319,27 @@ internal sealed class ExpressionBinder
     private Expr BindUnary(UnaryExpressionNode unary)
     {
         var operand = Bind(unary.Operand);
-        if (unary.Operator == TokenKind.Identifier)
+        switch (unary.Operator)
         {
-            if (operand.Type != ExprType.Bool)
-            {
-                Fail(CompilerDiagnosticCodes.TypeMismatch, "'not' needs a true/false condition.", unary.OperatorSpan.Start);
-            }
+            case UnaryOp.Not:
+                if (operand.Type != ExprType.Bool)
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Not}' needs a true/false condition.", unary.OperatorSpan.Start);
+                }
 
-            return new UnaryExpr(UnaryOp.Not, operand);
+                return new UnaryExpr(UnaryOp.Not, operand);
+            case UnaryOp.Negate:
+                if (operand.Type != ExprType.Number)
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Minus}' needs a number.", unary.OperatorSpan.Start);
+                }
+
+                return operand is NumberLiteral number
+                    ? new NumberLiteral(number.Value == int.MinValue ? int.MaxValue : -number.Value)
+                    : new UnaryExpr(UnaryOp.Negate, operand);
+            default:
+                throw new InvalidOperationException($"Unsupported unary operator '{unary.Operator}'.");
         }
-
-        if (operand.Type != ExprType.Number)
-        {
-            Fail(CompilerDiagnosticCodes.TypeMismatch, "'-' needs a number.", unary.OperatorSpan.Start);
-        }
-
-        return operand is NumberLiteral number
-            ? new NumberLiteral(number.Value == int.MinValue ? int.MaxValue : -number.Value)
-            : new UnaryExpr(UnaryOp.Negate, operand);
     }
 
     private Expr BindBinary(BinaryExpressionNode binary)
@@ -370,61 +363,51 @@ internal sealed class ExpressionBinder
 
     private Expr BindBinaryOperation(BinaryExpressionNode binary, Expr left, Expr right)
     {
-        var op = binary.Operator switch
+        var op = binary.Operator;
+        switch (op)
         {
-            TokenKind.Identifier when Text(binary.OperatorSpan) == "or" => BinaryOp.Or,
-            TokenKind.Identifier => BinaryOp.And,
-            TokenKind.Equal => BinaryOp.Equal,
-            TokenKind.NotEqual => BinaryOp.NotEqual,
-            TokenKind.Less => BinaryOp.Less,
-            TokenKind.LessOrEqual => BinaryOp.LessOrEqual,
-            TokenKind.Greater => BinaryOp.Greater,
-            TokenKind.GreaterOrEqual => BinaryOp.GreaterOrEqual,
-            TokenKind.Plus => BinaryOp.Add,
-            TokenKind.Minus => BinaryOp.Subtract,
-            TokenKind.Star => BinaryOp.Multiply,
-            TokenKind.Slash => BinaryOp.Divide,
-            _ => throw new InvalidOperationException($"Unsupported binary operator '{binary.Operator}'."),
-        };
+            case BinaryOp.Or or BinaryOp.And:
+                if (left.Type != ExprType.Bool || right.Type != ExprType.Bool)
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Spelling(op)}' needs true/false conditions on both sides.",
+                        binary.OperatorSpan.Start);
+                }
 
-        if (op is BinaryOp.Or or BinaryOp.And)
-        {
-            if (left.Type != ExprType.Bool || right.Type != ExprType.Bool)
-            {
-                Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{op.ToString().ToLowerInvariant()}' needs true/false conditions on both sides.",
-                    binary.OperatorSpan.Start);
-            }
-        }
-        else if (op is BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide)
-        {
-            if (left.Type != ExprType.Number || right.Type != ExprType.Number)
-            {
-                Fail(CompilerDiagnosticCodes.TypeMismatch, "Arithmetic needs numbers on both sides.", binary.OperatorSpan.Start);
-            }
-        }
-        else
-        {
-            if (left.Type == ExprType.Tier && right is StandingRef rightStanding)
-            {
-                right = new StandingTierRef(rightStanding.Faction);
-            }
-            else if (right.Type == ExprType.Tier && left is StandingRef leftStanding)
-            {
-                left = new StandingTierRef(leftStanding.Faction);
-            }
+                break;
+            case BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide:
+                if (left.Type != ExprType.Number || right.Type != ExprType.Number)
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, "Arithmetic needs numbers on both sides.", binary.OperatorSpan.Start);
+                }
 
-            if (left.Type != right.Type)
-            {
-                Fail(CompilerDiagnosticCodes.TypeMismatch,
-                    $"Cannot compare a {Describe(left.Type)} with a {Describe(right.Type)}.",
-                    binary.OperatorSpan.Start);
-            }
+                break;
+            case BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual or BinaryOp.Greater
+                or BinaryOp.GreaterOrEqual:
+                if (left.Type == ExprType.Tier && right is StandingRef rightStanding)
+                {
+                    right = new StandingTierRef(rightStanding.Faction);
+                }
+                else if (right.Type == ExprType.Tier && left is StandingRef leftStanding)
+                {
+                    left = new StandingTierRef(leftStanding.Faction);
+                }
 
-            if (left.Type is ExprType.Bool or ExprType.Text && op is not (BinaryOp.Equal or BinaryOp.NotEqual))
-            {
-                Fail(CompilerDiagnosticCodes.TypeMismatch, $"Only == and != can compare {Describe(left.Type)} values.",
-                    binary.OperatorSpan.Start);
-            }
+                if (left.Type != right.Type)
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch,
+                        $"Cannot compare a {Describe(left.Type)} with a {Describe(right.Type)}.",
+                        binary.OperatorSpan.Start);
+                }
+
+                if (left.Type is ExprType.Bool or ExprType.Text && op is not (BinaryOp.Equal or BinaryOp.NotEqual))
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"Only {ExpressionVocabulary.EqualTo} and {ExpressionVocabulary.NotEqualTo} can compare {Describe(left.Type)} values.",
+                        binary.OperatorSpan.Start);
+                }
+
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported binary operator '{op}'.");
         }
 
         return new BinaryExpr(op, left, right);
@@ -461,28 +444,21 @@ internal sealed class ExpressionBinder
     private Effect BindAssignment(AssignmentEffectSyntax effect)
     {
         var targetName = Text(effect.Target);
-        var ns = Text(effect.Namespace);
         var variable = new VarId(targetName);
-        if (ns == "var" && _symbols.UnresolvedVariables.Contains(variable))
+        if (effect.Kind == ReferenceNamespace.Variable && _symbols.UnresolvedVariables.Contains(variable))
         {
             Fail(CompilerDiagnosticCodes.UnresolvedVariableType,
                 $"Cannot infer the type of variable '{targetName}'. Declare an initial value under 'vars' in story.talewright.yaml.",
                 effect.Target.Start);
         }
 
-        var op = effect.Operator switch
-        {
-            TokenKind.Assign => AssignOp.Set,
-            TokenKind.PlusAssign => AssignOp.Add,
-            TokenKind.MinusAssign => AssignOp.Subtract,
-            _ => throw new InvalidOperationException($"Unsupported assignment operator '{effect.Operator}'."),
-        };
+        var op = effect.Operator;
         var amount = Bind(effect.Amount);
-        if (ns == "var" && _symbols.World.TextVariables.ContainsKey(variable))
+        if (effect.Kind == ReferenceNamespace.Variable && _symbols.World.TextVariables.ContainsKey(variable))
         {
             if (op != AssignOp.Set)
             {
-                Fail(CompilerDiagnosticCodes.TypeMismatch, $"Text variable '{targetName}' supports '=' only, not '{AssignmentText(effect.Operator)}'.",
+                Fail(CompilerDiagnosticCodes.TypeMismatch, $"Text variable '{targetName}' supports '{ExpressionVocabulary.Spelling(AssignOp.Set)}' only, not '{ExpressionVocabulary.Spelling(op)}'.",
                     effect.Target.Start);
             }
 
@@ -497,18 +473,18 @@ internal sealed class ExpressionBinder
 
         if (amount.Type != ExprType.Number)
         {
-            Fail(CompilerDiagnosticCodes.TypeMismatch, ns == "var"
+            Fail(CompilerDiagnosticCodes.TypeMismatch, effect.Kind == ReferenceNamespace.Variable
                 ? $"Variable '{targetName}' has a fixed integer type and needs a number, not {Describe(amount.Type)}."
                 : "Only numbers can be assigned to stats or faction standings.", effect.Amount.Span.Start);
         }
 
-        return ns switch
+        return effect.Kind switch
         {
-            "faction" => _symbols.World.Factions.ContainsKey(new FactionId(targetName))
+            ReferenceNamespace.Faction => _symbols.World.Factions.ContainsKey(new FactionId(targetName))
                 ? new ChangeStanding(new FactionId(targetName), op, amount)
                 : Fail<Effect>(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{targetName}'.", effect.Target.Start),
-            "var" => new ChangeVariable(variable, op, amount),
-            "flag" => Fail<Effect>(CompilerDiagnosticCodes.MalformedEffect, "Use 'set flag:x' or 'clear flag:x' for flags.", effect.Namespace.Start),
+            ReferenceNamespace.Variable => new ChangeVariable(variable, op, amount),
+            ReferenceNamespace.Flag => Fail<Effect>(CompilerDiagnosticCodes.MalformedEffect, "Use 'set flag:x' or 'clear flag:x' for flags.", effect.Namespace.Start),
             _ => new ChangeStat(Character(effect.Namespace), Stat(effect.Target), op, amount),
         };
     }
@@ -550,14 +526,6 @@ internal sealed class ExpressionBinder
     }
 
     private string Text(ExpressionSpan span) => _tokens.Source.AsSpan(span.Start, span.Length).ToString();
-
-    private static string AssignmentText(TokenKind kind) => kind switch
-    {
-        TokenKind.Assign => "=",
-        TokenKind.PlusAssign => "+=",
-        TokenKind.MinusAssign => "-=",
-        _ => throw new InvalidOperationException($"Unsupported assignment operator '{kind}'."),
-    };
 
     private static string Describe(ExprType type) => type switch
     {

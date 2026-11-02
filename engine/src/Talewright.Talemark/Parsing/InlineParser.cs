@@ -3,6 +3,7 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -457,8 +458,9 @@ internal static class InlineParser
             }
 
             var lead = inner.Length - inner.TrimStart().Length;
-            context.Symbols.Analysis?.Tokens.Add(new("image",
-                new(context.Source.Locate(sourceOffset + lead), context.Source.Locate(sourceOffset + lead + 5))));
+            context.Symbols.Analysis?.Tokens.Add(new(ExpressionVocabulary.Image,
+                new(context.Source.Locate(sourceOffset + lead),
+                    context.Source.Locate(sourceOffset + lead + ExpressionVocabulary.Image.Length))));
             var media = ImageSyntax.Parse(context.Source, sourceOffset, close, true, context.Diagnostics,
                 context.Symbols, context.CancellationToken);
             return media is null ? null : new InlinePiece(media);

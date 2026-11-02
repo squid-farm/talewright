@@ -6,6 +6,9 @@ namespace Talewright.Core.Identity;
 /// </summary>
 public static class IdentifierRules
 {
+    public const char DotSeparator = '.';
+    public const char HyphenSeparator = '-';
+
     public static bool IsValid(string value) => IsValid(value.AsSpan(0, value.Length));
 
     public static bool IsValid(ReadOnlySpan<char> value)
@@ -18,7 +21,7 @@ public static class IdentifierRules
         var afterSeparator = false;
         foreach (var c in value[1..])
         {
-            if (c is '.' or '-')
+            if (IsSeparator(c))
             {
                 if (afterSeparator)
                 {
@@ -42,7 +45,9 @@ public static class IdentifierRules
 
     public static bool IsStart(char value) => value is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or '_';
 
-    public static bool IsPart(char value) => IsWordChar(value) || value is '.' or '-';
+    public static bool IsPart(char value) => IsWordChar(value) || IsSeparator(value);
+
+    public static bool IsSeparator(char value) => value is DotSeparator or HyphenSeparator;
 
     private static bool IsWordChar(char value) => IsStart(value) || value is >= '0' and <= '9';
 }
