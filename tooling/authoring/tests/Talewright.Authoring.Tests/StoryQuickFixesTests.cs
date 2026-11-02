@@ -57,6 +57,35 @@ public sealed class StoryQuickFixesTests
         Assert.Equal("\n\nflags:\n  - missing", fix.NewText);
     }
 
+    [Theory]
+    [InlineData("game: {id: x}\n", "true", "\nflags:\n  - 'true'\n")]
+    [InlineData("flags: []\n", "false", "'false'")]
+    [InlineData("flags: [ready]\n", "Null", ", 'Null'")]
+    [InlineData("flags:\n  - ready\n", "yes", "  - 'yes'\n")]
+    [InlineData("flags: [ready]\n", "true-ish", ", true-ish")]
+    public void Yaml_keyword_spellings_are_quoted_in_every_list_shape(string manifest, string item, string newText)
+    {
+        var result = ManifestListEditor.Append(manifest, StorySource.ManifestFileName, "flags", item);
+
+        Assert.Null(result.Reason);
+        Assert.Equal(newText, result.Edit!.NewText);
+    }
+
+    [Fact]
+    public void Applying_a_reserved_flag_fix_declares_it_as_a_string()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\nflags: []\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n{if flag:true}Never.{/if}\n-> END\n";
+        var analysis = AnalyzeFlag(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingFlag(analysis, diagnostic).Fixes);
+        var edited = AnalyzeFlag(ApplyInsertion(manifest, fix), story);
+
+        Assert.Contains("flags: ['true']", ApplyInsertion(manifest, fix));
+        Assert.Empty(edited.Diagnostics);
+    }
+
     [Fact]
     public void Malformed_yaml_is_not_edited_and_returns_a_reason()
     {
@@ -176,6 +205,14 @@ public sealed class StoryQuickFixesTests
         };
         foreach (var (additionalFile, additionalText) in additionalFiles) files.Add(additionalFile, additionalText);
         return StoryAnalyzer.Analyze(new StorySource(files));
+    }
+
+    private static string ApplyInsertion(string text, StoryQuickFix fix)
+    {
+        Assert.Equal(fix.Range.Start, fix.Range.End);
+        var lines = text.Split('\n');
+        var offset = lines.Take(fix.Range.Start.Line - 1).Sum(line => line.Length + 1) + fix.Range.Start.Column - 1;
+        return text.Insert(offset, fix.NewText);
     }
 
     private static StoryAnalysis AnalyzeFlag(string manifest, string text) =>

@@ -24,6 +24,7 @@ internal static class ManifestListEditor
             return new(null, $"Cannot safely edit '{file}' because it contains invalid YAML.");
         }
 
+        var scalar = FormatScalar(item);
         if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
             return new(null, $"Cannot safely edit '{file}' because it must contain one YAML mapping.");
         if (root.Style == MappingStyle.Flow)
@@ -38,7 +39,7 @@ internal static class ManifestListEditor
             var hasFinalNewline = EndsInNewline(text);
             var separator = text.Length == 0 ? "" : hasFinalNewline ? newline : newline + newline;
             var ending = hasFinalNewline ? newline : "";
-            var insertion = $"{separator}{section}:{newline}  - {item}{ending}";
+            var insertion = $"{separator}{section}:{newline}  - {scalar}{ending}";
             var point = LocationAt(file, text, text.Length);
             return new(new(new(point, point), insertion), null);
         }
@@ -48,18 +49,18 @@ internal static class ManifestListEditor
 
         foreach (var child in sequence.Children)
         {
-            if (child is not YamlScalarNode scalar ||
-                scalar.Style is not (ScalarStyle.Plain or ScalarStyle.SingleQuoted or ScalarStyle.DoubleQuoted) ||
-                !IdentifierRules.IsValid(scalar.Value ?? ""))
+            if (child is not YamlScalarNode entry ||
+                entry.Style is not (ScalarStyle.Plain or ScalarStyle.SingleQuoted or ScalarStyle.DoubleQuoted) ||
+                !IdentifierRules.IsValid(entry.Value ?? ""))
                 return new(null, $"Cannot safely edit '{file}' because '{section}' contains an unsupported or invalid entry.");
         }
-        if (sequence.Children.OfType<YamlScalarNode>().Any(scalar => scalar.Value == item))
+        if (sequence.Children.OfType<YamlScalarNode>().Any(entry => entry.Value == item))
             return new(null, $"Cannot safely edit '{file}' because '{item}' is already declared.");
 
         return sequence.Style switch
         {
-            SequenceStyle.Flow => AppendFlow(text, file, section, sequence, item),
-            SequenceStyle.Block => AppendBlock(text, file, section, sequence, item),
+            SequenceStyle.Flow => AppendFlow(text, file, section, sequence, scalar),
+            SequenceStyle.Block => AppendBlock(text, file, section, sequence, scalar),
             _ => new(null, $"Cannot safely edit '{file}' because '{section}' uses an unsupported YAML list style.")
         };
     }
@@ -126,6 +127,15 @@ internal static class ManifestListEditor
         var point = LocationAt(file, text, insertionOffset);
         return new(new(new(point, point), insertion), null);
     }
+
+    // Identifiers cannot look numeric, but plain keyword spellings would resolve to booleans or null
+    // under YAML 1.2 core or YAML 1.1 schemas.
+    private static readonly HashSet<string> ReservedScalars = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "true", "false", "null", "yes", "no", "on", "off", "y", "n"
+    };
+
+    private static string FormatScalar(string item) => ReservedScalars.Contains(item) ? $"'{item}'" : item;
 
     private static int[] LineStarts(string text)
     {
