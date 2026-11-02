@@ -83,16 +83,17 @@ public sealed class TalemarkVocabularyGuardTests
     }
 
     [Fact]
-    public void Literal_scanner_ignores_prose_comments_and_interpolation()
+    public void Literal_scanner_checks_verbatim_and_raw_values_but_ignores_comments_and_interpolation()
     {
-        const string source = """
+        const string source = """"
             // "and"
-            var a = "and"; var b = ':'; var c = $"{x} and"; var d = @"or";
+            var a = "and"; var b = ':'; var c = $"{x} and"; var d = @"or"; var raw = """and""";
             var e = "Expected ')' here"; /* "not" */ var f = '\'';
-            var g = $"{(a ? "x" : "y")} {{"; var h = "or";
-            """;
+            var verbatimInterpolated = $@"{(a ? "x" : "y")} {{";
+            var ordinaryInterpolated = $"{(a ? "x" : "y")} {{"; var h = "or";
+            """";
 
-        Assert.Equal([(2, "and"), (2, ":"), (3, "Expected ')' here"), (3, "'"), (4, "or")], Literals(source));
+        Assert.Equal([(2, "and"), (2, ":"), (2, "or"), (2, "and"), (3, "Expected ')' here"), (3, "'"), (5, "or")], Literals(source));
     }
 
     private static (HashSet<string> Words, HashSet<string> Punctuation) Spellings()
@@ -114,7 +115,7 @@ public sealed class TalemarkVocabularyGuardTests
                 .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 .Any(part => part is "bin" or "obj" or "Vocabulary"));
 
-    /// <summary>Values of regular string and character literals, skipping comments, verbatim, raw and interpolated strings.</summary>
+    /// <summary>Values of regular, verbatim, raw and character literals, skipping comments and interpolated strings.</summary>
     private static List<(int Line, string Value)> Literals(string source)
     {
         var literals = new List<(int, string)>();
@@ -138,9 +139,23 @@ public sealed class TalemarkVocabularyGuardTests
                 while (i < source.Length && !(source[i] == '*' && At(i + 1) == '/')) line += source[i++] == '\n' ? 1 : 0;
                 i += 2;
             }
-            else if (c is '$' or '@' || c == '"' && At(i + 1) == '"' && At(i + 2) == '"')
+            else if (c == '@' && At(i + 1) == '"')
+            {
+                var start = line;
+                var (value, end) = ReadVerbatim(i);
+                literals.Add((start, value));
+                i = end;
+            }
+            else if (c is '$' or '@')
             {
                 i = SkipSpecialString(i);
+            }
+            else if (c == '"' && At(i + 1) == '"' && At(i + 2) == '"')
+            {
+                var start = line;
+                var (value, end) = ReadRaw(i);
+                literals.Add((start, value));
+                i = end;
             }
             else if (c is '"' or '\'')
             {
@@ -158,6 +173,57 @@ public sealed class TalemarkVocabularyGuardTests
         return literals;
 
         char At(int index) => index < source.Length ? source[index] : '\0';
+
+        (string Value, int End) ReadVerbatim(int start)
+        {
+            var value = new StringBuilder();
+            var index = start + 2;
+            while (index < source.Length)
+            {
+                if (source[index] == '"' && At(index + 1) == '"')
+                {
+                    value.Append('"');
+                    index += 2;
+                }
+                else if (source[index] == '"')
+                {
+                    return (value.ToString(), index + 1);
+                }
+                else
+                {
+                    if (source[index] == '\n') line++;
+                    value.Append(source[index++]);
+                }
+            }
+
+            return (value.ToString(), index);
+        }
+
+        (string Value, int End) ReadRaw(int start)
+        {
+            var delimiterLength = 0;
+            while (At(start + delimiterLength) == '"') delimiterLength++;
+            var contentStart = start + delimiterLength;
+            for (var index = contentStart; index < source.Length;)
+            {
+                if (source[index] != '"')
+                {
+                    if (source[index++] == '\n') line++;
+                    continue;
+                }
+
+                var quoteCount = 0;
+                while (At(index + quoteCount) == '"') quoteCount++;
+                if (quoteCount >= delimiterLength)
+                {
+                    return (source[contentStart..index], index + delimiterLength);
+                }
+
+                index += quoteCount;
+            }
+
+            return (source[contentStart..], source.Length);
+        }
 
         (string Value, int End) ReadQuoted(int start, char quote)
         {
