@@ -5,6 +5,7 @@ using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Tests;
 
@@ -140,6 +141,42 @@ public class EditorManifestSchemaTests
             }));
             Assert.Equal(expectedCodes, result.Diagnostics.Select(diagnostic => diagnostic.Code).Order().ToArray());
             Assert.Equal(!expectedCodes.Contains("TW4003"), result.Success);
+            Assert.All(result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4006"), diagnostic =>
+            {
+                Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+                Assert.Contains("(ignored)", diagnostic.Message);
+            });
+            if (fixture.TryGetProperty("diagnosticLocations", out var locations))
+            {
+                var expectedLocations = locations.EnumerateArray()
+                    .Select(location => (Line: location.GetProperty("line").GetInt32(),
+                        Column: location.GetProperty("column").GetInt32()))
+                    .OrderBy(location => location.Line)
+                    .ThenBy(location => location.Column)
+                    .ToArray();
+                var actualLocations = result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4003")
+                    .Select(diagnostic => (Line: diagnostic.Location.Line, Column: diagnostic.Location.Column))
+                    .OrderBy(location => location.Line)
+                    .ThenBy(location => location.Column)
+                    .ToArray();
+                Assert.Equal(expectedLocations, actualLocations);
+            }
+            if (fixture.TryGetProperty("warningLocations", out var warningLocations))
+            {
+                var expectedLocations = warningLocations.EnumerateArray()
+                    .Select(location => (Line: location.GetProperty("line").GetInt32(),
+                        Column: location.GetProperty("column").GetInt32()))
+                    .OrderBy(location => location.Line)
+                    .ThenBy(location => location.Column)
+                    .ToArray();
+                var actualLocations = result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4006")
+                    .Select(diagnostic => (Line: diagnostic.Location.Line, Column: diagnostic.Location.Column))
+                    .OrderBy(location => location.Line)
+                    .ThenBy(location => location.Column)
+                    .ToArray();
+                Assert.Equal(expectedLocations, actualLocations);
+            }
+
             if (!result.Success)
             {
                 Assert.Null(result.Story);
@@ -147,6 +184,15 @@ public class EditorManifestSchemaTests
             }
 
             var story = result.Story!;
+            if (fixture.TryGetProperty("booleanValue", out var booleanValue))
+            {
+                var expected = booleanValue.GetBoolean();
+                Assert.Equal(expected, story.UndoEnabled);
+                Assert.Equal(expected, story.Creation!.EditName);
+                Assert.Equal(expected, story.World.Items[new ItemId("coin")].Uncountable);
+                Assert.Equal(expected, Assert.Single(story.Triggers).Once);
+            }
+
             var player = story.World.Characters[EntityId.Player];
             switch (file)
             {

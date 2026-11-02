@@ -518,14 +518,15 @@ internal sealed class StoryYamlReader
         {
             var id = Identifier(key, "faction id");
             if (id is null) continue;
-            var name = id;
-            var standing = 0;
-            if (value is YamlMappingNode body)
+            if (value is not YamlMappingNode body)
             {
-                CheckKeys(body, "name", "standing");
-                name = Scalar(Get(body, "name")) ?? id;
-                standing = Int(Get(body, "standing")) ?? 0;
+                Error(value, "TW4003", $"Faction '{id}' must be a mapping (key: value pairs).", 0);
+                continue;
             }
+
+            CheckKeys(body, "name", "standing");
+            var name = Scalar(Get(body, "name")) ?? id;
+            var standing = Int(Get(body, "standing")) ?? 0;
 
             factions.Add(new FactionDefinition(new FactionId(id), name, standing));
         }
