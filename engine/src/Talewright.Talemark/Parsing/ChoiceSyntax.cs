@@ -229,7 +229,7 @@ internal static class ChoiceSyntax
             work++;
             index++;
         }
-        if (index >= end || text[index] != ':')
+        if (index >= end || text[index] != ExpressionVocabulary.Separator)
             return false;
 
         for (index++; index < end; index++)

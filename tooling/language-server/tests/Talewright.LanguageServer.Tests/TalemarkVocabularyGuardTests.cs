@@ -41,6 +41,7 @@ public sealed class TalemarkVocabularyGuardTests
         "engine/src/Talewright.Talemark/Parsing/ExpressionBinder.cs",
         "engine/src/Talewright.Talemark/Parsing/ExpressionParser.cs",
         "engine/src/Talewright.Talemark/Parsing/ImageSyntax.cs",
+        "engine/src/Talewright.Talemark/Parsing/ChoiceSyntax.cs",
         "engine/src/Talewright.Talemark/Formatting/ExpressionFormatter.cs",
         "engine/src/Talewright.Talemark/Analysis/CompletionSite.cs",
     ];
