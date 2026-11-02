@@ -52,8 +52,12 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 ### Grammar spellings
 
 Each Talemark spelling lives once, in [`Talewright.Talemark.Vocabulary`](../../engine/src/Talewright.Talemark/Vocabulary/).
-That includes keywords, reference namespaces, properties, operators and punctuation.
-The parser turns text into a typed value at the boundary, such as `BinaryOp`, `AssignOp`, `ReferenceNamespace` or `PronounForm`.
+That includes expression keywords, reference namespaces, properties, operators, scene and choice markers, inline conditions,
+skill-check terms, scene metadata keys, text escape and quote markers, and the `END` target.
+The parser turns text into a typed value at the boundary, such as `BinaryOp`, `AssignOp`, `ReferenceNamespace`,
+`PronounForm` or `SceneMetadataKey`.
+Keep vocabulary members internal by default; expose only the spellings that another assembly's tooling must consume.
+Identical characters in unrelated syntaxes, such as Talemark escapes and legacy Markdown, retain separate semantic owners.
 After that:
 
 - Binding and analysis switch on the typed value.
@@ -62,9 +66,9 @@ After that:
 
 To add a term:
 
-1. Add its constant to the vocabulary.
-2. For an operator or property, add its table entry as well.
-3. Use the constant from both the parser and the printer.
+1. Add its constant to the appropriate vocabulary type.
+2. If it selects behavior, map it to an exhaustive typed value (for example `SceneMetadataKey`).
+3. Use the constant from parsing through formatting, completion and authoring where applicable.
 
 Identifier characters belong to `IdentifierRules`, and text-modifier names belong to their modifier (for example `OneManyTextModifier.ModifierName`).
 
@@ -72,9 +76,9 @@ Two tests enforce this:
 
 - [TalemarkVocabularyGuardTests](../../tooling/language-server/tests/Talewright.LanguageServer.Tests/TalemarkVocabularyGuardTests.cs) fails on any string or character literal whose decoded value, as Roslyn reads it, equals a vocabulary spelling.
   - It covers the Talemark, authoring and language-server sources.
-  - Single punctuation characters are checked only in the expression-language files it lists.
+  - Expression punctuation is checked in the expression-language files it lists; reader-text delimiters, escape and quote markers, and single-character line markers are checked only in their parser files.
   - Remaining exemptions name the issue that removes them.
-- [ExpressionVocabularyTests](../../engine/tests/Talewright.Talemark.Tests/ExpressionVocabularyTests.cs) checks two things: every typed value has a spelling that maps back, and every lexer symbol produces its declared token.
+- [ExpressionVocabularyTests](../../engine/tests/Talewright.Talemark.Tests/ExpressionVocabularyTests.cs) checks that every typed expression value has a spelling that maps back, and every lexer symbol produces its declared token. Scene metadata uses an exhaustive `SceneMetadataKey` mapping.
 
 ## Verification and review
 

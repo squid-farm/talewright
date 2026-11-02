@@ -74,6 +74,21 @@ public sealed class ReaderTextGrammarTests
     }
 
     [Fact]
+    public void Unclosed_inline_diagnostic_suggests_an_escaped_brace()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = "=== start\n{unfinished\n-> END",
+        });
+        var result = StoryCompiler.Compile(source);
+        var error = Assert.Single(result.Errors,
+            diagnostic => diagnostic.Code == CompilerDiagnosticCodes.UnclosedInlineConstruct);
+
+        Assert.Equal("""Unclosed '{'. Use '\{' for a literal brace.""", error.Message);
+    }
+
+    [Fact]
     public void Formatting_and_code_scans_do_linear_work_on_a_mixed_paragraph()
     {
         var input = string.Concat(Enumerable.Repeat(

@@ -73,6 +73,7 @@ internal static class ExpressionVocabulary
     internal const char Less = '<';
     internal const char Greater = '>';
     internal const char Assign = '=';
+    internal const char NotEqualMarker = '!';
 
     /// <summary>Lexer punctuation, longest spelling first so two-character operators win.</summary>
     internal static readonly ImmutableArray<(string Spelling, TokenKind Kind)> Symbols =

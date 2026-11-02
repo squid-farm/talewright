@@ -167,6 +167,19 @@ public sealed class ImageSyntaxTests
     }
 
     [Theory]
+    [InlineData("""{image("ca\{mp", "Alt")}""",
+        """Unknown image string escape. Use '\"' for a quote or '\\' for a backslash.""")]
+    [InlineData("""{image("camp", "\q")}""",
+        """Unknown image string escape. Use '\"', '\\', or a reader-text escape such as '\{' or '\*'.""")]
+    public void Invalid_escape_diagnostic_names_valid_spellings(string call, string message)
+    {
+        var result = Compile($"=== start\n{call}\n-> END");
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW1014");
+
+        Assert.Equal(message, error.Message);
+    }
+
+    [Theory]
     [InlineData("""* [Pick {image("coin")] -> END""", "]", "Close it with '}'")]
     [InlineData("""  * [🦑 Pick {image("coin")] -> END""", "]", "Close it with '}'")]
     [InlineData("""* [Pick {image("coin", "unclosed)] -> END""", "\"unclosed", "closing double quote")]
@@ -217,6 +230,8 @@ public sealed class ImageSyntaxTests
     [InlineData(@"![a\]](p)")]
     [InlineData("![a](p(q))")]
     [InlineData("![a](p q)")]
+    [InlineData(@"![a](p\q)")]
+    [InlineData("""![a](p"q)""")]
     public void Malformed_markdown_image_candidates_remain_literal(string candidate)
     {
         var result = Compile($"=== start\n{candidate}\n-> END");

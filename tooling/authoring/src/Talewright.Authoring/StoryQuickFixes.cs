@@ -2,6 +2,7 @@ using Talewright.Core.Identity;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring;
 
@@ -55,14 +56,14 @@ public static class StoryQuickFixes
             .FirstOrDefault(site => site.Range.Start == diagnostic.Location &&
                 site.Kinds.Contains(AuthoringSymbolKind.Scene) &&
                 IdentifierRules.IsValid(site.Text))?.Text;
-        if (sceneId is null || sceneId == "END" ||
+        if (sceneId is null || sceneId == SceneVocabulary.End ||
             analysis.Symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Scene && symbol.Name == sceneId))
             return [];
 
         var hasFinalNewline = sourceText.EndsWith('\n') || sourceText.EndsWith('\r');
         var newline = DetectNewline(sourceText);
         var separator = sourceText.Length == 0 ? "" : hasFinalNewline ? newline : newline + newline;
-        var insertion = $"{separator}=== {sceneId}{(hasFinalNewline ? newline : "")}";
+        var insertion = $"{separator}{SceneVocabulary.SceneHeader} {sceneId}{(hasFinalNewline ? newline : "")}";
         var end = EndOfDocument(diagnostic.Location.File, sourceText);
         var fixes = new List<StoryQuickFix>
         {
@@ -79,7 +80,7 @@ public static class StoryQuickFixes
 
         var beginning = new SourceLocation(newFile, 1, 1);
         fixes.Add(new($"Create scene '{sceneId}' in a new file", StoryQuickFixKind.CreateFile, newFile,
-            new(beginning, beginning), $"=== {sceneId}{(hasFinalNewline ? newline : "")}"));
+            new(beginning, beginning), $"{SceneVocabulary.SceneHeader} {sceneId}{(hasFinalNewline ? newline : "")}"));
         return fixes;
     }
 

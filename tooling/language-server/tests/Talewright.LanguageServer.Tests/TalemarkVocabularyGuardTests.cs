@@ -20,7 +20,11 @@ public sealed class TalemarkVocabularyGuardTests
         ["tooling/authoring/src/Talewright.Authoring/StoryHover.cs"] =
             "Hover help keyed by spelling; sourced from the vocabulary in #471 part 3.",
         ["engine/src/Talewright.Talemark/Analysis/StoryAnalysis.cs"] =
-            "Authoring symbol type labels; typed with authoring tokens in #471 part 3.",
+            "Manifest symbol types; authoring token kinds are owned in #471 part 3.",
+        ["engine/src/Talewright.Talemark/Compilation/StorySource.cs"] =
+            "Manifest keys are a separate vocabulary owned in #474.",
+        ["engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs"] =
+            "Manifest keys are a separate vocabulary owned in #474.",
         ["engine/src/Talewright.Talemark/Parsing/StoryYamlWorldReader.cs"] = "Manifest keys; owned in #474.",
         ["engine/src/Talewright.Talemark/Parsing/StoryYamlRulesetReader.cs"] = "Manifest keys; owned in #474.",
         ["tooling/authoring/src/Talewright.Authoring/ManifestListEditor.cs"] = "YAML scalars; owned in #474.",
@@ -37,8 +41,18 @@ public sealed class TalemarkVocabularyGuardTests
         "engine/src/Talewright.Talemark/Parsing/ExpressionBinder.cs",
         "engine/src/Talewright.Talemark/Parsing/ExpressionParser.cs",
         "engine/src/Talewright.Talemark/Parsing/ImageSyntax.cs",
+        "engine/src/Talewright.Talemark/Parsing/ChoiceSyntax.cs",
         "engine/src/Talewright.Talemark/Formatting/ExpressionFormatter.cs",
         "engine/src/Talewright.Talemark/Analysis/CompletionSite.cs",
+    ];
+
+    private static readonly string[] LineMarkerFiles =
+    [
+        "engine/src/Talewright.Talemark/Parsing/TaleParser.cs",
+        "engine/src/Talewright.Talemark/Parsing/ChoiceSyntax.cs",
+        "engine/src/Talewright.Talemark/Parsing/DelimiterScanner.cs",
+        "engine/src/Talewright.Talemark/Parsing/ImageSyntax.cs",
+        "engine/src/Talewright.Talemark/Parsing/InlineParser.cs",
     ];
 
     private static readonly string[] SourceRoots =
@@ -52,23 +66,43 @@ public sealed class TalemarkVocabularyGuardTests
     public void Production_code_uses_vocabulary_names_instead_of_grammar_spellings()
     {
         var root = RepositoryRoot();
-        var (words, punctuation) = Spellings();
+        var spellings = Spellings();
+        var (words, punctuation, lineMarkers) = spellings;
         Assert.Contains("and", words);
         Assert.Contains("+=", words);
         Assert.Contains("var:", words);
+        Assert.Contains("===", words);
+        Assert.Contains("->", words);
+        Assert.Contains("(requires:", words);
+        Assert.Contains("skill-check", words);
         Assert.Contains("#", punctuation);
+        Assert.Contains("\\", punctuation);
+        Assert.Contains("\"", punctuation);
+        Assert.Contains("@", lineMarkers);
+        Assert.Contains("{", lineMarkers);
+        Assert.Contains("}", lineMarkers);
+        Assert.Contains("[", lineMarkers);
+        Assert.Contains("]", lineMarkers);
+        Assert.Contains("!", lineMarkers);
+        Assert.Contains("_", lineMarkers);
+        Assert.Contains("`", lineMarkers);
+        Assert.Contains("\\", lineMarkers);
+        Assert.Contains("\"", lineMarkers);
 
         var expressionFiles = ExpressionFiles.Select(path => Path.Combine(root, path)).ToHashSet(StringComparer.Ordinal);
+        var lineMarkerFiles = LineMarkerFiles.Select(path => Path.Combine(root, path)).ToHashSet(StringComparer.Ordinal);
         Assert.All(expressionFiles, path => Assert.True(File.Exists(path), $"{path} no longer exists."));
+        Assert.All(lineMarkerFiles, path => Assert.True(File.Exists(path), $"{path} no longer exists."));
         var failures = new List<string>();
         var pendingWithHits = new HashSet<string>(StringComparer.Ordinal);
         foreach (var path in SourceRoots.SelectMany(sourceRoot => SourceFiles(Path.Combine(root, sourceRoot))))
         {
             var relative = Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
             var checkPunctuation = expressionFiles.Contains(path);
+            var checkLineMarker = lineMarkerFiles.Contains(path);
             foreach (var (line, value) in Literals(File.ReadAllText(path)))
             {
-                if (!words.Contains(value) && !(checkPunctuation && punctuation.Contains(value))) continue;
+                if (!IsGuardedLiteral(value, spellings, checkPunctuation, checkLineMarker)) continue;
                 if (PendingFiles.ContainsKey(relative))
                 {
                     pendingWithHits.Add(relative);
@@ -102,17 +136,49 @@ public sealed class TalemarkVocabularyGuardTests
             Literals(source));
     }
 
-    private static (HashSet<string> Words, HashSet<string> Punctuation) Spellings()
+    [Theory]
+    [InlineData("""var character = '\\'; var text = "\\"; var unicode = "\u005c";""", "\\")]
+    [InlineData("""var character = '"'; var text = "\""; var unicode = "\u0022";""", "\"")]
+    public void Text_delimiter_literals_are_guarded_in_talemark_syntax_files(string source, string spelling)
     {
-        var values = typeof(StoryCompiler).Assembly.GetTypes()
+        var literals = Literals(source);
+        var spellings = Spellings();
+        Assert.Equal(3, literals.Count);
+        Assert.All(literals, literal =>
+        {
+            Assert.Equal(spelling, literal.Value);
+            Assert.True(IsGuardedLiteral(literal.Value, spellings, checkPunctuation: true, checkLineMarker: false));
+            Assert.True(IsGuardedLiteral(literal.Value, spellings, checkPunctuation: false, checkLineMarker: true));
+            Assert.False(IsGuardedLiteral(literal.Value, spellings, checkPunctuation: false, checkLineMarker: false));
+        });
+    }
+
+    private static bool IsGuardedLiteral(string value,
+        (HashSet<string> Words, HashSet<string> Punctuation, HashSet<string> LineMarkers) spellings,
+        bool checkPunctuation, bool checkLineMarker) =>
+        spellings.Words.Contains(value) ||
+        (checkPunctuation && spellings.Punctuation.Contains(value)) ||
+        (checkLineMarker && spellings.LineMarkers.Contains(value));
+
+    private static (HashSet<string> Words, HashSet<string> Punctuation, HashSet<string> LineMarkers) Spellings()
+    {
+        var vocabularyTypes = typeof(StoryCompiler).Assembly.GetTypes()
             .Where(type => type.Namespace == VocabularyNamespace)
+            .ToArray();
+        var values = vocabularyTypes
             .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
             .Select(field => field.IsLiteral ? field.GetRawConstantValue() : field.IsInitOnly ? field.GetValue(null) : null)
             .Select(value => value switch { string text => text, char character => character.ToString(), _ => null })
             .OfType<string>()
             .ToArray();
+        var lineMarkers = vocabularyTypes
+            .Where(type => type.Name is "SceneVocabulary" or "TextVocabulary")
+            .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+            .Where(field => field.IsLiteral && field.FieldType == typeof(char))
+            .Select(field => ((char)field.GetRawConstantValue()!).ToString())
+            .ToHashSet(StringComparer.Ordinal);
         return (values.Where(value => value.Length > 1).ToHashSet(StringComparer.Ordinal),
-            values.Where(value => value.Length == 1).ToHashSet(StringComparer.Ordinal));
+            values.Where(value => value.Length == 1).ToHashSet(StringComparer.Ordinal), lineMarkers);
     }
 
     private static IEnumerable<string> SourceFiles(string sourceRoot) =>

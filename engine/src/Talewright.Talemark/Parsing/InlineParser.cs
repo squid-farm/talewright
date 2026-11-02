@@ -258,7 +258,7 @@ internal static class InlineParser
             }
 
             var current = text[index];
-            if (current == '\\' && index + 1 < text.Length)
+            if (current == TextVocabulary.EscapeMark && index + 1 < text.Length)
             {
                 var next = text[index + 1];
                 if (DelimiterScanner.IsReaderTextEscape(next))
@@ -283,7 +283,7 @@ internal static class InlineParser
                 continue;
             }
 
-            if (current == '{')
+            if (current == SceneVocabulary.InlineOpen)
             {
                 while (braceIndex < bracePairs.Count && bracePairs[braceIndex].OpenOffset < index)
                 {
@@ -314,7 +314,7 @@ internal static class InlineParser
                 return tokens;
             }
 
-            if (current == '!' && TryReadLegacyImage(context, text, index,
+            if (current == SceneVocabulary.LegacyImageMarker && TryReadLegacyImage(context, text, index,
                     out var imageEnd, out var alt, out var path))
             {
                 AddToken(new(TokenKind.LegacyImage, index, imageEnd - index, text[index..imageEnd])
@@ -335,7 +335,7 @@ internal static class InlineParser
                 continue;
             }
 
-            if (current is '*' or '_')
+            if (current is SceneVocabulary.ChoiceMarker or SceneVocabulary.EmphasisMarker)
             {
                 var end = index + 1;
                 while (end < text.Length && text[end] == current)
@@ -349,7 +349,7 @@ internal static class InlineParser
                     AddToken(new(TokenKind.FormatDelimiter, index, length)
                     {
                         RunLength = length,
-                        Style = current == '*'
+                        Style = current == SceneVocabulary.ChoiceMarker
                             ? length == 1 ? TextStyle.Emphasis : TextStyle.Strong
                             : length == 1 ? TextStyle.Emphasis : TextStyle.Strong,
                         Text = current.ToString(),
@@ -365,10 +365,10 @@ internal static class InlineParser
                 continue;
             }
 
-            if (current == '`')
+            if (current == SceneVocabulary.CodeMarker)
             {
                 var end = index + 1;
-                while (end < text.Length && text[end] == '`')
+                while (end < text.Length && text[end] == SceneVocabulary.CodeMarker)
                 {
                     end++;
                     context.CheckCharacters(1);
@@ -399,7 +399,8 @@ internal static class InlineParser
             if (!context.AllowImages)
             {
                 context.Diagnostics.Error(CompilerDiagnosticCodes.InvalidImageCall,
-                    "Image alt text cannot contain {image(...)}. Write the description as text.",
+                    $"Image alt text cannot contain {SceneVocabulary.InlineOpen}{ExpressionVocabulary.ImageCall}..." +
+                    $"{ExpressionVocabulary.CloseParen}{SceneVocabulary.InlineClose}. Write the description as text.",
                     context.Source.Locate(open));
             }
             else
@@ -417,12 +418,13 @@ internal static class InlineParser
         {
             var incomplete = text[start..];
             var lead = incomplete.Length - incomplete.TrimStart().Length;
-            var condition = incomplete[lead..].StartsWith("if ", StringComparison.Ordinal);
-            var expressionOffset = condition ? lead + 3 : 0;
+            var condition = incomplete[lead..].StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal);
+            var expressionOffset = condition ? lead + SceneVocabulary.IfPrefix.Length : 0;
             if (condition)
             {
-                analysis.Tokens.Add(new("if",
-                    new(context.Source.Locate(start + lead), context.Source.Locate(start + lead + 2))));
+                analysis.Tokens.Add(new(SceneVocabulary.If,
+                    new(context.Source.Locate(start + lead),
+                        context.Source.Locate(start + lead + SceneVocabulary.If.Length))));
             }
 
             var expressionStart = start + expressionOffset;
@@ -439,7 +441,10 @@ internal static class InlineParser
         else
             ExpressionParser.ReportStringErrors(expressionTokens, offset => context.Source.Locate(errorStart + offset),
                 context.Diagnostics);
-        context.Diagnostics.Error(CompilerDiagnosticCodes.UnclosedInlineConstruct, "Unclosed '{'. Use '\\{' for a literal brace.", context.Source.Locate(open));
+        context.Diagnostics.Error(CompilerDiagnosticCodes.UnclosedInlineConstruct,
+            $"Unclosed '{SceneVocabulary.InlineOpen}'. Use " +
+            $"'{TextVocabulary.EscapeMark}{SceneVocabulary.InlineOpen}' for a literal brace.",
+            context.Source.Locate(open));
     }
 
     private static Piece? ParseConstruct(Context context, string text, int open, int close)
@@ -452,7 +457,8 @@ internal static class InlineParser
             if (!context.AllowImages)
             {
                 context.Diagnostics.Error(CompilerDiagnosticCodes.InvalidImageCall,
-                    "Image alt text cannot contain {image(...)}. Write the description as text.",
+                    $"Image alt text cannot contain {SceneVocabulary.InlineOpen}{ExpressionVocabulary.ImageCall}..." +
+                    $"{ExpressionVocabulary.CloseParen}{SceneVocabulary.InlineClose}. Write the description as text.",
                     context.Source.Locate(open));
                 return null;
             }
@@ -468,8 +474,8 @@ internal static class InlineParser
 
         var trimmed = inner.Trim();
         var leading = inner.Length - inner.TrimStart().Length;
-        var keyword = trimmed.StartsWith("if ", StringComparison.Ordinal) ? "if" :
-            trimmed is "else" or "/if" ? trimmed : null;
+        var keyword = trimmed.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal) ? SceneVocabulary.If :
+            trimmed is SceneVocabulary.Else or SceneVocabulary.EndIf ? trimmed : null;
         if (keyword is not null)
         {
             context.Symbols.Analysis?.Tokens.Add(new(keyword,
@@ -493,14 +499,15 @@ internal static class InlineParser
         var lead = inner.Length - inner.TrimStart().Length;
         // Analysis retains these mappings for on-request completion; capture only the source text.
         var source = context.Source;
-        if (trimmed == "else") return new ElsePiece(location);
-        if (trimmed == "/if") return new EndIfPiece(location);
+        if (trimmed == SceneVocabulary.Else) return new ElsePiece(location);
+        if (trimmed == SceneVocabulary.EndIf) return new EndIfPiece(location);
 
-        if (trimmed.StartsWith("if ", StringComparison.Ordinal))
+        if (trimmed.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
         {
-            var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3),
+            var condition = ExpressionParser.ParseCondition(trimmed[SceneVocabulary.IfPrefix.Length..],
+                location.Offset(lead + SceneVocabulary.IfPrefix.Length),
                 context.Symbols, context.Diagnostics,
-                locate: offset => source.Locate(sourceOffset + lead + 3 + offset));
+                locate: offset => source.Locate(sourceOffset + lead + SceneVocabulary.IfPrefix.Length + offset));
             return condition is null
                 ? null
                 : new IfPiece(condition, location, context.Source.Locate(sourceOffset - 1));
@@ -517,27 +524,35 @@ internal static class InlineParser
         end = start;
         alt = "";
         path = "";
-        if (start + 1 >= text.Length || text[start] != '!' || text[start + 1] != '[') return false;
+        if (start + 1 >= text.Length || text[start] != SceneVocabulary.LegacyImageMarker ||
+            text[start + 1] != SceneVocabulary.OpenBracket) return false;
 
         var altStart = start + 2;
         var cursor = altStart;
-        while (cursor < text.Length && text[cursor] != ']')
+        while (cursor < text.Length && text[cursor] != SceneVocabulary.CloseBracket)
         {
             context.Check();
             var c = text[cursor];
-            if (c is '\\' or '[' or '{' or '}' or '\r' or '\n') return false;
+            if (c is SceneVocabulary.LegacyImageEscape or SceneVocabulary.OpenBracket or SceneVocabulary.InlineOpen or
+                SceneVocabulary.InlineClose or '\r' or '\n')
+                return false;
             cursor++;
         }
 
-        if (cursor >= text.Length || cursor + 1 >= text.Length || text[cursor + 1] != '(') return false;
+        if (cursor >= text.Length || cursor + 1 >= text.Length ||
+            text[cursor + 1] != ExpressionVocabulary.OpenParen) return false;
         var altEnd = cursor;
         var pathStart = cursor + 2;
         cursor = pathStart;
-        while (cursor < text.Length && text[cursor] != ')')
+        while (cursor < text.Length && text[cursor] != ExpressionVocabulary.CloseParen)
         {
             context.Check();
             var c = text[cursor];
-            if (char.IsWhiteSpace(c) || c is '(' or '\\' or '"' or '{' or '}' or '\r' or '\n') return false;
+            if (char.IsWhiteSpace(c) ||
+                c is ExpressionVocabulary.OpenParen or SceneVocabulary.LegacyImageEscape or
+                    SceneVocabulary.LegacyImageQuote or SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
+                    '\r' or '\n')
+                return false;
             cursor++;
         }
 
@@ -613,7 +628,7 @@ internal static class InlineParser
             var token = tokens[index];
             if (token.Kind != TokenKind.FormatDelimiter || token.InCode) continue;
             var delimiter = text[token.Start];
-            var kind = (delimiter == '_' ? 2 : 0) + token.RunLength - 1;
+            var kind = (delimiter == SceneVocabulary.EmphasisMarker ? 2 : 0) + token.RunLength - 1;
             token.CanOpen = !IsWordLikeBefore(tokens, index) && IsNonWhitespaceNonBoundaryAfter(tokens, index);
             token.CanClose = IsNonWhitespaceNonBoundaryBefore(tokens, index) && !IsWordLikeAfter(tokens, index);
 
@@ -790,7 +805,10 @@ internal static class InlineParser
                     if (!frames.TryPeek(out var activeFrame) || activeFrame.Style != TextStyle.Code)
                     {
                         var replacement =
-                            $"{{image({ImageSyntax.Quote(token.LegacyPath!)}, {ImageSyntax.Quote(token.LegacyAlt!)})}}";
+                            $"{SceneVocabulary.InlineOpen}{ExpressionVocabulary.ImageCall}" +
+                            $"{ImageSyntax.Quote(token.LegacyPath!)}{ExpressionVocabulary.ArgumentSeparator} " +
+                            $"{ImageSyntax.Quote(token.LegacyAlt!)}{ExpressionVocabulary.CloseParen}" +
+                            SceneVocabulary.InlineClose;
                         context.Diagnostics.Error(CompilerDiagnosticCodes.LegacyImageSyntax,
                             $"Markdown images are no longer supported. Use {replacement} instead.",
                             context.Source.Locate(token.Start));
@@ -882,11 +900,17 @@ internal static class InlineParser
                 case ElsePiece alternative when suppressedDepth == 0:
                     if (!frames.TryPeek(out var frame))
                     {
-                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{else} without an {if} in the same paragraph and formatting.", alternative.Location);
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                            $"{SceneVocabulary.InlineOpen}{SceneVocabulary.Else}{SceneVocabulary.InlineClose} without an " +
+                            $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} in the same " +
+                            "paragraph and formatting.", alternative.Location);
                     }
                     else if (frame.InElse)
                     {
-                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "A second {else} in the same {if}.", alternative.Location);
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                            $"A second {SceneVocabulary.InlineOpen}{SceneVocabulary.Else}{SceneVocabulary.InlineClose} " +
+                            $"in the same {SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose}.",
+                            alternative.Location);
                         frames.Pop();
                         Close(frame);
                     }
@@ -906,7 +930,10 @@ internal static class InlineParser
                     }
                     else
                     {
-                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{/if} without an {if} in the same paragraph and formatting.", end.Location);
+                        context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                            $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose} without an " +
+                            $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} in the same " +
+                            "paragraph and formatting.", end.Location);
                     }
                     break;
             }
@@ -915,13 +942,19 @@ internal static class InlineParser
         if (suppressedDepth > 0)
         {
             context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
-                "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.",
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} has no matching " +
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose} here. Inline " +
+                $"conditionals must open and close inside the same paragraph and the same " +
+                $"{SceneVocabulary.ChoiceMarker}emphasis{SceneVocabulary.ChoiceMarker}.",
                 suppressedLocation);
         }
         while (frames.TryPop(out var unclosed))
         {
             context.Diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
-                "{if} has no matching {/if} here. Inline conditionals must open and close inside the same paragraph and the same *emphasis*.",
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} has no matching " +
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose} here. Inline " +
+                $"conditionals must open and close inside the same paragraph and the same " +
+                $"{SceneVocabulary.ChoiceMarker}emphasis{SceneVocabulary.ChoiceMarker}.",
                 unclosed.Open.Location);
         }
 

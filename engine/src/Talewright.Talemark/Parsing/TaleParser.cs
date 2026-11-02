@@ -6,6 +6,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -99,12 +100,13 @@ internal sealed partial class TaleParser
                 continue;
             }
 
-            if (trimmed.StartsWith("===", StringComparison.Ordinal))
+            if (trimmed.StartsWith(SceneVocabulary.SceneHeader, StringComparison.Ordinal))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
-                _symbols.Analysis?.Tokens.Add(new("===", AnalysisCollector.Range(At(indent), "===")));
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SceneHeader,
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.SceneHeader)));
                 FinishScene();
-                StartScene(trimmed[3..].Trim().ToString(), At(indent));
+                StartScene(trimmed[SceneVocabulary.SceneHeader.Length..].Trim().ToString(), At(indent));
                 AdvanceLine();
                 continue;
             }
@@ -113,7 +115,8 @@ internal sealed partial class TaleParser
             {
                 if (trimmed.Length > 0)
                 {
-                    _diagnostics.Error(CompilerDiagnosticCodes.TextOutsideSceneOrNoFiles, "Text before the first scene. Start a scene with '=== scene.id'.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.TextOutsideSceneOrNoFiles,
+                        $"Text before the first scene. Start a scene with '{SceneVocabulary.SceneHeader} scene.id'.", At(indent));
                 }
 
                 AdvanceLine();
@@ -175,7 +178,7 @@ internal sealed partial class TaleParser
         _discoverScene?.Invoke(new SceneId(id), location);
         _cancellationToken.ThrowIfCancellationRequested();
         _scene = new SceneBuilder(new SceneId(id), location);
-        if (!IdentifierRules.IsValid(id) || id == "END")
+        if (!IdentifierRules.IsValid(id) || id == SceneVocabulary.End)
         {
             _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneId, $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators (e.g. temple.entrance).", location);
         }
@@ -191,12 +194,18 @@ internal sealed partial class TaleParser
         FlushParagraph();
         if (_scene.SuppressedConditionDepth > 0)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{if} block is never closed with {/if}.", _scene.SuppressedConditionLocation);
+            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} block is never closed with " +
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.",
+                _scene.SuppressedConditionLocation);
             _scene.SuppressedConditionDepth = 0;
         }
         while (_scene.Frames.Count > 0)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{if} block is never closed with {/if}.", _scene.Frames.Peek().Location);
+            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} block is never closed with " +
+                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.",
+                _scene.Frames.Peek().Location);
             CloseFrame();
         }
 
@@ -224,7 +233,7 @@ internal sealed partial class TaleParser
             return;
         }
 
-        if (line[0] == '@' && !scene.HeaderDone && TryParseMetadata(line, indent))
+        if (line[0] == SceneVocabulary.MetadataMarker && !scene.HeaderDone && TryParseMetadata(line, indent))
         {
             return;
         }
@@ -240,27 +249,32 @@ internal sealed partial class TaleParser
 
         switch (line)
         {
-            case ['>', ..]:
-                _symbols.Analysis?.Tokens.Add(new(">", AnalysisCollector.Range(At(indent), ">")));
+            case [SceneVocabulary.SpeechMarker, ..]:
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SpeechMarker.ToString(),
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.SpeechMarker.ToString())));
                 FlushParagraph();
                 ParseSpeech(line, indent);
                 return;
-            case ['~', ..]:
-                _symbols.Analysis?.Tokens.Add(new("~", AnalysisCollector.Range(At(indent), "~")));
+            case [SceneVocabulary.EffectsMarker, ..]:
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.EffectsMarker.ToString(),
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.EffectsMarker.ToString())));
                 FlushParagraph();
                 ParseEntryEffects(line[1..], indent + 1);
                 return;
-            case ['*']:
-            case ['*', ' ' or '\t' or '[', ..]:
-                _symbols.Analysis?.Tokens.Add(new("*choice", AnalysisCollector.Range(At(indent), "*")));
-                // "* [label]" and "* -> target" are choices; "*text*" is emphasis.
+            case [SceneVocabulary.ChoiceMarker]:
+            case [SceneVocabulary.ChoiceMarker, ' ' or '\t' or SceneVocabulary.OpenBracket, ..]:
+                _symbols.Analysis?.Tokens.Add(new("*choice",
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.ChoiceMarker.ToString())));
+                // A choice marker followed by a label opener or divert marker is a choice; adjacent markers are emphasis.
                 FlushParagraph();
                 ParseChoice(line, indent);
                 return;
-            case ['-', '>', ..]:
-                _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(indent), "->")));
+            case [ExpressionVocabulary.Minus, ExpressionVocabulary.Greater, ..]:
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.Divert)));
                 FlushParagraph();
-                var target = ParseDivertTarget(line[2..], indent + 2);
+                var target = ParseDivertTarget(line[SceneVocabulary.Divert.Length..],
+                    indent + SceneVocabulary.Divert.Length);
                 if (target is not null)
                 {
                     var start = At(indent);
@@ -268,22 +282,33 @@ internal sealed partial class TaleParser
                 }
 
                 return;
-            case [':', ':', ':', ..]:
-                _symbols.Analysis?.Tokens.Add(new("::: skill-check", AnalysisCollector.Range(At(indent), ":::")));
-                FlushParagraph();
-                ParseBlockCheck(line, indent);
-                return;
         }
 
-        if (line.StartsWith("success:", StringComparison.Ordinal) || line.StartsWith("failure:", StringComparison.Ordinal))
+        if (line.StartsWith(SceneVocabulary.SkillCheckFence, StringComparison.Ordinal))
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "success:/failure: lines must directly follow a skill-check choice or be inside a '::: skill-check' block.", At(indent));
+            _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SkillCheckBlock,
+                AnalysisCollector.Range(At(indent), SceneVocabulary.SkillCheckFence)));
+            FlushParagraph();
+            ParseBlockCheck(line, indent);
             return;
         }
 
-        if (line[0] == '@' && IsMetadataKey(line))
+        if (line.StartsWith(SceneVocabulary.SuccessOutcome, StringComparison.Ordinal) ||
+            line.StartsWith(SceneVocabulary.FailureOutcome, StringComparison.Ordinal))
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "Metadata (@title, @tags, …) must come directly after the '===' line.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
+                $"{SceneVocabulary.SuccessOutcome}/{SceneVocabulary.FailureOutcome} lines must directly follow a " +
+                $"{SceneVocabulary.SkillCheck} choice or be inside a '{SceneVocabulary.SkillCheckBlock}' block.",
+                At(indent));
+            return;
+        }
+
+        if (line[0] == SceneVocabulary.MetadataMarker && IsMetadataKey(line))
+        {
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
+                $"Metadata ({SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}, " +
+                $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Tags}, …) must come directly after the " +
+                $"'{SceneVocabulary.SceneHeader}' line.", At(indent));
             return;
         }
 
@@ -292,48 +317,50 @@ internal sealed partial class TaleParser
 
     // ---- metadata --------------------------------------------------------------------------------------------------
 
-    private static readonly string[] MetadataKeys = ["title", "requires", "tags", "priority", "once", "hub", "hub-limit"];
-
     private static bool IsMetadataKey(string line)
     {
         var key = line[1..].Split(' ', 2)[0];
-        return MetadataKeys.Contains(key);
+        return SceneVocabulary.TryGetMetadataKey(key, out _);
     }
 
     private bool TryParseMetadata(string line, int indent)
     {
         var keyword = line[1..].Split(' ', 2)[0];
-        _symbols.Analysis?.Reference(keyword, At(indent + 1), AuthoringSymbolKind.Directive, MetadataKeys);
+        _symbols.Analysis?.Reference(keyword, At(indent + 1), AuthoringSymbolKind.Directive,
+            SceneVocabulary.MetadataSpellings);
         var parts = line[1..].Split(' ', 2, StringSplitOptions.TrimEntries);
-        var key = parts[0];
+        if (!SceneVocabulary.TryGetMetadataKey(parts[0], out var key))
+            return false;
         var value = parts.Length > 1 ? parts[1] : string.Empty;
         var valueColumn = indent + line.IndexOf(' ', StringComparison.Ordinal) + 1;
         var scene = _scene!;
-        if (key is "hub" or "hub-limit" && !scene.HubDirectives.Add(key))
+        if (key is SceneMetadataKey.Hub or SceneMetadataKey.HubLimit && !scene.HubDirectives.Add(key))
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, $"Duplicate @{key} directive.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
+                $"Duplicate @{SceneVocabulary.Spelling(key)} directive.", At(indent));
             return true;
         }
         switch (key)
         {
-            case "title":
+            case SceneMetadataKey.Title:
                 scene.Title = value;
                 return true;
-            case "requires":
+            case SceneMetadataKey.Requires:
                 var expressionColumn = line.IndexOf(' ', StringComparison.Ordinal) < 0
                     ? indent + line.Length
                     : valueColumn + line[(valueColumn - indent)..].Length - line[(valueColumn - indent)..].TrimStart().Length;
                 scene.Requires = ExpressionParser.ParseCondition(value, At(valueColumn), _symbols, _diagnostics,
                     At(expressionColumn));
                 return true;
-            case "tags":
-                foreach (var tag in value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            case SceneMetadataKey.Tags:
+                foreach (var tag in value.Split(ExpressionVocabulary.ArgumentSeparator,
+                             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
                 {
                     scene.Tags.Add(tag);
                 }
 
                 return true;
-            case "priority":
+            case SceneMetadataKey.Priority:
                 if (int.TryParse(value, out var priority))
                 {
                     scene.Priority = priority;
@@ -341,41 +368,52 @@ internal sealed partial class TaleParser
                 }
                 else
                 {
-                    _diagnostics.Error(CompilerDiagnosticCodes.NumberTooLarge, "@priority needs a whole number.", At(valueColumn));
+                    _diagnostics.Error(CompilerDiagnosticCodes.NumberTooLarge,
+                        $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Priority} needs a whole number.", At(valueColumn));
                 }
 
                 return true;
-            case "once":
+            case SceneMetadataKey.Once:
                 scene.Once = true;
                 return true;
-            case "hub":
-                var grouped = value.StartsWith("all(", StringComparison.Ordinal) || value.StartsWith("any(", StringComparison.Ordinal);
-                var tags = grouped && value.EndsWith(')')
-                    ? value[4..^1].Split(',', StringSplitOptions.TrimEntries)
+            case SceneMetadataKey.Hub:
+                SceneHubMode? hubMode = SceneVocabulary.TryGetHubMode(value, out var parsedHubMode)
+                    ? parsedHubMode
+                    : null;
+                var hubPrefix = hubMode is { } mode ? SceneVocabulary.HubModePrefix(mode) : string.Empty;
+                var tags = hubMode is not null && value.EndsWith(ExpressionVocabulary.CloseParen)
+                    ? value[hubPrefix.Length..^1].Split(ExpressionVocabulary.ArgumentSeparator, StringSplitOptions.TrimEntries)
                     : new[] { value };
-                if (tags.Any(t => string.IsNullOrWhiteSpace(t) || t.Any(c => char.IsWhiteSpace(c) || c is '(' or ')' or ',')) ||
+                if (tags.Any(t => string.IsNullOrWhiteSpace(t) ||
+                                  t.Any(c => char.IsWhiteSpace(c) || c is ExpressionVocabulary.OpenParen or
+                                      ExpressionVocabulary.CloseParen or ExpressionVocabulary.ArgumentSeparator)) ||
                     tags.Distinct(StringComparer.Ordinal).Count() != tags.Length)
                 {
-                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "@hub needs a tag or all(tag, tag)/any(tag, tag) with distinct nonempty tags.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Hub} needs a tag or " +
+                        $"{SceneVocabulary.HubAllPrefix}tag{ExpressionVocabulary.ArgumentSeparator} tag" +
+                        $"{ExpressionVocabulary.CloseParen}/{SceneVocabulary.HubAnyPrefix}tag" +
+                        $"{ExpressionVocabulary.ArgumentSeparator} tag{ExpressionVocabulary.CloseParen} " +
+                        "with distinct nonempty tags.", At(indent));
                 }
                 else
                 {
-                    scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, value.StartsWith("all(", StringComparison.Ordinal));
+                    scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, hubMode == SceneHubMode.All);
                 }
                 return true;
-            case "hub-limit":
+            case SceneMetadataKey.HubLimit:
                 if (int.TryParse(value, out var limit) && limit > 0)
                 {
                     scene.HubLimit = limit;
                 }
                 else
                 {
-                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata, "@hub-limit needs a positive whole number.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.HubLimit} needs a positive whole number.", At(indent));
                 }
                 return true;
             default:
-                // Not metadata (e.g. a paragraph starting with "@"); treat the line as prose.
-                return false;
+                throw new ArgumentOutOfRangeException(nameof(key), key, null);
         }
     }
 
@@ -384,7 +422,7 @@ internal sealed partial class TaleParser
     private static bool IsBlockDirective(string line, CancellationToken cancellationToken, out string directive)
     {
         directive = string.Empty;
-        if (line[0] != '{')
+        if (line[0] != SceneVocabulary.InlineOpen)
         {
             return false;
         }
@@ -396,7 +434,8 @@ internal sealed partial class TaleParser
         }
 
         var inner = line[1..^1].Trim();
-        if (inner is "else" or "/if" || inner.StartsWith("if ", StringComparison.Ordinal))
+        if (inner is SceneVocabulary.Else or SceneVocabulary.EndIf ||
+            inner.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
         {
             directive = inner;
             return true;
@@ -408,14 +447,17 @@ internal sealed partial class TaleParser
     private void ParseBlockDirective(string directive, int indent, string line)
     {
         var scene = _scene!;
-        var keyword = directive.StartsWith("if ", StringComparison.Ordinal) ? "if" : directive;
+        var keyword = directive.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal)
+            ? SceneVocabulary.If : directive;
         var keywordStart = line.IndexOf(keyword, StringComparison.Ordinal);
         _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(indent + keywordStart), keyword)));
-        if (directive == "else")
+        if (directive == SceneVocabulary.Else)
         {
             if (scene.Frames.Count == 0 || scene.Frames.Peek().InElse)
             {
-                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{else} without a matching {if}.", At(indent));
+                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.Else}{SceneVocabulary.InlineClose} without a matching " +
+                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose}.", At(indent));
                 return;
             }
 
@@ -423,11 +465,13 @@ internal sealed partial class TaleParser
             return;
         }
 
-        if (directive == "/if")
+        if (directive == SceneVocabulary.EndIf)
         {
             if (scene.Frames.Count == 0)
             {
-                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition, "{/if} without a matching {if}.", At(indent));
+                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
+                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose} without a matching " +
+                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose}.", At(indent));
                 return;
             }
 
@@ -445,8 +489,10 @@ internal sealed partial class TaleParser
         }
 
         var lead = line[1..^1].Length - line[1..^1].TrimStart().Length;
-        var condition = ExpressionParser.ParseCondition(directive[3..], At(indent + 1 + 3), _symbols, _diagnostics,
-            At(indent + 1 + lead + 3))
+        var condition = ExpressionParser.ParseCondition(
+            directive[SceneVocabulary.IfPrefix.Length..],
+            At(indent + 1 + SceneVocabulary.IfPrefix.Length), _symbols, _diagnostics,
+            At(indent + 1 + lead + SceneVocabulary.IfPrefix.Length))
             ?? new BoolLiteral(false);
         scene.Frames.Push(new Frame(condition, At(indent)));
     }
@@ -458,11 +504,11 @@ internal sealed partial class TaleParser
             return;
         }
 
-        if (directive.StartsWith("if ", StringComparison.Ordinal))
+        if (directive.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
         {
             _scene!.SuppressedConditionDepth++;
         }
-        else if (directive == "/if")
+        else if (directive == SceneVocabulary.EndIf)
         {
             _scene!.SuppressedConditionDepth--;
         }
@@ -507,14 +553,16 @@ internal sealed partial class TaleParser
         }
 
         var body = line[1..];
-        var colon = body.IndexOf(':', StringComparison.Ordinal);
+        var colon = body.IndexOf(ExpressionVocabulary.Separator, StringComparison.Ordinal);
         var speakerText = (colon < 0 ? body : body[..colon]).Trim();
         _symbols.Analysis?.Reference(speakerText, At(indent + 1 + body.Length - body.TrimStart().Length),
             AuthoringSymbolKind.Character);
         var who = colon > 0 ? body[..colon].Trim() : string.Empty;
         if (who.Length == 0 || !IdentifierRules.IsValid(who))
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedDialogue, "Speech lines look like '> who: text', where who is a character id.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedDialogue,
+                $"Speech lines look like '{SceneVocabulary.SpeechMarker} who{ExpressionVocabulary.Separator} text', " +
+                "where who is a character id.", At(indent));
             return;
         }
 
@@ -569,15 +617,17 @@ internal sealed partial class TaleParser
         var lead = text.Length - text.TrimStart().Length;
         var id = text.Trim();
         var location = At(column + lead);
-        _symbols.Analysis?.Reference(id, location, AuthoringSymbolKind.Scene, "END");
-        if (id == "END")
+        _symbols.Analysis?.Reference(id, location, AuthoringSymbolKind.Scene, SceneVocabulary.End);
+        if (id == SceneVocabulary.End)
         {
             return DivertTarget.End;
         }
 
         if (id.Length == 0)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.MissingDivertTarget, "Divert needs a target: '-> scene.id' or '-> END'.", location);
+            _diagnostics.Error(CompilerDiagnosticCodes.MissingDivertTarget,
+                $"Divert needs a target: '{SceneVocabulary.Divert} scene.id' or '{SceneVocabulary.Divert} " +
+                $"{SceneVocabulary.End}'.", location);
             return null;
         }
 
@@ -607,7 +657,7 @@ internal sealed partial class TaleParser
         var rest = line[1..];
         var pos = SkipSpaces(rest, 0);
         IReadOnlyList<TemplateInline>? label = null;
-        if (pos < rest.Length && rest[pos] == '[')
+        if (pos < rest.Length && rest[pos] == SceneVocabulary.OpenBracket)
         {
             var labelScan = DelimiterScanner.Scan(rest, DelimiterScanMode.ChoiceLabel, pos, _cancellationToken);
             if (!labelScan.TryGetClose(pos, out var close))
@@ -647,9 +697,9 @@ internal sealed partial class TaleParser
                         ExpressionParser.ReportStringErrors(rest[(unclosedBrace + 1)..],
                             offset => At(indent + unclosedBrace + 2 + offset), _diagnostics);
                     }
-                    var message = "Choice label is missing its closing ']'.";
+                    var message = $"Choice label is missing its closing '{SceneVocabulary.CloseBracket}'.";
                     if (hint.Marker is not null)
-                        message += $" Place ']' before '{hint.Marker}'.";
+                        message += $" Place '{SceneVocabulary.CloseBracket}' before '{hint.Marker}'.";
                     _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, message, At(indent + 1 + pos));
                 }
                 return;
@@ -676,29 +726,37 @@ internal sealed partial class TaleParser
         {
             var column = indent + 1 + pos;
             var remaining = rest.AsSpan(pos);
-            if (remaining.StartsWith("(requires:", StringComparison.Ordinal))
+            if (remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal))
             {
                 if (hasRequires)
-                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Duplicate '(requires:)' condition. A choice accepts only one.", At(column));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                        $"Duplicate '{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' condition. " +
+                        "A choice accepts only one.", At(column));
                 if (!clauseScan.TryGetClose(pos, out var end))
                 {
-                    var expression = rest[(pos + 10)..];
-                    var tokens = _symbols.Analysis?.Expression(ExpressionContextKind.Condition, expression, At(column + 10))
+                    var expressionStart = pos + SceneVocabulary.ChoiceRequires.Length;
+                    var expression = rest[expressionStart..];
+                    var tokens = _symbols.Analysis?.Expression(ExpressionContextKind.Condition, expression,
+                                     At(column + SceneVocabulary.ChoiceRequires.Length))
                         ?? Lexer.Tokenize(expression);
                     ExpressionParser.ReportStringErrors(tokens,
-                        offset => At(column + 10 + offset), _diagnostics);
-                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "'(requires:' is missing its closing ')'.", At(column));
+                        offset => At(column + SceneVocabulary.ChoiceRequires.Length + offset), _diagnostics);
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                        $"'{SceneVocabulary.ChoiceRequires}' is missing its closing '{ExpressionVocabulary.CloseParen}'.",
+                        At(column));
                     NoteDroppedChoice(scene);
                     return;
                 }
 
-                var condition = ExpressionParser.ParseCondition(rest[(pos + 10)..end], At(column + 10), _symbols, _diagnostics);
+                var condition = ExpressionParser.ParseCondition(
+                    rest[(pos + SceneVocabulary.ChoiceRequires.Length)..end],
+                    At(column + SceneVocabulary.ChoiceRequires.Length), _symbols, _diagnostics);
                 if (!hasRequires)
                     requires = condition;
                 hasRequires = true;
                 pos = SkipSpaces(rest, end + 1);
             }
-            else if (remaining[0] == '{')
+            else if (remaining[0] == SceneVocabulary.InlineOpen)
             {
                 if (hasEffects)
                     _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Duplicate effect block. A choice accepts only one.", At(column));
@@ -709,7 +767,8 @@ internal sealed partial class TaleParser
                         ?? Lexer.Tokenize(expression);
                     ExpressionParser.ReportStringErrors(tokens,
                         offset => At(column + 1 + offset), _diagnostics);
-                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Effect block is missing its closing '}'.", At(column));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                        $"Effect block is missing its closing '{SceneVocabulary.InlineClose}'.", At(column));
                     NoteDroppedChoice(scene);
                     return;
                 }
@@ -720,35 +779,41 @@ internal sealed partial class TaleParser
                 hasEffects = true;
                 pos = SkipSpaces(rest, end + 1);
             }
-            else if (remaining.StartsWith("->", StringComparison.Ordinal))
+            else if (remaining.StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal))
             {
-                _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(column), "->")));
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
+                    AnalysisCollector.Range(At(column), SceneVocabulary.Divert)));
                 hasDivert = true;
-                var targetEnd = SkipSpaces(rest, pos + 2);
+                var targetEnd = SkipSpaces(rest, pos + SceneVocabulary.Divert.Length);
                 var targetCheckpoint = _cancellationToken.CanBeCanceled ? new CancellationCheckpoint(_cancellationToken) : null;
                 while (targetEnd < rest.Length && !char.IsWhiteSpace(rest[targetEnd]) &&
-                       rest[targetEnd] is not ('{' or '(') &&
-                       !rest.AsSpan(targetEnd).StartsWith("->", StringComparison.Ordinal))
+                       rest[targetEnd] is not (SceneVocabulary.InlineOpen or ExpressionVocabulary.OpenParen) &&
+                       !rest.AsSpan(targetEnd).StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal))
                 {
                     targetCheckpoint?.Check();
                     targetEnd++;
                 }
-                divert = ParseDivertTarget(rest[(pos + 2)..targetEnd], column + 2);
+                divert = ParseDivertTarget(rest[(pos + SceneVocabulary.Divert.Length)..targetEnd],
+                    column + SceneVocabulary.Divert.Length);
                 var trailing = SkipSpaces(rest, targetEnd);
                 if (trailing < rest.Length)
                     ReportTrailingChoiceText(rest, trailing, indent + 1, afterCheck: false, insideBlock: false);
                 pos = rest.Length;
             }
-            else if (remaining.StartsWith("skill-check", StringComparison.Ordinal))
+            else if (remaining.StartsWith(SceneVocabulary.SkillCheck, StringComparison.Ordinal))
             {
                 if (label is null)
                 {
-                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
+                    _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                        $"Textless choices need '{SceneVocabulary.Divert} target' or '{SceneVocabulary.Divert} " +
+                        $"{SceneVocabulary.End}'; skill checks require a '{SceneVocabulary.OpenBracket}label" +
+                        $"{SceneVocabulary.CloseBracket}'.", At(indent));
                     NoteDroppedChoice(scene);
                     return;
                 }
-                var specOffset = pos + "skill-check".Length;
-                var spec = ParseCheckSpec(rest[specOffset..], column + "skill-check".Length, clauseScan, specOffset);
+                var specOffset = pos + SceneVocabulary.SkillCheck.Length;
+                var spec = ParseCheckSpec(rest[specOffset..], column + SceneVocabulary.SkillCheck.Length,
+                    clauseScan, specOffset);
                 var (success, failure) = ParseOutcomeLines(At(column), insideBlock: false);
                 if (spec is not null && success is not null && failure is not null)
                 {
@@ -757,7 +822,7 @@ internal sealed partial class TaleParser
 
                 pos = rest.Length;
             }
-            else if (remaining[0] == '(' &&
+            else if (remaining[0] == ExpressionVocabulary.OpenParen &&
                      ChoiceSyntax.TryReadSpacedRequires(rest, pos, _cancellationToken, out var expressionStart))
             {
                 var expressionEnd = clauseScan.TryGetClose(pos, out var end) ? end : rest.Length;
@@ -765,18 +830,24 @@ internal sealed partial class TaleParser
                     At(indent + 1 + expressionStart));
                 var spelling = ChoiceSyntax.Excerpt(rest.AsSpan(pos, expressionStart - pos));
                 _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
-                    $"Choice conditions use the exact marker '(requires:)'. '{spelling}' is not recognized.", At(column));
+                    $"Choice conditions use the exact marker " +
+                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}'. " +
+                    $"'{spelling}' is not recognized.", At(column));
                 NoteDroppedChoice(scene);
                 return;
             }
             else
             {
                 var help = label is null
-                    ? "Use '* [label] ...' or a textless '* ... -> target'."
-                    : "Expected (requires: …), { effects }, -> target or skill-check.";
+                    ? $"Use '{SceneVocabulary.ChoiceMarker} {SceneVocabulary.OpenBracket}label" +
+                      $"{SceneVocabulary.CloseBracket} ...' or a textless '{SceneVocabulary.ChoiceMarker} ... " +
+                      $"{SceneVocabulary.Divert} target'."
+                    : $"Expected {SceneVocabulary.ChoiceRequires} …{ExpressionVocabulary.CloseParen}, " +
+                      $"{SceneVocabulary.InlineOpen} effects " +
+                      $"{SceneVocabulary.InlineClose}, {SceneVocabulary.Divert} target or {SceneVocabulary.SkillCheck}.";
                 var excerpt = ChoiceSyntax.Excerpt(remaining);
                 var bareTarget = IdentifierRules.IsValid(remaining.ToString())
-                    ? " Insert '->' before the target."
+                    ? $" Insert '{SceneVocabulary.Divert}' before the target."
                     : "";
                 _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, $"Unexpected '{excerpt}' in choice.{bareTarget} {help}", At(column));
                 NoteDroppedChoice(scene);
@@ -786,7 +857,9 @@ internal sealed partial class TaleParser
 
         if (label is null && !hasDivert)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, "Textless choices need '-> target' or '-> END'.", At(indent));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                $"Textless choices need '{SceneVocabulary.Divert} target' or '{SceneVocabulary.Divert} " +
+                $"{SceneVocabulary.End}'.", At(indent));
             NoteDroppedChoice(scene);
             return;
         }
@@ -807,16 +880,18 @@ internal sealed partial class TaleParser
     private void ParseBlockCheck(string line, int indent)
     {
         var scene = _scene!;
-        var spec = line[3..].TrimStart();
+        var spec = line[SceneVocabulary.SkillCheckFence.Length..].TrimStart();
         var location = At(indent);
-        if (!spec.StartsWith("skill-check", StringComparison.Ordinal))
+        if (!spec.StartsWith(SceneVocabulary.SkillCheck, StringComparison.Ordinal))
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidBlock, "Only '::: skill-check' blocks are supported.", location);
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidBlock,
+                $"Only '{SceneVocabulary.SkillCheckBlock}' blocks are supported.", location);
             return;
         }
 
-        var check = ParseCheckSpec(spec["skill-check".Length..],
-            indent + line.IndexOf("skill-check", StringComparison.Ordinal) + "skill-check".Length, insideBlock: true);
+        var check = ParseCheckSpec(spec[SceneVocabulary.SkillCheck.Length..],
+            indent + line.IndexOf(SceneVocabulary.SkillCheck, StringComparison.Ordinal) + SceneVocabulary.SkillCheck.Length,
+            insideBlock: true);
         var (success, failure) = ParseOutcomeLines(location, insideBlock: true);
 
         if (check is not null && success is not null && failure is not null)
@@ -830,11 +905,12 @@ internal sealed partial class TaleParser
     private SkillCheck? ParseCheckSpec(string text, int column, DelimiterScanResult? scan = null, int scanOffset = 0,
         bool insideBlock = false)
     {
-        var dcExpression = text.IndexOf(" dc ", StringComparison.Ordinal);
+        var dcExpression = text.IndexOf(SceneVocabulary.DifficultySeparator, StringComparison.Ordinal);
         if (dcExpression >= 0)
         {
             scan ??= DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, cancellationToken: _cancellationToken);
-            var trailing = ChoiceSyntax.FindTrailingClause(text, dcExpression + 4, scan, scanOffset, _cancellationToken);
+            var trailing = ChoiceSyntax.FindTrailingClause(text,
+                dcExpression + SceneVocabulary.DifficultySeparator.Length, scan, scanOffset, _cancellationToken);
             if (trailing >= 0)
             {
                 ReportTrailingChoiceText(text, trailing, column, afterCheck: true, insideBlock);
@@ -843,13 +919,13 @@ internal sealed partial class TaleParser
         }
 
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var dc = Array.IndexOf(words, "dc");
+        var dc = Array.IndexOf(words, SceneVocabulary.Difficulty);
         if (_symbols.Analysis is { } analysis)
         {
-            analysis.Tokens.Add(new("skill-check",
-                AnalysisCollector.Range(At(column - "skill-check".Length), "skill-check")));
+            analysis.Tokens.Add(new(SceneVocabulary.SkillCheck,
+                AnalysisCollector.Range(At(column - SceneVocabulary.SkillCheck.Length), SceneVocabulary.SkillCheck)));
             var offset = 0;
-            var references = words.TakeWhile(word => word != "dc").Take(2).ToArray();
+            var references = words.TakeWhile(word => word != SceneVocabulary.Difficulty).Take(2).ToArray();
             if (references.Length == 0)
             {
                 analysis.Reference("", At(column), AuthoringSymbolKind.Character);
@@ -874,22 +950,28 @@ internal sealed partial class TaleParser
                 char.IsWhiteSpace(_text[_lineStart + column + offset]) &&
                 _symbols.World.Characters.ContainsKey(new EntityId(references[0])))
                 analysis.Reference("", At(column + offset + 1), AuthoringSymbolKind.Stat);
-            var dcStart = text.IndexOf(" dc ", StringComparison.Ordinal);
+            var dcStart = text.IndexOf(SceneVocabulary.DifficultySeparator, StringComparison.Ordinal);
             if (dcStart >= 0)
-                analysis.Expression(ExpressionContextKind.Number, text[(dcStart + 4)..], At(column + dcStart + 4),
+                analysis.Expression(ExpressionContextKind.Number,
+                    text[(dcStart + SceneVocabulary.DifficultySeparator.Length)..],
+                    At(column + dcStart + SceneVocabulary.DifficultySeparator.Length),
                     cacheForReuse: true);
-            else if (text.EndsWith(" dc", StringComparison.Ordinal))
+            else if (text.EndsWith(SceneVocabulary.DifficultyPrefix, StringComparison.Ordinal))
                 analysis.Expression(ExpressionContextKind.Number, string.Empty, At(column + text.Length));
         }
         if (_symbols.World.Ruleset.SkillCheckRule is null)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.SkillChecksUnsupported, $"The '{_symbols.World.Ruleset.Id}' ruleset has no skill-check rule, so skill-check cannot be used.", At(column));
+            _diagnostics.Error(CompilerDiagnosticCodes.SkillChecksUnsupported,
+                $"The '{_symbols.World.Ruleset.Id}' ruleset has no {SceneVocabulary.SkillCheck} rule, " +
+                $"so {SceneVocabulary.SkillCheck} cannot be used.", At(column));
             return null;
         }
 
         if (dc is < 1 or > 2 || dc == words.Length - 1)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheck, "Skill checks look like 'skill-check [actor] skill dc 12'.", At(column));
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheck,
+                $"Skill checks look like '{SceneVocabulary.SkillCheck} {SceneVocabulary.OpenBracket}actor" +
+                $"{SceneVocabulary.CloseBracket} skill{SceneVocabulary.DifficultySeparator}12'.", At(column));
             return null;
         }
 
@@ -907,8 +989,11 @@ internal sealed partial class TaleParser
             return null;
         }
 
-        var dcText = text[(text.IndexOf(" dc ", StringComparison.Ordinal) + 4)..];
-        var difficulty = ExpressionParser.ParseNumber(dcText, At(column + text.IndexOf(" dc ", StringComparison.Ordinal) + 4), _symbols, _diagnostics);
+        var dcText = text[(text.IndexOf(SceneVocabulary.DifficultySeparator, StringComparison.Ordinal)
+            + SceneVocabulary.DifficultySeparator.Length)..];
+        var difficulty = ExpressionParser.ParseNumber(dcText,
+            At(column + text.IndexOf(SceneVocabulary.DifficultySeparator, StringComparison.Ordinal)
+                + SceneVocabulary.DifficultySeparator.Length), _symbols, _diagnostics);
         return difficulty is null ? null : new SkillCheck(actor, skill, difficulty);
     }
 
@@ -933,21 +1018,22 @@ internal sealed partial class TaleParser
                 continue;
             }
 
-            if (insideBlock && line.SequenceEqual(":::"))
+            if (insideBlock && line.SequenceEqual(SceneVocabulary.SkillCheckFence))
             {
                 AdvanceLine();
                 closed = true;
                 break;
             }
 
-            var isSuccess = line.StartsWith("success:", StringComparison.Ordinal);
-            if (!isSuccess && !line.StartsWith("failure:", StringComparison.Ordinal))
+            var isSuccess = line.StartsWith(SceneVocabulary.SuccessOutcome, StringComparison.Ordinal);
+            if (!isSuccess && !line.StartsWith(SceneVocabulary.FailureOutcome, StringComparison.Ordinal))
             {
                 break;
             }
 
             AdvanceLine();
-            var outcome = ParseOutcome(line[8..].ToString(), indent + 8);
+            var outcomePrefix = isSuccess ? SceneVocabulary.SuccessOutcome : SceneVocabulary.FailureOutcome;
+            var outcome = ParseOutcome(line[outcomePrefix.Length..].ToString(), indent + outcomePrefix.Length);
             if (isSuccess)
             {
                 sawSuccess = true;
@@ -962,12 +1048,16 @@ internal sealed partial class TaleParser
 
         if (insideBlock && !closed)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidBlock, "'::: skill-check' block is never closed with ':::'.", checkLocation);
+            _diagnostics.Error(CompilerDiagnosticCodes.InvalidBlock,
+                $"'{SceneVocabulary.SkillCheckBlock}' block is never closed with '{SceneVocabulary.SkillCheckFence}'.",
+                checkLocation);
         }
 
         if (!sawSuccess || !sawFailure)
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "A skill check needs both a 'success:' and a 'failure:' line.", checkLocation);
+            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
+                $"A skill check needs both a '{SceneVocabulary.SuccessOutcome}' and a " +
+                $"'{SceneVocabulary.FailureOutcome}' line.", checkLocation);
         }
 
         return (success, failure);
@@ -978,13 +1068,14 @@ internal sealed partial class TaleParser
         var pos = SkipSpaces(text, 0);
         IReadOnlyList<Effect> effects = [];
         DivertTarget? divert = null;
-        if (pos < text.Length && text[pos] == '{')
+        if (pos < text.Length && text[pos] == SceneVocabulary.InlineOpen)
         {
             var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, pos, _cancellationToken);
             if (!scan.TryGetClose(pos, out var end))
             {
                 _symbols.Analysis?.Expression(ExpressionContextKind.Effects, text[(pos + 1)..], At(column + pos + 1));
-                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "Outcome effect block is missing its closing '}'.", At(column + pos));
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
+                    $"Outcome effect block is missing its closing '{SceneVocabulary.InlineClose}'.", At(column + pos));
                 return null;
             }
 
@@ -994,14 +1085,18 @@ internal sealed partial class TaleParser
 
         if (pos < text.Length)
         {
-            if (!text[pos..].StartsWith("->", StringComparison.Ordinal))
+            if (!text[pos..].StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal))
             {
-                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome, "Outcomes look like 'success: { effects } -> target'.", At(column + pos));
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
+                    $"Outcomes look like '{SceneVocabulary.SuccessOutcome} {SceneVocabulary.InlineOpen} effects " +
+                    $"{SceneVocabulary.InlineClose} {SceneVocabulary.Divert} target'.", At(column + pos));
                 return null;
             }
 
-            _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(column + pos), "->")));
-            divert = ParseDivertTarget(text[(pos + 2)..], column + pos + 2);
+            _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
+                AnalysisCollector.Range(At(column + pos), SceneVocabulary.Divert)));
+            divert = ParseDivertTarget(text[(pos + SceneVocabulary.Divert.Length)..],
+                column + pos + SceneVocabulary.Divert.Length);
         }
 
         return new CheckOutcome(effects, divert);
@@ -1024,29 +1119,38 @@ internal sealed partial class TaleParser
     private void ReportTrailingChoiceText(string text, int pos, int column, bool afterCheck, bool insideBlock)
     {
         var remaining = text.AsSpan(pos);
-        if (remaining[0] == '(' && ChoiceSyntax.TryReadSpacedRequires(text, pos, _cancellationToken, out _))
+        if (remaining[0] == ExpressionVocabulary.OpenParen &&
+            ChoiceSyntax.TryReadSpacedRequires(text, pos, _cancellationToken, out _))
         {
             var terminal = afterCheck ? "the skill check" : "the divert";
             _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
-                $"Choice conditions use the exact marker '(requires:)' and cannot follow {terminal}.", At(column + pos));
+                $"Choice conditions use the exact marker '{SceneVocabulary.ChoiceRequires}" +
+                $"{ExpressionVocabulary.CloseParen}' and cannot follow {terminal}.", At(column + pos));
             return;
         }
         var message = remaining[0] switch
         {
-            '{' when insideBlock =>
-                "Effect block is misplaced after the skill check. Put effects on a 'success:' or 'failure:' line.",
-            '{' when afterCheck =>
-                "Effect block is misplaced after the skill check. Put '{ effects }' before 'skill-check'.",
-            '{' =>
-                "Effect block is misplaced after the divert. Put '{ effects }' before '->'.",
-            _ when remaining.StartsWith("(requires:", StringComparison.Ordinal) && insideBlock =>
-                "'(requires:)' is misplaced after the block skill check.",
-            _ when remaining.StartsWith("(requires:", StringComparison.Ordinal) && afterCheck =>
-                "'(requires:)' is misplaced after the skill check. Put the condition before 'skill-check'.",
-            _ when remaining.StartsWith("(requires:", StringComparison.Ordinal) =>
-                "'(requires:)' is misplaced after the divert. Put the condition before '->'.",
-            _ when remaining.StartsWith("->", StringComparison.Ordinal) && afterCheck =>
-                "Divert is misplaced after the skill check. Outcomes belong on 'success:' and 'failure:' lines.",
+            SceneVocabulary.InlineOpen when insideBlock =>
+                $"Effect block is misplaced after the skill check. Put effects on a " +
+                $"'{SceneVocabulary.SuccessOutcome}' or '{SceneVocabulary.FailureOutcome}' line.",
+            SceneVocabulary.InlineOpen when afterCheck =>
+                $"Effect block is misplaced after the skill check. Put '{SceneVocabulary.InlineOpen} effects " +
+                $"{SceneVocabulary.InlineClose}' before '{SceneVocabulary.SkillCheck}'.",
+            SceneVocabulary.InlineOpen =>
+                $"Effect block is misplaced after the divert. Put '{SceneVocabulary.InlineOpen} effects " +
+                $"{SceneVocabulary.InlineClose}' before '{SceneVocabulary.Divert}'.",
+            _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) && insideBlock =>
+                $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
+                "block skill check.",
+            _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) && afterCheck =>
+                $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
+                $"skill check. Put the condition before '{SceneVocabulary.SkillCheck}'.",
+            _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) =>
+                $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the divert. " +
+                $"Put the condition before '{SceneVocabulary.Divert}'.",
+            _ when remaining.StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal) && afterCheck =>
+                $"Divert is misplaced after the skill check. Outcomes belong on " +
+                $"'{SceneVocabulary.SuccessOutcome}' and '{SceneVocabulary.FailureOutcome}' lines.",
             _ => $"Unexpected '{ChoiceSyntax.Excerpt(remaining)}' after the {(afterCheck ? "skill check" : "divert")}.",
         };
         _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice, message, At(column + pos));
@@ -1084,7 +1188,7 @@ internal sealed partial class TaleParser
         public bool Once { get; set; }
         public Talewright.Rules.Storylets.StoryletTags? Hub { get; set; }
         public int? HubLimit { get; set; }
-        public HashSet<string> HubDirectives { get; } = [];
+        public HashSet<SceneMetadataKey> HubDirectives { get; } = [];
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
         public bool DroppedMalformedChoice { get; set; }

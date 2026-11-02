@@ -474,7 +474,7 @@ internal sealed class ExpressionSyntaxParser
             if (index < text.Length && text[index] == ExpressionVocabulary.OpenParen)
             {
                 index = SkipSpace(text, index + 1, endOffset);
-                if (index >= endOffset || text[index] != '"')
+                if (index >= endOffset || text[index] != TextVocabulary.QuoteMark)
                 {
                     Fail(CompilerDiagnosticCodes.InvalidModifier,
                         $"Write the argument to '#{name}' in double quotes, such as #{name}(\"value\").", index);
@@ -498,7 +498,7 @@ internal sealed class ExpressionSyntaxParser
                     }
 
                     index = SkipSpace(text, index + 1, endOffset);
-                    if (index >= endOffset || text[index] != '"')
+                    if (index >= endOffset || text[index] != TextVocabulary.QuoteMark)
                     {
                         Fail(CompilerDiagnosticCodes.InvalidModifier, "Write the plural (second) argument to '#one-many' in double quotes.", index);
                     }

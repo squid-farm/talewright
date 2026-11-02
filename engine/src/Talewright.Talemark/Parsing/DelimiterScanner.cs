@@ -1,3 +1,5 @@
+using Talewright.Talemark.Vocabulary;
+
 namespace Talewright.Talemark.Parsing;
 
 internal enum DelimiterScanMode
@@ -140,7 +142,7 @@ internal static class DelimiterScanner
             workUnits++;
             var current = text[offset];
 
-            if (UsesQuotedStrings(mode, braceDepth) && current == '"')
+            if (UsesQuotedStrings(mode, braceDepth) && current == TextVocabulary.QuoteMark)
             {
                 var literal = QuotedStringSyntax.Scan(text, offset, text.Length, cancellationToken: cancellationToken,
                     checkpoint: checkpoint);
@@ -250,7 +252,7 @@ internal static class DelimiterScanner
 
     private static bool IsEscapedInMode(string text, int offset, DelimiterScanMode mode, int braceDepth)
     {
-        if (text[offset] != '\\' || offset + 1 >= text.Length)
+        if (text[offset] != TextVocabulary.EscapeMark || offset + 1 >= text.Length)
         {
             return false;
         }
@@ -265,7 +267,9 @@ internal static class DelimiterScanner
     }
 
     internal static bool IsReaderTextEscape(char character) =>
-        character is '\\' or '{' or '}' or '[' or ']' or '*' or '_' or '`';
+        character is TextVocabulary.EscapeMark or SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
+            SceneVocabulary.OpenBracket or SceneVocabulary.CloseBracket or SceneVocabulary.ChoiceMarker or
+            SceneVocabulary.EmphasisMarker or SceneVocabulary.CodeMarker;
 
     private static bool TryGetDelimiter(
         char character,
@@ -277,8 +281,8 @@ internal static class DelimiterScanner
         if (mode == DelimiterScanMode.ReaderText)
         {
             kind = DelimiterKind.Brace;
-            isOpen = character == '{';
-            return character is '{' or '}';
+            isOpen = character == SceneVocabulary.InlineOpen;
+            return character is SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose;
         }
 
         if (mode == DelimiterScanMode.ChoiceLabel)
@@ -286,21 +290,21 @@ internal static class DelimiterScanner
             if (braceDepth > 0)
             {
                 kind = DelimiterKind.Brace;
-                isOpen = character == '{';
-                return character is '{' or '}';
+                isOpen = character == SceneVocabulary.InlineOpen;
+                return character is SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose;
             }
 
-            if (character is '[' or ']')
+            if (character is SceneVocabulary.OpenBracket or SceneVocabulary.CloseBracket)
             {
                 kind = DelimiterKind.Bracket;
-                isOpen = character == '[';
+                isOpen = character == SceneVocabulary.OpenBracket;
                 return true;
             }
 
-            if (character is '{' or '}')
+            if (character is SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose)
             {
                 kind = DelimiterKind.Brace;
-                isOpen = character == '{';
+                isOpen = character == SceneVocabulary.InlineOpen;
                 return true;
             }
 
@@ -311,14 +315,16 @@ internal static class DelimiterScanner
 
         (kind, isOpen) = character switch
         {
-            '{' => (DelimiterKind.Brace, true),
-            '}' => (DelimiterKind.Brace, false),
-            '[' => (DelimiterKind.Bracket, true),
-            ']' => (DelimiterKind.Bracket, false),
-            '(' => (DelimiterKind.Parenthesis, true),
-            ')' => (DelimiterKind.Parenthesis, false),
+            SceneVocabulary.InlineOpen => (DelimiterKind.Brace, true),
+            SceneVocabulary.InlineClose => (DelimiterKind.Brace, false),
+            SceneVocabulary.OpenBracket => (DelimiterKind.Bracket, true),
+            SceneVocabulary.CloseBracket => (DelimiterKind.Bracket, false),
+            ExpressionVocabulary.OpenParen => (DelimiterKind.Parenthesis, true),
+            ExpressionVocabulary.CloseParen => (DelimiterKind.Parenthesis, false),
             _ => (default, false),
         };
-        return character is '{' or '}' or '[' or ']' or '(' or ')';
+        return character is SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
+            SceneVocabulary.OpenBracket or SceneVocabulary.CloseBracket or
+            ExpressionVocabulary.OpenParen or ExpressionVocabulary.CloseParen;
     }
 }

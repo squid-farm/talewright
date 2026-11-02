@@ -5,6 +5,7 @@ using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Talemark.Parsing;
+using Talewright.Talemark.Vocabulary;
 using YamlDotNet.RepresentationModel;
 
 namespace Talewright.Talemark.Analysis;
@@ -218,7 +219,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         if (!_lines.TryGetValue(location.File, out var lines))
             _lines.Add(location.File, lines = source.Files[location.File].ReplaceLineEndings("\n").Split('\n'));
         var line = lines[location.Line - 1];
-        var start = line.IndexOf("===", StringComparison.Ordinal) + 3;
+        var start = line.IndexOf(SceneVocabulary.SceneHeader, StringComparison.Ordinal)
+            + SceneVocabulary.SceneHeader.Length;
         while (start < line.Length && char.IsWhiteSpace(line[start])) start++;
         Symbols.Add(new(id.Value, AuthoringSymbolKind.Scene, "scene",
             Range(location with { Column = start + 1 }, id.Value)));
