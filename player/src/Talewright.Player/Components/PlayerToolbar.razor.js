@@ -39,11 +39,23 @@ export function initialize(bar, toggle, menu, confirmation, settings = null) {
         event.preventDefault();
         closeSettings(settings, toggle);
     };
+    const settingsKeydown = event => {
+        if (event.key !== "Tab") return;
+        const controls = [...settings.querySelectorAll("button:not(:disabled), select:not(:disabled)")]
+            .filter(element => element.getClientRects().length);
+        const index = controls.indexOf(document.activeElement);
+        if (index < 0 || (!event.shiftKey && index === controls.length - 1) ||
+            (event.shiftKey && index === 0)) {
+            event.preventDefault();
+            (controls[event.shiftKey ? controls.length - 1 : 0] ?? settings).focus();
+        }
+    };
     bar.addEventListener("keydown", escape);
     document.addEventListener("pointerdown", outside);
     confirmation.addEventListener("cancel", cancel);
     settings?.addEventListener("cancel", settingsCancel);
-    toolbars.set(bar, { resize, escape, outside, cancel, confirmation, settings, settingsCancel,
+    settings?.addEventListener("keydown", settingsKeydown);
+    toolbars.set(bar, { resize, escape, outside, cancel, confirmation, settings, settingsCancel, settingsKeydown,
         cancelResize: () => cancelAnimationFrame(frame) });
 }
 
@@ -83,6 +95,7 @@ export function dispose(bar) {
     document.removeEventListener("pointerdown", state.outside);
     state.confirmation.removeEventListener("cancel", state.cancel);
     state.settings?.removeEventListener("cancel", state.settingsCancel);
+    state.settings?.removeEventListener("keydown", state.settingsKeydown);
     document.documentElement.style.removeProperty("--tw-toolbar-offset");
     toolbars.delete(bar);
 }
