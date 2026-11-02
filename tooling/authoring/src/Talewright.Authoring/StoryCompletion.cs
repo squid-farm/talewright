@@ -12,8 +12,7 @@ public static class StoryCompletion
     {
         if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is "TW5001" or "TW5002"))
             throw new InvalidOperationException("Semantic completion is unavailable until project authoring metadata is supplied and valid.");
-        var sites = analysis.CompletionSites.Where(site => site.Range.Start.File == position.File &&
-            Compare(site.Range.Start, position) <= 0 && Compare(position, site.Range.End) <= 0).ToArray();
+        var sites = analysis.CompletionSitesAt(position);
         var result = new List<AuthoringCompletion>();
         foreach (var site in sites)
         {

@@ -429,9 +429,10 @@ internal static class InlineParser
             }
 
             var expressionStart = start + expressionOffset;
+            var expressionSource = context.Source;
             analysis.Expression(condition ? ExpressionContextKind.Condition : ExpressionContextKind.Substitution,
-                incomplete[expressionOffset..], context.Source.Locate(expressionStart),
-                offset => context.Source.Locate(expressionStart + offset));
+                incomplete[expressionOffset..], expressionSource.Locate(expressionStart),
+                offset => expressionSource.Locate(expressionStart + offset));
         }
 
         ExpressionParser.ReportStringErrors(text[start..], offset => context.Source.Locate(start + offset),
@@ -487,6 +488,8 @@ internal static class InlineParser
     {
         var trimmed = inner.Trim();
         var lead = inner.Length - inner.TrimStart().Length;
+        // Analysis retains these mappings for on-request completion; capture only the source text.
+        var source = context.Source;
         if (trimmed == "else") return new ElsePiece(location);
         if (trimmed == "/if") return new EndIfPiece(location);
 
@@ -494,14 +497,14 @@ internal static class InlineParser
         {
             var condition = ExpressionParser.ParseCondition(trimmed[3..], location.Offset(lead + 3),
                 context.Symbols, context.Diagnostics,
-                locate: offset => context.Source.Locate(sourceOffset + lead + 3 + offset));
+                locate: offset => source.Locate(sourceOffset + lead + 3 + offset));
             return condition is null
                 ? null
                 : new IfPiece(condition, location, context.Source.Locate(sourceOffset - 1));
         }
 
         var substitution = ExpressionParser.ParseSubstitution(inner, location, context.Symbols, context.Diagnostics,
-            offset => context.Source.Locate(sourceOffset + offset));
+            offset => source.Locate(sourceOffset + offset));
         return substitution is null ? null : new InlinePiece(substitution);
     }
 

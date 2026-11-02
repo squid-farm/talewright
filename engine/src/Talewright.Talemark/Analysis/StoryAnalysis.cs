@@ -34,6 +34,7 @@ public sealed class StoryAnalysis
         Symbols = original.Symbols;
         Expressions = original.Expressions;
         CompletionSites = original.CompletionSites;
+        _sites = original._sites;
         Tokens = original.Tokens;
         World = original.World;
         Substitutions = original.Substitutions;
@@ -46,6 +47,7 @@ public sealed class StoryAnalysis
         Symbols = Array.AsReadOnly(collector.Symbols.Distinct().ToArray());
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
         CompletionSites = Array.AsReadOnly(collector.CompletionSites.ToArray());
+        _sites = new CompletionSiteIndex(collector.SiteSources);
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
@@ -53,11 +55,19 @@ public sealed class StoryAnalysis
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
+    private readonly CompletionSiteIndex _sites;
+
     public StorySource Source { get; }
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
     public IReadOnlyList<ExpressionContext> Expressions { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
     public IReadOnlyList<CompletionSite> CompletionSites { get; }
+
+    /// <summary>
+    /// Parser-recognized reference slots whose range contains <paramref name="position"/>, including a range
+    /// ending there, in source-analysis order. Expression slots are computed on request.
+    /// </summary>
+    public IReadOnlyList<CompletionSite> CompletionSitesAt(SourceLocation position) => _sites.At(position, Symbols);
     public IReadOnlyList<AuthoringToken> Tokens { get; }
     public WorldDefinition? World { get; }
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
@@ -97,15 +107,22 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSite> CompletionSites { get; } = [];
+    internal List<CompletionSiteSource> SiteSources { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
     internal List<AuthoredScene> Scenes { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
 
+    private void AddSite(CompletionSite site)
+    {
+        CompletionSites.Add(site);
+        SiteSources.Add(CompletionSiteSource.Of(site));
+    }
+
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)
     {
-        CompletionSites.Add(new(path, range, [AuthoringSymbolKind.Image], [], positions,
+        AddSite(new(path, range, [AuthoringSymbolKind.Image], [], positions,
             Candidates: _imageCandidates, IsImagePath: true));
     }
 
@@ -116,7 +133,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null)
     {
         var range = Range(location, text);
-        CompletionSites.Add(new(text, range, [kind], keywords,
+        AddSite(new(text, range, [kind], keywords,
             Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray(), Candidates: candidates));
         if (text.Length == 0 && source.Files.TryGetValue(location.File, out var content))
         {
@@ -126,7 +143,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             for (var column = location.Column; column <= line.Length && char.IsWhiteSpace(line[column - 1]); column++)
             {
                 var point = location with { Column = column + 1 };
-                CompletionSites.Add(new("", new(point, point), [kind], keywords, [point], Candidates: candidates));
+                AddSite(new("", new(point, point), [kind], keywords, [point], Candidates: candidates));
             }
         }
     }
@@ -186,6 +203,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             completionText += line[(range.End.Column - 1)..end];
         }
         CompletionSites.AddRange(ExpressionCompletion.Sites(completionText, kind, Map, Symbols));
+        var sites = new ExpressionSiteSource(completionText, text.Length, kind, range, location, scalar, locate);
+        var siteMap = new ExpressionSourceMap(sites);
+        SiteSources.Add(new(new(siteMap.Map(0, 0).Start, siteMap.Map(completionText.Length, 0).End), null, sites));
         foreach (var token in Lexer.Tokenize(text))
             if (token.Kind is not (TokenKind.End or TokenKind.String or TokenKind.Error or TokenKind.NamedPredicate))
                 Tokens.Add(new(token.Text, Map(token.Offset, token.Text.Length)));
@@ -263,7 +283,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                         if (opened && (char.IsWhiteSpace(character) || character == ']'))
                         {
                             var point = new SourceLocation(file, line, column);
-                            CompletionSites.Add(new("", new(point, point), [kind], [], [point], Candidates: candidates));
+                            AddSite(new("", new(point, point), [kind], [], [point], Candidates: candidates));
                         }
                         if (character == ']') return;
                         if (!opened && character == '[') opened = true;
@@ -284,7 +304,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             ReferenceCore("", mapping.Range(0, 0).Start, kind, [], candidates);
             return;
         }
-        CompletionSites.Add(new(text, mapping.Range(0, text.Length), [kind], [],
+        AddSite(new(text, mapping.Range(0, text.Length), [kind], [],
             Enumerable.Range(0, text.Length + 1).Select(index => mapping.Range(index, 0).Start).ToArray(),
             Candidates: candidates));
     }
