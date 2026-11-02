@@ -7,6 +7,7 @@ using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Rules.Triggers;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Model;
 
@@ -61,7 +62,7 @@ public sealed record DivertTarget(SceneId? Scene)
 
     public bool IsEnd => Scene is null;
 
-    public override string ToString() => Scene?.Value ?? "END";
+    public override string ToString() => Scene?.Value ?? SceneVocabulary.End;
 }
 
 /// <summary>

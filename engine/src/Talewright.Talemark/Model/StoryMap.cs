@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Model;
 
@@ -60,7 +61,7 @@ public sealed class StoryMap
             reachability.IsReached(scene.Id))).ToList();
         var endIsReachable = diverts.Any(divert =>
             divert.Target.IsEnd && reachability.IsReached(divert.From));
-        nodes.Add(new StoryMapNode("END", null, null, Array.Empty<string>(), endIsReachable));
+        nodes.Add(new StoryMapNode(SceneVocabulary.End, null, null, Array.Empty<string>(), endIsReachable));
         return new StoryMap(
             Array.AsReadOnly(nodes.ToArray()),
             diverts,

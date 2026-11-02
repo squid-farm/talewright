@@ -74,7 +74,7 @@ internal static class ChoiceSyntax
             if (inProseQuote)
                 continue;
 
-            if (current == '[')
+            if (current == SceneVocabulary.OpenBracket)
             {
                 if (!TryGetClose(index, out var bracketEnd))
                     return Ambiguous();
@@ -84,13 +84,13 @@ internal static class ChoiceSyntax
 
             string? marker = null;
             var markerOffset = index;
-            if (current == '{')
+            if (current == SceneVocabulary.InlineOpen)
             {
                 var closed = TryGetClose(index, out var braceEnd);
                 if (!inUnclosedEffect && IsBoundary(text, index) &&
                     LooksLikeEffect(text, index + 1, closed ? braceEnd : text.Length, scan, checkpoint, ref work))
                 {
-                    marker = "{";
+                    marker = SceneVocabulary.InlineOpen.ToString();
                 }
                 else if (!closed)
                 {
@@ -106,13 +106,15 @@ internal static class ChoiceSyntax
                     inUnclosedEffect = true;
                 }
             }
-            else if (IsBoundary(text, index) && text.AsSpan(index).StartsWith("->", StringComparison.Ordinal))
+            else if (IsBoundary(text, index) &&
+                     text.AsSpan(index).StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal))
             {
-                marker = "->";
+                marker = SceneVocabulary.Divert;
             }
-            else if (IsBoundary(text, index) && text.AsSpan(index).StartsWith("(requires:", StringComparison.Ordinal))
+            else if (IsBoundary(text, index) &&
+                     text.AsSpan(index).StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal))
             {
-                marker = "(requires:";
+                marker = SceneVocabulary.ChoiceRequires;
             }
 
             if (marker is null)
@@ -134,7 +136,8 @@ internal static class ChoiceSyntax
     {
         cancellationToken.ThrowIfCancellationRequested();
         expressionStart = 0;
-        if (text[open] != '(' || text.AsSpan(open).StartsWith("(requires:", StringComparison.Ordinal))
+        if (text[open] != ExpressionVocabulary.OpenParen ||
+            text.AsSpan(open).StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal))
             return false;
 
         var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
@@ -144,15 +147,15 @@ internal static class ChoiceSyntax
             checkpoint?.Check();
             index++;
         }
-        if (!text.AsSpan(index).StartsWith("requires", StringComparison.Ordinal))
+        if (!text.AsSpan(index).StartsWith(SceneVocabulary.Requires, StringComparison.Ordinal))
             return false;
-        index += "requires".Length;
+        index += SceneVocabulary.Requires.Length;
         while (index < text.Length && char.IsWhiteSpace(text[index]))
         {
             checkpoint?.Check();
             index++;
         }
-        if (index >= text.Length || text[index] != ':')
+        if (index >= text.Length || text[index] != ExpressionVocabulary.Separator)
             return false;
 
         expressionStart = index + 1;
@@ -168,11 +171,13 @@ internal static class ChoiceSyntax
         {
             checkpoint?.Check();
             var current = text[index];
-            if (current == '{' || text.AsSpan(index).StartsWith("->", StringComparison.Ordinal) ||
-                text.AsSpan(index).StartsWith("(requires:", StringComparison.Ordinal) ||
-                current == '(' && TryReadSpacedRequires(text, index, cancellationToken, out _))
+            if (current == SceneVocabulary.InlineOpen ||
+                text.AsSpan(index).StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal) ||
+                text.AsSpan(index).StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) ||
+                current == ExpressionVocabulary.OpenParen &&
+                TryReadSpacedRequires(text, index, cancellationToken, out _))
                 return index;
-            if (current is '"' or '(' or '[')
+            if (current is '"' or ExpressionVocabulary.OpenParen or SceneVocabulary.OpenBracket)
             {
                 if (!scan.TryGetClose(scanOffset + index, out var close))
                     return -1;
@@ -237,8 +242,10 @@ internal static class ChoiceSyntax
                     return false;
                 index = quoteEnd;
             }
-            else if (text[index] == '=' && (index + 1 == end || text[index + 1] != '=') &&
-                     text[index - 1] is not ('=' or '!' or '<' or '>'))
+            else if (text[index] == ExpressionVocabulary.Assign &&
+                     (index + 1 == end || text[index + 1] != ExpressionVocabulary.Assign) &&
+                     text[index - 1] is not (ExpressionVocabulary.Assign or ExpressionVocabulary.NotEqualMarker or
+                         ExpressionVocabulary.Less or ExpressionVocabulary.Greater))
             {
                 return true;
             }

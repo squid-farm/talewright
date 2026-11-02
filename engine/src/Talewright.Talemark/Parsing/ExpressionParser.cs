@@ -129,5 +129,5 @@ internal static class ExpressionParser
         id is ExpressionVocabulary.And or ExpressionVocabulary.Or or ExpressionVocabulary.Not or ExpressionVocabulary.Has or
             ExpressionVocabulary.True or ExpressionVocabulary.False or ExpressionVocabulary.Visited or
             ExpressionVocabulary.Faction or ExpressionVocabulary.Item or ExpressionVocabulary.Flag or ExpressionVocabulary.Var or
-            "END";
+            SceneVocabulary.End;
 }

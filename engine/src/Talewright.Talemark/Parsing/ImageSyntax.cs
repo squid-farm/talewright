@@ -243,7 +243,7 @@ internal static class ImageSyntax
                 continue;
             }
 
-            if (text[i] == '{') return true;
+            if (text[i] == SceneVocabulary.InlineOpen) return true;
         }
 
         return false;
