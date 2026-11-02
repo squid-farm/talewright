@@ -75,13 +75,14 @@ test('player declarations may be in the root or a supporting configuration file'
 test('item grammar has explicit enum/boolean values and independent defaults', () => {
   const item = compileSubschema(schema.definitions.itemValue);
   for (const value of ['sword', {}, { name: 'armor', uncountable: true },
+    { name: 'armor', uncountable: 'true' }, { name: 'armor', uncountable: 'false' },
     { name: 'pants', 'name-agreement': 'plural' },
     { name: 'pair of boots', 'name-agreement': 'singular', uncountable: false }]) {
     assertValid(item, value, JSON.stringify(value));
   }
   for (const value of [{ 'name-agreement': 'many' }, { 'name-agreement': true },
     { 'name-agreement': ['singular'] }, { uncountable: 'sometimes' },
-    { uncountable: 1 }, { uncountable: {} }]) {
+    { uncountable: 'yes' }, { uncountable: 'no' }, { uncountable: 1 }, { uncountable: {} }]) {
     assertInvalid(item, value, JSON.stringify(value));
   }
   assert.equal(schema.definitions.item.properties['name-agreement'].default, 'singular');

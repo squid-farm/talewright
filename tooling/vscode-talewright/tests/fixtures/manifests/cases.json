@@ -3,11 +3,21 @@
   { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "text-variables.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "invalid-variable-shapes.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
-  { "file": "faction-shorthand.yaml", "schemaValid": false, "compilerCodes": [] },
+  { "file": "faction-shorthand.yaml", "schemaValid": false, "compilerCodes": ["TW4003"], "diagnosticLocations": [{ "line": 8, "column": 10 }] },
+  { "file": "faction-sequence.yaml", "schemaValid": false, "compilerCodes": ["TW4003"], "diagnosticLocations": [{ "line": 8, "column": 10 }] },
+  { "file": "faction-null.yaml", "schemaValid": false, "compilerCodes": ["TW4003"], "diagnosticLocations": [{ "line": 8, "column": 10 }] },
   { "file": "preset-empty.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "preset-whitespace.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "preset-too-long.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "wrong-type.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "trigger-once-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
-  { "file": "unknown-key.yaml", "schemaValid": false, "compilerCodes": ["TW4006"] }
+  { "file": "boolean-true.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": true },
+  { "file": "boolean-false.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": false },
+  { "file": "boolean-quoted-true.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": true },
+  { "file": "boolean-quoted-false.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": false },
+  { "file": "boolean-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
+  { "file": "boolean-no.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
+  { "file": "boolean-other-scalars.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
+  { "file": "boolean-null.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
+  { "file": "unknown-key.yaml", "schemaValid": false, "compilerCodes": ["TW4006", "TW4006", "TW4006"], "warningLocations": [{ "line": 5, "column": 3 }, { "line": 9, "column": 5 }, { "line": 10, "column": 1 }] }
 ]

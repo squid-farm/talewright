@@ -1,0 +1,18 @@
+game:
+  id: boolean-true
+  title: Boolean values
+  start: beginning
+  undo: true
+  creation:
+    name: true
+characters:
+  player:
+    first-name: Ada
+items:
+  coin:
+    uncountable: true
+triggers:
+  - id: once
+    when: 'true'
+    do: set flag:ready
+    once: true
