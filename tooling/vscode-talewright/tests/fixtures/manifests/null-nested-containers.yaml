@@ -1,0 +1,19 @@
+game:
+  id: null-nested-containers
+  title: Null nested containers
+  start: beginning
+  ruleset:
+    disable: ~
+    stats: ~
+  creation:
+    pronouns: ~
+    stats: ~
+    presets: ~
+characters:
+  player:
+    first-name: Ada
+    stats: ~
+    inventory: ~
+items:
+  coin:
+    modifiers: ~

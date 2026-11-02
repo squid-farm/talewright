@@ -1,0 +1,13 @@
+game:
+  id: null-containers
+  title: Null containers
+  start: beginning
+  ruleset: ~
+  creation: ~
+characters:
+  player: {first-name: Ada}
+items: ~
+factions: ~
+flags: ~
+vars: ~
+triggers: ~

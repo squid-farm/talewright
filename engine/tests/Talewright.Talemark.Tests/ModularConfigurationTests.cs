@@ -236,7 +236,10 @@ public sealed class ModularConfigurationTests
     [InlineData("characters:\n  guide: {first-name: Bea, inventory: [missing]}", "TW4005", 2)]
     [InlineData("items: [", "TW4001", 2)]
     [InlineData("flags: not-a-list", "TW4003", 1)]
+    [InlineData("flags: ~", "TW4003", 1)]
     [InlineData("vars: []", "TW4003", 1)]
+    [InlineData("factions: ~", "TW4003", 1)]
+    [InlineData("triggers: ~", "TW4003", 1)]
     [InlineData("characters: {}\n---\ncharacters: {}", "TW4001", 1)]
     [InlineData("triggers:\n  - id: invalid\n    when: var:missing > 0\n    do: set flag:done", "TW2004", 3)]
     public void Fragment_diagnostics_and_unsaved_analysis_retain_original_file_and_position(string text, string code, int line)
