@@ -137,7 +137,7 @@ internal sealed class ExpressionParser
     public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
         Func<int, SourceLocation>? locate = null)
     {
-        symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location);
+        symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location, locate);
         var tokens = Lexer.Tokenize(text);
         var hashToken = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
         var hash = hashToken < 0 ? -1 : tokens[hashToken].Offset;
@@ -331,7 +331,7 @@ internal sealed class ExpressionParser
         SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null)
     {
         symbols.Analysis?.Expression(type == ExprType.Bool ? ExpressionContextKind.Condition : ExpressionContextKind.Number,
-            text, authoringLocation ?? location);
+            text, authoringLocation ?? location, locate);
         var parser = new ExpressionParser(text, location, symbols, diagnostics, locate);
         try
         {
