@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../tooling/authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
     <ProjectReference Include="../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>

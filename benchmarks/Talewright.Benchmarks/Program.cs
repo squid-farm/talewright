@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text;
+using Talewright.Authoring;
 using Talewright.Runtime;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
@@ -130,7 +131,7 @@ void MeasureRealisticCorpus()
     var realisticSource = realistic.ToSource();
     var realisticBytes = PerformanceSource.Utf8ByteCount(realisticSource);
     Console.WriteLine($"Realistic corpus: {profile.Chapters} chapters, seed {profile.Seed}, {realistic.SceneCount} scenes, {realisticSource.Files.Count} files, {realisticBytes} UTF-8 source bytes including manifest.");
-    Measure("Compile realistic 20 chapters", () => Compile(realisticSource), sourceBytes: realisticBytes, allocationCeiling: 54,
+    Measure("Compile realistic 20 chapters", () => Compile(realisticSource), sourceBytes: realisticBytes, allocationCeiling: 50,
         validate: story =>
         {
             if (story.Scenes.Count != realistic.SceneCount)
@@ -138,7 +139,75 @@ void MeasureRealisticCorpus()
                 throw new InvalidOperationException("The realistic corpus compiled to an unexpected scene count.");
             }
         });
-    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 72);
+    MeasureAnalysis("Analyze realistic 20 chapters", realisticSource, realistic.SceneCount, allocationCeiling: 66);
+    MeasureCompletionQueries(realisticSource);
+}
+
+void MeasureCompletionQueries(StorySource source)
+{
+    var analysis = StoryAnalyzer.Analyze(source);
+    var positions = analysis.Expressions
+        .Where(expression => expression.Range.Start.Line == expression.Range.End.Line &&
+                             expression.Range.End.Column > expression.Range.Start.Column)
+        .SelectMany(expression => new[]
+        {
+            expression.Range.Start with
+            {
+                Column = (expression.Range.Start.Column + expression.Range.End.Column) / 2
+            },
+            expression.Range.End
+        })
+        .Where((_, index) => index % 7 == 0)
+        .Take(2_000)
+        .ToArray();
+
+    Console.WriteLine($"Completion-query workload: {positions.Length} deterministic positions sampled from realistic expression ranges.");
+    MeasureCompletionQuery("CompletionSitesAt", positions, position => analysis.CompletionSitesAt(position).Count, 3_500);
+    MeasureCompletionQuery("StoryCompletion.Complete", positions,
+        position => StoryCompletion.Complete(analysis, position).Count, 8_000);
+}
+
+void MeasureCompletionQuery(string name, SourceLocation[] positions, Func<SourceLocation, int> query,
+    double allocationCeiling)
+{
+    if (positions.Length == 0)
+    {
+        throw new InvalidOperationException("The realistic corpus produced no completion-query positions.");
+    }
+
+    var expectedResults = 0;
+    foreach (var position in positions) expectedResults += query(position);
+
+    var times = new double[7];
+    var allocations = new long[7];
+    for (var iteration = 0; iteration < times.Length; iteration++)
+    {
+        var resultCount = 0;
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        var started = Stopwatch.GetTimestamp();
+        foreach (var position in positions) resultCount += query(position);
+        times[iteration] = (Stopwatch.GetTimestamp() - started) * (1_000.0 / Stopwatch.Frequency);
+        allocations[iteration] = GC.GetAllocatedBytesForCurrentThread() - allocated;
+        if (resultCount != expectedResults)
+        {
+            throw new InvalidOperationException($"{name} returned a different result count during measurement.");
+        }
+    }
+
+    Array.Sort(times);
+    Array.Sort(allocations);
+    var medianMicroseconds = times[3] * 1_000 / positions.Length;
+    var maxMicroseconds = times[^1] * 1_000 / positions.Length;
+    var medianBytes = allocations[3] / (double)positions.Length;
+    var maxBytes = allocations[^1] / (double)positions.Length;
+    Console.WriteLine(FormattableString.Invariant(
+        $"{name}\t{positions.Length} queries\t{medianMicroseconds:F2} median us/query\t{maxMicroseconds:F2} max us/query\t{medianBytes:F0} median B/query\t{maxBytes:F0} max B/query\t{expectedResults} results\t{allocationCeiling:F0} B/query ceiling"));
+    if (maxBytes > allocationCeiling)
+    {
+        Console.Error.WriteLine(FormattableString.Invariant(
+            $"Completion-query allocation ceiling exceeded: {name}: {maxBytes:F0} B/query > {allocationCeiling:F0}."));
+        failed = true;
+    }
 }
 
 void MeasureSlowShape(SlowInputShape shape, string name)
