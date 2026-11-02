@@ -534,7 +534,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         var binaries = Path.GetDirectoryName(typeof(PublishCommand).Assembly.Location)!;
         var references = new XElement("ItemGroup");
         foreach (var name in new[] { "Talewright.Core", "Talewright.Graphs", "Talewright.Rules", "Talewright.Narrative",
-            "Talewright.Rulesets.Generic", "Talewright.Talemark", "Talewright.Runtime", "Talewright.Player", "Markdig", "YamlDotNet" })
+            "Talewright.Rulesets.Generic", "Talewright.Talemark", "Talewright.Runtime", "Talewright.Player", "YamlDotNet" })
         {
             var path = Path.Combine(binaries, name + ".dll");
             if (!File.Exists(path))
