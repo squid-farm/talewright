@@ -11,7 +11,12 @@ exports.run = async () => {
     'Exercise the installed VSIX, not the development source');
   assert.equal(extension.packageJSON.main, './dist/extension.cjs');
   if (process.env.TALEWRIGHT_TEST_ACTIONS === 'true') {
-    await testAuthorActions(extension);
+    try {
+      await testAuthorActions(extension);
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
     return;
   }
   assert.equal(vscode.workspace.getConfiguration('talewright').get('languageServer.command'), '',
@@ -134,7 +139,16 @@ async function testAuthorActions(extension) {
   assert.notEqual(player.code, 0, 'Task cancellation must not report player success');
   const debug = await run('openAuthorDebugger', true);
   assert.notEqual(debug.code, 0, 'Task cancellation must not report debugger success');
-  console.log('Installed CLI action smoke passed: validation success/failure, player/debugger tasks and process-tree cancellation.');
+  await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+  await fs.rm(path.join(root, 'story.talewright.yaml'));
+  await fs.rm(path.join(root, 'start.tale'));
+  await vscode.commands.executeCommand('talewright.newStory');
+  const scene = path.join(root, 'story.tale');
+  assert.equal(vscode.window.activeTextEditor.document.uri.fsPath, scene,
+    'Creating a story in the sole empty workspace folder must open its start scene');
+  assert.match(await fs.readFile(path.join(root, 'story.talewright.yaml'), 'utf8'), /start:\s*start/);
+  assert.equal((await run('validateStory')).code, 0, 'The generated story must validate through the extension CLI action');
+  console.log('Installed CLI action smoke passed: validation success/failure, player/debugger tasks, new story creation and start-scene opening.');
 }
 
 async function bundledServerProcesses(extension) {

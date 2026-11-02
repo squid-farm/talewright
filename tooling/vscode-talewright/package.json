@@ -34,6 +34,7 @@
       { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
       { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" },
       { "command": "talewright.runStory", "title": "Talewright: Run Story" },
+      { "command": "talewright.newStory", "title": "Talewright: New Story" },
       { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" },
       { "command": "talewright.togglePreviewHints", "title": "Talewright: Toggle Substitution Preview Hints" }
     ],
