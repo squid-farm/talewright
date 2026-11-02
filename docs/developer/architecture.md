@@ -312,11 +312,13 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     Its modes reflect which delimiters matter in reader text, choice labels and code groups. The same quoted-string
     boundary logic is shared with `QuotedStringSyntax`, which also decodes escapes for the lexer and image arguments.
     Reader-text escape characters are defined once and used by the scanner and reader-text consumers.
-  - `ExpressionParser` + `Lexer`: recursive-descent parser for conditions, numbers, substitutions and effects,
-    with type checking (TW2xxx). The lexer owns token boundaries; `ExpressionParser` owns expression and effect
-    grammar. Tokens retain offsets into their original expression text; quoted strings are decoded only when a
-    consumer needs their value. Compilation and authoring analysis reuse token buffers across expression consumers.
-    `QuotedStringSyntax` provides the shared quoted-string boundary and decoding rules.
+  - `Lexer` owns token boundaries. `ExpressionSyntaxParser` parses conditions, numbers, substitutions and effects
+    into immutable, span-based syntax without story symbols; `ExpressionBinder` resolves names and types and builds
+    the existing runtime expression/effect models. `ExpressionParser` is the compile-facing parse-and-bind facade.
+    Syntax nodes refer to the shared token buffer rather than copying source text. Compilation and authoring analysis
+    reuse token buffers across expression consumers, and variable inference rebinds one parsed initializer as symbols
+    become known. Syntax trees are transient compiler data, not retained by `StoryAnalysis`. Quoted strings are
+    decoded only when a consumer needs their value; `QuotedStringSyntax` provides the shared boundary and decoding rules.
   - `StorySymbols`: what's declared (stats, characters, items, factions, flags, vars, scenes), for resolving
     names.
 - **`Model/StoryDefinition.cs`**: the compiled story. `StoryDefinition` (Id, Title, Start, Randomness, Seed,

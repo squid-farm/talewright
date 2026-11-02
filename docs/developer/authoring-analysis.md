@@ -73,6 +73,11 @@ refer to the retained source text, and quoted-string values are decoded only
 when a consumer requests them. Hosts filter the returned sites for their own
 needs, such as end-exclusive navigation.
 
+Compilation parses expression syntax independently of story symbols, then binds
+that syntax against the current symbol table. The compiler can reuse a syntax
+tree while inferred declarations become known; `StoryAnalysis` currently retains
+the source and token buffer, not the syntax tree or bound runtime expression.
+
 This API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not produce completion items,
 hover, LSP transport, or evaluated gameplay values itself.

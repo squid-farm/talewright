@@ -26,6 +26,13 @@ internal static class VariableDiscovery
             Variables = numbers.Keys.Concat(text.Keys).Concat(unresolved).ToHashSet(),
             UnresolvedVariables = unresolved, Predicates = options.Predicates, Modifiers = options.Modifiers,
         };
+        var syntax = first.Where(declaration => !declaration.Numeric).ToDictionary(declaration => declaration.Id,
+            declaration =>
+            {
+                var diagnostics = new DiagnosticBag();
+                return ExpressionSyntaxParser.ParseExpression(Lexer.Tokenize(declaration.Expression),
+                    declaration.Expression.Length, declaration.Location.Offset, diagnostics, sumOnly: true);
+            });
         bool changed;
         do
         {
@@ -34,7 +41,8 @@ internal static class VariableDiscovery
             {
                 // Arithmetic and compound assignment constrain a variable to integers, including self-increments.
                 var type = declaration.Numeric ? ExprType.Number :
-                    ExpressionParser.ParseValue(declaration.Expression, declaration.Location, symbols, new DiagnosticBag())?.Type;
+                    ExpressionBinder.Bind(syntax[declaration.Id], symbols, new DiagnosticBag(),
+                        declaration.Location.Offset)?.Type;
                 if (type is not (ExprType.Number or ExprType.Text)) continue;
                 if (type == ExprType.Text) text.Add(declaration.Id, "");
                 else numbers.Add(declaration.Id, 0);

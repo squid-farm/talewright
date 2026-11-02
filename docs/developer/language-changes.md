@@ -42,7 +42,7 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 
 | Surface | Required review |
 |---|---|
-| Parser and diagnostics | Lexer, value/argument scanner, enclosing delimiters, semantic validation, precise positions, obsolete-form replacement messages. Keep parser behavior and the registry in agreement. |
+| Parser and diagnostics | Lexer, expression syntax grammar, enclosing delimiters, semantic binding, precise positions, obsolete-form replacement messages. `ExpressionSyntaxParser` owns expression grammar; `ExpressionBinder` owns symbol resolution and type validation. Identify which is affected and explicitly call out unaffected surfaces. Keep parser behavior and the registry in agreement. |
 | Manifest schema | Name rules and any new data shapes; schema/compiler agreement on valid and invalid fixtures. YAML quoting is a separate layer from Talemark quoting. |
 | VS Code grammar | Highlighting, strings, escapes, punctuation and identifier boundaries; do not accept a wider name set than the compiler. |
 | Language server and shared authoring analysis | Completion, replacement ranges, hover, live diagnostics, partial/incomplete input, finite argument suggestions and default details. Never execute project code merely to offer completion. |
