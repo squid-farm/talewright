@@ -84,7 +84,8 @@ public static class StoryHover
             throw new InvalidOperationException("Hover is unavailable until project authoring metadata is supplied and valid.");
         var declaration = analysis.Symbols.FirstOrDefault(symbol => symbol.Declaration is { } range && Contains(range, position));
         if (declaration is not null) return Describe(analysis, declaration, declaration.Declaration!);
-        foreach (var site in analysis.CompletionSites.Where(site => site.Text.Length > 0 && Contains(site.Range, position)))
+        var sites = analysis.CompletionSitesAt(position);
+        foreach (var site in sites.Where(site => site.Text.Length > 0 && Contains(site.Range, position)))
         {
             var symbol = (site.Candidates ?? analysis.Symbols).FirstOrDefault(candidate =>
                 site.Kinds.Contains(candidate.Kind) && candidate.Name == site.Text);
@@ -107,7 +108,7 @@ public static class StoryHover
         }
         foreach (var token in analysis.Tokens.Where(token => Contains(token.Range, position)))
         {
-            var unresolvedReference = analysis.CompletionSites.Any(site =>
+            var unresolvedReference = sites.Any(site =>
                 site.Text == token.Text && Contains(site.Range, position) &&
                 site.Kinds.Any(kind => kind != AuthoringSymbolKind.Directive) &&
                 !site.Keywords.Any(keyword => keyword.TrimEnd(':', '(') == site.Text));

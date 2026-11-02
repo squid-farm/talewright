@@ -63,8 +63,14 @@ for stable Talemark-aware lint findings. The CLI integration is delivered in #15
 the language server also consumes the same rule results and configuration in #151.
 
 The [language server](language-server.md) hosts this API for editor diagnostics.
+`StoryAnalysis.CompletionSitesAt(position)` returns the completion sites whose
+ranges contain a position (end inclusive), in analysis order. Expression sites are
+computed only when a request asks for them; analysis keeps each expression's
+inputs and builds a per-file position index on the first query. Hosts filter the
+returned sites for their own needs, such as end-exclusive navigation.
+
 This API exposes declaration ranges and expression extents, not a complete
-reference-binding or formatting syntax tree. It does not provide completion,
+reference-binding or formatting syntax tree. It does not produce completion items,
 hover, LSP transport, or evaluated gameplay values itself.
 
 ## Workspace lifecycle

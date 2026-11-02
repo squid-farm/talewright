@@ -12,7 +12,7 @@ public static class StoryNavigation
             throw new InvalidOperationException("Navigation is unavailable until project authoring metadata is supplied and valid.");
         var declaration = analysis.Symbols.FirstOrDefault(symbol => symbol.Declaration is { } range && Contains(range, position));
         if (declaration is not null) return declaration.Declaration;
-        foreach (var site in analysis.CompletionSites.Where(site => site.Text.Length > 0 && Contains(site.Range, position)))
+        foreach (var site in analysis.CompletionSitesAt(position).Where(site => site.Text.Length > 0 && Contains(site.Range, position)))
         {
             var symbol = (site.Candidates ?? analysis.Symbols).FirstOrDefault(candidate =>
                 site.Kinds.Contains(candidate.Kind) && candidate.Name == site.Text && candidate.Declaration is not null);

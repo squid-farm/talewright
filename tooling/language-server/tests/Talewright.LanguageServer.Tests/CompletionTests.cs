@@ -2,6 +2,7 @@ using System.Text.Json;
 using Talewright.Authoring;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.LanguageServer.Tests;
 
@@ -18,7 +19,11 @@ public sealed partial class ServerTests
         {
             [StorySource.ManifestFileName] = text, ["start.tale"] = Valid
         });
-        Assert.Contains(StoryAnalyzer.Analyze(source).CompletionSites, site =>
+        var scalarLines = text.Split('\n');
+        var scalarLine = Array.FindIndex(scalarLines, line => line.Contains("start: \"sta", StringComparison.Ordinal));
+        var scalarStart = new SourceLocation(StorySource.ManifestFileName, scalarLine + 1,
+            scalarLines[scalarLine].IndexOf("\"sta", StringComparison.Ordinal) + 2);
+        Assert.Contains(StoryAnalyzer.Analyze(source).CompletionSitesAt(scalarStart), site =>
             site.Text == "start" && site.Range.Start.Line != site.Range.End.Line);
         await client.Open(StorySource.ManifestFileName, text, 1);
         Assert.Empty(Items(await Completion(client, StorySource.ManifestFileName, marked)));
