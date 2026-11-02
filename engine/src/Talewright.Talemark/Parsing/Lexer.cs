@@ -30,8 +30,65 @@ internal enum TokenKind
     End,
 }
 
-internal readonly record struct Token(TokenKind Kind, string Text, int Offset,
-    int? StringEnd = null, int? ErrorOffset = null);
+internal readonly record struct Token(TokenKind Kind, string Source, int Offset, int Length,
+    string? Error = null, int ErrorAt = -1)
+{
+    internal int? ErrorOffset => ErrorAt < 0 ? null : ErrorAt;
+    internal int? StringEnd => Kind == TokenKind.String || ErrorOffset is not null ? Offset + Length : null;
+
+    internal ReadOnlySpan<char> Text
+    {
+        get
+        {
+            if (Error is not null) return Error.AsSpan();
+            if (Kind == TokenKind.String)
+                return QuotedStringSyntax.Read(Source, Offset, Offset + Length).Value.AsSpan();
+            var start = Offset;
+            if (Length > 0 && Source[start] == '@' && Kind is TokenKind.NamedPredicate or TokenKind.Error)
+                start++;
+            return Source.AsSpan(start, Offset + Length - start);
+        }
+    }
+
+    internal bool Is(string text) => Text.SequenceEqual(text);
+
+    internal string Value => Error ?? (Kind == TokenKind.String
+        ? QuotedStringSyntax.Read(Source, Offset, Offset + Length).Value
+        : Text.ToString());
+}
+
+internal sealed class TokenBuffer(string source, List<Token> tokens)
+{
+    private readonly List<Token> _tokens = tokens;
+
+    internal string Source { get; } = source;
+    internal int Count => _tokens.Count;
+    internal Token this[int index] => _tokens[index];
+    internal TokenWindow Slice(int start, int length) => new(this, start, length);
+    public List<Token>.Enumerator GetEnumerator() => _tokens.GetEnumerator();
+
+    internal int FindHash()
+    {
+        for (var index = 0; index < _tokens.Count; index++)
+            if (_tokens[index] is { Kind: TokenKind.Error, Text: "#" }) return index;
+        return -1;
+    }
+}
+
+internal readonly struct TokenWindow(TokenBuffer buffer, int start, int length)
+{
+    public int Length { get; } = length;
+    public Token this[int index] => buffer[start + index];
+    public Token this[Index index] => buffer[start + index.GetOffset(Length)];
+    public TokenWindow this[Range range]
+    {
+        get
+        {
+            var (offset, count) = range.GetOffsetAndLength(Length);
+            return new(buffer, start + offset, count);
+        }
+    }
+}
 
 /// <summary>
 /// Tokenizer for expressions and effects. Identifiers follow <see cref="IdentifierRules"/>; a dot is only
@@ -39,7 +96,7 @@ internal readonly record struct Token(TokenKind Kind, string Text, int Offset,
 /// </summary>
 internal static class Lexer
 {
-    public static List<Token> Tokenize(string text)
+    public static TokenBuffer Tokenize(string text)
     {
         var tokens = new List<Token>();
         var i = 0;
@@ -61,8 +118,8 @@ internal static class Lexer
                 }
 
                 while (i > start && text[i - 1] is '.' or '-') i--;
-                var value = text[start..i];
-                tokens.Add(new Token(IdentifierRules.IsValid(value) ? TokenKind.Identifier : TokenKind.Error, value, start));
+                tokens.Add(new Token(IdentifierRules.IsValid(text.AsSpan(start, i - start))
+                    ? TokenKind.Identifier : TokenKind.Error, text, start, i - start));
                 continue;
             }
 
@@ -73,16 +130,16 @@ internal static class Lexer
                     i++;
                 }
 
-                tokens.Add(new Token(TokenKind.Number, text[start..i], start));
+                tokens.Add(new Token(TokenKind.Number, text, start, i - start));
                 continue;
             }
 
             if (c == '"')
             {
-                var literal = QuotedStringSyntax.Read(text, i, text.Length);
+                var literal = QuotedStringSyntax.Scan(text, i, text.Length);
                 tokens.Add(literal.Error is { } error
-                    ? new(TokenKind.Error, error, start, literal.End, literal.ErrorOffset)
-                    : new(TokenKind.String, literal.Value, start, literal.End));
+                    ? new(TokenKind.Error, text, start, literal.End - start, error, literal.ErrorOffset)
+                    : new(TokenKind.String, text, start, literal.End - start));
                 i = literal.End;
                 continue;
             }
@@ -97,25 +154,24 @@ internal static class Lexer
                 }
 
                 while (i > nameStart && text[i - 1] is '.' or '-') i--;
-                var name = text[nameStart..i];
-                tokens.Add(new Token(IdentifierRules.IsValid(name) ? TokenKind.NamedPredicate : TokenKind.Error, name, start));
+                tokens.Add(new Token(IdentifierRules.IsValid(text.AsSpan(nameStart, i - nameStart))
+                    ? TokenKind.NamedPredicate : TokenKind.Error, text, start, i - start));
                 continue;
             }
 
-            var two = i + 1 < text.Length ? text.Substring(i, 2) : string.Empty;
-            var kind = two switch
+            var kind = (c, i + 1 < text.Length ? text[i + 1] : '\0') switch
             {
-                "==" => TokenKind.Equal,
-                "!=" => TokenKind.NotEqual,
-                "<=" => TokenKind.LessOrEqual,
-                ">=" => TokenKind.GreaterOrEqual,
-                "+=" => TokenKind.PlusAssign,
-                "-=" => TokenKind.MinusAssign,
+                ('=', '=') => TokenKind.Equal,
+                ('!', '=') => TokenKind.NotEqual,
+                ('<', '=') => TokenKind.LessOrEqual,
+                ('>', '=') => TokenKind.GreaterOrEqual,
+                ('+', '=') => TokenKind.PlusAssign,
+                ('-', '=') => TokenKind.MinusAssign,
                 _ => TokenKind.Error,
             };
             if (kind != TokenKind.Error)
             {
-                tokens.Add(new Token(kind, two, start));
+                tokens.Add(new Token(kind, text, start, 2));
                 i += 2;
                 continue;
             }
@@ -135,11 +191,11 @@ internal static class Lexer
                 '=' => TokenKind.Assign,
                 _ => TokenKind.Error,
             };
-            tokens.Add(new Token(kind, c.ToString(), start));
+            tokens.Add(new Token(kind, text, start, 1));
             i++;
         }
 
-        tokens.Add(new Token(TokenKind.End, string.Empty, text.Length));
-        return tokens;
+        tokens.Add(new Token(TokenKind.End, text, text.Length, 0));
+        return new TokenBuffer(text, tokens);
     }
 }

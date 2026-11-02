@@ -103,6 +103,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     private readonly Dictionary<SourceLocation, YamlScalarSource> _scalars = [];
     private readonly Dictionary<string, int[]> _manifestLineStarts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _variableTypes = new(StringComparer.Ordinal);
+    private Dictionary<(SourceLocation Location, string Text), TokenBuffer>? _reusableExpressions;
     private readonly AuthoringSymbol[] _imageCandidates = StoryImageResolver.CompletionPaths(source)
         .Select(name => new AuthoringSymbol(name, AuthoringSymbolKind.Image, "image path", null)).ToArray();
     internal List<AuthoringSymbol> Symbols { get; } = [];
@@ -152,8 +153,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     }
 
     // Prose callers pass their paragraph mapping as locate, so positions come straight from the line map.
-    internal void Expression(ExpressionContextKind kind, string text, SourceLocation location,
-        Func<int, SourceLocation>? locate = null)
+    internal TokenBuffer Expression(ExpressionContextKind kind, string text, SourceLocation location,
+        Func<int, SourceLocation>? locate = null, bool cacheForReuse = false)
     {
         YamlScalarSource? scalar = null;
         if (locate is null) _scalars.TryGetValue(location, out scalar);
@@ -170,20 +171,25 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             while (end < line.Length && char.IsWhiteSpace(line[end])) end++;
             completionText += line[(range.End.Column - 1)..end];
         }
-        var sites = new ExpressionSiteSource(completionText, text.Length, kind, range, location, scalar, locate);
+        var key = (location, completionText);
+        if (_reusableExpressions is null || !_reusableExpressions.TryGetValue(key, out var tokens))
+            tokens = Lexer.Tokenize(completionText);
+        if (cacheForReuse) (_reusableExpressions ??= []).TryAdd(key, tokens);
+        var sites = new ExpressionSiteSource(tokens, text.Length, kind, range, location, scalar, locate);
         var map = new ExpressionSourceMap(sites);
         CompletionSites.Add(new(new(map.Map(0, 0).Start, map.Map(completionText.Length, 0).End), null, sites));
-        foreach (var token in Lexer.Tokenize(text))
+        foreach (var token in tokens)
             if (token.Kind is not (TokenKind.End or TokenKind.String or TokenKind.Error or TokenKind.NamedPredicate))
-                Tokens.Add(new(token.Text, map.Map(token.Offset, token.Text.Length)));
+                Tokens.Add(new(token.Value, map.Map(token.Offset, token.Length)));
         if (kind == ExpressionContextKind.Effects)
         {
-            ExpressionParser.CollectDeclarations(text, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
+            ExpressionParser.CollectDeclarations(tokens, text.Length, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
                 (name, flag, offset) => Symbols.Add(new(name,
                     flag ? AuthoringSymbolKind.Flag : AuthoringSymbolKind.Variable,
                     flag ? "boolean" : _variableTypes.GetValueOrDefault(name, "unresolved"),
                     scalar?.Range(offset, name.Length) ?? Range(location.Offset(offset), name))));
         }
+        return tokens;
     }
 
     internal void Scalar(YamlScalarNode node, string file = StorySource.ManifestFileName)

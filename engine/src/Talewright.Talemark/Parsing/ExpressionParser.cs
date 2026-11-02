@@ -32,17 +32,21 @@ internal sealed class ExpressionParser
 
     private static readonly string[] Keywords = ["and", "or", "not", "has", "true", "false", "visited"];
 
-    private readonly List<Token> _tokens;
+    private readonly TokenBuffer _tokens;
+    private readonly int _endIndex;
+    private readonly int _endOffset;
     private readonly Func<int, SourceLocation> _locate;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
     private int _pos;
     private int _nestingDepth;
 
-    private ExpressionParser(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
-        Func<int, SourceLocation>? locate = null)
+    private ExpressionParser(TokenBuffer tokens, int endOffset, SourceLocation location, StorySymbols symbols,
+        DiagnosticBag diagnostics, Func<int, SourceLocation>? locate = null, int? endIndex = null)
     {
-        _tokens = Lexer.Tokenize(text);
+        _tokens = tokens;
+        _endIndex = endIndex ?? tokens.Count - 1;
+        _endOffset = endOffset;
         _locate = locate ?? location.Offset;
         _symbols = symbols;
         _diagnostics = diagnostics;
@@ -50,13 +54,16 @@ internal sealed class ExpressionParser
 
     private sealed class ParseException : Exception;
 
-    internal static bool ReportStringErrors(string text, Func<int, SourceLocation> locate, DiagnosticBag diagnostics)
+    internal static bool ReportStringErrors(string text, Func<int, SourceLocation> locate, DiagnosticBag diagnostics) =>
+        ReportStringErrors(Lexer.Tokenize(text), locate, diagnostics);
+
+    internal static bool ReportStringErrors(TokenBuffer tokens, Func<int, SourceLocation> locate, DiagnosticBag diagnostics)
     {
         var invalid = false;
-        foreach (var token in Lexer.Tokenize(text))
+        foreach (var token in tokens)
         {
             if (token.ErrorOffset is not { } offset) continue;
-            diagnostics.Error("TW1001", token.Text, locate(offset));
+            diagnostics.Error("TW1001", token.Value, locate(offset));
             invalid = true;
         }
         return invalid;
@@ -64,9 +71,13 @@ internal sealed class ExpressionParser
 
     internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables,
         Action<string, bool, int>? declaration = null,
+        Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default) =>
+        CollectDeclarations(Lexer.Tokenize(text), text.Length, flags, variables, declaration, typedDeclaration, location);
+
+    internal static void CollectDeclarations(TokenBuffer tokens, int expressionLength, ISet<FlagId> flags,
+        IDictionary<VarId, int> variables, Action<string, bool, int>? declaration = null,
         Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default)
     {
-        var tokens = Lexer.Tokenize(text);
         for (var start = 0; start < tokens.Count - 1;)
         {
             var end = start;
@@ -75,15 +86,16 @@ internal sealed class ExpressionParser
                 end++;
             }
 
-            var statement = tokens.GetRange(start, end - start).ToArray();
+            var statement = tokens.Slice(start, end - start);
             if (statement is [
                 { Kind: TokenKind.Identifier, Text: "set" or "clear" },
                 { Kind: TokenKind.Identifier, Text: "flag" },
                 { Kind: TokenKind.Colon },
                 { Kind: TokenKind.Identifier } flag])
             {
-                flags.Add(new FlagId(flag.Text));
-                declaration?.Invoke(flag.Text, true, flag.Offset);
+                var name = flag.Value;
+                flags.Add(new FlagId(name));
+                declaration?.Invoke(name, true, flag.Offset);
             }
             else if (statement is [
                 { Kind: TokenKind.Identifier, Text: "var" },
@@ -92,16 +104,18 @@ internal sealed class ExpressionParser
                 { Kind: TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign },
                 .. var amount])
             {
-                variables.TryAdd(new VarId(variable.Text), 0);
-                declaration?.Invoke(variable.Text, false, variable.Offset);
+                var name = variable.Value;
+                variables.TryAdd(new VarId(name), 0);
+                declaration?.Invoke(name, false, variable.Offset);
                 if (amount.Length == 0)
                 {
                     start = end + 1;
                     continue;
                 }
-                var numeric = statement[3].Kind is TokenKind.PlusAssign or TokenKind.MinusAssign ||
-                    amount.Any(token => token.Kind is TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash);
-                typedDeclaration?.Invoke(new(new(variable.Text), text[amount[0].Offset..tokens[end].Offset],
+                var numeric = statement[3].Kind is TokenKind.PlusAssign or TokenKind.MinusAssign;
+                for (var index = 0; index < amount.Length && !numeric; index++)
+                    numeric = amount[index].Kind is TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash;
+                typedDeclaration?.Invoke(new(new(name), tokens.Source[amount[0].Offset..Math.Min(tokens[end].Offset, expressionLength)],
                     numeric, location.Offset(variable.Offset)));
             }
 
@@ -120,7 +134,7 @@ internal sealed class ExpressionParser
 
     internal static Expr? ParseValue(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
     {
-        var parser = new ExpressionParser(text, location, symbols, diagnostics);
+        var parser = new ExpressionParser(Lexer.Tokenize(text), text.Length, location, symbols, diagnostics);
         try
         {
             var value = parser.ParseSum();
@@ -137,12 +151,12 @@ internal sealed class ExpressionParser
     public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics,
         Func<int, SourceLocation>? locate = null)
     {
-        symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location, locate);
-        var tokens = Lexer.Tokenize(text);
-        var hashToken = tokens.FindIndex(token => token is { Kind: TokenKind.Error, Text: "#" });
+        var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location, locate)
+            ?? Lexer.Tokenize(text);
+        var hashToken = tokens.FindHash();
         var hash = hashToken < 0 ? -1 : tokens[hashToken].Offset;
-        var valueText = hash < 0 ? text : text[..hash];
-        var parser = new ExpressionParser(valueText, location, symbols, diagnostics, locate);
+        var parser = new ExpressionParser(tokens, hash < 0 ? text.Length : hash, location, symbols, diagnostics,
+            locate, hashToken < 0 ? null : hashToken);
         try
         {
             var value = parser.ParseOr();
@@ -300,9 +314,10 @@ internal sealed class ExpressionParser
     /// <summary>Parses <c>;</c>-separated effects. Returns null (with diagnostics) on error.</summary>
     public static List<Effect>? ParseEffects(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics)
     {
-        symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location);
-        if (ReportStringErrors(text, location.Offset, diagnostics)) return null;
-        var parser = new ExpressionParser(text, location, symbols, diagnostics);
+        var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location)
+            ?? Lexer.Tokenize(text);
+        if (ReportStringErrors(tokens, location.Offset, diagnostics)) return null;
+        var parser = new ExpressionParser(tokens, text.Length, location, symbols, diagnostics);
         try
         {
             var effects = new List<Effect>();
@@ -330,16 +345,16 @@ internal sealed class ExpressionParser
     private static Expr? ParseTyped(string text, SourceLocation location, StorySymbols symbols, DiagnosticBag diagnostics, ExprType type,
         SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null)
     {
-        symbols.Analysis?.Expression(type == ExprType.Bool ? ExpressionContextKind.Condition : ExpressionContextKind.Number,
-            text, authoringLocation ?? location, locate);
-        var parser = new ExpressionParser(text, location, symbols, diagnostics, locate);
+        var tokens = symbols.Analysis?.Expression(type == ExprType.Bool ? ExpressionContextKind.Condition : ExpressionContextKind.Number,
+            text, authoringLocation ?? location, locate) ?? Lexer.Tokenize(text);
+        var parser = new ExpressionParser(tokens, text.Length, location, symbols, diagnostics, locate);
         try
         {
             var expr = parser.ParseOr();
             parser.ExpectEnd();
             if (expr.Type != type)
             {
-                parser.Fail("TW2003", $"Expected a {Describe(type)} expression but found a {Describe(expr.Type)}.", parser._tokens[0].Offset);
+                parser.Fail("TW2003", $"Expected a {Describe(type)} expression but found a {Describe(expr.Type)}.", parser.TokenAt(0).Offset);
             }
 
             return expr;
@@ -354,11 +369,15 @@ internal sealed class ExpressionParser
     {
         get
         {
-            var token = _tokens[_pos];
-            if (token.ErrorOffset is { } offset) Fail("TW1001", token.Text, offset);
+            var token = TokenAt(_pos);
+            if (token.ErrorOffset is { } offset) Fail("TW1001", token.Value, offset);
             return token;
         }
     }
+
+    private Token TokenAt(int index) => index >= _endIndex
+        ? new Token(TokenKind.End, _tokens.Source, _endOffset, 0)
+        : _tokens[index];
 
     private Token Next()
     {
@@ -367,7 +386,7 @@ internal sealed class ExpressionParser
         return token;
     }
 
-    private bool IsKeyword(string keyword) => Peek.Kind == TokenKind.Identifier && Peek.Text == keyword;
+    private bool IsKeyword(string keyword) => Peek.Kind == TokenKind.Identifier && Peek.Is(keyword);
 
     private void ExpectEnd()
     {
@@ -381,7 +400,8 @@ internal sealed class ExpressionParser
     {
         if (Peek.Kind != kind)
         {
-            Fail("TW1001", $"Expected {what} but found '{(Peek.Kind == TokenKind.End ? "end of expression" : Peek.Text)}'.", Peek.Offset);
+            var found = Peek.Kind == TokenKind.End ? "end of expression" : Peek.Value;
+            Fail("TW1001", $"Expected {what} but found '{found}'.", Peek.Offset);
         }
 
         return Next();
@@ -569,7 +589,7 @@ internal sealed class ExpressionParser
     {
         var position = _pos;
         var parentheses = 0;
-        while (_tokens[position].Kind == TokenKind.LeftParen)
+        while (TokenAt(position).Kind == TokenKind.LeftParen)
         {
             parentheses++;
             if (parentheses + _nestingDepth + 1 > MaximumNestingDepth)
@@ -579,7 +599,7 @@ internal sealed class ExpressionParser
             position++;
         }
 
-        if (_tokens[position] is not { Kind: TokenKind.Number } number ||
+        if (TokenAt(position) is not { Kind: TokenKind.Number } number ||
             !long.TryParse(number.Text, out var magnitude) || magnitude != -(long)int.MinValue)
         {
             return false;
@@ -588,7 +608,7 @@ internal sealed class ExpressionParser
         position++;
         for (var index = 0; index < parentheses; index++, position++)
         {
-            if (_tokens[position].Kind != TokenKind.RightParen)
+            if (TokenAt(position).Kind != TokenKind.RightParen)
             {
                 return false;
             }
@@ -608,15 +628,18 @@ internal sealed class ExpressionParser
                 return int.TryParse(token.Text, out var n) ? new NumberLiteral(n) : Fail<Expr>("TW1002", $"Number '{token.Text}' is too large.", token.Offset);
             case TokenKind.String:
                 Next();
-                return new TextLiteral(token.Text);
+                return new TextLiteral(token.Value);
             case TokenKind.NamedPredicate:
+            {
                 Next();
-                if (!_symbols.Predicates.Contains(token.Text))
+                var name = token.Value;
+                if (!_symbols.Predicates.Contains(name))
                 {
                     Fail("TW2005", $"Named predicate '@{token.Text}' is not registered. Named predicates are provided by C# story projects.", token.Offset);
                 }
 
-                return new NamedPredicate(token.Text);
+                return new NamedPredicate(name);
+            }
             case TokenKind.LeftParen:
                 var open = Next();
                 return ParseNested(open, () =>
@@ -653,12 +676,13 @@ internal sealed class ExpressionParser
                 Expect(TokenKind.LeftParen, "'(' after visited");
                 var scene = Expect(TokenKind.Identifier, "a scene id");
                 Expect(TokenKind.RightParen, "')'");
-                if (!_symbols.Scenes.Contains(new SceneId(scene.Text)))
+                var sceneId = new SceneId(scene.Value);
+                if (!_symbols.Scenes.Contains(sceneId))
                 {
                     Fail("TW2002", $"Unknown scene '{scene.Text}'.", scene.Offset);
                 }
 
-                return new Visited(new SceneId(scene.Text));
+                return new Visited(sceneId);
         }
 
         if (Peek.Kind == TokenKind.Colon)
@@ -683,7 +707,7 @@ internal sealed class ExpressionParser
             return new HasItem(who, Item(item));
         }
 
-        if (_symbols.World.Ruleset.FindTier(token.Text) is { } tier)
+        if (_symbols.World.Ruleset.FindTier(token.Value) is { } tier)
         {
             return new TierLiteral(tier);
         }
@@ -697,12 +721,12 @@ internal sealed class ExpressionParser
         {
             case "faction":
             {
-                var faction = new FactionId(path.Text);
+                var faction = new FactionId(path.Value);
                 if (!_symbols.World.Factions.ContainsKey(faction))
                 {
                     var dot = path.Text.LastIndexOf('.');
-                    var oldMember = dot < 0 ? string.Empty : path.Text[(dot + 1)..];
-                    var oldId = dot < 0 ? string.Empty : path.Text[..dot];
+                    var oldMember = dot < 0 ? string.Empty : faction.Value[(dot + 1)..];
+                    var oldId = dot < 0 ? string.Empty : faction.Value[..dot];
                     if (member is null && oldMember is "name" or "tier")
                     {
                         Fail("TW2001",
@@ -734,41 +758,47 @@ internal sealed class ExpressionParser
 
                 return new ItemNameRef(Item(path));
             case "flag":
+            {
                 if (member is not null)
                 {
                     Fail("TW2001", $"Flag references do not have properties; use 'flag:{path.Text}'.", member.Value.Offset);
                 }
 
-                if (!_symbols.Flags.Contains(new FlagId(path.Text)))
+                var flag = new FlagId(path.Value);
+                if (!_symbols.Flags.Contains(flag))
                 {
                     Fail("TW2004", $"Flag '{path.Text}' is never set by any effect and is not declared in story.talewright.yaml.", path.Offset);
                 }
 
-                return new FlagRef(new FlagId(path.Text));
+                return new FlagRef(flag);
+            }
             case "var":
+            {
                 if (member is not null)
                 {
                     Fail("TW2001", $"Variable references do not have properties; use 'var:{path.Text}'.", member.Value.Offset);
                 }
 
-                if (_symbols.UnresolvedVariables.Contains(new VarId(path.Text)))
+                var variable = new VarId(path.Value);
+                if (_symbols.UnresolvedVariables.Contains(variable))
                 {
                     Fail("TW2007", $"Cannot infer the type of variable '{path.Text}'. Declare an initial value under 'vars' in story.talewright.yaml.", path.Offset);
                 }
-                if (!_symbols.Variables.Contains(new VarId(path.Text)))
+                if (!_symbols.Variables.Contains(variable))
                 {
                     Fail("TW2004", $"Variable '{path.Text}' is never assigned by any effect and is not declared in story.talewright.yaml.", path.Offset);
                 }
 
-                return _symbols.World.TextVariables.ContainsKey(new VarId(path.Text))
-                    ? new TextVarRef(new VarId(path.Text))
-                    : new VarRef(new VarId(path.Text));
+                return _symbols.World.TextVariables.ContainsKey(variable)
+                    ? new TextVarRef(variable)
+                    : new VarRef(variable);
+            }
         }
 
         var character = Character(ns);
         if (member is not null)
         {
-            if (path.Text != "pronoun")
+            if (!path.Is("pronoun"))
             {
                 Fail("TW2001", $"Unknown character property '{path.Text}:{member.Value.Text}'.", member.Value.Offset);
             }
@@ -782,14 +812,21 @@ internal sealed class ExpressionParser
             "last-name" => new NameRef(character, NamePart.Last),
             "name" => new NameRef(character, NamePart.Full),
             "pronoun" => new PronounRef(character, PronounForm.Subject),
-            _ when _symbols.World.Ruleset.HasStat(new StatId(path.Text)) => new StatRef(character, new StatId(path.Text)),
-            _ => Fail<Expr>("TW2001", $"Unknown property '{path.Text}' on '{ns.Text}'.", path.Offset),
+            _ => ResolveStat(character, path, ns),
         };
+    }
+
+    private Expr ResolveStat(EntityId character, Token path, Token ns)
+    {
+        var stat = new StatId(path.Value);
+        return _symbols.World.Ruleset.HasStat(stat)
+            ? new StatRef(character, stat)
+            : Fail<Expr>("TW2001", $"Unknown property '{path.Text}' on '{ns.Text}'.", path.Offset);
     }
 
     private PronounForm ParsePronounForm(Token property)
     {
-        if (property.Text == "possessive-pronoun")
+        if (property.Is("possessive-pronoun"))
         {
             Expect(TokenKind.Colon, "':' after 'possessive-pronoun'");
             var form = Expect(TokenKind.Identifier, "a possessive pronoun property");
@@ -813,7 +850,7 @@ internal sealed class ExpressionParser
 
     private EntityId Character(Token token)
     {
-        var id = new EntityId(token.Text);
+        var id = new EntityId(token.Value);
         if (!_symbols.World.Characters.ContainsKey(id))
         {
             Fail("TW2001", $"Unknown character '{token.Text}'.", token.Offset);
@@ -824,7 +861,7 @@ internal sealed class ExpressionParser
 
     private ItemId Item(Token token)
     {
-        var id = new ItemId(token.Text);
+        var id = new ItemId(token.Value);
         if (!_symbols.World.Items.ContainsKey(id))
         {
             Fail("TW2001", $"Unknown item '{token.Text}'.", token.Offset);
@@ -835,7 +872,7 @@ internal sealed class ExpressionParser
 
     private StatId Stat(Token token)
     {
-        var id = new StatId(token.Text);
+        var id = new StatId(token.Value);
         if (!_symbols.World.Ruleset.HasStat(id))
         {
             Fail("TW2001", $"Unknown stat '{token.Text}' (not in ruleset '{_symbols.World.Ruleset.Id}').", token.Offset);
@@ -852,14 +889,14 @@ internal sealed class ExpressionParser
             case "set" or "clear":
             {
                 var ns = Expect(TokenKind.Identifier, "'flag'");
-                if (ns.Text != "flag")
+                if (!ns.Is("flag"))
                 {
                     Fail("TW1003", $"'{first.Text}' only works on flags: {first.Text} flag:<id>.", ns.Offset);
                 }
 
                 Expect(TokenKind.Colon, "':'");
                 var flag = Expect(TokenKind.Identifier, "a flag id");
-                return new SetFlag(new FlagId(flag.Text), first.Text == "set");
+                return new SetFlag(new FlagId(flag.Value), first.Is("set"));
             }
 
             case "give" or "take":
@@ -877,13 +914,14 @@ internal sealed class ExpressionParser
                     }
                 }
 
-                return first.Text == "give" ? new GiveItem(who, item, quantity) : new TakeItem(who, item, quantity);
+                return first.Is("give") ? new GiveItem(who, item, quantity) : new TakeItem(who, item, quantity);
             }
         }
 
         Expect(TokenKind.Colon, $"':' (effects look like 'player:hp -= 3', 'set flag:x', 'give player rope')");
         var target = Expect(TokenKind.Identifier, "a name");
-        if (first.Text == "var" && _symbols.UnresolvedVariables.Contains(new VarId(target.Text)))
+        var targetName = target.Value;
+        if (first.Is("var") && _symbols.UnresolvedVariables.Contains(new VarId(targetName)))
         {
             Fail("TW2007", $"Cannot infer the type of variable '{target.Text}'. Declare an initial value under 'vars' in story.talewright.yaml.", target.Offset);
         }
@@ -897,7 +935,7 @@ internal sealed class ExpressionParser
         };
         var amountStart = Peek.Offset;
         var amount = ParseSum();
-        if (first.Text == "var" && _symbols.World.TextVariables.ContainsKey(new VarId(target.Text)))
+        if (first.Is("var") && _symbols.World.TextVariables.ContainsKey(new VarId(targetName)))
         {
             if (op != AssignOp.Set)
             {
@@ -907,21 +945,21 @@ internal sealed class ExpressionParser
             {
                 Fail("TW2003", $"Text variable '{target.Text}' needs text, not {Describe(amount.Type)}.", amountStart);
             }
-            return new SetTextVariable(new VarId(target.Text), amount);
+            return new SetTextVariable(new VarId(targetName), amount);
         }
         if (amount.Type != ExprType.Number)
         {
-            Fail("TW2003", first.Text == "var"
+            Fail("TW2003", first.Is("var")
                 ? $"Variable '{target.Text}' has a fixed integer type and needs a number, not {Describe(amount.Type)}."
                 : "Only numbers can be assigned to stats or faction standings.", amountStart);
         }
 
         return first.Text switch
         {
-            "faction" => _symbols.World.Factions.ContainsKey(new FactionId(target.Text))
-                ? new ChangeStanding(new FactionId(target.Text), op, amount)
+            "faction" => _symbols.World.Factions.ContainsKey(new FactionId(targetName))
+                ? new ChangeStanding(new FactionId(targetName), op, amount)
                 : Fail<Effect>("TW2001", $"Unknown faction '{target.Text}'.", target.Offset),
-            "var" => new ChangeVariable(new VarId(target.Text), op, amount),
+            "var" => new ChangeVariable(new VarId(targetName), op, amount),
             "flag" => Fail<Effect>("TW1003", "Use 'set flag:x' or 'clear flag:x' for flags.", first.Offset),
             _ => new ChangeStat(Character(first), Stat(target), op, amount),
         };

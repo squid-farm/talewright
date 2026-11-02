@@ -314,7 +314,9 @@ Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → Compilati
     Reader-text escape characters are defined once and used by the scanner and reader-text consumers.
   - `ExpressionParser` + `Lexer`: recursive-descent parser for conditions, numbers, substitutions and effects,
     with type checking (TW2xxx). The lexer owns token boundaries; `ExpressionParser` owns expression and effect
-    grammar. `QuotedStringSyntax` provides the shared quoted-string boundary and decoding rules.
+    grammar. Tokens retain offsets into their original expression text; quoted strings are decoded only when a
+    consumer needs their value. Compilation and authoring analysis reuse token buffers across expression consumers.
+    `QuotedStringSyntax` provides the shared quoted-string boundary and decoding rules.
   - `StorySymbols`: what's declared (stats, characters, items, factions, flags, vars, scenes), for resolving
     names.
 - **`Model/StoryDefinition.cs`**: the compiled story. `StoryDefinition` (Id, Title, Start, Randomness, Seed,
