@@ -39,8 +39,10 @@ saves over to a new version is planned ([#39](https://github.com/squid-farm/tale
 ## My saves disappeared (web)
 
 Web saves live in your browser for that site. Clearing browsing data, private windows and switching
-browsers or devices all lose them. Use the desktop player if you need saves to stick around. Exporting
-saves to a file for backup is planned ([#84](https://github.com/squid-farm/talewright/issues/84)).
+browsers or devices all lose them. Export a save file before clearing data or moving devices, then
+import it into the same story on the other player. See
+[backing up and moving saves](playing-and-saving.md#backing-up-and-moving-saves). If no backup exists,
+cleared browser saves cannot be recovered by the player.
 
 ## The desktop player or debugger won't start on Linux
 

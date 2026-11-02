@@ -23,7 +23,7 @@ The web player, the desktop player and published games all share the same screen
 | **History** | Read earlier recorded passages and choices without changing your playthrough. |
 | **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `game.undo: false`. |
 | **Quick Save** | Write or replace this story's one quick checkpoint, without an overwrite prompt. Named saves are never replaced by this action. |
-| **Saves** | Open the Saves dialog to create or load a named save. Saving over an existing slot asks you to confirm. |
+| **Saves** | Open the Saves dialog to create, load, export or import a save. Replacing an existing named save asks you to confirm. |
 | **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |
 | **More actions → Library** | Return to the list of stories (not shown in published games). |
 
@@ -80,8 +80,22 @@ If Quick Save fails, the previous checkpoint is kept: follow the storage advice 
 | Desktop (Linux) | `~/.local/share/Talewright/saves` |
 
 There's no autosave yet ([#54](https://github.com/squid-farm/talewright/issues/54)), so save before
-closing the player. Web saves can't be backed up yet either; exporting saves to a file is planned
-([#84](https://github.com/squid-farm/talewright/issues/84)).
+closing the player.
+
+### Backing up and moving saves
+
+Open **Saves** and select **Export** beside a named save or Quick Save checkpoint. The web player
+downloads a JSON save file using the story title and save name. The desktop player opens a native
+save dialog with a suggested filename containing the story title and save name. You can change
+the name or location before saving.
+Keep the file somewhere safe before clearing browser data or moving to another device.
+
+To restore a backup, open the same story, enter a destination **Save name**, then choose the file
+under **Import save file**. If that name already exists, confirm before replacing it. Import checks
+the file against the same story and player compatibility rules as loading; a damaged or incompatible
+file leaves your existing saves and current playthrough unchanged. Import adds a named save; it does
+not load it or replace the separate Quick Save checkpoint. Select **Load** to play it.
+Backups can move between web and desktop when the story files and player save format are compatible.
 
 ## Updating a story with existing saves
 

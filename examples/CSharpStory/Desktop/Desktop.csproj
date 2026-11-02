@@ -5,6 +5,8 @@
     <TalewrightStoryRoot>$(MSBuildProjectDirectory)/../Story/Content</TalewrightStoryRoot>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="AlvorKit.NFDe.Native" Version="1.3.0.2"
+                      Condition="'$(RuntimeIdentifier)' != 'linux-x64' and '$(RuntimeIdentifier)' != 'linux-arm64'" />
     <PackageReference Include="Talewright.Player" Version="$(TalewrightVersion)" />
     <PackageReference Include="Photino.Blazor" Version="4.0.13" />
     <ProjectReference Include="../Story/Story.csproj" />
@@ -12,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

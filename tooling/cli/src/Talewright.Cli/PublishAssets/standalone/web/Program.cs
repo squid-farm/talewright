@@ -12,5 +12,6 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddSingleton<IStoryLibrary>(new PublishedStoryLibrary(
     new HttpClient { BaseAddress = new Uri(new Uri(builder.HostEnvironment.BaseAddress), "story/") }));
 builder.Services.AddScoped<ISaveStore, IndexedDbSaveStore>();
+builder.Services.AddScoped<ISaveFileExporter, BrowserSaveFileExporter>();
 builder.Services.AddScoped<PlayerPreferencesStore>();
 await builder.Build().RunAsync();

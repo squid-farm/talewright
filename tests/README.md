@@ -736,6 +736,16 @@ missing engine. The WebKit sandbox is not disabled.
 CI runs this probe before the full native suite so a broken chooser fails once instead of timing out
 separately in every upload-dependent scenario.
 
+Save-export tests use the test-only `TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY` override: they
+exercise the export action, suggested filename and saved bytes but bypass the native save dialog.
+For a real-dialog check on each desktop platform:
+
+1. Save a game, open **Saves**, and export it. Confirm the native dialog suggests a filename
+   containing the story title and save name. Cancel and confirm no export was created.
+2. Export again, choose a directory and filename, and confirm the resulting file contains the
+   original save bytes. Repeat with an existing destination and verify that the dialog requests
+   confirmation before replacing it.
+
 ## Stable, programmatically supplied stories
 
 `Talewright.TestStories` contains named C# raw-string YAML and `.tale` definitions, rather than checked-in

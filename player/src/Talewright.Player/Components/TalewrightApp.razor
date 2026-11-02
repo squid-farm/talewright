@@ -4,6 +4,7 @@
 @inject IServiceProvider Services
 @inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 @using Microsoft.Extensions.DependencyInjection
+@using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
 @implements IAsyncDisposable
 
@@ -29,7 +30,7 @@ else
             }
             else
             {
-                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="Services.GetService<ISaveStore>()" />
+                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="Services.GetService<ISaveStore>()" SaveExporter="Services.GetService<ISaveFileExporter>()" />
             }
         </div>
         </CascadingValue>

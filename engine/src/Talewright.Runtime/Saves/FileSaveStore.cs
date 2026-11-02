@@ -94,24 +94,6 @@ public sealed class FileSaveStore(string root) : ISaveStore
     {
         SaveNames.ValidateData(data);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        var temporary = target + $".{Guid.NewGuid():N}.tmp";
-        try
-        {
-            await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            {
-                await stream.WriteAsync(data);
-                await stream.FlushAsync();
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporary, target, overwrite);
-        }
-        finally
-        {
-            if (File.Exists(temporary))
-            {
-                File.Delete(temporary);
-            }
-        }
+        await AtomicFileWriter.WriteAsync(target, data, overwrite);
     }
 }

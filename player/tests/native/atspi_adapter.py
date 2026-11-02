@@ -103,9 +103,9 @@ class Desktop:
             raise RuntimeError("No window belongs to the Photino process")
         return window
 
-    def upload(self, path):
+    def upload(self, path, control_name="Story archive"):
         Path(path).resolve(strict=True)
-        self.click(name="Story archive", role="push button")
+        self.click(name=control_name, role="push button")
         self.wait(lambda: self.find(role="file chooser"), "file chooser")
         self.key("Control_L", pyatspi.KEY_PRESS)
         try:

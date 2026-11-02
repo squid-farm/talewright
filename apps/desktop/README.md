@@ -23,6 +23,7 @@ Linux needs WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` (or your distro's 
 Manual saves use per-user local application data under `Talewright/saves` (normally
 `$XDG_DATA_HOME/Talewright/saves`, or `~/.local/share/Talewright/saves` on Linux).
 Slot replacement is explicit and atomic; incompatible/corrupt loads leave the current playthrough intact.
+Export uses a native save dialog with the story-and-save filename prefilled.
 
 ## Files
 
