@@ -320,7 +320,7 @@ public sealed class DebuggerTests : IDisposable
     public void Graphical_desktop_detection_accepts_x11_or_wayland(string? display, string? wayland, bool expected)
     {
         var environment = new Dictionary<string, string?> { ["DISPLAY"] = display, ["WAYLAND_DISPLAY"] = wayland };
-        Assert.Equal(expected, DebugCommand.HasGraphicalDisplay(name => environment.GetValueOrDefault(name)));
+        Assert.Equal(expected, NativeHostLauncher.HasGraphicalDisplay(name => environment.GetValueOrDefault(name)));
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);

@@ -1,0 +1,7 @@
+@inject PlayerLaunchOptions Options
+
+<TalewrightApp AutoStartStoryId="@Options.StoryRoot" LibraryEnabled="false" OnTitleChanged="UpdateTitle" />
+
+@code {
+    private void UpdateTitle(string? title) => Options.SetTitle?.Invoke(title ?? "Talewright");
+}

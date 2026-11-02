@@ -24,7 +24,7 @@ New here? Play the [web player](https://play.trytalewright.com/), then follow
 |---|---|
 | [Talemark syntax](reference/talemark-syntax.md) | Every `story.talewright.yaml` field and Talemark directive |
 | [Error codes](reference/diagnostics.md) | What each `TWxxxx` code means and how to fix it |
-| [CLI](reference/cli.md) | `validate`, `debug` and `publish` options, output and limits |
+| [CLI](reference/cli.md) | `validate`, `lint`, `run`, `debug` and `publish` options, output and limits |
 | [Distribution and runtime safety](reference/safety.md) | Framework boundaries, author/player responsibilities and current limitations |
 | [Sample stories](../samples/README.md) | *The Lost Relic* and which features it demonstrates |
 

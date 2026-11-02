@@ -4,7 +4,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>talewright</ToolCommandName>
     <IsPackable>true</IsPackable>
-    <Description>Validate, lint, debug and publish Talewright stories.</Description>
+    <Description>Validate, lint, run, debug and publish Talewright stories.</Description>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Talewright.Cli.Tests" />

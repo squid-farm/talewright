@@ -26,7 +26,8 @@ public sealed record AccessibleNode(
     }
 }
 
-public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null) : IPlayerDriver
+public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null,
+    bool windowInChildProcess = false) : IPlayerDriver
 {
     private Process? _adapter;
     private Task<string>? _stderr;
@@ -55,6 +56,10 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
             foreach (var argument in new[] { helper, "adapter", "--executable", executable, "--output", artifacts })
             {
                 start.ArgumentList.Add(argument);
+            }
+            if (windowInChildProcess)
+            {
+                start.ArgumentList.Add("--child-window");
             }
 
             _protocolFailed = false;
@@ -150,6 +155,8 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task ScrollToImageAsync(string name) => await CommandAsync("scroll", new { name, role = "image" });
     public async Task ScrollToButtonAsync(string name) => await CommandAsync("scroll", new { name, role = "push button" });
     public async Task<int> CloseWindowAsync() => (await CommandAsync("close-window")).GetInt32();
+    public async Task<int> CancelAsync(bool terminate) =>
+        (await CommandAsync("cancel", new { signal = terminate ? "terminate" : "interrupt" })).GetInt32();
     public async Task<AccessibleNode> SnapshotAsync() =>
         (await CommandAsync("snapshot")).Deserialize<AccessibleNode>(Json)
         ?? throw new InvalidDataException("Missing accessibility snapshot.");

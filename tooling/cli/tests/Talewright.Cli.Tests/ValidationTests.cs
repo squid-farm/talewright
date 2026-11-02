@@ -245,6 +245,7 @@ public sealed class ValidationTests : IDisposable
     [InlineData("validate", "--help", "--non-interactive")]
     [InlineData("publish", "--help", "--non-interactive")]
     [InlineData("debug", "--help", "--non-interactive")]
+    [InlineData("run", "--help", "--non-interactive")]
     public void Framework_help_describes_commands_and_options(string first, string second, string expected)
     {
         using var output = new StringWriter();
