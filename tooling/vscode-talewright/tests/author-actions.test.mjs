@@ -9,7 +9,7 @@ const toolsSource = await readFile(new URL('../cli-tools.cjs', import.meta.url),
 
 function host(options = {}) {
   const uri = file => ({ scheme: 'file', fsPath: file });
-  const calls = { tasks: [], errors: [], picks: [], dialogs: [], messages: [], warnings: [], updates: [], urls: [], fetches: [], sdk: [], commands: new Map() };
+  const calls = { tasks: [], errors: [], picks: [], dialogs: [], messages: [], warnings: [], updates: [], urls: [], fetches: [], sdk: [], runtimeChecks: [], commands: new Map() };
   const roots = options.roots ?? ['/workspace/My Story'];
   const documents = options.documents ?? [];
   const vscode = {
@@ -84,6 +84,11 @@ function host(options = {}) {
     'node:os': { homedir: () => '/home/author' },
     'node:child_process': { execFile: {} },
     'node:util': { promisify: () => async (...args) => {
+      if (args[0] === 'dotnet' && args[1][0] === '--list-runtimes') {
+        calls.runtimeChecks.push(args);
+        if (options.dotnetError) throw Object.assign(new Error(options.dotnetError), { code: options.dotnetError });
+        return { stdout: options.runtimes ?? 'Microsoft.NETCore.App 10.0.0 [/usr/share/dotnet/shared/Microsoft.NETCore.App]' };
+      }
       calls.sdk.push(args);
       if (options.sdkError) throw Object.assign(new Error(options.sdkError), { code: options.sdkError });
       return { stdout: options.sdks ?? '' };
@@ -175,6 +180,58 @@ test('validation runs the CLI in a visible process task with separate space-safe
   assert.equal(calls.errors.length, 0);
 });
 
+test('Run Story executes talewright run as a visible, space-safe player task', async () => {
+  const { calls, run } = host();
+  await run('runStory');
+  const task = calls.tasks[0];
+  assert.equal(task.name, 'Run Story');
+  assert.equal(task.execution.executable, '/bin/talewright');
+  assert.deepEqual(Array.from(task.execution.args), ['run', '/workspace/My Story']);
+  assert.equal(task.execution.settings.cwd, '/workspace/My Story');
+  assert.equal(task.presentationOptions.focus, true);
+  assert.equal(calls.runtimeChecks[0][0], 'dotnet');
+  assert.deepEqual(Array.from(calls.runtimeChecks[0][1]), ['--list-runtimes']);
+  assert.equal(calls.errors.length, 0);
+});
+
+test('Run Story reports task launch failures without claiming success', async () => {
+  const { calls, run } = host({ launchError: 'spawn failed' });
+  await run('runStory');
+  assert.match(calls.errors[0], /spawn failed/);
+  assert.equal(calls.messages.length, 0);
+});
+
+test('Run Story uses normal story selection and does not launch on selection cancellation', async () => {
+  const roots = ['/workspace/A', '/workspace/B'];
+  const active = host({ roots, active: '/workspace/B/scene.tale' });
+  await active.run('runStory');
+  assert.equal(active.calls.tasks[0].execution.args[1], '/workspace/B');
+  const chosen = host({ roots, active: '/outside/file.tale', pick: 1 });
+  await chosen.run('runStory');
+  assert.equal(chosen.calls.tasks[0].execution.args[1], '/workspace/B');
+  const cancelled = host({ roots });
+  await cancelled.run('runStory');
+  assert.equal(cancelled.calls.tasks.length, 0);
+});
+
+test('Run Story requires .NET 10 and reports missing runtimes without installing anything', async () => {
+  for (const options of [{ runtimes: '' }, { dotnetError: 'ENOENT' }]) {
+    const { calls, run } = host(options);
+    await run('runStory');
+    assert.match(calls.errors[0], /\.NET 10 Runtime.*download\.dotnet\.com|\.NET 10 Runtime.*dotnet\.microsoft\.com/);
+    assert.equal(calls.tasks.length, 0);
+    assert.equal(calls.sdk.length, 0);
+    assert.equal(calls.updates.length, 0);
+  }
+  const missingCli = host({ files: [] });
+  await missingCli.run('runStory');
+  assert.match(missingCli.calls.errors[0], /CLI not found/);
+  assert.deepEqual(missingCli.calls.errorActions, ['Set Up CLI']);
+  assert.equal(missingCli.calls.tasks.length, 0);
+  assert.equal(missingCli.calls.sdk.length, 0);
+  assert.equal(missingCli.calls.updates.length, 0);
+});
+
 test('active containing story wins, otherwise multiple stories require an explicit choice', async () => {
   const roots = ['/workspace/A', '/workspace/B'];
   const active = host({ roots, active: '/workspace/B/scene.tale' });
@@ -248,6 +305,9 @@ test('dirty documents require consent and successful saves; unrelated documents 
   unrelated.uri.fsPath = '/elsewhere/scene.tale';
   await host({ documents: [unrelated] }).run('validateStory');
   assert.equal(saves, 1);
+  const runWithDirtyDocument = host({ documents: [document()], saveChoice: 'Save and Continue' });
+  await runWithDirtyDocument.run('runStory');
+  assert.equal(runWithDirtyDocument.calls.tasks.length, 1);
 });
 
 test('publish chooses a ZIP then uses interactive CLI overwrite behavior, never --force', async () => {
@@ -265,14 +325,22 @@ test('publish chooses a ZIP then uses interactive CLI overwrite behavior, never 
   assert.match(invalid.calls.errors[0], /\.zip/);
 });
 
-test('debug action and reusable task share selection, executable, trust and save handling', async () => {
+test('debug and run actions and reusable tasks share selection, executable, trust and save handling', async () => {
   const { calls, run } = host();
   await run('openAuthorDebugger');
   assert.deepEqual(Array.from(calls.tasks[0].execution.args), ['debug', '/workspace/My Story']);
+  await run('runStory');
+  assert.deepEqual(Array.from(calls.tasks[1].execution.args), ['run', '/workspace/My Story']);
   const definition = { type: 'talewright', command: 'debug', story: 'My Story' };
   const task = await calls.provider.resolveTask({ definition, scope: { uri: { scheme: 'file', fsPath: '/workspace' } } });
   assert.equal(task.definition, definition);
   assert.deepEqual(Array.from(task.execution.args), ['debug', '/workspace/My Story']);
+  const runDefinition = { type: 'talewright', command: 'run', story: 'My Story' };
+  const runTask = await calls.provider.resolveTask({
+    definition: runDefinition, scope: { uri: { scheme: 'file', fsPath: '/workspace' } },
+  });
+  assert.equal(runTask.definition, runDefinition);
+  assert.deepEqual(Array.from(runTask.execution.args), ['run', '/workspace/My Story']);
   for (const story of ['../outside', 'My Story/nested']) {
     assert.equal(await calls.provider.resolveTask({
       definition: { ...definition, story }, scope: { uri: { scheme: 'file', fsPath: '/workspace' } },
