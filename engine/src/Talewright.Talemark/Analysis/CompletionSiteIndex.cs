@@ -1,4 +1,5 @@
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Parsing;
 
 namespace Talewright.Talemark.Analysis;
 
@@ -46,10 +47,11 @@ internal sealed class ExpressionSourceMap(ExpressionSiteSource source)
 /// What analysis retains for one expression so its completion sites can be computed on request.
 /// <see cref="Text"/> is the completion text: the expression plus trailing whitespace on its final line.
 /// </summary>
-internal sealed class ExpressionSiteSource(string text, int expressionLength, ExpressionContextKind kind,
+internal sealed class ExpressionSiteSource(TokenBuffer tokens, int expressionLength, ExpressionContextKind kind,
     SourceRange range, SourceLocation location, YamlScalarSource? scalar, Func<int, SourceLocation>? locate)
 {
-    internal string Text { get; } = text;
+    internal TokenBuffer Tokens { get; } = tokens;
+    internal string Text => Tokens.Source;
     internal int ExpressionLength { get; } = expressionLength;
     internal ExpressionContextKind Kind { get; } = kind;
     internal SourceRange Range { get; } = range;
@@ -58,7 +60,7 @@ internal sealed class ExpressionSiteSource(string text, int expressionLength, Ex
     internal Func<int, SourceLocation>? Locate { get; } = locate;
 
     internal IEnumerable<CompletionSite> Sites(IReadOnlyList<AuthoringSymbol> symbols) =>
-        ExpressionCompletion.Sites(Text, Kind, new ExpressionSourceMap(this).Map, symbols);
+        ExpressionCompletion.Sites(Tokens, Kind, new ExpressionSourceMap(this).Map, symbols);
 }
 
 /// <summary>A precomputed site, or an expression whose sites are computed on request, covering <see cref="Region"/>.</summary>

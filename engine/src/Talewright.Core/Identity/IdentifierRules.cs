@@ -6,7 +6,9 @@ namespace Talewright.Core.Identity;
 /// </summary>
 public static class IdentifierRules
 {
-    public static bool IsValid(string value)
+    public static bool IsValid(string value) => IsValid(value.AsSpan(0, value.Length));
+
+    public static bool IsValid(ReadOnlySpan<char> value)
     {
         if (value.Length == 0 || !IsStart(value[0]))
         {
@@ -14,7 +16,7 @@ public static class IdentifierRules
         }
 
         var afterSeparator = false;
-        foreach (var c in value.AsSpan(1))
+        foreach (var c in value[1..])
         {
             if (c is '.' or '-')
             {

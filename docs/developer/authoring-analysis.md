@@ -66,8 +66,12 @@ The [language server](language-server.md) hosts this API for editor diagnostics.
 `StoryAnalysis.CompletionSitesAt(position)` returns the completion sites whose
 ranges contain a position (end inclusive), in analysis order. Expression sites are
 computed only when a request asks for them; analysis keeps each expression's
-inputs and builds a per-file position index on the first query. Hosts filter the
-returned sites for their own needs, such as end-exclusive navigation.
+source and offset-backed token buffer, and builds a per-file position index on
+the first query. Repeated early and later registrations of the same expression
+reuse that buffer without removing duplicate completion sites. Token ranges
+refer to the retained source text, and quoted-string values are decoded only
+when a consumer requests them. Hosts filter the returned sites for their own
+needs, such as end-exclusive navigation.
 
 This API exposes declaration ranges and expression extents, not a complete
 reference-binding or formatting syntax tree. It does not produce completion items,

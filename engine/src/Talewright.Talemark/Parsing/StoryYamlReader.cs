@@ -103,7 +103,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
                 {
                     if (Get(map, key) is not YamlScalarNode scalar) continue;
                     _analysis.Scalar(scalar, _yaml.At(scalar).File);
-                    _analysis.Expression(kind, scalar.Value ?? string.Empty, _yaml.At(scalar));
+                    _analysis.Expression(kind, scalar.Value ?? string.Empty, _yaml.At(scalar), cacheForReuse: true);
                 }
             }
             var idNode = Get(map, "id");
