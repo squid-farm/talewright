@@ -792,11 +792,11 @@ public sealed partial class ServerTests
 
         public string PathOf(string name) => Path.Combine(Root, name);
         public string UriOf(string name) => new Uri(PathOf(name)).AbsoluteUri;
-        public Task<JsonElement> Initialize(object? options = null, bool includeRoot = true) => Request("initialize", new
+        public Task<JsonElement> Initialize(object? options = null, bool includeRoot = true, object? capabilities = null) => Request("initialize", new
         {
             processId = Environment.ProcessId,
             rootUri = includeRoot ? new Uri(Root).AbsoluteUri : null,
-            capabilities = new { },
+            capabilities = capabilities ?? new { },
             initializationOptions = options
         });
         public Task Open(string name, string text, int version) => Send("textDocument/didOpen",
