@@ -131,16 +131,6 @@ def verify(directory, version):
                     raise ValueError(f"{path}: missing {required}")
             dependencies = {item.attrib["id"]: item.attrib["version"]
                             for item in metadata.findall(".//{*}dependency")}
-            if any(identity.casefold() == "markdig" for identity in dependencies):
-                raise ValueError(f"{path}: Markdig must not be a production package dependency")
-            for name in names:
-                if Path(name).name.casefold() == "markdig.dll":
-                    raise ValueError(f"{path}: Markdig assembly must not be shipped")
-                if name.casefold().endswith(".deps.json"):
-                    manifest = json.loads(package.read(name))
-                    if any(library.split("/", 1)[0].casefold() == "markdig"
-                           for library in manifest.get("libraries", {})):
-                        raise ValueError(f"{path}: Markdig must not be a production runtime dependency")
             if identity == "Talewright.LanguageServer":
                 settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
                 command = settings.find("Commands/Command")

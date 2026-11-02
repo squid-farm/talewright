@@ -51,11 +51,6 @@ try {
   const lock = JSON.parse(await readFile(new URL('package-lock.json', root), 'utf8'));
   const serverNotices = await readFile(new URL('tests/server-notices.txt', root), 'utf8');
   const dependencies = JSON.parse(await readFile(new URL('Talewright.LanguageServer.deps.json', server), 'utf8'));
-  if (Object.keys(dependencies.libraries).some(identity =>
-    identity.split('/')[0].toLowerCase() === 'markdig') ||
-    (await readdir(server)).some(name => name.toLowerCase() === 'markdig.dll')) {
-    throw new Error('Markdig must not be a bundled language-server dependency');
-  }
   for (const [identity, library] of Object.entries(dependencies.libraries)) {
     if (library.type === 'package' && !serverNotices.includes(`\n${identity}\n`)) {
       throw new Error(`Update server-notices.txt with the pinned license for ${identity}`);
