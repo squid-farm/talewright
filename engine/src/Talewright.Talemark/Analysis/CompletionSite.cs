@@ -1,5 +1,8 @@
+using Talewright.Core.Identity;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Parsing;
+using Talewright.Narrative.Templates;
+using static Talewright.Talemark.Vocabulary.ExpressionVocabulary;
 
 namespace Talewright.Talemark.Analysis;
 
@@ -16,17 +19,17 @@ internal static class ExpressionCompletion
 {
     private static readonly IReadOnlyDictionary<string, string> PronounFormDetails = new Dictionary<string, string>
     {
-        ["subject"] = "Pronoun form: subject, such as she, he or they.",
-        ["object"] = "Pronoun form: object, such as her, him or them.",
-        ["possessive-pronoun"] = "Possessive pronoun properties: determiner (her, their) or independent (hers, theirs).",
-        ["reflexive"] = "Pronoun form: reflexive, such as herself or themselves.",
-        ["one-many"] = "Agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement (including singular they) or item name-agreement, never inventory quantity or uncountable.",
+        [SubjectForm] = "Pronoun form: subject, such as she, he or they.",
+        [ObjectForm] = "Pronoun form: object, such as her, him or them.",
+        [PossessivePronoun] = "Possessive pronoun properties: determiner (her, their) or independent (hers, theirs).",
+        [ReflexiveForm] = "Pronoun form: reflexive, such as herself or themselves.",
+        [OneManyTextModifier.ModifierName] = "Agreement selector: #one-many(\"singular\", \"plural\"). Selects from effective pronoun agreement (including singular they) or item name-agreement, never inventory quantity or uncountable.",
     };
 
     private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails = new Dictionary<string, string>
     {
-        ["determiner"] = "Possessive determiner before a noun, such as her or their.",
-        ["independent"] = "Independent possessive that stands alone, such as hers or theirs.",
+        [Determiner] = "Possessive determiner before a noun, such as her or their.",
+        [Independent] = "Independent possessive that stands alone, such as hers or theirs.",
     };
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
@@ -39,12 +42,12 @@ internal static class ExpressionCompletion
             if (token.Kind is TokenKind.Identifier or TokenKind.NamedPredicate) offsets.Add(token.Offset);
         }
         for (var index = 0; index < text.Length; index++)
-            if (char.IsWhiteSpace(text[index]) || text[index] is ':' or '(' or '#' or '@' or ';') offsets.Add(index + 1);
+            if (char.IsWhiteSpace(text[index]) || text[index] is Separator or OpenParen or ModifierMarker or PredicateMarker or StatementSeparator) offsets.Add(index + 1);
         var tokenIndex = 0;
         foreach (var offset in offsets.Order())
         {
             var start = offset;
-            if (start < text.Length && text[start] == '@') start++;
+            if (start < text.Length && text[start] == PredicateMarker) start++;
             while (tokenIndex < tokens.Count && tokens[tokenIndex].Offset < start) tokenIndex++;
             if (tokenIndex > 0 && tokens[tokenIndex - 1] is { } previous &&
                 previous.StringEnd is { } stringEnd &&
@@ -58,34 +61,34 @@ internal static class ExpressionCompletion
             else if (tokenIndex > 0 && tokens[tokenIndex - 1] is { Kind: TokenKind.NamedPredicate } predicate &&
                      predicate.Offset + 1 == start)
                 end += predicate.Text.Length;
-            if (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '-' or '.')) continue;
+            if (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || IdentifierRules.IsPart(text[start - 1]))) continue;
             var before = tokens.Slice(Math.Max(0, tokenIndex - 2), Math.Min(2, tokenIndex));
             AuthoringSymbolKind[] kinds = [];
             string[] keywords = [];
             IReadOnlyDictionary<string, string>? details = null;
-            if (start > 0 && text[start - 1] == '#' || before is [.., { Kind: TokenKind.Error, Text: "#" }])
+            if (start > 0 && text[start - 1] == ModifierMarker || before is [.., { Kind: TokenKind.Hash }])
             {
                 if (kind == ExpressionContextKind.Substitution)
                 {
                     kinds = [AuthoringSymbolKind.Modifier];
                     if (IsAgreementReference(tokens, symbols))
                     {
-                        keywords = ["one-many"];
+                        keywords = [OneManyTextModifier.ModifierName];
                         details = PronounFormDetails;
                     }
                 }
             }
             else if (kind != ExpressionContextKind.Number && tokenIndex >= 6 &&
                      tokens.Slice(tokenIndex - 6, 6) is [{ Kind: TokenKind.Identifier } possessor,
-                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "pronoun" },
-                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: "possessive-pronoun" },
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: Pronoun },
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: PossessivePronoun },
                          { Kind: TokenKind.Colon }] &&
                      symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && possessor.Is(symbol.Name)))
             {
-                keywords = ExpressionParser.PossessiveProperties;
+                keywords = [.. PossessiveProperties];
                 details = PossessivePropertyDetails;
             }
-            else if (start > 0 && text[start - 1] == '@')
+            else if (start > 0 && text[start - 1] == PredicateMarker)
             {
                 if (kind == ExpressionContextKind.Condition) kinds = [AuthoringSymbolKind.Predicate];
             }
@@ -94,12 +97,12 @@ internal static class ExpressionCompletion
                      tokens[tokenIndex - 4] is { Kind: TokenKind.Identifier } owner &&
                      tokens[tokenIndex - 3].Kind == TokenKind.Colon)
             {
-                if (owner.Is("faction"))
-                    keywords = ["name", "tier"];
-                else if (kind != ExpressionContextKind.Number && member.Is("pronoun") &&
+                if (owner.Is(Faction))
+                    keywords = [.. FactionProperties];
+                else if (kind != ExpressionContextKind.Number && member.Is(Pronoun) &&
                          symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)))
                 {
-                    keywords = ExpressionParser.PronounProperties;
+                    keywords = [.. PronounProperties];
                     details = PronounFormDetails;
                 }
             }
@@ -107,64 +110,64 @@ internal static class ExpressionCompletion
             {
                 kinds = ns.Text switch
                 {
-                    "flag" when kind != ExpressionContextKind.Number => [AuthoringSymbolKind.Flag],
-                    "var" => [AuthoringSymbolKind.Variable],
-                    "faction" => [AuthoringSymbolKind.Faction],
-                    "item" when kind is ExpressionContextKind.Substitution or ExpressionContextKind.Condition
+                    Flag when kind != ExpressionContextKind.Number => [AuthoringSymbolKind.Flag],
+                    Var => [AuthoringSymbolKind.Variable],
+                    Faction => [AuthoringSymbolKind.Faction],
+                    Item when kind is ExpressionContextKind.Substitution or ExpressionContextKind.Condition
                         => [AuthoringSymbolKind.Item],
                     _ when symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && ns.Is(symbol.Name))
                         => [AuthoringSymbolKind.Stat],
                     _ => []
                 };
                 if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
-                    keywords = ["first-name", "last-name", "name", "pronoun"];
+                    keywords = [.. CharacterProperties];
             }
-            else if (before is [.., { Text: "visited" }, { Kind: TokenKind.LeftParen }])
+            else if (before is [.., { Text: Visited }, { Kind: TokenKind.LeftParen }])
                 kinds = kind == ExpressionContextKind.Condition ? [AuthoringSymbolKind.Scene] : [];
-            else if (before is [.., { Text: "has" }])
+            else if (before is [.., { Text: Has }])
                 kinds = kind is ExpressionContextKind.Condition or ExpressionContextKind.Effects ? [AuthoringSymbolKind.Item] : [];
-            else if (before is [.., { Text: "give" or "take" }, { Kind: TokenKind.Identifier }])
+            else if (before is [.., { Text: Give or Take }, { Kind: TokenKind.Identifier }])
                 kinds = kind == ExpressionContextKind.Effects ? [AuthoringSymbolKind.Item] : [];
-            else if (before is [.., { Text: "give" or "take" }])
+            else if (before is [.., { Text: Give or Take }])
                 kinds = kind == ExpressionContextKind.Effects ? [AuthoringSymbolKind.Character] : [];
             else if (kind == ExpressionContextKind.Effects && tokenIndex >= 3 &&
-                     tokens[tokenIndex - 3] is { Kind: TokenKind.Identifier, Text: "give" or "take" } &&
+                     tokens[tokenIndex - 3] is { Kind: TokenKind.Identifier, Text: Give or Take } &&
                      before is [{ Kind: TokenKind.Identifier }, { Kind: TokenKind.Identifier }])
             {
                 kinds = [AuthoringSymbolKind.Character];
-                keywords = ["var:", "faction:"];
+                keywords = [VarPrefix, FactionPrefix];
             }
-            else if (before is [.., { Text: "set" or "clear" }])
-                keywords = kind == ExpressionContextKind.Effects ? ["flag:"] : [];
+            else if (before is [.., { Text: Set or Clear }])
+                keywords = kind == ExpressionContextKind.Effects ? [FlagPrefix] : [];
             else if (before.Length == 0 || before[^1].Kind is TokenKind.LeftParen or TokenKind.Semicolon
                      or TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash or TokenKind.Assign
                      or TokenKind.PlusAssign or TokenKind.MinusAssign or TokenKind.Equal or TokenKind.NotEqual
                      or TokenKind.Less or TokenKind.LessOrEqual or TokenKind.Greater or TokenKind.GreaterOrEqual ||
-                     before[^1].Text is "and" or "or" or "not")
+                     before[^1].Text is And or Or or Not)
             {
                 kinds = [AuthoringSymbolKind.Character];
                 keywords = kind switch
                 {
                     ExpressionContextKind.Effects when before.Length == 0 || before[^1].Kind == TokenKind.Semicolon
-                        => ["set", "clear", "give", "take", "var:", "faction:"],
-                    ExpressionContextKind.Effects => ["var:", "faction:"],
-                    ExpressionContextKind.Number => ["var:"],
-                    ExpressionContextKind.Substitution when before.Length == 0 => ["var:", "flag:", "faction:", "item:", "image("],
-                    ExpressionContextKind.Substitution => ["var:", "flag:", "faction:", "item:"],
-                    _ => ["flag:", "var:", "faction:", "item:", "visited(", "true", "false", "not"]
+                        => [.. EffectVerbs, VarPrefix, FactionPrefix],
+                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix],
+                    ExpressionContextKind.Number => [VarPrefix],
+                    ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ImageCall],
+                    ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix],
+                    _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, VisitedCall, True, False, Not]
                 };
             }
             if (kinds.Length == 0 && keywords.Length == 0) continue;
             // Numeric references retain a trailing subtraction token; name slots may recover an unfinished hyphen.
             var unfinishedEnd = end;
-            while (unfinishedEnd < text.Length && (text[unfinishedEnd] == '.' ||
-                   text[unfinishedEnd] == '-' && !kinds.Any(candidate => candidate is
+            while (unfinishedEnd < text.Length && (text[unfinishedEnd] == IdentifierRules.DotSeparator ||
+                   text[unfinishedEnd] == IdentifierRules.HyphenSeparator && !kinds.Any(candidate => candidate is
                        AuthoringSymbolKind.Stat or AuthoringSymbolKind.Variable or AuthoringSymbolKind.Faction)))
                 unfinishedEnd++;
             if (unfinishedEnd == text.Length) end = unfinishedEnd;
             yield return new(text[start..end], map(start, end - start), kinds, keywords,
                 Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray(),
-                end < text.Length && text[end] is ':' or '(' ? text[end] : null, null, details);
+                end < text.Length && text[end] is Separator or OpenParen ? text[end] : null, null, details);
         }
     }
 
@@ -186,18 +189,18 @@ internal static class ExpressionCompletion
             return false;
         var owner = tokens[reference[0]];
         var member = tokens[reference[2]];
-        if (owner.Is("item") && count == 3)
+        if (owner.Is(Item) && count == 3)
             return symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && member.Is(symbol.Name));
-        if (!member.Is("pronoun") ||
+        if (!member.Is(Pronoun) ||
             !symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)))
             return false;
         if (count == 3) return true;
         if (count < 5 || tokens[reference[3]].Kind != TokenKind.Colon) return false;
         var property = tokens[reference[4]];
         if (property.Kind != TokenKind.Identifier) return false;
-        if (count == 5) return property.Text is "subject" or "object" or "reflexive";
-        return count == 7 && property.Is("possessive-pronoun") &&
+        if (count == 5) return property.Text is SubjectForm or ObjectForm or ReflexiveForm;
+        return count == 7 && property.Is(PossessivePronoun) &&
             tokens[reference[5]].Kind == TokenKind.Colon &&
-            tokens[reference[6]] is { Kind: TokenKind.Identifier, Text: "determiner" or "independent" };
+            tokens[reference[6]] is { Kind: TokenKind.Identifier, Text: Determiner or Independent };
     }
 }

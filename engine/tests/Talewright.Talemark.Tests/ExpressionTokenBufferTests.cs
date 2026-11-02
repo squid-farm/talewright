@@ -22,7 +22,7 @@ public sealed class ExpressionTokenBufferTests
             (TokenKind.Number, "42", "42"),
             (TokenKind.String, "\"hi \\\"friend\\\" \\\\ 😀\"", "hi \"friend\" \\ 😀"),
             (TokenKind.NotEqual, "!=", "!="),
-            (TokenKind.Error, "#", "#"),
+            (TokenKind.Hash, "#", "#"),
         };
         var tokens = Lexer.Tokenize(input);
         Assert.Equal(expected.Length + 1, tokens.Count);

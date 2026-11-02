@@ -1,4 +1,7 @@
 using System.Collections.Immutable;
+using Talewright.Rules.Effects;
+using Talewright.Rules.Expressions;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -25,16 +28,16 @@ internal sealed record VisitedExpressionNode(ExpressionSpan Scene, ExpressionSpa
 
 internal sealed record ParenthesizedExpressionNode(ExpressionNode Inner, ExpressionSpan Span) : ExpressionNode(Span);
 
-internal sealed record ReferenceExpressionNode(ExpressionSpan Namespace, ExpressionSpan Name,
+internal sealed record ReferenceExpressionNode(ReferenceNamespace Kind, ExpressionSpan Namespace, ExpressionSpan Name,
     ExpressionSpan? Member, ExpressionSpan? SubMember, ExpressionSpan Span) : ExpressionNode(Span);
 
 internal sealed record HasItemExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Span) : ExpressionNode(Span);
 
-internal sealed record UnaryExpressionNode(TokenKind Operator, ExpressionNode Operand, ExpressionSpan OperatorSpan,
+internal sealed record UnaryExpressionNode(UnaryOp Operator, ExpressionNode Operand, ExpressionSpan OperatorSpan,
     ExpressionSpan Span) : ExpressionNode(Span);
 
-internal sealed record BinaryExpressionNode(TokenKind Operator, ExpressionNode Left, ExpressionNode Right,
+internal sealed record BinaryExpressionNode(BinaryOp Operator, ExpressionNode Left, ExpressionNode Right,
     ExpressionSpan OperatorSpan, ExpressionSpan Span) : ExpressionNode(Span);
 
 internal sealed record ExpressionSyntaxTree(TokenBuffer Tokens, ExpressionNode Root, bool HasErrors);
@@ -53,7 +56,7 @@ internal sealed record SetFlagEffectSyntax(bool Set, ExpressionSpan Flag, Expres
 internal sealed record GiveTakeEffectSyntax(bool Give, ExpressionSpan Character, ExpressionSpan Item,
     ExpressionNode? Quantity, ExpressionSpan Span) : EffectSyntax(Span);
 
-internal sealed record AssignmentEffectSyntax(ExpressionSpan Namespace, ExpressionSpan Target, TokenKind Operator,
-    ExpressionNode Amount, ExpressionSpan Span) : EffectSyntax(Span);
+internal sealed record AssignmentEffectSyntax(ReferenceNamespace Kind, ExpressionSpan Namespace, ExpressionSpan Target,
+    AssignOp Operator, ExpressionNode Amount, ExpressionSpan Span) : EffectSyntax(Span);
 
 internal sealed record EffectsSyntaxTree(TokenBuffer Tokens, ImmutableArray<EffectSyntax> Effects, bool HasErrors);

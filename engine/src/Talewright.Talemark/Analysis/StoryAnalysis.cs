@@ -179,7 +179,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         var map = new ExpressionSourceMap(sites);
         CompletionSites.Add(new(new(map.Map(0, 0).Start, map.Map(completionText.Length, 0).End), null, sites));
         foreach (var token in tokens)
-            if (token.Kind is not (TokenKind.End or TokenKind.String or TokenKind.Error or TokenKind.NamedPredicate))
+            if (token.Kind is not (TokenKind.End or TokenKind.String or TokenKind.Error or TokenKind.Hash or TokenKind.NamedPredicate))
                 Tokens.Add(new(token.Value, map.Map(token.Offset, token.Length)));
         if (kind == ExpressionContextKind.Effects)
         {

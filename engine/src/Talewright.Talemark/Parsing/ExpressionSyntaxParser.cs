@@ -1,6 +1,10 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Talewright.Narrative.Templates;
+using Talewright.Rules.Effects;
+using Talewright.Rules.Expressions;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -206,10 +210,10 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseOr()
     {
         var left = ParseAnd();
-        while (IsKeyword("or"))
+        while (IsKeyword(ExpressionVocabulary.Or))
         {
             var op = Next();
-            left = Binary(op, left, ParseAnd());
+            left = Binary(BinaryOp.Or, op, left, ParseAnd());
         }
 
         return left;
@@ -218,10 +222,10 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseAnd()
     {
         var left = ParseNot();
-        while (IsKeyword("and"))
+        while (IsKeyword(ExpressionVocabulary.And))
         {
             var op = Next();
-            left = Binary(op, left, ParseNot());
+            left = Binary(BinaryOp.And, op, left, ParseNot());
         }
 
         return left;
@@ -229,11 +233,11 @@ internal sealed class ExpressionSyntaxParser
 
     private ExpressionNode ParseNot()
     {
-        if (IsKeyword("not"))
+        if (IsKeyword(ExpressionVocabulary.Not))
         {
             var op = Next();
             var operand = ParseNested(op, ParseNot);
-            return new UnaryExpressionNode(TokenKind.Identifier, operand, Span(op),
+            return new UnaryExpressionNode(UnaryOp.Not, operand, Span(op),
                 new(op.Offset, operand.Span.End - op.Offset));
         }
 
@@ -243,14 +247,23 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseComparison()
     {
         var left = ParseSum();
-        if (Peek.Kind is not (TokenKind.Equal or TokenKind.NotEqual or TokenKind.Less or TokenKind.LessOrEqual or
-            TokenKind.Greater or TokenKind.GreaterOrEqual))
+        BinaryOp? comparison = Peek.Kind switch
+        {
+            TokenKind.Equal => BinaryOp.Equal,
+            TokenKind.NotEqual => BinaryOp.NotEqual,
+            TokenKind.Less => BinaryOp.Less,
+            TokenKind.LessOrEqual => BinaryOp.LessOrEqual,
+            TokenKind.Greater => BinaryOp.Greater,
+            TokenKind.GreaterOrEqual => BinaryOp.GreaterOrEqual,
+            _ => null,
+        };
+        if (comparison is not { } kind)
         {
             return left;
         }
 
         var op = Next();
-        return Binary(op, left, ParseSum());
+        return Binary(kind, op, left, ParseSum());
     }
 
     private ExpressionNode ParseSum()
@@ -259,7 +272,7 @@ internal sealed class ExpressionSyntaxParser
         while (Peek.Kind is TokenKind.Plus or TokenKind.Minus)
         {
             var op = Next();
-            left = Binary(op, left, ParseTerm());
+            left = Binary(op.Kind == TokenKind.Plus ? BinaryOp.Add : BinaryOp.Subtract, op, left, ParseTerm());
         }
 
         return left;
@@ -271,7 +284,7 @@ internal sealed class ExpressionSyntaxParser
         while (Peek.Kind is TokenKind.Star or TokenKind.Slash)
         {
             var op = Next();
-            left = Binary(op, left, ParseUnary());
+            left = Binary(op.Kind == TokenKind.Star ? BinaryOp.Multiply : BinaryOp.Divide, op, left, ParseUnary());
         }
 
         return left;
@@ -289,7 +302,7 @@ internal sealed class ExpressionSyntaxParser
             }
 
             var operand = ParseNested(op, ParseUnary);
-            return new UnaryExpressionNode(TokenKind.Minus, operand, Span(op),
+            return new UnaryExpressionNode(UnaryOp.Negate, operand, Span(op),
                 new(op.Offset, operand.Span.End - op.Offset));
         }
 
@@ -368,9 +381,9 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseIdentifier()
     {
         var token = Next();
-        if (token.Is("true")) return new BooleanExpressionNode(true, Span(token));
-        if (token.Is("false")) return new BooleanExpressionNode(false, Span(token));
-        if (token.Is("visited"))
+        if (token.Is(ExpressionVocabulary.True)) return new BooleanExpressionNode(true, Span(token));
+        if (token.Is(ExpressionVocabulary.False)) return new BooleanExpressionNode(false, Span(token));
+        if (token.Is(ExpressionVocabulary.Visited))
         {
             Expect(TokenKind.LeftParen, "'(' after visited");
             var scene = Expect(TokenKind.Identifier, "a scene id");
@@ -389,21 +402,21 @@ internal sealed class ExpressionSyntaxParser
             {
                 Next();
                 member = Expect(TokenKind.Identifier, $"a property after '{token.Text}:{name.Text}:'");
-                if (name.Is("pronoun") && member.Value.Is("possessive-pronoun"))
+                if (name.Is(ExpressionVocabulary.Pronoun) && member.Value.Is(ExpressionVocabulary.PossessivePronoun))
                 {
-                    Expect(TokenKind.Colon, "':' after 'possessive-pronoun'");
+                    Expect(TokenKind.Colon, $"':' after '{ExpressionVocabulary.PossessivePronoun}'");
                     subMember = Expect(TokenKind.Identifier, "a possessive pronoun property");
                 }
             }
 
             var end = subMember ?? member ?? name;
-            return new ReferenceExpressionNode(Span(token), Span(name),
+            return new ReferenceExpressionNode(ExpressionVocabulary.Namespace(token.Text), Span(token), Span(name),
                 member is null ? null : Span(member.Value),
                 subMember is null ? null : Span(subMember.Value),
                 new(token.Offset, end.Offset + end.Length - token.Offset));
         }
 
-        if (IsKeyword("has"))
+        if (IsKeyword(ExpressionVocabulary.Has))
         {
             Next();
             var item = Expect(TokenKind.Identifier, "an item id after 'has'");
@@ -414,8 +427,8 @@ internal sealed class ExpressionSyntaxParser
         return new NameExpressionNode(Span(token), Span(token));
     }
 
-    private ExpressionNode Binary(Token op, ExpressionNode left, ExpressionNode right) =>
-        new BinaryExpressionNode(op.Kind, left, right, Span(op),
+    private static ExpressionNode Binary(BinaryOp kind, Token op, ExpressionNode left, ExpressionNode right) =>
+        new BinaryExpressionNode(kind, left, right, Span(op),
             new(left.Span.Start, right.Span.End - left.Span.Start));
 
     private static ExpressionSpan Span(Token token) => new(token.Offset, token.Length);
@@ -434,7 +447,7 @@ internal sealed class ExpressionSyntaxParser
     {
         for (var index = 0; index < tokens.Count && tokens[index].Offset < endOffset; index++)
         {
-            if (tokens[index] is { Kind: TokenKind.Error } token && token.Is("#")) return index;
+            if (tokens[index].Kind == TokenKind.Hash) return index;
         }
 
         return -1;
@@ -450,7 +463,7 @@ internal sealed class ExpressionSyntaxParser
             var offset = index;
             index++;
             var nameStart = index;
-            while (index < endOffset && text[index] is not ('#' or '('))
+            while (index < endOffset && text[index] is not (ExpressionVocabulary.ModifierMarker or ExpressionVocabulary.OpenParen))
             {
                 index++;
             }
@@ -458,7 +471,7 @@ internal sealed class ExpressionSyntaxParser
             var name = text[nameStart..index].Trim();
             string? argument = null;
             string? pluralArgument = null;
-            if (index < text.Length && text[index] == '(')
+            if (index < text.Length && text[index] == ExpressionVocabulary.OpenParen)
             {
                 index = SkipSpace(text, index + 1, endOffset);
                 if (index >= endOffset || text[index] != '"')
@@ -475,9 +488,9 @@ internal sealed class ExpressionSyntaxParser
 
                 argument = literal.Value;
                 index = SkipSpace(text, literal.End, endOffset);
-                if (name == "one-many")
+                if (name == OneManyTextModifier.ModifierName)
                 {
-                    if (index >= endOffset || text[index] != ',')
+                    if (index >= endOffset || text[index] != ExpressionVocabulary.ArgumentSeparator)
                     {
                         Fail(CompilerDiagnosticCodes.InvalidModifier,
                             "'#one-many' requires exactly two quoted strings: #one-many(\"singular\", \"plural\").",
@@ -500,13 +513,13 @@ internal sealed class ExpressionSyntaxParser
                     index = SkipSpace(text, literal.End, endOffset);
                 }
 
-                if (index >= endOffset || text[index] != ')')
+                if (index >= endOffset || text[index] != ExpressionVocabulary.CloseParen)
                 {
                     Fail(CompilerDiagnosticCodes.InvalidModifier, $"Expected ')' after the argument to '#{name}'.", index);
                 }
 
                 index = SkipSpace(text, index + 1, endOffset);
-                if (index < endOffset && text[index] != '#')
+                if (index < endOffset && text[index] != ExpressionVocabulary.ModifierMarker)
                 {
                     Fail(CompilerDiagnosticCodes.InvalidModifier, $"Expected '#' or the end of the substitution after '#{name}(…)'.", index);
                 }
@@ -527,21 +540,21 @@ internal sealed class ExpressionSyntaxParser
     private EffectSyntax ParseEffect()
     {
         var first = Expect(TokenKind.Identifier, "an effect");
-        if (first.Is("set") || first.Is("clear"))
+        if (first.Is(ExpressionVocabulary.Set) || first.Is(ExpressionVocabulary.Clear))
         {
-            var ns = Expect(TokenKind.Identifier, "'flag'");
-            if (!ns.Is("flag"))
+            var ns = Expect(TokenKind.Identifier, $"'{ExpressionVocabulary.Flag}'");
+            if (!ns.Is(ExpressionVocabulary.Flag))
             {
                 Fail(CompilerDiagnosticCodes.MalformedEffect, $"'{first.Text}' only works on flags: {first.Text} flag:<id>.", ns.Offset);
             }
 
             Expect(TokenKind.Colon, "':'");
             var flag = Expect(TokenKind.Identifier, "a flag id");
-            return new SetFlagEffectSyntax(first.Is("set"), Span(flag),
+            return new SetFlagEffectSyntax(first.Is(ExpressionVocabulary.Set), Span(flag),
                 new(first.Offset, flag.Offset + flag.Length - first.Offset));
         }
 
-        if (first.Is("give") || first.Is("take"))
+        if (first.Is(ExpressionVocabulary.Give) || first.Is(ExpressionVocabulary.Take))
         {
             var who = Expect(TokenKind.Identifier, "a character id");
             var item = Expect(TokenKind.Identifier, "an item id");
@@ -551,20 +564,28 @@ internal sealed class ExpressionSyntaxParser
                 quantity = ParseSum();
             }
 
-            return new GiveTakeEffectSyntax(first.Is("give"), Span(who), Span(item), quantity,
+            return new GiveTakeEffectSyntax(first.Is(ExpressionVocabulary.Give), Span(who), Span(item), quantity,
                 new(first.Offset, (quantity?.Span.End ?? item.Offset + item.Length) - first.Offset));
         }
 
         Expect(TokenKind.Colon, "':' (effects look like 'player:hp -= 3', 'set flag:x', 'give player rope')");
         var target = Expect(TokenKind.Identifier, "a name");
         var op = Next();
-        if (op.Kind is not (TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign))
+        AssignOp? assignment = op.Kind switch
+        {
+            TokenKind.Assign => AssignOp.Set,
+            TokenKind.PlusAssign => AssignOp.Add,
+            TokenKind.MinusAssign => AssignOp.Subtract,
+            _ => null,
+        };
+        if (assignment is not { } kind)
         {
             Fail(CompilerDiagnosticCodes.MalformedEffect, $"Expected '=', '+=' or '-=' but found '{op.Text}'.", op.Offset);
+            return default!;
         }
 
         var amount = ParseSum();
-        return new AssignmentEffectSyntax(Span(first), Span(target), op.Kind, amount,
+        return new AssignmentEffectSyntax(ExpressionVocabulary.Namespace(first.Text), Span(first), Span(target), kind, amount,
             new(first.Offset, amount.Span.End - first.Offset));
     }
 }

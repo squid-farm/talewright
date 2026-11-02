@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -24,6 +25,8 @@ internal enum TokenKind
     Greater,
     GreaterOrEqual,
     Assign,
+    /// <summary>The <c>#</c> that starts a substitution modifier.</summary>
+    Hash,
     PlusAssign,
     MinusAssign,
     Error,
@@ -44,7 +47,7 @@ internal readonly record struct Token(TokenKind Kind, string Source, int Offset,
             if (Kind == TokenKind.String)
                 return QuotedStringSyntax.Read(Source, Offset, Offset + Length).Value.AsSpan();
             var start = Offset;
-            if (Length > 0 && Source[start] == '@' && Kind is TokenKind.NamedPredicate or TokenKind.Error)
+            if (Length > 0 && Source[start] == ExpressionVocabulary.PredicateMarker && Kind is TokenKind.NamedPredicate or TokenKind.Error)
                 start++;
             return Source.AsSpan(start, Offset + Length - start);
         }
@@ -70,7 +73,7 @@ internal sealed class TokenBuffer(string source, List<Token> tokens)
     internal int FindHash()
     {
         for (var index = 0; index < _tokens.Count; index++)
-            if (_tokens[index] is { Kind: TokenKind.Error, Text: "#" }) return index;
+            if (_tokens[index].Kind == TokenKind.Hash) return index;
         return -1;
     }
 }
@@ -117,7 +120,7 @@ internal static class Lexer
                     i++;
                 }
 
-                while (i > start && text[i - 1] is '.' or '-') i--;
+                while (i > start && IdentifierRules.IsSeparator(text[i - 1])) i--;
                 tokens.Add(new Token(IdentifierRules.IsValid(text.AsSpan(start, i - start))
                     ? TokenKind.Identifier : TokenKind.Error, text, start, i - start));
                 continue;
@@ -134,7 +137,7 @@ internal static class Lexer
                 continue;
             }
 
-            if (c == '"')
+            if (c == QuotedStringSyntax.QuoteMark)
             {
                 var literal = QuotedStringSyntax.Scan(text, i, text.Length);
                 tokens.Add(literal.Error is { } error
@@ -144,7 +147,7 @@ internal static class Lexer
                 continue;
             }
 
-            if (c == '@')
+            if (c == ExpressionVocabulary.PredicateMarker)
             {
                 i++;
                 var nameStart = i;
@@ -153,46 +156,24 @@ internal static class Lexer
                     i++;
                 }
 
-                while (i > nameStart && text[i - 1] is '.' or '-') i--;
+                while (i > nameStart && IdentifierRules.IsSeparator(text[i - 1])) i--;
                 tokens.Add(new Token(IdentifierRules.IsValid(text.AsSpan(nameStart, i - nameStart))
                     ? TokenKind.NamedPredicate : TokenKind.Error, text, start, i - start));
                 continue;
             }
 
-            var kind = (c, i + 1 < text.Length ? text[i + 1] : '\0') switch
+            var kind = TokenKind.Error;
+            var length = 1;
+            foreach (var (spelling, symbol) in ExpressionVocabulary.Symbols)
             {
-                ('=', '=') => TokenKind.Equal,
-                ('!', '=') => TokenKind.NotEqual,
-                ('<', '=') => TokenKind.LessOrEqual,
-                ('>', '=') => TokenKind.GreaterOrEqual,
-                ('+', '=') => TokenKind.PlusAssign,
-                ('-', '=') => TokenKind.MinusAssign,
-                _ => TokenKind.Error,
-            };
-            if (kind != TokenKind.Error)
-            {
-                tokens.Add(new Token(kind, text, start, 2));
-                i += 2;
-                continue;
+                if (!text.AsSpan(i).StartsWith(spelling, StringComparison.Ordinal)) continue;
+                kind = symbol;
+                length = spelling.Length;
+                break;
             }
 
-            kind = c switch
-            {
-                ':' => TokenKind.Colon,
-                ';' => TokenKind.Semicolon,
-                '(' => TokenKind.LeftParen,
-                ')' => TokenKind.RightParen,
-                '+' => TokenKind.Plus,
-                '-' => TokenKind.Minus,
-                '*' => TokenKind.Star,
-                '/' => TokenKind.Slash,
-                '<' => TokenKind.Less,
-                '>' => TokenKind.Greater,
-                '=' => TokenKind.Assign,
-                _ => TokenKind.Error,
-            };
-            tokens.Add(new Token(kind, text, start, 1));
-            i++;
+            tokens.Add(new Token(kind, text, start, length));
+            i += length;
         }
 
         tokens.Add(new Token(TokenKind.End, text, text.Length, 0));

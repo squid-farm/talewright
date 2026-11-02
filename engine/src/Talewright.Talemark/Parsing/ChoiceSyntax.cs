@@ -1,3 +1,6 @@
+using Talewright.Core.Identity;
+using Talewright.Talemark.Vocabulary;
+
 namespace Talewright.Talemark.Parsing;
 
 /// <param name="Marker">The clause marker to suggest placing <c>]</c> before, when exactly one is plausible.</param>
@@ -8,8 +11,6 @@ internal readonly record struct ChoiceLabelHint(string? Marker, int Offset, int 
 
 internal static class ChoiceSyntax
 {
-    private static readonly string[] EffectVerbs = ["set", "clear", "give", "take"];
-
     public static ChoiceLabelHint FindMissingBracketHint(string text, int open, DelimiterScanResult scan,
         CancellationToken cancellationToken)
     {
@@ -210,14 +211,14 @@ internal static class ChoiceSyntax
         }
 
         var remaining = text.AsSpan(index, end - index);
-        foreach (var verb in EffectVerbs)
+        foreach (var verb in ExpressionVocabulary.EffectVerbs)
         {
             if (remaining.StartsWith(verb, StringComparison.Ordinal) &&
                 remaining.Length > verb.Length && char.IsWhiteSpace(remaining[verb.Length]))
                 return true;
         }
 
-        while (index < end && (char.IsAsciiLetterOrDigit(text[index]) || text[index] is '_' or '.' or '-'))
+        while (index < end && IdentifierRules.IsPart(text[index]))
         {
             checkpoint?.Check();
             work++;

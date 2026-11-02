@@ -4,14 +4,12 @@ using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
 internal static class ExpressionParser
 {
-    internal static readonly string[] PronounProperties = ["subject", "object", "possessive-pronoun", "reflexive"];
-    internal static readonly string[] PossessiveProperties = ["determiner", "independent"];
-
     internal static bool ReportStringErrors(string text, Func<int, SourceLocation> locate, DiagnosticBag diagnostics) =>
         ReportStringErrors(Lexer.Tokenize(text), locate, diagnostics);
 
@@ -48,8 +46,8 @@ internal static class ExpressionParser
 
             var statement = tokens.Slice(start, end - start);
             if (statement is [
-                { Kind: TokenKind.Identifier, Text: "set" or "clear" },
-                { Kind: TokenKind.Identifier, Text: "flag" },
+                { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Set or ExpressionVocabulary.Clear },
+                { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Flag },
                 { Kind: TokenKind.Colon },
                 { Kind: TokenKind.Identifier } flag])
             {
@@ -58,7 +56,7 @@ internal static class ExpressionParser
                 declaration?.Invoke(name, true, flag.Offset);
             }
             else if (statement is [
-                { Kind: TokenKind.Identifier, Text: "var" },
+                { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Var },
                 { Kind: TokenKind.Colon },
                 { Kind: TokenKind.Identifier } variable,
                 { Kind: TokenKind.Assign or TokenKind.PlusAssign or TokenKind.MinusAssign },
@@ -128,6 +126,8 @@ internal static class ExpressionParser
 
     /// <summary>True for words that can't be used as ids.</summary>
     public static bool IsReserved(string id) =>
-        id is "and" or "or" or "not" or "has" or "true" or "false" or "visited" or
-            "faction" or "item" or "flag" or "var" or "END";
+        id is ExpressionVocabulary.And or ExpressionVocabulary.Or or ExpressionVocabulary.Not or ExpressionVocabulary.Has or
+            ExpressionVocabulary.True or ExpressionVocabulary.False or ExpressionVocabulary.Visited or
+            ExpressionVocabulary.Faction or ExpressionVocabulary.Item or ExpressionVocabulary.Flag or ExpressionVocabulary.Var or
+            "END";
 }
