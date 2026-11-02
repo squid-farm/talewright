@@ -15,22 +15,28 @@ public sealed class AuthorSession
 {
     private StorySession _session;
     private AuthorCommand[] _commands;
+    private ReplayCursor _timeline;
     private readonly List<AuthorPlayedChoice> _playedChoices = [];
     private IReadOnlyList<AuthorCommandResult> _results = [];
 
     private AuthorSession(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, AuthorCommand[] commands, int cursor, bool captureDecisions, AuthorSceneCheckpoint? verify = null)
+        CharacterSelection? character, AuthorCommand[] commands, ReplayCursor timeline, bool captureDecisions,
+        AuthorSceneCheckpoint? verify = null)
     {
         Story = story;
         StartScene = target;
         Setup = setup;
         Character = character;
         _commands = commands;
-        Cursor = cursor;
+        if (timeline.Length != commands.Length)
+        {
+            throw new ArgumentException("The author timeline length must match its command history.", nameof(timeline));
+        }
+        _timeline = timeline;
         CaptureDecisions = captureDecisions;
         var decisions = new List<RuleDecision>();
         var results = new List<AuthorCommandResult>();
-        var appliedCommands = commands.Take(cursor).ToArray();
+        var appliedCommands = commands.Take(_timeline.Position).ToArray();
         var lastEntryCommand = Array.FindLastIndex(appliedCommands,
             command => command is AuthorChoice or AuthorJump);
         var verifyNextEntry = lastEntryCommand < 0;
@@ -132,9 +138,9 @@ public sealed class AuthorSession
     public bool IsSynthetic => true;
     public bool CaptureDecisions { get; }
     public IReadOnlyList<AuthorCommand> Commands => Array.AsReadOnly(_commands);
-    public int Cursor { get; private set; }
-    public bool CanBack => Cursor > 0;
-    public bool CanForward => Cursor < _commands.Length;
+    public int Cursor => _timeline.Position;
+    public bool CanBack => _timeline.CanBack;
+    public bool CanForward => _timeline.CanForward;
     /// <summary>Applied command deltas, including all trigger/leveling consequences; redo commands have no result yet.</summary>
     public IReadOnlyList<AuthorCommandResult> Results => _results;
     /// <summary>Historical decisions at their event offsets; empty when observation was not enabled.</summary>
@@ -158,7 +164,7 @@ public sealed class AuthorSession
         var selection = CharacterSelection.Validate(story, character);
         var validated = (setup ?? new AuthorSetup()).Validate(story);
         return new AuthorSession(story, target, validated,
-            seed ?? story.Seed ?? DeterministicDice.NewSeed(), selection, [], 0, captureDecisions);
+            seed ?? story.Seed ?? DeterministicDice.NewSeed(), selection, [], new ReplayCursor(0, 0), captureDecisions);
     }
 
     /// <summary>Snapshots declared state and recorded decisions; never reevaluates branch predicates.</summary>
@@ -179,7 +185,7 @@ public sealed class AuthorSession
         AuthorReloadComparison.Schema(Story, candidate);
         candidate.GetScene(checkpoint.Scene);
         var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
-            CharacterSelection.Validate(candidate, Character), _commands, Cursor, CaptureDecisions, checkpoint);
+            CharacterSelection.Validate(candidate, Character), _commands, _timeline, CaptureDecisions, checkpoint);
         AuthorReloadComparison.Require(result.Checkpoint?.Scene == checkpoint.Scene, "the replay no longer reaches the displayed scene");
         return result;
     }
@@ -215,17 +221,17 @@ public sealed class AuthorSession
     public void Back()
     {
         if (!CanBack) { throw new InvalidOperationException("No earlier author command."); }
-        MoveTo(Cursor - 1);
+        MoveTo(_timeline.Back());
     }
 
     public void Forward()
     {
         if (!CanForward) { throw new InvalidOperationException("No redo author command."); }
-        MoveTo(Cursor + 1);
+        MoveTo(_timeline.Forward());
     }
 
-    private void MoveTo(int cursor) => Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character,
-        _commands, cursor, CaptureDecisions));
+    private void MoveTo(ReplayCursor timeline) => Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character,
+        _commands, timeline, CaptureDecisions));
 
     private void Append(AuthorCommand command)
     {
@@ -233,8 +239,9 @@ public sealed class AuthorSession
         {
             throw new InvalidOperationException($"An author timeline supports at most {StoryHistory.MaxChoices:N0} commands.");
         }
-        AuthorCommand[] commands = [.. _commands.Take(Cursor), command];
-        Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character, commands, commands.Length, CaptureDecisions));
+        AuthorCommand[] commands = [.. _commands.Take(_timeline.Position), command];
+        Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character, commands,
+            _timeline.AfterAppend(), CaptureDecisions));
     }
 
     /// <summary>Starts a fresh synthetic candidate, not a preserve-current-state jump.</summary>
@@ -244,11 +251,13 @@ public sealed class AuthorSession
 
     internal static AuthorSession Replay(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
         CharacterSelection? character, AuthorCommand[] commands, bool captureDecisions = false)
-        => new(story, target, setup, seed, character, commands, commands.Length, captureDecisions);
+        => new(story, target, setup, seed, character, commands,
+            new ReplayCursor(commands.Length, commands.Length), captureDecisions);
 
     internal static AuthorSession RestoreTimeline(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
         CharacterSelection? character, AuthorCommand[] commands, int cursor, bool captureDecisions)
-        => new(story, target, setup, seed, character, commands, cursor, captureDecisions);
+        => new(story, target, setup, seed, character, commands,
+            new ReplayCursor(cursor, commands.Length), captureDecisions);
 
     private void Adopt(AuthorSession candidate)
     {
@@ -261,7 +270,7 @@ public sealed class AuthorSession
         Checkpoint = candidate.Checkpoint;
         Decisions = candidate.Decisions;
         _commands = candidate._commands;
-        Cursor = candidate.Cursor;
+        _timeline = candidate._timeline;
         _results = candidate._results;
         _playedChoices.Clear();
         _playedChoices.AddRange(candidate._playedChoices);
