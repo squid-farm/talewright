@@ -14,6 +14,21 @@ function requireTrust() {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before setting up or running the Talewright CLI.');
 }
 
+async function requireDotnetRuntime() {
+  let stdout;
+  try {
+    ({ stdout } = await execute('dotnet', ['--list-runtimes'], { timeout: 10000, maxBuffer: 1024 * 1024 }));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      throw new Error('The .NET 10 Runtime is required to run a story. Install it from https://dotnet.microsoft.com/download/dotnet/10.0; no installation was attempted.');
+    }
+    throw new Error(`Could not check the .NET 10 Runtime: ${error.message}. Install it from https://dotnet.microsoft.com/download/dotnet/10.0 and try again.`);
+  }
+  if (!stdout.split(/\r?\n/).some(line => /^Microsoft\.NETCore\.App 10\./.test(line))) {
+    throw new Error('The .NET 10 Runtime is required to run a story. Install it from https://dotnet.microsoft.com/download/dotnet/10.0; no installation was attempted.');
+  }
+}
+
 async function executableExists(file) {
   try {
     await access(file, process.platform === 'win32' ? constants.F_OK : constants.X_OK);
@@ -186,4 +201,4 @@ function registerCliSetup(context) {
   context.subscriptions.push(vscode.commands.registerCommand('talewright.setUpCli', () => setUpCli(context)));
 }
 
-module.exports = { cliExecutable, registerCliSetup };
+module.exports = { cliExecutable, registerCliSetup, requireDotnetRuntime };

@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 const path = require('node:path');
-const { cliExecutable, registerCliSetup } = require('./cli-tools.cjs');
+const { cliExecutable, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
 
 function contains(root, file) {
   const relative = path.relative(root, file);
@@ -62,6 +62,7 @@ async function createTask(command, requested, definition, scope) {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
   const root = await selectStory(requested);
   if (!root) return undefined;
+  if (command === 'run') await requireDotnetRuntime();
   const executable = await cliExecutable(root);
   const args = [command, root];
   if (command === 'publish') {
@@ -79,7 +80,10 @@ async function createTask(command, requested, definition, scope) {
   if (!await saveStory(root)) return undefined;
   if (!vscode.workspace.isTrusted) throw new Error('Workspace trust was revoked. No CLI task was started.');
   const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(root));
-  const names = { validate: 'Validate Story', publish: 'Publish Story ZIP', debug: 'Open Author Debugger' };
+  const names = {
+    validate: 'Validate Story', publish: 'Publish Story ZIP',
+    debug: 'Open Author Debugger', run: 'Run Story',
+  };
   const task = new vscode.Task(
     definition ?? { type: 'talewright', command, story: root },
     scope ?? folder, names[command], 'Talewright',
@@ -97,7 +101,8 @@ function registerAuthorActions(context) {
     if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli');
   };
   for (const [id, command] of [
-    ['validateStory', 'validate'], ['publishStoryZip', 'publish'], ['openAuthorDebugger', 'debug'],
+    ['validateStory', 'validate'], ['publishStoryZip', 'publish'],
+    ['openAuthorDebugger', 'debug'], ['runStory', 'run'],
   ]) {
     context.subscriptions.push(vscode.commands.registerCommand(`talewright.${id}`, async () => {
       try {
@@ -114,9 +119,9 @@ function registerAuthorActions(context) {
       try {
         if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
         const workspaceScope = task.scope === vscode.TaskScope.Workspace;
-        if (task.definition.command !== 'debug' || typeof task.definition.story !== 'string'
+        if (!['debug', 'run'].includes(task.definition.command) || typeof task.definition.story !== 'string'
             || (!workspaceScope && task.scope?.uri?.scheme !== 'file')) {
-          throw new Error('A Talewright task requires command "debug", a story path, and a workspace or workspace-folder scope.');
+          throw new Error('A Talewright task requires command "debug" or "run", a story path, and a workspace or workspace-folder scope.');
         }
         let requested;
         if (workspaceScope) {
@@ -135,7 +140,7 @@ function registerAuthorActions(context) {
         } else {
           requested = path.resolve(task.scope.uri.fsPath, task.definition.story);
         }
-        return await createTask('debug', requested, task.definition, task.scope);
+        return await createTask(task.definition.command, requested, task.definition, task.scope);
       } catch (error) {
         await report(error);
         return undefined;

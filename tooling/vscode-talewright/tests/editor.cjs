@@ -82,7 +82,7 @@ async function testAuthorActions(extension) {
   await vscode.commands.executeCommand('talewright.setUpCli');
   assert.equal(vscode.workspace.getConfiguration('talewright', document.uri).get('cli.executablePath'), configuredCli,
     'Setup must preserve an existing configured CLI');
-  const run = async (command, stopDebugger = false) => {
+  const run = async (command, stopNativePlayer = false) => {
     let execution;
     let pid;
     let cancelled = false;
@@ -93,11 +93,11 @@ async function testAuthorActions(extension) {
         if (event.execution.task.source !== 'Talewright') return;
         execution = event.execution;
         pid = event.processId;
-        if (stopDebugger) {
+        if (stopNativePlayer) {
           await new Promise(resolve => setTimeout(resolve, 3000));
           try {
             children = (await fs.readFile(`/proc/${pid}/task/${pid}/children`, 'utf8')).trim().split(/\s+/).filter(Boolean);
-            assert.ok(children.length > 0, 'CLI must have launched the native debugger before cancellation');
+            assert.ok(children.length > 0, 'CLI must have launched the native player before cancellation');
           } catch (error) {
             reject(error);
             return;
@@ -116,22 +116,25 @@ async function testAuthorActions(extension) {
     });
     await vscode.commands.executeCommand(`talewright.${command}`);
     const code = await finished;
-    if (stopDebugger) {
-      assert.equal(cancelled, true, 'Debugger must remain running until task cancellation');
+    if (stopNativePlayer) {
+      assert.equal(cancelled, true, 'Native player must remain running until task cancellation');
       await new Promise(resolve => setTimeout(resolve, 500));
       for (const child of children) {
         await assert.rejects(fs.access(`/proc/${child}/exe`), { code: 'ENOENT' },
-          'Task cancellation must not leave the native debugger running');
+          'Task cancellation must not leave the native player running');
       }
     }
     return { code, pid };
   };
   assert.notEqual((await run('validateStory')).code, 0, 'Invalid story must retain CLI failure status');
+  assert.notEqual((await run('runStory')).code, 0, 'Invalid story must not report a successful run');
   await fs.writeFile(path.join(root, 'start.tale'), '=== start\nHello.\n-> END\n');
   assert.equal((await run('validateStory')).code, 0, 'Valid story must return CLI success');
+  const player = await run('runStory', true);
+  assert.notEqual(player.code, 0, 'Task cancellation must not report player success');
   const debug = await run('openAuthorDebugger', true);
   assert.notEqual(debug.code, 0, 'Task cancellation must not report debugger success');
-  console.log('Installed CLI action smoke passed: real validation success/failure, visible debugger task and termination.');
+  console.log('Installed CLI action smoke passed: validation success/failure, player/debugger tasks and process-tree cancellation.');
 }
 
 async function bundledServerProcesses(extension) {

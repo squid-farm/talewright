@@ -33,6 +33,7 @@
       { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
       { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
       { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" },
+      { "command": "talewright.runStory", "title": "Talewright: Run Story" },
       { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" },
       { "command": "talewright.togglePreviewHints", "title": "Talewright: Toggle Substitution Preview Hints" }
     ],
@@ -40,7 +41,7 @@
       "type": "talewright",
       "required": ["command", "story"],
       "properties": {
-        "command": { "type": "string", "enum": ["debug"], "description": "Open the native Author Debugger; not a VS Code debug adapter." },
+        "command": { "type": "string", "enum": ["debug", "run"], "description": "Open the native Author Debugger or play the story in the normal player." },
         "story": { "type": "string", "description": "Canonical story-root path within an open workspace folder. Relative paths in workspace-scoped tasks must identify exactly one story across the open folders." }
       }
     }],
