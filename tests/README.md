@@ -720,7 +720,8 @@ It uses `/usr/bin/python3` so a Python virtualenv does not hide the distro's GI/
 Each case generates its own ZIP bytes or CLI directory directly from the C# fixtures, starts a fresh
 Photino process through a JSON-lines adapter, and removes its temporary story files on disposal.
 Tests locate controls by accessible roles/names and activate actions or actual keyboard events; no OCR or
-coordinate-based clicking is used. Archive selection invokes the GTK location entry's own accessible
+coordinate-based clicking is used. Button activation waits for the AT-SPI enabled and sensitive states,
+not just presence in the accessibility tree. Archive selection invokes the GTK location entry's own accessible
 activation action (rather than sending Enter to the globally focused window) and waits
 for the chooser to close; accepting an AT-SPI action alone does not mean GTK opened the selected file.
 All native cases run serially. App logs, accessibility-tree dumps,

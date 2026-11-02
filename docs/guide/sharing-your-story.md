@@ -29,7 +29,7 @@ Every `publish` checks your story first and stops if there are errors.
 |---|---|---|
 | Send the story to someone who already has a Talewright player | A story file | The [web player](https://play.trytalewright.com/) or any Talewright player |
 | Put a playable game on the web or itch.io | A web game | A web browser |
-| Give players a downloadable app | A desktop game | Nothing on macOS. WebView2 on Windows (built into Windows 11 and up-to-date Windows 10). WebKitGTK 4.1 on Linux. |
+| Give players a downloadable app | A desktop game | Nothing on macOS. WebView2 on Windows (built into Windows 11 and up-to-date Windows 10). WebKitGTK 4.1 and libnotify on Linux. |
 
 ## A story file
 
@@ -109,6 +109,12 @@ zip** and run:
 
 The `story/` folder is shared by all six versions of the app. Keep it beside the platform
 folders and launchers; do not extract just the executable.
+
+The game includes its .NET runtime, so players do not need to install .NET. Linux players do need
+system WebKitGTK 4.1 and libnotify; share the
+[Linux desktop setup commands](getting-started.md#linux-desktop-setup) with them. Published games
+do not currently check for these libraries before launch. A published web game is a browser-based
+alternative without those desktop dependencies.
 
 Like a web game, the published app stays in your story and does not expose Library
 navigation. The general-purpose desktop player still has a library by default;

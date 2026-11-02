@@ -82,7 +82,15 @@ class Desktop:
                      and (pattern is None or re.fullmatch(pattern, normalized(node.name)))), None)
 
     def click(self, **query):
-        node = self.wait(lambda: self.find(**query), f"activate {query}")
+        def enabled():
+            node = self.find(**query)
+            if node is None:
+                return None
+            state = node.getState()
+            return node if (state.contains(pyatspi.STATE_ENABLED)
+                            and state.contains(pyatspi.STATE_SENSITIVE)) else None
+
+        node = self.wait(enabled, f"enabled activation target {query}")
         actions = node.queryAction()
         if actions.nActions == 0 or not actions.doAction(0):
             raise RuntimeError(f"Control does not support activation: {query}")
