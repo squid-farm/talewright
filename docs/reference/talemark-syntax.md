@@ -529,9 +529,10 @@ braces in it are filename characters, not substitutions. Alt text is optional:
 `{image("maps/old_map-v2")}`.
 
 Inside either argument, `\"` means a quote and `\\` means a backslash. Any other backslash escape
-in the path is an error. In alt text, `\{` and `\}` are literal braces; any other backslash escape
-is still an error. Apostrophes, commas, parentheses and brackets are literal within the quotes.
-Whitespace is allowed around `image`, parentheses and arguments.
+in the path is an error. Alt text also accepts the reader-text escapes `\{`, `\}`, `\[`, `\]`,
+`\*`, `\_` and `` \` ``; any other backslash escape is an error. Apostrophes, commas, parentheses
+and brackets are literal within the quotes. Whitespace is allowed around `image`, parentheses and
+arguments.
 
 Alt text uses the same template language as prose, rendered with the state where the image appears:
 

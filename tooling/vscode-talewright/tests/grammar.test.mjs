@@ -172,6 +172,12 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
   assert.ok(!tokens('**a*b** after').tokens.some(token => token.scopes.includes('markup.italic.markdown')), 'unmatched * inside strong stays literal');
   hasScope('**bold *italic* bold**', 'italic', 'markup.italic.markdown');
   hasScope('**bold *italic* bold**', 'bold', 'markup.bold.markdown');
+  hasScope('*(door)*', '(door)', 'markup.italic.markdown');
+  hasScope('*door!*', 'door!', 'markup.italic.markdown');
+  hasScope('_(door)_', '(door)', 'markup.italic.markdown');
+  hasScope('_door!_', 'door!', 'markup.italic.markdown');
+  hasScope('**(door)**', '(door)', 'markup.bold.markdown');
+  hasScope('__door!__', 'door!', 'markup.bold.markdown');
   hasScope('Use ``a`b`` here.', 'a`b', 'markup.inline.raw.string.markdown');
   hasScope(String.raw`\*literal\*`, String.raw`\*`, 'constant.character.escape.tale');
   hasScope('![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale');

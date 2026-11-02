@@ -608,8 +608,8 @@ internal static class InlineParser
             if (token.Kind != TokenKind.FormatDelimiter || token.InCode) continue;
             var delimiter = text[token.Start];
             var kind = (delimiter == '_' ? 2 : 0) + token.RunLength - 1;
-            token.CanOpen = !IsWordLikeBefore(tokens, index) && IsWordLikeAfter(tokens, index);
-            token.CanClose = IsWordLikeBefore(tokens, index) && !IsWordLikeAfter(tokens, index);
+            token.CanOpen = !IsWordLikeBefore(tokens, index) && IsNonWhitespaceNonBoundaryAfter(tokens, index);
+            token.CanClose = IsNonWhitespaceNonBoundaryBefore(tokens, index) && !IsWordLikeAfter(tokens, index);
 
             if (token.CanClose && topOfKind[kind] >= 0)
             {
@@ -679,6 +679,51 @@ internal static class InlineParser
             TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
             _ => false,
         };
+    }
+
+    private static bool IsNonWhitespaceNonBoundaryBefore(IReadOnlyList<Token> tokens, int index)
+    {
+        if (index == 0) return false;
+        var previous = tokens[index - 1];
+        return previous.Kind switch
+        {
+            TokenKind.Text => EndsWithNonWhitespaceCharacter(previous.Text!),
+            TokenKind.Construct => previous.Piece is InlinePiece,
+            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            _ => false,
+        };
+    }
+
+    private static bool IsNonWhitespaceNonBoundaryAfter(IReadOnlyList<Token> tokens, int index)
+    {
+        if (index + 1 >= tokens.Count) return false;
+        var next = tokens[index + 1];
+        return next.Kind switch
+        {
+            TokenKind.Text => StartsWithNonWhitespaceCharacter(next.Text!),
+            TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
+            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            _ => false,
+        };
+    }
+
+    private static bool StartsWithNonWhitespaceCharacter(string text)
+    {
+        if (text.Length == 0) return false;
+        if (text.Length > 1 && char.IsHighSurrogate(text[0]) && char.IsLowSurrogate(text[1]) &&
+            Rune.TryCreate(text[0], text[1], out var rune))
+            return !Rune.IsWhiteSpace(rune);
+        return !char.IsWhiteSpace(text[0]);
+    }
+
+    private static bool EndsWithNonWhitespaceCharacter(string text)
+    {
+        if (text.Length == 0) return false;
+        var last = text[^1];
+        if (char.IsLowSurrogate(last) && text.Length > 1 && char.IsHighSurrogate(text[^2]) &&
+            Rune.TryCreate(text[^2], last, out var rune))
+            return !Rune.IsWhiteSpace(rune);
+        return !char.IsWhiteSpace(last);
     }
 
     private static bool StartsWithWordCharacter(string text)
