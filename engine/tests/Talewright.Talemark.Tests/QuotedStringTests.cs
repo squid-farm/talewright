@@ -79,6 +79,15 @@ public class QuotedStringTests
             diagnostic.Location.Line == 2 && diagnostic.Location.Column == line.IndexOf('\\') + 1);
     }
 
+    [Fact]
+    public void Invalid_escape_diagnostic_names_valid_spellings()
+    {
+        var result = Compile("""~ var:word = "bad\q" """ + "\n-> END");
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW1001");
+
+        Assert.Equal("""Unknown string escape. Use '\"' for a quote or '\\' for a backslash.""", error.Message);
+    }
+
     [Theory]
     [InlineData("~ var:word = \"unfinished")]
     [InlineData("{\"unfinished}")]

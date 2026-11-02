@@ -52,21 +52,21 @@ internal static class ChoiceSyntax
             checkpoint?.Check();
             work++;
             var current = text[index];
-            if (inUnclosedEffect && current == '"')
+            if (inUnclosedEffect && current == TextVocabulary.QuoteMark)
             {
                 if (!TryGetClose(index, out var quoteEnd))
                     return Ambiguous();
                 index = quoteEnd;
                 continue;
             }
-            if (!inUnclosedEffect && current == '\\' && index + 1 < text.Length &&
+            if (!inUnclosedEffect && current == TextVocabulary.EscapeMark && index + 1 < text.Length &&
                 DelimiterScanner.IsReaderTextEscape(text[index + 1]))
             {
                 index++;
                 work++;
                 continue;
             }
-            if (!inUnclosedEffect && current == '"')
+            if (!inUnclosedEffect && current == SceneVocabulary.ChoiceProseQuote)
             {
                 inProseQuote = !inProseQuote;
                 continue;
@@ -177,7 +177,7 @@ internal static class ChoiceSyntax
                 current == ExpressionVocabulary.OpenParen &&
                 TryReadSpacedRequires(text, index, cancellationToken, out _))
                 return index;
-            if (current is '"' or ExpressionVocabulary.OpenParen or SceneVocabulary.OpenBracket)
+            if (current is TextVocabulary.QuoteMark or ExpressionVocabulary.OpenParen or SceneVocabulary.OpenBracket)
             {
                 if (!scan.TryGetClose(scanOffset + index, out var close))
                     return -1;
@@ -236,7 +236,7 @@ internal static class ChoiceSyntax
         {
             checkpoint?.Check();
             work++;
-            if (text[index] == '"')
+            if (text[index] == TextVocabulary.QuoteMark)
             {
                 if (!scan.TryGetClose(index, out var quoteEnd) || quoteEnd >= end)
                     return false;

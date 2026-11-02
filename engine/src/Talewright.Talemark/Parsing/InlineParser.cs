@@ -258,7 +258,7 @@ internal static class InlineParser
             }
 
             var current = text[index];
-            if (current == '\\' && index + 1 < text.Length)
+            if (current == TextVocabulary.EscapeMark && index + 1 < text.Length)
             {
                 var next = text[index + 1];
                 if (DelimiterScanner.IsReaderTextEscape(next))
@@ -442,7 +442,8 @@ internal static class InlineParser
             ExpressionParser.ReportStringErrors(expressionTokens, offset => context.Source.Locate(errorStart + offset),
                 context.Diagnostics);
         context.Diagnostics.Error(CompilerDiagnosticCodes.UnclosedInlineConstruct,
-            $"Unclosed '{SceneVocabulary.InlineOpen}'. Use '\\{SceneVocabulary.InlineOpen}' for a literal brace.",
+            $"Unclosed '{SceneVocabulary.InlineOpen}'. Use " +
+            $"'{TextVocabulary.EscapeMark}{SceneVocabulary.InlineOpen}' for a literal brace.",
             context.Source.Locate(open));
     }
 
@@ -532,7 +533,7 @@ internal static class InlineParser
         {
             context.Check();
             var c = text[cursor];
-            if (c is '\\' or SceneVocabulary.OpenBracket or SceneVocabulary.InlineOpen or
+            if (c is SceneVocabulary.LegacyImageEscape or SceneVocabulary.OpenBracket or SceneVocabulary.InlineOpen or
                 SceneVocabulary.InlineClose or '\r' or '\n')
                 return false;
             cursor++;
@@ -548,8 +549,9 @@ internal static class InlineParser
             context.Check();
             var c = text[cursor];
             if (char.IsWhiteSpace(c) ||
-                c is ExpressionVocabulary.OpenParen or '\\' or '"' or SceneVocabulary.InlineOpen or
-                    SceneVocabulary.InlineClose or '\r' or '\n')
+                c is ExpressionVocabulary.OpenParen or SceneVocabulary.LegacyImageEscape or
+                    SceneVocabulary.LegacyImageQuote or SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
+                    '\r' or '\n')
                 return false;
             cursor++;
         }

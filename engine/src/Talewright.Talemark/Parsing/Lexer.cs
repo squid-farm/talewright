@@ -137,7 +137,7 @@ internal static class Lexer
                 continue;
             }
 
-            if (c == QuotedStringSyntax.QuoteMark)
+            if (c == TextVocabulary.QuoteMark)
             {
                 var literal = QuotedStringSyntax.Scan(text, i, text.Length);
                 tokens.Add(literal.Error is { } error

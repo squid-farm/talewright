@@ -59,6 +59,10 @@ public static class SceneVocabulary
     internal const char OpenBracket = '[';
     internal const char CloseBracket = ']';
     internal const char LegacyImageMarker = '!';
+    // Prose and legacy Markdown are distinct from Talemark quoted-string syntax.
+    internal const char ChoiceProseQuote = '"';
+    internal const char LegacyImageEscape = '\\';
+    internal const char LegacyImageQuote = '"';
     internal const char EmphasisMarker = '_';
     internal const char CodeMarker = '`';
 

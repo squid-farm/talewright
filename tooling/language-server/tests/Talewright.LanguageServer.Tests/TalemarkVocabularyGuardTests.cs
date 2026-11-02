@@ -65,7 +65,8 @@ public sealed class TalemarkVocabularyGuardTests
     public void Production_code_uses_vocabulary_names_instead_of_grammar_spellings()
     {
         var root = RepositoryRoot();
-        var (words, punctuation, lineMarkers) = Spellings();
+        var spellings = Spellings();
+        var (words, punctuation, lineMarkers) = spellings;
         Assert.Contains("and", words);
         Assert.Contains("+=", words);
         Assert.Contains("var:", words);
@@ -74,6 +75,8 @@ public sealed class TalemarkVocabularyGuardTests
         Assert.Contains("(requires:", words);
         Assert.Contains("skill-check", words);
         Assert.Contains("#", punctuation);
+        Assert.Contains("\\", punctuation);
+        Assert.Contains("\"", punctuation);
         Assert.Contains("@", lineMarkers);
         Assert.Contains("{", lineMarkers);
         Assert.Contains("}", lineMarkers);
@@ -82,6 +85,8 @@ public sealed class TalemarkVocabularyGuardTests
         Assert.Contains("!", lineMarkers);
         Assert.Contains("_", lineMarkers);
         Assert.Contains("`", lineMarkers);
+        Assert.Contains("\\", lineMarkers);
+        Assert.Contains("\"", lineMarkers);
 
         var expressionFiles = ExpressionFiles.Select(path => Path.Combine(root, path)).ToHashSet(StringComparer.Ordinal);
         var lineMarkerFiles = LineMarkerFiles.Select(path => Path.Combine(root, path)).ToHashSet(StringComparer.Ordinal);
@@ -96,8 +101,7 @@ public sealed class TalemarkVocabularyGuardTests
             var checkLineMarker = lineMarkerFiles.Contains(path);
             foreach (var (line, value) in Literals(File.ReadAllText(path)))
             {
-                if (!words.Contains(value) && !(checkPunctuation && punctuation.Contains(value)) &&
-                    !(checkLineMarker && lineMarkers.Contains(value))) continue;
+                if (!IsGuardedLiteral(value, spellings, checkPunctuation, checkLineMarker)) continue;
                 if (PendingFiles.ContainsKey(relative))
                 {
                     pendingWithHits.Add(relative);
@@ -131,6 +135,30 @@ public sealed class TalemarkVocabularyGuardTests
             Literals(source));
     }
 
+    [Theory]
+    [InlineData("""var character = '\\'; var text = "\\"; var unicode = "\u005c";""", "\\")]
+    [InlineData("""var character = '"'; var text = "\""; var unicode = "\u0022";""", "\"")]
+    public void Text_delimiter_literals_are_guarded_in_talemark_syntax_files(string source, string spelling)
+    {
+        var literals = Literals(source);
+        var spellings = Spellings();
+        Assert.Equal(3, literals.Count);
+        Assert.All(literals, literal =>
+        {
+            Assert.Equal(spelling, literal.Value);
+            Assert.True(IsGuardedLiteral(literal.Value, spellings, checkPunctuation: true, checkLineMarker: false));
+            Assert.True(IsGuardedLiteral(literal.Value, spellings, checkPunctuation: false, checkLineMarker: true));
+            Assert.False(IsGuardedLiteral(literal.Value, spellings, checkPunctuation: false, checkLineMarker: false));
+        });
+    }
+
+    private static bool IsGuardedLiteral(string value,
+        (HashSet<string> Words, HashSet<string> Punctuation, HashSet<string> LineMarkers) spellings,
+        bool checkPunctuation, bool checkLineMarker) =>
+        spellings.Words.Contains(value) ||
+        (checkPunctuation && spellings.Punctuation.Contains(value)) ||
+        (checkLineMarker && spellings.LineMarkers.Contains(value));
+
     private static (HashSet<string> Words, HashSet<string> Punctuation, HashSet<string> LineMarkers) Spellings()
     {
         var vocabularyTypes = typeof(StoryCompiler).Assembly.GetTypes()
@@ -143,7 +171,7 @@ public sealed class TalemarkVocabularyGuardTests
             .OfType<string>()
             .ToArray();
         var lineMarkers = vocabularyTypes
-            .Where(type => type.Name == "SceneVocabulary")
+            .Where(type => type.Name is "SceneVocabulary" or "TextVocabulary")
             .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
             .Where(field => field.IsLiteral && field.FieldType == typeof(char))
             .Select(field => ((char)field.GetRawConstantValue()!).ToString())

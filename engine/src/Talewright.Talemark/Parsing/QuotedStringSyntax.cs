@@ -1,13 +1,13 @@
 using System.Text;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
 internal static class QuotedStringSyntax
 {
-    internal const char QuoteMark = '"';
-    internal const char EscapeMark = '\\';
-
-    internal const string InvalidEscape = "Unknown string escape. Use '\\\"' for a quote or '\\\\' for a backslash.";
+    internal static readonly string InvalidEscape =
+        $"Unknown string escape. Use '{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}' for a quote or " +
+        $"'{TextVocabulary.EscapeMark}{TextVocabulary.EscapeMark}' for a backslash.";
     internal const string Unterminated = "The string is missing its closing double quote.";
 
     internal readonly record struct Result(string Value, int End, bool Closed, string? Error, int ErrorOffset);
@@ -51,7 +51,8 @@ internal static class QuotedStringSyntax
             if (unit.ClosingQuote) return new(i, true, error, errorOffset, workUnits);
             if (unit.Escaped)
             {
-                if (unit.End == unit.Start + 1 || unit.Character is not (QuoteMark or EscapeMark))
+                if (unit.End == unit.Start + 1 ||
+                    unit.Character is not (TextVocabulary.QuoteMark or TextVocabulary.EscapeMark))
                 {
                     if (error is null)
                     {
@@ -69,9 +70,9 @@ internal static class QuotedStringSyntax
     internal static Unit ReadUnit(string text, int start, int end)
     {
         var character = text[start];
-        if (character == QuoteMark)
+        if (character == TextVocabulary.QuoteMark)
             return new(character, start, start + 1, false, true);
-        if (character == EscapeMark)
+        if (character == TextVocabulary.EscapeMark)
         {
             if (start + 1 < end)
                 return new(text[start + 1], start, start + 2, true, false);
@@ -82,6 +83,8 @@ internal static class QuotedStringSyntax
     }
 
     internal static string Quote(string text) =>
-        QuoteMark + text.Replace(EscapeMark.ToString(), $"{EscapeMark}{EscapeMark}")
-            .Replace(QuoteMark.ToString(), $"{EscapeMark}{QuoteMark}") + QuoteMark;
+        TextVocabulary.QuoteMark + text.Replace(TextVocabulary.EscapeMark.ToString(),
+                $"{TextVocabulary.EscapeMark}{TextVocabulary.EscapeMark}")
+            .Replace(TextVocabulary.QuoteMark.ToString(),
+                $"{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}") + TextVocabulary.QuoteMark;
 }

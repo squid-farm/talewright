@@ -85,7 +85,7 @@ internal static class ImageSyntax
         bool ReadString(out string value)
         {
             value = "";
-            if (i >= end || text[i] != QuotedStringSyntax.QuoteMark)
+            if (i >= end || text[i] != TextVocabulary.QuoteMark)
             {
                 Error("Image arguments must be in double quotes. Write {image(\"path\", \"alt text\")}.", i);
                 return false;
@@ -98,7 +98,9 @@ internal static class ImageSyntax
             i = literal.End;
             if (literal.Error == QuotedStringSyntax.InvalidEscape)
             {
-                Error("Unknown image string escape. Use '\\\"' for a quote or '\\\\' for a backslash.", literal.ErrorOffset);
+                Error($"Unknown image string escape. Use '{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}' " +
+                    $"for a quote or '{TextVocabulary.EscapeMark}{TextVocabulary.EscapeMark}' for a backslash.",
+                    literal.ErrorOffset);
                 return false;
             }
 
@@ -119,7 +121,7 @@ internal static class ImageSyntax
         {
             decoded = "";
             template = null;
-            if (i >= end || text[i] != QuotedStringSyntax.QuoteMark)
+            if (i >= end || text[i] != TextVocabulary.QuoteMark)
             {
                 Error("Image arguments must be in double quotes. Write {image(\"path\", \"alt text\")}.", i);
                 return false;
@@ -155,16 +157,19 @@ internal static class ImageSyntax
                 if (unit.Escaped)
                 {
                     if (unit.End == i + 1 ||
-                        (unit.Character != QuotedStringSyntax.QuoteMark && !DelimiterScanner.IsReaderTextEscape(unit.Character)))
+                        (unit.Character != TextVocabulary.QuoteMark && !DelimiterScanner.IsReaderTextEscape(unit.Character)))
                     {
                         AnalyzePartial(trimTrailingCall: false);
-                        Error("Unknown image string escape. Use '\\\"', '\\\\', or a reader-text escape such as '\\{' or '\\*'.", i);
+                        Error($"Unknown image string escape. Use '{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}', " +
+                            $"'{TextVocabulary.EscapeMark}{TextVocabulary.EscapeMark}', or a reader-text escape such as " +
+                            $"'{TextVocabulary.EscapeMark}{SceneVocabulary.InlineOpen}' or " +
+                            $"'{TextVocabulary.EscapeMark}{SceneVocabulary.ChoiceMarker}'.", i);
                         return false;
                     }
 
                     var next = unit.Character;
                     i = unit.End;
-                    if (next is QuotedStringSyntax.QuoteMark or QuotedStringSyntax.EscapeMark)
+                    if (next is TextVocabulary.QuoteMark or TextVocabulary.EscapeMark)
                     {
                         templateText.Append(next);
                         plain.Append(next);
@@ -172,7 +177,7 @@ internal static class ImageSyntax
                     }
                     else
                     {
-                        templateText.Append('\\').Append(next);
+                        templateText.Append(TextVocabulary.EscapeMark).Append(next);
                         plain.Append(next);
                         locations.Add(source.Locate(i - 2));
                         locations.Add(source.Locate(i - 1));
@@ -236,7 +241,7 @@ internal static class ImageSyntax
                 cancellationToken.ThrowIfCancellationRequested();
                 nextCancellationCheck = i + Math.Min(1024, text.Length - i);
             }
-            if (text[i] == '\\' && i + 1 < text.Length &&
+            if (text[i] == TextVocabulary.EscapeMark && i + 1 < text.Length &&
                 DelimiterScanner.IsReaderTextEscape(text[i + 1]))
             {
                 i++;

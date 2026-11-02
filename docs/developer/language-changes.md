@@ -53,10 +53,11 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 
 Each Talemark spelling lives once, in [`Talewright.Talemark.Vocabulary`](../../engine/src/Talewright.Talemark/Vocabulary/).
 That includes expression keywords, reference namespaces, properties, operators, scene and choice markers, inline conditions,
-skill-check terms, scene metadata keys and the `END` target.
+skill-check terms, scene metadata keys, text escape and quote markers, and the `END` target.
 The parser turns text into a typed value at the boundary, such as `BinaryOp`, `AssignOp`, `ReferenceNamespace`,
 `PronounForm` or `SceneMetadataKey`.
 Keep vocabulary members internal by default; expose only the spellings that another assembly's tooling must consume.
+Identical characters in unrelated syntaxes, such as Talemark escapes and legacy Markdown, retain separate semantic owners.
 After that:
 
 - Binding and analysis switch on the typed value.
@@ -75,7 +76,7 @@ Two tests enforce this:
 
 - [TalemarkVocabularyGuardTests](../../tooling/language-server/tests/Talewright.LanguageServer.Tests/TalemarkVocabularyGuardTests.cs) fails on any string or character literal whose decoded value, as Roslyn reads it, equals a vocabulary spelling.
   - It covers the Talemark, authoring and language-server sources.
-  - Expression punctuation is checked in the expression-language files it lists; reader-text delimiters and single-character line markers are checked only in their parser files.
+  - Expression punctuation is checked in the expression-language files it lists; reader-text delimiters, escape and quote markers, and single-character line markers are checked only in their parser files.
   - Remaining exemptions name the issue that removes them.
 - [ExpressionVocabularyTests](../../engine/tests/Talewright.Talemark.Tests/ExpressionVocabularyTests.cs) checks that every typed expression value has a spelling that maps back, and every lexer symbol produces its declared token. Scene metadata uses an exhaustive `SceneMetadataKey` mapping.
 

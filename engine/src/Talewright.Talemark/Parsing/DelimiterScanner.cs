@@ -142,7 +142,7 @@ internal static class DelimiterScanner
             workUnits++;
             var current = text[offset];
 
-            if (UsesQuotedStrings(mode, braceDepth) && current == '"')
+            if (UsesQuotedStrings(mode, braceDepth) && current == TextVocabulary.QuoteMark)
             {
                 var literal = QuotedStringSyntax.Scan(text, offset, text.Length, cancellationToken: cancellationToken,
                     checkpoint: checkpoint);
@@ -252,7 +252,7 @@ internal static class DelimiterScanner
 
     private static bool IsEscapedInMode(string text, int offset, DelimiterScanMode mode, int braceDepth)
     {
-        if (text[offset] != '\\' || offset + 1 >= text.Length)
+        if (text[offset] != TextVocabulary.EscapeMark || offset + 1 >= text.Length)
         {
             return false;
         }
@@ -267,7 +267,7 @@ internal static class DelimiterScanner
     }
 
     internal static bool IsReaderTextEscape(char character) =>
-        character is '\\' or SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
+        character is TextVocabulary.EscapeMark or SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
             SceneVocabulary.OpenBracket or SceneVocabulary.CloseBracket or SceneVocabulary.ChoiceMarker or
             SceneVocabulary.EmphasisMarker or SceneVocabulary.CodeMarker;
 
