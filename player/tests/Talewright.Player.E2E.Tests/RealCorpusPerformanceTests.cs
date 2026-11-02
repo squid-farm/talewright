@@ -82,7 +82,10 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
         await Microsoft.Playwright.Assertions.Expect(SaveStatus)
             .ToHaveTextAsync($"Loaded '{slot}'.", new() { Timeout = 180_000 });
         await Microsoft.Playwright.Assertions.Expect(Page.Locator(".tw-frame"))
-            .ToHaveCountAsync(tier.HistoryDepth + 1, new() { Timeout = 180_000 });
+            .ToHaveCountAsync(Math.Min(tier.HistoryDepth + 1, 21), new() { Timeout = 180_000 });
+        await Microsoft.Playwright.Assertions.Expect(Latest)
+            .ToContainTextAsync($"Passage for Tester; visit {2 * tier.HistoryDepth + 1}.",
+                new() { Timeout = 180_000 });
         restoreTimer.Stop();
 
         var longTasks = await Page.EvaluateAsync<double[]>("() => window.__talewrightLongTasks ?? []");
@@ -90,6 +93,16 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
         var userAgent = await Page.EvaluateAsync<string>("() => navigator.userAgent");
         var browserResources = await Page.EvaluateAsync<JsonElement>(
             "() => ({ hardwareConcurrency: navigator.hardwareConcurrency, deviceMemoryGB: navigator.deviceMemory ?? null })");
+
+        await Driver.ClickAsync("Back");
+        await Microsoft.Playwright.Assertions.Expect(Latest)
+            .ToContainTextAsync($"Passage for Tester; visit {2 * (tier.HistoryDepth - 1) + 1}.",
+                new() { Timeout = 180_000 });
+        await Driver.ClickAsync("Forward");
+        await Microsoft.Playwright.Assertions.Expect(Latest)
+            .ToContainTextAsync($"Passage for Tester; visit {2 * tier.HistoryDepth + 1}.",
+                new() { Timeout = 180_000 });
+
         _output.WriteLine(JsonSerializer.Serialize(new
         {
             host = "browser",

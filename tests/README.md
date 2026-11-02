@@ -409,7 +409,9 @@ python3 player/tests/run_e2e.py linux --filter 'FullyQualifiedName~RealCorpusNat
 ```
 
 Browser integration records archive upload through first playable passage, a choice,
-IndexedDB write/restore, browser identity and main-thread long tasks. The Linux
+IndexedDB write/restore, browser identity and main-thread long tasks. Restore checks
+the bounded 21-passage play window and the full history's current passage.
+Back/Forward verification runs after the restore timer stops. The Linux
 Photino case records fresh application open through first playable passage and a
 choice. These are single end-to-end observations, not percentiles. The scheduled
 workflow separately times real CLI web, single-RID desktop and universal desktop
