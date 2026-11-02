@@ -174,7 +174,10 @@ parentheses, unary prefixes, unmatched emphasis, unclosed links, plain choices,
 choices with requirements and effects, broken choice lines, and one unclosed
 choice label of the requested length at 1, 5, 10, 20, 50, 100, 500 and 1,000
 elements. Broken choice lines must report one TW1011 per line, and the unclosed
-label must report one TW1011. Sizes past a nesting limit must recover with exactly one
+label must report one TW1011. At 1,000 lines and above, broken choice lines also
+fail if any measured analysis allocation exceeds 150 bytes per source byte, which
+keeps recovery well below the cost of analyzing the valid choice it approximates.
+Sizes past a nesting limit must recover with exactly one
 TW1016 and no other error. The opt-in
 extension adds 10,000 for each shape. A process-isolated language-server test
 compiles and analyzes the 10,000-level nested-condition, parenthesis and

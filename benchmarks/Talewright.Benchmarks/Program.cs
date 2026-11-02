@@ -158,8 +158,10 @@ void MeasureSlowShape(SlowInputShape shape, string name)
             SlowInputShape.UnclosedChoiceLabel => 1,
             _ => 0,
         };
-        MeasureAnalysis($"Slow {name} {size}", source, 1, expectedNestingDiagnostic: size > nestingLimit,
-            expectedChoiceErrors: expectedChoiceErrors);
+        // Broken lines must stay well below the cost of analysing the valid choice they approximate.
+        double? allocationCeiling = shape == SlowInputShape.BrokenChoiceLines && size >= 1_000 ? 150 : null;
+        MeasureAnalysis($"Slow {name} {size}", source, 1, allocationCeiling: allocationCeiling,
+            expectedNestingDiagnostic: size > nestingLimit, expectedChoiceErrors: expectedChoiceErrors);
     }
 }
 

@@ -57,6 +57,23 @@ public sealed class ChoiceDiagnosticsTests
         Assert.Equal("player:first-name", Slice(source, expression.Range));
     }
 
+    [Theory]
+    [InlineData("* [Hello {player:first-name} (requires: flag:ready) { set flag:weapon.known } -> END")]
+    [InlineData("* [Hello {player:first-name} -> END { set flag:weapon.known }")]
+    [InlineData("* [Hello {player:first-name} { set flag:weapon.known } (requires: flag:ready)")]
+    [InlineData("* [Hello {player:first-name} -> second { set flag:weapon.")]
+    public void Ambiguous_missing_bracket_analysis_stops_at_the_first_clause(string line)
+    {
+        var source = Source("=== start\n" + line);
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+        Assert.DoesNotContain("Place ']'", Assert.Single(analysis.Diagnostics).Message);
+        var expression = Assert.Single(analysis.Expressions);
+        Assert.Equal(ExpressionContextKind.Substitution, expression.Kind);
+        Assert.Equal("player:first-name", Slice(source, expression.Range));
+    }
+
     [Fact]
     public void Unclosed_label_substitution_is_analyzed_without_a_published_brace_error()
     {

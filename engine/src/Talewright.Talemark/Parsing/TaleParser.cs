@@ -623,7 +623,8 @@ internal sealed partial class TaleParser
                     var hint = ChoiceSyntax.FindMissingBracketHint(rest, pos, labelScan, _cancellationToken);
                     if (_symbols.Analysis is not null)
                     {
-                        var end = hint.Offset >= 0 ? hint.Offset : rest.Length;
+                        // Clauses after the label are not reader text, so they must not be analysed as substitutions.
+                        var end = hint.LabelEnd;
                         if (unclosedImage)
                             end = Math.Min(end, unclosedBrace);
                         var partial = rest[(pos + 1)..end];

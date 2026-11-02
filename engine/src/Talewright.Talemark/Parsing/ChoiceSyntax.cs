@@ -1,6 +1,10 @@
 namespace Talewright.Talemark.Parsing;
 
-internal readonly record struct ChoiceLabelHint(string? Marker, int Offset, int WorkUnits);
+/// <param name="Marker">The clause marker to suggest placing <c>]</c> before, when exactly one is plausible.</param>
+/// <param name="Offset">Offset of <paramref name="Marker"/>, or -1.</param>
+/// <param name="WorkUnits">Characters examined, for linear-time tests.</param>
+/// <param name="LabelEnd">Where the intended label most likely ends: the first clause-like marker, or the end of the text.</param>
+internal readonly record struct ChoiceLabelHint(string? Marker, int Offset, int WorkUnits, int LabelEnd);
 
 internal static class ChoiceSyntax
 {
@@ -25,7 +29,7 @@ internal static class ChoiceSyntax
             if (inUnclosedEffect && current == '"')
             {
                 if (!scan.TryGetClose(index, out var quoteEnd))
-                    return new(null, -1, work);
+                    return Ambiguous();
                 index = quoteEnd;
                 continue;
             }
@@ -47,7 +51,7 @@ internal static class ChoiceSyntax
             if (current == '[')
             {
                 if (!scan.TryGetClose(index, out var bracketEnd))
-                    return new(null, -1, work);
+                    return Ambiguous();
                 index = bracketEnd;
                 continue;
             }
@@ -64,7 +68,7 @@ internal static class ChoiceSyntax
                 }
                 else if (!closed)
                 {
-                    return new(null, -1, work);
+                    return Ambiguous();
                 }
 
                 if (closed)
@@ -88,13 +92,15 @@ internal static class ChoiceSyntax
             if (marker is null)
                 continue;
             if (candidate is not null)
-                return new(null, -1, work);
+                return Ambiguous();
             candidate = marker;
             candidateOffset = markerOffset;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new(candidate, candidateOffset, work);
+        return new(candidate, candidateOffset, work, candidate is null ? text.Length : candidateOffset);
+
+        ChoiceLabelHint Ambiguous() => new(null, -1, work, candidate is null ? text.Length : candidateOffset);
     }
 
     public static bool TryReadSpacedRequires(string text, int open, CancellationToken cancellationToken,

@@ -29,42 +29,80 @@ internal readonly record struct DelimiterIssue(DelimiterKind Kind, int Offset, D
 
 internal sealed class DelimiterScanResult
 {
-    private readonly Dictionary<int, int> _closingOffsets;
-    private readonly Dictionary<int, int> _openingOffsets;
+    private readonly DelimiterPair[] _pairs;
+    private readonly List<DelimiterIssue>? _issues;
 
-    public DelimiterScanResult(IReadOnlyList<DelimiterPair> pairs, IReadOnlyList<DelimiterIssue> issues,
-        int workUnits, CancellationCheckpoint? checkpoint)
+    /// <param name="pairs">Matched pairs ordered by <see cref="DelimiterPair.OpenOffset"/>.</param>
+    /// <param name="issues">Unmatched or mismatched delimiters.</param>
+    /// <param name="workUnits">Characters and stack operations examined, for linear-time tests.</param>
+    public DelimiterScanResult(DelimiterPair[] pairs, List<DelimiterIssue>? issues, int workUnits)
     {
-        _closingOffsets = new(pairs.Count);
-        _openingOffsets = new(pairs.Count);
-        foreach (var pair in pairs)
-        {
-            checkpoint?.Check();
-            _closingOffsets.Add(pair.OpenOffset, pair.CloseOffset);
-            _openingOffsets.Add(pair.CloseOffset, pair.OpenOffset);
-        }
-
-        Pairs = pairs;
-        Issues = issues;
+        _pairs = pairs;
+        _issues = issues;
         WorkUnits = workUnits;
     }
 
-    public IReadOnlyList<DelimiterPair> Pairs { get; }
+    /// <summary>Matched pairs ordered by opening offset.</summary>
+    public IReadOnlyList<DelimiterPair> Pairs => _pairs;
 
-    public IReadOnlyList<DelimiterIssue> Issues { get; }
+    public IReadOnlyList<DelimiterIssue> Issues => _issues is null ? [] : _issues;
 
     public int WorkUnits { get; }
 
-    public bool TryGetClose(int openOffset, out int closeOffset) =>
-        _closingOffsets.TryGetValue(openOffset, out closeOffset);
+    public bool TryGetClose(int openOffset, out int closeOffset)
+    {
+        var low = 0;
+        var high = _pairs.Length - 1;
+        while (low <= high)
+        {
+            var middle = low + ((high - low) >> 1);
+            var candidate = _pairs[middle].OpenOffset;
+            if (candidate == openOffset)
+            {
+                closeOffset = _pairs[middle].CloseOffset;
+                return true;
+            }
+            if (candidate < openOffset)
+                low = middle + 1;
+            else
+                high = middle - 1;
+        }
 
-    public bool TryGetOpen(int closeOffset, out int openOffset) =>
-        _openingOffsets.TryGetValue(closeOffset, out openOffset);
+        closeOffset = -1;
+        return false;
+    }
+
+    /// <remarks>Linear in the number of pairs; parsing paths should look up by opening offset instead.</remarks>
+    public bool TryGetOpen(int closeOffset, out int openOffset)
+    {
+        foreach (var pair in _pairs)
+        {
+            if (pair.CloseOffset == closeOffset)
+            {
+                openOffset = pair.OpenOffset;
+                return true;
+            }
+        }
+
+        openOffset = -1;
+        return false;
+    }
 }
 
 internal static class DelimiterScanner
 {
-    private readonly record struct OpenDelimiter(DelimiterKind Kind, int Offset);
+    /// <summary>An open delimiter, its reserved slot in the pair list and the next open delimiter of the same kind.</summary>
+    private readonly record struct OpenDelimiter(DelimiterKind Kind, int Offset, int Slot, int PreviousOfKind);
+
+    private const int Unclosed = -1;
+    private const int MaxRetainedBuffer = 256;
+
+    // Every choice line is scanned, so the working lists are reused per thread rather than allocated per scan.
+    [ThreadStatic]
+    private static List<DelimiterPair>? s_pairBuffer;
+
+    [ThreadStatic]
+    private static List<OpenDelimiter>? s_openerBuffer;
 
     public static DelimiterScanResult Scan(string text, DelimiterScanMode mode, int startOffset = 0,
         CancellationToken cancellationToken = default)
@@ -82,19 +120,21 @@ internal static class DelimiterScanner
 
         cancellationToken.ThrowIfCancellationRequested();
         var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
-        var pairs = new List<DelimiterPair>();
-        var issues = new List<DelimiterIssue>();
-        var openers = new List<OpenDelimiter>();
-        var openersByKind = new List<int>[4];
-        for (var index = 0; index < openersByKind.Length; index++)
-        {
-            openersByKind[index] = [];
-        }
+        // Slots are reserved in opening order so the finished list is sorted for binary search.
+        var pairs = s_pairBuffer ?? [];
+        var openers = s_openerBuffer ?? [];
+        s_pairBuffer = null;
+        s_openerBuffer = null;
+        pairs.Clear();
+        openers.Clear();
+        List<DelimiterIssue>? issues = null;
+        Span<int> topOfKind = [-1, -1, -1, -1];
+        var unclosedSlots = 0;
 
         var workUnits = 0;
         var braceDepth = 0;
         var inString = false;
-        var stringStart = -1;
+        var stringSlot = -1;
 
         for (var offset = startOffset; offset < text.Length; offset++)
         {
@@ -111,9 +151,9 @@ internal static class DelimiterScanner
                 }
                 else if (current == '"')
                 {
-                    pairs.Add(new(DelimiterKind.QuotedString, stringStart, offset));
+                    pairs[stringSlot] = pairs[stringSlot] with { CloseOffset = offset };
                     inString = false;
-                    stringStart = -1;
+                    stringSlot = -1;
                 }
 
                 continue;
@@ -122,7 +162,8 @@ internal static class DelimiterScanner
             if (UsesQuotedStrings(mode, braceDepth) && current == '"')
             {
                 inString = true;
-                stringStart = offset;
+                stringSlot = pairs.Count;
+                pairs.Add(new(DelimiterKind.QuotedString, offset, Unclosed));
                 continue;
             }
 
@@ -140,8 +181,9 @@ internal static class DelimiterScanner
 
             if (isOpen)
             {
-                openers.Add(new(kind, offset));
-                openersByKind[(int)kind].Add(openers.Count - 1);
+                openers.Add(new(kind, offset, pairs.Count, topOfKind[(int)kind]));
+                topOfKind[(int)kind] = openers.Count - 1;
+                pairs.Add(new(kind, offset, Unclosed));
                 if (kind == DelimiterKind.Brace)
                 {
                     braceDepth++;
@@ -150,71 +192,66 @@ internal static class DelimiterScanner
                 continue;
             }
 
-            CloseDelimiter(kind, offset, openers, openersByKind, pairs, issues, ref braceDepth, ref workUnits,
-                checkpoint);
+            var matchingIndex = topOfKind[(int)kind];
+            if (matchingIndex < 0)
+            {
+                var issue = openers.Count == 0
+                    ? DelimiterIssueKind.StrayCloser
+                    : DelimiterIssueKind.MismatchedCloser;
+                (issues ??= []).Add(new(kind, offset, issue));
+                continue;
+            }
+
+            while (openers.Count - 1 > matchingIndex)
+            {
+                checkpoint?.Check();
+                workUnits++;
+                var mismatched = PopOpener(openers, topOfKind, ref braceDepth);
+                unclosedSlots++;
+                (issues ??= []).Add(new(mismatched.Kind, mismatched.Offset, DelimiterIssueKind.MismatchedOpener));
+            }
+
+            var opener = PopOpener(openers, topOfKind, ref braceDepth);
+            pairs[opener.Slot] = pairs[opener.Slot] with { CloseOffset = offset };
         }
 
         if (inString)
         {
-            issues.Add(new(DelimiterKind.QuotedString, stringStart, DelimiterIssueKind.UnclosedOpener));
+            unclosedSlots++;
+            (issues ??= []).Add(new(DelimiterKind.QuotedString, pairs[stringSlot].OpenOffset, DelimiterIssueKind.UnclosedOpener));
         }
 
         while (openers.Count > 0)
         {
             checkpoint?.Check();
             workUnits++;
-            var opener = PopOpener(openers, openersByKind, ref braceDepth);
-            issues.Add(new(opener.Kind, opener.Offset, DelimiterIssueKind.UnclosedOpener));
+            var opener = PopOpener(openers, topOfKind, ref braceDepth);
+            unclosedSlots++;
+            (issues ??= []).Add(new(opener.Kind, opener.Offset, DelimiterIssueKind.UnclosedOpener));
         }
 
-        var result = new DelimiterScanResult(pairs, issues, workUnits, checkpoint);
+        var matched = pairs.Count == unclosedSlots ? [] : new DelimiterPair[pairs.Count - unclosedSlots];
+        var next = 0;
+        foreach (var pair in pairs)
+        {
+            if (pair.CloseOffset != Unclosed)
+                matched[next++] = pair;
+        }
+
+        if (pairs.Capacity <= MaxRetainedBuffer)
+            s_pairBuffer = pairs;
+        if (openers.Capacity <= MaxRetainedBuffer)
+            s_openerBuffer = openers;
         cancellationToken.ThrowIfCancellationRequested();
-        return result;
+        return new DelimiterScanResult(matched, issues, workUnits);
     }
 
-    private static void CloseDelimiter(
-        DelimiterKind kind,
-        int offset,
-        List<OpenDelimiter> openers,
-        List<int>[] openersByKind,
-        List<DelimiterPair> pairs,
-        List<DelimiterIssue> issues,
-        ref int braceDepth,
-        ref int workUnits,
-        CancellationCheckpoint? checkpoint)
-    {
-        var matching = openersByKind[(int)kind];
-        if (matching.Count == 0)
-        {
-            var issue = openers.Count == 0
-                ? DelimiterIssueKind.StrayCloser
-                : DelimiterIssueKind.MismatchedCloser;
-            issues.Add(new(kind, offset, issue));
-            return;
-        }
-
-        var matchingIndex = matching[^1];
-        while (openers.Count - 1 > matchingIndex)
-        {
-            checkpoint?.Check();
-            workUnits++;
-            var mismatched = PopOpener(openers, openersByKind, ref braceDepth);
-            issues.Add(new(mismatched.Kind, mismatched.Offset, DelimiterIssueKind.MismatchedOpener));
-        }
-
-        var opener = PopOpener(openers, openersByKind, ref braceDepth);
-        pairs.Add(new(kind, opener.Offset, offset));
-    }
-
-    private static OpenDelimiter PopOpener(
-        List<OpenDelimiter> openers,
-        List<int>[] openersByKind,
-        ref int braceDepth)
+    private static OpenDelimiter PopOpener(List<OpenDelimiter> openers, Span<int> topOfKind, ref int braceDepth)
     {
         var lastIndex = openers.Count - 1;
         var opener = openers[lastIndex];
         openers.RemoveAt(lastIndex);
-        openersByKind[(int)opener.Kind].RemoveAt(openersByKind[(int)opener.Kind].Count - 1);
+        topOfKind[(int)opener.Kind] = opener.PreviousOfKind;
         if (opener.Kind == DelimiterKind.Brace)
         {
             braceDepth--;
