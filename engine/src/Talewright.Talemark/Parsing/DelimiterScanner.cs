@@ -27,19 +27,33 @@ internal readonly record struct DelimiterPair(DelimiterKind Kind, int OpenOffset
 
 internal readonly record struct DelimiterIssue(DelimiterKind Kind, int Offset, DelimiterIssueKind Issue);
 
-internal sealed class DelimiterScanResult(
-    IReadOnlyList<DelimiterPair> pairs,
-    IReadOnlyList<DelimiterIssue> issues,
-    int workUnits)
+internal sealed class DelimiterScanResult
 {
-    private readonly Dictionary<int, int> _closingOffsets = pairs.ToDictionary(pair => pair.OpenOffset, pair => pair.CloseOffset);
-    private readonly Dictionary<int, int> _openingOffsets = pairs.ToDictionary(pair => pair.CloseOffset, pair => pair.OpenOffset);
+    private readonly Dictionary<int, int> _closingOffsets;
+    private readonly Dictionary<int, int> _openingOffsets;
 
-    public IReadOnlyList<DelimiterPair> Pairs { get; } = pairs;
+    public DelimiterScanResult(IReadOnlyList<DelimiterPair> pairs, IReadOnlyList<DelimiterIssue> issues,
+        int workUnits, CancellationCheckpoint? checkpoint)
+    {
+        _closingOffsets = new(pairs.Count);
+        _openingOffsets = new(pairs.Count);
+        foreach (var pair in pairs)
+        {
+            checkpoint?.Check();
+            _closingOffsets.Add(pair.OpenOffset, pair.CloseOffset);
+            _openingOffsets.Add(pair.CloseOffset, pair.OpenOffset);
+        }
 
-    public IReadOnlyList<DelimiterIssue> Issues { get; } = issues;
+        Pairs = pairs;
+        Issues = issues;
+        WorkUnits = workUnits;
+    }
 
-    public int WorkUnits { get; } = workUnits;
+    public IReadOnlyList<DelimiterPair> Pairs { get; }
+
+    public IReadOnlyList<DelimiterIssue> Issues { get; }
+
+    public int WorkUnits { get; }
 
     public bool TryGetClose(int openOffset, out int closeOffset) =>
         _closingOffsets.TryGetValue(openOffset, out closeOffset);
@@ -52,7 +66,8 @@ internal static class DelimiterScanner
 {
     private readonly record struct OpenDelimiter(DelimiterKind Kind, int Offset);
 
-    public static DelimiterScanResult Scan(string text, DelimiterScanMode mode, int startOffset = 0)
+    public static DelimiterScanResult Scan(string text, DelimiterScanMode mode, int startOffset = 0,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentOutOfRangeException.ThrowIfNegative(startOffset);
@@ -65,6 +80,8 @@ internal static class DelimiterScanner
             throw new ArgumentOutOfRangeException(nameof(mode));
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
         var pairs = new List<DelimiterPair>();
         var issues = new List<DelimiterIssue>();
         var openers = new List<OpenDelimiter>();
@@ -81,6 +98,7 @@ internal static class DelimiterScanner
 
         for (var offset = startOffset; offset < text.Length; offset++)
         {
+            checkpoint?.Check();
             workUnits++;
             var current = text[offset];
 
@@ -132,7 +150,8 @@ internal static class DelimiterScanner
                 continue;
             }
 
-            CloseDelimiter(kind, offset, openers, openersByKind, pairs, issues, ref braceDepth, ref workUnits);
+            CloseDelimiter(kind, offset, openers, openersByKind, pairs, issues, ref braceDepth, ref workUnits,
+                checkpoint);
         }
 
         if (inString)
@@ -142,12 +161,15 @@ internal static class DelimiterScanner
 
         while (openers.Count > 0)
         {
+            checkpoint?.Check();
             workUnits++;
             var opener = PopOpener(openers, openersByKind, ref braceDepth);
             issues.Add(new(opener.Kind, opener.Offset, DelimiterIssueKind.UnclosedOpener));
         }
 
-        return new(pairs, issues, workUnits);
+        var result = new DelimiterScanResult(pairs, issues, workUnits, checkpoint);
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 
     private static void CloseDelimiter(
@@ -158,7 +180,8 @@ internal static class DelimiterScanner
         List<DelimiterPair> pairs,
         List<DelimiterIssue> issues,
         ref int braceDepth,
-        ref int workUnits)
+        ref int workUnits,
+        CancellationCheckpoint? checkpoint)
     {
         var matching = openersByKind[(int)kind];
         if (matching.Count == 0)
@@ -173,6 +196,7 @@ internal static class DelimiterScanner
         var matchingIndex = matching[^1];
         while (openers.Count - 1 > matchingIndex)
         {
+            checkpoint?.Check();
             workUnits++;
             var mismatched = PopOpener(openers, openersByKind, ref braceDepth);
             issues.Add(new(mismatched.Kind, mismatched.Offset, DelimiterIssueKind.MismatchedOpener));

@@ -133,6 +133,12 @@ DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks
 # Opt in to the 10,000-element slow-input extension; this may take several minutes.
 DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --slow-input-stress
 
+# Run just the two choice-recovery ladders, including 10,000, without the other workloads.
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --choice-recovery-stress
+
+# Check the existing realistic-corpus allocation ceilings without the other workloads.
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --realistic-only
+
 python3 player/tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
 ```
 
@@ -164,9 +170,11 @@ corpus, CPU, power source and power mode, and run without other build/test work.
 
 The default slow-input ladder analyzes paragraphs with substitutions and inline
 conditions, single-line substitutions, nested block conditions, nested
-parentheses, unary prefixes, unmatched emphasis, unclosed links, and both plain
-choices and choices with requirements and effects at 1, 5, 10, 20, 50, 100, 500
-and 1,000 elements. Sizes past a nesting limit must recover with exactly one
+parentheses, unary prefixes, unmatched emphasis, unclosed links, plain choices,
+choices with requirements and effects, broken choice lines, and one unclosed
+choice label of the requested length at 1, 5, 10, 20, 50, 100, 500 and 1,000
+elements. Broken choice lines must report one TW1011 per line, and the unclosed
+label must report one TW1011. Sizes past a nesting limit must recover with exactly one
 TW1016 and no other error. The opt-in
 extension adds 10,000 for each shape. A process-isolated language-server test
 compiles and analyzes the 10,000-level nested-condition, parenthesis and

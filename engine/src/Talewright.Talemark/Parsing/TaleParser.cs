@@ -14,6 +14,7 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 {
     public required int EndLine { get; init; }
     public bool HasExplicitPriority { get; init; }
+    public bool DroppedMalformedChoice { get; init; }
 }
 
 /// <summary>
@@ -203,6 +204,7 @@ internal sealed partial class TaleParser
         {
             EndLine = _index,
             HasExplicitPriority = _scene.HasExplicitPriority,
+            DroppedMalformedChoice = _scene.DroppedMalformedChoice,
         });
         _scene = null;
     }
@@ -601,20 +603,48 @@ internal sealed partial class TaleParser
         IReadOnlyList<TemplateInline>? label = null;
         if (pos < rest.Length && rest[pos] == '[')
         {
-            var close = FindClosingBracket(rest, pos, out var unclosedBrace);
-            if (close < 0)
+            var labelScan = DelimiterScanner.Scan(rest, DelimiterScanMode.ChoiceLabel, pos, _cancellationToken);
+            if (!labelScan.TryGetClose(pos, out var close))
             {
-                if (_discoverEffects is null && unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1)))
+                NoteDroppedChoice(scene);
+                if (_discoverEffects is null)
                 {
-                    ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
-                        rest.Length, false, _diagnostics, _symbols, _cancellationToken);
+                    var unclosedBrace = -1;
+                    var checkpoint = _cancellationToken.CanBeCanceled ? new CancellationCheckpoint(_cancellationToken) : null;
+                    foreach (var issue in labelScan.Issues)
+                    {
+                        checkpoint?.Check();
+                        if (issue.Kind == DelimiterKind.Brace &&
+                            issue.Issue is (DelimiterIssueKind.UnclosedOpener or DelimiterIssueKind.MismatchedOpener) &&
+                            (unclosedBrace < 0 || issue.Offset < unclosedBrace))
+                            unclosedBrace = issue.Offset;
+                    }
+                    var unclosedImage = unclosedBrace >= 0 && ImageSyntax.IsCall(rest.AsSpan(unclosedBrace + 1));
+                    var hint = ChoiceSyntax.FindMissingBracketHint(rest, pos, labelScan, _cancellationToken);
+                    if (_symbols.Analysis is not null)
+                    {
+                        var end = hint.Offset >= 0 ? hint.Offset : rest.Length;
+                        if (unclosedImage)
+                            end = Math.Min(end, unclosedBrace);
+                        var partial = rest[(pos + 1)..end];
+                        InlineParser.AnalyzePartial(SourceText.Single(partial, At(indent + pos + 2)), _symbols,
+                            _cancellationToken);
+                    }
+                    if (unclosedImage)
+                    {
+                        ImageSyntax.Parse(SourceText.Single(rest, At(indent + 1)), unclosedBrace + 1,
+                            rest.Length, false, _diagnostics, _symbols, _cancellationToken);
+                    }
+                    else if (unclosedBrace >= 0)
+                    {
+                        ExpressionParser.ReportStringErrors(rest[(unclosedBrace + 1)..],
+                            offset => At(indent + unclosedBrace + 2 + offset), _diagnostics);
+                    }
+                    var message = "Choice label is missing its closing ']'.";
+                    if (hint.Marker is not null)
+                        message += $" Place ']' before '{hint.Marker}'.";
+                    _diagnostics.Error("TW1011", message, At(indent + 1 + pos));
                 }
-                else if (_discoverEffects is null && unclosedBrace >= 0)
-                {
-                    ExpressionParser.ReportStringErrors(rest[(unclosedBrace + 1)..],
-                        offset => At(indent + unclosedBrace + 2 + offset), _diagnostics);
-                }
-                _diagnostics.Error("TW1011", "Choice label is missing its closing ']'.", At(indent + 1 + pos));
                 return;
             }
 
@@ -631,46 +661,71 @@ internal sealed partial class TaleParser
         DivertTarget? divert = null;
         CheckBranch? check = null;
         var hasDivert = false;
+        var hasRequires = false;
+        var hasEffects = false;
+        var clauseScan = DelimiterScanner.Scan(rest, DelimiterScanMode.CodeGroup, pos, _cancellationToken);
 
         while (pos < rest.Length)
         {
             var column = indent + 1 + pos;
-            var remaining = rest[pos..];
+            var remaining = rest.AsSpan(pos);
             if (remaining.StartsWith("(requires:", StringComparison.Ordinal))
             {
-                var end = FindClosingParen(rest, pos);
-                if (end < 0)
+                if (hasRequires)
+                    _diagnostics.Error("TW1011", "Duplicate '(requires:)' condition. A choice accepts only one.", At(column));
+                if (!clauseScan.TryGetClose(pos, out var end))
                 {
                     ExpressionParser.ReportStringErrors(rest[(pos + 10)..],
                         offset => At(column + 10 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[(pos + 10)..], At(column + 10));
                     _diagnostics.Error("TW1011", "'(requires:' is missing its closing ')'.", At(column));
+                    NoteDroppedChoice(scene);
                     return;
                 }
 
-                requires = ExpressionParser.ParseCondition(rest[(pos + 10)..end], At(column + 10), _symbols, _diagnostics);
+                var condition = ExpressionParser.ParseCondition(rest[(pos + 10)..end], At(column + 10), _symbols, _diagnostics);
+                if (!hasRequires)
+                    requires = condition;
+                hasRequires = true;
                 pos = SkipSpaces(rest, end + 1);
             }
             else if (remaining[0] == '{')
             {
-                var end = InlineParser.FindClosingBrace(rest, pos);
-                if (end < 0)
+                if (hasEffects)
+                    _diagnostics.Error("TW1011", "Duplicate effect block. A choice accepts only one.", At(column));
+                if (!clauseScan.TryGetClose(pos, out var end))
                 {
                     ExpressionParser.ReportStringErrors(rest[(pos + 1)..],
                         offset => At(column + 1 + offset), _diagnostics);
                     _symbols.Analysis?.Expression(ExpressionContextKind.Effects, rest[(pos + 1)..], At(column + 1));
                     _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column));
+                    NoteDroppedChoice(scene);
                     return;
                 }
 
-                effects = ParseEffects(rest[(pos + 1)..end], At(column + 1)) ?? [];
+                var parsedEffects = ParseEffects(rest[(pos + 1)..end], At(column + 1)) ?? [];
+                if (!hasEffects)
+                    effects = parsedEffects;
+                hasEffects = true;
                 pos = SkipSpaces(rest, end + 1);
             }
             else if (remaining.StartsWith("->", StringComparison.Ordinal))
             {
                 _symbols.Analysis?.Tokens.Add(new("->", AnalysisCollector.Range(At(column), "->")));
                 hasDivert = true;
-                divert = ParseDivertTarget(rest[(pos + 2)..], column + 2);
+                var targetEnd = SkipSpaces(rest, pos + 2);
+                var targetCheckpoint = _cancellationToken.CanBeCanceled ? new CancellationCheckpoint(_cancellationToken) : null;
+                while (targetEnd < rest.Length && !char.IsWhiteSpace(rest[targetEnd]) &&
+                       rest[targetEnd] is not ('{' or '(') &&
+                       !rest.AsSpan(targetEnd).StartsWith("->", StringComparison.Ordinal))
+                {
+                    targetCheckpoint?.Check();
+                    targetEnd++;
+                }
+                divert = ParseDivertTarget(rest[(pos + 2)..targetEnd], column + 2);
+                var trailing = SkipSpaces(rest, targetEnd);
+                if (trailing < rest.Length)
+                    ReportTrailingChoiceText(rest, trailing, indent + 1, afterCheck: false, insideBlock: false);
                 pos = rest.Length;
             }
             else if (remaining.StartsWith("skill-check", StringComparison.Ordinal))
@@ -678,9 +733,11 @@ internal sealed partial class TaleParser
                 if (label is null)
                 {
                     _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'; skill checks require a '[label]'.", At(indent));
+                    NoteDroppedChoice(scene);
                     return;
                 }
-                var spec = ParseCheckSpec(remaining["skill-check".Length..], column + "skill-check".Length);
+                var specOffset = pos + "skill-check".Length;
+                var spec = ParseCheckSpec(rest[specOffset..], column + "skill-check".Length, clauseScan, specOffset);
                 var (success, failure) = ParseOutcomeLines(At(column), insideBlock: false);
                 if (spec is not null && success is not null && failure is not null)
                 {
@@ -689,12 +746,29 @@ internal sealed partial class TaleParser
 
                 pos = rest.Length;
             }
+            else if (remaining[0] == '(' &&
+                     ChoiceSyntax.TryReadSpacedRequires(rest, pos, _cancellationToken, out var expressionStart))
+            {
+                var expressionEnd = clauseScan.TryGetClose(pos, out var end) ? end : rest.Length;
+                _symbols.Analysis?.Expression(ExpressionContextKind.Condition, rest[expressionStart..expressionEnd],
+                    At(indent + 1 + expressionStart));
+                var spelling = ChoiceSyntax.Excerpt(rest.AsSpan(pos, expressionStart - pos));
+                _diagnostics.Error("TW1011",
+                    $"Choice conditions use the exact marker '(requires:)'. '{spelling}' is not recognized.", At(column));
+                NoteDroppedChoice(scene);
+                return;
+            }
             else
             {
                 var help = label is null
                     ? "Use '* [label] ...' or a textless '* ... -> target'."
                     : "Expected (requires: …), { effects }, -> target or skill-check.";
-                _diagnostics.Error("TW1011", $"Unexpected '{remaining}' in choice. {help}", At(column));
+                var excerpt = ChoiceSyntax.Excerpt(remaining);
+                var bareTarget = IdentifierRules.IsValid(remaining.ToString())
+                    ? " Insert '->' before the target."
+                    : "";
+                _diagnostics.Error("TW1011", $"Unexpected '{excerpt}' in choice.{bareTarget} {help}", At(column));
+                NoteDroppedChoice(scene);
                 return;
             }
         }
@@ -702,6 +776,7 @@ internal sealed partial class TaleParser
         if (label is null && !hasDivert)
         {
             _diagnostics.Error("TW1011", "Textless choices need '-> target' or '-> END'.", At(indent));
+            NoteDroppedChoice(scene);
             return;
         }
 
@@ -729,7 +804,8 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var check = ParseCheckSpec(spec["skill-check".Length..], indent + line.IndexOf("skill-check", StringComparison.Ordinal) + "skill-check".Length);
+        var check = ParseCheckSpec(spec["skill-check".Length..],
+            indent + line.IndexOf("skill-check", StringComparison.Ordinal) + "skill-check".Length, insideBlock: true);
         var (success, failure) = ParseOutcomeLines(location, insideBlock: true);
 
         if (check is not null && success is not null && failure is not null)
@@ -740,8 +816,21 @@ internal sealed partial class TaleParser
     }
 
     /// <summary>Parses <c>[actor] skill dc expr</c>.</summary>
-    private SkillCheck? ParseCheckSpec(string text, int column)
+    private SkillCheck? ParseCheckSpec(string text, int column, DelimiterScanResult? scan = null, int scanOffset = 0,
+        bool insideBlock = false)
     {
+        var dcExpression = text.IndexOf(" dc ", StringComparison.Ordinal);
+        if (dcExpression >= 0)
+        {
+            scan ??= DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, cancellationToken: _cancellationToken);
+            var trailing = ChoiceSyntax.FindTrailingClause(text, dcExpression + 4, scan, scanOffset, _cancellationToken);
+            if (trailing >= 0)
+            {
+                ReportTrailingChoiceText(text, trailing, column, afterCheck: true, insideBlock);
+                text = text[..trailing].TrimEnd();
+            }
+        }
+
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var dc = Array.IndexOf(words, "dc");
         if (_symbols.Analysis is { } analysis)
@@ -818,6 +907,8 @@ internal sealed partial class TaleParser
     {
         CheckOutcome? success = null;
         CheckOutcome? failure = null;
+        var sawSuccess = false;
+        var sawFailure = false;
         var closed = false;
         while (_hasNextLine)
         {
@@ -847,10 +938,12 @@ internal sealed partial class TaleParser
             var outcome = ParseOutcome(line[8..].ToString(), indent + 8);
             if (isSuccess)
             {
+                sawSuccess = true;
                 success = outcome;
             }
             else
             {
+                sawFailure = true;
                 failure = outcome;
             }
         }
@@ -860,7 +953,7 @@ internal sealed partial class TaleParser
             _diagnostics.Error("TW1012", "'::: skill-check' block is never closed with ':::'.", checkLocation);
         }
 
-        if (success is null || failure is null)
+        if (!sawSuccess || !sawFailure)
         {
             _diagnostics.Error("TW1009", "A skill check needs both a 'success:' and a 'failure:' line.", checkLocation);
         }
@@ -879,7 +972,7 @@ internal sealed partial class TaleParser
             if (end < 0)
             {
                 _symbols.Analysis?.Expression(ExpressionContextKind.Effects, text[(pos + 1)..], At(column + pos + 1));
-                _diagnostics.Error("TW1011", "Effect block is missing its closing '}'.", At(column + pos));
+                _diagnostics.Error("TW1009", "Outcome effect block is missing its closing '}'.", At(column + pos));
                 return null;
             }
 
@@ -904,6 +997,49 @@ internal sealed partial class TaleParser
 
     // ---- helpers ---------------------------------------------------------------------------------------------------
 
+    private static void NoteDroppedChoice(SceneBuilder scene)
+    {
+        if (scene.DroppedMalformedChoice)
+            return;
+        foreach (var frame in scene.Frames)
+        {
+            if (frame.Condition is BoolLiteral literal && literal.Value == frame.InElse)
+                return;
+        }
+        scene.DroppedMalformedChoice = true;
+    }
+
+    private void ReportTrailingChoiceText(string text, int pos, int column, bool afterCheck, bool insideBlock)
+    {
+        var remaining = text.AsSpan(pos);
+        if (remaining[0] == '(' && ChoiceSyntax.TryReadSpacedRequires(text, pos, _cancellationToken, out _))
+        {
+            var terminal = afterCheck ? "the skill check" : "the divert";
+            _diagnostics.Error("TW1011",
+                $"Choice conditions use the exact marker '(requires:)' and cannot follow {terminal}.", At(column + pos));
+            return;
+        }
+        var message = remaining[0] switch
+        {
+            '{' when insideBlock =>
+                "Effect block is misplaced after the skill check. Put effects on a 'success:' or 'failure:' line.",
+            '{' when afterCheck =>
+                "Effect block is misplaced after the skill check. Put '{ effects }' before 'skill-check'.",
+            '{' =>
+                "Effect block is misplaced after the divert. Put '{ effects }' before '->'.",
+            _ when remaining.StartsWith("(requires:", StringComparison.Ordinal) && insideBlock =>
+                "'(requires:)' is misplaced after the block skill check.",
+            _ when remaining.StartsWith("(requires:", StringComparison.Ordinal) && afterCheck =>
+                "'(requires:)' is misplaced after the skill check. Put the condition before 'skill-check'.",
+            _ when remaining.StartsWith("(requires:", StringComparison.Ordinal) =>
+                "'(requires:)' is misplaced after the divert. Put the condition before '->'.",
+            _ when remaining.StartsWith("->", StringComparison.Ordinal) && afterCheck =>
+                "Divert is misplaced after the skill check. Outcomes belong on 'success:' and 'failure:' lines.",
+            _ => $"Unexpected '{ChoiceSyntax.Excerpt(remaining)}' after the {(afterCheck ? "skill check" : "divert")}.",
+        };
+        _diagnostics.Error("TW1011", message, At(column + pos));
+    }
+
     private static int SkipSpaces(string text, int pos)
     {
         while (pos < text.Length && char.IsWhiteSpace(text[pos]))
@@ -912,67 +1048,6 @@ internal sealed partial class TaleParser
         }
 
         return pos;
-    }
-
-    private static int FindClosingBracket(string text, int open, out int unclosedBrace)
-    {
-        unclosedBrace = -1;
-        var brackets = 0;
-        for (var i = open + 1; i < text.Length; i++)
-        {
-            switch (text[i])
-            {
-                case '{':
-                    var close = InlineParser.FindClosingBrace(text, i);
-                    if (close < 0)
-                    {
-                        unclosedBrace = i;
-                        return -1;
-                    }
-                    i = close;
-                    break;
-                case '\\':
-                    i++;
-                    break;
-                case '[':
-                    brackets++;
-                    break;
-                case ']':
-                    if (brackets == 0) return i;
-                    brackets--;
-                    break;
-            }
-        }
-
-        return -1;
-    }
-
-    private static int FindClosingParen(string text, int open)
-    {
-        var depth = 0;
-        var inString = false;
-        for (var i = open; i < text.Length; i++)
-        {
-            var c = text[i];
-            if (inString && c == '\\')
-            {
-                i++;
-            }
-            else if (c == '"')
-            {
-                inString = !inString;
-            }
-            else if (!inString && c == '(')
-            {
-                depth++;
-            }
-            else if (!inString && c == ')' && --depth == 0)
-            {
-                return i;
-            }
-        }
-
-        return -1;
     }
 
     private sealed class Frame(Expr condition, SourceLocation location)
@@ -1000,6 +1075,7 @@ internal sealed partial class TaleParser
         public HashSet<string> HubDirectives { get; } = [];
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
+        public bool DroppedMalformedChoice { get; set; }
         public Stack<Frame> Frames { get; } = new();
         public int SuppressedConditionDepth { get; set; }
         public SourceLocation SuppressedConditionLocation { get; set; }

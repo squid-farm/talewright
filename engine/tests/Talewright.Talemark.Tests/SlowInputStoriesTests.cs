@@ -4,6 +4,7 @@ using System.Text;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Parsing;
 using Talewright.Testing;
 
 namespace Talewright.Talemark.Tests;
@@ -20,6 +21,8 @@ public sealed class SlowInputStoriesTests
     [InlineData(SlowInputShape.ChoicesWithExpressions, 67_049, "E40444CDCF6441CDF91F84224A153CD3F8378EB6D1E254B7160F94A78114DECA")]
     [InlineData(SlowInputShape.NestedParentheses, 2_182, "BC9E630280B9216D3D844B5B8758885957F34B878B851F9D81411299ACCEA390")]
     [InlineData(SlowInputShape.UnaryPrefixes, 1_182, "7C72C05219A6D9588E23CCBFA04EEA4BA81257F40742FEC355B23930E4FF0C97")]
+    [InlineData(SlowInputShape.BrokenChoiceLines, 61_159, "5593EFF3A1E7884D9488BCB98A02BAC17F5D737430B9191BAE397D803464A13A")]
+    [InlineData(SlowInputShape.UnclosedChoiceLabel, 1_172, "0BF25CEA1DA3CCF1129FE76E7650B57B39088BC0A2DF1A9B30DA0633515731A6")]
     public void Reference_ladder_preserves_source_bytes(SlowInputShape shape, int expectedBytes, string expectedHash)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -112,6 +115,58 @@ public sealed class SlowInputStoriesTests
         Assert.Equal(20, Assert.Single(analysis.Scenes).Definition.Choices.Count);
         Assert.Equal(20, analysis.Expressions.Count(expression => expression.Kind == ExpressionContextKind.Condition));
         Assert.Equal(20, analysis.Expressions.Count(expression => expression.Kind == ExpressionContextKind.Effects));
+    }
+
+    [Theory]
+    [InlineData(SlowInputShape.BrokenChoiceLines, 5)]
+    [InlineData(SlowInputShape.UnclosedChoiceLabel, 1)]
+    public void Broken_choice_ladders_reproduce_the_expected_diagnostics(SlowInputShape shape, int expectedErrors)
+    {
+        var source = SlowInputStories.Create(shape, 5);
+        var repeated = SlowInputStories.Create(shape, 5);
+        var analysis = StoryAnalyzer.Analyze(source);
+        var errors = analysis.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+
+        Assert.Equal(source.Files, repeated.Files);
+        Assert.Single(analysis.Scenes);
+        Assert.Equal(expectedErrors, errors.Length);
+        Assert.All(errors, error => Assert.Equal("TW1011", error.Code));
+    }
+
+    [Fact]
+    public void Broken_choice_stress_shapes_reach_ten_thousand_lines_and_label_characters()
+    {
+        const int size = 10_000;
+        const string brokenLine = "* [Go {var:count} (requires: flag:a) { set flag:b } -> start";
+        var lines = SlowInputStories.Create(SlowInputShape.BrokenChoiceLines, size).Files["main.tale"];
+        var label = SlowInputStories.Create(SlowInputShape.UnclosedChoiceLabel, size).Files["main.tale"];
+
+        Assert.Equal(size, lines.Split(brokenLine, StringSplitOptions.None).Length - 1);
+        Assert.Contains("* [" + new string('a', size) + " -> start", label);
+    }
+
+    [Theory]
+    [InlineData(SlowInputShape.BrokenChoiceLines, 10_000)]
+    [InlineData(SlowInputShape.UnclosedChoiceLabel, 1)]
+    public void Broken_choice_stress_shapes_have_linear_scanner_and_hint_work(
+        SlowInputShape shape, int expectedLines)
+    {
+        var tale = SlowInputStories.Create(shape, 10_000).Files["main.tale"];
+        var lines = tale.Split('\n').Where(line => line.StartsWith("* [", StringComparison.Ordinal)).ToArray();
+        long work = 0;
+        long characters = 0;
+        Assert.Equal(expectedLines, lines.Length);
+        foreach (var line in lines)
+        {
+            var open = line.IndexOf('[');
+            var scan = DelimiterScanner.Scan(line, DelimiterScanMode.ChoiceLabel, open);
+            Assert.False(scan.TryGetClose(open, out _));
+            var hint = ChoiceSyntax.FindMissingBracketHint(line, open, scan, CancellationToken.None);
+            work += scan.WorkUnits + hint.WorkUnits;
+            characters += line.Length - open;
+        }
+
+        Assert.InRange(work, 0, 4 * characters);
     }
 
     [Fact]
