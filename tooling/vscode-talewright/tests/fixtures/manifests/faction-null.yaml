@@ -1,0 +1,8 @@
+game:
+  id: faction-null
+  title: Faction null
+  start: beginning
+characters:
+  player: {first-name: Ada}
+factions:
+  guild: null

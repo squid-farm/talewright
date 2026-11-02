@@ -1,0 +1,8 @@
+game:
+  id: faction-sequence
+  title: Faction sequence
+  start: beginning
+characters:
+  player: {first-name: Ada}
+factions:
+  guild: [explorers]

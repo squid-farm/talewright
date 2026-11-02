@@ -160,6 +160,19 @@ triggers:
     once: true
 ```
 
+Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
+accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
+This applies to `game.undo`, `game.creation.name`, item `uncountable`, and
+trigger `once`.
+
+Faction entries must be objects, unlike the shorthand allowed for items:
+`guild: {}` is valid and defaults the name to `guild` and standing to `0`;
+`guild: Explorers Guild` is invalid.
+
+Unknown keys produce a TW4006 warning and are ignored by the compiler. The
+bundled editor schema intentionally rejects unknown keys, so editor validation
+is stricter than compilation.
+
 For a complete custom skill declaration, character value and check, see
 [Add a skill for your setting](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
 
