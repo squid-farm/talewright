@@ -6,8 +6,12 @@ You can also use any plain-text editor and the browser player.
 
 ## 1. Set up your story folder
 
-Each story lives in its own folder. Make one now, somewhere easy to find, such as
-**Documents > talewright > my-story**. Start with two files inside it:
+**Fastest start:** if you have the [CLI installed](cli-installation.md), run `talewright new my-story`
+in a terminal. It creates a valid, playable starter story; open the new folder in your editor. See the
+[CLI reference](../reference/cli.md#new) for options.
+
+Or, create a story folder manually. Each story lives in its own folder. Make one now, somewhere easy
+to find, such as **Documents > talewright > my-story**. Start with two files inside it:
 
 ```text
 my-story/

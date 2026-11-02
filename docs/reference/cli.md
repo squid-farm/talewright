@@ -1,12 +1,14 @@
 # CLI reference
 
-The `talewright` command validates, lints, runs, debugs and publishes stories. It is an optional tool for
-authors who want to make a standalone web or desktop game; you do not need it to share a story zip
-with friends. See [Get the story-checking tools](../guide/cli-installation.md) to install a
-standalone download or the .NET tool.
+The `talewright` command creates, validates, lints, runs, debugs and publishes stories. It is an
+optional tool for authors who want to make a standalone web or desktop game; you do not need it to
+share a story zip with friends. See
+[Get the story-checking tools](../guide/cli-installation.md) to install a standalone download or the
+.NET tool.
 
 | Command | Does |
 |---|---|
+| `talewright new [folder] [--id <id>] [--title <title>]` | Creates a runnable starter story folder. |
 | `talewright validate <story>` | Checks a story folder for errors and warnings. |
 | `talewright lint <story>` | Checks compiler diagnostics and configurable Talemark-aware rules. |
 | `talewright run [story]` | Validates and plays a story folder in a native window. |
@@ -20,6 +22,30 @@ value, including any `+...` source-revision metadata.
 
 For the usual one-file web game, start with the [sharing guide](../guide/sharing-your-story.md#a-web-game).
 The less common desktop split-build and file-replacement details are covered below.
+
+## new
+
+```bash
+talewright new my-story
+talewright new stories/night-ferry --id night-ferry --title "The Night Ferry"
+talewright new
+```
+
+Creates `story.talewright.yaml` and `story.tale` with a valid two-scene starter story, one choice and an
+ending. The folder is created if needed. If omitted, `folder` means the current directory.
+
+By default, the story ID and title come from the folder name: `night-ferry` becomes ID `night-ferry`
+and title `Night Ferry`. Use `--id` and `--title` to choose them explicitly. IDs must use lowercase
+kebab-case; if no valid ID can be derived from the folder name, the command asks you to provide `--id`.
+
+The command never overwrites. It refuses a folder containing `story.talewright.yaml`, any `.tale`
+file, or either file it would create. Other files, such as a README or `.git`, are left alone.
+After creation it prints the file paths and next steps:
+
+```text
+talewright run "/path/to/my-story"
+Open "/path/to/my-story" in VS Code.
+```
 
 ## Options shared by all commands
 

@@ -20,11 +20,16 @@ public static class StoryLintRules
     public const string SceneIdStyle = "TWL001";
     public const string StoryIdStyle = "TWL002";
 
+    private static readonly Regex StoryIdPattern = new(@"\A[a-z0-9]+(?:-[a-z0-9]+)*\z",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     public static IReadOnlyList<StoryLintRule> All { get; } = Array.AsReadOnly(new[]
     {
         new StoryLintRule(SceneIdStyle, "Scene IDs use lowercase kebab-case segments, optionally grouped with dots.", LintSeverity.Warning),
         new StoryLintRule(StoryIdStyle, "The story ID uses lowercase kebab-case.", LintSeverity.Warning),
     });
+
+    public static bool IsStoryIdStyle(string id) => StoryIdPattern.IsMatch(id);
 
     internal static bool Contains(string id) => All.Any(rule => rule.Id == id);
 }
@@ -48,9 +53,6 @@ public sealed class LintConfiguration
 
     private static readonly Regex SceneIdPattern = new(
         @"\A[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*\z",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    private static readonly Regex StoryIdPattern = new(
-        @"\A[a-z0-9]+(?:-[a-z0-9]+)*\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly IReadOnlyDictionary<string, LintSeverity> _ruleSeverities;
@@ -271,7 +273,7 @@ public sealed class LintConfiguration
     }
 
     internal static bool IsSceneIdStyle(string id) => SceneIdPattern.IsMatch(id);
-    internal static bool IsStoryIdStyle(string id) => StoryIdPattern.IsMatch(id);
+    internal static bool IsStoryIdStyle(string id) => StoryLintRules.IsStoryIdStyle(id);
 }
 
 public static class StoryLintAnalyzer
