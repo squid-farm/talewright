@@ -251,6 +251,11 @@ edits, and supplies reference completion, hover, go-to-definition into the
 declaring file, and compiler checks; use `talewright validate <story-folder>` for
 command-line validation.
 
+For a `TW2002` missing-scene diagnostic in a `.tale` file, the Quick Fix menu offers
+**Create scene in this file** (appending a scene header at the end) and
+**Create scene in a new file** (creating and opening an adjacent `<scene-id>.tale`
+file). The new-file action is not offered when that file already exists.
+
 Editors that don't use the SchemaStore catalog can use the same schema with this
 modeline at the top of `story.talewright.yaml`:
 

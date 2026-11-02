@@ -298,6 +298,35 @@ async function testLiveDiagnostics() {
     const document = await vscode.workspace.openTextDocument(file);
     await vscode.window.showTextDocument(document);
     await waitForCompiler(document, items => items.length > 0);
+    const missingScene = vscode.languages.getDiagnostics(document.uri)
+      .find(item => item.source === 'talewright' && item.code === 'TW2002');
+    assert.ok(missingScene, 'Missing-scene reference must have a compiler diagnostic');
+    const actions = await vscode.commands.executeCommand(
+      'vscode.executeCodeActionProvider', document.uri, missingScene.range, vscode.CodeActionKind.QuickFix.value);
+    assert.ok(actions.some(action => action.title === "Create scene 'missing' in this file"));
+    const appendAction = actions.find(action => action.title === "Create scene 'missing' in this file");
+    assert.equal(await vscode.workspace.applyEdit(appendAction.edit), true);
+    assert.equal(document.getText(), '=== start\n* [Go] -> missing\n\n=== missing\n');
+    await waitForCompiler(document, items => !items.some(item => item.code === 'TW2002'));
+
+    const restoreMissing = new vscode.WorkspaceEdit();
+    restoreMissing.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n* [Go] -> missing\n');
+    assert.equal(await vscode.workspace.applyEdit(restoreMissing), true);
+    await waitForCompiler(document, items => items.some(item => item.code === 'TW2002'));
+    const currentDiagnostic = vscode.languages.getDiagnostics(document.uri)
+      .find(item => item.source === 'talewright' && item.code === 'TW2002');
+    const currentActions = await vscode.commands.executeCommand(
+      'vscode.executeCodeActionProvider', document.uri, currentDiagnostic.range, vscode.CodeActionKind.QuickFix.value);
+    const createAction = currentActions.find(action => action.title === "Create scene 'missing' in a new file");
+    assert.ok(createAction, 'Missing-scene action must offer a new adjacent file');
+    assert.equal(await vscode.workspace.applyEdit(createAction.edit), true);
+    await vscode.commands.executeCommand(createAction.command.command, ...createAction.command.arguments);
+    assert.equal(vscode.window.activeTextEditor.document.uri.fsPath, path.join(folder, 'missing.tale'));
+    assert.equal(vscode.window.activeTextEditor.document.getText(), '=== missing\n');
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await vscode.window.showTextDocument(document);
+
     const edit = new vscode.WorkspaceEdit();
     edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
       '=== start\nHello.\n-> END\n');
