@@ -102,12 +102,42 @@ entry checks. Choice labels and prose remain compiled templates; nothing is rend
 Speakers are unique in first-seen order. Block conditions are described, not evaluated, and an `{else}`
 context is formatted as a negation.
 
+## Story images
+
+`StoryImageResolver` is the shared path-only image lookup. It takes a `StorySource`, a path relative to
+`images/`, optional alt text, the reference's source location, and a `DiagnosticBag`. It returns a
+`ResolvedStoryImage` with a story-root-relative path and effective alt text, or null with an error.
+
+Paths match case-sensitively; explicit extensions recognize PNG, JPEG and WebP regardless of extension casing,
+but the filename must still match exactly. Extensionless paths try `.png`, `.jpg`, `.jpeg`, then `.webp`,
+warning and listing matches if ambiguous. Absolute paths, parent traversal, backslashes, web addresses, empty
+path segments, query strings and fragments are rejected. No files are downloaded.
+
+Missing, empty or whitespace-only alt text warns and uses Humanizer.Core 3.0.10 to turn the filename into
+words, then applies invariant sentence case. For example, `old_map-v2.png` becomes `Old map v2`;
+punctuation-only names become `Image`. Author-written literal alt text is preserved after escape decoding. Alt
+that contains a template is parsed with the prose template language and rendered later. All diagnostics point
+to the reference.
+
+Ordinary compilation, `talewright validate` and editor analysis use this resolver for well-formed image calls.
+Compiled `MediaTemplate` nodes store the selected story-root-relative path and either that literal alt or the
+alt template. Editor completion also reuses the resolver's supported safe-path catalogue. Lookup diagnostics
+point to the path's authored opening quote, and malformed calls receive only parser diagnostics. This adds no
+image rendering, byte decoding or image size checks.
+
+Bundled web/desktop samples include image resources so their source catalogue remains complete.
+`EmbeddedStoryLibrary` records image resource names without opening their streams. Existing exports copy
+actual safe, supported image files into story ZIPs and embed staged files under `stories/Published/` in
+standalone hosts, preserving the same catalogue and lookup after export. Image rendering and the remaining
+deployment acceptance under #179 stay separate.
+
 ## Files
 
 | File | Contents |
 |---|---|
 | `Compilation/StoryCompiler.cs` | The pipeline above. |
 | `Compilation/StorySource.cs` | Path → text map. `FromDirectory`, `FromZip(stream)` (strips one wrapping folder), `TaleFiles` (sorted), `ReadTitle()`. |
+| `Compilation/StoryImageResolver.cs` | Safe, path-only image lookup and alt-text defaults; see [Story images](#story-images). |
 | `Compilation/CompilerOptions.cs` | `Predicates` (`@Name`), `Modifiers` (`#mod`), `Rulesets` (name → factory; defaults `generic` and `none`). Also `CompilationResult` (`Story`, `Diagnostics`, `Success`, `Errors`, `Warnings`). |
 | `Compilation/StoryValidator.cs` | Whole-story structural checks (TW3xxx). Reachability is skipped when there are errors so one bad divert doesn't produce a wall of warnings. |
 | `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are warnings (TW4006) so typos are noticed. |
@@ -127,7 +157,7 @@ context is formatted as a negation.
 ## Diagnostic codes
 
 `TW1xxx` syntax, `TW2xxx` references and types, `TW3xxx` structure, `TW4xxx` story.talewright.yaml. The full table is in
-the [error code reference](../../../docs/reference/diagnostics.md). To find where a code is raised: `grep -rn TW2002 src/`.
+the [error code reference](../../../docs/reference/diagnostics.md). To find where a code is raised: `grep -rn TW2002 .` from this folder.
 
 ## Semantics worth knowing
 
