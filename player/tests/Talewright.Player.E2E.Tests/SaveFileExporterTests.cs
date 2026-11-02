@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using Talewright.Player.Saves;
 using Talewright.Runtime;
@@ -55,6 +56,47 @@ public sealed class SaveFileExporterTests : IDisposable
             exporter.ExportAsync("save.json", new byte[StoryHistory.MaxSaveBytes + 1]));
         await Assert.ThrowsAnyAsync<IOException>(() => exporter.ExportAsync("save.json", [1]));
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task Native_dialog_dispatches_the_suggested_name_and_waits_for_the_ui_thread()
+    {
+        var queued = new TaskCompletionSource<Action>(TaskCreationOptions.RunContinuationsAsynchronously);
+        string? actualName = null;
+        var pending = NativeSaveFileDialog.DispatchAsync("Story - Slot.json",
+            action => queued.SetResult(action),
+            name =>
+            {
+                actualName = name;
+                return null;
+            });
+
+        var callback = await queued.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(pending.IsCompleted);
+        callback();
+        Assert.Null(await pending);
+        Assert.Equal("Story - Slot.json", actualName);
+    }
+
+    [Fact]
+    public async Task Native_dialog_propagates_errors_from_the_ui_thread()
+    {
+        var error = await Assert.ThrowsAsync<IOException>(() =>
+            NativeSaveFileDialog.DispatchAsync("save.json", action => action(), _ =>
+                throw new IOException("The chooser failed.")));
+        Assert.Equal("The chooser failed.", error.Message);
+    }
+
+    [Fact]
+    public void Native_dialog_options_match_the_64_bit_library_abi()
+    {
+        Assert.Equal(8, IntPtr.Size);
+        Assert.Equal(16, Marshal.SizeOf<NfdSaveFileDialog.Filter>());
+        Assert.Equal(48, Marshal.SizeOf<NfdSaveFileDialog.Options>());
+        Assert.Equal(8, Marshal.OffsetOf<NfdSaveFileDialog.Options>(nameof(NfdSaveFileDialog.Options.FilterCount)).ToInt32());
+        Assert.Equal(16, Marshal.OffsetOf<NfdSaveFileDialog.Options>(nameof(NfdSaveFileDialog.Options.DefaultFolder)).ToInt32());
+        Assert.Equal(32, Marshal.OffsetOf<NfdSaveFileDialog.Options>(nameof(NfdSaveFileDialog.Options.ParentType)).ToInt32());
+        Assert.Equal(40, Marshal.OffsetOf<NfdSaveFileDialog.Options>(nameof(NfdSaveFileDialog.Options.ParentHandle)).ToInt32());
     }
 
     public void Dispose()

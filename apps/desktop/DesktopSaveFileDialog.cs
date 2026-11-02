@@ -1,13 +1,22 @@
 using Photino.NET;
+using Talewright.Player.Saves;
 
 namespace Talewright.Host.Desktop;
 
 internal static class DesktopSaveFileDialog
 {
-    internal static async Task<string?> ChooseAsync(PhotinoWindow window, string suggestedName)
+    // Test-only deviation: the native UI suite cannot reliably accept the GTK save dialog.
+    // The test runner sets this directory; the real dialog is covered by the manual test plan.
+    internal const string TestExportDirectoryVariable = "TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY";
+
+    internal static Task<string?> ChooseAsync(PhotinoWindow window, string suggestedName)
     {
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return await window.ShowSaveFileAsync($"Export saved game as {suggestedName}", folder,
-            [("JSON saved game", ["json"])]);
+        if (Environment.GetEnvironmentVariable(TestExportDirectoryVariable) is { Length: > 0 } directory)
+        {
+            return Task.FromResult<string?>(Path.Combine(directory, suggestedName));
+        }
+
+        return NativeSaveFileDialog.ChooseAsync(suggestedName, action => window.Invoke(action),
+            OperatingSystem.IsWindows() ? () => window.WindowHandle : null);
     }
 }

@@ -139,6 +139,10 @@ support importing and normal saves. Import validates the existing save format an
 the current story before writing a named slot; a name collision requires explicit confirmation.
 Import does not load the save or replace the separate Quick Save checkpoint. Export reads the stored
 bytes unchanged; canceled dialogs do not write a file.
+`NativeSaveFileDialog` dispatches the chooser to the host's UI thread and prefills the suggested
+name. Linux uses GTK 3; Windows and macOS hosts must include `AlvorKit.NFDe.Native` 1.3.0.2,
+which provides [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended)
+under the zlib license.
 **Quick Save** writes/replaces one dedicated checkpoint for the story, without named-save
 overwrite confirmation. It uses the same atomic storage, summary and persisted-progress
 load guard as named saves. The dialog marks it **Quick Save checkpoint**, independently of

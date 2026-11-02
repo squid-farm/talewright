@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Playwright;
 using Talewright.Runtime;
+using Talewright.Runtime.Saves;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -114,6 +115,40 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
 
     [Fact]
     [Trait("Host", "Linux")]
+    public async Task Desktop_export_uses_the_suggested_name_and_writes_the_stored_bytes()
+    {
+        var fixture = Fixture();
+        var story = fixture.Compile();
+        var slot = $"Portable-{Guid.NewGuid():N}";
+        // Test-only deviation: the native chooser is bypassed by the isolated test runner.
+        var directory = Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY")
+            ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py.");
+        var path = Path.Combine(directory, $"Player Test - {slot}.json");
+        await Upload(fixture);
+        await Driver.ClickAsync("Saves");
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        await native.FillAsync("Save name", slot);
+        await Driver.ClickAsync("Save game");
+        var timer = Stopwatch.StartNew();
+        while (!(await native.SnapshotAsync()).Content.Contains($"Saved '{slot}'.", StringComparison.Ordinal))
+        {
+            Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "Saved game did not appear.");
+            await Task.Delay(100);
+        }
+
+        await Driver.ClickAsync($"Export {slot}");
+        timer.Restart();
+        while (!File.Exists(path))
+        {
+            Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "Exported save file did not appear.");
+            await Task.Delay(100);
+        }
+        Assert.Equal(await new FileSaveStore(FileSaveStore.DefaultRoot).ReadAsync(story.Id, slot),
+            await File.ReadAllBytesAsync(path));
+    }
+
+    [Fact]
+    [Trait("Host", "Linux")]
     public async Task Desktop_import_uses_the_native_file_chooser_and_preserves_play_until_load()
     {
         var fixture = Fixture();
@@ -142,6 +177,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
 
     private async Task ImportAsync(string name, byte[] bytes)
     {
+        await Page.GetByLabel("Save name", new() { Exact = true }).BlurAsync();
         var input = Page.GetByLabel("Import save file", new() { Exact = true });
         var previous = await input.ElementHandleAsync();
         await input.SetInputFilesAsync(new FilePayload

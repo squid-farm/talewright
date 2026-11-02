@@ -376,7 +376,7 @@
         {
             await operation(generation);
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or JSException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException or ApplicationException or DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or JSException)
         {
             if (generation == _generation)
             {
@@ -387,6 +387,8 @@
                         "That saved game could not be found. Refresh the list and choose another save.",
                     UnauthorizedAccessException =>
                         "The player does not have permission to access saved games. Check your save-folder permissions or browser storage settings.",
+                    DllNotFoundException or EntryPointNotFoundException or BadImageFormatException =>
+                        "The native save dialog could not start because a desktop library is missing or incompatible.",
                     IOException =>
                         "Saved games could not be read or written. Check that storage is available and has free space, then refresh the list and try again.",
                     JSException => $"Couldn't complete save operation: {ex.Message.Split('\n')[0]}",

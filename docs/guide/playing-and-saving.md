@@ -86,8 +86,8 @@ closing the player.
 
 Open **Saves** and select **Export** beside a named save or Quick Save checkpoint. The web player
 downloads a JSON save file using the story title and save name. The desktop player opens a native
-save dialog; its title shows a suggested filename containing the story title and save name.
-Enter that name, or choose another, in the dialog.
+save dialog with a suggested filename containing the story title and save name. You can change
+the name or location before saving.
 Keep the file somewhere safe before clearing browser data or moving to another device.
 
 To restore a backup, open the same story, enter a destination **Save name**, then choose the file

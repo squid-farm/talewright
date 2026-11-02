@@ -100,6 +100,10 @@ def main():
         exports = temporary / "map-exports"
         exports.mkdir()
         environment["TALEWRIGHT_TEST_ONLY_MAP_EXPORT_DIRECTORY"] = str(exports)
+        # Save exports have the same test-only native dialog bypass; see DesktopSaveFileDialog.
+        save_exports = temporary / "save-exports"
+        save_exports.mkdir()
+        environment["TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY"] = str(save_exports)
         environment["GSETTINGS_BACKEND"] = "keyfile"
         settings = temporary / "config/glib-2.0/settings"
         settings.mkdir(parents=True)

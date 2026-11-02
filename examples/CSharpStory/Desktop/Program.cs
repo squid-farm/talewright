@@ -11,9 +11,11 @@ builder.Services.AddSingleton<IStoryLibrary>(new EmbeddedStoryLibrary(typeof(Sto
 builder.Services.AddSingleton<ISaveStore>(new FileSaveStore(FileSaveStore.DefaultRoot));
 PhotinoWindow? window = null;
 builder.Services.AddSingleton<ISaveFileExporter>(new LocalSaveFileExporter(name =>
-    (window ?? throw new InvalidOperationException("The desktop window is not ready."))
-        .ShowSaveFileAsync($"Export saved game as {name}", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            [("JSON saved game", ["json"])])));
+{
+    var ready = window ?? throw new InvalidOperationException("The desktop window is not ready.");
+    return NativeSaveFileDialog.ChooseAsync(name, action => ready.Invoke(action),
+        OperatingSystem.IsWindows() ? () => ready.WindowHandle : null);
+}));
 builder.RootComponents.Add<Desktop.App>("app");
 var app = builder.Build();
 window = app.MainWindow;

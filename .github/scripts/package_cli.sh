@@ -70,7 +70,8 @@ for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension
   debug-assets/map/vendor/licenses/d3-timer.txt \
   debug-assets/map/vendor/licenses/d3-transition.txt \
   debug-assets/map/vendor/licenses/d3-zoom.txt \
-  publish-assets/standalone/desktop/App.razor publish-assets/player/talewright.css; do
+  publish-assets/standalone/desktop/App.razor publish-assets/desktop/THIRD-PARTY-NOTICES.txt \
+  publish-assets/player/talewright.css; do
   test -s "$output/$file" || { echo "Missing CLI archive asset: $file" >&2; exit 1; }
 done
 python3 - "$output" <<'PY'
