@@ -2,6 +2,9 @@ game:
   id: unknown-key
   title: Unknown manifest key
   start: beginning
+  unknown-game: true
 characters:
-  player: {first-name: Ada}
+  player:
+    first-name: Ada
+    unknown-character: true
 unknown-root: true

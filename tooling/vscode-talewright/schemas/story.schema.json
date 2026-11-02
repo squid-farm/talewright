@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json",
   "title": "Talewright story configuration (*.talewright.yaml)",
-  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler.",
+  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler. The editor schema rejects unknown keys; the compiler reports TW4006 and ignores them.",
   "type": "object",
   "properties": {
     "game": {
@@ -128,6 +128,7 @@
       "maximum": 2147483647
     },
     "booleanScalar": {
+      "description": "Use YAML true or false. Quoted 'true' and 'false' are also accepted; yes, no, and other values are invalid.",
       "oneOf": [
         {
           "type": "boolean"
@@ -135,7 +136,7 @@
         {
           "type": "string",
           "pattern": "^(true|false)$",
-          "description": "Quoted true/false values are also accepted by the compiler."
+          "description": "Quoted 'true' or 'false' values are also accepted by the compiler."
         }
       ]
     },
@@ -351,7 +352,7 @@
           "description": "Displayed-name grammar, never inventory quantity. Controls #this/#that, #possessive and #one-many(\"singular\", \"plural\"). A pair of boots is singular; pants is plural."
         },
         "uncountable": {
-          "type": "boolean",
+          "$ref": "#/definitions/booleanScalar",
           "default": false,
           "description": "Use some with #a, as in some armor. Does not imply plural agreement: this armor is singular. No automatic inflection or count phrasing."
         },
@@ -364,6 +365,7 @@
     },
     "faction": {
       "type": "object",
+      "description": "Faction entries must be objects. The name defaults to the faction ID and standing defaults to 0.",
       "properties": {
         "name": {
           "type": "string",
