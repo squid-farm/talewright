@@ -598,9 +598,8 @@ internal static class InlineParser
 
     private static void PairFormatting(Context context, string text, List<Token> tokens)
     {
-        var openers = new List<(int Token, int Kind, int PreviousOfKind, bool Overflow)>();
+        var openers = new List<(int Token, int PreviousOfKind)>();
         Span<int> topOfKind = [-1, -1, -1, -1];
-        var depthReported = false;
 
         for (var index = 0; index < tokens.Count; index++)
         {
@@ -619,7 +618,6 @@ internal static class InlineParser
                 var opener = openers[^1];
                 openers.RemoveAt(openers.Count - 1);
                 topOfKind[kind] = opener.PreviousOfKind;
-                if (opener.Overflow) continue;
                 tokens[opener.Token].Kind = TokenKind.FormatOpen;
                 tokens[opener.Token].Mate = index;
                 token.Kind = TokenKind.FormatClose;
@@ -628,17 +626,32 @@ internal static class InlineParser
             }
 
             if (!token.CanOpen) continue;
-            var overflow = openers.Count >= MaximumFormattingDepth;
-            if (overflow && !depthReported)
+            openers.Add((index, topOfKind[kind]));
+            topOfKind[kind] = openers.Count - 1;
+        }
+
+        var depth = 0;
+        var depthReported = false;
+        foreach (var token in tokens)
+        {
+            context.Check();
+            if (token.Kind == TokenKind.FormatClose)
             {
+                if (depth > MaximumFormattingDepth) token.Kind = TokenKind.FormatDelimiter;
+                depth--;
+            }
+            else if (token.Kind == TokenKind.FormatOpen)
+            {
+                depth++;
+                if (depth <= MaximumFormattingDepth) continue;
+                token.Kind = TokenKind.FormatDelimiter;
+                if (depthReported) continue;
+
                 context.Diagnostics.Error("TW1016",
                     $"Formatting spans are nested more than {MaximumFormattingDepth} levels deep.",
                     context.Source.Locate(token.Start));
                 depthReported = true;
             }
-
-            openers.Add((index, kind, topOfKind[kind], overflow));
-            topOfKind[kind] = openers.Count - 1;
         }
     }
 

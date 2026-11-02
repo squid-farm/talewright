@@ -389,7 +389,8 @@ is [#404](https://github.com/squid-farm/talewright/issues/404).
 - So `2*3*4`, `snake_case` and `word*inner*word` are literal. Nested spans work. Crossing spans
   are literal at the crossing run and never close an outer span or reinterpret that run as an
   opener.
-- Spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
+- Matched spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
+  Unmatched opening runs remain literal and do not count toward this limit.
 
 ### Code spans
 

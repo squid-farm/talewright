@@ -148,6 +148,8 @@ public sealed class NestingLimitTests
     [Theory]
     [InlineData(64, true)]
     [InlineData(65, false)]
+    [InlineData(66, false)]
+    [InlineData(1_000, false)]
     public void Formatting_observes_the_depth_limit(int depth, bool expectedSuccess)
     {
         var inline = string.Concat(Enumerable.Repeat("*word ", depth)) + "middle " +

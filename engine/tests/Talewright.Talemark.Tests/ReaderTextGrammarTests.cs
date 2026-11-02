@@ -76,6 +76,42 @@ public sealed class ReaderTextGrammarTests
         Assert.InRange(result.WorkUnits, input.Length, 10 * input.Length);
     }
 
+    [Theory]
+    [InlineData("*", 65)]
+    [InlineData("**", 65)]
+    [InlineData("_", 65)]
+    [InlineData("__", 65)]
+    [InlineData("*", 10_000)]
+    [InlineData("**", 10_000)]
+    [InlineData("_", 10_000)]
+    [InlineData("__", 10_000)]
+    public void Unmatched_formatting_openers_remain_literal_with_linear_work(string marker, int count)
+    {
+        var input = string.Concat(Enumerable.Repeat($"{marker}a ", count));
+        var diagnostics = new DiagnosticBag();
+        var result = InlineParser.ParseWithWork(
+            SourceText.Single(input, SourceLocation.None), Symbols(), diagnostics);
+
+        Assert.Empty(diagnostics.Items);
+        Assert.Equal(input, string.Concat(result.Inlines.Select(inline => Assert.IsType<TextTemplate>(inline).Text)));
+        Assert.InRange(result.WorkUnits, input.Length, 10 * input.Length);
+    }
+
+    [Fact]
+    public void Unmatched_openers_do_not_count_toward_matched_formatting_depth()
+    {
+        var prefix = string.Concat(Enumerable.Repeat("*unclosed ", 100));
+        var diagnostics = new DiagnosticBag();
+        var result = InlineParser.ParseWithWork(
+            SourceText.Single(prefix + "*matched*", SourceLocation.None), Symbols(), diagnostics);
+
+        Assert.Empty(diagnostics.Items);
+        Assert.Equal(prefix, string.Concat(result.Inlines.SkipLast(1).Select(inline => Assert.IsType<TextTemplate>(inline).Text)));
+        var formatted = Assert.IsType<StyledTemplate>(result.Inlines[^1]);
+        Assert.Equal(TextStyle.Emphasis, formatted.Style);
+        Assert.Equal("matched", Assert.IsType<TextTemplate>(Assert.Single(formatted.Children)).Text);
+    }
+
     private static StorySymbols Symbols()
     {
         var options = CompilerOptions.Default;
