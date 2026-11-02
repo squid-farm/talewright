@@ -62,6 +62,11 @@ async function cliExecutable(root) {
     { code: 'CLI_NOT_FOUND' });
 }
 
+async function executeCli(root, args) {
+  const executable = await cliExecutable(root);
+  return execute(executable, args, { cwd: root, timeout: 60000, maxBuffer: 1024 * 1024 });
+}
+
 async function selectExecutable(resource) {
   requireTrust();
   const [file] = await vscode.window.showOpenDialog({
@@ -201,4 +206,4 @@ function registerCliSetup(context) {
   context.subscriptions.push(vscode.commands.registerCommand('talewright.setUpCli', () => setUpCli(context)));
 }
 
-module.exports = { cliExecutable, registerCliSetup, requireDotnetRuntime };
+module.exports = { cliExecutable, executeCli, registerCliSetup, requireDotnetRuntime };
