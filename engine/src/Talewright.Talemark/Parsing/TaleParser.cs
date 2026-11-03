@@ -28,8 +28,6 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 /// </remarks>
 internal sealed partial class TaleParser
 {
-    private const int MaximumBlockConditionDepth = 64;
-
     private readonly string _file;
     private readonly TaleFileSyntax _syntax;
     private readonly string _text;
@@ -162,22 +160,9 @@ internal sealed partial class TaleParser
         }
 
         FlushParagraph();
-        if (_scene.SuppressedConditionDepth > 0)
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
-                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} block is never closed with " +
-                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.",
-                _scene.SuppressedConditionLocation);
-            _scene.SuppressedConditionDepth = 0;
-        }
+        // Syntax reported unclosed blocks; close them so their steps are kept.
         while (_scene.Frames.Count > 0)
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
-                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} block is never closed with " +
-                $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.",
-                _scene.Frames.Peek().Location);
             CloseFrame();
-        }
 
         _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location)
         {
@@ -191,11 +176,8 @@ internal sealed partial class TaleParser
     private void ParseSceneLine(TaleLineSyntax syntax)
     {
         var scene = _scene!;
-        if (scene.SuppressedConditionDepth > 0)
-        {
-            SkipSuppressedBlockLine(syntax.Kind);
+        if (syntax.IsSuppressed)
             return;
-        }
 
         if (syntax.Kind == TaleLineKind.Blank)
         {
@@ -203,9 +185,8 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var line = _syntax.Content(_sceneSyntax!, syntax).ToString();
         var indent = syntax.Indent;
-        if (syntax.Kind == TaleLineKind.Metadata && TryParseMetadata(line, indent))
+        if (syntax.Kind == TaleLineKind.Metadata && TryParseMetadata(syntax))
         {
             return;
         }
@@ -213,7 +194,7 @@ internal sealed partial class TaleParser
         if (syntax.Kind is TaleLineKind.BlockIf or TaleLineKind.BlockElse or TaleLineKind.BlockEndIf)
         {
             FlushParagraph();
-            ParseBlockDirective(syntax.Kind, indent, line);
+            ParseBlockDirective(syntax);
             return;
         }
 
@@ -224,29 +205,37 @@ internal sealed partial class TaleParser
                     AnalysisCollector.Range(At(indent), SceneVocabulary.SpeechMarker.ToString()))
                     { Kind = AuthoringTokenKind.Speech });
                 FlushParagraph();
-                ParseSpeech(line, indent);
+                ParseSpeech(syntax);
                 return;
             case TaleLineKind.Effects:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.EffectsMarker.ToString(),
                     AnalysisCollector.Range(At(indent), SceneVocabulary.EffectsMarker.ToString()))
                     { Kind = AuthoringTokenKind.Effects });
                 FlushParagraph();
-                ParseEntryEffects(line[1..], indent + 1);
+                var effects = ParseEffects(Value(syntax), At(Part(syntax).ValueStart));
+                if (effects is not null)
+                {
+                    var effectStart = At(indent);
+                    scene.CurrentSteps.Add(new EffectStep(StepId(effectStart), SpanFrom(effectStart), effects));
+                }
+
                 return;
             case TaleLineKind.Choice:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.ChoiceMarker.ToString(),
                     AnalysisCollector.Range(At(indent), SceneVocabulary.ChoiceMarker.ToString()))
                     { Kind = AuthoringTokenKind.Choice });
                 FlushParagraph();
-                ParseChoice(line, indent);
+                ParseChoice(Content(syntax), indent);
                 return;
             case TaleLineKind.Divert:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
                     AnalysisCollector.Range(At(indent), SceneVocabulary.Divert))
                     { Kind = AuthoringTokenKind.Divert });
                 FlushParagraph();
-                var target = ParseDivertTarget(line[SceneVocabulary.Divert.Length..],
-                    indent + SceneVocabulary.Divert.Length);
+                var targetLocation = At(Part(syntax).ValueStart);
+                var targetId = Value(syntax);
+                _symbols.Analysis?.Reference(targetId, targetLocation, AuthoringSymbolKind.Scene, SceneVocabulary.End);
+                var target = syntax.IsInvalid ? null : BindDivertTarget(targetId, targetLocation);
                 if (target is not null)
                 {
                     var start = At(indent);
@@ -259,7 +248,7 @@ internal sealed partial class TaleParser
                     AnalysisCollector.Range(At(indent), SceneVocabulary.SkillCheckFence))
                     { Kind = AuthoringTokenKind.SkillCheckBlock });
                 FlushParagraph();
-                ParseBlockCheck(line, indent);
+                ParseBlockCheck(Content(syntax), indent);
                 return;
             case TaleLineKind.SuccessOutcome or TaleLineKind.FailureOutcome:
                 _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
@@ -268,106 +257,62 @@ internal sealed partial class TaleParser
                     At(indent));
                 return;
             case TaleLineKind.MisplacedMetadata:
-                _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
-                    $"Metadata ({SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}, " +
-                    $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Tags}, …) must come directly after the " +
-                    $"'{SceneVocabulary.SceneHeader}' line.", At(indent));
                 return;
         }
 
-        scene.Paragraph.AppendLine(line, At(indent));
+        scene.Paragraph.AppendLine(Content(syntax), At(indent));
     }
+
+    private string Content(TaleLineSyntax line) => _syntax.Content(_sceneSyntax!, line).ToString();
+
+    private TaleLinePart Part(TaleLineSyntax line) => _sceneSyntax!.Part(line);
+
+    private string Head(TaleLineSyntax line) => _syntax.Head(_sceneSyntax!, line).ToString();
+
+    private string Value(TaleLineSyntax line) => _syntax.Value(_sceneSyntax!, line).ToString();
 
     // ---- metadata --------------------------------------------------------------------------------------------------
 
-    private bool TryParseMetadata(string line, int indent)
+    private bool TryParseMetadata(TaleLineSyntax syntax)
     {
-        var keyword = line[1..].Split(' ', 2)[0];
-        _symbols.Analysis?.Reference(keyword, At(indent + 1), AuthoringSymbolKind.Directive,
+        _symbols.Analysis?.Reference(Head(syntax), At(Part(syntax).HeadStart), AuthoringSymbolKind.Directive,
             SceneVocabulary.MetadataSpellings);
-        var parts = line[1..].Split(' ', 2, StringSplitOptions.TrimEntries);
-        if (!SceneVocabulary.TryGetMetadataKey(parts[0], out var key))
+        if (syntax.MetadataKey is not { } key)
             return false;
-        var value = parts.Length > 1 ? parts[1] : string.Empty;
-        var valueColumn = indent + line.IndexOf(' ', StringComparison.Ordinal) + 1;
-        var scene = _scene!;
-        if (key is SceneMetadataKey.Hub or SceneMetadataKey.HubLimit && !scene.HubDirectives.Add(key))
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
-                $"Duplicate @{SceneVocabulary.Spelling(key)} directive.", At(indent));
+        if (syntax.IsInvalid)
             return true;
-        }
+        var value = Value(syntax);
+        var scene = _scene!;
         switch (key)
         {
             case SceneMetadataKey.Title:
                 scene.Title = value;
                 return true;
             case SceneMetadataKey.Requires:
-                var expressionColumn = line.IndexOf(' ', StringComparison.Ordinal) < 0
-                    ? indent + line.Length
-                    : valueColumn + line[(valueColumn - indent)..].Length - line[(valueColumn - indent)..].TrimStart().Length;
-                scene.Requires = ExpressionParser.ParseCondition(value, At(valueColumn), _symbols, _diagnostics,
-                    At(expressionColumn));
+                var part = Part(syntax);
+                scene.Requires = ExpressionParser.ParseCondition(value, At(part.MetadataValueColumn(syntax)),
+                    _symbols, _diagnostics, At(part.ValueStart));
                 return true;
             case SceneMetadataKey.Tags:
-                foreach (var tag in value.Split(ExpressionVocabulary.ArgumentSeparator,
-                             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                foreach (var tag in TaleSyntaxParser.ReadTags(value))
                 {
                     scene.Tags.Add(tag);
                 }
 
                 return true;
             case SceneMetadataKey.Priority:
-                if (int.TryParse(value, out var priority))
-                {
-                    scene.Priority = priority;
-                    scene.HasExplicitPriority = true;
-                }
-                else
-                {
-                    _diagnostics.Error(CompilerDiagnosticCodes.NumberTooLarge,
-                        $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Priority} needs a whole number.", At(valueColumn));
-                }
-
+                scene.Priority = int.Parse(value);
+                scene.HasExplicitPriority = true;
                 return true;
             case SceneMetadataKey.Once:
                 scene.Once = true;
                 return true;
             case SceneMetadataKey.Hub:
-                SceneHubMode? hubMode = SceneVocabulary.TryGetHubMode(value, out var parsedHubMode)
-                    ? parsedHubMode
-                    : null;
-                var hubPrefix = hubMode is { } mode ? SceneVocabulary.HubModePrefix(mode) : string.Empty;
-                var tags = hubMode is not null && value.EndsWith(ExpressionVocabulary.CloseParen)
-                    ? value[hubPrefix.Length..^1].Split(ExpressionVocabulary.ArgumentSeparator, StringSplitOptions.TrimEntries)
-                    : new[] { value };
-                if (tags.Any(t => string.IsNullOrWhiteSpace(t) ||
-                                  t.Any(c => char.IsWhiteSpace(c) || c is ExpressionVocabulary.OpenParen or
-                                      ExpressionVocabulary.CloseParen or ExpressionVocabulary.ArgumentSeparator)) ||
-                    tags.Distinct(StringComparer.Ordinal).Count() != tags.Length)
-                {
-                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
-                        $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Hub} needs a tag or " +
-                        $"{SceneVocabulary.HubAllPrefix}tag{ExpressionVocabulary.ArgumentSeparator} tag" +
-                        $"{ExpressionVocabulary.CloseParen}/{SceneVocabulary.HubAnyPrefix}tag" +
-                        $"{ExpressionVocabulary.ArgumentSeparator} tag{ExpressionVocabulary.CloseParen} " +
-                        "with distinct nonempty tags.", At(indent));
-                }
-                else
-                {
-                    scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, hubMode == SceneHubMode.All);
-                }
+                TaleSyntaxParser.TryReadHub(value, out var tags, out var all);
+                scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, all);
                 return true;
             case SceneMetadataKey.HubLimit:
-                if (int.TryParse(value, out var limit) && limit > 0)
-                {
-                    scene.HubLimit = limit;
-                }
-                else
-                {
-                    _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
-                        $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.HubLimit} needs a positive whole number.", At(indent));
-                }
+                scene.HubLimit = int.Parse(value);
                 return true;
             default:
                 throw new ArgumentOutOfRangeException(nameof(key), key, null);
@@ -376,75 +321,29 @@ internal sealed partial class TaleParser
 
     // ---- block conditionals ----------------------------------------------------------------------------------------
 
-    private void ParseBlockDirective(TaleLineKind kind, int indent, string line)
+    private void ParseBlockDirective(TaleLineSyntax syntax)
     {
         var scene = _scene!;
-        var directive = line[1..^1].Trim();
-        var keyword = kind switch
-        {
-            TaleLineKind.BlockIf => SceneVocabulary.If,
-            TaleLineKind.BlockElse => SceneVocabulary.Else,
-            _ => SceneVocabulary.EndIf,
-        };
-        var keywordStart = line.IndexOf(keyword, StringComparison.Ordinal);
-        _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(indent + keywordStart), keyword))
+        var keyword = Head(syntax);
+        _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(Part(syntax).HeadStart), keyword))
             { Kind = AuthoringSyntaxVocabulary.ConditionalKind(keyword) });
-        if (kind == TaleLineKind.BlockElse)
+        // Syntax reported unmatched and over-nested directives; the frames below always balance.
+        if (syntax.IsInvalid)
+            return;
+        switch (syntax.Kind)
         {
-            if (scene.Frames.Count == 0 || scene.Frames.Peek().InElse)
-            {
-                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
-                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.Else}{SceneVocabulary.InlineClose} without a matching " +
-                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose}.", At(indent));
+            case TaleLineKind.BlockElse:
+                scene.Frames.Peek().InElse = true;
                 return;
-            }
-
-            scene.Frames.Peek().InElse = true;
-            return;
-        }
-
-        if (kind == TaleLineKind.BlockEndIf)
-        {
-            if (scene.Frames.Count == 0)
-            {
-                _diagnostics.Error(CompilerDiagnosticCodes.UnbalancedCondition,
-                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose} without a matching " +
-                    $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose}.", At(indent));
+            case TaleLineKind.BlockEndIf:
+                CloseFrame();
                 return;
-            }
-
-            CloseFrame();
-            return;
         }
 
-        if (scene.Frames.Count == MaximumBlockConditionDepth)
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.NestingLimitExceeded,
-                $"Conditions are nested more than {MaximumBlockConditionDepth} levels deep.", At(indent));
-            scene.SuppressedConditionDepth = 1;
-            scene.SuppressedConditionLocation = At(indent);
-            return;
-        }
-
-        var lead = line[1..^1].Length - line[1..^1].TrimStart().Length;
-        var condition = ExpressionParser.ParseCondition(
-            directive[SceneVocabulary.IfPrefix.Length..],
-            At(indent + 1 + SceneVocabulary.IfPrefix.Length), _symbols, _diagnostics,
-            At(indent + 1 + lead + SceneVocabulary.IfPrefix.Length))
+        var condition = ExpressionParser.ParseCondition(Value(syntax),
+            At(syntax.Indent + 1 + SceneVocabulary.IfPrefix.Length), _symbols, _diagnostics, At(Part(syntax).ValueStart))
             ?? new BoolLiteral(false);
-        scene.Frames.Push(new Frame(condition, At(indent)));
-    }
-
-    private void SkipSuppressedBlockLine(TaleLineKind kind)
-    {
-        if (kind == TaleLineKind.BlockIf)
-        {
-            _scene!.SuppressedConditionDepth++;
-        }
-        else if (kind == TaleLineKind.BlockEndIf)
-        {
-            _scene!.SuppressedConditionDepth--;
-        }
+        scene.Frames.Push(new Frame(condition, At(syntax.Indent)));
     }
 
     private void CloseFrame()
@@ -478,61 +377,35 @@ internal sealed partial class TaleParser
         scene.Paragraph = new SourceText();
     }
 
-    private void ParseSpeech(string line, int indent)
+    private void ParseSpeech(TaleLineSyntax syntax)
     {
         if (_discoverEffects is not null)
         {
             return;
         }
 
-        var body = line[1..];
-        var colon = body.IndexOf(ExpressionVocabulary.Separator, StringComparison.Ordinal);
-        var speakerText = (colon < 0 ? body : body[..colon]).Trim();
-        _symbols.Analysis?.Reference(speakerText, At(indent + 1 + body.Length - body.TrimStart().Length),
-            AuthoringSymbolKind.Character);
-        var who = colon > 0 ? body[..colon].Trim() : string.Empty;
-        if (who.Length == 0 || !IdentifierRules.IsValid(who))
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedDialogue,
-                $"Speech lines look like '{SceneVocabulary.SpeechMarker} who{ExpressionVocabulary.Separator} text', " +
-                "where who is a character id.", At(indent));
+        var who = Head(syntax);
+        var speakerLocation = At(Part(syntax).HeadStart);
+        _symbols.Analysis?.Reference(who, speakerLocation, AuthoringSymbolKind.Character);
+        if (syntax.IsInvalid)
             return;
-        }
 
         var speaker = new EntityId(who);
+        var text = SourceText.Single(Value(syntax), At(Part(syntax).ValueStart));
         if (!_symbols.World.Characters.ContainsKey(speaker))
         {
-            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{who}'. Declare it under characters in story.talewright.yaml.", At(indent + 1 + body.IndexOf(who, StringComparison.Ordinal)));
+            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{who}'. Declare it under characters in story.talewright.yaml.", speakerLocation);
             if (_symbols.Analysis is not null)
-            {
-                var partial = body[(colon + 1)..];
-                var whitespace = partial.Length - partial.TrimStart().Length;
-                InlineParser.Parse(SourceText.Single(partial.Trim(), At(indent + colon + 2 + whitespace)),
-                    _symbols, new DiagnosticBag(), cancellationToken: _cancellationToken);
-            }
+                InlineParser.Parse(text, _symbols, new DiagnosticBag(), cancellationToken: _cancellationToken);
             return;
         }
 
-        var text = body[(colon + 1)..];
-        var lead = text.Length - text.TrimStart().Length;
-        var inlines = InlineParser.Parse(SourceText.Single(text.Trim(), At(indent + 1 + colon + 1 + lead)),
-            _symbols, _diagnostics, cancellationToken: _cancellationToken);
-        var start = At(indent);
+        var inlines = InlineParser.Parse(text, _symbols, _diagnostics, cancellationToken: _cancellationToken);
+        var start = At(syntax.Indent);
         _scene!.CurrentSteps.Add(new ProseStep(StepId(start), SpanFrom(start), new SpeechTemplate(speaker, inlines)));
     }
 
     // ---- effects and diverts ---------------------------------------------------------------------------------------
-
-    private void ParseEntryEffects(string text, int column)
-    {
-        var lead = text.Length - text.TrimStart().Length;
-        var effects = ParseEffects(text.Trim(), At(column + lead));
-        if (effects is not null)
-        {
-            var start = At(column - 1);
-            _scene!.CurrentSteps.Add(new EffectStep(StepId(start), SpanFrom(start), effects));
-        }
-    }
 
     private IReadOnlyList<Effect>? ParseEffects(string text, SourceLocation location)
     {
@@ -551,25 +424,20 @@ internal sealed partial class TaleParser
         var id = text.Trim();
         var location = At(column + lead);
         _symbols.Analysis?.Reference(id, location, AuthoringSymbolKind.Scene, SceneVocabulary.End);
+        if (TaleSyntaxParser.DivertTargetError(id) is { } error)
+        {
+            _diagnostics.Error(error.Code, error.Message, location);
+            return null;
+        }
+
+        return BindDivertTarget(id, location);
+    }
+
+    private DivertTarget? BindDivertTarget(string id, SourceLocation location)
+    {
         if (id == SceneVocabulary.End)
         {
             return DivertTarget.End;
-        }
-
-        if (id.Length == 0)
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.MissingDivertTarget,
-                $"Divert needs a target: '{SceneVocabulary.Divert} scene.id' or '{SceneVocabulary.Divert} " +
-                $"{SceneVocabulary.End}'.", location);
-            return null;
-        }
-
-        if (!IdentifierRules.IsValid(id))
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneId,
-                $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators.",
-                location);
-            return null;
         }
 
         if (!_symbols.Scenes.Contains(new SceneId(id)))
@@ -1124,13 +992,10 @@ internal sealed partial class TaleParser
         public bool Once { get; set; }
         public Talewright.Rules.Storylets.StoryletTags? Hub { get; set; }
         public int? HubLimit { get; set; }
-        public HashSet<SceneMetadataKey> HubDirectives { get; } = [];
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
         public bool DroppedMalformedChoice { get; set; }
         public Stack<Frame> Frames { get; } = new();
-        public int SuppressedConditionDepth { get; set; }
-        public SourceLocation SuppressedConditionLocation { get; set; }
         public SourceText Paragraph { get; set; } = new();
 
         public List<SceneStep> CurrentSteps =>
