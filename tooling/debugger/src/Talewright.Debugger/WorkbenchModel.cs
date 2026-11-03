@@ -41,9 +41,10 @@ public sealed class SetupText(VarId id, string value)
 public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text);
 
 /// <summary>UI-independent orchestration; every replacement is prepared before adoption.</summary>
-public sealed class WorkbenchModel(string root) : IDisposable
+public sealed class WorkbenchModel(string root, string? requestedScene = null) : IDisposable
 {
     private StorySource? _acceptedSource;
+    private string? _requestedScene = requestedScene;
     public StoryImages? Images { get; private set; }
     private readonly List<StoryImages> _retiredImages = [];
     public string Root { get; } = root;
@@ -72,7 +73,8 @@ public sealed class WorkbenchModel(string root) : IDisposable
     public AuthorInspection? Inspection { get; private set; }
     public IGameStateView PreviewState => Session?.State ?? StartingState();
     public CharacterSelection? Character { get; private set; }
-    public string Target { get; set; } = "";
+    public string Target { get; set; } = requestedScene ?? "";
+    public string? RequestedSceneNotice { get; private set; }
     public string Seed { get; set; } = "";
     public IReadOnlyList<SetupNumber> Numbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
@@ -241,6 +243,9 @@ public sealed class WorkbenchModel(string root) : IDisposable
                     Diagnostics = compiled.Diagnostics;
                     SourceRejected = true;
                     Error = "Story has compiler errors. Fix and save, or select Rescan / retry watcher. Any previous run is unchanged.";
+                    RequestedSceneNotice = _requestedScene is { } requested
+                        ? $"Requested scene '{requested}' could not be verified because the story has compiler errors."
+                        : null;
                 });
                 return false;
             }
@@ -358,7 +363,14 @@ public sealed class WorkbenchModel(string root) : IDisposable
             }
             BuildSetup(numbers, flags, texts).Validate(story);
             var selection = RevalidateCharacter(story);
-            var target = string.IsNullOrWhiteSpace(Target) ? story.Start.Value : Target;
+            var requestedScene = _requestedScene;
+            var target = requestedScene ?? (string.IsNullOrWhiteSpace(Target) ? story.Start.Value : Target);
+            var requestedSceneExists = requestedScene is null ||
+                story.Scenes.Any(scene => scene.Id.Value == requestedScene);
+            if (!requestedSceneExists)
+            {
+                target = story.Start.Value;
+            }
             story.GetScene(new(target));
             var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
             ParseSeed(seed);
@@ -382,6 +394,9 @@ public sealed class WorkbenchModel(string root) : IDisposable
                 RefreshEdits();
                 SourceRejected = false;
                 RestartRequired = false;
+                _requestedScene = null;
+                RequestedSceneNotice = requestedSceneExists ? null
+                    : $"Requested scene '{requestedScene}' was not found. The configured start scene is selected instead.";
                 _acceptedSource = candidate.Source;
                 AdoptImages(candidate.Source!);
                 AcceptedSourceMap = compiled.SourceMap;

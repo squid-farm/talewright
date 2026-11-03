@@ -35,11 +35,11 @@ internal sealed record NativeHostEnvironment(
 internal static class NativeHostLauncher
 {
     internal sealed record Operations(
-        Func<NativeHostMode, string, TextWriter, TextWriter, CancellationToken, int> Launch)
+        Func<NativeHostMode, string, string?, TextWriter, TextWriter, CancellationToken, int> Launch)
     {
         public static Operations Default { get; } = new(
-            (mode, root, output, error, cancellationToken) =>
-                NativeHostLauncher.Launch(mode, root, output, error, cancellationToken));
+            (mode, root, scene, output, error, cancellationToken) =>
+                NativeHostLauncher.Launch(mode, root, output, error, cancellationToken, scene));
     }
 
     private sealed record HostDetails(string Name, string AssetName, string[] Assets, string[] BundledAssets);
@@ -76,7 +76,7 @@ internal static class NativeHostLauncher
         !string.IsNullOrEmpty(environment("DISPLAY")) || !string.IsNullOrEmpty(environment("WAYLAND_DISPLAY"));
 
     internal static int Launch(NativeHostMode mode, string root, TextWriter output, TextWriter error,
-        CancellationToken cancellationToken, NativeHostEnvironment? environment = null)
+        CancellationToken cancellationToken, string? scene = null, NativeHostEnvironment? environment = null)
     {
         var host = mode switch
         {
@@ -147,6 +147,11 @@ internal static class NativeHostLauncher
             start.ArgumentList.Add("--play");
         }
         start.ArgumentList.Add(root);
+        if (mode == NativeHostMode.Debugger && scene is not null)
+        {
+            start.ArgumentList.Add("--scene");
+            start.ArgumentList.Add(scene);
+        }
         if (mode == NativeHostMode.Player)
         {
             start.ArgumentList.Add(Path.Combine(binaries, "publish-assets", "player"));

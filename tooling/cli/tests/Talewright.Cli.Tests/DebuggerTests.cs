@@ -114,6 +114,62 @@ public sealed class DebuggerTests : IDisposable
     }
 
     [Fact]
+    public void Requested_scene_is_preselected_without_starting_the_workbench()
+    {
+        using var model = new WorkbenchModel(_root, "scene1000");
+
+        model.Reload();
+
+        Assert.Null(model.Error);
+        Assert.Null(model.Session);
+        Assert.Equal("scene1000", model.Target);
+        Assert.Null(model.RequestedSceneNotice);
+
+        model.Start();
+
+        Assert.Equal("scene1000", model.Session!.Current.Scene?.Value);
+        Assert.Equal(0, model.Session.State.VisitCount(new("scene1")));
+    }
+
+    [Fact]
+    public void Requested_scene_is_reported_when_compilation_fails_then_selected_after_repair()
+    {
+        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== start\n-> missing\n");
+        using var model = new WorkbenchModel(_root, "scene1000");
+
+        model.Reload();
+
+        Assert.Null(model.Session);
+        Assert.Contains("could not be verified", model.RequestedSceneNotice);
+        Assert.NotEmpty(model.Diagnostics);
+
+        File.WriteAllText(Path.Combine(_root, "main.tale"), string.Join('\n',
+            SceneFaker.Header("scene1"), DivertFaker.To("scene1000"),
+            SceneFaker.Header("scene1000"), SceneFaker.Title("Requested scene"), DivertFaker.To("END")));
+        model.Reload();
+
+        Assert.Null(model.Error);
+        Assert.Null(model.RequestedSceneNotice);
+        Assert.Equal("scene1000", model.Target);
+        Assert.Null(model.Session);
+        model.Start();
+        Assert.Equal("scene1000", model.Session!.Current.Scene?.Value);
+    }
+
+    [Fact]
+    public void Missing_requested_scene_falls_back_to_start_with_visible_notice()
+    {
+        using var model = new WorkbenchModel(_root, "not-found");
+
+        model.Reload();
+
+        Assert.Null(model.Error);
+        Assert.Null(model.Session);
+        Assert.Equal("scene1", model.Target);
+        Assert.Contains("was not found", model.RequestedSceneNotice);
+    }
+
+    [Fact]
     public void Map_preview_uses_pending_setup_when_no_run_exists_and_current_state_after_start()
     {
         using var model = new WorkbenchModel(_root);
@@ -307,8 +363,72 @@ public sealed class DebuggerTests : IDisposable
         using var error = new StringWriter();
         Assert.Equal(0, CommandLine.Run(["debug", "--help"], output, error));
         Assert.Contains("story-root", output.ToString());
+        Assert.Contains("--scene", output.ToString());
         Assert.Equal(2, CommandLine.Run(["debug", Path.Combine(_root, "missing")], output, error));
         Assert.Contains("TWCLI002", error.ToString());
+    }
+
+    [Fact]
+    public void Debug_scene_option_is_passed_to_host_without_starting_the_debugger()
+    {
+        NativeHostMode? mode = null;
+        string? launchedRoot = null;
+        string? scene = null;
+        var result = CommandLine.Run(["debug", _root, "--scene", "scene1000"],
+            new StringWriter(), new StringWriter(),
+            new CliInput(TextReader.Null, true, true, true),
+            nativeLaunch: new NativeHostLauncher.Operations((actualMode, root, requestedScene, _, _, _) =>
+            {
+                mode = actualMode;
+                launchedRoot = root;
+                scene = requestedScene;
+                return 0;
+            }));
+
+        Assert.Equal(0, result);
+        Assert.Equal(NativeHostMode.Debugger, mode);
+        Assert.Equal(Path.GetFullPath(_root), launchedRoot);
+        Assert.Equal("scene1000", scene);
+    }
+
+    [Fact]
+    public void Unknown_scene_is_rejected_before_launch_when_story_compiles()
+    {
+        var launched = false;
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var result = CommandLine.Run(["debug", _root, "--scene", "missing"], output, error,
+            new CliInput(TextReader.Null, true, true, true),
+            nativeLaunch: new NativeHostLauncher.Operations((_, _, _, _, _, _) =>
+            {
+                launched = true;
+                return 0;
+            }));
+
+        Assert.Equal(2, result);
+        Assert.Contains("TWCLI001", error.ToString());
+        Assert.Contains("Scene 'missing' was not found", error.ToString());
+        Assert.False(launched);
+    }
+
+    [Fact]
+    public void Compiler_errors_still_open_debugger_with_requested_scene()
+    {
+        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== scene1\n-> missing");
+        string? scene = null;
+
+        var result = CommandLine.Run(["debug", _root, "--scene", "future-scene"],
+            new StringWriter(), new StringWriter(),
+            new CliInput(TextReader.Null, true, true, true),
+            nativeLaunch: new NativeHostLauncher.Operations((_, _, requestedScene, _, _, _) =>
+            {
+                scene = requestedScene;
+                return 0;
+            }));
+
+        Assert.Equal(0, result);
+        Assert.Equal("future-scene", scene);
     }
 
     [Theory]

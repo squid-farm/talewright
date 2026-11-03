@@ -47,6 +47,16 @@ with whatever game state you need:
 talewright debug my-story
 ```
 
+You can preselect a scene from the CLI with `--scene`; the debugger still waits for you to set up
+the seed, character and prerequisite overrides, then click **Start selected scene**:
+
+```bash
+talewright debug my-story --scene temple.altar
+```
+
+The scene ID is checked before the window opens when the story compiles. If the story has compiler
+errors, the debugger opens to show them and selects the requested scene after it becomes available.
+
 The editor action opens this same native testing window, not a VS Code debug adapter or F5 session.
 The portable CLI includes the debugger, but its window still needs the system components listed
 in the [setup guide](cli-installation.md#if-something-goes-wrong).
