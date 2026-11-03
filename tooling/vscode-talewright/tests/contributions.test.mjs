@@ -19,3 +19,19 @@ test('snippets have discoverable prefixes and a bounded default-expansion contra
       `${name}: update compiler/default-expansion tests if richer snippet syntax is added`);
   }
 });
+
+test('Play From This Scene has gated menus, a default-enabled code lens, and an optional debug task scene', async () => {
+  const manifest = await json('package.json');
+  assert.ok(manifest.contributes.commands.some(command =>
+    command.command === 'talewright.playFromScene' && command.title === 'Talewright: Play From This Scene'));
+  assert.ok(manifest.contributes.menus['editor/context'].some(menu =>
+    menu.command === 'talewright.playFromScene' && /talewright\.inScene/.test(menu.when)));
+  assert.ok(manifest.contributes.menus.commandPalette.some(menu =>
+    menu.command === 'talewright.playFromScene' && /talewright\.inScene/.test(menu.when)));
+  assert.deepEqual(manifest.contributes.configuration.properties['talewright.codeLens.playFromScene'], {
+    type: 'boolean', default: true, scope: 'resource',
+    description: 'Show a Play from here code lens above each scene in Talemark files.',
+  });
+  assert.equal(manifest.contributes.taskDefinitions[0].properties.scene.type, 'string');
+  assert.ok(!manifest.contributes.taskDefinitions[0].required.includes('scene'));
+});

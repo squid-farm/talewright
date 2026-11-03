@@ -158,6 +158,11 @@ remain in the task terminal; a started task is not a success notification.
   prerequisites are required: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.
   Linux x64 is the installed-extension verification platform; other hosts are not verified here.
   See [CLI/debugger prerequisites](https://github.com/squid-farm/talewright/blob/main/docs/reference/cli.md).
+- **Play From This Scene** is available from the Command Palette and the editor context menu when
+  the cursor is inside a scene. The **Play from here** code lens above each scene launches
+  `talewright debug <story> --scene <scene-id>` in the native Author Debugger. Code lenses are
+  enabled by default and can be disabled with `talewright.codeLens.playFromScene`. The command
+  saves dirty story documents with your approval and does not start normal play automatically.
 - **Run Story** runs `talewright run <story>` in the native player from the story's configured
   start. It requires the .NET 10 Runtime and the separately installed CLI; missing prerequisites
   are reported with setup guidance, never installed automatically. The task stays alive while play
@@ -181,9 +186,19 @@ the extension never creates or edits that file:
     "command": "run",
     "story": ".",
     "problemMatcher": []
+  }, {
+    "label": "Debug a scene",
+    "type": "talewright",
+    "command": "debug",
+    "story": ".",
+    "scene": "scene-id",
+    "problemMatcher": []
   }]
 }
 ```
+
+For a reusable scene-specific debugger task, add the optional `scene` property to a `debug`
+task. It is not supported with `run`.
 
 `story` is relative to that workspace folder (or an absolute canonical story-root path within the
 workspace). Tasks in a multi-root `.code-workspace` file are also supported: a relative `story`
