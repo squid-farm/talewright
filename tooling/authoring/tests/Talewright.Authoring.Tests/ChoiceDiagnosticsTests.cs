@@ -96,7 +96,7 @@ public sealed class ChoiceDiagnosticsTests
         var analysis = StoryAnalyzer.Analyze(source);
 
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
-        Assert.Equal(["TW1014", "TW1011"], analysis.Diagnostics.Select(diagnostic => diagnostic.Code));
+        Assert.Equal(["TW1011", "TW1014"], analysis.Diagnostics.Select(diagnostic => diagnostic.Code).Order());
         Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Code == "TW1004");
     }
 
@@ -109,7 +109,7 @@ public sealed class ChoiceDiagnosticsTests
         var substitutions = analysis.Expressions.Where(context => context.Kind == ExpressionContextKind.Substitution).ToArray();
 
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
-        Assert.Equal(["TW1014", "TW1011"], analysis.Diagnostics.Select(diagnostic => diagnostic.Code));
+        Assert.Equal(["TW1011", "TW1014"], analysis.Diagnostics.Select(diagnostic => diagnostic.Code).Order());
         Assert.Equal(["player:first-name", "item:weapon."], substitutions.Select(context => context.Text));
         Assert.All(substitutions, context => Assert.Equal(context.Text, Slice(source, context.Range)));
         var position = new SourceLocation("main.tale", 2, line.Length + 1);

@@ -145,7 +145,7 @@ public sealed class StoryCompletionTests
         var errors = analysis.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
         if (line.StartsWith("*", StringComparison.Ordinal))
         {
-            Assert.Equal(["TW1014", "TW1011"], errors.Select(diagnostic => diagnostic.Code));
+            Assert.Equal(["TW1011", "TW1014"], errors.Select(diagnostic => diagnostic.Code).Order());
         }
         else
         {
