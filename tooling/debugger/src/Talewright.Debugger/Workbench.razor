@@ -18,6 +18,10 @@
         <p role="status">@status</p>
     }
     <DiagnosticList Diagnostics="Model.Diagnostics" />
+    @if (Model.RequestedSceneNotice is { } requestedSceneNotice)
+    {
+        <p role="status">@requestedSceneNotice</p>
+    }
     @if (Model.SourceRejected)
     {
         <p role="status">Source not adopted. Displayed story and playtest, if any, use the last successful compilation.</p>

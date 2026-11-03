@@ -173,10 +173,15 @@ Missing folders, assets or prerequisites, and native launch failures, exit 2 wit
 
 ```bash
 talewright debug path/to/story
+talewright debug path/to/story --scene temple.altar
 ```
 
 Opens the native Author Debugger and waits for it to close. For a walkthrough, see
 [Testing your story](../guide/testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
+`--scene <id>` preselects a scene in setup; it does not start the scene automatically. If the story
+compiles but the ID does not exist, the command exits 2 with `TWCLI001` before opening the debugger.
+If the story has compiler errors, the debugger still opens with those diagnostics and the requested
+scene is selected if it exists after the errors are fixed.
 
 **Requirements.** A graphical desktop and the OS webview: WebKitGTK 4.1 on Linux
 (`libwebkit2gtk-4.1-0`), WebView2 on Windows, WKWebView on macOS. There's no browser fallback. Linux x64

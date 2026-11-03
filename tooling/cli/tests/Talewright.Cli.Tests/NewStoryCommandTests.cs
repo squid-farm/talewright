@@ -53,7 +53,7 @@ public sealed class NewStoryCommandTests : IDisposable
 
         NativeHostMode? mode = null;
         string? launchedStory = null;
-        var run = Invoke(["run", story], new NativeHostLauncher.Operations((actualMode, root, _, _, _) =>
+        var run = Invoke(["run", story], new NativeHostLauncher.Operations((actualMode, root, _, _, _, _) =>
         {
             mode = actualMode;
             launchedStory = root;
