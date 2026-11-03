@@ -64,10 +64,38 @@ public sealed class CharacterCreationTests(WebHostFixture host, ITestOutputHelpe
     [Fact]
     public async Task Default_creation_plays_saves_replays_and_restarts_on_both_hosts()
     {
-        await Upload(Fixture());
+        var fixture = Fixture();
+        await Upload(fixture);
         await Driver.ClickAsync("Start story");
         await Observe(new(null, "Mara's"));
+
+        if (PlayerTarget.IsDesktop)
+        {
+            await Driver.DisposeAsync();
+            await Driver.StartAsync();
+        }
+        else
+        {
+            await ReloadAsync();
+        }
+        await Upload(fixture, resumeAutosave: true);
+        await Observe(new(null, "Mara's"));
+
         await Choose("Walk onward");
+        await Observe(new(null, "Second passage text."));
+
+        if (PlayerTarget.IsDesktop)
+        {
+            await Driver.DisposeAsync();
+            await Driver.StartAsync();
+        }
+        else
+        {
+            await ReloadAsync();
+        }
+        await Upload(fixture, resumeAutosave: true);
+        await Observe(new(null, "Second passage text."));
+
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
         await Driver.ClickAsync("Load My save");

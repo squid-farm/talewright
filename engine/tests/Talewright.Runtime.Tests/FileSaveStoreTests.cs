@@ -53,6 +53,52 @@ public sealed class FileSaveStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Autosave_is_one_story_scoped_atomic_slot_separate_from_named_and_quick_saves()
+    {
+        await Assert.ThrowsAsync<FileNotFoundException>(() => Store.ReadAutosaveAsync("story"));
+        await Store.WriteAsync("story", "Autosave", [1]);
+        await Store.WriteQuickAsync("story", [2]);
+        await Store.WriteAutosaveAsync("story", [3]);
+        await Store.WriteAutosaveAsync("story", [4]);
+        await Store.WriteAutosaveAsync("other", [5]);
+
+        Assert.Equal(new byte[] { 4 }, await Store.ReadAutosaveAsync("story"));
+        Assert.Equal(new byte[] { 5 }, await Store.ReadAutosaveAsync("other"));
+        Assert.Equal(new byte[] { 2 }, await Store.ReadQuickAsync("story"));
+        Assert.Equal(new byte[] { 1 }, await Store.ReadAsync("story", "Autosave"));
+        Assert.Equal(["Autosave"], await Store.ListAsync("story"));
+        Assert.Equal([SaveEntry.QuickSlot, SaveEntry.AutosaveSlot, "Autosave"],
+            (await Store.ListEntriesAsync("story")).Select(entry => entry.Slot));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            Store.WriteAsync("story", SaveEntry.AutosaveSlot, [6], overwrite: true));
+        Assert.Equal(2, Directory.EnumerateFiles(_root, "autosave.json", SearchOption.AllDirectories).Count());
+    }
+
+    [Fact]
+    public async Task Failed_autosave_replacement_preserves_payload_and_cleans_temporary_files()
+    {
+        await Store.WriteAutosaveAsync("story", [1]);
+        await Assert.ThrowsAsync<InvalidDataException>(() => Store.WriteAutosaveAsync("story", []));
+        Assert.Equal(new byte[] { 1 }, await Store.ReadAutosaveAsync("story"));
+
+        var target = Directory.GetFiles(_root, "autosave.json", SearchOption.AllDirectories).Single();
+        var backup = target + ".backup";
+        File.Move(target, backup);
+        Directory.CreateDirectory(target);
+        try
+        {
+            await Assert.ThrowsAnyAsync<IOException>(() => Store.WriteAutosaveAsync("story", [2]));
+            Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            Directory.Delete(target);
+            File.Move(backup, target);
+        }
+        Assert.Equal(new byte[] { 1 }, await Store.ReadAutosaveAsync("story"));
+    }
+
+    [Fact]
     public async Task Catalog_lists_quick_metadata_once_and_preserves_damaged_checkpoint()
     {
         var json = """

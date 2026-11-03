@@ -45,6 +45,9 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 .tw-story-origin { display: block; font-family: var(--tw-ui-font); font-size: 0.8rem; color: var(--tw-muted); }
 .tw-error { color: var(--tw-error); }
 .tw-resume { margin: 1rem 0; }
+.tw-resume-prompt { max-width: 42rem; margin: 2rem auto; padding: 1.25rem; background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; }
+.tw-resume-prompt .tw-choice { display: block; width: 100%; margin-top: .5rem; }
+.tw-autosave-error { margin: 0 0 1rem; }
 .tw-empty { color: var(--tw-muted); font-style: italic; }
 
 /* Player layout */
