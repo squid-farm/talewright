@@ -83,6 +83,15 @@ for the cancelled run to unwind. Superseded results do not publish diagnostics.
 Cancellation is cooperative: a single expression or inline construct can
 finish before the next checkpoint.
 
+The fixed 150 ms quiet window coalesces edits arriving less than 150 ms apart,
+such as fast typing, into one analysis instead of one per keystroke. It trades
+single-edit latency for less repeated whole-story work; revisit it with author
+feedback rather than tuning it speculatively.
+The workspace reuses exact-text file syntax across edits and watched-file
+reloads, but binding and validation still run story-wide. See the
+[cache lifecycle](authoring-analysis.md#workspace-lifecycle)
+and [measured end-to-end budget](performance.md#file-syntax-reuse-and-edit-diagnostics).
+
 Hover and definition may use the last published analysis when the requested
 document's text is unchanged. Cross-file semantic information may therefore be
 older, but a definition does not use a previous target if that target's text

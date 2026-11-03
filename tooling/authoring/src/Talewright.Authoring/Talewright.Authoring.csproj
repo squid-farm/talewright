@@ -2,6 +2,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Talewright.LanguageServer" />
     <InternalsVisibleTo Include="Talewright.Authoring.Tests" />
+    <InternalsVisibleTo Include="Talewright.Benchmarks" />
     <ProjectReference Include="../../../../engine/src/Talewright.Talemark/Talewright.Talemark.csproj" />
     <EmbeddedResource Include="../../../vscode-talewright/schemas/story.schema.json" LogicalName="Talewright.Authoring.story.schema.json" />
   </ItemGroup>
