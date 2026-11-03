@@ -80,7 +80,7 @@ public sealed class LanguageServer
     private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions }
     private const int DiagnosticLimit = 200;
     internal static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(10);
-    private static readonly TimeSpan TypingBurstDebounce = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan TypingBurstDebounce = TimeSpan.FromMilliseconds(150);
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
         Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown,
         bool documentChangesSupported, bool createFileOperationSupported,

@@ -77,7 +77,7 @@ public sealed class ConcurrencyTests
         {
             await client.Change("start.tale", Tale($"Burst {version}."), version);
             latest = await control.NextDelay();
-            Assert.Equal(TimeSpan.FromMilliseconds(50), latest.Duration);
+            Assert.Equal(TimeSpan.FromMilliseconds(150), latest.Duration);
         }
         Assert.True(running.CancellationRequested);
         Assert.Equal(2, control.AnalysisCount);
@@ -97,6 +97,37 @@ public sealed class ConcurrencyTests
         isolated.Release();
         (await control.NextAnalysis()).Release();
         await client.Diagnostics("start.tale", 26);
+    }
+
+    [Fact]
+    public async Task Paced_typing_burst_does_not_restart_analysis_for_each_edit()
+    {
+        var control = new AnalysisControl(realDelays: true);
+        await using var client = new InProcessClient(control);
+        await client.Initialize();
+        await client.Open("start.tale", Original, 1);
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 1);
+
+        await client.Change("start.tale", Changed, 2);
+        var running = await control.NextAnalysis();
+        Assert.Equal(2, control.AnalysisCount);
+
+        for (var version = 3; version <= 8; version++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(60));
+            Assert.Equal(2, control.AnalysisCount);
+            await client.Change("start.tale", Tale($"Paced {version}."), version);
+            await client.Barrier(version);
+            Assert.Equal(2, control.AnalysisCount);
+        }
+
+        Assert.True(running.CancellationRequested);
+        var settled = await control.NextAnalysis();
+        Assert.Equal(Tale("Paced 8."), settled.Source.Files["start.tale"]);
+        settled.Release();
+        await client.Diagnostics("start.tale", 8);
+        Assert.Equal(3, control.AnalysisCount);
     }
 
     [Fact]
@@ -508,14 +539,18 @@ public sealed class ConcurrencyTests
         private readonly Channel<AnalysisCall> _analyses = Channel.CreateUnbounded<AnalysisCall>();
         private readonly Channel<LanguageServer.DiagnosticPublication> _publications =
             Channel.CreateUnbounded<LanguageServer.DiagnosticPublication>();
+        private readonly bool _realDelays;
         private bool _releaseAll;
         private int _analysisCount;
+
+        public AnalysisControl(bool realDelays = false) => _realDelays = realDelays;
 
         public int AnalysisCount => Volatile.Read(ref _analysisCount);
 
         public Task Delay(TimeSpan delay, CancellationToken cancellationToken)
         {
             if (delay == TimeSpan.Zero) return Task.CompletedTask;
+            if (_realDelays) return Task.Delay(delay, cancellationToken);
             var gate = NewGate();
             _delays.Writer.TryWrite(new Gate(gate, delay));
             return gate.Task.WaitAsync(cancellationToken);

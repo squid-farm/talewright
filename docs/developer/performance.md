@@ -105,12 +105,15 @@ analyzer or an analyzer-only latency. An internal opt-in observer exposes stage
 timings to the harness; no telemetry is emitted by the normal server.
 
 **The 50 ms edit-to-diagnostics target is missed.** File reuse removes repeated
-parsing and the 150 ms debounce is gone, but whole-story analysis alone remains
-over budget. The report gates lead review of #411; it does not silently enable
-per-scene reuse or claim that #392's latency target is satisfied.
+parsing and the fixed 150 ms debounce for isolated edits is gone, but whole-story
+analysis alone remains over budget. After a running analysis is cancelled during
+typing, the server uses a 150 ms quiet window to coalesce the burst. The report
+gates lead review of #411; it does not silently enable per-scene reuse or claim
+that #392's latency target is satisfied.
 
 The measured workload waits for publication between edits, so it exercises the
 10 ms isolated-edit window. During typing that cancels running analysis, the
-server instead waits for 50 ms of quiet until a revision publishes. Deterministic
-tests cover this backoff, cancellation, latest-only publication and restoration
-of the short window; these isolated-edit numbers are not burst-settling latency.
+server instead waits for 150 ms of quiet until a revision publishes. Tests cover
+this backoff, cancellation, paced bursts, latest-only publication and
+restoration of the short window; these isolated-edit numbers are not
+burst-settling latency.

@@ -84,11 +84,11 @@ Cancellation is cooperative: a single expression or inline construct can
 finish before the next checkpoint.
 
 The trailing quiet window coalesces very rapid edits. If typing supersedes an
-already-running analysis, subsequent edits use a 50 ms quiet window until the
+already-running analysis, subsequent edits use a 150 ms quiet window until the
 latest analysis publishes; then isolated edits return to 10 ms. Requests can
 still end either debounce immediately. This avoids repeatedly starting expensive
-analysis during a fast typing burst, at the cost of a longer settling delay.
-It does not guarantee a 50 ms diagnostic response. The workspace
+analysis for edits arriving less than 150 ms apart, at the cost of a longer
+settling delay. It does not guarantee a 50 ms diagnostic response. The workspace
 reuses exact-text file syntax across edits and watched-file reloads, but binding
 and validation still run story-wide. See the [cache lifecycle](authoring-analysis.md#workspace-lifecycle)
 and [measured end-to-end budget](performance.md#file-syntax-reuse-and-edit-diagnostics).
