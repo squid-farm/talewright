@@ -21,6 +21,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
     protected ILocator SaveStatus => Page.GetByRole(AriaRole.Status).And(Page.Locator(".tw-save-status"));
+    protected string NativeSaveRoot => Path.Combine(_artifacts, "xdg-data", "Talewright", "saves");
     protected virtual bool AutoStartDesktop => true;
     protected virtual bool StartsInLibrary => true;
 
@@ -145,10 +146,14 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
 
         await Page.WaitForFunctionAsync("""
             () => {
+                const visible = element => element !== null && element.checkVisibility();
+                if (visible(document.querySelector('.tw-library'))) return false;
                 const resume = document.querySelector('[aria-labelledby="tw-resume-heading"]');
                 const passage = document.querySelector('[aria-label="Current passage"]');
-                const buttons = Array.from(document.querySelectorAll('button'), button => button.textContent.trim());
-                return resume || passage || buttons.includes('Start story') || buttons.includes('Start a new game');
+                const buttons = Array.from(document.querySelectorAll('button')).filter(visible)
+                    .map(button => button.textContent.trim());
+                return visible(resume) || visible(passage) ||
+                    buttons.includes('Start story') || buttons.includes('Start a new game');
             }
             """, null, new() { Timeout = 15_000 });
 

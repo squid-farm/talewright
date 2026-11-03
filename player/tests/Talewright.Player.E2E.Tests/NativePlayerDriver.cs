@@ -32,6 +32,7 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     private Process? _adapter;
     private Task<string>? _stderr;
     private bool _protocolFailed;
+    private readonly string? _dataHome = xdgDataHome ?? (executableOverride is null ? Path.Combine(artifacts, "xdg-data") : null);
     private readonly string _temporary = Path.Combine(Path.GetTempPath(), "talewright-driver-" + Guid.NewGuid().ToString("N"));
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
@@ -57,9 +58,10 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
             {
                 start.ArgumentList.Add(argument);
             }
-            if (xdgDataHome is not null)
+            if (_dataHome is not null)
             {
-                start.Environment["XDG_DATA_HOME"] = xdgDataHome;
+                Directory.CreateDirectory(_dataHome);
+                start.Environment["XDG_DATA_HOME"] = _dataHome;
             }
             if (windowInChildProcess)
             {

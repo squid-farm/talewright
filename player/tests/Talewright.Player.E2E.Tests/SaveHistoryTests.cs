@@ -187,7 +187,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         });
         if (PlayerTarget.IsDesktop)
         {
-            Assert.Equal(bytes, await new FileSaveStore(FileSaveStore.DefaultRoot).ReadAsync(old.Id, slot));
+            Assert.Equal(bytes, await new FileSaveStore(NativeSaveRoot).ReadAsync(old.Id, slot));
         }
         else
         {
@@ -207,7 +207,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     {
         if (PlayerTarget.IsDesktop)
         {
-            await new FileSaveStore(FileSaveStore.DefaultRoot).WriteAsync(storyId, slot, bytes);
+            await new FileSaveStore(NativeSaveRoot).WriteAsync(storyId, slot, bytes);
         }
         else
         {
@@ -369,10 +369,10 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await AssertDialogText(text => Assert.Contains("Saved 'My save'.", text));
         await Driver.ClickAsync("Close saves");
         await Choose("Walk onward");
-        var store = new FileSaveStore(FileSaveStore.DefaultRoot);
+        var store = new FileSaveStore(NativeSaveRoot);
         var storyId = fixture.Compile().Id;
         var original = await store.ReadAsync(storyId, "My save");
-        var path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "*.json", SearchOption.AllDirectories)
+        var path = Directory.EnumerateFiles(NativeSaveRoot, "*.json", SearchOption.AllDirectories)
             .Single(file => File.ReadAllBytes(file).SequenceEqual(original));
         var backup = path + ".test-backup";
         File.Move(path, backup);

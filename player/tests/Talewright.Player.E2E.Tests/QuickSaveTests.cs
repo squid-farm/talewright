@@ -46,8 +46,8 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         if (PlayerTarget.IsDesktop)
         {
             var storyId = fixture.Compile().Id;
-            var bytes = await new FileSaveStore(FileSaveStore.DefaultRoot).ReadQuickAsync(storyId);
-            path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "quick.json", SearchOption.AllDirectories)
+            var bytes = await new FileSaveStore(NativeSaveRoot).ReadQuickAsync(storyId);
+            path = Directory.EnumerateFiles(NativeSaveRoot, "quick.json", SearchOption.AllDirectories)
                 .Single(file => File.ReadAllBytes(file).SequenceEqual(bytes));
             backup = path + ".test-backup";
             File.Move(path, backup);
@@ -234,7 +234,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         var storyId = first.Compile().Id;
         if (PlayerTarget.IsDesktop)
         {
-            await new FileSaveStore(FileSaveStore.DefaultRoot).WriteQuickAsync(storyId, "{broken"u8.ToArray());
+            await new FileSaveStore(NativeSaveRoot).WriteQuickAsync(storyId, "{broken"u8.ToArray());
         }
         else
         {
@@ -283,7 +283,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
             }
             """, abortTransaction);
         await Driver.ClickAsync("Quick Save");
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync(
+        await Expect(Page.GetByRole(AriaRole.Banner, new() { Name = "Player toolbar" }).GetByRole(AriaRole.Alert)).ToContainTextAsync(
             abortTransaction ? "previous save has not been replaced" : "not enough browser storage");
         await Page.EvaluateAsync("""
             () => {
@@ -311,9 +311,9 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         await Upload(fixture);
         await QuickSave();
         var storyId = fixture.Compile().Id;
-        var store = new FileSaveStore(FileSaveStore.DefaultRoot);
+        var store = new FileSaveStore(NativeSaveRoot);
         var original = await store.ReadQuickAsync(storyId);
-        var path = Directory.EnumerateFiles(FileSaveStore.DefaultRoot, "quick.json", SearchOption.AllDirectories)
+        var path = Directory.EnumerateFiles(NativeSaveRoot, "quick.json", SearchOption.AllDirectories)
             .Single(file => File.ReadAllBytes(file).SequenceEqual(original));
         await Choose("Walk onward");
         var backup = path + ".test-backup";
