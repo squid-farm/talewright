@@ -26,7 +26,7 @@ else
                     <p>Checking for an autosave…</p>
                 </section>
             }
-            else if (_resumeHistory is not null)
+            else if (_resumeHistory is not null && !_resumeAccepted)
             {
                 <section class="tw-resume-prompt" aria-labelledby="tw-resume-heading">
                     <h2 id="tw-resume-heading">Resume this story?</h2>
@@ -38,6 +38,7 @@ else
                             {
                                 <span> · @summary.CharacterName</span>
                             }
+                            <span aria-hidden="true"> · </span>
                             <time datetime="@summary.SavedAt.UtcDateTime.ToString("O")">@summary.SavedAt.ToLocalTime().ToString("g")</time>
                         </p>
                     }
