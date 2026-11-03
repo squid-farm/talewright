@@ -4,6 +4,7 @@ using Talewright.Authoring;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.LanguageServer;
 
@@ -248,7 +249,7 @@ public sealed class LanguageServer
                         definitionProvider = true,
                         inlayHintProvider = true,
                         codeActionProvider = new { codeActionKinds = new[] { "quickfix" }, resolveProvider = false },
-                        completionProvider = new { resolveProvider = false, triggerCharacters = new[] { ":", "@", "#", ">", "(", "\"", "/" } },
+                        completionProvider = new { resolveProvider = false, triggerCharacters = AuthoringSyntaxVocabulary.CompletionTriggerCharacters },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
                     },

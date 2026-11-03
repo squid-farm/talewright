@@ -104,7 +104,8 @@ internal sealed partial class TaleParser
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SceneHeader,
-                    AnalysisCollector.Range(At(indent), SceneVocabulary.SceneHeader)));
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.SceneHeader))
+                    { Kind = AuthoringTokenKind.SceneHeader });
                 FinishScene();
                 StartScene(trimmed[SceneVocabulary.SceneHeader.Length..].Trim().ToString(), At(indent));
                 AdvanceLine();
@@ -251,27 +252,31 @@ internal sealed partial class TaleParser
         {
             case [SceneVocabulary.SpeechMarker, ..]:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SpeechMarker.ToString(),
-                    AnalysisCollector.Range(At(indent), SceneVocabulary.SpeechMarker.ToString())));
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.SpeechMarker.ToString()))
+                    { Kind = AuthoringTokenKind.Speech });
                 FlushParagraph();
                 ParseSpeech(line, indent);
                 return;
             case [SceneVocabulary.EffectsMarker, ..]:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.EffectsMarker.ToString(),
-                    AnalysisCollector.Range(At(indent), SceneVocabulary.EffectsMarker.ToString())));
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.EffectsMarker.ToString()))
+                    { Kind = AuthoringTokenKind.Effects });
                 FlushParagraph();
                 ParseEntryEffects(line[1..], indent + 1);
                 return;
             case [SceneVocabulary.ChoiceMarker]:
             case [SceneVocabulary.ChoiceMarker, ' ' or '\t' or SceneVocabulary.OpenBracket, ..]:
-                _symbols.Analysis?.Tokens.Add(new("*choice",
-                    AnalysisCollector.Range(At(indent), SceneVocabulary.ChoiceMarker.ToString())));
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.ChoiceMarker.ToString(),
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.ChoiceMarker.ToString()))
+                    { Kind = AuthoringTokenKind.Choice });
                 // A choice marker followed by a label opener or divert marker is a choice; adjacent markers are emphasis.
                 FlushParagraph();
                 ParseChoice(line, indent);
                 return;
             case [ExpressionVocabulary.Minus, ExpressionVocabulary.Greater, ..]:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
-                    AnalysisCollector.Range(At(indent), SceneVocabulary.Divert)));
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.Divert))
+                    { Kind = AuthoringTokenKind.Divert });
                 FlushParagraph();
                 var target = ParseDivertTarget(line[SceneVocabulary.Divert.Length..],
                     indent + SceneVocabulary.Divert.Length);
@@ -287,7 +292,8 @@ internal sealed partial class TaleParser
         if (line.StartsWith(SceneVocabulary.SkillCheckFence, StringComparison.Ordinal))
         {
             _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SkillCheckBlock,
-                AnalysisCollector.Range(At(indent), SceneVocabulary.SkillCheckFence)));
+                AnalysisCollector.Range(At(indent), SceneVocabulary.SkillCheckFence))
+                { Kind = AuthoringTokenKind.SkillCheckBlock });
             FlushParagraph();
             ParseBlockCheck(line, indent);
             return;
@@ -450,7 +456,8 @@ internal sealed partial class TaleParser
         var keyword = directive.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal)
             ? SceneVocabulary.If : directive;
         var keywordStart = line.IndexOf(keyword, StringComparison.Ordinal);
-        _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(indent + keywordStart), keyword)));
+        _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(indent + keywordStart), keyword))
+            { Kind = AuthoringSyntaxVocabulary.ConditionalKind(keyword) });
         if (directive == SceneVocabulary.Else)
         {
             if (scene.Frames.Count == 0 || scene.Frames.Peek().InElse)
@@ -782,7 +789,8 @@ internal sealed partial class TaleParser
             else if (remaining.StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal))
             {
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
-                    AnalysisCollector.Range(At(column), SceneVocabulary.Divert)));
+                    AnalysisCollector.Range(At(column), SceneVocabulary.Divert))
+                    { Kind = AuthoringTokenKind.Divert });
                 hasDivert = true;
                 var targetEnd = SkipSpaces(rest, pos + SceneVocabulary.Divert.Length);
                 var targetCheckpoint = _cancellationToken.CanBeCanceled ? new CancellationCheckpoint(_cancellationToken) : null;
@@ -923,7 +931,8 @@ internal sealed partial class TaleParser
         if (_symbols.Analysis is { } analysis)
         {
             analysis.Tokens.Add(new(SceneVocabulary.SkillCheck,
-                AnalysisCollector.Range(At(column - SceneVocabulary.SkillCheck.Length), SceneVocabulary.SkillCheck)));
+                AnalysisCollector.Range(At(column - SceneVocabulary.SkillCheck.Length), SceneVocabulary.SkillCheck))
+                { Kind = AuthoringTokenKind.SkillCheck });
             var offset = 0;
             var references = words.TakeWhile(word => word != SceneVocabulary.Difficulty).Take(2).ToArray();
             if (references.Length == 0)
@@ -1094,7 +1103,8 @@ internal sealed partial class TaleParser
             }
 
             _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
-                AnalysisCollector.Range(At(column + pos), SceneVocabulary.Divert)));
+                AnalysisCollector.Range(At(column + pos), SceneVocabulary.Divert))
+                { Kind = AuthoringTokenKind.Divert });
             divert = ParseDivertTarget(text[(pos + SceneVocabulary.Divert.Length)..],
                 column + pos + SceneVocabulary.Divert.Length);
         }

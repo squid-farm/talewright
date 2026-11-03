@@ -82,9 +82,12 @@ internal static class QuotedStringSyntax
         return new(character, start, start + 1, false, false);
     }
 
-    internal static string Quote(string text) =>
-        TextVocabulary.QuoteMark + text.Replace(TextVocabulary.EscapeMark.ToString(),
+    internal static string EscapeContent(string text) =>
+        text.Replace(TextVocabulary.EscapeMark.ToString(),
                 $"{TextVocabulary.EscapeMark}{TextVocabulary.EscapeMark}")
             .Replace(TextVocabulary.QuoteMark.ToString(),
-                $"{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}") + TextVocabulary.QuoteMark;
+                $"{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}");
+
+    internal static string Quote(string text) =>
+        TextVocabulary.QuoteMark + EscapeContent(text) + TextVocabulary.QuoteMark;
 }

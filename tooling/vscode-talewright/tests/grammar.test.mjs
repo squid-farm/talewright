@@ -31,6 +31,33 @@ function hasScope(line, text, scope) {
   assert.ok(token.scopes.includes(scope), `${line}: ${text} expected ${scope}, got ${token.scopes.join(', ')}`);
 }
 
+test('TextMate scopes agree with the owned vocabulary contract', async () => {
+  const cases = JSON.parse(await readFile(new URL('./fixtures/vocabulary.json', import.meta.url), 'utf8'));
+  for (const entry of cases) {
+    const start = entry.line.indexOf(entry.spelling);
+    assert.notEqual(start, -1, `${entry.owner}.${entry.member}: missing spelling in ${entry.line}`);
+    const checks = entry.scopes ?? [{ offset: 0, length: entry.spelling.length, scope: entry.scope }];
+    const covered = new Set();
+    const lineTokens = tokens(entry.line).tokens;
+    for (const check of checks) {
+      assert.ok(check.offset >= 0 && check.length > 0 && check.offset + check.length <= entry.spelling.length,
+        `${entry.owner}.${entry.member}: invalid scope range`);
+      for (let relative = check.offset; relative < check.offset + check.length; relative++) {
+        covered.add(relative);
+        const offset = start + relative;
+        const token = lineTokens.find(candidate => candidate.startIndex <= offset && candidate.endIndex > offset);
+        assert.ok(token?.scopes.includes(check.scope),
+          `${entry.owner}.${entry.member}: ${entry.line} expected ${check.scope} at ${offset}, got ${token?.scopes.join(', ')}`);
+        if (entry.exactScope) assert.deepEqual(token.scopes, [check.scope], entry.line);
+      }
+    }
+    for (let relative = 0; relative < entry.spelling.length; relative++) {
+      assert.ok(covered.has(relative) || /\s/.test(entry.spelling[relative]),
+        `${entry.owner}.${entry.member}: unchecked character at ${relative}`);
+    }
+  }
+});
+
 test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
   for (const [line, text, scope] of [
     ['=== temple.hall', 'temple.hall', 'entity.name.section.tale'],

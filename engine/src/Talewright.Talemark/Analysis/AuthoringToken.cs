@@ -2,5 +2,74 @@ using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Analysis;
 
+/// <summary>Recognized authoring syntax, independent of its written spelling.</summary>
+public enum AuthoringTokenKind
+{
+    Other,
+    ManifestProperty,
+    SceneHeader,
+    Speech,
+    Effects,
+    Choice,
+    Divert,
+    SkillCheckBlock,
+    SkillCheck,
+    If,
+    Else,
+    EndIf,
+    Title,
+    Requires,
+    Tags,
+    Priority,
+    Once,
+    Hub,
+    HubLimit,
+    End,
+    Visited,
+    Flag,
+    Variable,
+    Faction,
+    Item,
+    Image,
+    Set,
+    Clear,
+    Give,
+    Take,
+    Has,
+    And,
+    Or,
+    Not,
+    True,
+    False,
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Assign,
+    AddAssign,
+    SubtractAssign,
+    Equal,
+    NotEqual,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    FirstName,
+    LastName,
+    Name,
+    Tier,
+    Pronoun,
+    Subject,
+    Object,
+    PossessivePronoun,
+    Reflexive,
+    Determiner,
+    Independent,
+    OneMany,
+}
+
 /// <summary>A parsed syntax token or manifest property, without editor-specific presentation.</summary>
-public sealed record AuthoringToken(string Text, SourceRange Range, IReadOnlyList<string>? ManifestPath = null);
+public sealed record AuthoringToken(string Text, SourceRange Range, IReadOnlyList<string>? ManifestPath = null)
+{
+    public AuthoringTokenKind Kind { get; init; }
+}

@@ -181,7 +181,11 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         CompletionSites.Add(new(new(map.Map(0, 0).Start, map.Map(completionText.Length, 0).End), null, sites));
         foreach (var token in tokens)
             if (token.Kind is not (TokenKind.End or TokenKind.String or TokenKind.Error or TokenKind.Hash or TokenKind.NamedPredicate))
-                Tokens.Add(new(token.Value, map.Map(token.Offset, token.Length)));
+            {
+                var value = token.Value;
+                Tokens.Add(new(value, map.Map(token.Offset, token.Length))
+                    { Kind = AuthoringSyntaxVocabulary.ExpressionKind(value) });
+            }
         if (kind == ExpressionContextKind.Effects)
         {
             ExpressionParser.CollectDeclarations(tokens, text.Length, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
@@ -298,7 +302,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     var next = path.Append(name).ToArray();
                     Scalar(scalar, file);
                     var location = new SourceLocation(file, (int)key.Start.Line, (int)key.Start.Column);
-                    Tokens.Add(new(name, _scalars[location].Range(0, name.Length), next));
+                    Tokens.Add(new(name, _scalars[location].Range(0, name.Length), next)
+                        { Kind = AuthoringTokenKind.ManifestProperty });
                     Properties(value, next, ancestors);
                 }
             }

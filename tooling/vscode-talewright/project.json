@@ -20,7 +20,7 @@
       "inputs": ["default", "^default", "editorWorkflow", "documentedManifests"],
       "dependsOn": [{"projects": ["Talewright.Talemark.Tests"], "target": "build:release"}],
       "options": {
-        "command": "dotnet test engine/tests/Talewright.Talemark.Tests -c Release --no-build --no-restore --filter FullyQualifiedName~EditorManifestSchemaTests"
+        "command": "dotnet test engine/tests/Talewright.Talemark.Tests -c Release --no-build --no-restore --filter 'FullyQualifiedName~EditorManifestSchemaTests|FullyQualifiedName~EditorVocabularyContractTests'"
       }
     },
     "test": {

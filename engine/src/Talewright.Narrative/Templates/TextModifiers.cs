@@ -39,18 +39,29 @@ public sealed record OneManyTextModifier(string Singular, string Plural) : IText
 /// <summary>The set of modifiers available to a story. <see cref="CreateDefault"/> contains the built-ins.</summary>
 public sealed class TextModifierRegistry
 {
+    /// <summary>The built-in possessive modifier name.</summary>
+    public const string PossessiveName = "possessive";
+    /// <summary>The built-in indefinite-article modifier name.</summary>
+    public const string IndefiniteArticleName = "a";
+    /// <summary>The built-in definite-article modifier name.</summary>
+    public const string DefiniteArticleName = "the";
+    /// <summary>The built-in proximal demonstrative modifier name.</summary>
+    public const string ThisName = "this";
+    /// <summary>The built-in distal demonstrative modifier name.</summary>
+    public const string ThatName = "that";
+
     private readonly Dictionary<string, ITextModifier> _modifiers = new(StringComparer.Ordinal);
 
     private static readonly ITextModifier[] BuiltIns =
     [
-        new DelegateTextModifier("possessive", (t, c) => c.Grammar.Possessive(t, c.IsPlural)),
+        new DelegateTextModifier(PossessiveName, (t, c) => c.Grammar.Possessive(t, c.IsPlural)),
         new DelegateTextModifier("capitalize", (t, c) => c.Grammar.Capitalize(t)),
         new DelegateTextModifier("upper", (t, _) => t.ToUpperInvariant()),
         new DelegateTextModifier("lower", (t, _) => t.ToLowerInvariant()),
-        new DelegateTextModifier("a", (t, c) => c.IsPlural || c.IsUncountable ? "some " + t : c.Grammar.WithIndefiniteArticle(t)),
-        new DelegateTextModifier("the", (t, _) => "the " + t),
-        new DelegateTextModifier("this", (t, c) => (c.IsPlural ? "these " : "this ") + t),
-        new DelegateTextModifier("that", (t, c) => (c.IsPlural ? "those " : "that ") + t),
+        new DelegateTextModifier(IndefiniteArticleName, (t, c) => c.IsPlural || c.IsUncountable ? "some " + t : c.Grammar.WithIndefiniteArticle(t)),
+        new DelegateTextModifier(DefiniteArticleName, (t, _) => "the " + t),
+        new DelegateTextModifier(ThisName, (t, c) => (c.IsPlural ? "these " : "this ") + t),
+        new DelegateTextModifier(ThatName, (t, c) => (c.IsPlural ? "those " : "that ") + t),
     ];
 
     public static TextModifierRegistry CreateDefault()

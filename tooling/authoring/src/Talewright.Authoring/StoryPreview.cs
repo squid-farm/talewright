@@ -4,6 +4,7 @@ using Talewright.Narrative.Grammar;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring;
 
@@ -80,7 +81,7 @@ public static class StoryPreview
         foreach (var modifier in template.Modifiers)
         {
             value = modifier.Apply(value, modifierContext);
-            steps.Add(new("#" + modifier.Name, value));
+            steps.Add(new(AuthoringSyntaxVocabulary.FormatModifier(modifier.Name), value));
         }
         return new(substitution.Range, value, steps.AsReadOnly(), null);
     }
