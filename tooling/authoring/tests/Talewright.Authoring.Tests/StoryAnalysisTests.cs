@@ -355,6 +355,8 @@ public class StoryAnalysisTests
         }));
         Assert.Contains(missing.Symbols, symbol => symbol.Name == "first");
         Assert.Contains(missing.Diagnostics, diagnostic => diagnostic.Code == "TW4002");
+        Assert.Equal([AuthoringTokenKind.SceneHeader, AuthoringTokenKind.Divert],
+            missing.Tokens.Select(token => token.Kind));
         var invalid = StoryAnalyzer.Analyze(Source(yaml: Manifest.Replace("  start: first",
             "  start: first\n  ruleset:\n    stats:\n      - id: focus\n        min: 8\n        max: 2")));
         Assert.Contains(invalid.Symbols, symbol => symbol.Name == "focus" && symbol.Declaration is not null);

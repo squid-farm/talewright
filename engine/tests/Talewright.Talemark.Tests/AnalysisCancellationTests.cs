@@ -30,22 +30,21 @@ public sealed class AnalysisCancellationTests
     }
 
     [Fact]
-    public void Discovery_stops_at_the_next_scene_after_cancellation_from_the_first_scene_callback()
+    public void Declaration_collection_stops_at_the_next_scene_after_cancellation_from_the_first_scene_callback()
     {
         using var cancellation = new CancellationTokenSource();
         var scenes = new List<string>();
-        var text = "=== first\n-> END\n=== second\n-> END\n";
+        var syntax = TaleSyntaxParser.Parse("=== first\n-> END\n=== second\n-> END\n");
 
-        Assert.Throws<OperationCanceledException>(() => TaleParser.Discover(
+        Assert.Throws<OperationCanceledException>(() => TaleDeclarations.Collect(
             "main.tale",
-            text,
-            Symbols(),
-            (_, _) => { },
+            syntax,
             (id, _) =>
             {
                 scenes.Add(id.ToString());
                 if (scenes.Count == 1) cancellation.Cancel();
             },
+            (_, _) => { },
             cancellation.Token));
 
         Assert.Equal(["first"], scenes);
@@ -63,7 +62,7 @@ public sealed class AnalysisCancellationTests
         var text = "=== first\n" + string.Join('\n', Enumerable.Repeat("Value {var:n}.", 2048)) + "\n-> END\n";
 
         Assert.Throws<OperationCanceledException>(() =>
-            TaleParser.Parse("main.tale", text, Symbols(variables), new DiagnosticBag(), cancellation.Token));
+            TaleParser.Parse("main.tale", TaleSyntaxParser.Parse(text), Symbols(variables), new DiagnosticBag(), cancellation.Token));
         Assert.InRange(lookups, 1, 64);
     }
 
@@ -81,7 +80,7 @@ public sealed class AnalysisCancellationTests
         var imageSource = new StorySource(new Dictionary<string, string>(), ["images/test.png"]);
 
         Assert.Throws<OperationCanceledException>(() =>
-            TaleParser.Parse("main.tale", text, Symbols(variables, imageSource), new DiagnosticBag(), cancellation.Token));
+            TaleParser.Parse("main.tale", TaleSyntaxParser.Parse(text), Symbols(variables, imageSource), new DiagnosticBag(), cancellation.Token));
         Assert.InRange(lookups, 1, 64);
     }
 

@@ -19,9 +19,9 @@ namespace Talewright.Talemark.Compilation;
 /// Pipeline:
 /// <list type="number">
 /// <item>Read story.talewright.yaml into a <see cref="WorldDefinition"/> (ruleset, characters, items, factions…).</item>
-/// <item>Discover scene ids and effect assignment targets using the Talemark parser and expression lexer,
-/// so forward references and auto-declared flags/variables resolve.</item>
-/// <item>Parse each <c>.tale</c> file (expressions are type-checked and resolved as they are parsed).</item>
+/// <item>Parse each <c>.tale</c> file's syntax once, then collect scene ids and effect assignment targets from it
+/// with the expression lexer, so forward references and auto-declared flags/variables resolve.</item>
+/// <item>Bind each file's syntax (expressions are type-checked and resolved as they are bound).</item>
 /// <item>Parse triggers, then run the whole-story <see cref="StoryValidator"/>.</item>
 /// </list>
 /// Any error means no story is produced; all diagnostics are returned either way.
@@ -79,29 +79,20 @@ public static class StoryCompiler
             ExpressionParser.CollectDeclarations(text, flags, discoveredNumbers,
                 typedDeclaration: declarations.Add, location: location);
         }
-        var discoverySymbols = new StorySymbols
-        {
-            World = manifest.World,
-            Flags = flags,
-            Variables = variables.Keys.Concat(manifest.World.TextVariables.Keys).ToHashSet(),
-            Scenes = new HashSet<SceneId>(),
-            Predicates = options.Predicates,
-            Modifiers = options.Modifiers,
-        };
         var syntaxes = new List<(string Path, TaleFileSyntax Syntax)>(taleFiles.Count);
         foreach (var (path, text) in taleFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var syntax = TaleSyntaxParser.Parse(text, cancellationToken);
             syntaxes.Add((path, syntax));
-            TaleParser.Discover(path, syntax, discoverySymbols, DiscoverEffects, (id, location) =>
+            TaleDeclarations.Collect(path, syntax, (id, location) =>
             {
                 analysis?.Scene(id, location);
                 if (!scenes.TryAdd(id, location))
                 {
                     diagnostics.Error(CompilerDiagnosticCodes.DuplicateScene, $"Scene '{id}' is declared more than once (first at {scenes[id]}).", location);
                 }
-            }, cancellationToken);
+            }, DiscoverEffects, cancellationToken);
         }
 
         foreach (var trigger in manifest.Triggers)

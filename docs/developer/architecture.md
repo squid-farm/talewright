@@ -333,8 +333,8 @@ flowchart TD
   yaml["StoryYamlReader<br/>story.talewright.yaml → manifest"]
   world["Ruleset factory + WorldDefinition<br/>(CompilerOptions.Rulesets)"]
   syn["TaleSyntaxParser per .tale<br/>scenes + classified lines, no symbols"]
-  disc["Discovery pass: TaleParser.Discover per syntax<br/>scene ids, auto-declared flags/vars"]
-  parse["Parse pass: TaleParser.Parse per syntax<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
+  disc["Declarations: TaleDeclarations per syntax<br/>scene ids, auto-declared flags/vars"]
+  parse["Binding: TaleParser per syntax<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
   val["StoryValidator<br/>structure + StoryReachability (Graphs)"]
   ok(["StoryDefinition"])
   err(["Diagnostics only (Story = null)"])
@@ -343,8 +343,8 @@ flowchart TD
   val -- "any error" --> err
 ```
 
-Each `.tale` file is split into syntax once; discovery and parsing both bind it, discovery first so forward
-references resolve. The player compiles
+Each `.tale` file is split into syntax once. Declaration collection walks every file's syntax before any file
+is bound, so forward references resolve; only binding runs the full binder. The player compiles
 at story load, including in WebAssembly, so parser cost is load-time cost; see [performance](performance.md).
 
 - **`Compilation/`**
@@ -360,8 +360,8 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
   - `CompilerOptions`: the registries the compiler resolves names against: `Predicates` (for `@Name`),
     `Modifiers` (for `#mod`) and `Rulesets` (name → factory, for `game.ruleset.base:`). C# extension means
     "pass your own options"; see [C# extensions](csharp-extensions.md).
-  - `StoryCompiler`: orchestrates. Order: read `story.talewright.yaml` → build ruleset and `WorldDefinition` → syntax discovery of
-    every `.tale` for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
+  - `StoryCompiler`: orchestrates. Order: read `story.talewright.yaml` → build ruleset and `WorldDefinition` → declaration collection over
+    every `.tale` syntax for scene ids and auto-declared flags/vars (so forward references work) → parse each `.tale` →
     validate → assemble `StoryDefinition`. Any error ⇒ `Story` is null.
   - `StoryValidator`: whole-story checks after parsing: start scene exists, choices form the final block
     and have explicit targets, no dead ends, empty hubs, unreachable steps and scenes.
@@ -373,6 +373,8 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
     fences and outcomes, `{if}` blocks, speech lines and prose with scene-relative spans. It also checks block
     structure, malformed metadata, speech, divert, choice and skill-check lines, and attaches outcome lines to
     their check. Choice and skill-check lines record clause spans.
+  - `TaleDeclarations`: walks that syntax for scene ids and effect text before binding, so story-wide flags
+    and vars are known up front. It does not run the binder.
   - `TaleParser`: binds that syntax to scenes and steps. See the Talemark README for syntax/binding ownership.
   - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes
     constructs, escapes, code spans and bounded formatting directly; unsupported Markdown remains literal.

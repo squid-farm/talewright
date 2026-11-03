@@ -19,9 +19,9 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 }
 
 /// <summary>
-/// Line-oriented parser for <c>.tale</c> files. Each line is classified by its first characters (<c>===</c>,
-/// <c>@</c>, <c>&gt;</c>, <c>~</c>, <c>*</c>, <c>-&gt;</c>, <c>:::</c>, <c>{if}</c>…); everything else is prose,
-/// grouped into paragraphs by blank lines and handed to <see cref="InlineParser"/>.
+/// Binds a file's <see cref="TaleFileSyntax"/> against story-wide <see cref="StorySymbols"/>, producing scenes and
+/// steps. Syntax has already classified every line; prose lines are grouped into paragraphs by blank lines and
+/// handed to <see cref="InlineParser"/>. <see cref="TaleDeclarations"/> collects symbols from the same syntax first.
 /// </summary>
 /// <remarks>
 /// Block-level conditions retain their nested steps so the runtime decides each branch once.
@@ -33,8 +33,6 @@ internal sealed partial class TaleParser
     private readonly string _text;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
-    private readonly Action<string, SourceLocation>? _discoverEffects;
-    private readonly Action<SceneId, SourceLocation>? _discoverScene;
     private readonly CancellationToken _cancellationToken;
     private int _linesSinceCancellationCheck;
     private readonly List<ParsedScene> _scenes = [];
@@ -46,40 +44,23 @@ internal sealed partial class TaleParser
     private int _lineLength;
 
     private TaleParser(string file, TaleFileSyntax syntax, StorySymbols symbols, DiagnosticBag diagnostics,
-        Action<string, SourceLocation>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         _file = file;
         _syntax = syntax;
         _text = syntax.Text;
         _symbols = symbols;
         _diagnostics = diagnostics;
-        _discoverEffects = discoverEffects;
-        _discoverScene = discoverScene;
         _cancellationToken = cancellationToken;
     }
-
-    public static List<ParsedScene> Parse(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
-        CancellationToken cancellationToken = default) =>
-        Parse(file, TaleSyntaxParser.Parse(text, cancellationToken), symbols, diagnostics, cancellationToken);
 
     public static List<ParsedScene> Parse(string file, TaleFileSyntax syntax, StorySymbols symbols,
         DiagnosticBag diagnostics, CancellationToken cancellationToken = default)
     {
-        var parser = new TaleParser(file, syntax, symbols, diagnostics, cancellationToken: cancellationToken);
+        var parser = new TaleParser(file, syntax, symbols, diagnostics, cancellationToken);
         parser.Run();
         return parser._scenes;
     }
-
-    public static void Discover(string file, string text, StorySymbols symbols,
-        Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene,
-        CancellationToken cancellationToken = default) =>
-        Discover(file, TaleSyntaxParser.Parse(text, cancellationToken), symbols, effects, scene, cancellationToken);
-
-    public static void Discover(string file, TaleFileSyntax syntax, StorySymbols symbols,
-        Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene,
-        CancellationToken cancellationToken = default) =>
-        new TaleParser(file, syntax, symbols, new DiagnosticBag(), effects, scene, cancellationToken).Run();
 
     private SourceLocation At(int column) => new(_file, _index + 1, column + 1);
     private SourceRange SpanFrom(SourceLocation start) => new(start, At(_lineLength));
@@ -145,8 +126,6 @@ internal sealed partial class TaleParser
     {
         _cancellationToken.ThrowIfCancellationRequested();
         var location = At(syntax.HeaderIndent);
-        _discoverScene?.Invoke(new SceneId(syntax.Id), location);
-        _cancellationToken.ThrowIfCancellationRequested();
         _sceneSyntax = syntax;
         _scene = new SceneBuilder(new SceneId(syntax.Id), location);
         TaleFileSyntax.Report(_file, syntax, _diagnostics);
@@ -213,7 +192,8 @@ internal sealed partial class TaleParser
                     AnalysisCollector.Range(At(indent), SceneVocabulary.EffectsMarker.ToString()))
                     { Kind = AuthoringTokenKind.Effects });
                 FlushParagraph();
-                var effects = ParseEffects(Value(syntax), At(Part(syntax).ValueStart));
+                var effects = ExpressionParser.ParseEffects(Value(syntax), At(Part(syntax).ValueStart), _symbols,
+                    _diagnostics);
                 if (effects is not null)
                 {
                     var effectStart = At(indent);
@@ -365,9 +345,7 @@ internal sealed partial class TaleParser
             return;
         }
 
-        var inlines = _discoverEffects is null
-            ? InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics, cancellationToken: _cancellationToken)
-            : [];
+        var inlines = InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics, cancellationToken: _cancellationToken);
         if (inlines.Count > 0)
         {
             var start = scene.Paragraph.Locate(0);
@@ -380,11 +358,6 @@ internal sealed partial class TaleParser
 
     private void ParseSpeech(TaleLineSyntax syntax)
     {
-        if (_discoverEffects is not null)
-        {
-            return;
-        }
-
         var who = Head(syntax);
         var speakerLocation = At(Part(syntax).HeadStart);
         _symbols.Analysis?.Reference(who, speakerLocation, AuthoringSymbolKind.Character);
@@ -407,17 +380,6 @@ internal sealed partial class TaleParser
     }
 
     // ---- effects and diverts ---------------------------------------------------------------------------------------
-
-    private IReadOnlyList<Effect>? ParseEffects(string text, SourceLocation location)
-    {
-        if (_discoverEffects is not null)
-        {
-            _discoverEffects(text, location);
-            return [];
-        }
-
-        return ExpressionParser.ParseEffects(text, location, _symbols, _diagnostics);
-    }
 
     private DivertTarget? BindDivertTarget(string id, SourceLocation location)
     {
@@ -457,20 +419,18 @@ internal sealed partial class TaleParser
             switch (clause.Kind)
             {
                 case TaleClauseKind.Label:
-                    label = _discoverEffects is null
-                        ? InlineParser.Parse(SourceText.Single(value, location), _symbols, _diagnostics,
-                            cancellationToken: _cancellationToken)
-                        : [];
+                    label = InlineParser.Parse(SourceText.Single(value, location), _symbols, _diagnostics,
+                        cancellationToken: _cancellationToken);
                     break;
-                case TaleClauseKind.UnclosedLabel when _discoverEffects is null && _symbols.Analysis is not null:
+                case TaleClauseKind.UnclosedLabel when _symbols.Analysis is not null:
                     InlineParser.AnalyzePartial(SourceText.Single(value, location), _symbols, _cancellationToken);
                     break;
-                case TaleClauseKind.UnclosedImage when _discoverEffects is null:
+                case TaleClauseKind.UnclosedImage:
                     var rest = Content(syntax)[1..];
                     ImageSyntax.Parse(SourceText.Single(rest, At(syntax.Indent + 1)), clause.ValueStart - syntax.Indent - 1,
                         rest.Length, false, _diagnostics, _symbols, _cancellationToken);
                     break;
-                case TaleClauseKind.UnclosedBrace when _discoverEffects is null:
+                case TaleClauseKind.UnclosedBrace:
                     ExpressionParser.ReportStringErrors(value, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
                 case TaleClauseKind.Requires:
@@ -490,7 +450,7 @@ internal sealed partial class TaleParser
                     _symbols.Analysis?.Expression(ExpressionContextKind.Condition, value, location);
                     break;
                 case TaleClauseKind.Effects:
-                    var parsedEffects = ParseEffects(value, location) ?? [];
+                    var parsedEffects = ExpressionParser.ParseEffects(value, location, _symbols, _diagnostics) ?? [];
                     if (!hasEffects)
                         effects = parsedEffects;
                     hasEffects = true;
@@ -684,7 +644,8 @@ internal sealed partial class TaleParser
             switch (clause.Kind)
             {
                 case TaleClauseKind.Effects:
-                    effects = ParseEffects(Value(syntax, clause), At(clause.ValueStart)) ?? [];
+                    effects = ExpressionParser.ParseEffects(Value(syntax, clause), At(clause.ValueStart), _symbols,
+                        _diagnostics) ?? [];
                     break;
                 case TaleClauseKind.UnclosedEffects:
                     _symbols.Analysis?.Expression(ExpressionContextKind.Effects, Value(syntax, clause),
