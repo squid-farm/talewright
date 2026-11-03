@@ -370,7 +370,8 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
     deserialisation, for trimming and precise error locations).
   - `TaleSyntaxParser`: symbol-independent `.tale` file syntax. It splits lines, assigns them to scenes and
     classifies `=== scene` headers, `@directives`, `~ effects`, `* choices`, `-> diverts`, `::: skill-check`
-    fences and outcomes, `{if}` blocks, speech lines and prose with scene-relative spans.
+    fences and outcomes, `{if}` blocks, speech lines and prose with scene-relative spans. It also checks block
+    structure and malformed metadata, speech and divert lines.
   - `TaleParser`: binds that syntax to scenes and steps, asking the shared delimiter scanner for code-group and
     choice-label boundaries inside a line. See the Talemark README for syntax/binding ownership.
   - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes

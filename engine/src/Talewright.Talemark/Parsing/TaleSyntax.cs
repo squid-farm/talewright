@@ -47,8 +47,32 @@ internal readonly record struct TaleLineSyntax(
     int Indent,
     int ContentLength)
 {
-    // One byte keeps the line at 24 bytes; its meaning depends on Kind.
+    private const byte SuppressedFlag = 1;
+    private const byte InvalidFlag = 2;
+
+    // Its meaning depends on Kind.
     private readonly byte _detail;
+    private readonly byte _flags;
+
+    // One-based index into the scene's parts; zero when the line has none.
+    internal int PartIndex { get; init; }
+
+    /// <summary>The line is inside a block condition nested past the limit; binding ignores it.</summary>
+    public bool IsSuppressed
+    {
+        get => (_flags & SuppressedFlag) != 0;
+        init => _flags = value ? (byte)(_flags | SuppressedFlag) : (byte)(_flags & ~SuppressedFlag);
+    }
+
+    /// <summary>
+    /// Syntax reported a structural error for this line, so binding gives it no meaning beyond tokens and
+    /// references.
+    /// </summary>
+    public bool IsInvalid
+    {
+        get => (_flags & InvalidFlag) != 0;
+        init => _flags = value ? (byte)(_flags | InvalidFlag) : (byte)(_flags & ~InvalidFlag);
+    }
 
     public SceneMetadataKey? MetadataKey
     {
@@ -71,6 +95,27 @@ internal readonly record struct TaleLineSyntax(
     }
 }
 
+/// <summary>
+/// The parts of a metadata, speech, effects, divert or <c>{if}</c> line. Columns are relative to the raw line start.
+/// </summary>
+/// <param name="HeadStart">Column of the leading part: the metadata keyword, speaker or block keyword.</param>
+/// <param name="HeadLength">Length of the leading part.</param>
+/// <param name="ValueStart">
+/// Column of the trimmed value: the metadata value, speech text, effects or divert target. For <c>{if}</c> it is the
+/// text after the <c>if </c> prefix, untrimmed so expression offsets match the source.
+/// </param>
+/// <param name="ValueLength">Length of the value.</param>
+internal readonly record struct TaleLinePart(int HeadStart, int HeadLength, int ValueStart, int ValueLength)
+{
+    /// <summary>
+    /// Column where a metadata value begins before trimming: just after the first space, or the line indent when
+    /// there is no value.
+    /// </summary>
+    public int MetadataValueColumn(TaleLineSyntax line) => HeadStart + HeadLength == line.Indent + line.ContentLength
+        ? line.Indent
+        : HeadStart + HeadLength + 1;
+}
+
 /// <summary>A syntax diagnostic positioned relative to its owner (scene or file).</summary>
 internal sealed record TaleSyntaxDiagnostic(string Code, string Message, int Line, int Column);
 
@@ -80,9 +125,12 @@ internal sealed record TaleSyntaxDiagnostic(string Code, string Message, int Lin
 /// </summary>
 internal sealed class TaleSceneSyntax
 {
+    private readonly TaleLinePart[] _parts;
+
     internal TaleSceneSyntax(int start, int line, int headerIndent, int headerLength, string id, TaleLineSyntax[] lines,
-        int lineCount, TaleSyntaxDiagnostic[] diagnostics)
+        TaleLinePart[] parts, int lineCount, TaleSyntaxDiagnostic[] diagnostics)
     {
+        _parts = parts;
         Start = start;
         Line = line;
         HeaderIndent = headerIndent;
@@ -115,6 +163,9 @@ internal sealed class TaleSceneSyntax
 
     /// <summary>Scene-owned syntax diagnostics with scene-relative lines.</summary>
     public IReadOnlyList<TaleSyntaxDiagnostic> Diagnostics { get; }
+
+    /// <summary>The parts of a body line, or default when its kind has none.</summary>
+    public TaleLinePart Part(TaleLineSyntax line) => line.PartIndex == 0 ? default : _parts[line.PartIndex - 1];
 
     public int FileOffset(int relativeOffset) => Start + relativeOffset;
 
@@ -156,6 +207,20 @@ internal sealed class TaleFileSyntax
     /// <summary>The trimmed text of a scene line.</summary>
     public ReadOnlySpan<char> Content(TaleSceneSyntax scene, TaleLineSyntax line) =>
         Text.AsSpan(scene.FileOffset(line.Start + line.Indent), line.ContentLength);
+
+    /// <summary>The leading part of a scene line; see <see cref="TaleLinePart.HeadStart"/>.</summary>
+    public ReadOnlySpan<char> Head(TaleSceneSyntax scene, TaleLineSyntax line)
+    {
+        var part = scene.Part(line);
+        return Text.AsSpan(scene.FileOffset(line.Start + part.HeadStart), part.HeadLength);
+    }
+
+    /// <summary>The trimmed value of a scene line; see <see cref="TaleLinePart.ValueStart"/>.</summary>
+    public ReadOnlySpan<char> Value(TaleSceneSyntax scene, TaleLineSyntax line)
+    {
+        var part = scene.Part(line);
+        return Text.AsSpan(scene.FileOffset(line.Start + part.ValueStart), part.ValueLength);
+    }
 
     /// <summary>The trimmed text of a pre-scene line.</summary>
     public ReadOnlySpan<char> Content(TaleLineSyntax preambleLine) =>
