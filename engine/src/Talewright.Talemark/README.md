@@ -33,16 +33,48 @@ images have a separate path catalogue. Unrelated files are not published as stor
 1. **Manifest.** `StoryYamlReader` reads `story.talewright.yaml` (YamlDotNet node model, so error positions are exact and
    nothing depends on reflection). Builds the ruleset (`base` → factory from `CompilerOptions.Rulesets`, then
    `disable`, then `stats`), characters, items, factions, flags, vars and triggers.
-2. **Discover.** The Talemark parser collects scene ids and actual effect blocks; the expression lexer collects
+2. **Syntax.** `TaleSyntaxParser` splits each file once into scenes and classified lines without story symbols
+   (see [File and scene syntax](#file-and-scene-syntax)). Both passes below bind the same syntax.
+3. **Discover.** The Talemark parser collects scene ids and actual effect blocks; the expression lexer collects
    assignment targets from those blocks and manifest effects. Comments, prose and choice labels do not
    declare flags/vars. Forward references across files remain supported.
-3. **Parse.** `TaleParser` walks each file line by line (files in path order). Prose goes through `InlineParser`;
+4. **Parse.** `TaleParser` binds each file's syntax line by line (files in path order). Prose goes through `InlineParser`;
    conditions, substitutions and effects through `ExpressionParser`. `SceneDefinition.Steps` preserves source
    order, effect batches and nested conditions. Every step has a deterministic source-position ID and half-open
    UTF-16 source span; choice keys remain `c0`, `c1`, ... in source order.
-4. **Validate.** `StoryValidator` checks final choice blocks, explicit choice targets, dead ends, unreachable
+5. **Validate.** `StoryValidator` checks final choice blocks, explicit choice targets, dead ends, unreachable
    steps, hubs and reachability. Shared `SceneSteps` walks describe possible flow without evaluating game state.
-5. **Assemble.** If there were no errors, build the `StoryDefinition`. Warnings never block compilation.
+6. **Assemble.** If there were no errors, build the `StoryDefinition`. Warnings never block compilation.
+
+## File and scene syntax
+
+`TaleFileSyntax` keeps the original file text and a span for every line; nodes never copy source text. It owns
+lines before the first scene (`Preamble`) and their TW3001 diagnostics. Each `TaleSceneSyntax` owns its `===`
+header and every following line up to the next header or EOF, including comments, blank lines and unclosed
+blocks, so recovery never crosses a scene boundary. Scene lines and scene diagnostics use offsets and line
+numbers relative to the header; `FileOffset`/`FileLine` are the only mapping to file positions. Editing one
+scene therefore leaves other scenes' line syntax unchanged.
+
+`TaleLineKind` records the line-level grammar: blank, comment, header or misplaced metadata, block
+`{if}`/`{else}`/`{/if}`, speech, effects, choice, divert, `:::` fence and outcome lines, otherwise prose.
+Classification depends only on the text and the position of the line in its scene header.
+
+Ownership:
+
+| Syntax (`TaleSyntaxParser`) | Binding (`TaleParser`) |
+| --- | --- |
+| Line splitting, scene ownership, line kinds and spans | Steps, block-condition frames, outcome attachment |
+| TW3001 text before the first scene, TW1008 invalid scene ids | Diagnostics that need symbols or step context |
+| | Analysis tokens, emitted from line kinds and spans |
+
+Line detail (choice clauses, skill checks, effects, conditions and images) is still read by the binder; #407
+part 2 moves it into syntax. Prose stays as line spans and is parsed by `InlineParser` during binding until
+#491 separates inline syntax from symbol binding. `TaleParser` is the compatibility adapter from syntax to the
+existing model; #408 compiles from syntax directly and deletes the discovery pass.
+
+Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
+choice keys, so step IDs are runtime and tooling identities (executor caches, author inspection, debugger map
+matching). Edit-stable IDs are evaluated separately in #492.
 
 ## Accepted source provenance
 
@@ -141,7 +173,8 @@ deployment acceptance under #179 stay separate.
 | `Compilation/CompilerOptions.cs` | `Predicates` (`@Name`), `Modifiers` (`#mod`), `Rulesets` (name → factory; defaults `generic` and `none`). Also `CompilationResult` (`Story`, `Diagnostics`, `Success`, `Errors`, `Warnings`). |
 | `Compilation/StoryValidator.cs` | Whole-story structural checks (TW3xxx). Reachability is skipped when there are errors so one bad divert doesn't produce a wall of warnings. |
 | `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are warnings (TW4006) so typos are noticed. |
-| `Parsing/TaleParser.cs` | Line classifier and scene builder. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
+| `Parsing/TaleSyntaxParser.cs`, `Parsing/TaleSyntax.cs` | Symbol-independent file/scene syntax: line splitting, scene ownership and line kinds with scene-relative spans. |
+| `Parsing/TaleParser.cs` | Binds file syntax to scenes and steps. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
 | `Parsing/InlineParser.cs` | Prose → `TemplateInline`s. Directly tokenizes reader-text escapes, inline constructs, code spans and formatting, then folds inline conditions; `SourceText` maps offsets back to line/column. |
 | `Parsing/ExpressionParser.cs` | Recursive descent with type checking: conditions (`player:str >= 12 and player has rope`), numbers, substitutions (`player:first-name#possessive`), effects (`player:hp -= 2`). |
 | `Parsing/Lexer.cs` | Tokens for the expression parser. |

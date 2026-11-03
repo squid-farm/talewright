@@ -31,6 +31,7 @@ internal sealed partial class TaleParser
     private const int MaximumBlockConditionDepth = 64;
 
     private readonly string _file;
+    private readonly TaleFileSyntax _syntax;
     private readonly string _text;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
@@ -40,27 +41,19 @@ internal sealed partial class TaleParser
     private int _linesSinceCancellationCheck;
     private readonly List<ParsedScene> _scenes = [];
     private SceneBuilder? _scene;
+    private TaleSceneSyntax? _sceneSyntax;
+    private int _lineCursor;
     private int _index;
     private int _lineStart;
     private int _lineLength;
-    private int _nextLineStart;
-    private int _nextLineLength;
-    private int _afterNextLineStart;
-    private bool _hasCurrentLine = true;
-    private bool _hasNextLine;
-    private bool _hasAfterNextLine;
 
-    private TaleParser(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
+    private TaleParser(string file, TaleFileSyntax syntax, StorySymbols symbols, DiagnosticBag diagnostics,
         Action<string, SourceLocation>? discoverEffects = null, Action<SceneId, SourceLocation>? discoverScene = null,
         CancellationToken cancellationToken = default)
     {
         _file = file;
-        _text = text;
-        _lineLength = GetLineLength(0, out _nextLineStart, out _hasNextLine);
-        if (_hasNextLine)
-        {
-            _nextLineLength = GetLineLength(_nextLineStart, out _afterNextLineStart, out _hasAfterNextLine);
-        }
+        _syntax = syntax;
+        _text = syntax.Text;
         _symbols = symbols;
         _diagnostics = diagnostics;
         _discoverEffects = discoverEffects;
@@ -69,9 +62,13 @@ internal sealed partial class TaleParser
     }
 
     public static List<ParsedScene> Parse(string file, string text, StorySymbols symbols, DiagnosticBag diagnostics,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        Parse(file, TaleSyntaxParser.Parse(text, cancellationToken), symbols, diagnostics, cancellationToken);
+
+    public static List<ParsedScene> Parse(string file, TaleFileSyntax syntax, StorySymbols symbols,
+        DiagnosticBag diagnostics, CancellationToken cancellationToken = default)
     {
-        var parser = new TaleParser(file, text, symbols, diagnostics, cancellationToken: cancellationToken);
+        var parser = new TaleParser(file, syntax, symbols, diagnostics, cancellationToken: cancellationToken);
         parser.Run();
         return parser._scenes;
     }
@@ -79,7 +76,12 @@ internal sealed partial class TaleParser
     public static void Discover(string file, string text, StorySymbols symbols,
         Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene,
         CancellationToken cancellationToken = default) =>
-        new TaleParser(file, text, symbols, new DiagnosticBag(), effects, scene, cancellationToken).Run();
+        Discover(file, TaleSyntaxParser.Parse(text, cancellationToken), symbols, effects, scene, cancellationToken);
+
+    public static void Discover(string file, TaleFileSyntax syntax, StorySymbols symbols,
+        Action<string, SourceLocation> effects, Action<SceneId, SourceLocation> scene,
+        CancellationToken cancellationToken = default) =>
+        new TaleParser(file, syntax, symbols, new DiagnosticBag(), effects, scene, cancellationToken).Run();
 
     private SourceLocation At(int column) => new(_file, _index + 1, column + 1);
     private SourceRange SpanFrom(SourceLocation start) => new(start, At(_lineLength));
@@ -88,101 +90,68 @@ internal sealed partial class TaleParser
     private void Run()
     {
         _cancellationToken.ThrowIfCancellationRequested();
-        while (_hasCurrentLine)
+        _syntax.Report(_file, _diagnostics);
+        foreach (var sceneSyntax in _syntax.Scenes)
         {
-            var raw = _text.AsSpan(_lineStart, _lineLength);
-            var trimmed = raw.Trim();
-            var indent = raw.Length - raw.TrimStart().Length;
-
-            if (trimmed.StartsWith("//", StringComparison.Ordinal))
+            _cancellationToken.ThrowIfCancellationRequested();
+            _index = sceneSyntax.Line;
+            _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SceneHeader,
+                AnalysisCollector.Range(At(sceneSyntax.HeaderIndent), SceneVocabulary.SceneHeader))
+                { Kind = AuthoringTokenKind.SceneHeader });
+            FinishScene();
+            StartScene(sceneSyntax);
+            CountLine();
+            for (_lineCursor = 0; _lineCursor < sceneSyntax.Lines.Count; _lineCursor++)
             {
-                AdvanceLine();
-                continue;
+                var line = MoveTo(_lineCursor);
+                if (line.Kind != TaleLineKind.Comment)
+                    ParseSceneLine(line);
+                CountLine();
             }
-
-            if (trimmed.StartsWith(SceneVocabulary.SceneHeader, StringComparison.Ordinal))
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SceneHeader,
-                    AnalysisCollector.Range(At(indent), SceneVocabulary.SceneHeader))
-                    { Kind = AuthoringTokenKind.SceneHeader });
-                FinishScene();
-                StartScene(trimmed[SceneVocabulary.SceneHeader.Length..].Trim().ToString(), At(indent));
-                AdvanceLine();
-                continue;
-            }
-
-            if (_scene is null)
-            {
-                if (trimmed.Length > 0)
-                {
-                    _diagnostics.Error(CompilerDiagnosticCodes.TextOutsideSceneOrNoFiles,
-                        $"Text before the first scene. Start a scene with '{SceneVocabulary.SceneHeader} scene.id'.", At(indent));
-                }
-
-                AdvanceLine();
-                continue;
-            }
-
-            ParseSceneLine(trimmed.ToString(), indent);
-            AdvanceLine();
         }
 
         FinishScene();
     }
 
-    private int GetLineLength(int start, out int nextStart, out bool hasNext)
+    private TaleLineSyntax MoveTo(int cursor)
     {
-        var remainder = _text.AsSpan(start);
-        var lineBreak = remainder.IndexOfAny("\r\n\u0085\u2028\u2029");
-        var end = lineBreak < 0 ? _text.Length : start + lineBreak;
-        if (lineBreak < 0)
-        {
-            nextStart = end;
-            hasNext = false;
-            return end - start;
-        }
-
-        nextStart = end + 1;
-        if (_text[end] == '\r' && nextStart < _text.Length && _text[nextStart] == '\n')
-        {
-            nextStart++;
-        }
-
-        hasNext = true;
-        return end - start;
+        var scene = _sceneSyntax!;
+        var line = scene.Lines[cursor];
+        _lineCursor = cursor;
+        _index = scene.FileLine(line.Line);
+        _lineStart = scene.FileOffset(line.Start);
+        _lineLength = line.Length;
+        return line;
     }
 
-    private void AdvanceLine()
+    private bool TryPeekLine(out TaleLineSyntax line)
+    {
+        var lines = _sceneSyntax!.Lines;
+        if (_lineCursor + 1 < lines.Count)
+        {
+            line = lines[_lineCursor + 1];
+            return true;
+        }
+
+        line = default;
+        return false;
+    }
+
+    private void CountLine()
     {
         if ((_linesSinceCancellationCheck++ & 63) == 0)
             _cancellationToken.ThrowIfCancellationRequested();
-        _index++;
-        if (!_hasNextLine)
-        {
-            _hasCurrentLine = false;
-            return;
-        }
-
-        _lineStart = _nextLineStart;
-        _lineLength = _nextLineLength;
-        _nextLineStart = _afterNextLineStart;
-        _hasNextLine = _hasAfterNextLine;
-        _nextLineLength = _hasNextLine
-            ? GetLineLength(_nextLineStart, out _afterNextLineStart, out _hasAfterNextLine)
-            : 0;
     }
 
-    private void StartScene(string id, SourceLocation location)
+    private void StartScene(TaleSceneSyntax syntax)
     {
         _cancellationToken.ThrowIfCancellationRequested();
-        _discoverScene?.Invoke(new SceneId(id), location);
+        var location = At(syntax.HeaderIndent);
+        _discoverScene?.Invoke(new SceneId(syntax.Id), location);
         _cancellationToken.ThrowIfCancellationRequested();
-        _scene = new SceneBuilder(new SceneId(id), location);
-        if (!IdentifierRules.IsValid(id) || id == SceneVocabulary.End)
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneId, $"'{id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' and single '-' or '.' separators (e.g. temple.entrance).", location);
-        }
+        _sceneSyntax = syntax;
+        _scene = new SceneBuilder(new SceneId(syntax.Id), location);
+        TaleFileSyntax.Report(_file, syntax, _diagnostics);
     }
 
     private void FinishScene()
@@ -212,68 +181,66 @@ internal sealed partial class TaleParser
 
         _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location)
         {
-            EndLine = _index,
+            EndLine = _sceneSyntax!.Line + _sceneSyntax.LineCount,
             HasExplicitPriority = _scene.HasExplicitPriority,
             DroppedMalformedChoice = _scene.DroppedMalformedChoice,
         });
         _scene = null;
     }
 
-    private void ParseSceneLine(string line, int indent)
+    private void ParseSceneLine(TaleLineSyntax syntax)
     {
         var scene = _scene!;
         if (scene.SuppressedConditionDepth > 0)
         {
-            SkipSuppressedBlockLine(line);
+            SkipSuppressedBlockLine(syntax.Kind);
             return;
         }
 
-        if (line.Length == 0)
+        if (syntax.Kind == TaleLineKind.Blank)
         {
             FlushParagraph();
             return;
         }
 
-        if (line[0] == SceneVocabulary.MetadataMarker && !scene.HeaderDone && TryParseMetadata(line, indent))
+        var line = _syntax.Content(_sceneSyntax!, syntax).ToString();
+        var indent = syntax.Indent;
+        if (syntax.Kind == TaleLineKind.Metadata && TryParseMetadata(line, indent))
         {
             return;
         }
 
-        scene.HeaderDone = true;
-
-        if (IsBlockDirective(line, _cancellationToken, out var directive))
+        if (syntax.Kind is TaleLineKind.BlockIf or TaleLineKind.BlockElse or TaleLineKind.BlockEndIf)
         {
             FlushParagraph();
-            ParseBlockDirective(directive, indent, line);
+            ParseBlockDirective(syntax.Kind, indent, line);
             return;
         }
 
-        switch (line)
+        switch (syntax.Kind)
         {
-            case [SceneVocabulary.SpeechMarker, ..]:
+            case TaleLineKind.Speech:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SpeechMarker.ToString(),
                     AnalysisCollector.Range(At(indent), SceneVocabulary.SpeechMarker.ToString()))
                     { Kind = AuthoringTokenKind.Speech });
                 FlushParagraph();
                 ParseSpeech(line, indent);
                 return;
-            case [SceneVocabulary.EffectsMarker, ..]:
+            case TaleLineKind.Effects:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.EffectsMarker.ToString(),
                     AnalysisCollector.Range(At(indent), SceneVocabulary.EffectsMarker.ToString()))
                     { Kind = AuthoringTokenKind.Effects });
                 FlushParagraph();
                 ParseEntryEffects(line[1..], indent + 1);
                 return;
-            case [SceneVocabulary.ChoiceMarker]:
-            case [SceneVocabulary.ChoiceMarker, ' ' or '\t' or SceneVocabulary.OpenBracket, ..]:
+            case TaleLineKind.Choice:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.ChoiceMarker.ToString(),
                     AnalysisCollector.Range(At(indent), SceneVocabulary.ChoiceMarker.ToString()))
                     { Kind = AuthoringTokenKind.Choice });
-                // A choice marker followed by a label opener or divert marker is a choice; adjacent markers are emphasis.
                 FlushParagraph();
                 ParseChoice(line, indent);
                 return;
-            case [ExpressionVocabulary.Minus, ExpressionVocabulary.Greater, ..]:
+            case TaleLineKind.Divert:
                 _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.Divert,
                     AnalysisCollector.Range(At(indent), SceneVocabulary.Divert))
                     { Kind = AuthoringTokenKind.Divert });
@@ -287,47 +254,31 @@ internal sealed partial class TaleParser
                 }
 
                 return;
-        }
-
-        if (line.StartsWith(SceneVocabulary.SkillCheckFence, StringComparison.Ordinal))
-        {
-            _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SkillCheckBlock,
-                AnalysisCollector.Range(At(indent), SceneVocabulary.SkillCheckFence))
-                { Kind = AuthoringTokenKind.SkillCheckBlock });
-            FlushParagraph();
-            ParseBlockCheck(line, indent);
-            return;
-        }
-
-        if (line.StartsWith(SceneVocabulary.SuccessOutcome, StringComparison.Ordinal) ||
-            line.StartsWith(SceneVocabulary.FailureOutcome, StringComparison.Ordinal))
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
-                $"{SceneVocabulary.SuccessOutcome}/{SceneVocabulary.FailureOutcome} lines must directly follow a " +
-                $"{SceneVocabulary.SkillCheck} choice or be inside a '{SceneVocabulary.SkillCheckBlock}' block.",
-                At(indent));
-            return;
-        }
-
-        if (line[0] == SceneVocabulary.MetadataMarker && IsMetadataKey(line))
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
-                $"Metadata ({SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}, " +
-                $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Tags}, …) must come directly after the " +
-                $"'{SceneVocabulary.SceneHeader}' line.", At(indent));
-            return;
+            case TaleLineKind.SkillCheckBlock:
+                _symbols.Analysis?.Tokens.Add(new(SceneVocabulary.SkillCheckBlock,
+                    AnalysisCollector.Range(At(indent), SceneVocabulary.SkillCheckFence))
+                    { Kind = AuthoringTokenKind.SkillCheckBlock });
+                FlushParagraph();
+                ParseBlockCheck(line, indent);
+                return;
+            case TaleLineKind.SuccessOutcome or TaleLineKind.FailureOutcome:
+                _diagnostics.Error(CompilerDiagnosticCodes.MalformedSkillCheckOutcome,
+                    $"{SceneVocabulary.SuccessOutcome}/{SceneVocabulary.FailureOutcome} lines must directly follow a " +
+                    $"{SceneVocabulary.SkillCheck} choice or be inside a '{SceneVocabulary.SkillCheckBlock}' block.",
+                    At(indent));
+                return;
+            case TaleLineKind.MisplacedMetadata:
+                _diagnostics.Error(CompilerDiagnosticCodes.InvalidSceneMetadata,
+                    $"Metadata ({SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}, " +
+                    $"{SceneVocabulary.MetadataMarker}{SceneVocabulary.Tags}, …) must come directly after the " +
+                    $"'{SceneVocabulary.SceneHeader}' line.", At(indent));
+                return;
         }
 
         scene.Paragraph.AppendLine(line, At(indent));
     }
 
     // ---- metadata --------------------------------------------------------------------------------------------------
-
-    private static bool IsMetadataKey(string line)
-    {
-        var key = line[1..].Split(' ', 2)[0];
-        return SceneVocabulary.TryGetMetadataKey(key, out _);
-    }
 
     private bool TryParseMetadata(string line, int indent)
     {
@@ -425,40 +376,20 @@ internal sealed partial class TaleParser
 
     // ---- block conditionals ----------------------------------------------------------------------------------------
 
-    private static bool IsBlockDirective(string line, CancellationToken cancellationToken, out string directive)
-    {
-        directive = string.Empty;
-        if (line[0] != SceneVocabulary.InlineOpen)
-        {
-            return false;
-        }
-
-        var scan = DelimiterScanner.Scan(line, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
-        if (!scan.TryGetClose(0, out var close) || close != line.Length - 1)
-        {
-            return false;
-        }
-
-        var inner = line[1..^1].Trim();
-        if (inner is SceneVocabulary.Else or SceneVocabulary.EndIf ||
-            inner.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
-        {
-            directive = inner;
-            return true;
-        }
-
-        return false;
-    }
-
-    private void ParseBlockDirective(string directive, int indent, string line)
+    private void ParseBlockDirective(TaleLineKind kind, int indent, string line)
     {
         var scene = _scene!;
-        var keyword = directive.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal)
-            ? SceneVocabulary.If : directive;
+        var directive = line[1..^1].Trim();
+        var keyword = kind switch
+        {
+            TaleLineKind.BlockIf => SceneVocabulary.If,
+            TaleLineKind.BlockElse => SceneVocabulary.Else,
+            _ => SceneVocabulary.EndIf,
+        };
         var keywordStart = line.IndexOf(keyword, StringComparison.Ordinal);
         _symbols.Analysis?.Tokens.Add(new(keyword, AnalysisCollector.Range(At(indent + keywordStart), keyword))
             { Kind = AuthoringSyntaxVocabulary.ConditionalKind(keyword) });
-        if (directive == SceneVocabulary.Else)
+        if (kind == TaleLineKind.BlockElse)
         {
             if (scene.Frames.Count == 0 || scene.Frames.Peek().InElse)
             {
@@ -472,7 +403,7 @@ internal sealed partial class TaleParser
             return;
         }
 
-        if (directive == SceneVocabulary.EndIf)
+        if (kind == TaleLineKind.BlockEndIf)
         {
             if (scene.Frames.Count == 0)
             {
@@ -504,18 +435,13 @@ internal sealed partial class TaleParser
         scene.Frames.Push(new Frame(condition, At(indent)));
     }
 
-    private void SkipSuppressedBlockLine(string line)
+    private void SkipSuppressedBlockLine(TaleLineKind kind)
     {
-        if (!IsBlockDirective(line, _cancellationToken, out var directive))
-        {
-            return;
-        }
-
-        if (directive.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
+        if (kind == TaleLineKind.BlockIf)
         {
             _scene!.SuppressedConditionDepth++;
         }
-        else if (directive == SceneVocabulary.EndIf)
+        else if (kind == TaleLineKind.BlockEndIf)
         {
             _scene!.SuppressedConditionDepth--;
         }
@@ -1016,33 +942,34 @@ internal sealed partial class TaleParser
         var sawSuccess = false;
         var sawFailure = false;
         var closed = false;
-        while (_hasNextLine)
+        while (TryPeekLine(out var next))
         {
-            var raw = _text.AsSpan(_nextLineStart, _nextLineLength);
-            var line = raw.Trim();
-            var indent = raw.Length - raw.TrimStart().Length;
-            if (line.StartsWith("//", StringComparison.Ordinal) || (insideBlock && line.Length == 0))
+            if (next.Kind == TaleLineKind.Comment || (insideBlock && next.Kind == TaleLineKind.Blank))
             {
-                AdvanceLine();
+                MoveTo(_lineCursor + 1);
+                CountLine();
                 continue;
             }
 
-            if (insideBlock && line.SequenceEqual(SceneVocabulary.SkillCheckFence))
+            if (insideBlock && next is { Kind: TaleLineKind.SkillCheckBlock, IsBareFence: true })
             {
-                AdvanceLine();
+                MoveTo(_lineCursor + 1);
+                CountLine();
                 closed = true;
                 break;
             }
 
-            var isSuccess = line.StartsWith(SceneVocabulary.SuccessOutcome, StringComparison.Ordinal);
-            if (!isSuccess && !line.StartsWith(SceneVocabulary.FailureOutcome, StringComparison.Ordinal))
+            var isSuccess = next.Kind == TaleLineKind.SuccessOutcome;
+            if (!isSuccess && next.Kind != TaleLineKind.FailureOutcome)
             {
                 break;
             }
 
-            AdvanceLine();
+            MoveTo(_lineCursor + 1);
+            CountLine();
+            var line = _syntax.Content(_sceneSyntax!, next);
             var outcomePrefix = isSuccess ? SceneVocabulary.SuccessOutcome : SceneVocabulary.FailureOutcome;
-            var outcome = ParseOutcome(line[outcomePrefix.Length..].ToString(), indent + outcomePrefix.Length);
+            var outcome = ParseOutcome(line[outcomePrefix.Length..].ToString(), next.Indent + outcomePrefix.Length);
             if (isSuccess)
             {
                 sawSuccess = true;
@@ -1189,7 +1116,6 @@ internal sealed partial class TaleParser
     {
         public SceneId Id { get; } = id;
         public SourceLocation Location { get; } = location;
-        public bool HeaderDone { get; set; }
         public string? Title { get; set; }
         public Expr? Requires { get; set; }
         public HashSet<string> Tags { get; } = [];

@@ -1,0 +1,177 @@
+using System.Runtime.InteropServices;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
+
+namespace Talewright.Talemark.Parsing;
+
+/// <summary>How a <c>.tale</c> line is classified, independent of story symbols.</summary>
+internal enum TaleLineKind : byte
+{
+    Blank,
+    Comment,
+    /// <summary>An <c>@</c> line in a scene's header position; <see cref="TaleLineSyntax.MetadataKey"/> is null for unknown keys.</summary>
+    Metadata,
+    /// <summary>A known <c>@key</c> line after the scene header has ended.</summary>
+    MisplacedMetadata,
+    BlockIf,
+    BlockElse,
+    BlockEndIf,
+    Speech,
+    Effects,
+    Choice,
+    Divert,
+    /// <summary>A line starting with <c>:::</c>; <see cref="TaleLineSyntax.IsBareFence"/> marks the closing fence.</summary>
+    SkillCheckBlock,
+    SuccessOutcome,
+    FailureOutcome,
+    /// <summary>Reader prose, or stray text when the line precedes the first scene.</summary>
+    Prose,
+}
+
+/// <summary>
+/// One source line. Offsets and line numbers are relative to the owning scene's header line (or to the file start for
+/// pre-scene lines); map them with <see cref="TaleSceneSyntax.FileOffset"/> and <see cref="TaleSceneSyntax.FileLine"/>.
+/// </summary>
+/// <param name="Kind">The line classification.</param>
+/// <param name="Start">Offset of the raw line start.</param>
+/// <param name="Line">Zero-based line number.</param>
+/// <param name="Length">Raw line length, excluding the line break.</param>
+/// <param name="Indent">UTF-16 length of leading whitespace.</param>
+/// <param name="ContentLength">Length of the line with leading and trailing whitespace removed.</param>
+[StructLayout(LayoutKind.Auto)]
+internal readonly record struct TaleLineSyntax(
+    TaleLineKind Kind,
+    int Start,
+    int Line,
+    int Length,
+    int Indent,
+    int ContentLength)
+{
+    // One byte keeps the line at 24 bytes; its meaning depends on Kind.
+    private readonly byte _detail;
+
+    public SceneMetadataKey? MetadataKey
+    {
+        get => Kind == TaleLineKind.Metadata && _detail != 0 ? (SceneMetadataKey)(_detail - 1) : null;
+        init
+        {
+            if (value is { } key)
+                _detail = checked((byte)((int)key + 1));
+        }
+    }
+
+    public bool IsBareFence
+    {
+        get => Kind == TaleLineKind.SkillCheckBlock && _detail != 0;
+        init
+        {
+            if (value)
+                _detail = 1;
+        }
+    }
+}
+
+/// <summary>A syntax diagnostic positioned relative to its owner (scene or file).</summary>
+internal sealed record TaleSyntaxDiagnostic(string Code, string Message, int Line, int Column);
+
+/// <summary>
+/// A scene: its <c>===</c> header plus every following line up to the next header or end of file. Body lines are
+/// scene-relative so an unchanged scene keeps identical syntax when earlier text moves.
+/// </summary>
+internal sealed class TaleSceneSyntax
+{
+    internal TaleSceneSyntax(int start, int line, int headerIndent, int headerLength, string id, TaleLineSyntax[] lines,
+        int lineCount, TaleSyntaxDiagnostic[] diagnostics)
+    {
+        Start = start;
+        Line = line;
+        HeaderIndent = headerIndent;
+        HeaderLength = headerLength;
+        Id = id;
+        Lines = lines;
+        LineCount = lineCount;
+        Diagnostics = diagnostics;
+    }
+
+    /// <summary>File offset of the header line.</summary>
+    public int Start { get; }
+
+    /// <summary>Zero-based file line of the header.</summary>
+    public int Line { get; }
+
+    public int HeaderIndent { get; }
+
+    /// <summary>Raw header line length.</summary>
+    public int HeaderLength { get; }
+
+    /// <summary>Header text after <c>===</c>, trimmed; may be invalid.</summary>
+    public string Id { get; }
+
+    /// <summary>Body lines after the header.</summary>
+    public IReadOnlyList<TaleLineSyntax> Lines { get; }
+
+    /// <summary>Lines owned by the scene, including the header.</summary>
+    public int LineCount { get; }
+
+    /// <summary>Scene-owned syntax diagnostics with scene-relative lines.</summary>
+    public IReadOnlyList<TaleSyntaxDiagnostic> Diagnostics { get; }
+
+    public int FileOffset(int relativeOffset) => Start + relativeOffset;
+
+    public int FileLine(int relativeLine) => Line + relativeLine;
+}
+
+/// <summary>
+/// Symbol-independent syntax for one <c>.tale</c> file. The original text is shared, not copied per node; pre-scene
+/// lines and their diagnostics are owned by the file.
+/// </summary>
+internal sealed class TaleFileSyntax
+{
+    internal TaleFileSyntax(string text, TaleLineSyntax[] preamble, TaleSceneSyntax[] scenes,
+        TaleSyntaxDiagnostic[] diagnostics, int lineCount)
+    {
+        Text = text;
+        Preamble = preamble;
+        Scenes = scenes;
+        Diagnostics = diagnostics;
+        LineCount = lineCount;
+    }
+
+    public string Text { get; }
+
+    /// <summary>Lines before the first scene header, with file-relative positions.</summary>
+    public IReadOnlyList<TaleLineSyntax> Preamble { get; }
+
+    public IReadOnlyList<TaleSceneSyntax> Scenes { get; }
+
+    /// <summary>File-owned syntax diagnostics with file lines.</summary>
+    public IReadOnlyList<TaleSyntaxDiagnostic> Diagnostics { get; }
+
+    public int LineCount { get; }
+
+    /// <summary>The raw text of a scene line.</summary>
+    public ReadOnlySpan<char> RawText(TaleSceneSyntax scene, TaleLineSyntax line) =>
+        Text.AsSpan(scene.FileOffset(line.Start), line.Length);
+
+    /// <summary>The trimmed text of a scene line.</summary>
+    public ReadOnlySpan<char> Content(TaleSceneSyntax scene, TaleLineSyntax line) =>
+        Text.AsSpan(scene.FileOffset(line.Start + line.Indent), line.ContentLength);
+
+    /// <summary>The trimmed text of a pre-scene line.</summary>
+    public ReadOnlySpan<char> Content(TaleLineSyntax preambleLine) =>
+        Text.AsSpan(preambleLine.Start + preambleLine.Indent, preambleLine.ContentLength);
+
+    internal void Report(string file, DiagnosticBag diagnostics)
+    {
+        foreach (var diagnostic in Diagnostics)
+            diagnostics.Error(diagnostic.Code, diagnostic.Message,
+                new SourceLocation(file, diagnostic.Line + 1, diagnostic.Column + 1));
+    }
+
+    internal static void Report(string file, TaleSceneSyntax scene, DiagnosticBag diagnostics)
+    {
+        foreach (var diagnostic in scene.Diagnostics)
+            diagnostics.Error(diagnostic.Code, diagnostic.Message,
+                new SourceLocation(file, scene.FileLine(diagnostic.Line) + 1, diagnostic.Column + 1));
+    }
+}

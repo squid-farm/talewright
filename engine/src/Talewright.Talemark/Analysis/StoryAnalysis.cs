@@ -421,10 +421,11 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         foreach (var (file, text) in source.TaleFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            TaleParser.Discover(file, text, symbols, (_, _) => { }, Scene, cancellationToken);
+            var syntax = TaleSyntaxParser.Parse(text, cancellationToken);
+            TaleParser.Discover(file, syntax, symbols, (_, _) => { }, Scene, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
-            TaleParser.Parse(file, text, symbols, diagnostics, cancellationToken);
+            TaleParser.Parse(file, syntax, symbols, diagnostics, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
                 diagnostic.Code is CompilerDiagnosticCodes.UnsafeImagePath or CompilerDiagnosticCodes.UnsupportedImageFormat or CompilerDiagnosticCodes.MissingImage or CompilerDiagnosticCodes.AmbiguousImagePath or CompilerDiagnosticCodes.MissingImageAlt));
