@@ -34,11 +34,13 @@ images have a separate path catalogue. Unrelated files are not published as stor
    nothing depends on reflection). Builds the ruleset (`base` → factory from `CompilerOptions.Rulesets`, then
    `disable`, then `stats`), characters, items, factions, flags, vars and triggers.
 2. **Syntax.** `TaleSyntaxParser` splits each file once into scenes and classified lines without story symbols
-   (see [File and scene syntax](#file-and-scene-syntax)). Both passes below bind the same syntax.
-3. **Discover.** The Talemark parser collects scene ids and actual effect blocks; the expression lexer collects
-   assignment targets from those blocks and manifest effects. Comments, prose and choice labels do not
-   declare flags/vars. Forward references across files remain supported.
-4. **Parse.** `TaleParser` binds each file's syntax line by line (files in path order). Prose goes through `InlineParser`;
+   (see [File and scene syntax](#file-and-scene-syntax)). Both steps below read the same syntax; no file is
+   parsed twice.
+3. **Declare.** `TaleDeclarations` walks every file's syntax for scene ids and actual effect blocks (`~` lines,
+   choice effect clauses and attached outcome effects); the expression lexer collects assignment targets from
+   those blocks and manifest effects. Comments, prose and choice labels do not declare flags/vars. Forward
+   references across files remain supported.
+4. **Bind.** `TaleParser` binds each file's syntax line by line (files in path order). Prose goes through `InlineParser`;
    conditions, substitutions and effects through `ExpressionParser`. `SceneDefinition.Steps` preserves source
    order, effect batches and nested conditions. Every step has a deterministic source-position ID and half-open
    UTF-16 source span; choice keys remain `c0`, `c1`, ... in source order.
@@ -85,8 +87,8 @@ Ownership:
 
 Expressions stay as spans and are parsed and bound by `ExpressionParser` during binding. Prose and
 images stay as line spans parsed by `InlineParser` during binding until #491 separates inline syntax from symbol
-binding. `TaleParser` is the compatibility adapter from syntax to the existing model; #408 compiles from syntax
-directly and deletes the discovery pass.
+binding. `TaleParser` binds syntax to the existing model; `TaleDeclarations` collects story-wide symbols from the
+same syntax before any file is bound.
 
 Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
 choice keys, so step IDs are runtime and tooling identities (executor caches, author inspection, debugger map

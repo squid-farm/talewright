@@ -422,7 +422,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         {
             cancellationToken.ThrowIfCancellationRequested();
             var syntax = TaleSyntaxParser.Parse(text, cancellationToken);
-            TaleParser.Discover(file, syntax, symbols, (_, _) => { }, Scene, cancellationToken);
+            TaleDeclarations.Collect(file, syntax, Scene, null, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
             TaleParser.Parse(file, syntax, symbols, diagnostics, cancellationToken);
