@@ -44,7 +44,7 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Library();
         Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
         var invalid = new StoryFixture("bad-images", "game:\n  id: bad\n  title: Bad\n  start: missing\n", "=== start\n-> END");
-        await Upload(invalid);
+        await UploadBytes(invalid.Id + ".zip", invalid.Zip());
         await Expect(Page.Locator(".tw-library .tw-diagnostics")).ToBeVisibleAsync();
         await Page.Locator(".tw-resume").ClickAsync();
         await Expect(image).ToHaveAttributeAsync("src", url!);
