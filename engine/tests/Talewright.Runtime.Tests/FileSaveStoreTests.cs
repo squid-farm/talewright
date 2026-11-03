@@ -67,7 +67,8 @@ public sealed class FileSaveStoreTests : IDisposable
         Assert.Equal(new byte[] { 2 }, await Store.ReadQuickAsync("story"));
         Assert.Equal(new byte[] { 1 }, await Store.ReadAsync("story", "Autosave"));
         Assert.Equal(["Autosave"], await Store.ListAsync("story"));
-        Assert.DoesNotContain(await Store.ListEntriesAsync("story"), entry => entry.IsAutosave);
+        Assert.Equal([SaveEntry.QuickSlot, SaveEntry.AutosaveSlot, "Autosave"],
+            (await Store.ListEntriesAsync("story")).Select(entry => entry.Slot));
         await Assert.ThrowsAsync<ArgumentException>(() =>
             Store.WriteAsync("story", SaveEntry.AutosaveSlot, [6], overwrite: true));
         Assert.Equal(2, Directory.EnumerateFiles(_root, "autosave.json", SearchOption.AllDirectories).Count());

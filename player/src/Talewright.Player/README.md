@@ -148,7 +148,9 @@ writes one separate recovery slot at the initial playable point and after each c
 It offers **Resume saved game** or **Start a new game** when the story is opened again; it never
 restores silently. Resuming or loading a save does not itself write an autosave. Failed writes leave
 the last committed recovery save intact, do not stop play, and show **Retry autosave** with storage
-advice. Autosave is separate from named saves and Quick Save, and is not included in the Saves list.
+advice. Autosave is separate from named saves and Quick Save. The Saves list shows it as a
+read-only **Autosave** entry that can be loaded or exported but not overwritten; because the next
+choice replaces it, it does not count as safely saved progress for the load confirmation.
 The desktop file store and web IndexedDB store both support it. A custom host must implement the
 autosave methods on `ISaveStore`; without a store, play continues without persistence.
 **Quick Save** writes/replaces one dedicated checkpoint for the story, without named-save

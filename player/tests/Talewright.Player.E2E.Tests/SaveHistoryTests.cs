@@ -34,7 +34,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         });
         if (!PlayerTarget.IsDesktop)
         {
-            var time = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true }).Locator("time");
+            var time = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true }).Locator("[data-save-kind=named] time");
             var timestamp = await time.GetAttributeAsync("datetime");
             Assert.NotNull(timestamp);
             Assert.True(DateTimeOffset.TryParse(timestamp, out var savedAt), "Machine-readable UTC timestamp missing.");
@@ -91,11 +91,13 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
 
         var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true });
         var entries = dialog.Locator(".tw-save-list > li");
-        await Expect(entries).ToHaveCountAsync(2);
+        await Expect(entries).ToHaveCountAsync(3);
         await Expect(entries.Nth(0)).ToHaveAttributeAsync("data-save-kind", "named");
         await Expect(entries.Nth(1)).ToHaveAttributeAsync("data-save-kind", "quick");
+        await Expect(entries.Nth(2)).ToHaveAttributeAsync("data-save-kind", "autosave");
         await Expect(entries.Nth(0).Locator(".tw-save-kind")).ToHaveTextAsync("Named save");
         await Expect(entries.Nth(1).Locator(".tw-save-kind")).ToHaveCountAsync(0);
+        await Expect(entries.Nth(2).Locator(".tw-save-kind")).ToHaveCountAsync(0);
         var text = await dialog.InnerTextAsync();
         Assert.Contains("Named save", text);
         Assert.DoesNotContain("One replaceable checkpoint for this story", text);
@@ -236,14 +238,15 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.True(await dialog.EvaluateAsync<bool>("e => e.matches(':modal')"));
         Assert.Equal(dark ? "rgb(38, 35, 31)" : "rgb(240, 235, 224)",
             await dialog.EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));
+        await Expect(dialog.Locator("[data-save-kind=autosave]")).ToHaveCountAsync(1);
         await Page.Keyboard.PressAsync("Shift+Tab");
-        await Expect(Page.GetByLabel("Import save file", new() { Exact = true })).ToBeFocusedAsync();
+        await Expect(dialog.Locator("[data-save-kind=autosave] button").Last).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Refresh saves" })).ToHaveCountAsync(0);
         await Page.GetByLabel("Save name", new() { Exact = true }).FillAsync(new string('S', 64));
         await Driver.ClickAsync("Save game");
-        await Expect(dialog.Locator("li")).ToHaveCountAsync(1);
+        await Expect(dialog.Locator("li")).ToHaveCountAsync(2);
         Assert.True(await dialog.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"),
             await dialog.EvaluateAsync<string>("""
                 e => JSON.stringify({client: e.clientWidth, scroll: e.scrollWidth, children:
@@ -259,7 +262,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Expect(dialog).ToBeHiddenAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Saves", Exact = true })).ToBeFocusedAsync();
         await Driver.ClickAsync("Saves");
-        await Expect(dialog.Locator("li")).ToHaveCountAsync(1);
+        await Expect(dialog.Locator("li")).ToHaveCountAsync(2);
         await Driver.ClickAsync("Close saves");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Saves", Exact = true })).ToBeFocusedAsync();
     }
@@ -272,7 +275,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Observe(new(null, "First passage"));
         await Driver.ResizeAsync(390, 800);
         await Driver.ClickAsync("Saves");
-        await AssertDialogText(text => Assert.Contains("No saved games.", text));
+        await AssertDialogText(text => Assert.Contains("Load Autosave", text));
         await Driver.PressAsync("Tab");
         await Driver.PressAsync("Tab");
         var native = Assert.IsType<NativePlayerDriver>(Driver);
@@ -280,7 +283,14 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.PressAsync("Tab");
         Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Import save file");
         await Driver.PressAsync("Tab");
-        Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Close saves");
+        Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Load Autosave");
+        var closeFocused = false;
+        for (var i = 0; i < 2 && !closeFocused; i++)
+        {
+            await Driver.PressAsync("Tab");
+            closeFocused = (await native.SnapshotAsync()).Descendants().Any(node => node.Focused && node.Name == "Close saves");
+        }
+        Assert.True(closeFocused);
         await Driver.PressAsync("Escape");
         await Observe(new(null, "First passage"));
         Assert.Contains((await native.SnapshotAsync()).Descendants(), node => node.Focused && node.Name == "Saves");

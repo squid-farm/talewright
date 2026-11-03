@@ -315,8 +315,9 @@ story compatibility. Failed replacements preserve the existing checkpoint.
 
 `ISaveStore.ReadAutosaveAsync(storyId)` / `WriteAutosaveAsync(storyId, data)` address one
 additional, separate recovery slot. Replacements are atomic, and failed writes preserve the last
-committed autosave. Named `ListAsync` and `SaveCatalog.ListEntriesAsync` omit it; the player uses it
-for an explicit Resume prompt rather than mixing it with named saves or Quick Save. Desktop storage
+committed autosave. Named `ListAsync` omits it; `SaveCatalog.ListEntriesAsync` lists it after the
+Quick Save checkpoint as `SaveEntry.AutosaveSlot` (`IsAutosave`). The player uses it for an explicit
+Resume prompt and as a read-only Saves list entry. Desktop storage
 uses `autosave.json`; IndexedDB uses the reserved `\0autosave` key. Custom `ISaveStore`
 implementations must provide these methods as well.
 

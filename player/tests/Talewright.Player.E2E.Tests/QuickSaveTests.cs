@@ -222,7 +222,11 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         await Library();
         await Upload(second);
         await Driver.ClickAsync("Saves");
-        await AssertText(text => Assert.Contains("No saved games.", text));
+        await AssertText(text =>
+        {
+            Assert.Contains("Load Autosave", text);
+            Assert.DoesNotContain("Load Quick Save checkpoint", text);
+        });
         await Driver.ClickAsync("Close saves");
         await QuickSave();
         await Library();

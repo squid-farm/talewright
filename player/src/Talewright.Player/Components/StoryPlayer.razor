@@ -436,7 +436,8 @@
         }
         _slots = slots;
         var currentProgress = _session.TryProgressKey(out var progressKey) ? progressKey : null;
-        if (currentProgress is null || !_slots.Any(entry => entry.ProgressKey == currentProgress))
+        // The autosave is replaced by the next choice, so it does not protect progress from a load.
+        if (currentProgress is null || !_slots.Any(entry => !entry.IsAutosave && entry.ProgressKey == currentProgress))
         {
             _pendingLoad = slot;
             return;

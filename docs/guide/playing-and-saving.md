@@ -81,7 +81,10 @@ If Quick Save fails, the previous checkpoint is kept: follow the storage advice 
 
 Autosave is on by default. Talewright saves the initial playable point and each completed choice
 to one recovery slot. When you reopen the same story, choose **Resume saved game** or **Start a new
-game**; progress is never restored silently. A failed autosave leaves the previous recovery save
+game**; progress is never restored silently. While playing, the **Saves** list also shows the
+**Autosave** entry so you can load your latest autosave at any time. You can't overwrite it, and
+your next choice replaces it, so loading another save still asks before discarding progress that
+exists only in the autosave. A failed autosave leaves the previous recovery save
 intact, lets you continue playing and offers **Retry autosave**. Autosave is not a backup or save
 migration: saves still depend on the exact story and player compatibility.
 

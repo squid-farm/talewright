@@ -24,18 +24,8 @@ public static class SaveCatalog
     public static async Task<IReadOnlyList<SaveEntry>> ListEntriesAsync(this ISaveStore store, string storyId)
     {
         var entries = new List<SaveEntry>();
-        try
-        {
-            entries.Add(StoryHistory.DescribeSave(SaveEntry.QuickSlot, await store.ReadQuickAsync(storyId)));
-        }
-        catch (FileNotFoundException)
-        {
-            // No checkpoint has been created for this story.
-        }
-        catch (InvalidDataException ex)
-        {
-            entries.Add(new(SaveEntry.QuickSlot, null, null, $"Save details unavailable: {ex.Message}"));
-        }
+        await AddReservedAsync(entries, SaveEntry.QuickSlot, () => store.ReadQuickAsync(storyId));
+        await AddReservedAsync(entries, SaveEntry.AutosaveSlot, () => store.ReadAutosaveAsync(storyId));
         foreach (var slot in await store.ListAsync(storyId))
         {
             try
@@ -48,5 +38,21 @@ public static class SaveCatalog
             }
         }
         return entries;
+    }
+
+    private static async Task AddReservedAsync(List<SaveEntry> entries, string slot, Func<Task<byte[]>> read)
+    {
+        try
+        {
+            entries.Add(StoryHistory.DescribeSave(slot, await read()));
+        }
+        catch (FileNotFoundException)
+        {
+            // This reserved save has not been created for this story.
+        }
+        catch (InvalidDataException ex)
+        {
+            entries.Add(new(slot, null, null, $"Save details unavailable: {ex.Message}"));
+        }
     }
 }
