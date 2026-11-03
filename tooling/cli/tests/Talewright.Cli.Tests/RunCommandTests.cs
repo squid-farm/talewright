@@ -38,7 +38,7 @@ public sealed class RunCommandTests : IDisposable
     }
 
     private static NativeHostLauncher.Operations CaptureLaunch(Action<NativeHostMode, string> capture) =>
-        new((mode, root, _, _, _) =>
+        new((mode, root, _, _, _, _) =>
         {
             capture(mode, root);
             return 0;
@@ -51,8 +51,8 @@ public sealed class RunCommandTests : IDisposable
             environment ?? (_ => null), webKit ?? (() => true));
 
     private static NativeHostLauncher.Operations LaunchOn(NativeHostEnvironment platform) =>
-        new((mode, root, output, error, cancellationToken) =>
-            NativeHostLauncher.Launch(mode, root, output, error, cancellationToken, platform));
+        new((mode, root, scene, output, error, cancellationToken) =>
+            NativeHostLauncher.Launch(mode, root, output, error, cancellationToken, scene, platform));
 
     [Theory]
     [InlineData("run", "first", "second")]
@@ -199,7 +199,7 @@ public sealed class RunCommandTests : IDisposable
     {
         using var cancellation = new CancellationTokenSource();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var launch = new NativeHostLauncher.Operations((_, _, _, _, token) =>
+        var launch = new NativeHostLauncher.Operations((_, _, _, _, _, token) =>
         {
             started.SetResult();
             token.WaitHandle.WaitOne();

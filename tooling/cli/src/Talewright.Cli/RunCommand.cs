@@ -24,7 +24,7 @@ public sealed class RunCommand : Command<RunSettings>
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return writers.NativeLaunch.Launch(NativeHostMode.Player, Path.GetFullPath(settings.Root),
+            return writers.NativeLaunch.Launch(NativeHostMode.Player, Path.GetFullPath(settings.Root), null,
                 writers.Output, writers.Error, cancellationToken);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or Win32Exception)
