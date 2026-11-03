@@ -27,7 +27,7 @@ public sealed record AccessibleNode(
 }
 
 public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null,
-    bool windowInChildProcess = false) : IPlayerDriver
+    bool windowInChildProcess = false, string? xdgDataHome = null) : IPlayerDriver
 {
     private Process? _adapter;
     private Task<string>? _stderr;
@@ -56,6 +56,10 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
             foreach (var argument in new[] { helper, "adapter", "--executable", executable, "--output", artifacts })
             {
                 start.ArgumentList.Add(argument);
+            }
+            if (xdgDataHome is not null)
+            {
+                start.Environment["XDG_DATA_HOME"] = xdgDataHome;
             }
             if (windowInChildProcess)
             {

@@ -38,7 +38,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
         var slots = new List<string>();
         foreach (var path in paths)
         {
-            if (Path.GetFileName(path) == "quick.json")
+            if (Path.GetFileName(path) is "quick.json" or "autosave.json")
             {
                 continue;
             }
@@ -64,6 +64,11 @@ public sealed class FileSaveStore(string root) : ISaveStore
 
     public Task WriteQuickAsync(string storyId, byte[] data) =>
         WriteFileAsync(Path.Combine(StoryDirectory(storyId), "quick.json"), data, overwrite: true);
+
+    public Task<byte[]> ReadAutosaveAsync(string storyId) => ReadFileAsync(Path.Combine(StoryDirectory(storyId), "autosave.json"));
+
+    public Task WriteAutosaveAsync(string storyId, byte[] data) =>
+        WriteFileAsync(Path.Combine(StoryDirectory(storyId), "autosave.json"), data, overwrite: true);
 
     private static async Task<byte[]> ReadFileAsync(string path)
     {

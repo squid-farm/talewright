@@ -68,7 +68,7 @@ Cancel keeps your current game; a failed load also leaves it untouched.
 Use **Close saves** or Escape to return to play. If storage fails, check the displayed advice and
 use **Retry save list**; a failed save does not count as saved progress.
 If Quick Save fails, the previous checkpoint is kept: follow the storage advice and try
-**Quick Save** again. Restarting or reopening the player keeps both quick and named saves.
+**Quick Save** again. Restarting or reopening the player keeps autosave, Quick Save and named saves.
 
 ## Where saves are kept
 
@@ -79,8 +79,11 @@ If Quick Save fails, the previous checkpoint is kept: follow the storage advice 
 | Desktop (macOS) | `~/Library/Application Support/Talewright/saves` |
 | Desktop (Linux) | `~/.local/share/Talewright/saves` |
 
-There's no autosave yet ([#54](https://github.com/squid-farm/talewright/issues/54)), so save before
-closing the player.
+Autosave is on by default. Talewright saves the initial playable point and each completed choice
+to one recovery slot. When you reopen the same story, choose **Resume saved game** or **Start a new
+game**; progress is never restored silently. A failed autosave leaves the previous recovery save
+intact, lets you continue playing and offers **Retry autosave**. Autosave is not a backup or save
+migration: saves still depend on the exact story and player compatibility.
 
 ### Backing up and moving saves
 

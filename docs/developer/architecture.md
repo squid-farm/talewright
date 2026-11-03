@@ -671,8 +671,8 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 
 ## 9. Known limitations and seams left for later
 
-- **No save migration or autosave.** Manual slots reject mismatched content/extensions/version;
-  migration is M8, autosave is a separate follow-up.
+- **No save migration.** Manual slots and autosaves reject mismatched content/extensions/version;
+  migration is M8.
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
 - **Media adapters.** Native folder player/debugger and built-in embedded samples display images.

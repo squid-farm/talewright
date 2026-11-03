@@ -4,11 +4,18 @@ public sealed record SaveSummary(string SceneTitle, DateTimeOffset SavedAt, stri
 
 public sealed record SaveEntry(string Slot, SaveSummary? Summary, string? ProgressKey, string? Warning)
 {
-    // This identity cannot pass named-slot validation; it is never a user-entered name.
+    // Reserved identities cannot pass named-slot validation and are never user-entered names.
     public const string QuickSlot = "\0quick";
+    public const string AutosaveSlot = "\0autosave";
     public bool IsQuick => Slot == QuickSlot;
-    public string DisplayName => IsQuick ? "Quick Save checkpoint" : Slot;
-    public static string DisplayNameFor(string slot) => slot == QuickSlot ? "Quick Save checkpoint" : slot;
+    public bool IsAutosave => Slot == AutosaveSlot;
+    public string DisplayName => DisplayNameFor(Slot);
+    public static string DisplayNameFor(string slot) => slot switch
+    {
+        QuickSlot => "Quick Save checkpoint",
+        AutosaveSlot => "Autosave",
+        _ => slot,
+    };
 }
 
 public static class SaveCatalog

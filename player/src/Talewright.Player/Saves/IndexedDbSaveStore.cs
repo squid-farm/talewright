@@ -60,6 +60,18 @@ public sealed class IndexedDbSaveStore(IJSRuntime js) : ISaveStore, IAsyncDispos
         await WriteSlotAsync(storyId, SaveEntry.QuickSlot, data, overwrite: true);
     }
 
+    public async Task<byte[]> ReadAutosaveAsync(string storyId)
+    {
+        SaveNames.Validate(storyId);
+        return await ReadSlotAsync(storyId, SaveEntry.AutosaveSlot);
+    }
+
+    public async Task WriteAutosaveAsync(string storyId, byte[] data)
+    {
+        SaveNames.Validate(storyId);
+        await WriteSlotAsync(storyId, SaveEntry.AutosaveSlot, data, overwrite: true);
+    }
+
     private async Task WriteSlotAsync(string storyId, string slot, byte[] data, bool overwrite)
     {
         SaveNames.ValidateData(data);

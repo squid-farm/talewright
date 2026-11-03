@@ -14,8 +14,8 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 
 | Component | Job |
 |---|---|
-| `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
-| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`. |
+| `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
+| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
 | `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, import/export, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
@@ -143,11 +143,19 @@ bytes unchanged; canceled dialogs do not write a file.
 name. Linux uses GTK 3; Windows and macOS hosts must include `AlvorKit.NFDe.Native` 1.3.0.2,
 which provides [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended)
 under the zlib license.
+**Autosave** is enabled by default for stories played with a registered `ISaveStore`. The player
+writes one separate recovery slot at the initial playable point and after each completed choice.
+It offers **Resume saved game** or **Start a new game** when the story is opened again; it never
+restores silently. Resuming or loading a save does not itself write an autosave. Failed writes leave
+the last committed recovery save intact, do not stop play, and show **Retry autosave** with storage
+advice. Autosave is separate from named saves and Quick Save, and is not included in the Saves list.
+The desktop file store and web IndexedDB store both support it. A custom host must implement the
+autosave methods on `ISaveStore`; without a store, play continues without persistence.
 **Quick Save** writes/replaces one dedicated checkpoint for the story, without named-save
 overwrite confirmation. It uses the same atomic storage, summary and persisted-progress
 load guard as named saves. The dialog marks it **Quick Save checkpoint**, independently of
 user-entered names; Quick Save can never overwrite a named slot. Failure keeps the previous
-checkpoint and reports advice; retry using Quick Save. This is explicit saving, not autosave.
+checkpoint and reports advice; retry using Quick Save.
 Use **Saves** to open the modal and automatically refresh its list. New entries show scene title,
 actual UTC save time and character name. Missing/malformed details are explicitly unavailable;
 listing never replays a story. Saving to an existing name requires **Confirm overwrite**.
@@ -164,7 +172,7 @@ At 10,000 choices, an explanatory alert replaces silent failure and disables fur
 choices. Save, Back/Forward (when allowed by the story), Restart and Library remain
 usable. Going Back below the cap re-enables choices; returning Forward restores the notice.
 Authors can disable these controls with `undo: false`. Restart starts a fresh playthrough but does not
-delete manual saves. Autosave is a [separate follow-up](https://github.com/squid-farm/talewright/issues/54).
+delete manual saves or autosave.
 See the [runtime compatibility policy](../../../engine/src/Talewright.Runtime/README.md#history-and-saves).
 
 ## Styling (`wwwroot/talewright.css`)

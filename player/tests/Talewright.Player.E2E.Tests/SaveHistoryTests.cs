@@ -451,7 +451,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
             await ReloadAsync();
         }
 
-        await Upload(fixture);
+        await Upload(fixture, resumeAutosave: true);
+        await Observe(new(null, "Finished safely.", Ended: true));
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load My save");
         await Driver.ClickAsync("Load save");

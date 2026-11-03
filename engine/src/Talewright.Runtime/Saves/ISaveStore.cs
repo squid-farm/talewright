@@ -7,4 +7,6 @@ public interface ISaveStore
     Task WriteAsync(string storyId, string slot, byte[] data, bool overwrite = false);
     Task<byte[]> ReadQuickAsync(string storyId);
     Task WriteQuickAsync(string storyId, byte[] data);
+    Task<byte[]> ReadAutosaveAsync(string storyId);
+    Task WriteAutosaveAsync(string storyId, byte[] data);
 }
