@@ -5,6 +5,7 @@ const { cliExecutable, executeCli, registerCliSetup, requireDotnetRuntime } = re
 
 const PENDING_NEW_STORY = 'pendingNewStory';
 const PENDING_NEW_STORY_MAX_AGE = 5 * 60 * 1000;
+const SCENE_ID = /^[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
 
 function contains(root, file) {
   const relative = path.relative(root, file);
@@ -39,6 +40,31 @@ async function selectStory(requested) {
     roots.map(root => ({ label: path.basename(root), description: root, root })),
     { placeHolder: 'Choose a Talewright story' },
   ))?.root;
+}
+
+function sceneHeaders(document) {
+  const headers = [];
+  for (let line = 0; line < document.lineCount; line++) {
+    const header = sceneHeaderAtLine(document, line);
+    if (header?.id) headers.push(header);
+  }
+  return headers;
+}
+
+function sceneHeaderAtLine(document, line) {
+  const content = document.lineAt(line).text.trim();
+  if (!content.startsWith('===')) return undefined;
+  const id = content.slice(3).trim();
+  return { id: SCENE_ID.test(id) ? id : undefined, line };
+}
+
+function sceneAtLine(document, line) {
+  if (!Number.isInteger(line) || line < 0 || line >= document.lineCount) return undefined;
+  for (let current = line; current >= 0; current--) {
+    const header = sceneHeaderAtLine(document, current);
+    if (header) return header.id ? header : undefined;
+  }
+  return undefined;
 }
 
 async function saveStory(root) {
@@ -155,13 +181,14 @@ async function openPendingNewStory(context) {
   await context.globalState.update(PENDING_NEW_STORY, undefined);
 }
 
-async function createTask(command, requested, definition, scope) {
+async function createTask(command, requested, definition, scope, scene) {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
   const root = await selectStory(requested);
   if (!root) return undefined;
   if (command === 'run') await requireDotnetRuntime();
   const executable = await cliExecutable(root);
   const args = [command, root];
+  if (command === 'debug' && scene) args.push('--scene', scene);
   if (command === 'publish') {
     const output = await vscode.window.showSaveDialog({
       title: 'Publish story files for a Talewright player (not a standalone game)',
@@ -181,9 +208,12 @@ async function createTask(command, requested, definition, scope) {
     validate: 'Validate Story', publish: 'Publish Story ZIP',
     debug: 'Open Author Debugger', run: 'Run Story',
   };
+  const taskDefinition = definition ?? {
+    type: 'talewright', command, story: root, ...(scene ? { scene } : {}),
+  };
   const task = new vscode.Task(
-    definition ?? { type: 'talewright', command, story: root },
-    scope ?? folder, names[command], 'Talewright',
+    taskDefinition,
+    scope ?? folder, scene && command === 'debug' ? 'Play From This Scene' : names[command], 'Talewright',
     new vscode.ProcessExecution(executable, args, { cwd: root }), [],
   );
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, focus: true };
@@ -196,6 +226,30 @@ function registerAuthorActions(context) {
     const choice = await vscode.window.showErrorMessage(`Talewright: ${error.message}`,
       ...(error.code === 'CLI_NOT_FOUND' ? ['Set Up CLI'] : []));
     if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli');
+  };
+  const updateSceneContext = async editor => {
+    const active = editor ?? vscode.window.activeTextEditor;
+    const scene = active?.document.uri.scheme === 'file' && active.document.languageId === 'tale'
+      ? sceneAtLine(active.document, active.selection.active.line)
+      : undefined;
+    await vscode.commands.executeCommand('setContext', 'talewright.inScene', Boolean(scene));
+    return scene;
+  };
+  const playFromScene = async (uri, line) => {
+    if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
+    const active = vscode.window.activeTextEditor;
+    const document = uri ? await vscode.workspace.openTextDocument(uri) : active?.document;
+    if (!document || document.uri.scheme !== 'file' || document.languageId !== 'tale') {
+      throw new Error('Open a local .tale document and place the cursor inside a scene first.');
+    }
+    const cursorLine = Number.isInteger(line) ? line
+      : active?.document === document ? active.selection.active.line : undefined;
+    const scene = sceneAtLine(document, cursorLine);
+    if (!scene) throw new Error('Place the cursor inside a valid scene before playing from here.');
+    const root = (await storyRoots()).find(candidate => contains(candidate, document.uri.fsPath));
+    if (!root) throw new Error('The scene must be inside a story in an open workspace folder.');
+    const task = await createTask('debug', root, undefined, undefined, scene.id);
+    if (task) await vscode.tasks.executeTask(task);
   };
   for (const [id, command] of [
     ['validateStory', 'validate'], ['publishStoryZip', 'publish'],
@@ -210,6 +264,44 @@ function registerAuthorActions(context) {
       }
     }));
   }
+  context.subscriptions.push(vscode.commands.registerCommand('talewright.playFromScene', async (uri, line) => {
+    try {
+      await playFromScene(uri, line);
+    } catch (error) {
+      await report(error);
+    }
+  }));
+  const codeLensChanges = new vscode.EventEmitter();
+  context.subscriptions.push(codeLensChanges);
+  context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file', language: 'tale' }, {
+    onDidChange: codeLensChanges.event,
+    provideCodeLenses: document => {
+      if (!vscode.workspace.getConfiguration('talewright', document.uri)
+        .get('codeLens.playFromScene', true)) return [];
+      return sceneHeaders(document).map(scene => new vscode.CodeLens(
+        new vscode.Range(scene.line, 0, scene.line, 0),
+        {
+          title: 'Play from here',
+          command: 'talewright.playFromScene',
+          arguments: [document.uri, scene.line],
+        },
+      ));
+    },
+  }));
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor =>
+    updateSceneContext(editor).catch(report)));
+  context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(event =>
+    updateSceneContext(event.textEditor).catch(report)));
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
+    codeLensChanges.fire();
+    if (event.document === vscode.window.activeTextEditor?.document) {
+      updateSceneContext().catch(report);
+    }
+  }));
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('talewright.codeLens.playFromScene')) codeLensChanges.fire();
+  }));
+  const sceneContext = updateSceneContext().catch(report);
   context.subscriptions.push(vscode.commands.registerCommand('talewright.newStory', async () => {
     try {
       await createNewStory(context);
@@ -223,6 +315,11 @@ function registerAuthorActions(context) {
     resolveTask: async task => {
       try {
         if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
+        const scene = task.definition.scene;
+        if (scene !== undefined &&
+            (task.definition.command !== 'debug' || typeof scene !== 'string' || !SCENE_ID.test(scene))) {
+          throw new Error('A Talewright task scene must be a valid scene ID and can only be used with command "debug".');
+        }
         const workspaceScope = task.scope === vscode.TaskScope.Workspace;
         if (!['debug', 'run'].includes(task.definition.command) || typeof task.definition.story !== 'string'
             || (!workspaceScope && task.scope?.uri?.scheme !== 'file')) {
@@ -245,14 +342,14 @@ function registerAuthorActions(context) {
         } else {
           requested = path.resolve(task.scope.uri.fsPath, task.definition.story);
         }
-        return await createTask(task.definition.command, requested, task.definition, task.scope);
+        return await createTask(task.definition.command, requested, task.definition, task.scope, scene);
       } catch (error) {
         await report(error);
         return undefined;
       }
     },
   }));
-  return pendingStory;
+  return Promise.all([pendingStory, sceneContext]);
 }
 
-module.exports = { registerAuthorActions };
+module.exports = { registerAuthorActions, sceneAtLine, sceneHeaders };

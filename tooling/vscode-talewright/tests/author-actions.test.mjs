@@ -9,16 +9,42 @@ const toolsSource = await readFile(new URL('../cli-tools.cjs', import.meta.url),
 
 function host(options = {}) {
   const uri = file => ({ scheme: 'file', fsPath: file });
+  const document = (file, text, settings = {}) => {
+    const lines = text.split(/\r\n|\r|\n/);
+    return {
+      uri: uri(file), languageId: settings.languageId ?? 'tale', isDirty: settings.isDirty ?? false,
+      lineCount: lines.length, lineAt: line => ({ text: lines[line] }), getText: () => text,
+      save: settings.save ?? (async () => true),
+    };
+  };
   const calls = {
     tasks: [], errors: [], picks: [], dialogs: [], openDialogs: [], messages: [], warnings: [], updates: [],
     urls: [], fetches: [], sdk: [], cli: [], runtimeChecks: [], openFolders: [], openedDocuments: [],
-    shownDocuments: [], commands: new Map(),
+    shownDocuments: [], commands: new Map(), contextKeys: [], codeLensProviders: [],
   };
   const globalState = options.state ?? new Map();
   const roots = options.roots ?? ['/workspace/My Story'];
   const documents = options.documents ?? [];
+  const activeDocument = options.activeDocument
+    ?? (options.active ? documents.find(item => item.uri.fsPath === options.active)
+      ?? document(options.active, options.activeText ?? '') : undefined);
+  const textDocuments = activeDocument && !documents.includes(activeDocument)
+    ? [...documents, activeDocument] : documents;
+  class EventEmitter {
+    listeners = [];
+    event = listener => { this.listeners.push(listener); return { dispose() {} }; };
+    fire(value) { for (const listener of this.listeners) listener(value); }
+    dispose() {}
+  }
   const vscode = {
     Uri: { file: uri, parse: url => url },
+    Position: class { constructor(line, character) { Object.assign(this, { line, character }); } },
+    Range: class { constructor(startLine, startCharacter, endLine, endCharacter) {
+      this.start = new vscode.Position(startLine, startCharacter);
+      this.end = new vscode.Position(endLine, endCharacter);
+    } },
+    CodeLens: class { constructor(range, command) { Object.assign(this, { range, command }); } },
+    EventEmitter,
     RelativePattern: class { constructor(folder, pattern) { this.folder = folder; this.pattern = pattern; } },
     ProcessExecution: class { constructor(executable, args, settings) { Object.assign(this, { executable, args, settings }); } },
     Task: class { constructor(definition, scope, name, source, execution, problemMatchers) {
@@ -29,7 +55,7 @@ function host(options = {}) {
     workspace: {
       isTrusted: options.trusted ?? true,
       workspaceFolders: (options.folders ?? ['/workspace']).map(folder => ({ uri: uri(folder) })),
-      textDocuments: documents,
+      textDocuments,
       findFiles: async pattern => roots.filter(root => {
         const relative = path.relative(pattern.folder.uri.fsPath, root);
         return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
@@ -37,7 +63,9 @@ function host(options = {}) {
       getConfiguration: (section, resource) => {
         calls.configurationResource = resource;
         return {
-          get: () => options.executable ?? '',
+          get: (key, defaultValue) => key === 'codeLens.playFromScene'
+            ? options.codeLens ?? true
+            : key === 'cli.executablePath' ? options.executable ?? '' : defaultValue,
           update: async (key, value) => { calls.updates.push([key, value]); options.executable = value; },
         };
       },
@@ -47,11 +75,17 @@ function host(options = {}) {
       }),
       openTextDocument: async resource => {
         calls.openedDocuments.push(resource);
-        return { uri: resource };
+        return textDocuments.find(item => item.uri.fsPath === resource.fsPath) ?? { uri: resource };
       },
+      onDidChangeTextDocument: listener => { calls.documentChanged = listener; return { dispose() {} }; },
+      onDidChangeConfiguration: listener => { calls.configurationChanged = listener; return { dispose() {} }; },
     },
     window: {
-      activeTextEditor: options.active ? { document: { uri: uri(options.active) } } : undefined,
+      activeTextEditor: activeDocument ? {
+        document: activeDocument, selection: { active: { line: options.activeLine ?? 0 } },
+      } : undefined,
+      onDidChangeActiveTextEditor: listener => { calls.activeEditorChanged = listener; return { dispose() {} }; },
+      onDidChangeTextEditorSelection: listener => { calls.selectionChanged = listener; return { dispose() {} }; },
       showErrorMessage: async (message, ...actions) => { calls.errors.push(message); calls.errorActions = actions; return options.errorChoice; },
       showInformationMessage: async message => { calls.messages.push(message); return options.infoChoice; },
       showQuickPick: async (choices, settings) => {
@@ -71,6 +105,10 @@ function host(options = {}) {
     commands: {
       registerCommand: (id, handler) => { calls.commands.set(id, handler); return {}; },
       executeCommand: async (id, ...args) => {
+        if (id === 'setContext') {
+          calls.contextKeys.push(args);
+          return;
+        }
         if (id === 'vscode.openFolder') {
           calls.openFolders.push(args);
           return options.openFolderResult ?? true;
@@ -98,6 +136,12 @@ function host(options = {}) {
       onDidEndTask: handler => {
         calls.taskEndHandler = handler;
         return { dispose() {} };
+      },
+    },
+    languages: {
+      registerCodeLensProvider: (selector, provider) => {
+        calls.codeLensProviders.push({ selector, provider });
+        return {};
       },
     },
   };
@@ -165,7 +209,7 @@ function host(options = {}) {
     },
   });
   const run = name => calls.commands.get(`talewright.${name}`)();
-  return { calls, run, activation, state: globalState };
+  return { calls, run, activation, state: globalState, document, api: module.exports };
 }
 
 test('workspace-scoped debugger tasks resolve relative or absolute stories across open folders', async () => {
@@ -212,6 +256,42 @@ test('debugger tasks reject global, missing and non-file folder scopes explicitl
     }), undefined);
     assert.match(calls.errors[0], /workspace.*scope/);
   }
+});
+
+test('Play From This Scene detects the active scene, offers code lenses, and launches the CLI scene option', async () => {
+  const tale = host().document('/workspace/My Story/story.tale',
+    'Preamble\n\n=== beginning\nText\n=== next.scene-2\nMore text\n');
+  const { calls, api } = host({ activeDocument: tale, activeLine: 0 });
+  assert.equal(api.sceneAtLine(tale, 0), undefined);
+  assert.equal(api.sceneAtLine(tale, 2).id, 'beginning');
+  assert.equal(api.sceneAtLine(tale, 4).id, 'next.scene-2');
+  const invalid = host().document('/workspace/My Story/invalid.tale',
+    '=== valid\nText\n=== invalid scene\nMore text\n');
+  assert.equal(api.sceneAtLine(invalid, 3), undefined);
+  assert.equal(calls.contextKeys.at(-1)[1], false);
+
+  const provider = calls.codeLensProviders[0].provider;
+  const lenses = provider.provideCodeLenses(tale);
+  assert.deepEqual(Array.from(lenses, lens => [lens.range.start.line, lens.command.title]),
+    [[2, 'Play from here'], [4, 'Play from here']]);
+  calls.selectionChanged({ textEditor: { document: tale, selection: { active: { line: 3 } } } });
+  assert.equal(calls.contextKeys.at(-1)[1], true);
+  await calls.commands.get('talewright.playFromScene')(tale.uri, 3);
+  assert.deepEqual(Array.from(calls.tasks[0].execution.args),
+    ['debug', '/workspace/My Story', '--scene', 'beginning']);
+  assert.equal(calls.tasks[0].name, 'Play From This Scene');
+  assert.equal(calls.errors.length, 0);
+
+  const disabled = host({ codeLens: false });
+  assert.deepEqual(Array.from(disabled.calls.codeLensProviders[0].provider.provideCodeLenses(tale)), []);
+});
+
+test('Play From This Scene rejects positions before the first scene', async () => {
+  const document = host().document('/workspace/My Story/story.tale', 'Preamble\n=== beginning\nText\n');
+  const { calls, run } = host({ activeDocument: document, activeLine: 0 });
+  await run('playFromScene');
+  assert.equal(calls.tasks.length, 0);
+  assert.match(calls.errors[0], /inside a valid scene/);
 });
 
 test('validation runs the CLI in a visible process task with separate space-safe arguments', async () => {
@@ -449,16 +529,21 @@ test('debug and run actions and reusable tasks share selection, executable, trus
   assert.deepEqual(Array.from(calls.tasks[0].execution.args), ['debug', '/workspace/My Story']);
   await run('runStory');
   assert.deepEqual(Array.from(calls.tasks[1].execution.args), ['run', '/workspace/My Story']);
-  const definition = { type: 'talewright', command: 'debug', story: 'My Story' };
+  const definition = { type: 'talewright', command: 'debug', story: 'My Story', scene: 'beginning' };
   const task = await calls.provider.resolveTask({ definition, scope: { uri: { scheme: 'file', fsPath: '/workspace' } } });
   assert.equal(task.definition, definition);
-  assert.deepEqual(Array.from(task.execution.args), ['debug', '/workspace/My Story']);
+  assert.deepEqual(Array.from(task.execution.args), ['debug', '/workspace/My Story', '--scene', 'beginning']);
   const runDefinition = { type: 'talewright', command: 'run', story: 'My Story' };
   const runTask = await calls.provider.resolveTask({
     definition: runDefinition, scope: { uri: { scheme: 'file', fsPath: '/workspace' } },
   });
   assert.equal(runTask.definition, runDefinition);
   assert.deepEqual(Array.from(runTask.execution.args), ['run', '/workspace/My Story']);
+  assert.equal(await calls.provider.resolveTask({
+    definition: { type: 'talewright', command: 'run', story: 'My Story', scene: 'beginning' },
+    scope: { uri: { scheme: 'file', fsPath: '/workspace' } },
+  }), undefined);
+  assert.match(calls.errors.at(-1), /only be used with command "debug"/);
   for (const story of ['../outside', 'My Story/nested']) {
     assert.equal(await calls.provider.resolveTask({
       definition: { ...definition, story }, scope: { uri: { scheme: 'file', fsPath: '/workspace' } },

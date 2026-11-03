@@ -87,7 +87,7 @@ async function testAuthorActions(extension) {
   await vscode.commands.executeCommand('talewright.setUpCli');
   assert.equal(vscode.workspace.getConfiguration('talewright', document.uri).get('cli.executablePath'), configuredCli,
     'Setup must preserve an existing configured CLI');
-  const run = async (command, stopNativePlayer = false) => {
+  const run = async (command, stopNativePlayer = false, ...args) => {
     let execution;
     let pid;
     let cancelled = false;
@@ -119,7 +119,7 @@ async function testAuthorActions(extension) {
         resolve(event.exitCode);
       });
     });
-    await vscode.commands.executeCommand(`talewright.${command}`);
+    await vscode.commands.executeCommand(`talewright.${command}`, ...args);
     const code = await finished;
     if (stopNativePlayer) {
       assert.equal(cancelled, true, 'Native player must remain running until task cancellation');
@@ -129,16 +129,26 @@ async function testAuthorActions(extension) {
           'Task cancellation must not leave the native player running');
       }
     }
-    return { code, pid };
+    return { code, pid, args: execution?.task.execution.args };
   };
   assert.notEqual((await run('validateStory')).code, 0, 'Invalid story must retain CLI failure status');
   assert.notEqual((await run('runStory')).code, 0, 'Invalid story must not report a successful run');
+  await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
   await fs.writeFile(path.join(root, 'start.tale'), '=== start\nHello.\n-> END\n');
+  const sceneDocument = await vscode.workspace.openTextDocument(path.join(root, 'start.tale'));
+  await vscode.window.showTextDocument(sceneDocument);
   assert.equal((await run('validateStory')).code, 0, 'Valid story must return CLI success');
+  const lenses = await vscode.commands.executeCommand('vscode.executeCodeLensProvider', sceneDocument.uri);
+  const playLens = lenses.find(lens => lens.command.command === 'talewright.playFromScene');
+  assert.ok(playLens, 'Every valid scene must offer a Play from here code lens');
   const player = await run('runStory', true);
   assert.notEqual(player.code, 0, 'Task cancellation must not report player success');
   const debug = await run('openAuthorDebugger', true);
   assert.notEqual(debug.code, 0, 'Task cancellation must not report debugger success');
+  const sceneDebug = await run('playFromScene', true, ...playLens.command.arguments);
+  assert.notEqual(sceneDebug.code, 0, 'Scene debugger cancellation must not report success');
+  assert.deepEqual(Array.from(sceneDebug.args), ['debug', root, '--scene', 'start'],
+    'Play from here must pass the selected scene to the CLI');
   await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
   await fs.rm(path.join(root, 'story.talewright.yaml'));
   await fs.rm(path.join(root, 'start.tale'));
@@ -148,7 +158,7 @@ async function testAuthorActions(extension) {
     'Creating a story in the sole empty workspace folder must open its start scene');
   assert.match(await fs.readFile(path.join(root, 'story.talewright.yaml'), 'utf8'), /start:\s*start/);
   assert.equal((await run('validateStory')).code, 0, 'The generated story must validate through the extension CLI action');
-  console.log('Installed CLI action smoke passed: validation success/failure, player/debugger tasks, new story creation and start-scene opening.');
+  console.log('Installed CLI action smoke passed: validation success/failure, player/debugger/scene tasks, new story creation and start-scene opening.');
 }
 
 async function bundledServerProcesses(extension) {
