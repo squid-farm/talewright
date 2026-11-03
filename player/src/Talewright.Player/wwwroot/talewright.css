@@ -106,7 +106,7 @@ html { scroll-padding-top: var(--tw-toolbar-offset, 1rem); }
 /* Transcript */
 .tw-frame { outline: none; }
 .tw-choices button { scroll-margin-top: 1rem; }
-.tw-past { opacity: 0.7; }
+.tw-past { border-top: 1px solid var(--tw-border); margin-top: 1rem; padding-top: 1rem; }
 .tw-scene-title { font-size: 1.25rem; margin: 1.5rem 0 0.5rem; }
 .tw-speech { margin-left: 1rem; }
 .tw-speaker { font-variant: small-caps; font-weight: bold; margin-right: 0.5rem; }
