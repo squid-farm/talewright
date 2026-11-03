@@ -88,10 +88,13 @@ public static class StoryCompiler
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,
         };
+        var syntaxes = new List<(string Path, TaleFileSyntax Syntax)>(taleFiles.Count);
         foreach (var (path, text) in taleFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            TaleParser.Discover(path, text, discoverySymbols, DiscoverEffects, (id, location) =>
+            var syntax = TaleSyntaxParser.Parse(text, cancellationToken);
+            syntaxes.Add((path, syntax));
+            TaleParser.Discover(path, syntax, discoverySymbols, DiscoverEffects, (id, location) =>
             {
                 analysis?.Scene(id, location);
                 if (!scenes.TryAdd(id, location))
@@ -126,10 +129,10 @@ public static class StoryCompiler
 
         var parsed = new List<ParsedScene>();
         var seen = new HashSet<SceneId>();
-        foreach (var (path, text) in taleFiles)
+        foreach (var (path, syntax) in syntaxes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var scene in TaleParser.Parse(path, text, symbols, diagnostics, cancellationToken))
+            foreach (var scene in TaleParser.Parse(path, syntax, symbols, diagnostics, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // Discovery reported duplicates; keep the first so the rest still validates.

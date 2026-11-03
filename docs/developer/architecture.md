@@ -332,17 +332,19 @@ flowchart TD
   src[/"StorySource<br/>path → text, image path catalogue"/]
   yaml["StoryYamlReader<br/>story.talewright.yaml → manifest"]
   world["Ruleset factory + WorldDefinition<br/>(CompilerOptions.Rulesets)"]
-  disc["Discovery pass: TaleParser.Discover per .tale<br/>scene ids, auto-declared flags/vars"]
-  parse["Parse pass: TaleParser.Parse per .tale<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
+  syn["TaleSyntaxParser per .tale<br/>scenes + classified lines, no symbols"]
+  disc["Discovery pass: TaleParser.Discover per syntax<br/>scene ids, auto-declared flags/vars"]
+  parse["Parse pass: TaleParser.Parse per syntax<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
   val["StoryValidator<br/>structure + StoryReachability (Graphs)"]
   ok(["StoryDefinition"])
   err(["Diagnostics only (Story = null)"])
-  src --> yaml --> world --> disc --> parse --> val
+  src --> yaml --> world --> syn --> disc --> parse --> val
   val -- "no errors" --> ok
   val -- "any error" --> err
 ```
 
-Each `.tale` file is parsed twice: discovery runs first so forward references resolve. The player compiles
+Each `.tale` file is split into syntax once; discovery and parsing both bind it, discovery first so forward
+references resolve. The player compiles
 at story load, including in WebAssembly, so parser cost is load-time cost; see [performance](performance.md).
 
 - **`Compilation/`**
@@ -366,9 +368,11 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
 - **`Parsing/`**
   - `StoryYamlReader`: `story.talewright.yaml` → manifest (uses YamlDotNet's node model, not reflection-based
     deserialisation, for trimming and precise error locations).
-  - `TaleParser`: line-based parser for `.tale` structure: `=== scene` headers, `@directives`, `~ effects`,
-    `* choices`, `-> diverts`, `::: skill-check` blocks, `{if}` blocks, speech lines, paragraphs. It owns this
-    line-level grammar and asks the shared delimiter scanner to find code-group and choice-label boundaries.
+  - `TaleSyntaxParser`: symbol-independent `.tale` file syntax. It splits lines, assigns them to scenes and
+    classifies `=== scene` headers, `@directives`, `~ effects`, `* choices`, `-> diverts`, `::: skill-check`
+    fences and outcomes, `{if}` blocks, speech lines and prose with scene-relative spans.
+  - `TaleParser`: binds that syntax to scenes and steps, asking the shared delimiter scanner for code-group and
+    choice-label boundaries inside a line. See the Talemark README for syntax/binding ownership.
   - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes
     constructs, escapes, code spans and bounded formatting directly; unsupported Markdown remains literal.
   - `DelimiterScanner`: pairs enclosing delimiters and quoted strings; it does not parse the meaning inside them.
@@ -625,7 +629,7 @@ event means touching `GameState.Apply`), and save formats.
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
 | What can `story.talewright.yaml` contain?             | `StoryYamlReader` and the [Talemark syntax reference](../reference/talemark-syntax.md#1-storytalewrightyaml)                                                                       |
-| How is a `.tale` line classified?          | `TaleParser` (line kinds), the [Talemark syntax reference](../reference/talemark-syntax.md)                                                                     |
+| How is a `.tale` line classified?          | `TaleSyntaxParser` (line kinds), the [Talemark syntax reference](../reference/talemark-syntax.md)                                                                                  |
 | How does `{…}` inside prose become a node? | `InlineParser` → `ExpressionParser.ParseSubstitution`                                                         |
 | What does error TWxxxx mean?               | the [diagnostics reference](../reference/diagnostics.md) and `grep -rn TWxxxx engine/src tooling`                                                                  |
 | Where do "Gained: X" lines come from?      | `EventNarrator.Describe`                                                                                      |
