@@ -59,18 +59,27 @@ scene therefore leaves other scenes' line syntax unchanged.
 `{if}`/`{else}`/`{/if}`, speech, effects, choice, divert, `:::` fence and outcome lines, otherwise prose.
 Classification depends only on the text and the position of the line in its scene header.
 
+Metadata, speech, effects, divert and `{if}` lines also record their parts (`TaleLinePart`): the head (metadata
+keyword, speaker or block keyword) and value spans. Parts live in a per-scene side table so prose, blank and
+comment lines stay small. Lines with a structural error are marked `IsInvalid`; lines inside a condition nested past
+the limit are marked `IsSuppressed`. The binder gives either kind no further meaning.
+
 Ownership:
 
 | Syntax (`TaleSyntaxParser`) | Binding (`TaleParser`) |
 | --- | --- |
 | Line splitting, scene ownership, line kinds and spans | Steps, block-condition frames, outcome attachment |
-| TW3001 text before the first scene, TW1008 invalid scene ids | Diagnostics that need symbols or step context |
+| Head and value parts of metadata, speech, effects, divert and `{if}` lines | Expressions, prose and divert targets bound against symbols |
+| TW3001 text before the first scene, TW1008 invalid scene ids (headers and divert targets) | Diagnostics that need symbols or step context |
+| `{if}`/`{else}`/`{/if}` balance, unclosed blocks, nesting limit and suppression | |
+| Misplaced, duplicate and malformed metadata values; malformed speech; missing divert targets | |
 | | Analysis tokens, emitted from line kinds and spans |
 
-Line detail (choice clauses, skill checks, effects, conditions and images) is still read by the binder; #407
-part 2 moves it into syntax. Prose stays as line spans and is parsed by `InlineParser` during binding until
-#491 separates inline syntax from symbol binding. `TaleParser` is the compatibility adapter from syntax to the
-existing model; #408 compiles from syntax directly and deletes the discovery pass.
+Choice clauses, skill-check specs and outcome attachment are still read by the binder; #407 part 2b moves them
+into syntax. Expressions stay as spans and are parsed and bound by `ExpressionParser` during binding. Prose and
+images stay as line spans parsed by `InlineParser` during binding until #491 separates inline syntax from symbol
+binding. `TaleParser` is the compatibility adapter from syntax to the existing model; #408 compiles from syntax
+directly and deletes the discovery pass.
 
 Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
 choice keys, so step IDs are runtime and tooling identities (executor caches, author inspection, debugger map

@@ -68,7 +68,8 @@ public sealed class TaleSyntaxTests
             start.Lines.Where(line => line.Kind == TaleLineKind.Metadata).Select(line => line.MetadataKey));
         Assert.Equal([false, true],
             start.Lines.Where(line => line.Kind == TaleLineKind.SkillCheckBlock).Select(line => line.IsBareFence));
-        Assert.Empty(start.Diagnostics);
+        var misplaced = Assert.Single(start.Diagnostics);
+        Assert.Equal((CompilerDiagnosticCodes.InvalidSceneMetadata, 6, 0), (misplaced.Code, misplaced.Line, misplaced.Column));
         Assert.Equal("next", syntax.Scenes[1].Id);
     }
 
@@ -164,6 +165,86 @@ public sealed class TaleSyntaxTests
     }
 
     [Fact]
+    public void Line_parts_locate_heads_and_values()
+    {
+        var syntax = TaleSyntaxParser.Parse(
+            "=== a\n  @title   The  Hall \n@once\n> guard :  Halt!\n~  var:x = 1 \n->  b \n {if  x > 0 }\n{else}\n{/if}");
+        var scene = syntax.Scenes[0];
+
+        var parts = scene.Lines.Select(line => (syntax.Head(scene, line).ToString(), syntax.Value(scene, line).ToString()));
+
+        Assert.Equal(
+        [
+            ("title", "The  Hall"), ("once", ""), ("guard", "Halt!"), ("", "var:x = 1"), ("", "b"),
+            ("if", " x > 0"), ("else", ""), ("/if", ""),
+        ], parts);
+        Assert.Empty(scene.Diagnostics);
+        Assert.All(scene.Lines, line => Assert.False(line.IsInvalid || line.IsSuppressed));
+    }
+
+    [Theory]
+    [InlineData("@hub tag\n@hub other", CompilerDiagnosticCodes.InvalidSceneMetadata, 2, 0)]
+    [InlineData("@hub-limit 2\n@hub-limit 3", CompilerDiagnosticCodes.InvalidSceneMetadata, 2, 0)]
+    [InlineData("@priority  high", CompilerDiagnosticCodes.NumberTooLarge, 1, 10)]
+    [InlineData("@priority", CompilerDiagnosticCodes.NumberTooLarge, 1, 0)]
+    [InlineData("@hub all(a, a)", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 0)]
+    [InlineData("@hub-limit 0", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 0)]
+    public void Invalid_metadata_values_are_reported_by_syntax(string header, string code, int line, int column)
+    {
+        var scene = TaleSyntaxParser.Parse($"=== a\n{header}\nText").Scenes[0];
+
+        var diagnostic = Assert.Single(scene.Diagnostics);
+        Assert.Equal((code, line, column), (diagnostic.Code, diagnostic.Line, diagnostic.Column));
+        Assert.True(scene.Lines[line - 1].IsInvalid);
+    }
+
+    [Fact]
+    public void Block_structure_is_checked_without_symbols()
+    {
+        var scene = TaleSyntaxParser.Parse("=== a\n{else}\n{/if}\n  {if x}\n{else}\n{else}\n{if y}").Scenes[0];
+
+        Assert.Equal(
+        [
+            (CompilerDiagnosticCodes.UnbalancedCondition, 1, 0), (CompilerDiagnosticCodes.UnbalancedCondition, 2, 0),
+            (CompilerDiagnosticCodes.UnbalancedCondition, 5, 0), (CompilerDiagnosticCodes.UnbalancedCondition, 6, 0),
+            (CompilerDiagnosticCodes.UnbalancedCondition, 3, 2),
+        ], scene.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Line, diagnostic.Column)));
+        Assert.Equal([true, true, false, false, true, false], scene.Lines.Select(line => line.IsInvalid));
+    }
+
+    [Fact]
+    public void Conditions_nested_past_the_limit_suppress_their_lines()
+    {
+        var depth = TaleSyntaxParser.MaximumBlockConditionDepth;
+        var scene = TaleSyntaxParser.Parse("=== a\n" + string.Concat(Enumerable.Repeat("{if x}\n", depth + 2)) +
+            "> nobody\n{/if}\n{/if}\nafter").Scenes[0];
+
+        var diagnostic = Assert.Single(scene.Diagnostics, item => item.Code == CompilerDiagnosticCodes.NestingLimitExceeded);
+        Assert.Equal(depth + 1, diagnostic.Line);
+        Assert.True(scene.Lines[depth].IsInvalid);
+        Assert.False(scene.Lines[depth].IsSuppressed);
+        Assert.All(scene.Lines.Skip(depth + 1).Take(4), line => Assert.True(line.IsSuppressed));
+        Assert.False(scene.Lines[depth + 5].IsSuppressed);
+        Assert.DoesNotContain(scene.Diagnostics, item => item.Code == CompilerDiagnosticCodes.MalformedDialogue);
+        Assert.Equal(depth, scene.Diagnostics.Count(item => item.Code == CompilerDiagnosticCodes.UnbalancedCondition));
+    }
+
+    [Theory]
+    [InlineData("> : Hi", CompilerDiagnosticCodes.MalformedDialogue, 0)]
+    [InlineData("  > bad id: Hi", CompilerDiagnosticCodes.MalformedDialogue, 2)]
+    [InlineData("> nobody", CompilerDiagnosticCodes.MalformedDialogue, 0)]
+    [InlineData("->", CompilerDiagnosticCodes.MissingDivertTarget, 2)]
+    [InlineData("->  bad id", CompilerDiagnosticCodes.InvalidSceneId, 4)]
+    public void Malformed_speech_and_diverts_are_reported_by_syntax(string text, string code, int column)
+    {
+        var scene = TaleSyntaxParser.Parse($"=== a\n{text}").Scenes[0];
+
+        var diagnostic = Assert.Single(scene.Diagnostics);
+        Assert.Equal((code, 1, column), (diagnostic.Code, diagnostic.Line, diagnostic.Column));
+        Assert.True(Assert.Single(scene.Lines).IsInvalid);
+    }
+
+    [Fact]
     public void Syntax_binds_to_different_symbol_tables_without_reparsing()
     {
         var syntax = TaleSyntaxParser.Parse("=== start\n-> later");
@@ -209,9 +290,10 @@ public sealed class TaleSyntaxTests
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         Assert.All(files.Zip(syntaxes), pair => Assert.Same(pair.First.Value, pair.Second.Text));
-        // Measured at about 2.2 allocated bytes per source char on the reference corpus; retained syntax is smaller.
-        Assert.True(allocated <= sourceChars * 3, $"Syntax allocated {allocated:N0} bytes for {sourceChars:N0} chars.");
-        Assert.True(Unsafe.SizeOf<TaleLineSyntax>() <= 24, $"TaleLineSyntax is {Unsafe.SizeOf<TaleLineSyntax>()} bytes.");
+        // Measured at about 1.5 allocated bytes per source char on the reference corpus; retained syntax is smaller.
+        Assert.True(allocated <= sourceChars * 2, $"Syntax allocated {allocated:N0} bytes for {sourceChars:N0} chars.");
+        // Line parts live in a per-scene side table so prose and blank lines stay small.
+        Assert.True(Unsafe.SizeOf<TaleLineSyntax>() <= 32, $"TaleLineSyntax is {Unsafe.SizeOf<TaleLineSyntax>()} bytes.");
     }
 
     [Fact]
