@@ -148,6 +148,7 @@
     private bool _disposed;
     private int _autosaveSequence;
     private Task _autosaveTail = Task.CompletedTask;
+    private int _autosaveCheckStartedGeneration = -1;
 
     protected override void OnParametersSet()
     {
@@ -197,34 +198,47 @@
         return QueueAutosaveAsync();
     }
 
-    private async Task CheckAutosaveForResumeAsync()
+    private async Task CheckAutosaveForResumeAsync(StoryDefinition story, ISaveStore saveStore, int generation)
     {
         try
         {
-            var bytes = await SaveStore!.ReadAutosaveAsync(Story.Id);
-            _startupResumeHistory = StoryHistory.Restore(Story, bytes);
-            _resumePrompt = true;
-            _autosaveStartupError = null;
+            var bytes = await saveStore.ReadAutosaveAsync(story.Id);
+            if (generation == _generation)
+            {
+                _startupResumeHistory = StoryHistory.Restore(story, bytes);
+                _resumePrompt = true;
+                _autosaveStartupError = null;
+            }
         }
         catch (FileNotFoundException)
         {
-            _startupResumeHistory = null;
-            _resumePrompt = false;
-            _autosaveStartupError = null;
+            if (generation == _generation)
+            {
+                _startupResumeHistory = null;
+                _resumePrompt = false;
+                _autosaveStartupError = null;
+            }
         }
         catch (Exception ex) when (IsAutosaveFailure(ex) || ex is InvalidDataException)
         {
-            _startupResumeHistory = null;
-            _resumePrompt = false;
-            _autosaveStartupError = $"Couldn't check this story's autosave: {ex.Message}";
+            if (generation == _generation)
+            {
+                _startupResumeHistory = null;
+                _resumePrompt = false;
+                _autosaveStartupError = $"Couldn't check this story's autosave: {ex.Message}";
+            }
         }
         finally
         {
-            _autosaveCheckComplete = true;
+            if (generation == _generation)
+            {
+                _autosaveCheckComplete = true;
+            }
         }
 
+        if (generation != _generation) return;
         await InvokeAsync(StateHasChanged);
-        if (!_resumePrompt && _autosaveStartupError is null && _initialAutosavePending)
+        if (generation == _generation && !_resumePrompt && _autosaveStartupError is null && _initialAutosavePending)
         {
             _initialAutosavePending = false;
             await QueueAutosaveAsync();
@@ -236,7 +250,8 @@
         if (SaveStore is null) return Task.CompletedTask;
         _autosaveCheckComplete = false;
         _autosaveStartupError = null;
-        return CheckAutosaveForResumeAsync();
+        _autosaveCheckStartedGeneration = _generation;
+        return CheckAutosaveForResumeAsync(Story, SaveStore, _generation);
     }
 
     private Task ResumeAutosave()
@@ -616,9 +631,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && SaveStore is not null && !AutosaveResumeChecked && !_autosaveCheckComplete)
+        if (SaveStore is not null && !AutosaveResumeChecked && !_autosaveCheckComplete
+            && _autosaveCheckStartedGeneration != _generation)
         {
-            await CheckAutosaveForResumeAsync();
+            var generation = _generation;
+            _autosaveCheckStartedGeneration = generation;
+            await CheckAutosaveForResumeAsync(Story, SaveStore, generation);
             return;
         }
         else if (_autosaveCheckComplete && _initialAutosavePending && !_resumePrompt && _autosaveStartupError is null)
