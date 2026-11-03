@@ -49,13 +49,18 @@ internal readonly record struct TaleLineSyntax(
 {
     private const byte SuppressedFlag = 1;
     private const byte InvalidFlag = 2;
+    private const byte AttachedFlag = 4;
 
     // Its meaning depends on Kind.
     private readonly byte _detail;
     private readonly byte _flags;
 
-    // One-based index into the scene's parts; zero when the line has none.
+    // One-based index into the scene's parts, or for choice, skill-check block and outcome lines its first clause;
+    // zero when the line has none.
     internal int PartIndex { get; init; }
+
+    /// <summary>Number of clauses on a choice, skill-check block or outcome line.</summary>
+    internal int ClauseCount { get; init; }
 
     /// <summary>The line is inside a block condition nested past the limit; binding ignores it.</summary>
     public bool IsSuppressed
@@ -72,6 +77,16 @@ internal readonly record struct TaleLineSyntax(
     {
         get => (_flags & InvalidFlag) != 0;
         init => _flags = value ? (byte)(_flags | InvalidFlag) : (byte)(_flags & ~InvalidFlag);
+    }
+
+    /// <summary>
+    /// The line belongs to the preceding skill check: an outcome, a comment or block blank line between outcomes, or
+    /// the closing fence. The check binds it.
+    /// </summary>
+    public bool IsAttached
+    {
+        get => (_flags & AttachedFlag) != 0;
+        init => _flags = value ? (byte)(_flags | AttachedFlag) : (byte)(_flags & ~AttachedFlag);
     }
 
     public SceneMetadataKey? MetadataKey
@@ -117,6 +132,81 @@ internal readonly record struct TaleLinePart(int HeadStart, int HeadLength, int 
 }
 
 /// <summary>A syntax diagnostic positioned relative to its owner (scene or file).</summary>
+/// <summary>The kind of a clause on a choice, skill-check block or outcome line.</summary>
+internal enum TaleClauseKind : byte
+{
+    /// <summary>Choice label; the value is the text between the brackets.</summary>
+    Label,
+
+    /// <summary>Choice label without its closing bracket; the value is the text up to where it should close.</summary>
+    UnclosedLabel,
+
+    /// <summary>Unclosed <c>{</c> inside an unclosed label; the value runs from after the brace to the line end.</summary>
+    UnclosedBrace,
+
+    /// <summary>Unclosed image call inside an unclosed label; the value runs from after the brace to the line end.</summary>
+    UnclosedImage,
+
+    /// <summary><c>(requires: …)</c>; the value is the condition.</summary>
+    Requires,
+
+    /// <summary><c>(requires:</c> without its closing parenthesis; the value runs to the line end.</summary>
+    UnclosedRequires,
+
+    /// <summary>A spaced or misspelled requires marker; the value is the condition.</summary>
+    MisspelledRequires,
+
+    /// <summary><c>{ effects }</c>; the value is the text between the braces.</summary>
+    Effects,
+
+    /// <summary><c>{</c> without its closing brace; the value runs to the line end.</summary>
+    UnclosedEffects,
+
+    /// <summary><c>-&gt; target</c>; the value is the trimmed target.</summary>
+    Divert,
+
+    /// <summary>The <c>skill-check</c> keyword; the value is the spec after it, without any trailing clause.</summary>
+    SkillCheck,
+
+    /// <summary>An actor or stat word before <c>dc</c>; at most two follow a <see cref="SkillCheck"/>.</summary>
+    CheckWord,
+
+    /// <summary>The difficulty expression after <c>dc</c>; empty at the spec end when <c>dc</c> has no value.</summary>
+    Difficulty,
+}
+
+/// <summary>A clause on a choice, skill-check block or outcome line. Columns are relative to the raw line start.</summary>
+/// <param name="Kind">What the clause is.</param>
+/// <param name="Start">Column of the clause marker, or of the value when it has none.</param>
+/// <param name="ValueStart">Column of the value; see <see cref="TaleClauseKind"/> for what each kind's value is.</param>
+/// <param name="ValueLength">Length of the value.</param>
+[StructLayout(LayoutKind.Auto)]
+internal readonly record struct TaleClause(TaleClauseKind Kind, int Start, int ValueStart, int ValueLength)
+{
+    private const byte InvalidFlag = 0x80;
+    private readonly byte _detail;
+
+    /// <summary>
+    /// Syntax reported an error for this clause: an invalid divert target, or a skill-check spec that is not
+    /// <c>[actor] stat dc expr</c>.
+    /// </summary>
+    public bool IsInvalid
+    {
+        get => (_detail & InvalidFlag) != 0;
+        init => _detail = value ? (byte)(_detail | InvalidFlag) : (byte)(_detail & ~InvalidFlag);
+    }
+
+    /// <summary>
+    /// For <see cref="TaleClauseKind.SkillCheck"/>, the index of the <c>dc</c> word when it is 1 (stat) or 2 (actor
+    /// and stat); otherwise 0.
+    /// </summary>
+    public int DifficultyWord
+    {
+        get => _detail & ~InvalidFlag;
+        init => _detail = (byte)((_detail & InvalidFlag) | (value is 1 or 2 ? value : 0));
+    }
+}
+
 internal sealed record TaleSyntaxDiagnostic(string Code, string Message, int Line, int Column);
 
 /// <summary>
@@ -126,11 +216,13 @@ internal sealed record TaleSyntaxDiagnostic(string Code, string Message, int Lin
 internal sealed class TaleSceneSyntax
 {
     private readonly TaleLinePart[] _parts;
+    private readonly TaleClause[] _clauses;
 
     internal TaleSceneSyntax(int start, int line, int headerIndent, int headerLength, string id, TaleLineSyntax[] lines,
-        TaleLinePart[] parts, int lineCount, TaleSyntaxDiagnostic[] diagnostics)
+        TaleLinePart[] parts, TaleClause[] clauses, int lineCount, TaleSyntaxDiagnostic[] diagnostics)
     {
         _parts = parts;
+        _clauses = clauses;
         Start = start;
         Line = line;
         HeaderIndent = headerIndent;
@@ -165,7 +257,12 @@ internal sealed class TaleSceneSyntax
     public IReadOnlyList<TaleSyntaxDiagnostic> Diagnostics { get; }
 
     /// <summary>The parts of a body line, or default when its kind has none.</summary>
-    public TaleLinePart Part(TaleLineSyntax line) => line.PartIndex == 0 ? default : _parts[line.PartIndex - 1];
+    public TaleLinePart Part(TaleLineSyntax line) =>
+        line.PartIndex == 0 || line.ClauseCount > 0 ? default : _parts[line.PartIndex - 1];
+
+    /// <summary>The clauses of a choice, skill-check block or outcome line, in source order.</summary>
+    public ReadOnlySpan<TaleClause> Clauses(TaleLineSyntax line) =>
+        line.ClauseCount == 0 ? default : _clauses.AsSpan(line.PartIndex - 1, line.ClauseCount);
 
     public int FileOffset(int relativeOffset) => Start + relativeOffset;
 
@@ -221,6 +318,10 @@ internal sealed class TaleFileSyntax
         var part = scene.Part(line);
         return Text.AsSpan(scene.FileOffset(line.Start + part.ValueStart), part.ValueLength);
     }
+
+    /// <summary>The value of a clause on a scene line.</summary>
+    public ReadOnlySpan<char> Value(TaleSceneSyntax scene, TaleLineSyntax line, TaleClause clause) =>
+        Text.AsSpan(scene.FileOffset(line.Start + clause.ValueStart), clause.ValueLength);
 
     /// <summary>The trimmed text of a pre-scene line.</summary>
     public ReadOnlySpan<char> Content(TaleLineSyntax preambleLine) =>

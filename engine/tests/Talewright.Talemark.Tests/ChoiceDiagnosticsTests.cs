@@ -355,9 +355,9 @@ public sealed class ChoiceDiagnosticsTests
 
         const string unclosedImage = """* [View {image("bad\q""";
         var incompleteImage = Compile("=== start\n" + unclosedImage);
-        Assert.Equal(["TW1014", "TW1011"], incompleteImage.Diagnostics.Select(item => item.Code));
+        Assert.Equal(["TW1011", "TW1014"], incompleteImage.Diagnostics.Select(item => item.Code).Order());
         Assert.Equal(new SourceLocation("main.tale", 2, unclosedImage.IndexOf('\\') + 1),
-            incompleteImage.Diagnostics[0].Location);
+            Assert.Single(incompleteImage.Diagnostics, item => item.Code == "TW1014").Location);
     }
 
     [Fact]

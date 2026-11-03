@@ -376,6 +376,23 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Skill_check_specs_report_every_unresolved_part()
+    {
+        var result = Compile("""
+            === a
+            * [Ask] skill-check ghost charm dc "high"
+              success: -> END
+              failure: -> END
+            """);
+
+        Assert.Collection(result.Errors.Where(item => item.Code == "TW2001"),
+            item => Assert.Equal("Unknown character 'ghost'.", item.Message),
+            item => Assert.StartsWith("Unknown stat 'charm'", item.Message));
+        Assert.Contains(result.Errors, item => item.Code == "TW2003");
+        Assert.DoesNotContain(result.Errors, item => item.Code is not ("TW2001" or "TW2003" or "TW3003"));
+    }
+
+    [Fact]
     public void Parses_choice_and_block_skill_checks()
     {
         var story = Ok("""

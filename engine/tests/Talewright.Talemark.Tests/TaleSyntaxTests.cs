@@ -68,8 +68,15 @@ public sealed class TaleSyntaxTests
             start.Lines.Where(line => line.Kind == TaleLineKind.Metadata).Select(line => line.MetadataKey));
         Assert.Equal([false, true],
             start.Lines.Where(line => line.Kind == TaleLineKind.SkillCheckBlock).Select(line => line.IsBareFence));
-        var misplaced = Assert.Single(start.Diagnostics);
-        Assert.Equal((CompilerDiagnosticCodes.InvalidSceneMetadata, 6, 0), (misplaced.Code, misplaced.Line, misplaced.Column));
+        Assert.Equal(
+        [
+            (CompilerDiagnosticCodes.InvalidSceneMetadata, 6, 0),
+            (CompilerDiagnosticCodes.InvalidBlock, 16, 0),
+            (CompilerDiagnosticCodes.MalformedSkillCheckOutcome, 17, 0),
+            (CompilerDiagnosticCodes.MalformedSkillCheckOutcome, 18, 0),
+            (CompilerDiagnosticCodes.InvalidBlock, 19, 0),
+            (CompilerDiagnosticCodes.MalformedSkillCheckOutcome, 20, 0),
+        ], start.Diagnostics.Select(item => (item.Code, item.Line, item.Column)));
         Assert.Equal("next", syntax.Scenes[1].Id);
     }
 
@@ -245,6 +252,118 @@ public sealed class TaleSyntaxTests
     }
 
     [Fact]
+    public void Choice_clauses_locate_label_condition_effects_and_divert()
+    {
+        var syntax = Parse("=== a\n* [Go] (requires: flag:f) { set flag:g } -> next");
+        var scene = syntax.Scenes[0];
+        var line = Assert.Single(scene.Lines);
+
+        Assert.Empty(scene.Diagnostics);
+        Assert.Equal(
+        [
+            (TaleClauseKind.Label, 2, "Go"), (TaleClauseKind.Requires, 7, "flag:f"),
+            (TaleClauseKind.Effects, 26, "set flag:g"), (TaleClauseKind.Divert, 41, "next"),
+        ], scene.Clauses(line).ToArray().Select(clause =>
+            (clause.Kind, clause.Start, syntax.Value(scene, line, clause).ToString().Trim())));
+    }
+
+    [Theory]
+    [InlineData("* [Go -> next", 2)]
+    [InlineData("* [Go] (requires: flag:f -> next", 7)]
+    [InlineData("* [Go] { set flag:g -> next", 7)]
+    [InlineData("* [Go] (require flag:f) -> next", 7)]
+    [InlineData("* [Go] next", 7)]
+    [InlineData("* (requires: flag:f)", 0)]
+    [InlineData("* skill-check dex dc 5", 0)]
+    public void Malformed_choices_are_dropped_by_syntax(string text, int column)
+    {
+        var scene = Parse($"=== a\n{text}").Scenes[0];
+
+        var diagnostic = Assert.Single(scene.Diagnostics);
+        Assert.Equal((CompilerDiagnosticCodes.MalformedChoice, 1, column),
+            (diagnostic.Code, diagnostic.Line, diagnostic.Column));
+        Assert.True(Assert.Single(scene.Lines).IsInvalid);
+    }
+
+    [Theory]
+    [InlineData("* [Go] (requires: flag:f) (requires: flag:g) -> next")]
+    [InlineData("* [Go] -> next then")]
+    [InlineData("* [Go] -> 1bad")]
+    public void Recoverable_choice_errors_keep_the_choice(string text)
+    {
+        var scene = Parse($"=== a\n{text}").Scenes[0];
+
+        Assert.Single(scene.Diagnostics);
+        Assert.False(Assert.Single(scene.Lines).IsInvalid);
+    }
+
+    [Fact]
+    public void Skill_checks_split_their_spec_and_attach_outcomes()
+    {
+        var syntax = Parse("""
+            === a
+            * [Ask] skill-check guard insight dc 10 + 2
+              // aside
+              success: { set flag:won } -> b
+              failure: -> END
+            Prose
+            ::: skill-check dex dc 5
+            success: -> END
+
+            failure: -> END
+            :::
+            -> END
+            """);
+        var scene = syntax.Scenes[0];
+        var lines = scene.Lines;
+
+        Assert.Empty(scene.Diagnostics);
+        Assert.Equal([false, true, true, true, false, false, true, true, true, true, false],
+            lines.Select(line => line.IsAttached));
+        Assert.Equal(
+        [
+            (TaleClauseKind.Label, "Ask"), (TaleClauseKind.SkillCheck, "guard insight dc 10 + 2"),
+            (TaleClauseKind.CheckWord, "guard"), (TaleClauseKind.CheckWord, "insight"),
+            (TaleClauseKind.Difficulty, "10 + 2"),
+        ], Values(syntax, scene, lines[0]));
+        Assert.Equal(2, scene.Clauses(lines[0])[1].DifficultyWord);
+        Assert.Equal([(TaleClauseKind.Effects, "set flag:won"), (TaleClauseKind.Divert, "b")],
+            Values(syntax, scene, lines[2]));
+        Assert.Equal(
+        [
+            (TaleClauseKind.SkillCheck, "dex dc 5"), (TaleClauseKind.CheckWord, "dex"), (TaleClauseKind.Difficulty, "5"),
+        ], Values(syntax, scene, lines[5]));
+    }
+
+    [Fact]
+    public void Skill_check_outcome_structure_is_checked_without_symbols()
+    {
+        var scene = Parse("""
+            === a
+            * [Ask] skill-check insight dc 10
+              success: -> END
+            Prose
+            ::: skill-check dex dc 5
+            success: -> END
+            failure: -> END
+            -> END
+            failure: -> END
+            * [Go] skill-check dc 5
+              success: -> END
+              failure: -> END
+            """).Scenes[0];
+
+        Assert.Equal(
+        [
+            (CompilerDiagnosticCodes.MalformedSkillCheckOutcome, 1, 8),
+            (CompilerDiagnosticCodes.MalformedSkillCheckOutcome, 8, 0),
+            (CompilerDiagnosticCodes.InvalidBlock, 4, 0),
+            (CompilerDiagnosticCodes.MalformedSkillCheck, 9, 18),
+        ], scene.Diagnostics.Select(item => (item.Code, item.Line, item.Column)).Order());
+        Assert.True(scene.Clauses(scene.Lines[8])[1].IsInvalid);
+    }
+
+    [Fact]
     public void Syntax_binds_to_different_symbol_tables_without_reparsing()
     {
         var syntax = TaleSyntaxParser.Parse("=== start\n-> later");
@@ -313,6 +432,10 @@ public sealed class TaleSyntaxTests
         new(TaleSyntaxParser.Parse(new string('x', 10) + "\n=== a\n-> END"));
 
     private static TaleFileSyntax Parse(string text) => TaleSyntaxParser.Parse(text);
+
+    private static (TaleClauseKind, string)[] Values(TaleFileSyntax syntax, TaleSceneSyntax scene, TaleLineSyntax line) =>
+        scene.Clauses(line).ToArray().Select(clause => (clause.Kind, syntax.Value(scene, line, clause).ToString().Trim()))
+            .ToArray();
 
     private static StorySymbols Symbols(params SceneId[] scenes)
     {

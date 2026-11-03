@@ -64,19 +64,26 @@ keyword, speaker or block keyword) and value spans. Parts live in a per-scene si
 comment lines stay small. Lines with a structural error are marked `IsInvalid`; lines inside a condition nested past
 the limit are marked `IsSuppressed`. The binder gives either kind no further meaning.
 
+Choice, `::: skill-check` and outcome lines record clauses (`TaleClause`) instead: label, `(requires: …)`,
+effects, divert, the skill-check spec with its actor/stat words and `dc` expression. An invalid choice line is a
+dropped choice; duplicate clauses, trailing text and bad divert targets are reported but keep it. Comment lines and
+`success:`/`failure:` lines after an accepted check, plus blank lines and the closing `:::` inside a block, are
+marked `IsAttached`: the check binds them, and the next unattached line ends the check.
+
 Ownership:
 
 | Syntax (`TaleSyntaxParser`) | Binding (`TaleParser`) |
 | --- | --- |
-| Line splitting, scene ownership, line kinds and spans | Steps, block-condition frames, outcome attachment |
+| Line splitting, scene ownership, line kinds and spans | Steps and block-condition frames |
 | Head and value parts of metadata, speech, effects, divert and `{if}` lines | Expressions, prose and divert targets bound against symbols |
+| Choice and outcome clauses, skill-check spec words and `dc` span, outcome attachment | Skill-check actor, stat and `dc` binding; each unresolved part is reported |
 | TW3001 text before the first scene, TW1008 invalid scene ids (headers and divert targets) | Diagnostics that need symbols or step context |
 | `{if}`/`{else}`/`{/if}` balance, unclosed blocks, nesting limit and suppression | |
 | Misplaced, duplicate and malformed metadata values; malformed speech; missing divert targets | |
+| Malformed choices, skill-check specs and blocks; missing and misplaced outcomes | Dropped-choice bookkeeping, which needs condition frames |
 | | Analysis tokens, emitted from line kinds and spans |
 
-Choice clauses, skill-check specs and outcome attachment are still read by the binder; #407 part 2b moves them
-into syntax. Expressions stay as spans and are parsed and bound by `ExpressionParser` during binding. Prose and
+Expressions stay as spans and are parsed and bound by `ExpressionParser` during binding. Prose and
 images stay as line spans parsed by `InlineParser` during binding until #491 separates inline syntax from symbol
 binding. `TaleParser` is the compatibility adapter from syntax to the existing model; #408 compiles from syntax
 directly and deletes the discovery pass.
