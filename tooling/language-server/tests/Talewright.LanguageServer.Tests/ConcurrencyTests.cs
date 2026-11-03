@@ -44,7 +44,7 @@ public sealed class ConcurrencyTests
         {
             await client.Change("start.tale", Tale($"Edit {version}."), version);
             latest = await control.NextDelay();
-            Assert.Equal(TimeSpan.FromMilliseconds(10), latest.Duration);
+            Assert.Equal(TimeSpan.FromMilliseconds(150), latest.Duration);
         }
         await client.Barrier(2);
         Assert.Equal(1, control.AnalysisCount);
@@ -60,16 +60,14 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
-    public async Task Cancelling_running_analysis_uses_a_longer_quiet_window_until_the_burst_publishes()
+    public async Task Edits_during_running_analysis_cancel_it_and_publish_only_the_latest()
     {
         var control = new AnalysisControl();
         await using var client = new InProcessClient(control);
         await client.Initialize();
         await PublishInitial(control, client, Original);
         await client.Change("start.tale", Changed, 2);
-        var first = await control.NextDelay();
-        Assert.Equal(TimeSpan.FromMilliseconds(10), first.Duration);
-        first.Release();
+        (await control.NextDelay()).Release();
         var running = await control.NextAnalysis();
 
         Gate? latest = null;
@@ -90,13 +88,6 @@ public sealed class ConcurrencyTests
         Assert.Equal(3, control.AnalysisCount);
         for (var version = 2; version < 25; version++)
             Assert.False(client.HasDiagnostics("start.tale", version));
-
-        await client.Change("start.tale", Tale("Isolated."), 26);
-        var isolated = await control.NextDelay();
-        Assert.Equal(TimeSpan.FromMilliseconds(10), isolated.Duration);
-        isolated.Release();
-        (await control.NextAnalysis()).Release();
-        await client.Diagnostics("start.tale", 26);
     }
 
     [Fact]

@@ -70,15 +70,15 @@ MSBUILDDISABLENODEREUSE=1 dotnet build benchmarks/Talewright.Benchmarks -c Relea
 dotnet benchmarks/Talewright.Benchmarks/bin/Release/net10.0/Talewright.Benchmarks.dll --edit-diagnostics
 ```
 
-Recorded on 2026-11-02: Linux Mint 22.3 x64, .NET 10.0.14,
+Recorded on 2026-11-03: Linux Mint 22.3 x64, .NET 10.0.14,
 AMD Ryzen 9 7940HS (8 cores / 16 threads), 27 GiB RAM, performance power profile
-and CPU governor. Other work was active (load average about 3). Seven samples
+and CPU governor. Other work was active (load average about 5). Seven samples
 follow three warmups; p95 is the maximum of seven, not a high-confidence tail estimate.
 
 | Operation | Median managed bytes | Maximum managed bytes |
 | --- | ---: | ---: |
-| Fresh full workspace analysis | 38,237,488 (53.86 B/source byte) | 38,353,928 |
-| One-file edit workspace analysis | 36,593,424 (51.54 B/source byte) | 36,809,264 |
+| Fresh full workspace analysis | 37,990,136 (53.51 B/source byte) | 38,246,824 |
+| One-file edit workspace analysis | 36,442,944 (51.33 B/source byte) | 36,553,432 |
 
 These allocations use the **process-wide** counter so worker-thread allocations
 are included. They are not directly comparable to current-thread-only probes.
@@ -90,30 +90,28 @@ Fresh compiler and analyzer ceilings remain unchanged.
 
 | End-to-end stage | p50 ms | p95 ms |
 | --- | ---: | ---: |
-| Notification sent to diagnostics flushed and received | 89.44 | 100.36 |
-| Trailing debounce | 10.17 | 10.29 |
+| Notification sent to diagnostics flushed and received | 237.92 | 252.86 |
+| Trailing debounce | 150.19 | 150.27 |
 | Analysis-gate queue | 0.00 | 0.01 |
-| Whole-story analysis, with one file parsed | 77.95 | 88.61 |
-| Completion-event dispatch | 0.05 | 0.06 |
-| Lint and diagnostic conversion | 0.59 | 3.75 |
-| Protocol serialization and publication | 0.12 | 0.15 |
-| Scheduling, transport and client-receipt residual | 0.46 | 0.71 |
+| Whole-story analysis, with one file parsed | 85.70 | 102.15 |
+| Completion-event dispatch | 0.06 | 0.14 |
+| Lint and diagnostic conversion | 0.66 | 6.87 |
+| Protocol serialization and publication | 0.15 | 0.26 |
+| Scheduling, transport and client-receipt residual | 0.70 | 1.70 |
 
 Stage percentiles are independent and must not be added. This uses the real
 in-process LSP framing, workspace, linting and publication pipeline, not a mocked
 analyzer or an analyzer-only latency. An internal opt-in observer exposes stage
 timings to the harness; no telemetry is emitted by the normal server.
 
-**The 50 ms edit-to-diagnostics target is missed.** File reuse removes repeated
-parsing and the fixed 150 ms debounce for isolated edits is gone, but whole-story
-analysis alone remains over budget. After a running analysis is cancelled during
-typing, the server uses a 150 ms quiet window to coalesce the burst. The report
-gates lead review of #411; it does not silently enable per-scene reuse or claim
-that #392's latency target is satisfied.
+**The 50 ms edit-to-diagnostics target is missed, and that is accepted for
+now.** File reuse removes repeated parsing, but whole-story analysis alone
+remains over budget. The fixed 150 ms quiet window is deliberate: it coalesces
+edits arriving less than 150 ms apart into one analysis instead of starting
+whole-story work per keystroke. Adaptive or shorter windows are deferred until
+authors report on real editing experience. The report does not enable per-scene
+reuse (#411) or claim that #392's latency target is satisfied.
 
-The measured workload waits for publication between edits, so it exercises the
-10 ms isolated-edit window. During typing that cancels running analysis, the
-server instead waits for 150 ms of quiet until a revision publishes. Tests cover
-this backoff, cancellation, paced bursts, latest-only publication and
-restoration of the short window; these isolated-edit numbers are not
-burst-settling latency.
+The measured workload waits for publication between edits, so each sample is
+one isolated edit plus the full quiet window. Tests cover burst coalescing,
+cancellation of running analysis, paced edits and latest-only publication.

@@ -34,7 +34,6 @@ public sealed class SharedAnalysis
     internal long FinishedAt { get; set; }
     internal int ParsedFiles { get; set; }
     internal int CachedFiles { get; set; }
-    internal bool WasRunningWhenSuperseded { get; private set; }
 
     /// <summary>Ends the debounce without creating another analysis.</summary>
     public void StartImmediately() => _start.TrySetResult();
@@ -42,12 +41,7 @@ public sealed class SharedAnalysis
     internal Task StartRequested => _start.Task;
     internal void Supersede()
     {
-        var running = StartedAt != 0 && !Completion.IsCompleted;
-        if (_superseded.TrySetResult())
-        {
-            WasRunningWhenSuperseded = running;
-            _cancellation.Cancel();
-        }
+        if (_superseded.TrySetResult()) _cancellation.Cancel();
     }
     internal void SetCompletion(Task<AnalysisUpdate> completion) => _completion = completion;
 }

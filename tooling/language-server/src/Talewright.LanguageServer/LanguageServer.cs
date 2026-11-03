@@ -79,8 +79,7 @@ public sealed class LanguageServer
     private sealed record ProtocolError(int Code, string Message);
     private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions }
     private const int DiagnosticLimit = 200;
-    internal static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(10);
-    private static readonly TimeSpan TypingBurstDebounce = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(150);
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
         Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown,
         bool documentChangesSupported, bool createFileOperationSupported,
@@ -119,7 +118,6 @@ public sealed class LanguageServer
         public SemaphoreSlim AnalysisGate { get; } = analysisGate;
         public long Generation { get; set; }
         public SharedAnalysis? Pending { get; set; }
-        public bool TypingBurst { get; set; }
         public StoryAnalysis? PublishedAnalysis { get; set; }
         public HashSet<string> Published { get; } = new(PathComparer);
         public Exception? MetadataError { get; init; }
@@ -930,7 +928,6 @@ public sealed class LanguageServer
         story.Pending?.Supersede();
         var replacement = LoadStory(story.Root, story.AnalysisGate);
         replacement.Generation = story.Generation;
-        replacement.TypingBurst = story.TypingBurst || story.Pending?.WasRunningWhenSuperseded == true;
         replacement.PublishedAnalysis = story.PublishedAnalysis;
         foreach (var path in story.Published) replacement.Published.Add(path);
         foreach (var (path, document) in _documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)))
@@ -951,8 +948,7 @@ public sealed class LanguageServer
             _events.Writer.TryWrite(new Completed(story, generation, null, error));
             return;
         }
-        story.TypingBurst |= story.Pending?.WasRunningWhenSuperseded == true;
-        var shared = story.Workspace.ScheduleAnalysis(story.TypingBurst ? TypingBurstDebounce : DiagnosticsDebounce);
+        var shared = story.Workspace.ScheduleAnalysis(DiagnosticsDebounce);
         story.Pending = shared;
         var task = ObserveAnalysisAsync(story, generation, shared);
         _analyses.RemoveAll(task => task.IsCompletedSuccessfully);
@@ -986,7 +982,6 @@ public sealed class LanguageServer
             story.Generation != completed.Generation) return;
         if (completed.Error is { } error)
         {
-            story.TypingBurst = false;
             story.PublishedAnalysis = null;
             await _errors.WriteLineAsync($"{LanguageServerLogCodes.AnalysisFailure}: {error.Message}");
             await NotifyAsync("window/showMessage", new { type = 1, message = $"Talewright analysis failed: {error.Message}" }, cancellationToken);
@@ -1015,7 +1010,6 @@ public sealed class LanguageServer
             return;
         }
         if (completed.Update is not { Published: true } update) return;
-        story.TypingBurst = false;
         var conversionStarted = Stopwatch.GetTimestamp();
         var lintResult = StoryLintAnalyzer.Analyze(update.Analysis, story.LintConfiguration);
         var groups = new Dictionary<string, List<EditorDiagnostic>>(PathComparer);
