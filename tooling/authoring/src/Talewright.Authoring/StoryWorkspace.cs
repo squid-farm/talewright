@@ -1,6 +1,9 @@
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Parsing;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Talewright.Authoring;
 
@@ -13,6 +16,7 @@ public sealed class SharedAnalysis
     private readonly TaskCompletionSource _superseded = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _cancellation = new();
     private Task<AnalysisUpdate>? _completion;
+    private long _startedAt;
 
     internal SharedAnalysis(long revision) => Revision = revision;
 
@@ -20,6 +24,17 @@ public sealed class SharedAnalysis
     public Task<AnalysisUpdate> Completion => _completion ?? throw new InvalidOperationException("Analysis has not been scheduled.");
     public Task Superseded => _superseded.Task;
     internal CancellationToken CancellationToken => _cancellation.Token;
+    internal long ScheduledAt { get; } = Stopwatch.GetTimestamp();
+    internal long ReadyAt { get; set; }
+    internal long StartedAt
+    {
+        get => Volatile.Read(ref _startedAt);
+        set => Volatile.Write(ref _startedAt, value);
+    }
+    internal long FinishedAt { get; set; }
+    internal int ParsedFiles { get; set; }
+    internal int CachedFiles { get; set; }
+    internal bool WasRunningWhenSuperseded { get; private set; }
 
     /// <summary>Ends the debounce without creating another analysis.</summary>
     public void StartImmediately() => _start.TrySetResult();
@@ -27,7 +42,12 @@ public sealed class SharedAnalysis
     internal Task StartRequested => _start.Task;
     internal void Supersede()
     {
-        if (_superseded.TrySetResult()) _cancellation.Cancel();
+        var running = StartedAt != 0 && !Completion.IsCompleted;
+        if (_superseded.TrySetResult())
+        {
+            WasRunningWhenSuperseded = running;
+            _cancellation.Cancel();
+        }
     }
     internal void SetCompletion(Task<AnalysisUpdate> completion) => _completion = completion;
 }
@@ -42,14 +62,17 @@ public sealed class StoryWorkspace
     private readonly Dictionary<string, string> _disk;
     private readonly HashSet<string> _imagePaths;
     private readonly Dictionary<string, (int Version, string Text)> _open = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TaleFileSyntax> _syntax = new(StringComparer.Ordinal);
     private readonly CompilerOptions _options;
     private readonly bool _missingMetadata;
     private readonly Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>> _analyze;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly Func<string, CancellationToken, TaleFileSyntax> _parseSyntax;
     private readonly SemaphoreSlim _analysisGate;
     private long _revision;
     private StoryAnalysis? _current;
     private SharedAnalysis? _shared;
+    private int _syntaxParseCount;
 
     public StoryWorkspace(StorySource source, CompilerOptions? options = null, bool requiresProjectMetadata = false)
         : this(source, options, requiresProjectMetadata, null, null)
@@ -58,15 +81,17 @@ public sealed class StoryWorkspace
 
     internal StoryWorkspace(StorySource source, CompilerOptions? options, bool requiresProjectMetadata,
         Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? analyze,
-        Func<TimeSpan, CancellationToken, Task>? delay, SemaphoreSlim? analysisGate = null)
+        Func<TimeSpan, CancellationToken, Task>? delay, SemaphoreSlim? analysisGate = null,
+        Func<string, CancellationToken, TaleFileSyntax>? parseSyntax = null)
     {
         _disk = source.Files.ToDictionary(StringComparer.Ordinal);
         _imagePaths = source.ImagePaths.ToHashSet(StringComparer.Ordinal);
         _options = options ?? CompilerOptions.Default;
         _missingMetadata = requiresProjectMetadata && options is null;
         _analyze = analyze ?? ((snapshot, compilerOptions, token) =>
-            Task.Run(() => StoryAnalyzer.Analyze(snapshot, compilerOptions, token), token));
+            Task.Run(() => AnalyzeSnapshot(snapshot, compilerOptions, token), token));
         _delay = delay ?? Task.Delay;
+        _parseSyntax = parseSyntax ?? TaleSyntaxParser.Parse;
         _analysisGate = analysisGate ?? new SemaphoreSlim(1, 1);
     }
 
@@ -76,6 +101,27 @@ public sealed class StoryWorkspace
     public StoryAnalysis? Current
     {
         get { lock (_gate) return _current; }
+    }
+
+    internal int SyntaxParseCount => Volatile.Read(ref _syntaxParseCount);
+
+    internal StoryAnalysis AnalyzeSnapshot(StorySource snapshot, CompilerOptions options, CancellationToken token) =>
+        StoryAnalyzer.Analyze(snapshot, options, token, GetSyntax);
+
+    internal IReadOnlyDictionary<string, TaleFileSyntax> Syntax
+    {
+        get { lock (_gate) return new Dictionary<string, TaleFileSyntax>(_syntax, StringComparer.Ordinal); }
+    }
+
+    internal void ReuseSyntaxFrom(StoryWorkspace previous)
+    {
+        var entries = previous.Syntax;
+        lock (_gate)
+        {
+            foreach (var (path, syntax) in entries)
+                if (TryGetText(path, out var text) && string.Equals(text, syntax.Text, StringComparison.Ordinal))
+                    _syntax[path] = syntax;
+        }
     }
 
     public static StoryWorkspace FromDirectory(string directory, CompilerOptions? options = null,
@@ -101,7 +147,7 @@ public sealed class StoryWorkspace
         {
             if (text is null) _disk.Remove(path);
             else _disk[path] = text;
-            Invalidate();
+            Invalidate(path);
         }
     }
 
@@ -112,7 +158,7 @@ public sealed class StoryWorkspace
         {
             if (_open.ContainsKey(path)) throw new InvalidOperationException($"'{path}' is already open.");
             _open.Add(path, (version, text));
-            Invalidate();
+            Invalidate(path);
         }
     }
 
@@ -139,7 +185,7 @@ public sealed class StoryWorkspace
             if (!_open.TryGetValue(path, out var current)) throw new InvalidOperationException($"'{path}' is not open.");
             if (version <= current.Version) return false;
             _open[path] = (version, text);
-            Invalidate();
+            Invalidate(path);
             return true;
         }
     }
@@ -151,7 +197,7 @@ public sealed class StoryWorkspace
         lock (_gate)
         {
             if (!_open.Remove(path)) throw new InvalidOperationException($"'{path}' is not open.");
-            Invalidate();
+            Invalidate(path);
         }
     }
 
@@ -176,9 +222,7 @@ public sealed class StoryWorkspace
         path = Normalize(path);
         lock (_gate)
         {
-            return _open.TryGetValue(path, out var document)
-                ? document.Text == text
-                : _disk.TryGetValue(path, out var diskText) && diskText == text;
+            return TryGetText(path, out var current) && string.Equals(current, text, StringComparison.Ordinal);
         }
     }
 
@@ -216,11 +260,14 @@ public sealed class StoryWorkspace
             catch (OperationCanceledException) when (delayCancellation.IsCancellationRequested) { }
         }
         else await delay.ConfigureAwait(false);
+        shared.ReadyAt = Stopwatch.GetTimestamp();
         shared.CancellationToken.ThrowIfCancellationRequested();
         await _analysisGate.WaitAsync(shared.CancellationToken).ConfigureAwait(false);
         try
         {
             shared.CancellationToken.ThrowIfCancellationRequested();
+            shared.StartedAt = Stopwatch.GetTimestamp();
+            var parsedBefore = SyntaxParseCount;
             var analysis = await _analyze(snapshot, _options, shared.CancellationToken).ConfigureAwait(false);
             shared.CancellationToken.ThrowIfCancellationRequested();
             if (_missingMetadata)
@@ -233,14 +280,48 @@ public sealed class StoryWorkspace
             {
                 var published = shared.Revision == _revision;
                 if (published) _current = analysis;
+                shared.ParsedFiles = SyntaxParseCount - parsedBefore;
+                shared.CachedFiles = _syntax.Count;
+                shared.FinishedAt = Stopwatch.GetTimestamp();
                 return new(shared.Revision, analysis, published);
             }
         }
         finally { _analysisGate.Release(); }
     }
 
-    private void Invalidate()
+    private TaleFileSyntax GetSyntax(string path, string text, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+            if (_syntax.TryGetValue(path, out var cached) && string.Equals(cached.Text, text, StringComparison.Ordinal))
+                return cached;
+
+        Interlocked.Increment(ref _syntaxParseCount);
+        var syntax = _parseSyntax(text, cancellationToken);
+        lock (_gate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (TryGetText(path, out var current) && string.Equals(current, text, StringComparison.Ordinal))
+                _syntax[path] = syntax;
+        }
+        return syntax;
+    }
+
+    private bool TryGetText(string path, [NotNullWhen(true)] out string? text)
+    {
+        if (_open.TryGetValue(path, out var document))
+        {
+            text = document.Text;
+            return true;
+        }
+        return _disk.TryGetValue(path, out text);
+    }
+
+    private void Invalidate(string? path = null)
+    {
+        if (path is not null && _syntax.TryGetValue(path, out var syntax) &&
+            (!TryGetText(path, out var text) || !string.Equals(text, syntax.Text, StringComparison.Ordinal)))
+            _syntax.Remove(path);
         _revision++;
         _current = null;
         _shared?.Supersede();

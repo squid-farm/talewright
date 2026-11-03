@@ -92,7 +92,7 @@ instead construct a workspace explicitly for a new, unsaved story.
 var workspace = StoryWorkspace.FromDirectory(storyDirectory);
 workspace.Open("chapters/start.tale", version: 1, unsavedText);
 workspace.Change("chapters/start.tale", version: 2, editedText);
-var update = await workspace.AnalyzeAsync(TimeSpan.FromMilliseconds(150), cancellationToken);
+var update = await workspace.AnalyzeAsync(TimeSpan.FromMilliseconds(10), cancellationToken);
 if (update.Published)
 {
     Publish(update.Analysis);
@@ -108,7 +108,28 @@ the host. `Change` returns false for superseded document versions; lifecycle
 misuse and invalid paths throw rather than silently succeed.
 
 Any accepted change invalidates `Current`. Analysis is whole-story, debounced,
-and performed on an immutable snapshot. A result superseded by any file/document
+and performed on an immutable snapshot. The workspace retains only complete
+symbol-independent `.tale` syntax, keyed by ordinal path and exact effective text.
+An edit parses the changed file; unchanged files reuse syntax but are all rebound
+against fresh story-wide declarations, types, registrations and image catalogues.
+An unchanged analyzed revision returns its existing analysis without parsing.
+Invalid or incomplete syntax is reusable too; diagnostics and symbols are not
+cached separately from their analysis revision.
+
+Changing effective text or deleting a file evicts its syntax immediately. Disk
+updates beneath an open overlay do not evict matching overlay syntax; closing
+restores the supplied disk text and evicts any mismatch. Manifest and image
+changes invalidate analysis, not matching `.tale` syntax. Parser configuration
+is currently fixed and independent of `CompilerOptions`; recreate the workspace
+when registrations change. The language server copies only exact-text matches
+into a replacement workspace after reloading disk and restoring overlays.
+Ownership/root changes do not transfer another story's cache.
+
+Parsing runs outside the workspace lock. A completed parse enters the cache
+only if its cancellation token is still live and the file's effective text
+still matches. Removed files and superseded syntax are not retained by the
+cache; callers may deliberately retain earlier immutable analysis snapshots.
+A result superseded by any file/document
 change has `Published == false` and cannot replace `Current`. Cancellation is
 propagated. Hosts should cancel superseded requests to avoid unnecessary work;
 there is no speculative incremental compiler, hidden watcher, or background

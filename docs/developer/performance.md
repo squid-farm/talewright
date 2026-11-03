@@ -58,3 +58,59 @@ are available as [GitHub Actions artifacts](https://github.com/squid-farm/talewr
 See the [performance scorecard](performance-scorecard.md) for a cross-host view
 of browser observations, fixed-byte file-layout measurements, end-cursor versus
 redo-prefix restore, metric limitations, and the status of proposed budgets.
+
+## File syntax reuse and edit diagnostics
+
+The #409 measurement uses the deterministic 20-chapter realistic corpus:
+22 text files (21 `.tale`), 709,952 UTF-8 source bytes including configuration.
+Each warm edit parses one file and rebinds/validates the entire story.
+
+```sh
+MSBUILDDISABLENODEREUSE=1 dotnet build benchmarks/Talewright.Benchmarks -c Release -nodeReuse:false -maxcpucount:1
+dotnet benchmarks/Talewright.Benchmarks/bin/Release/net10.0/Talewright.Benchmarks.dll --edit-diagnostics
+```
+
+Recorded on 2026-11-02: Linux Mint 22.3 x64, .NET 10.0.14,
+AMD Ryzen 9 7940HS (8 cores / 16 threads), 27 GiB RAM, performance power profile
+and CPU governor. Other work was active (load average about 3). Seven samples
+follow three warmups; p95 is the maximum of seven, not a high-confidence tail estimate.
+
+| Operation | Median managed bytes | Maximum managed bytes |
+| --- | ---: | ---: |
+| Fresh full workspace analysis | 38,237,488 (53.86 B/source byte) | 38,353,928 |
+| One-file edit workspace analysis | 36,593,424 (51.54 B/source byte) | 36,809,264 |
+
+These allocations use the **process-wide** counter so worker-thread allocations
+are included. They are not directly comparable to current-thread-only probes.
+Retained syntax was approximately 664 KB, excluding source strings already shared
+with the source snapshot; this is not total retained analysis or peak memory.
+A deterministic current-thread test guards the synchronous cached analysis core
+at 54 B/source byte, with exact parser-invocation and obsolete-snapshot GC tests.
+Fresh compiler and analyzer ceilings remain unchanged.
+
+| End-to-end stage | p50 ms | p95 ms |
+| --- | ---: | ---: |
+| Notification sent to diagnostics flushed and received | 89.44 | 100.36 |
+| Trailing debounce | 10.17 | 10.29 |
+| Analysis-gate queue | 0.00 | 0.01 |
+| Whole-story analysis, with one file parsed | 77.95 | 88.61 |
+| Completion-event dispatch | 0.05 | 0.06 |
+| Lint and diagnostic conversion | 0.59 | 3.75 |
+| Protocol serialization and publication | 0.12 | 0.15 |
+| Scheduling, transport and client-receipt residual | 0.46 | 0.71 |
+
+Stage percentiles are independent and must not be added. This uses the real
+in-process LSP framing, workspace, linting and publication pipeline, not a mocked
+analyzer or an analyzer-only latency. An internal opt-in observer exposes stage
+timings to the harness; no telemetry is emitted by the normal server.
+
+**The 50 ms edit-to-diagnostics target is missed.** File reuse removes repeated
+parsing and the 150 ms debounce is gone, but whole-story analysis alone remains
+over budget. The report gates lead review of #411; it does not silently enable
+per-scene reuse or claim that #392's latency target is satisfied.
+
+The measured workload waits for publication between edits, so it exercises the
+10 ms isolated-edit window. During typing that cancels running analysis, the
+server instead waits for 50 ms of quiet until a revision publishes. Deterministic
+tests cover this backoff, cancellation, latest-only publication and restoration
+of the short window; these isolated-edit numbers are not burst-settling latency.

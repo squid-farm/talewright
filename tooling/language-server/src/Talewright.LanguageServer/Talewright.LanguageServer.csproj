@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Talewright.LanguageServer.Tests" />
+    <InternalsVisibleTo Include="Talewright.Benchmarks" />
     <ProjectReference Include="../../../authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
   </ItemGroup>
 </Project>

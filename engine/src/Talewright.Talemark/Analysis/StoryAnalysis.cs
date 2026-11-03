@@ -86,11 +86,15 @@ public static class StoryAnalyzer
     /// <summary>Reuses compiler parsing/checks, retaining authoring data even when no runtime story can be built.</summary>
     public static StoryAnalysis Analyze(StorySource source, CompilerOptions? options = null,
         CancellationToken cancellationToken = default)
+        => Analyze(source, options, cancellationToken, null);
+
+    internal static StoryAnalysis Analyze(StorySource source, CompilerOptions? options,
+        CancellationToken cancellationToken, Func<string, string, CancellationToken, TaleFileSyntax>? syntax)
     {
         cancellationToken.ThrowIfCancellationRequested();
         options ??= CompilerOptions.Default;
         var collector = new AnalysisCollector(source, options);
-        var result = StoryCompiler.CompileForAnalysis(source, options, collector, cancellationToken);
+        var result = StoryCompiler.CompileForAnalysis(source, options, collector, cancellationToken, syntax);
         cancellationToken.ThrowIfCancellationRequested();
         var analysis = new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
         cancellationToken.ThrowIfCancellationRequested();
@@ -406,7 +410,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             Symbols.Add(new(name, AuthoringSymbolKind.Ruleset, "ruleset", null));
     }
 
-    internal void DiscoverWithoutManifest(CancellationToken cancellationToken)
+    internal void DiscoverWithoutManifest(CancellationToken cancellationToken,
+        Func<string, string, CancellationToken, TaleFileSyntax> syntax)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var world = new WorldDefinition(new Talewright.Core.Rulesets.RulesetBuilder("analysis-recovery").Build(),
@@ -421,11 +426,11 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         foreach (var (file, text) in source.TaleFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var syntax = TaleSyntaxParser.Parse(text, cancellationToken);
-            TaleDeclarations.Collect(file, syntax, Scene, null, cancellationToken);
+            var fileSyntax = syntax(file, text, cancellationToken);
+            TaleDeclarations.Collect(file, fileSyntax, Scene, null, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
-            TaleParser.Parse(file, syntax, symbols, diagnostics, cancellationToken);
+            TaleParser.Parse(file, fileSyntax, symbols, diagnostics, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
                 diagnostic.Code is CompilerDiagnosticCodes.UnsafeImagePath or CompilerDiagnosticCodes.UnsupportedImageFormat or CompilerDiagnosticCodes.MissingImage or CompilerDiagnosticCodes.AmbiguousImagePath or CompilerDiagnosticCodes.MissingImageAlt));

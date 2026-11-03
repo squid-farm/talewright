@@ -74,7 +74,7 @@ hold up later notifications or diagnostic publication; responses can arrive out
 of order. Output frames are serialized.
 
 Each story revision has one shared analysis. Diagnostic analysis normally waits
-150 ms for edits to settle; a request needing that revision ends the debounce
+10 ms for edits to settle; a request needing that revision ends the debounce
 and waits for the same analysis instead of starting another. A running analysis
 is cancelled when superseded and checks for cancellation between files and
 scenes and periodically while processing buffered prose, nested scene steps,
@@ -82,6 +82,16 @@ hub offers, and reachability graphs. A newer analysis for that story waits only
 for the cancelled run to unwind. Superseded results do not publish diagnostics.
 Cancellation is cooperative: a single expression or inline construct can
 finish before the next checkpoint.
+
+The trailing quiet window coalesces very rapid edits. If typing supersedes an
+already-running analysis, subsequent edits use a 50 ms quiet window until the
+latest analysis publishes; then isolated edits return to 10 ms. Requests can
+still end either debounce immediately. This avoids repeatedly starting expensive
+analysis during a fast typing burst, at the cost of a longer settling delay.
+It does not guarantee a 50 ms diagnostic response. The workspace
+reuses exact-text file syntax across edits and watched-file reloads, but binding
+and validation still run story-wide. See the [cache lifecycle](authoring-analysis.md#workspace-lifecycle)
+and [measured end-to-end budget](performance.md#file-syntax-reuse-and-edit-diagnostics).
 
 Hover and definition may use the last published analysis when the requested
 document's text is unchanged. Cross-file semantic information may therefore be
