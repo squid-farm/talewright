@@ -9,7 +9,7 @@ public enum StoryStateReadKind
     /// <summary>A character stat, such as <c>player:dex</c>.</summary>
     Stat,
 
-    /// <summary>A faction standing, such as <c>faction:river</c>.</summary>
+    /// <summary>A faction standing, such as <c>faction:river:standing</c>.</summary>
     Standing,
 
     /// <summary>A faction standing tier, such as <c>faction:river:tier</c>.</summary>
@@ -30,7 +30,7 @@ public enum StoryStateReadKind
     /// <summary>A character pronoun property, such as <c>player:pronoun:object</c>.</summary>
     CharacterPronoun,
 
-    /// <summary>A faction name, such as <c>faction:river:name</c>.</summary>
+    /// <summary>A faction name, such as <c>faction:river</c>.</summary>
     FactionName,
 
     /// <summary>An item name, such as <c>item:lantern</c>.</summary>

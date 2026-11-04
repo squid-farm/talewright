@@ -10,13 +10,13 @@ The walk back to camp is quiet. {guide:first-name} keeps glancing at your pack.
 -> ending.empty-handed
 {/if}
 
-* [Hand the relic to the guild] (requires: faction:explorers-guild >= neutral) { take player relic; faction:explorers-guild += 20 } -> ending.guild
-* [Keep it for yourself] { faction:explorers-guild -= 30 } -> ending.keep
+* [Hand the relic to the guild] (requires: faction:explorers-guild:tier >= neutral) { take player relic; faction:explorers-guild:standing += 20 } -> ending.guild
+* [Keep it for yourself] { faction:explorers-guild:standing -= 30 } -> ending.keep
 
 === ending.guild
 @title Honoured
 
-The {faction:explorers-guild:name} hangs {player:last-name#possessive} portrait in the great hall, a little
+The {faction:explorers-guild} hangs {player:last-name#possessive} portrait in the great hall, a little
 crooked. Your standing with them is now *{faction:explorers-guild:tier#lower}*.
 {if visited(dream.sleeper)}
 {if flag:dream-promise}
@@ -65,7 +65,7 @@ You return with nothing but {player:pronoun:possessive-pronoun:determiner} notes
 believes. {guide:first-name}, at least, buys you a drink.
 {if visited(dream.sleeper)}
 You left the {item:relic}, but not the memory of {sleeper:first-name}.
-{if flag:dream-promise and faction:explorers-guild >= friendly}
+{if flag:dream-promise and faction:explorers-guild:tier >= friendly}
 The guild ghost's testimony earns a hearing, even without treasure.
 {else}
 The glyph marks are proof enough for the two of you.

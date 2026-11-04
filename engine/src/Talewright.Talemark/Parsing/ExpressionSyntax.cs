@@ -57,6 +57,6 @@ internal sealed record GiveTakeEffectSyntax(bool Give, ExpressionSpan Character,
     ExpressionNode? Quantity, ExpressionSpan Span) : EffectSyntax(Span);
 
 internal sealed record AssignmentEffectSyntax(ReferenceNamespace Kind, ExpressionSpan Namespace, ExpressionSpan Target,
-    AssignOp Operator, ExpressionNode Amount, ExpressionSpan Span) : EffectSyntax(Span);
+    ExpressionSpan? Member, AssignOp Operator, ExpressionNode Amount, ExpressionSpan Span) : EffectSyntax(Span);
 
 internal sealed record EffectsSyntaxTree(TokenBuffer Tokens, ImmutableArray<EffectSyntax> Effects, bool HasErrors);

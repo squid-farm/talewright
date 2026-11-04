@@ -156,7 +156,7 @@ vars:
 
 triggers:
   - id: guild-turns
-    when: faction:explorers-guild <= hostile
+    when: faction:explorers-guild:tier <= hostile
     do: set flag:guild-hostile
     once: true
 ```
@@ -291,7 +291,7 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 ~ var:torches-lit += 1
 
 * [Read the glyphs] (requires: player:int >= 12) -> temple.glyphs
-* [Shove the door] { faction:explorers-guild -= 5 } -> temple.hall
+* [Shove the door] { faction:explorers-guild:standing -= 5 } -> temple.hall
 ```
 
 | Element                                            | Meaning                                                                                        |
@@ -361,7 +361,7 @@ A scene-level `->` leaves immediately, showing the prose already rendered with a
 (or as the final frame for `-> END`). Put conditional early exits **before** the choices:
 
 ```tale
-{if faction:gang <= -31}
+{if faction:gang:standing <= -31}
 -> the-gang-hates-you
 {/if}
 * [Ask for work] -> gang.work
@@ -421,13 +421,21 @@ editor's soft wrapping for display instead.
 | `player:first-name`, `player:last-name`, `player:name`                                      | Names (`name` = first + last)             |
 | `player:pronoun`                                                                            | Subject pronoun (`she`, `they`)           |
 | `player:<stat>`                                                                             | Effective stat value (base + modifiers)   |
-| `faction:<id>`                                                                              | Player standing with the faction (number) |
+| `faction:<id>`                                                                              | Faction display name                      |
+| `faction:<id>:standing`                                                                     | Player standing with the faction (number) |
 | `faction:<id>:tier`                                                                         | Standing tier name (`friendly`, …)        |
-| `faction:<id>:name`, `item:<id>`                                                            | Display names                             |
+| `faction:<id>:name`, `item:<id>`, `item:<id>:name`                                         | Display names                             |
 | `var:<id>`, `flag:<id>`                                                                     | Story variables / flags                   |
 
-Every property separator is `:`. For example, use `faction:explorers-guild:name` and
-`faction:explorers-guild:tier`. Dots within an ID remain part of that name.
+Every property separator is `:`. For example, use `faction:explorers-guild:standing` and
+`faction:explorers-guild:tier`. Dots within an ID remain part of that name. Bare faction
+references show the faction name; use `:standing` for a number and `:tier` for a reputation tier.
+`faction:<id>:name` and `item:<id>:name` are explicit display-name forms.
+For these terms, see the [glossary](glossary.md).
+
+**Migration.** Bare `faction:<id>` used to render the numeric standing; it now renders the
+faction name without a diagnostic. Replace numeric uses with `faction:<id>:standing`, and
+comparisons to reputation tiers with `faction:<id>:tier`.
 
 Any character id can replace `player`.
 
@@ -635,7 +643,7 @@ or / and / not            boolean logic
 player has rope           inventory check (any character id)
 visited(temple.hall)      has the scene ever been entered
 true false 12 "text"      literals
-hostile … allied          reputation tier names (compare with faction:<id>)
+hostile … allied          reputation tier names (compare with faction:<id>:tier)
 @CanPickLock              named predicate registered from C# (see C# extensions)
 ```
 
@@ -718,7 +726,7 @@ Writing those effects on two `~` lines creates two batches instead.
 
 ```
 player:hp -= 3            stat arithmetic (= += -=), clamped to min/max
-faction:explorers-guild += 5
+faction:explorers-guild:standing += 5
 var:torches-lit = 2
 set flag:door-open        / clear flag:door-open
 give player relic         / give player torch 2

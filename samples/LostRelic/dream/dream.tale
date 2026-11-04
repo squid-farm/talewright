@@ -144,18 +144,18 @@ The hall stretches away. You gather yourself before trying another way.
 
 {archivist:first-name#capitalize} wears a guild coat with no body inside it.
 
-{if faction:explorers-guild >= friendly}
+{if faction:explorers-guild:tier >= friendly}
 > archivist: They still put your name in the ledger. Make them write ours there too.
 {else}
-{if faction:explorers-guild >= neutral}
+{if faction:explorers-guild:tier >= neutral}
 > archivist: The guild sent us here, then forgot the cost.
 {else}
 > archivist: You know what it is to fall out of their favour. Do not let them erase us.
 {/if}
 {/if}
 
-* [Promise the guild an honest account] (requires: faction:explorers-guild >= neutral) { set flag:dream-promise; faction:explorers-guild += 5 } -> dream.hub
-* [Refuse to speak for the guild] { faction:explorers-guild -= 10 } -> dream.hub
+* [Promise the guild an honest account] (requires: faction:explorers-guild:tier >= neutral) { set flag:dream-promise; faction:explorers-guild:standing += 5 } -> dream.hub
+* [Refuse to speak for the guild] { faction:explorers-guild:standing -= 10 } -> dream.hub
 
 === dream.hands
 @title Ask the Hands for passage

@@ -38,6 +38,12 @@ internal sealed class ExpressionBinder
             var value = binder.Bind(syntax.Root);
             if (expectedType is { } expected && value.Type != expected)
             {
+                if (expected == ExprType.Number && value is FactionNameRef faction)
+                {
+                    binder.Fail(CompilerDiagnosticCodes.TypeMismatch,
+                        FactionValueHint(faction, ExpressionVocabulary.Standing), syntax.Root.Span.Start);
+                }
+
                 binder.Fail(CompilerDiagnosticCodes.TypeMismatch,
                     $"Expected a {Describe(expected)} expression but found a {Describe(value.Type)}.",
                     syntax.Root.Span.Start);
@@ -208,21 +214,27 @@ internal sealed class ExpressionBinder
                     Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{path}'.", reference.Name.Start);
                 }
 
-                if (member is null) return new StandingRef(faction);
+                if (member is null) return new FactionNameRef(faction);
                 return member switch
                 {
+                    ExpressionVocabulary.Standing => new StandingRef(faction),
                     ExpressionVocabulary.Tier => new StandingTierRef(faction),
                     ExpressionVocabulary.Name => new FactionNameRef(faction),
                     _ => Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                        $"Unknown faction property '{member}'. Use 'faction:{path}:tier' or 'faction:{path}:name'.",
+                        $"Unknown faction property '{member}'. Use '{FactionReference(path, ExpressionVocabulary.Name)}', " +
+                        $"'{FactionReference(path, ExpressionVocabulary.Standing)}' or " +
+                        $"'{FactionReference(path, ExpressionVocabulary.Tier)}'.",
                         reference.Member!.Value.Start),
                 };
             }
 
             case ReferenceNamespace.Item:
-                if (member is not null)
+                if (member is not null && member != ExpressionVocabulary.Name)
                 {
-                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Item names are referenced as 'item:{path}'; '.' only groups words inside names.",
+                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                        $"Unknown item property '{member}'. Use " +
+                        $"'{ExpressionVocabulary.ItemPrefix}{path}{ExpressionVocabulary.Separator}{ExpressionVocabulary.Name}' " +
+                        "or omit the property for its display name.",
                         reference.Member!.Value.Start);
                 }
 
@@ -331,6 +343,12 @@ internal sealed class ExpressionBinder
             case UnaryOp.Negate:
                 if (operand.Type != ExprType.Number)
                 {
+                    if (operand is FactionNameRef faction)
+                    {
+                        Fail(CompilerDiagnosticCodes.TypeMismatch,
+                            FactionValueHint(faction, ExpressionVocabulary.Standing), unary.OperatorSpan.Start);
+                    }
+
                     Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Minus}' needs a number.", unary.OperatorSpan.Start);
                 }
 
@@ -377,23 +395,42 @@ internal sealed class ExpressionBinder
             case BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide:
                 if (left.Type != ExprType.Number || right.Type != ExprType.Number)
                 {
+                    if (left is FactionNameRef leftFaction)
+                    {
+                        Fail(CompilerDiagnosticCodes.TypeMismatch,
+                            FactionValueHint(leftFaction, ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                    }
+
+                    if (right is FactionNameRef rightFaction)
+                    {
+                        Fail(CompilerDiagnosticCodes.TypeMismatch,
+                            FactionValueHint(rightFaction, ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                    }
+
                     Fail(CompilerDiagnosticCodes.TypeMismatch, "Arithmetic needs numbers on both sides.", binary.OperatorSpan.Start);
                 }
 
                 break;
             case BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual or BinaryOp.Greater
                 or BinaryOp.GreaterOrEqual:
-                if (left.Type == ExprType.Tier && right is StandingRef rightStanding)
-                {
-                    right = new StandingTierRef(rightStanding.Faction);
-                }
-                else if (right.Type == ExprType.Tier && left is StandingRef leftStanding)
-                {
-                    left = new StandingTierRef(leftStanding.Faction);
-                }
-
                 if (left.Type != right.Type)
                 {
+                    if (left is FactionNameRef leftFaction && right.Type is ExprType.Number or ExprType.Tier)
+                    {
+                        Fail(CompilerDiagnosticCodes.TypeMismatch,
+                            FactionValueHint(leftFaction, right.Type == ExprType.Tier
+                                ? ExpressionVocabulary.Tier
+                                : ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                    }
+
+                    if (right is FactionNameRef rightFaction && left.Type is ExprType.Number or ExprType.Tier)
+                    {
+                        Fail(CompilerDiagnosticCodes.TypeMismatch,
+                            FactionValueHint(rightFaction, left.Type == ExprType.Tier
+                                ? ExpressionVocabulary.Tier
+                                : ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                    }
+
                     Fail(CompilerDiagnosticCodes.TypeMismatch,
                         $"Cannot compare a {Describe(left.Type)} with a {Describe(right.Type)}.",
                         binary.OperatorSpan.Start);
@@ -432,6 +469,12 @@ internal sealed class ExpressionBinder
             quantity = Bind(quantitySyntax);
             if (quantity.Type != ExprType.Number)
             {
+                if (quantity is FactionNameRef faction)
+                {
+                    Fail(CompilerDiagnosticCodes.TypeMismatch,
+                        FactionValueHint(faction, ExpressionVocabulary.Standing), quantitySyntax.Span.Start);
+                }
+
                 Fail(CompilerDiagnosticCodes.TypeMismatch, "Item quantity must be a number.", quantitySyntax.Span.Start);
             }
         }
@@ -450,6 +493,22 @@ internal sealed class ExpressionBinder
             Fail(CompilerDiagnosticCodes.UnresolvedVariableType,
                 $"Cannot infer the type of variable '{targetName}'. Declare an initial value under 'vars' in story.talewright.yaml.",
                 effect.Target.Start);
+        }
+
+        if (effect.Kind == ReferenceNamespace.Faction)
+        {
+            var faction = new FactionId(targetName);
+            if (!_symbols.World.Factions.ContainsKey(faction))
+            {
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{targetName}'.", effect.Target.Start);
+            }
+
+            if (effect.Member is not { } member || Text(member) != ExpressionVocabulary.Standing)
+            {
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                    $"Faction changes must target '{FactionReference(targetName, ExpressionVocabulary.Standing)}'.",
+                    effect.Member?.Start ?? effect.Target.Start);
+            }
         }
 
         var op = effect.Operator;
@@ -473,6 +532,12 @@ internal sealed class ExpressionBinder
 
         if (amount.Type != ExprType.Number)
         {
+            if (amount is FactionNameRef faction)
+            {
+                Fail(CompilerDiagnosticCodes.TypeMismatch,
+                    FactionValueHint(faction, ExpressionVocabulary.Standing), effect.Amount.Span.Start);
+            }
+
             Fail(CompilerDiagnosticCodes.TypeMismatch, effect.Kind == ReferenceNamespace.Variable
                 ? $"Variable '{targetName}' has a fixed integer type and needs a number, not {Describe(amount.Type)}."
                 : "Only numbers can be assigned to stats or faction standings.", effect.Amount.Span.Start);
@@ -480,14 +545,23 @@ internal sealed class ExpressionBinder
 
         return effect.Kind switch
         {
-            ReferenceNamespace.Faction => _symbols.World.Factions.ContainsKey(new FactionId(targetName))
-                ? new ChangeStanding(new FactionId(targetName), op, amount)
-                : Fail<Effect>(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{targetName}'.", effect.Target.Start),
+            ReferenceNamespace.Faction => new ChangeStanding(new FactionId(targetName), op, amount),
             ReferenceNamespace.Variable => new ChangeVariable(variable, op, amount),
             ReferenceNamespace.Flag => Fail<Effect>(CompilerDiagnosticCodes.MalformedEffect, "Use 'set flag:x' or 'clear flag:x' for flags.", effect.Namespace.Start),
             _ => new ChangeStat(Character(effect.Namespace), Stat(effect.Target), op, amount),
         };
     }
+
+    private static string FactionValueHint(FactionNameRef faction, string property)
+    {
+        var value = FactionReference(faction.Faction.Value, property);
+        return property == ExpressionVocabulary.Tier
+            ? $"Faction names are text. Use '{value}' to compare the faction's standing tier."
+            : $"Faction names are text. Use '{value}' for the numeric standing.";
+    }
+
+    private static string FactionReference(string faction, string property) =>
+        $"{ExpressionVocabulary.FactionPrefix}{faction}{ExpressionVocabulary.Separator}{property}";
 
     private EntityId Character(ExpressionSpan span)
     {

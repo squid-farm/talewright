@@ -570,6 +570,13 @@ internal sealed class ExpressionSyntaxParser
 
         Expect(TokenKind.Colon, "':' (effects look like 'player:hp -= 3', 'set flag:x', 'give player rope')");
         var target = Expect(TokenKind.Identifier, "a name");
+        Token? member = null;
+        if (first.Is(ExpressionVocabulary.Faction) && Peek.Kind == TokenKind.Colon)
+        {
+            Next();
+            member = Expect(TokenKind.Identifier, "a faction property");
+        }
+
         var op = Next();
         AssignOp? assignment = op.Kind switch
         {
@@ -585,7 +592,7 @@ internal sealed class ExpressionSyntaxParser
         }
 
         var amount = ParseSum();
-        return new AssignmentEffectSyntax(ExpressionVocabulary.Namespace(first.Text), Span(first), Span(target), kind, amount,
-            new(first.Offset, amount.Span.End - first.Offset));
+        return new AssignmentEffectSyntax(ExpressionVocabulary.Namespace(first.Text), Span(first), Span(target),
+            member is null ? null : Span(member.Value), kind, amount, new(first.Offset, amount.Span.End - first.Offset));
     }
 }

@@ -212,7 +212,7 @@ they are; you do not need to change them to write or publish a story.
 > no-code authoring path.
 
 ```tale
-* [Shove the door] { faction:explorers-guild -= 10 } -> hall
+* [Shove the door] { faction:explorers-guild:standing -= 10 } -> hall
 {if faction:explorers-guild:tier >= friendly}The guild speaks well of you.{/if}
 ```
 
@@ -268,7 +268,7 @@ The camp hums{if var:supplies > 0}, crates stacked by the fire{/if}.
 Or as a block, which can also contain choices, effects and `->` lines:
 
 ```tale
-{if faction:explorers-guild >= friendly}
+{if faction:explorers-guild:tier >= friendly}
 > guide: I'll do what I can.
 {else}
 > guide: Between us, the guild expects you to fail.
@@ -309,7 +309,7 @@ triggers can change what later ones do. Don't split the list between files.
 ```yaml
 triggers:
   - id: guild-turns
-    when: faction:explorers-guild <= hostile
+    when: faction:explorers-guild:tier <= hostile
     do: set flag:guild-hostile
     once: true
 ```

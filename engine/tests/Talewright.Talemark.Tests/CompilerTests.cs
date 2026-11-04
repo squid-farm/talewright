@@ -52,7 +52,7 @@ public class CompilerTests
         vars: { torches: 1 }
         triggers:
           - id: outcast
-            when: faction:guild <= hostile
+            when: faction:guild:tier <= hostile
             do: set flag:outcast
             once: true
         """;
@@ -292,7 +292,7 @@ public class CompilerTests
             === a
             You {if player has rope}carry a rope{else}carry nothing{/if}.
 
-            {if faction:guild >= friendly}
+            {if faction:guild:tier >= friendly}
             The guild waves.
             {else}
             The guild ignores you.
@@ -316,7 +316,7 @@ public class CompilerTests
             === a
             Pick.
             * [Read the glyphs] (requires: player:int >= 12) -> b
-            * [Shove {player:first-name}] { faction:guild -= 5; give player relic; set flag:shoved } -> b
+            * [Shove {player:first-name}] { faction:guild:standing -= 5; give player relic; set flag:shoved } -> b
             * [Leave] -> END
             === b
             {if flag:shoved}Shoved.{/if}
@@ -433,11 +433,47 @@ public class CompilerTests
         Error("=== a\n~ var:torches = \"three\"\n-> END", "TW2003");
     }
 
+    [Theory]
+    [InlineData("=== a\n{if faction:guild >= 5}x{/if}\n-> END", "faction:guild:standing")]
+    [InlineData("=== a\n{if faction:guild >= friendly}x{/if}\n-> END", "faction:guild:tier")]
+    [InlineData("=== a\n~ var:torches = faction:guild\n-> END", "faction:guild:standing")]
+    [InlineData("=== a\n~ var:torches = faction:guild + 1\n-> END", "faction:guild:standing")]
+    public void Bare_faction_names_in_numeric_contexts_suggest_the_required_property(string tale, string replacement)
+    {
+        var error = Error(tale, "TW2003");
+
+        Assert.Contains(replacement, error.Message);
+    }
+
+    [Fact]
+    public void Faction_effect_targets_require_the_standing_property()
+    {
+        var error = Error("=== a\n~ faction:guild += 1\n-> END", "TW2001");
+
+        Assert.Contains("faction:guild:standing", error.Message);
+        Assert.True(Ok("=== a\n~ faction:guild:standing += 1\n-> END").Scenes.Count > 0);
+    }
+
+    [Fact]
+    public void Trigger_conditions_suggest_explicit_standing_when_a_number_is_expected()
+    {
+        var yaml = Yaml.Replace("when: faction:guild:tier <= hostile", "when: faction:guild > 1",
+            StringComparison.Ordinal);
+        var error = Error("=== a\n-> END", "TW2003", yaml);
+
+        Assert.Contains("faction:guild:standing", error.Message);
+
+        var explicitStandingYaml = Yaml.Replace("when: faction:guild:tier <= hostile",
+            "when: faction:guild:standing > 1", StringComparison.Ordinal);
+        Assert.True(Ok("=== a\n-> END", explicitStandingYaml).Scenes.Count > 0);
+    }
+
     [Fact]
     public void Reports_unknown_references()
     {
         Assert.Contains("Unknown property 'strenght'", Error("=== a\n{player:strenght}\n-> END", "TW2001").Message);
         Error("=== a\n{faction:nobody}\n-> END", "TW2001");
+        Assert.Contains("item:rope:name", Error("=== a\n{item:rope:color}\n-> END", "TW2001").Message);
         Error("=== a\n{if player has sword}x{/if}\n-> END", "TW2001");
         Error("=== a\n> ghost: boo\n-> END", "TW2001");
         Error("=== a\n-> nowhere", "TW2002");
@@ -467,6 +503,19 @@ public class CompilerTests
             """, yaml);
         Assert.Equal("camp.arrival", story.Scenes.Single().Id.Value);
         Assert.Equal("Guild name", story.World.Factions[new Talewright.Core.Identity.FactionId("guild.name")].Name);
+    }
+
+    [Fact]
+    public void Bare_faction_and_explicit_item_name_references_render_the_declared_names()
+    {
+        var story = Ok("""
+            === a
+            {faction:guild} / {faction:guild:name} / {faction:guild:standing} / {item:rope} / {item:rope:name}
+            -> END
+            """);
+
+        Assert.Equal("Explorers' Guild / Explorers' Guild / 0 / coil of rope / coil of rope",
+            Render(story, story.GetScene(new SceneId("a"))));
     }
 
     [Theory]

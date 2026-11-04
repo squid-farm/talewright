@@ -29,7 +29,7 @@ public sealed class ModularConfigurationTests
             do: var:count += 1
             once: true
           - id: second
-            when: faction:guild > 0
+            when: faction:guild:standing > 0
             do: set flag:done
             once: true
         """;

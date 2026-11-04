@@ -57,6 +57,7 @@ public enum AuthoringTokenKind
     FirstName,
     LastName,
     Name,
+    Standing,
     Tier,
     Pronoun,
     Subject,

@@ -19,7 +19,7 @@ public class StorySessionTests
         manifest.Faction("guild", "Explorers' Guild");
         manifest.Item("relic", "Relic of Ysh", new Dictionary<string, int> { ["wis"] = 2 });
         manifest.Item("rope", "coil of rope");
-        manifest.Trigger("outcast", "faction:guild <= unfriendly", EffectFaker.Set(new TaleFlagRef("outcast")), once: true);
+        manifest.Trigger("outcast", "faction:guild:tier <= unfriendly", EffectFaker.Set(new TaleFlagRef("outcast")), once: true);
         return manifest.Build();
     }
 
@@ -82,7 +82,7 @@ public class StorySessionTests
     {
         var session = new StorySession(Compile("""
             === camp
-            * [Take the relic] { give player relic; faction:guild -= 20 } -> cursed
+            * [Take the relic] { give player relic; faction:guild:standing -= 20 } -> cursed
             * [Leave it] -> safe
             === cursed
             The relic hums. Outcast: {if flag:outcast}yes{else}no{/if}.

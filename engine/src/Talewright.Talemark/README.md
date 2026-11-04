@@ -217,4 +217,4 @@ the [error code reference](../../../docs/reference/diagnostics.md). To find wher
   scene fallback.
 - A line starting with `*` is a choice only if followed by a space, tab or `[`, so `*emphasis*` at the start of a
   paragraph is still prose.
-- Comparing a faction standing with a tier name (`faction:explorers-guild >= friendly`) compares tier order.
+- Compare a faction standing with a number through `faction:explorers-guild:standing`; compare its tier with `faction:explorers-guild:tier`.

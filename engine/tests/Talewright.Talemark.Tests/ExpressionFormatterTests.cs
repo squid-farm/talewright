@@ -50,6 +50,7 @@ public class ExpressionFormatterTests
     [InlineData("friendly", "friendly")]
     [InlineData("player:dex", "player:dex")]
     [InlineData("faction:river", "faction:river")]
+    [InlineData("faction:river:standing", "faction:river:standing")]
     [InlineData("faction:river:tier", "faction:river:tier")]
     [InlineData("flag:ready", "flag:ready")]
     [InlineData("var:coins", "var:coins")]
@@ -63,19 +64,19 @@ public class ExpressionFormatterTests
     [InlineData("player:pronoun:possessive-pronoun:determiner", "player:pronoun:possessive-pronoun:determiner")]
     [InlineData("player:pronoun:possessive-pronoun:independent", "player:pronoun:possessive-pronoun:independent")]
     [InlineData("player:pronoun:reflexive", "player:pronoun:reflexive")]
-    [InlineData("faction:river:name", "faction:river:name")]
+    [InlineData("faction:river:name", "faction:river")]
     [InlineData("item:lantern", "item:lantern")]
     [InlineData("player has lantern", "player has lantern")]
     [InlineData("visited( a )", "visited(a)")]
     [InlineData("@CanGo", "@CanGo")]
     [InlineData("@_Can.Open-door", "@_Can.Open-door")]
-    [InlineData("faction:river >= friendly", "faction:river:tier >= friendly")]
-    [InlineData("friendly <= faction:river", "friendly <= faction:river:tier")]
+    [InlineData("faction:river:tier >= friendly", "faction:river:tier >= friendly")]
+    [InlineData("friendly <= faction:river:tier", "friendly <= faction:river:tier")]
     [InlineData("faction:river:tier == faction:river:tier", "faction:river:tier == faction:river:tier")]
-    [InlineData("faction:river:name == \"River Guild\"", "faction:river:name == \"River Guild\"")]
+    [InlineData("faction:river:name == \"River Guild\"", "faction:river == \"River Guild\"")]
     [InlineData("var:weather != \"sun\"", "var:weather != \"sun\"")]
     [InlineData("player:pronoun:object == \"her\"", "player:pronoun:object == \"her\"")]
-    [InlineData("player has lantern and faction:river >= 3", "player has lantern and faction:river >= 3")]
+    [InlineData("player has lantern and faction:river:standing >= 3", "player has lantern and faction:river:standing >= 3")]
     [InlineData("not (player:dex > 1)", "not player:dex > 1")]
     [InlineData("(not true) == false", "(not true) == false")]
     [InlineData("true == (not false)", "true == (not false)")]
@@ -183,7 +184,8 @@ public class ExpressionFormatterTests
     {
         string[] representatives =
         [
-            "1", "true", "\"text\"", "friendly", "player:dex", "faction:river", "faction:river:tier",
+            "1", "true", "\"text\"", "friendly", "player:dex", "faction:river", "faction:river:standing",
+            "faction:river:tier",
             "flag:ready", "var:coins", "var:weather", "player:name", "player:pronoun", "faction:river:name",
             "item:lantern", "player has lantern", "visited(a)", "@CanGo", "not true", "1 + 2",
         ];

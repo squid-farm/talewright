@@ -152,7 +152,7 @@ public sealed class StoryDivertConditionsTests
             * -> END
             === destination
             @tags offer
-            @requires player:dex >= 10 and faction:river >= 1 and faction:river:tier == faction:river:tier and flag:ready and var:coins > 0 and var:weather == "rain" and player:first-name == "Mara" and player:pronoun:object == "her" and faction:river:name == "River Guild" and item:lantern == "Lantern" and player has lantern and visited(destination) and @CanGo and flag:ready
+            @requires player:dex >= 10 and faction:river:standing >= 1 and faction:river:tier == faction:river:tier and flag:ready and var:coins > 0 and var:weather == "rain" and player:first-name == "Mara" and player:pronoun:object == "her" and faction:river == "River Guild" and faction:river:name == "River Guild" and item:lantern == "Lantern" and item:lantern:name == "Lantern" and player has lantern and visited(destination) and @CanGo and flag:ready
             @once
             -> END
             """);
@@ -162,14 +162,14 @@ public sealed class StoryDivertConditionsTests
         Assert.Equal(
             [
                 (StoryStateReadKind.Stat, "player:dex"),
-                (StoryStateReadKind.Standing, "faction:river"),
+                (StoryStateReadKind.Standing, "faction:river:standing"),
                 (StoryStateReadKind.StandingTier, "faction:river:tier"),
                 (StoryStateReadKind.Flag, "flag:ready"),
                 (StoryStateReadKind.NumberVariable, "var:coins"),
                 (StoryStateReadKind.TextVariable, "var:weather"),
                 (StoryStateReadKind.CharacterName, "player:first-name"),
                 (StoryStateReadKind.CharacterPronoun, "player:pronoun:object"),
-                (StoryStateReadKind.FactionName, "faction:river:name"),
+                (StoryStateReadKind.FactionName, "faction:river"),
                 (StoryStateReadKind.ItemName, "item:lantern"),
                 (StoryStateReadKind.ItemsHeld, "player has lantern"),
                 (StoryStateReadKind.VisitedScene, "visited(destination)"),

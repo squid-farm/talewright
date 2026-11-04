@@ -16,6 +16,7 @@
   {"owner":"expression","member":"Name","spelling":"name","line":"{player:name}","scope":"variable.other.member.tale","reference":"player:name"},
   {"owner":"expression","member":"Pronoun","spelling":"pronoun","line":"{player:pronoun}","scope":"variable.other.member.tale","reference":"player:pronoun"},
   {"owner":"expression","member":"Tier","spelling":"tier","line":"{faction:guild:tier}","scope":"variable.other.member.tale","reference":"faction:<id>:tier"},
+  {"owner":"expression","member":"Standing","spelling":"standing","line":"{faction:guild:standing}","scope":"variable.other.member.tale","reference":"faction:<id>:standing"},
   {"owner":"expression","member":"SubjectForm","spelling":"subject","line":"{player:pronoun:subject}","scope":"variable.other.member.tale","reference":"player:pronoun:subject"},
   {"owner":"expression","member":"ObjectForm","spelling":"object","line":"{player:pronoun:object}","scope":"variable.other.member.tale","reference":"player:pronoun:object"},
   {"owner":"expression","member":"ReflexiveForm","spelling":"reflexive","line":"{player:pronoun:reflexive}","scope":"variable.other.member.tale","reference":"player:pronoun:reflexive"},

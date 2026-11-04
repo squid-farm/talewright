@@ -40,6 +40,7 @@ internal static class ExpressionVocabulary
     internal const string Name = "name";
     internal const string Pronoun = "pronoun";
     internal const string Tier = "tier";
+    internal const string Standing = "standing";
     internal const string SubjectForm = "subject";
     internal const string ObjectForm = "object";
     internal const string ReflexiveForm = "reflexive";
@@ -106,7 +107,8 @@ internal static class ExpressionVocabulary
     internal static readonly string ImageCall = Image + OpenParen;
 
     internal static readonly ImmutableArray<string> CharacterProperties = [FirstName, LastName, Name, Pronoun];
-    internal static readonly ImmutableArray<string> FactionProperties = [Name, Tier];
+    internal static readonly ImmutableArray<string> FactionProperties = [Name, Standing, Tier];
+    internal static readonly ImmutableArray<string> ItemProperties = [Name];
     internal static readonly ImmutableArray<string> PronounProperties = [SubjectForm, ObjectForm, PossessivePronoun, ReflexiveForm];
     internal static readonly ImmutableArray<string> PossessiveProperties = [Determiner, Independent];
     internal static readonly ImmutableArray<string> EffectVerbs = [Set, Clear, Give, Take];

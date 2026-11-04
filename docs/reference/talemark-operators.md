@@ -22,7 +22,7 @@ naming lint diagnostics TWL001 and TWL002 are warnings about that style.
 - Valid: `weapon.knife`, `camp.arrival`, `_guide`, `north-gate`, `act.2`.
 - Invalid: `2doors`, `camp..arrival`, `north.-gate`, `door-`, `café`.
 - `weapon.knife` is one name, not a read of `knife` on `weapon`.
-- Use `:` for access: `faction:explorers-guild:name`, `player:hp`.
+- Use `:` for access: `faction:explorers-guild:standing`, `player:hp`.
 - Use spaces around subtraction: `var:coins - 1`. `var:coins-1` reads the name `coins-1`.
   A minus at the start of a numeric operand means negation: `-3`.
 
@@ -198,7 +198,7 @@ using the quoted-text rules when it is inside syntax.
 
 | Operator | Meaning, context and arguments | Binding | Canonical example | Diagnostics |
 |---|---|---|---|---|
-| `:` | Access a named value/property in expressions and substitutions; also select an effect target. Repeats for nested access. Never use `.` instead. | 1 | `{faction:explorers-guild:name}` | TW2001 unknown name/property or old spelling; TW2004 undeclared flag/variable. |
+| `:` | Access a named value/property in expressions and substitutions; also select an effect target. Repeats for nested access. Never use `.` instead. | 1 | `{faction:explorers-guild:standing}` | TW2001 unknown name/property or old spelling; TW2004 undeclared flag/variable. |
 | `.` | Group words within one identifier, never access a property. | Name | `{item:weapon.knife}` | Invalid identifiers produce TW1001 in expressions, TW1008 for scenes, TW4003 in YAML. |
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
 | `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value. |
@@ -210,14 +210,14 @@ using the quoted-text rules when it is inside syntax.
 | `*` `/` | Integer multiplication and division; two numbers. A slash also appears in `{/if}` and `//` comments, with structural meanings. | 3 | `{var:coins / 2}` | TW2003 non-numbers; TW1001 missing operand. |
 | `+` `-` | Integer addition and subtraction; two numbers. Space subtraction away from names. | 4 | `{var:coins - 1}` | TW2003 non-numbers; TW1001 missing operand; TW2004 if an unintended hyphenated variable is undeclared. |
 | `==` `!=` | Equality/inequality of matching types (number, boolean, text or tier). | 5 | `{if item:rope == "Rope"}Found it.{/if}` | TW2003 mismatched types; TW1001 malformed expression. |
-| `<` `<=` `>` `>=` | Ordered comparison of numbers or reputation tiers. | 5 | `{if faction:guild >= friendly}Welcome.{/if}` | TW2003 mismatched/unordered types; TW1001 malformed expression. |
+| `<` `<=` `>` `>=` | Ordered comparison of numbers or reputation tiers. | 5 | `{if faction:guild:tier >= friendly}Welcome.{/if}` | TW2003 mismatched/unordered types; faction values suggest `:standing` or `:tier`; TW1001 malformed expression. |
 | `not` | Negate a boolean condition. | 6 | `{if not visited(camp)}New here.{/if}` | TW2003 non-boolean; TW2002 unknown scene. |
 | `and` | Both boolean conditions must hold. | 7 | `{if player:hp > 0 and player has rope}Climb.{/if}` | TW2003 non-booleans. |
 | `or` | At least one boolean condition must hold. | 8 | `{if flag:ready or player:hp > 0}Go.{/if}` | TW2003 non-booleans; TW2004 undeclared flag. |
 | `has` | Inventory predicate: character ID on the left, item ID on the right. Item counts live only in inventory, not variables. | 1 | `{if player has rope}Equipped.{/if}` | TW2001 unknown character/item. |
 | `visited(...)` | Boolean predicate with one bare scene ID. | 1 | `{if visited(camp)}Back again.{/if}` | TW1001 malformed call; TW2002 unknown scene. |
 | `@` in expressions | Named boolean predicate registered by a C# story project; no arguments. Distinct from line metadata. | 1 | `{if @CanPickLock}Try the lock.{/if}` | TW2005 unregistered predicate. |
-| `=` `+=` `-=` | Assign, add or subtract a number in an effect targeting a stat, variable or faction standing. Text variables support `=` only and require a text expression. Not comparison. | Structural | `~ player:hp -= 3`; `~ var:weather = "stormy"` | TW1003 malformed effect; TW2003 incompatible types or numeric operations on text; name errors. |
+| `=` `+=` `-=` | Assign, add or subtract a number in an effect targeting a stat, variable or faction standing. Text variables support `=` only and require a text expression. Not comparison. | Structural | `~ player:hp -= 3`; `~ faction:guild:standing += 2`; `~ var:weather = "stormy"` | TW1003 malformed effect; TW2003 incompatible types or numeric operations on text; a faction target needs `:standing`; name errors. |
 | `;` | Separate effects inside an effect list, not prose sentences or arguments. | Structural | `* [Pay] { var:coins -= 1; set flag:paid } -> hall` | TW1003 malformed effect; TW1001 unexpected trailing text. |
 
 Effects also use `set flag:id`, `clear flag:id`, `give character item [number-expression]` and
