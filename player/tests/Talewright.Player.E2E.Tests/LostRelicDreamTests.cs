@@ -125,7 +125,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
         await Observe(new(null, "10"));
         await Choose("Promise to carry her message");
         await Choose("Answer the Spiral");
-        await Observe(new(null, "Xe has a question"));
+        await Observe(new(null, "Xe\nhas a question"));
         await Observe(new(null, "living voice and the written word agree"));
         await Choose("Accept the spiral mark");
         await Observe(new(null, "Glyph marks held: 1"));
@@ -140,7 +140,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
         await Observe(new(null, "They still put your name in the ledger"));
         await Choose("Promise the guild an honest account");
         await Choose("Ask the Hands for passage");
-        await Observe(new(null, "The Hands have no owner. They offer the final mark."));
+        await Observe(new(null, "The Hands have no owner.\nThey offer the final mark."));
         await Choose("Accept the hand mark and the price");
         await Observe(new(null, "Glyph marks held: 3"));
         await Choose("Approach the Sleeper");

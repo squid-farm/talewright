@@ -65,12 +65,12 @@ public sealed class NativeImageTests
         await driver.StartAsync(files.Root);
         await WaitFor(driver, snapshot => snapshot.Content.Contains("Before"));
         foreach (var name in new[] { "A camp", "A pixel", "Strong camp", "Emphasized camp",
-                     "Code pixel", "Conditional camp" })
+                     "WebP pixel", "Conditional camp" })
         {
             await driver.ScrollToImageAsync(name);
             await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
                 node.Role == "image" && node.Name == name &&
-                (name is "A pixel" or "Code pixel"
+                (name is "A pixel" or "WebP pixel"
                     ? node.Bounds.Width is > 0 and <= 2 && node.Bounds.Height is > 0 and <= 2
                     : node.Bounds.Width > 100 && node.Bounds.Height > 100)));
         }

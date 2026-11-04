@@ -58,7 +58,7 @@ public class ItemGrammarTests
             """);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
-        Assert.Equal("Those pants look expensive. Some ARMOR/These pants/are/HANDCUFFS'",
+        Assert.Equal("Those pants look expensive.\nSome ARMOR/These pants/are/HANDCUFFS'",
             new TemplateRenderer().Render(CompilerTests.Templates(story.GetScene(new("start"))), GameState.CreateInitial(story.World, 1)).ToPlainText());
         var plural = Assert.Single(story.World.Items.Values, item => item.Id == new ItemId("pants"));
         Assert.Equal(GrammaticalNumber.Plural, plural.NameAgreement);

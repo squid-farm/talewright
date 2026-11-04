@@ -193,7 +193,7 @@ deployment acceptance under #179 stay separate.
 | `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are warnings (TW4006) so typos are noticed. |
 | `Parsing/TaleSyntaxParser.cs`, `Parsing/TaleSyntax.cs` | Symbol-independent file/scene syntax: line splitting, scene ownership and line kinds with scene-relative spans. |
 | `Parsing/TaleParser.cs` | Binds file syntax to scenes and steps. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
-| `Parsing/InlineParser.cs` | Prose → `TemplateInline`s. Directly tokenizes reader-text escapes, inline constructs, code spans and formatting, then folds inline conditions; `SourceText` maps offsets back to line/column. |
+| `Parsing/InlineParser.cs` | Prose → `TemplateInline`s. Directly tokenizes reader-text escapes, inline constructs, line breaks and formatting, then folds inline conditions; `SourceText` maps offsets back to line/column. |
 | `Parsing/ExpressionParser.cs` | Recursive descent with type checking: conditions (`player:str >= 12 and player has rope`), numbers, substitutions (`player:first-name#possessive`), effects (`player:hp -= 2`). |
 | `Parsing/Lexer.cs` | Tokens for the expression parser. |
 | `Parsing/StorySymbols.cs` | Declared names (stats, characters, items, factions, flags, vars, scenes) for resolution. |

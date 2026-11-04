@@ -103,16 +103,12 @@ internal static class InlineParser
     private enum TokenKind
     {
         Text,
-        SoftBreak,
-        HardBreak,
+        LineBreak,
         Construct,
         LegacyImage,
         FormatDelimiter,
         FormatOpen,
         FormatClose,
-        CodeDelimiter,
-        CodeOpen,
-        CodeClose,
     }
 
     private sealed class Token(TokenKind kind, int start, int length, string? text = null)
@@ -129,10 +125,6 @@ internal static class InlineParser
         public TextStyle Style { get; set; }
         public bool CanOpen { get; set; }
         public bool CanClose { get; set; }
-        public bool InCode { get; set; }
-        public int NextRun { get; set; } = -1;
-        public int Mate { get; set; } = -1;
-        public int TrimOffset { get; set; } = -1;
     }
 
     private abstract record Piece;
@@ -183,8 +175,6 @@ internal static class InlineParser
     {
         public TextStyle Style { get; } = style;
         public List<Piece> Pieces { get; } = [];
-        public int TrimStart { get; set; } = -1;
-        public int TrimEnd { get; set; } = -1;
     }
 
     internal static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
@@ -206,7 +196,6 @@ internal static class InlineParser
             if (pair.Kind == DelimiterKind.Brace) bracePairs.Add(pair);
         }
         var tokens = Tokenize(context, text, bracePairs);
-        PairCodeSpans(context, text, tokens);
         PairFormatting(context, text, tokens);
         var inlines = BuildTemplate(context, text, tokens);
         cancellationToken.ThrowIfCancellationRequested();
@@ -258,23 +247,27 @@ internal static class InlineParser
             }
 
             var current = text[index];
-            if (current == TextVocabulary.EscapeMark && index + 1 < text.Length)
+            if (current == TextVocabulary.EscapeMark)
             {
-                var next = text[index + 1];
-                if (DelimiterScanner.IsReaderTextEscape(next))
+                if (index + 1 < text.Length)
                 {
-                    AppendText(next, index, 2);
-                    index += 2;
-                    context.CheckCharacters(2);
-                    continue;
-                }
+                    var next = text[index + 1];
+                    if (DelimiterScanner.IsReaderTextEscape(next))
+                    {
+                        AppendText(next, index, 2);
+                        index += 2;
+                        context.CheckCharacters(2);
+                        continue;
+                    }
 
-                if (next == '\n')
+                    if (next == '\n')
+                    {
+                        ReportTrailingBackslash(context, index);
+                    }
+                }
+                else
                 {
-                    AddToken(new(TokenKind.HardBreak, index, 2));
-                    index += 2;
-                    context.CheckCharacters(2);
-                    continue;
+                    ReportTrailingBackslash(context, index);
                 }
 
                 AppendText(current, index, 1);
@@ -329,7 +322,7 @@ internal static class InlineParser
 
             if (current == '\n')
             {
-                AddToken(new(TokenKind.SoftBreak, index, 1));
+                AddToken(new(TokenKind.LineBreak, index, 1));
                 index++;
                 context.CheckCharacters(1);
                 continue;
@@ -365,23 +358,6 @@ internal static class InlineParser
                 continue;
             }
 
-            if (current == SceneVocabulary.CodeMarker)
-            {
-                var end = index + 1;
-                while (end < text.Length && text[end] == SceneVocabulary.CodeMarker)
-                {
-                    end++;
-                    context.CheckCharacters(1);
-                }
-                AddToken(new(TokenKind.CodeDelimiter, index, end - index)
-                {
-                    RunLength = end - index,
-                });
-                context.CheckCharacters(1);
-                index = end;
-                continue;
-            }
-
             AppendText(current, index, 1);
             index++;
             context.CheckCharacters(1);
@@ -403,6 +379,7 @@ internal static class InlineParser
                     $"{ExpressionVocabulary.CloseParen}{SceneVocabulary.InlineClose}. Write the description as text.",
                     context.Source.Locate(open));
             }
+
             else
             {
                 ImageSyntax.Parse(context.Source, start, text.Length, false, context.Diagnostics,
@@ -447,6 +424,11 @@ internal static class InlineParser
             $"'{TextVocabulary.EscapeMark}{SceneVocabulary.InlineOpen}' for a literal brace.",
             context.Source.Locate(open));
     }
+
+    private static void ReportTrailingBackslash(Context context, int offset) =>
+        context.Diagnostics.Error(CompilerDiagnosticCodes.TrailingReaderTextBackslash,
+            $"Line breaks now render as written; remove the trailing '{TextVocabulary.EscapeMark}'.",
+            context.Source.Locate(offset));
 
     private static Piece? ParseConstruct(Context context, string text, int open, int close)
     {
@@ -566,60 +548,6 @@ internal static class InlineParser
         return true;
     }
 
-    private static void PairCodeSpans(Context context, string text, List<Token> tokens)
-    {
-        var nextOfLength = new Dictionary<int, int>();
-        for (var index = tokens.Count - 1; index >= 0; index--)
-        {
-            context.Check();
-            var token = tokens[index];
-            if (token.Kind != TokenKind.CodeDelimiter) continue;
-            if (nextOfLength.TryGetValue(token.RunLength, out var next))
-                token.NextRun = next;
-            nextOfLength[token.RunLength] = index;
-        }
-
-        var activeClose = -1;
-        for (var index = 0; index < tokens.Count; index++)
-        {
-            context.Check();
-            var token = tokens[index];
-            if (activeClose >= 0)
-            {
-                token.InCode = true;
-                if (index == activeClose)
-                {
-                    token.Kind = TokenKind.CodeClose;
-                    activeClose = -1;
-                }
-                else if (token.Kind == TokenKind.CodeDelimiter)
-                {
-                    token.Kind = TokenKind.Text;
-                    token.Text = text.Substring(token.Start, token.Length);
-                }
-
-                continue;
-            }
-
-            if (token.Kind != TokenKind.CodeDelimiter || token.NextRun < 0) continue;
-            var close = tokens[token.NextRun];
-            token.Kind = TokenKind.CodeOpen;
-            token.Mate = token.NextRun;
-            close.Kind = TokenKind.CodeClose;
-            close.Mate = index;
-            activeClose = token.NextRun;
-
-            var contentStart = token.End;
-            var contentLength = close.Start - contentStart;
-            if (contentLength > 1 && text[contentStart] == ' ' && text[close.Start - 1] == ' ' &&
-                text.AsSpan(contentStart + 1, contentLength - 2).ContainsAnyExcept(' '))
-            {
-                token.TrimOffset = contentStart;
-                close.TrimOffset = close.Start - 1;
-            }
-        }
-    }
-
     private static void PairFormatting(Context context, string text, List<Token> tokens)
     {
         var openers = new List<(int Token, int PreviousOfKind)>();
@@ -629,7 +557,7 @@ internal static class InlineParser
         {
             context.Check();
             var token = tokens[index];
-            if (token.Kind != TokenKind.FormatDelimiter || token.InCode) continue;
+            if (token.Kind != TokenKind.FormatDelimiter) continue;
             var delimiter = text[token.Start];
             var kind = (delimiter == SceneVocabulary.EmphasisMarker ? 2 : 0) + token.RunLength - 1;
             token.CanOpen = !IsWordLikeBefore(tokens, index) && IsNonWhitespaceNonBoundaryAfter(tokens, index);
@@ -643,9 +571,7 @@ internal static class InlineParser
                 openers.RemoveAt(openers.Count - 1);
                 topOfKind[kind] = opener.PreviousOfKind;
                 tokens[opener.Token].Kind = TokenKind.FormatOpen;
-                tokens[opener.Token].Mate = index;
                 token.Kind = TokenKind.FormatClose;
-                token.Mate = opener.Token;
                 continue;
             }
 
@@ -687,7 +613,7 @@ internal static class InlineParser
         {
             TokenKind.Text => EndsWithWordCharacter(previous.Text!),
             TokenKind.Construct => previous.Piece is InlinePiece,
-            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            TokenKind.LegacyImage => true,
             _ => false,
         };
     }
@@ -700,7 +626,7 @@ internal static class InlineParser
         {
             TokenKind.Text => StartsWithWordCharacter(next.Text!),
             TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
-            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose => true,
+            TokenKind.LegacyImage => true,
             _ => false,
         };
     }
@@ -713,8 +639,7 @@ internal static class InlineParser
         {
             TokenKind.Text => EndsWithNonWhitespaceCharacter(previous.Text!),
             TokenKind.Construct => previous.Piece is InlinePiece,
-            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose or
-                TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
+            TokenKind.LegacyImage or TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
     }
@@ -727,8 +652,7 @@ internal static class InlineParser
         {
             TokenKind.Text => StartsWithNonWhitespaceCharacter(next.Text!),
             TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
-            TokenKind.LegacyImage or TokenKind.CodeOpen or TokenKind.CodeClose or
-                TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
+            TokenKind.LegacyImage or TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
     }
@@ -791,51 +715,32 @@ internal static class InlineParser
             switch (token.Kind)
             {
                 case TokenKind.Text:
-                    AddText(token, Current(), frames);
+                    AddText(token, Current());
                     break;
-                case TokenKind.SoftBreak:
-                    Current().Add(new InlinePiece(new TextTemplate(" ")));
-                    break;
-                case TokenKind.HardBreak:
-                    Current().Add(new InlinePiece(frames.TryPeek(out var frame) && frame.Style == TextStyle.Code
-                        ? new TextTemplate(" ")
-                        : new LineBreakTemplate()));
+                case TokenKind.LineBreak:
+                    Current().Add(new InlinePiece(new LineBreakTemplate()));
                     break;
                 case TokenKind.Construct:
                     if (token.Piece is { } construct) Current().Add(construct);
                     break;
                 case TokenKind.LegacyImage:
-                    if (!frames.TryPeek(out var activeFrame) || activeFrame.Style != TextStyle.Code)
-                    {
-                        var replacement =
-                            $"{SceneVocabulary.InlineOpen}{ExpressionVocabulary.ImageCall}" +
-                            $"{ImageSyntax.Quote(token.LegacyPath!)}{ExpressionVocabulary.ArgumentSeparator} " +
-                            $"{ImageSyntax.Quote(token.LegacyAlt!)}{ExpressionVocabulary.CloseParen}" +
-                            SceneVocabulary.InlineClose;
-                        context.Diagnostics.Error(CompilerDiagnosticCodes.LegacyImageSyntax,
-                            $"Markdown images are no longer supported. Use {replacement} instead.",
-                            context.Source.Locate(token.Start));
-                    }
+                    var replacement =
+                        $"{SceneVocabulary.InlineOpen}{ExpressionVocabulary.ImageCall}" +
+                        $"{ImageSyntax.Quote(token.LegacyPath!)}{ExpressionVocabulary.ArgumentSeparator} " +
+                        $"{ImageSyntax.Quote(token.LegacyAlt!)}{ExpressionVocabulary.CloseParen}" +
+                        SceneVocabulary.InlineClose;
+                    context.Diagnostics.Error(CompilerDiagnosticCodes.LegacyImageSyntax,
+                        $"Markdown images are no longer supported. Use {replacement} instead.",
+                        context.Source.Locate(token.Start));
                     Current().Add(new InlinePiece(new TextTemplate(token.Text!)));
                     break;
                 case TokenKind.FormatOpen:
                     frames.Push(new FormattingFrame(token.Style));
                     break;
-                case TokenKind.CodeOpen:
-                    frames.Push(new FormattingFrame(TextStyle.Code)
-                    {
-                        TrimStart = token.TrimOffset,
-                        TrimEnd = tokens[token.Mate].TrimOffset,
-                    });
-                    break;
                 case TokenKind.FormatClose:
-                case TokenKind.CodeClose:
                     CloseFrame();
                     break;
                 case TokenKind.FormatDelimiter:
-                    Current().Add(new InlinePiece(new TextTemplate(text.Substring(token.Start, token.Length))));
-                    break;
-                case TokenKind.CodeDelimiter:
                     Current().Add(new InlinePiece(new TextTemplate(text.Substring(token.Start, token.Length))));
                     break;
             }
@@ -844,15 +749,9 @@ internal static class InlineParser
         return Fold(root, context);
     }
 
-    private static void AddText(Token token, List<Piece> pieces, Stack<FormattingFrame> frames)
+    private static void AddText(Token token, List<Piece> pieces)
     {
         var value = token.Text!;
-        if (frames.TryPeek(out var frame) && frame.Style == TextStyle.Code)
-        {
-            if (value.Length > 0 && token.Start == frame.TrimStart && value[0] == ' ') value = value[1..];
-            if (value.Length > 0 && token.End - 1 == frame.TrimEnd && value[^1] == ' ') value = value[..^1];
-        }
-
         if (value.Length > 0) pieces.Add(new InlinePiece(new TextTemplate(value)));
     }
 

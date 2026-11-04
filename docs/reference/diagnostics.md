@@ -35,6 +35,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1014 | Malformed image call, image path escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
 | TW1015 | The simple legacy `![alt](path)` image form. | Replace it with `{image("path", "alt")}`; the message gives the escaped replacement. |
 | TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |
+| TW1017 | A reader-text line ends with an unpaired backslash. | Remove the trailing `\`; line breaks render as written. |
 
 ## TW2xxx: names and types
 
