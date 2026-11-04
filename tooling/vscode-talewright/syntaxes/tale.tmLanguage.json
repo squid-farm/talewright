@@ -233,6 +233,17 @@
     "inline": {
       "patterns": [
         {"match": "\\\\[!-/:-@\\[\\\\\\]^_`{|}~]","name": "constant.character.escape.tale"},
+        {"include": "#template"},
+        {"include": "text.html.markdown#bold"},
+        {"include": "text.html.markdown#italic"}
+      ]
+    }
+  },
+  "injections": {
+    "L:text.tale markup.bold.markdown, L:text.tale markup.italic.markdown": {
+      "comment": "Emphasis comes from VS Code's Markdown grammar; keep Talemark escapes and templates inside it.",
+      "patterns": [
+        {"match": "\\\\[!-/:-@\\[\\\\\\]^_`{|}~]", "name": "constant.character.escape.tale"},
         {"include": "#template"}
       ]
     }

@@ -228,7 +228,10 @@ override these language-specific defaults in your VS Code settings.
 
 The grammar distinguishes scene headers, metadata, speech, effects, conditions,
 choices, substitutions, checks, escapes and `{image("path", "alt text")}` calls.
-Bold and italic text are not colored yet; they still render normally during play.
+Bold and italic text are colored by VS Code's built-in Markdown grammar, so a few
+edge cases color differently from how they render. For example, `word*inner*word`
+and `**bold**text` look emphasized but play as literal asterisks, and
+`__snake__case__` plays as bold but is not colored.
 These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
 images are currently placeholders, not image rendering support.
