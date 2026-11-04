@@ -47,10 +47,10 @@ Keep choices last. Every choice and every choice-check outcome needs its own `->
 A scene-level `->` means **leave now**, not "use this if there are no choices"; later lines do not run.
 For an early exit, put the conditional `->` before the choices. Give hubs an explicit exit choice.
 The textless `* -> END` is a choice labelled **Continue**, offered in order alongside the other
-choices. It can also use `(requires: ...)` and `{ effects }`, like a labelled choice:
+choices. It can also use `(requires ...)` and `{ effects }`, like a labelled choice:
 
 ```tale
-* [Open the door] (requires: flag:ready) -> hall
+* [Open the door] (requires flag:ready) -> hall
 * { set flag:left } -> garden
 ```
 
@@ -133,7 +133,7 @@ items:
 
 ```tale
 ~ give player rope
-* [Climb down] (requires: player has rope) -> cellar
+* [Climb down] (requires player has rope) -> cellar
 * [Trade the charm] { take player charm; give player rope } -> market
 ```
 
@@ -154,7 +154,7 @@ creates it.
 ~ var:bribes += 1
 
 {if flag:met-the-queen}The guards bow.{/if}
-* [Bribe again] (requires: var:bribes < 3) -> gate
+* [Bribe again] (requires var:bribes < 3) -> gate
 ```
 
 Checking a flag or variable that nothing ever sets is reported as a mistake (usually a typo). If it's
@@ -246,7 +246,7 @@ Want the same rolls every time? Set `seed: 1234` in `story.talewright.yaml`. For
 
 ## Conditions
 
-Use conditions in `requires:`, `{if}` and triggers:
+Use conditions in choice requirements such as `(requires expression)`, `{if}` and triggers:
 
 ```text
 player:dex >= 12 and not flag:alarm-raised

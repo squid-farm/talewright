@@ -6,6 +6,7 @@ using Spectre.Console.Cli;
 using Spectre.Console.Cli.Help;
 using Spectre.Console.Rendering;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Cli;
 
@@ -210,9 +211,8 @@ public sealed class ValidateCommand : Command<ValidationSettings>
         var success = result.Success && (!settings.WarningsAsErrors || !result.Warnings.Any());
         if (json)
         {
-            CommandLine.WriteJson(new ValidationOutput(1, success, result.Diagnostics.Select(d => new DiagnosticOutput(
-                d.Code, d.Severity.ToString().ToLowerInvariant(), d.Message,
-                d.Location.File, d.Location.Line, d.Location.Column)).ToArray()), writers.Output);
+            CommandLine.WriteJson(new ValidationOutput(1, success,
+                result.Diagnostics.Select(DiagnosticOutput.FromCompiler).ToArray()), writers.Output);
         }
         else
         {
@@ -249,7 +249,13 @@ public sealed class InvocationFailureCommand : Command<InvocationFailureSettings
 
 internal sealed record DiagnosticOutput(string Code, string Severity, string Message, string File, int Line, int Column,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? EndLine = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? EndColumn = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? EndColumn = null)
+{
+    public static DiagnosticOutput FromCompiler(Diagnostic diagnostic) => new(
+        diagnostic.Code, diagnostic.Severity.ToString().ToLowerInvariant(), diagnostic.Message,
+        diagnostic.Location.File, diagnostic.Location.Line, diagnostic.Location.Column,
+        diagnostic.EndLocation?.Line, diagnostic.EndLocation?.Column);
+}
 internal sealed record ErrorOutput(string Code, string Message);
 internal sealed record ValidationOutput(int SchemaVersion, bool Success, DiagnosticOutput[] Diagnostics,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ErrorOutput? Error = null);

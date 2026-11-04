@@ -26,7 +26,7 @@ public class StoryAnalysisTests
     [Fact]
     public void Choice_availability_warning_matches_compiler_and_clears_after_an_unconditional_exit()
     {
-        var source = Source("=== first\n* [Maybe] (requires: player:hp > 0) -> END");
+        var source = Source("=== first\n* [Maybe] (requires player:hp > 0) -> END");
         var compiled = StoryCompiler.Compile(source);
         var analysis = StoryAnalyzer.Analyze(source);
 
@@ -36,7 +36,7 @@ public class StoryAnalysisTests
         Assert.Equal("TW3013", warning.Code);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
         Assert.Equal(new SourceLocation("main.tale", 1, 1), warning.Location);
-        Assert.Empty(StoryAnalyzer.Analyze(Source("=== first\n* [Maybe] (requires: player:hp > 0) -> END\n* -> END")).Diagnostics);
+        Assert.Empty(StoryAnalyzer.Analyze(Source("=== first\n* [Maybe] (requires player:hp > 0) -> END\n* -> END")).Diagnostics);
     }
 
     [Fact]
@@ -158,9 +158,9 @@ public class StoryAnalysisTests
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >", "TW1011")]
+    [InlineData("* [Go] (requires player:hp >", ExpressionContextKind.Condition, "player:hp >", "TW1011")]
     [InlineData("* [Go] {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=", "TW1011")]
-    [InlineData("* (requires: player:hp >", ExpressionContextKind.Condition, " player:hp >", "TW1011")]
+    [InlineData("* (requires player:hp >", ExpressionContextKind.Condition, "player:hp >", "TW1011")]
     [InlineData("* {set flag:ready; var:count +=", ExpressionContextKind.Effects, "set flag:ready; var:count +=", "TW1011")]
     [InlineData("* [Go] skill-check athletics dc 12\nsuccess: {set flag:ready", ExpressionContextKind.Effects, "set flag:ready", "TW1009")]
     public void Unclosed_choice_expressions_keep_partial_context(string choice, ExpressionContextKind kind, string text, string diagnosticCode)

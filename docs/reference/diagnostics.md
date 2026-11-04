@@ -29,7 +29,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1008 | Invalid scene id. | Use the shared ASCII identifier form: start with a letter or `_`, then use letters, digits, `_`, and single `.` or `-` separators, e.g. `temple.entrance`. |
 | TW1009 | Skill check outcomes are missing or misplaced, or an outcome effect block is unclosed. | Put both `success:` and `failure:` lines directly below the check and close each outcome's `{ effects }`. |
 | TW1010 | `->` without a target. | `-> scene.id` or `-> END`. |
-| TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires: ...) { effects } -> target` or `* -> target` for **Continue**. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires:` exactly and close `]`, `)` and `}`. |
+| TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires ...) { effects } -> target` or `* -> target` for **Continue**. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires ` exactly and close `]`, `)` and `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
 | TW1014 | Malformed image call, image path escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
@@ -84,10 +84,10 @@ Giving a character a value does not declare the skill. See the complete
 | ⚠ TW3012 | A line cannot run because an earlier step always leaves its block. | Move the line before the exit, make the exit conditional, or remove the unreachable line. |
 | ⚠ TW3013 | A scene may reach its choices with none available. | Add an unconditional choice such as `* -> target` or `* [The end] -> END`, or give every continuing `{if}` / `{else}` branch an unconditional choice. |
 
-TW3013 counts authored choices without `requires:`. Hub offers do not guarantee a choice:
+TW3013 counts authored choices without a choice requirement. Hub offers do not guarantee a choice:
 their storylets can all be ineligible or already visited. A conditional `->` may be skipped
 and therefore does not guarantee an exit. The compiler does not solve requirements, so even
-complementary choices such as `(requires: var:gold > 5)` and `(requires: var:gold <= 5)`
+complementary choices such as `(requires var:gold > 5)` and `(requires var:gold <= 5)`
 still warn. Restructure them as a single `{if}` / `{else}` with an unconditional choice in
 each branch, or add an unconditional exit.
 

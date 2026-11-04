@@ -85,11 +85,13 @@ internal static class ExpressionParser
 
     /// <summary>Parses and binds a boolean condition.</summary>
     public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols,
-        DiagnosticBag diagnostics, SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null)
+        DiagnosticBag diagnostics, SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null,
+        bool highlightUnexpectedTokens = false)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Condition, text,
             authoringLocation ?? location, locate) ?? Lexer.Tokenize(text);
-        var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, locate ?? location.Offset, diagnostics);
+        var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, locate ?? location.Offset, diagnostics,
+            highlightUnexpectedTokens: highlightUnexpectedTokens);
         return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, ExprType.Bool);
     }
 

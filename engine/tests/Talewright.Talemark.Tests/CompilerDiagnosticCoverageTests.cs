@@ -86,7 +86,7 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW3010", Story("=== start\n-> END\n=== start\n-> END")),
         Error("TW3011", Scene("* [Leave] -> END\nProse.")),
         Warning("TW3012", Scene("-> END\nAfter.")),
-        Warning("TW3013", Scene("* [Maybe] (requires: player:hp > 0) -> END")),
+        Warning("TW3013", Scene("* [Maybe] (requires player:hp > 0) -> END")),
 
         Error("TW4001", Story("=== start\n-> END", "game: [")),
         Error("TW4002", new StorySource(new Dictionary<string, string> { [MainFile] = "=== start\n-> END" })),

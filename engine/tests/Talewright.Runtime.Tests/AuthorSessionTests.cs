@@ -84,7 +84,7 @@ public sealed class AuthorSessionTests
             === start
             ~ var:count += 1
             Ready: {if flag:ready}yes{else}no{/if}. Count: {var:count}.
-            * [Prepared] (requires: flag:ready and guide:str >= 15 and faction:guild:standing >= 5) -> END
+            * [Prepared] (requires flag:ready and guide:str >= 15 and faction:guild:standing >= 5) -> END
             * [Wait] -> END
             """);
         var requested = int.MaxValue;

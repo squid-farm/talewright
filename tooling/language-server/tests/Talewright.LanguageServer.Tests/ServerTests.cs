@@ -581,6 +581,89 @@ public sealed partial class ServerTests
         Assert.Empty(await client.Diagnostics("start.tale", 2));
     }
 
+    [Theory]
+    [InlineData("* [Go] (requires: true) -> END")]
+    [InlineData("* (requires: true) -> END")]
+    [InlineData("  * [😀] (requires : true) -> END")]
+    public async Task Unexpected_choice_condition_token_highlights_the_offending_character(string line)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale", $"=== start\r\n{line}\r\n", 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW1001");
+
+        Assert.Equal("Unexpected ':'.", diagnostic.GetProperty("message").GetString());
+        var range = diagnostic.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        Assert.Equal(1, start.GetProperty("line").GetInt32());
+        Assert.Equal(line.IndexOf(':'), start.GetProperty("character").GetInt32());
+        Assert.Equal(1, end.GetProperty("line").GetInt32());
+        Assert.Equal(line.IndexOf(':') + 1, end.GetProperty("character").GetInt32());
+    }
+
+    [Fact]
+    public async Task Compiler_point_diagnostics_still_use_zero_width_ranges()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale", "=== start\n* [Go] -> missing\n", 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2002");
+        var range = diagnostic.GetProperty("range");
+
+        Assert.Equal(range.GetProperty("start").GetRawText(), range.GetProperty("end").GetRawText());
+    }
+
+    [Theory]
+    [InlineData("true 😀")]
+    [InlineData("😀")]
+    public async Task Unknown_unicode_expression_character_remains_a_point_diagnostic(string condition)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale", $"=== start\n* [Go] (requires {condition}) -> END\n", 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW1001");
+        var range = diagnostic.GetProperty("range");
+
+        Assert.Equal(range.GetProperty("start").GetRawText(), range.GetProperty("end").GetRawText());
+    }
+
+    [Fact]
+    public async Task Unexpected_nonchoice_expression_token_remains_a_point_diagnostic()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string tale = "=== start\r\n{if true \"first\r\nsecond\"}text{/if}\r\n-> END\r\n";
+        await client.Open("start.tale", tale, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW1001");
+        var range = diagnostic.GetProperty("range");
+        Assert.Equal(range.GetProperty("start").GetRawText(), range.GetProperty("end").GetRawText());
+    }
+
+    [Fact]
+    public async Task Unexpected_token_in_quoted_yaml_expression_remains_a_point_diagnostic()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var manifest = Manifest + """
+            flags: [ready]
+            triggers:
+              - id: event
+                when: "true\t: false"
+                do: set flag:ready
+            """;
+        await client.Open("story.talewright.yaml", manifest, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("story.talewright.yaml", 1),
+            item => item.GetProperty("code").GetString() == "TW1001");
+        var range = diagnostic.GetProperty("range");
+
+        Assert.Equal(range.GetProperty("start").GetRawText(), range.GetProperty("end").GetRawText());
+    }
+
     [Fact]
     public async Task Saved_diagnostics_match_cli_codes_severities_messages_and_utf16_positions()
     {

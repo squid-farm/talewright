@@ -292,7 +292,7 @@ public sealed class MapViewTests
             {else}
             Waiting {var:visits}.
             {/if}
-            * [Prepared {var:visits}] (requires: flag:ready) -> END
+            * [Prepared {var:visits}] (requires flag:ready) -> END
             * [Wait] -> END
             """);
         var start = new SceneId("start");
