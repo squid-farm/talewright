@@ -280,6 +280,18 @@ test('literal backslashes inside reader text do not suppress emphasis', () => {
   ]) hasScope(line, text, scope);
 });
 
+test('escaped leading markers remain reader text', () => {
+  for (const [line, directiveScope] of [
+    [String.raw`\* [Go] -> hall`, 'punctuation.definition.choice.tale'],
+    [String.raw`\> guide: Hello`, 'punctuation.definition.speech.tale'],
+    [String.raw`\=== hall`, 'entity.name.section.tale'],
+    [String.raw`\{player}`, 'meta.template.tale'],
+  ]) {
+    hasScope(line, line.slice(0, 2), 'constant.character.escape.tale');
+    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes(directiveScope)), line);
+  }
+});
+
 test('choice conditions highlight only the exact requires marker', () => {
   const valid = '* [Continue] (requires: flag:ready) -> END';
   hasScope(valid, 'requires', 'keyword.control.tale');
