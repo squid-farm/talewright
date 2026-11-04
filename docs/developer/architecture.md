@@ -571,7 +571,7 @@ Invalid keys throw `InvalidOperationException` listing the valid ones. The UI on
 
 ```mermaid
 flowchart LR
-  subgraph save["Save bytes (JSON)"]
+  subgraph save["Save bytes (.twsave)"]
     direction TB
     f1["format + story id/version"]
     f2["content fingerprint"]
@@ -589,8 +589,9 @@ _cursor_ choice keys.
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
 format/story versions and source/extension fingerprint. Unknown/corrupt/incompatible saves are rejected,
-not silently migrated. The current save format requires a character field, null for fixed-protagonist
-stories. Pre-v1 format and replay contracts may change without support for previous versions.
+not silently migrated. Saves use a compressed, tagged binary format (protobuf wire format plus zlib);
+see [Save format](save-format.md) for the schema, field-number rules and limits. Fixed-protagonist
+stories omit the character. Pre-v1 replay contracts may change without support for previous versions.
 
 ---
 

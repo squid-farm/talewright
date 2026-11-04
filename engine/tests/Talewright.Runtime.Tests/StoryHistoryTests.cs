@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json.Nodes;
 using Talewright.Core.Identity;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
@@ -72,19 +71,21 @@ public class StoryHistoryTests
         var withoutDetails = StoryHistory.DescribeSave("Without details", history.Save());
         Assert.Null(withoutDetails.Summary);
         Assert.Equal(entry.ProgressKey, withoutDetails.ProgressKey);
-        Assert.DoesNotContain("summary", Encoding.UTF8.GetString(history.Save()));
+        Assert.Null(SaveFormat.Read(history.Save()).Summary);
     }
 
     [Theory]
-    [InlineData("\"damaged\"")]
-    [InlineData("{\"sceneTitle\":\"a\",\"savedAt\":\"not-a-date\"}")]
-    [InlineData("{\"savedAt\":\"2026-10-23T00:00:00Z\"}")]
-    public void Unreadable_summary_does_not_prevent_loading_replay(string metadata)
+    [InlineData(new byte[] { 0x0A, 0x05, (byte)'a' })] // Scene title length runs past the summary.
+    [InlineData(new byte[] { 0x0A, 0x01, (byte)'a' })] // No save time.
+    [InlineData(new byte[] { 0x10, 0x01 })] // No scene title.
+    [InlineData(new byte[] { 0x0A, 0x01, (byte)'a', 0x10, 0x01, 0x18, 0x90, 0x0E })] // Offset beyond 14 hours.
+    [InlineData(new byte[] { 0x0A, 0x02, 0xC3, 0x28, 0x10, 0x01 })] // Invalid UTF-8 title.
+    public void Unreadable_summary_does_not_prevent_loading_replay(byte[] summary)
     {
         var history = new StoryHistory(Compile(), 7);
-        var json = JsonNode.Parse(history.Save())!;
-        json["summary"] = JsonNode.Parse(metadata);
-        var bytes = Encoding.UTF8.GetBytes(json.ToJsonString());
+        var extra = new ProtoWriter();
+        extra.WriteBytes(SaveFields.Summary, summary);
+        var bytes = AppendFields(history.Save(), extra);
         var entry = StoryHistory.DescribeSave("Damaged details", bytes);
         Assert.Null(entry.Summary);
         Assert.Contains("unreadable", entry.Warning);
@@ -96,16 +97,17 @@ public class StoryHistoryTests
     public void Catalog_reads_metadata_without_replaying_and_keeps_damaged_slots_visible()
     {
         var history = new StoryHistory(Compile(), 7);
-        var json = JsonNode.Parse(history.Save(history.CaptureSummary(DateTimeOffset.UtcNow)))!;
-        json["choices"] = new JsonArray("no-such-choice");
-        json["cursor"] = 1;
-        var bytes = Encoding.UTF8.GetBytes(json.ToJsonString());
+        var bytes = Mutate(history.Save(history.CaptureSummary(DateTimeOffset.UtcNow)),
+            save => save with { Choices = ["no-such-choice"], Cursor = 1 });
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes));
         Assert.NotNull(StoryHistory.DescribeSave("Invalid replay", bytes).Summary);
-        var damaged = StoryHistory.DescribeSave("Broken", "{broken"u8);
-        Assert.Equal("Broken", damaged.Slot);
-        Assert.Null(damaged.ProgressKey);
-        Assert.NotNull(damaged.Warning);
+        foreach (var broken in new[] { "{broken"u8.ToArray(), bytes[..^4], [.. "TWSV"u8, 3, 0xFF] })
+        {
+            var damaged = StoryHistory.DescribeSave("Broken", broken);
+            Assert.Equal("Broken", damaged.Slot);
+            Assert.Null(damaged.ProgressKey);
+            Assert.NotNull(damaged.Warning);
+        }
     }
 
     [Fact]
@@ -190,13 +192,11 @@ public class StoryHistoryTests
         var history = new StoryHistory(Compile(), 7);
         history.Choose("c0");
         history.Choose("c0");
-        var save = JsonNode.Parse(history.Save())!.AsObject();
-        save["choices"]![1] = "missing";
+        var save = Mutate(history.Save(), save => save with { Choices = [save.Choices[0], "missing"] });
 
-        var error = Assert.Throws<InvalidDataException>(() =>
-            StoryHistory.Restore(history.Story, Encoding.UTF8.GetBytes(save.ToJsonString())));
+        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
 
-        Assert.Contains("cannot continue at choice 2", error.Message);
+        Assert.Contains("cannot continue", error.Message);
     }
 
     [Fact]
@@ -232,24 +232,41 @@ public class StoryHistoryTests
     }
 
     [Theory]
-    [InlineData("formatVersion", "1", "unsupported")]
-    [InlineData("formatVersion", "99", "unsupported")]
-    [InlineData("storyId", "\"other\"", "different story")]
-    [InlineData("storyVersion", "\"other\"", "incompatible")]
-    [InlineData("contentFingerprint", "\"changed\"", "incompatible")]
-    [InlineData("cursor", "-1", "history is damaged")]
-    [InlineData("cursor", "3", "history is damaged")]
-    [InlineData("choices", "null", "history is damaged")]
-    [InlineData("choices", "[null]", "history is damaged")]
-    [InlineData("choices", "[\"missing\"]", "cannot continue")]
-    public void Invalid_saves_preserve_active_session(string field, string value, string message)
+    [InlineData("format-old", "unsupported format")]
+    [InlineData("format-new", "unsupported format")]
+    [InlineData("json", "unsupported format")]
+    [InlineData("story-id", "different story")]
+    [InlineData("story-version", "Version other of History has changed")]
+    [InlineData("fingerprint", "History has changed")]
+    [InlineData("cursor", "history is damaged")]
+    [InlineData("choice-index", "history is damaged")]
+    [InlineData("choice", "cannot continue")]
+    public void Invalid_saves_preserve_active_session(string damage, string message)
     {
         var history = new StoryHistory(Compile(), 7);
         history.Choose("c0");
         var before = history.Save();
-        var save = JsonNode.Parse(before)!.AsObject();
-        save[field] = JsonNode.Parse(value);
-        var invalid = Encoding.UTF8.GetBytes(save.ToJsonString());
+        var invalid = damage switch
+        {
+            "format-old" => [.. before[..4], 2, .. before[5..]],
+            "format-new" => [.. before[..4], 99, .. before[5..]],
+            "json" => """{"formatVersion":2,"storyId":"history"}"""u8.ToArray(),
+            "story-id" => Mutate(before, save => save with { StoryId = "other" }),
+            "story-version" => Mutate(before, save => save with { StoryVersion = "other" }),
+            "fingerprint" => Mutate(before, save => save with { ContentFingerprint = "changed" }),
+            "cursor" => Mutate(before, save => save with { Cursor = 3 }),
+            "choice-index" => SaveFormat.Pack(Body(new SavedGame
+            {
+                StoryId = "history", StoryVersion = "1", ContentFingerprint = history.Story.ContentFingerprint!,
+                Seed = 7, Cursor = 0, Choices = [],
+            }, writer =>
+            {
+                writer.WriteString(SaveFields.ChoiceKeys, "c0");
+                writer.WritePackedUInt32(SaveFields.Choices, [1]);
+            })),
+            "choice" => Mutate(before, save => save with { Choices = ["missing"] }),
+            _ => throw new ArgumentOutOfRangeException(nameof(damage)),
+        };
 
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, invalid));
 
@@ -261,18 +278,40 @@ public class StoryHistoryTests
     public void Invalid_redo_is_checked_even_when_cursor_is_at_the_start()
     {
         var history = new StoryHistory(Compile(), 7);
-        var save = JsonNode.Parse(history.Save())!.AsObject();
-        save["choices"] = new JsonArray("missing");
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, Encoding.UTF8.GetBytes(save.ToJsonString())));
+        var save = Mutate(history.Save(), save => save with { Choices = ["missing"] });
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
+    }
+
+    [Fact]
+    public void Invalid_replay_reports_no_scene_or_choice_position()
+    {
+        var history = new StoryHistory(Compile(), 7);
+        var save = Mutate(history.Save(), save => save with { Choices = ["missing"] });
+        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
+
+        Assert.Contains("cannot continue", error.Message);
+        Assert.Contains("no longer compatible", error.Message);
+        Assert.DoesNotContain("choice", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("scene", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
     [InlineData("{}")]
     [InlineData("null")]
     [InlineData("{")]
-    public void Malformed_saves_are_explicitly_rejected(string json)
+    [InlineData("TWSV")]
+    [InlineData("TWSV\u0003")]
+    public void Malformed_saves_are_explicitly_rejected(string text)
     {
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(Compile(), Encoding.UTF8.GetBytes(json)));
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(Compile(), Encoding.UTF8.GetBytes(text)));
+    }
+
+    [Fact]
+    public void Old_json_saves_are_reported_as_an_unsupported_format()
+    {
+        var error = Assert.Throws<InvalidDataException>(() =>
+            StoryHistory.Restore(Compile(), "\n {\"formatVersion\":2}"u8));
+        Assert.Equal(SaveFormat.UnsupportedMessage, error.Message);
     }
 
     [Fact]
@@ -281,23 +320,13 @@ public class StoryHistoryTests
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(Compile(), new byte[StoryHistory.MaxSaveBytes + 1]));
     }
 
-    [Fact]
-    public void Legal_long_choice_keys_reach_the_exact_save_byte_limit()
+    [Theory]
+    [InlineData(SaveFormat.MaxChoiceKeyLength, true)]
+    [InlineData(SaveFormat.MaxChoiceKeyLength + 1, false)]
+    public void Choice_keys_up_to_the_length_limit_save_and_longer_keys_do_not(int keyLength, bool saves)
     {
         var story = Compile(Yaml, "=== a\n~ var:visits += 1\n* [Again] -> a");
-        var emptySaveLength = new StoryHistory(story, 7).Save().Length;
-        var choices = Enumerable.Range(1, StoryHistory.MaxChoices)
-            .Select(count =>
-            {
-                var keyBytes = StoryHistory.MaxSaveBytes - emptySaveLength -
-                    (3 * count - 1) - (count.ToString().Length - 1);
-                return keyBytes > 0 && keyBytes % count == 0
-                    ? (Count: count, KeyLength: keyBytes / count)
-                    : (Count: 0, KeyLength: 0);
-            })
-            .First(candidate => candidate.Count != 0 && candidate.KeyLength is >= 1 and <= 512);
-
-        var key = new string('k', choices.KeyLength);
+        var key = new string('k', keyLength);
         var scene = story.GetScene(story.Start);
         var longKeyStory = new StoryDefinition
         {
@@ -339,21 +368,21 @@ public class StoryHistoryTests
         };
 
         var history = new StoryHistory(longKeyStory, 7);
-        for (var index = 0; index < choices.Count; index++)
-        {
-            history.Choose(key);
-        }
-
-        var exactLimitSave = history.Save();
-        Assert.Equal(StoryHistory.MaxSaveBytes, exactLimitSave.Length);
-        Assert.Equal(choices.Count, StoryHistory.Restore(longKeyStory, exactLimitSave).Cursor);
-
         history.Choose(key);
-        Assert.Throws<InvalidOperationException>(() => history.Save());
-        Assert.Equal(choices.Count + 1, history.Cursor);
-        Assert.Equal(StoryHistory.MaxSaveBytes, exactLimitSave.Length);
-        Assert.False(history.TryProgressKey(out var progress));
-        Assert.Null(progress);
+        history.Choose(key);
+        if (saves)
+        {
+            var save = history.Save();
+            Assert.Equal([key, key], SaveFormat.Read(save).Choices);
+            Assert.Equal(2, StoryHistory.Restore(longKeyStory, save).Cursor);
+            Assert.True(history.TryProgressKey(out _));
+        }
+        else
+        {
+            Assert.Throws<InvalidOperationException>(() => history.Save());
+            Assert.False(history.TryProgressKey(out var progress));
+            Assert.Null(progress);
+        }
     }
 
     [Fact]
@@ -377,22 +406,33 @@ public class StoryHistoryTests
     }
 
     [Fact]
-    public void Oversized_choice_history_and_unknown_fields_are_rejected()
+    public void Oversized_choice_history_is_rejected_and_unknown_fields_are_ignored()
     {
         var history = new StoryHistory(Compile(), 7);
-        var save = JsonNode.Parse(history.Save())!.AsObject();
-        save["extra"] = true;
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, Encoding.UTF8.GetBytes(save.ToJsonString())));
-        save.Remove("extra");
-        save["choices"] = new JsonArray(Enumerable.Range(0, StoryHistory.MaxChoices + 1).Select(_ => (JsonNode?)JsonValue.Create("c0")).ToArray());
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, Encoding.UTF8.GetBytes(save.ToJsonString())));
+        history.Choose("c0");
+        var extra = new ProtoWriter();
+        extra.WriteUInt64(100, 1);
+        extra.WriteString(101, "future");
+        extra.WriteFixed64(102, 3);
+        var withUnknown = AppendFields(history.Save(), extra);
+        AssertEquivalent(history, StoryHistory.Restore(history.Story, withUnknown));
+        Assert.Equal(history.ProgressKey, StoryHistory.DescribeSave("future", withUnknown).ProgressKey);
+
+        var oversized = Mutate(history.Save(), save => save with
+        {
+            Choices = Enumerable.Repeat("c0", StoryHistory.MaxChoices + 1).ToArray(),
+        });
+        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, oversized));
+        Assert.Equal(SaveFormat.HistoryMessage, error.Message);
     }
 
     [Fact]
     public void Changed_source_with_unchanged_story_version_is_incompatible()
     {
         var history = new StoryHistory(Compile(), 7);
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(Compile(tale: Tale + "\n// change"), history.Save()));
+        var error = Assert.Throws<InvalidDataException>(() =>
+            StoryHistory.Restore(Compile(tale: Tale + "\n// change"), history.Save()));
+        Assert.Equal("Version 1 of History has changed, and this save is no longer compatible. Open it with the story and player version that created it.", error.Message);
     }
 
     [Fact]
@@ -425,6 +465,22 @@ public class StoryHistoryTests
         Assert.Throws<InvalidOperationException>(() => history.Back());
         Assert.Throws<InvalidOperationException>(() => history.Forward());
         Assert.Equal(original, history.Save());
+    }
+
+    private static byte[] Mutate(byte[] save, Func<SavedGame, SavedGame> change) =>
+        SaveFormat.Write(change(SaveFormat.Read(save)));
+
+    private static byte[] Body(SavedGame save, Action<ProtoWriter> extra)
+    {
+        var writer = new ProtoWriter();
+        extra(writer);
+        return [.. SaveFormat.EncodeBody(save), .. writer.WrittenSpan];
+    }
+
+    private static byte[] AppendFields(byte[] save, ProtoWriter extra)
+    {
+        var body = SaveFormat.EncodeBody(SaveFormat.Read(save, out _));
+        return SaveFormat.Pack([.. body, .. extra.WrittenSpan]);
     }
 
     private static void AssertEquivalent(StoryHistory expected, StoryHistory actual)

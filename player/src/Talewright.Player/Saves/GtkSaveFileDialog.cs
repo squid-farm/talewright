@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Talewright.Runtime.Saves;
 
 namespace Talewright.Player.Saves;
 
@@ -35,8 +36,8 @@ internal static class GtkSaveFileDialog
             {
                 throw new InvalidOperationException("The desktop save file filter could not be created.");
             }
-            gtk_file_filter_set_name(filter, "JSON saved game");
-            gtk_file_filter_add_pattern(filter, "*.json");
+            gtk_file_filter_set_name(filter, "Talewright saved game");
+            gtk_file_filter_add_pattern(filter, "*" + SaveFormat.FileExtension);
             gtk_file_chooser_add_filter(dialog, filter);
 
             var response = gtk_dialog_run(dialog);

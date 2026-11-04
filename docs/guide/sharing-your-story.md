@@ -177,7 +177,10 @@ Avoid publishing two builds to the same path at once. Without force, publish sto
 appears or an approved file observably changes during the build. This is a safety check, not a lock
 against every possible filesystem race; see the [replacement policy](../reference/cli.md#advanced-replacing-an-existing-archive).
 
-If you publish an update, existing saves won't load in the new version
-(see [saves](playing-and-saving.md#updating-a-story-with-existing-saves)).
+Currently, any edit to `story.talewright.yaml` or a `.tale` file makes existing saves incompatible.
+This includes changes to choice text, stats, unvisited scenes or even a typo. Renaming a source file
+or changing the story version also breaks saves. Player or extension compatibility changes can do
+the same. Keep a copy of each released build so players can open older saves with it.
+See [updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves).
 
 All options and limits: [CLI reference: publish](../reference/cli.md#publish).

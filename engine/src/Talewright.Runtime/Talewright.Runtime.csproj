@@ -7,6 +7,10 @@
     <ProjectReference Include="../Talewright.Talemark/Talewright.Talemark.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.Runtime.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

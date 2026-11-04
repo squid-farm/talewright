@@ -1,5 +1,4 @@
 using Microsoft.Playwright;
-using System.Text.Json.Nodes;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Talewright.Runtime;
@@ -124,10 +123,10 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Upload(fixture);
         await Observe(new(null, "First passage"));
         await Persist(story.Id, "Without details", history.Save());
-        var damaged = JsonNode.Parse(history.Save())!;
-        damaged["summary"] = "unreadable metadata";
-        await Persist(story.Id, "Damaged details", System.Text.Encoding.UTF8.GetBytes(damaged.ToJsonString()));
-        await Persist(story.Id, "Broken replay", "{broken"u8.ToArray());
+        // A blank scene title makes the details unusable without affecting replay.
+        var damaged = SaveFormat.Write(SaveFormat.Read(history.Save()) with { Summary = new(" ", DateTimeOffset.UtcNow, null) });
+        await Persist(story.Id, "Damaged details", damaged);
+        await Persist(story.Id, "Broken replay", "broken"u8.ToArray());
         await Driver.ClickAsync("Saves");
         await AssertDialogText(text =>
         {
@@ -163,13 +162,11 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var old = result.Story!;
         var history = new StoryHistory(old, 42, old.Creation!.Default(old.World.Characters[EntityId.Player]));
-        var saved = JsonNode.Parse(history.Save())!;
+        var bytes = history.Save();
         if (!olderVersion)
         {
-            saved["storyVersion"] = "0.4.0";
-            saved["contentFingerprint"] = "before-the-dream";
+            bytes = SaveFormat.Write(SaveFormat.Read(bytes) with { StoryVersion = "0.4.0", ContentFingerprint = "before-the-dream" });
         }
-        var bytes = System.Text.Encoding.UTF8.GetBytes(saved.ToJsonString());
         var slot = olderVersion ? "Older sample" : "Pre-dream sample";
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
@@ -179,7 +176,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load " + slot);
         await Driver.ClickAsync("Load save");
-        await AssertDialogText(text => Assert.Contains("incompatible", text));
+        await AssertDialogText(text => Assert.Contains(
+            $"Version {(olderVersion ? "0.3.0" : "0.4.0")} of The Lost Relic has changed, and this save is no longer compatible", text));
         await Driver.ClickAsync("Close saves");
         await AssertState(state =>
         {
@@ -193,13 +191,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         }
         else
         {
-            var stored = await Page.EvaluateAsync<string>("""
-                async ({storyId, slot}) => {
-                    const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                    return new TextDecoder().decode(await module.read(storyId, slot));
-                }
-                """, new { storyId = old.Id, slot });
-            Assert.Equal(System.Text.Encoding.UTF8.GetString(bytes), stored);
+            Assert.Equal(bytes, await ReadBrowserSaveAsync(old.Id, slot));
         }
         await Choose("Sign the expedition register");
         await Observe(new(null, "MARA BURNS"));
@@ -213,12 +205,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         }
         else
         {
-            await Page.EvaluateAsync("""
-                async ({storyId, slot, json}) => {
-                    const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                    await module.write(storyId, slot, new TextEncoder().encode(json), false);
-                }
-                """, new { storyId, slot, json = System.Text.Encoding.UTF8.GetString(bytes) });
+            await WriteBrowserSaveAsync(storyId, slot, bytes);
         }
     }
 
@@ -382,7 +369,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         var store = new FileSaveStore(NativeSaveRoot);
         var storyId = fixture.Compile().Id;
         var original = await store.ReadAsync(storyId, "My save");
-        var path = Directory.EnumerateFiles(NativeSaveRoot, "*.json", SearchOption.AllDirectories)
+        var path = Directory.EnumerateFiles(NativeSaveRoot, "*" + SaveFormat.FileExtension, SearchOption.AllDirectories)
             .Single(file => File.ReadAllBytes(file).SequenceEqual(original));
         var backup = path + ".test-backup";
         File.Move(path, backup);
@@ -499,12 +486,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Confirm overwrite");
         await Expect(SaveStatus).ToContainTextAsync("Saved 'My save'.");
 
-        await Page.EvaluateAsync("""
-            async storyId => {
-                const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                await module.write(storyId, 'My save', new TextEncoder().encode('{broken'), true);
-            }
-            """, fixture.Compile().Id);
+        await WriteBrowserSaveAsync(fixture.Compile().Id, "My save", "broken"u8.ToArray(), overwrite: true);
         await Driver.ClickAsync("Load My save");
         await Driver.ClickAsync("Load save");
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("malformed");
@@ -580,17 +562,13 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
             ["chapters/main.tale"] = fixture.Tale,
         });
         var story = StoryCompiler.Compile(source).Story!;
-        var saved = JsonNode.Parse(new StoryHistory(story).Save())!;
-        saved["choices"] = new JsonArray(Enumerable.Range(0, StoryHistory.MaxChoices)
-            .Select(_ => JsonValue.Create("c0")).ToArray<JsonNode?>());
-        saved["cursor"] = StoryHistory.MaxChoices;
+        var saved = SaveFormat.Write(SaveFormat.Read(new StoryHistory(story).Save()) with
+        {
+            Choices = Enumerable.Repeat("c0", StoryHistory.MaxChoices).ToArray(),
+            Cursor = StoryHistory.MaxChoices,
+        });
         await Upload(fixture);
-        await Page.EvaluateAsync("""
-            async ({storyId, json}) => {
-                const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                await module.write(storyId, 'Limit', new TextEncoder().encode(json), false);
-            }
-            """, new { storyId = story.Id, json = saved.ToJsonString() });
+        await WriteBrowserSaveAsync(story.Id, "Limit", saved);
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load Limit");
         await Driver.ClickAsync("Load save");

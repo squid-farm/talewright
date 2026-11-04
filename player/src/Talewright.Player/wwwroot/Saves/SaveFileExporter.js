@@ -1,5 +1,5 @@
 export function download(name, data) {
-    const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    const url = URL.createObjectURL(new Blob([data], { type: "application/octet-stream" }));
     try {
         const link = document.createElement("a");
         link.href = url;

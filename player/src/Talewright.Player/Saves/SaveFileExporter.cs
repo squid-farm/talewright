@@ -13,7 +13,7 @@ public interface ISaveFileExporter
 public static class SaveFileName
 {
     public static string Create(string storyTitle, string saveName) =>
-        $"{SafePart(storyTitle, "Story")} - {SafePart(saveName, "Save")}.json";
+        $"{SafePart(storyTitle, "Story")} - {SafePart(saveName, "Save")}{SaveFormat.FileExtension}";
 
     private static string SafePart(string value, string fallback)
     {

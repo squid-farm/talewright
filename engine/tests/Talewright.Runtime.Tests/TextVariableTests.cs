@@ -1,7 +1,6 @@
-using System.Text;
-using System.Text.Json.Nodes;
 using Talewright.Core.Events;
 using Talewright.Narrative.Rendering;
+using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 
@@ -58,10 +57,9 @@ public class TextVariableTests
         Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
         Assert.Contains(restored.Events, e => e is TextVariableChanged { OldValue: "雪", NewValue: "" });
         var before = history.Save();
-        var json = JsonNode.Parse(before)!;
-        json["choices"]![1] = "missing";
-        Assert.Throws<InvalidDataException>(() =>
-            StoryHistory.Restore(result.Story!, Encoding.UTF8.GetBytes(json.ToJsonString())));
+        var saved = SaveFormat.Read(before);
+        var damaged = SaveFormat.Write(saved with { Choices = [saved.Choices[0], "missing", .. saved.Choices.Skip(2)] });
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(result.Story!, damaged));
         Assert.Equal(before, history.Save());
         Assert.Equal("", history.State.GetTextVariable(new("weather")));
 

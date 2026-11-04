@@ -66,14 +66,7 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
         const string slot = "Real corpus benchmark";
         var save = history.Save();
         var saveTimer = Stopwatch.StartNew();
-        await Page.EvaluateAsync(
-            """
-            async ({ storyId, slot, json }) => {
-                const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                await module.write(storyId, slot, new TextEncoder().encode(json), false);
-            }
-            """,
-            new { storyId = story.Id, slot, json = System.Text.Encoding.UTF8.GetString(save) });
+        await WriteBrowserSaveAsync(story.Id, slot, save);
         saveTimer.Stop();
         await Driver.ClickAsync("Saves");
         var restoreTimer = Stopwatch.StartNew();

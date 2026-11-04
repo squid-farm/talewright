@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
@@ -16,9 +14,8 @@ public sealed record HistoryFrame(StoryFrame Frame, IReadOnlyList<RenderedInline
 /// <summary>Deterministic choice history. Restores are built separately before replacing a live session.</summary>
 public sealed class StoryHistory
 {
-    public const int MaxChoices = 10_000;
-    public const int MaxSaveBytes = 2 * 1024 * 1024;
-    private const int FormatVersion = 2;
+    public const int MaxChoices = SaveFormat.MaxChoices;
+    public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
     private readonly List<string> _choices = [];
     private StorySession _session;
     private List<HistoryFrame> _frames;
@@ -107,28 +104,7 @@ public sealed class StoryHistory
 
     public byte[] Save(SaveSummary? summary = null)
     {
-        if (string.IsNullOrEmpty(Story.ContentFingerprint))
-        {
-            throw new InvalidOperationException("Saving is unavailable for this story. Ask the author to enable save compatibility for their custom extensions.");
-        }
-
-        if (_choices.Any(c => c.Length > 512))
-        {
-            throw new InvalidOperationException("This story contains a choice identifier that is too long to save. Contact the story author.");
-        }
-
-        var data = JsonSerializer.SerializeToUtf8Bytes(new SavedHistory
-        {
-            FormatVersion = FormatVersion,
-            StoryId = Story.Id,
-            StoryVersion = Story.Version,
-            ContentFingerprint = Story.ContentFingerprint,
-            Seed = Seed,
-            Choices = _choices.ToArray(),
-            Cursor = Cursor,
-            Character = Character,
-            Summary = summary is null ? null : JsonSerializer.SerializeToElement(summary, SaveJsonContext.Default.SaveSummary),
-        }, SaveJsonContext.Default.SavedHistory);
+        var data = SaveFormat.Write(ToSavedGame(summary));
         if (data.Length > MaxSaveBytes)
         {
             throw new InvalidOperationException("This playthrough is too large to save (maximum 2 MiB). You can continue playing, but this save could not be created.");
@@ -137,7 +113,36 @@ public sealed class StoryHistory
         return data;
     }
 
-    public string ProgressKey => Convert.ToHexString(SHA256.HashData(Save()));
+    /// <summary>Identifies replay progress. Equal for every save of the same playthrough, whatever its details.</summary>
+    public string ProgressKey => KeyOf(ToSavedGame(null));
+
+    private SavedGame ToSavedGame(SaveSummary? summary)
+    {
+        if (string.IsNullOrEmpty(Story.ContentFingerprint))
+        {
+            throw new InvalidOperationException("Saving is unavailable for this story. Ask the author to enable save compatibility for their custom extensions.");
+        }
+
+        if (_choices.Any(c => c.Length > SaveFormat.MaxChoiceKeyLength))
+        {
+            throw new InvalidOperationException("This story contains a choice identifier that is too long to save. Contact the story author.");
+        }
+
+        return new SavedGame
+        {
+            StoryId = Story.Id,
+            StoryVersion = Story.Version,
+            ContentFingerprint = Story.ContentFingerprint,
+            Seed = Seed,
+            Choices = _choices.ToArray(),
+            Cursor = Cursor,
+            Character = Character,
+            Summary = summary,
+        };
+    }
+
+    private static string KeyOf(SavedGame save) =>
+        Convert.ToHexString(SHA256.HashData(SaveFormat.EncodeBody(save with { Summary = null })));
 
     public bool TryProgressKey([NotNullWhen(true)] out string? progressKey)
     {
@@ -170,34 +175,13 @@ public sealed class StoryHistory
         {
             return new(slot, null, null, "Saved game is empty or exceeds 2 MiB.");
         }
+
         try
         {
-            var save = JsonSerializer.Deserialize(bytes, SaveJsonContext.Default.SavedHistory)
-                ?? throw new JsonException("Empty saved game.");
-            SaveSummary? summary = null;
-            string? warning = null;
-            if (save.Summary is { } metadata && metadata.ValueKind != JsonValueKind.Null)
-            {
-                try
-                {
-                    summary = metadata.Deserialize(SaveJsonContext.Default.SaveSummary);
-                    if (summary is null || string.IsNullOrWhiteSpace(summary.SceneTitle) || summary.SavedAt == default)
-                    {
-                        summary = null;
-                        warning = "Save details are unreadable.";
-                    }
-                }
-                catch (JsonException)
-                {
-                    warning = "Save details are unreadable.";
-                }
-            }
-            save.Summary = null;
-            var key = Convert.ToHexString(SHA256.HashData(
-                JsonSerializer.SerializeToUtf8Bytes(save, SaveJsonContext.Default.SavedHistory)));
-            return new(slot, summary, key, warning);
+            var save = SaveFormat.Read(bytes, out var summaryDamaged);
+            return new(slot, save.Summary, KeyOf(save), summaryDamaged ? "Save details are unreadable." : null);
         }
-        catch (JsonException)
+        catch (InvalidDataException)
         {
             return new(slot, null, null, "Saved game is malformed; loading will show the error.");
         }
@@ -205,38 +189,24 @@ public sealed class StoryHistory
 
     public static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data)
     {
-        if (data.Length > MaxSaveBytes)
+        var save = SaveFormat.Read(data);
+        if (save.StoryId != story.Id)
         {
-            throw new InvalidDataException("This saved game is too large to load (maximum 2 MiB). Choose another save.");
+            throw new InvalidDataException("This save belongs to a different story. Open it with the story and player version that created it.");
         }
 
-        SavedHistory save;
-        try
+        if (string.IsNullOrEmpty(story.ContentFingerprint))
         {
-            save = JsonSerializer.Deserialize(data, SaveJsonContext.Default.SavedHistory)
-                ?? throw new InvalidDataException("This saved game is empty. Choose another save or start a new game.");
-        }
-        catch (JsonException ex)
-        {
-            throw new InvalidDataException("This saved game is malformed or damaged. Choose another save or start a new game.", ex);
+            throw new InvalidDataException("This save is incompatible with the current story or player. Contact the story author.");
         }
 
-        if (save.FormatVersion != FormatVersion)
+        if (save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint)
         {
-            throw new InvalidDataException("This saved game uses an unsupported format. Open it with the player version that created it.");
-        }
-
-        if (string.IsNullOrEmpty(story.ContentFingerprint) ||
-            save.StoryId != story.Id || save.StoryVersion != story.Version ||
-            save.ContentFingerprint != story.ContentFingerprint)
-        {
-            throw new InvalidDataException("This save belongs to a different story or an incompatible story/extension version. Open it with the story and player version that created it.");
-        }
-
-        if (save.Choices is null || save.Choices.Length > MaxChoices || save.Cursor < 0 || save.Cursor > save.Choices.Length ||
-            save.Choices.Any(c => string.IsNullOrEmpty(c) || c.Length > 512))
-        {
-            throw new InvalidDataException("This saved game's history is damaged or exceeds the supported length. Choose another save.");
+            var version = save.StoryVersion;
+            var subject = !string.IsNullOrWhiteSpace(version) && version.Length <= 64 && !version.Any(char.IsControl)
+                ? $"Version {version} of {story.Title}"
+                : story.Title;
+            throw new InvalidDataException($"{subject} has changed, and this save is no longer compatible. Open it with the story and player version that created it.");
         }
 
         // Validate redo choices too, not just the visible prefix.
@@ -249,7 +219,7 @@ public sealed class StoryHistory
         {
             throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
         }
-        var timeline = new ReplayCursor(save.Cursor, save.Choices.Length);
+        var timeline = new ReplayCursor(save.Cursor, save.Choices.Count);
         var (session, frames) = Replay(story, save.Seed, save.Choices, character);
         if (timeline.CanForward)
         {
@@ -269,7 +239,7 @@ public sealed class StoryHistory
             var choice = session.Current!.Choices.FirstOrDefault(c => c.Key == key);
             if (choice is null)
             {
-                throw new InvalidDataException($"This saved game cannot continue at choice {frames.Count}. It may be damaged or belong to a different story version.");
+                throw new InvalidDataException("This saved game cannot continue because the story has changed or the save is damaged. It is no longer compatible.");
             }
 
             frames[^1] = frames[^1] with { Chosen = choice.Label };
@@ -279,23 +249,3 @@ public sealed class StoryHistory
         return (session, frames);
     }
 }
-
-internal sealed class SavedHistory
-{
-    public required int FormatVersion { get; init; }
-    public required string StoryId { get; init; }
-    public required string StoryVersion { get; init; }
-    public required string ContentFingerprint { get; init; }
-    public required ulong Seed { get; init; }
-    public required string[] Choices { get; init; }
-    public required int Cursor { get; init; }
-    public required CharacterSelection? Character { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Summary { get; set; }
-}
-
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
-[JsonSerializable(typeof(SavedHistory))]
-[JsonSerializable(typeof(SaveSummary))]
-internal partial class SaveJsonContext : JsonSerializerContext;
