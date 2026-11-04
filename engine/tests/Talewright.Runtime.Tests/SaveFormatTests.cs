@@ -149,7 +149,7 @@ public class SaveFormatTests
     public void Replay_evidence_round_trips_and_invalid_evidence_is_rejected()
     {
         var evidence = new byte[ReplayEvidence.Length];
-        evidence[0] = 1;
+        evidence[0] = 2;
         evidence[^1] = 42;
         var save = Sample with { ReplayEvidence = evidence };
         Assert.Equal(evidence, SaveFormat.Read(SaveFormat.Write(save)).ReplayEvidence);
@@ -376,7 +376,7 @@ public class SaveFormatTests
         if (evidence is not null)
         {
             random.NextBytes(evidence);
-            evidence[0] = 1;
+            evidence[0] = 2;
         }
         return Sample with
         {

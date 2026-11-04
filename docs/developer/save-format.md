@@ -79,7 +79,7 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 | Choice key | 1–512 characters | Saving and reading |
 | Character stats | 1,000 | Reading; array size checked before deserialization |
 | Summary UTC offset | ±14 hours | Reading (invalid details are dropped, not fatal) |
-| Replay evidence | 33 bytes, version 1 | Reading; malformed evidence rejects the save |
+| Replay evidence | 33 bytes, version 2 | Reading; malformed or unsupported evidence rejects the save |
 
 Collection counts are checked with `MessagePackReader` before the generated deserializer allocates
 their lists. Other decoded structures are bounded by the 8 MiB body limit. A repeated-choice
@@ -100,7 +100,7 @@ by successful synthetic replay tests.
 
 A save must have the same story id. With matching version and content fingerprint it can replay as
 before, and any evidence present is verified. Across changed source or story versions, it additionally
-needs version-1 replay evidence and the same engine replay/extension identity. The runtime validates
+needs version-2 replay evidence and the same engine replay/extension identity. The runtime validates
 the character, replays the entire choice history including redo, and accepts only when the evidence
 matches. It also checks that reconstructing the visible cursor reproduces the validated prefix and
 offered choices. The old bytes are never rewritten by loading. A later save uses the current story
