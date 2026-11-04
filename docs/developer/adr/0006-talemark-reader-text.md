@@ -3,6 +3,10 @@
 **Status:** Accepted. Supersedes only the Markdig portion of [ADR 0003](0003-tale-markup.md).
 Implementation is tracked in [#392](https://github.com/squid-farm/talewright/issues/392).
 
+The delimiter-only escape decision below was superseded by
+[#404](https://github.com/squid-farm/talewright/issues/404). Use the current
+[reader-text grammar](../../reference/talemark-operators.md#reader-text-grammar) for active rules.
+
 ## Context
 
 ADR 0003 parsed the prose inside Talemark with Markdig, a CommonMark library. Talemark already

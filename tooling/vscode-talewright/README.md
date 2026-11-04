@@ -227,11 +227,9 @@ ordinary prose and literal braces should remain comfortable to type. You can
 override these language-specific defaults in your VS Code settings.
 
 The grammar distinguishes scene headers, metadata, speech, effects, conditions,
-choices, substitutions, and checks. It also highlights inline Markdown emphasis,
-strong text, code, `{image("path", "alt text")}` calls, and links. Old Markdown images
-are highlighted as deprecated and reported with replacement guidance. Substitutions and conditionals inside a
-link label keep their Talemark colors, because the compiler renders the label text
-and drops the target. These colors describe syntax, not whether
+choices, substitutions, and checks. It also highlights bold, italic and code text,
+escapes and `{image("path", "alt text")}` calls. Old Markdown images are highlighted as
+deprecated and reported with replacement guidance. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
 images are currently placeholders, not image rendering support.
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;

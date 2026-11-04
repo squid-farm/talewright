@@ -145,8 +145,6 @@
                   "end": "\"|(?=$)",
                   "name": "string.quoted.double.tale",
                   "patterns": [
-                    {"match": "\\\\[\"\\\\{}\\[\\]*_`]", "name": "constant.character.escape.tale"},
-                    {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"},
                     {"include": "#inline"}
                   ]
                 }
@@ -234,7 +232,7 @@
     },
     "inline": {
       "patterns": [
-        {"match": "\\\\[{}\\[\\]*_`]","name": "constant.character.escape.tale"},
+        {"match": "\\\\[!-~&&[^A-Za-z0-9]]", "name": "constant.character.escape.tale"},
         {"include": "#template"},
         {
           "begin": "(`+)(?=(?:(?!\\1(?!`))(?:\\\\.|.))*\\1(?!`))",
@@ -244,7 +242,7 @@
           "name": "markup.inline.raw.string.markdown",
           "patterns": [
             {"include": "#template"},
-            {"match": "\\\\[{}\\[\\]*_`]","name": "constant.character.escape.tale"}
+            {"match": "\\\\[!-~&&[^A-Za-z0-9]]", "name": "constant.character.escape.tale"}
           ]
         },
         {

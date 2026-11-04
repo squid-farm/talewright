@@ -58,6 +58,28 @@ test('TextMate scopes agree with the owned vocabulary contract', async () => {
   }
 });
 
+test('emphasis scopes match the shared compiler corpus and record its known difference', async () => {
+  const cases = JSON.parse(await readFile(
+    new URL('../../../engine/tests/Talewright.Talemark.Tests/Fixtures/reader-text-emphasis-parity.json', import.meta.url),
+    'utf8',
+  ));
+  assert.equal(cases.filter(testCase => testCase.knownDifference).length, 1);
+  for (const { input, segments } of cases) {
+    const lineTokens = tokens(input).tokens;
+    for (const { start, length, text, styles } of segments) {
+      assert.equal(input.slice(start, start + length), text, `${input}: invalid fixture range`);
+      for (let offset = start; offset < start + length; offset++) {
+        const token = lineTokens.find(candidate => candidate.startIndex <= offset && candidate.endIndex > offset);
+        const actualStyles = token.scopes
+          .filter(scope => /^markup\.(bold|italic)\.markdown$/.test(scope))
+          .map(scope => scope.includes('.bold.') ? 'bold' : 'italic')
+          .sort();
+        assert.deepEqual(actualStyles, [...styles].sort(), `${input}: unexpected formatting at ${offset}`);
+      }
+    }
+  }
+});
+
 test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
   for (const [line, text, scope] of [
     ['=== temple.hall', 'temple.hall', 'entity.name.section.tale'],
@@ -175,6 +197,8 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     assert.ok(!scopes.includes('keyword.control.metadata.tale'), line);
   }
   assert.ok(!tokens('Literal \\{player:first-name\\}').tokens.some(token => token.scopes.includes('meta.template.tale')));
+  hasScope(String.raw`a \. b`, String.raw`\.`, 'constant.character.escape.tale');
+  hasScope(String.raw`a \— b`, String.raw`—`, 'text.tale');
   assert.ok(!tokens('A -> sign in prose').tokens.some(token => token.scopes.includes('keyword.control.divert.tale')));
   assert.ok(!tokens('snake_case_words').tokens.some(token => token.scopes.includes('markup.italic.markdown')));
   for (const [line, text] of [
@@ -219,6 +243,53 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
   const close = requires.indexOf(') ->');
   const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);
   assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
+});
+
+test('image alt text follows reader-text escapes while the path stays strict', () => {
+  for (const line of [String.raw`{image("camp", "a \q b")}`, String.raw`{image("camp", "a \. b")}`, String.raw`{image("camp", "a \ b")}`]) {
+    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.illegal.escape.tale')), line);
+  }
+  hasScope(String.raw`{image("camp", "a \q b")}`, String.raw`\q`, 'string.quoted.double.tale');
+  hasScope(String.raw`{image("camp", "a \. b")}`, String.raw`\.`, 'constant.character.escape.tale');
+  hasScope(String.raw`{image("camp\q", "alt")}`, String.raw`\q`, 'invalid.illegal.escape.tale');
+});
+
+test('reader-text highlighting escapes exactly the ASCII punctuation and symbols', () => {
+  const punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+  for (const character of punctuation) {
+    const escape = `\\${character}`;
+    const line = `text ${escape} end`;
+    const offset = line.indexOf(escape);
+    const token = tokens(line).tokens.find(item => item.startIndex <= offset && item.endIndex > offset + 1);
+    assert.ok(token?.scopes.includes('constant.character.escape.tale'), line);
+  }
+  for (const character of ['a', '1', ' ', '—']) {
+    const line = `text \\${character} end`;
+    const offset = line.indexOf('\\');
+    const token = tokens(line).tokens.find(item => item.startIndex <= offset && item.endIndex > offset);
+    assert.ok(!token.scopes.includes('constant.character.escape.tale'), line);
+  }
+});
+
+test('literal backslashes inside reader text do not suppress emphasis', () => {
+  for (const [line, text, scope] of [
+    [String.raw`*look \q here*`, 'here', 'markup.italic.markdown'],
+    [String.raw`*look \ here*`, 'here', 'markup.italic.markdown'],
+    [String.raw`**look \— here**`, 'here', 'markup.bold.markdown'],
+    [String.raw`**look \. here**`, 'here', 'markup.bold.markdown'],
+  ]) hasScope(line, text, scope);
+});
+
+test('escaped leading markers remain reader text', () => {
+  for (const [line, directiveScope] of [
+    [String.raw`\* [Go] -> hall`, 'punctuation.definition.choice.tale'],
+    [String.raw`\> guide: Hello`, 'punctuation.definition.speech.tale'],
+    [String.raw`\=== hall`, 'entity.name.section.tale'],
+    [String.raw`\{player}`, 'meta.template.tale'],
+  ]) {
+    hasScope(line, line.slice(0, 2), 'constant.character.escape.tale');
+    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes(directiveScope)), line);
+  }
 });
 
 test('choice conditions highlight only the exact requires marker', () => {

@@ -1,0 +1,99 @@
+[
+  {
+    "input": "*emphasis*",
+    "expected": "[I: emphasis]",
+    "segments": [
+      { "start": 1, "length": 8, "text": "emphasis", "styles": ["italic"] }
+    ]
+  },
+  {
+    "input": "_emphasis_",
+    "expected": "[I: emphasis]",
+    "segments": [
+      { "start": 1, "length": 8, "text": "emphasis", "styles": ["italic"] }
+    ]
+  },
+  {
+    "input": "**strong**",
+    "expected": "[B: strong]",
+    "segments": [
+      { "start": 2, "length": 6, "text": "strong", "styles": ["bold"] }
+    ]
+  },
+  {
+    "input": "__strong__",
+    "expected": "[B: strong]",
+    "segments": [
+      { "start": 2, "length": 6, "text": "strong", "styles": ["bold"] }
+    ]
+  },
+  {
+    "input": "*(door)*",
+    "expected": "[I: (door)]",
+    "segments": [
+      { "start": 1, "length": 6, "text": "(door)", "styles": ["italic"] }
+    ]
+  },
+  {
+    "input": "**bold *italic* bold**",
+    "expected": "[B: bold ][B+I: italic][B:  bold]",
+    "segments": [
+      { "start": 2, "length": 5, "text": "bold ", "styles": ["bold"] },
+      { "start": 8, "length": 6, "text": "italic", "styles": ["bold", "italic"] },
+      { "start": 15, "length": 5, "text": " bold", "styles": ["bold"] }
+    ]
+  },
+  {
+    "input": "**_combined_**",
+    "expected": "[B+I: combined]",
+    "segments": [
+      { "start": 3, "length": 8, "text": "combined", "styles": ["bold", "italic"] }
+    ]
+  },
+  {
+    "input": "__*combined*__",
+    "expected": "[B+I: combined]",
+    "segments": [
+      { "start": 3, "length": 8, "text": "combined", "styles": ["bold", "italic"] }
+    ]
+  },
+  {
+    "input": "_**combined**_",
+    "expected": "[B+I: combined]",
+    "segments": [
+      { "start": 3, "length": 8, "text": "combined", "styles": ["bold", "italic"] }
+    ]
+  },
+  {
+    "input": "*__combined__*",
+    "expected": "[B+I: combined]",
+    "segments": [
+      { "start": 3, "length": 8, "text": "combined", "styles": ["bold", "italic"] }
+    ]
+  },
+  {
+    "input": "**a*b**",
+    "expected": "[B: a*b]",
+    "segments": [
+      { "start": 2, "length": 3, "text": "a*b", "styles": ["bold"] }
+    ]
+  },
+  {
+    "input": "_under_ and __strong__",
+    "expected": "[I: under] and [B: strong]",
+    "segments": [
+      { "start": 1, "length": 5, "text": "under", "styles": ["italic"] },
+      { "start": 7, "length": 5, "text": " and ", "styles": [] },
+      { "start": 14, "length": 6, "text": "strong", "styles": ["bold"] }
+    ]
+  },
+  {
+    "input": "*a **b* c**",
+    "expected": "*a [B: b* c]",
+    "knownDifference": true,
+    "segments": [
+      { "start": 1, "length": 2, "text": "a ", "styles": ["italic"] },
+      { "start": 5, "length": 4, "text": "b* c", "styles": ["bold", "italic"] }
+    ]
+  }
+]

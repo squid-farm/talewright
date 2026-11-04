@@ -267,9 +267,7 @@ internal static class DelimiterScanner
     }
 
     internal static bool IsReaderTextEscape(char character) =>
-        character is TextVocabulary.EscapeMark or SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose or
-            SceneVocabulary.OpenBracket or SceneVocabulary.CloseBracket or SceneVocabulary.ChoiceMarker or
-            SceneVocabulary.EmphasisMarker or SceneVocabulary.CodeMarker;
+        character <= 0x7F && (char.IsPunctuation(character) || char.IsSymbol(character));
 
     private static bool TryGetDelimiter(
         char character,

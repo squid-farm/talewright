@@ -38,16 +38,16 @@ Pronoun properties use `character:pronoun:subject`, `:object`, `:reflexive`,
 
 ### Reader text, quotes and escapes
 
-**Decided, not fully implemented:** reader-facing text inside syntax uses double quotes.
+Reader-facing text inside syntax uses double quotes.
 Names remain bare. `"Joel's cat"` is text; `weapon.knife` is a name. Single quotes are not a second
 Talemark string delimiter: apostrophes are ordinary text.
 
-Backslash is the escape character everywhere. Inside double quotes, `\"` means a literal double
-quote and `\\` means a literal backslash. In prose, `\{` and `\}` mean literal braces.
-For example, `"She said \"Go\"."` contains `She said "Go".`.
-Expression strings, modifier arguments, and image path/alt arguments all decode these escapes.
-Other escapes, including `\n` and `\u0041`, are errors. These rules do not introduce a
-quoted choice-label spelling or a new formatting feature.
+Inside double-quoted strings, `\"` means a literal double quote and `\\` means a literal
+backslash. Expression strings, modifier arguments and image paths accept only those two escapes.
+In reader text, a backslash before any ASCII punctuation or symbol quotes that character, so
+`\{` and `\}` show literal braces; a backslash before letters, digits, whitespace or non-ASCII
+characters remains visible. Image alt text uses this reader-text rule. These rules do not introduce
+a quoted choice-label spelling or a new formatting feature.
 
 Write `"C:\\stories"` for the text `C:\stories`. A single backslash inside a Talemark string
 must now be doubled, including in stories written before escape decoding was implemented.
@@ -57,9 +57,9 @@ titles, dialogue and choice labels still use their current unquoted forms:
 `@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`.
 Do not add quotes to those forms expecting them to be removed.
 Image calls use `{image("path", "alt text")}`. The path is a literal string. Alt text uses the
-same reader-text grammar as prose, including `\{`, `\}`, `\*`, `\_`, `\[` and `\]` for literal
-delimiters. Both arguments decode `\"` and `\\`; alt text also accepts backtick escapes. Unknown
-image escapes produce TW1014. A nested `{image(...)}` in alt text also produces TW1014. See the
+same reader-text grammar as prose. Both arguments decode `\"` and `\\`; other path escapes produce
+TW1014, while unknown letter escapes in alt text remain literal. A nested `{image(...)}` in alt
+text also produces TW1014. See the
 [reader-text grammar](#reader-text-grammar).
 
 The manifest is YAML, not Talemark: YAML quoting and escaping still apply there. A Talemark
@@ -156,16 +156,15 @@ Known inconsistencies, recorded for follow-up rather than changed here:
   and extensibility belong to [#193](https://github.com/squid-farm/talewright/issues/193).
 - General multi-argument modifiers are not implemented; only `#one-many` takes arguments
   (#184, #193).
-- Image alt text is read as reader text only when it contains `{`. The approved rule makes it always
-  reader text in [#401](https://github.com/squid-farm/talewright/issues/401).
 
 ## Structural markers
 
 These markers select a construct rather than taking part in arithmetic. Their precedence is
 **structural**: line directives are recognized before prose formatting; braces inside prose are
 recognized before bold, italic and code formatting. A code span does not hide a substitution.
-Each row gives its arguments and boundaries. Escaping follows the quote/prose rules above;
-there is no general escape for a line directive today. Do not assume that `\@` or `\===` escapes one.
+Each row gives its arguments and boundaries.
+Escaping follows the quote/prose rules above: a leading backslash before ASCII punctuation is
+handled as reader text, so `\* [Go] -> hall` is prose rather than a choice.
 
 | Marker | Meaning, context and arguments | Canonical example | Diagnostics |
 |---|---|---|---|
@@ -206,7 +205,7 @@ using the quoted-text rules when it is inside syntax.
 | `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value. |
 | `(` `)` | Group an expression; also bound `visited`'s scene argument, modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
 | `"` | Bound text literals, modifier string arguments and image arguments. All decode `\"` and `\\`; no single-quoted Talemark string form. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
-| `\` | Escape a quote or backslash inside strings, or a brace in prose. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |
+| `\` | Escape a quote or backslash inside literal strings, or ASCII punctuation and symbols in reader text. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |
 | `,` | Separate metadata tags, hub arguments and image arguments today; decided separator for multiple double-quoted modifier arguments. Each modifier defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; multi-argument modifiers are not implemented (TW2006). |
 | Unary `-` | Negate one number. | 2 | `{var:coins + -3}` | TW2003 non-number; TW1002 oversized literal. |
 | `*` `/` | Integer multiplication and division; two numbers. A slash also appears in `{/if}` and `//` comments, with structural meanings. | 3 | `{var:coins / 2}` | TW2003 non-numbers; TW1001 missing operand. |
@@ -325,7 +324,7 @@ Broader typography and presentation remain in
 **Implemented.** [ADR 0006](../developer/adr/0006-talemark-reader-text.md) records
 the decision. [#400](https://github.com/squid-farm/talewright/issues/400) adds the bounded scanner and
 [#401](https://github.com/squid-farm/talewright/issues/401) replaces Markdig with these rules.
-Until #401 ships, the current behavior above and in the corpus's *Current* column applies.
+The [escape update](#escapes) applies a single punctuation rule across reader text.
 CommonMark is not the specification. Anything not listed here is literal text.
 
 ### Text units
@@ -355,17 +354,16 @@ are single lines.
 
 ### Escapes
 
-A backslash followed by one of `\`, `{`, `}`, `[`, `]`, `*`, `_` or a backtick produces that
-character literally. Escapes work the same way inside code spans. In a quoted reader-text slot
-such as alt text, `\"` is also an escape. Escapes are decoded once: finding the closing quote does
-not decode anything.
+A backslash before any ASCII punctuation or symbol character quotes exactly that character. The
+backslash is removed, and the character is literal rather than opening syntax. `\\` therefore
+shows one backslash. Backslashes before letters, digits, whitespace or non-ASCII characters stay
+visible: `C:\stories`, `\a` and `\—` display as written. This applies in prose, dialogue, choice
+labels and image alt text, including inside code spans. A quoted image path remains strict; a
+quoted alt also uses `\"` for a quote. Unknown letter escapes in alt text remain literal.
 
-In unquoted reader text, any other backslash is literal, so `C:\stories` and `\.` display as
-written. A quoted slot is strict: an unknown escape is that construct's error, such as TW1014 for
-alt text. A trailing `\` on a paragraph line followed by another line of the same paragraph is a
-hard line break. On a paragraph's last line, or in speech text and labels, it is a literal
-backslash. Trailing spaces never create a break. Line directives have no escape; that proposal
-is [#404](https://github.com/squid-farm/talewright/issues/404).
+A trailing `\` on a paragraph line followed by another line of the same paragraph is a hard line
+break. On a paragraph's last line, or in speech text and labels, it is a literal backslash.
+Trailing spaces never create a break.
 
 ### Emphasis and strong
 
@@ -454,8 +452,8 @@ escaped as `\"`; the path is inserted verbatim. Thus `![A "torch"](torch)` sugge
 
 Alt text always uses this grammar, whether or not it contains `{`. The reader sees plain text:
 formatting is dropped, code-span text is kept, and a hard break becomes a space. Its escapes are
-`\"` plus the reader-text escapes; other escapes report TW1014, and a nested `{image(...)}` reports
-TW1014. Missing-alt warnings are decided from the authored alt, as today.
+`\"` plus the reader-text punctuation rule; unknown letter escapes remain literal. A nested
+`{image(...)}` still reports TW1014. Missing-alt warnings are decided from the authored alt, as today.
 
 ### Example corpus
 
@@ -484,7 +482,7 @@ strong and `[C: ...]` is code.
 | 17 | ``` `a \{b\} c` ``` | `[C: a \{b\} c]` | `[C: a {b} c]` |
 | 18 | ```` `` a`b `` ```` | ``` [C: a`b] ``` | Same. |
 | 19 | `\* \_ \[ \] \{ \} \\` | `* _ [ ] { } \` | Same. |
-| 20 | `\. \# \> \& \a` | `. # > & \a` | Literal, backslashes kept. |
+| 20 | `\. \# \> \& \a` | `. # > & \a` | `. # > & \a` |
 | 21 | `line one\` ⏎ `line two` | Hard break. | Same. |
 | 22 | `She said "hi" (quietly) [aside]` | Literal. | Same. |
 | 23 | `* [Open [the] door] -> END` | Label `Open [the] door`. | Same. |
@@ -523,14 +521,14 @@ The language server uses the shared authoring completion provider.
 | `#one-many("singular", "plural")` | Pronoun selection implemented in [#192](https://github.com/squid-farm/talewright/issues/192); item-name selection in [#308](https://github.com/squid-farm/talewright/issues/308). Uses effective pronoun `agreement` or item `name-agreement`, never quantity. |
 | Item `name-agreement` / `uncountable`, `#a` / `#the` / `#this` / `#that` | Implemented in [#308](https://github.com/squid-farm/talewright/issues/308); explicit helpers retain original-reference grammar through chains, with no object-copy semantics. |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
-| `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/modifier strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Prose `\{` and `\}` also work. |
+| `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/modifier strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Reader text uses the broader punctuation-escape rule in [#404](https://github.com/squid-farm/talewright/issues/404). |
 | Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal is handled in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers are tracked by [#403](https://github.com/squid-farm/talewright/issues/403). |
 | Alt text always reader text | Approved in [#399](https://github.com/squid-farm/talewright/issues/399); implemented in [#401](https://github.com/squid-farm/talewright/issues/401). |
 | Choice clauses | Both orders remain accepted; [#384](https://github.com/squid-farm/talewright/issues/384) diagnoses duplicate, incomplete and misplaced clauses. |
-| Line-directive escape | Not approved. Optional and decision-gated in [#404](https://github.com/squid-farm/talewright/issues/404). |
+| Line-directive escape | A leading backslash before ASCII punctuation is reader text, not a directive; it uses the same escape rule as prose ([#404](https://github.com/squid-farm/talewright/issues/404)). |
 | [Callable construct contract](#callable-construct-contract) | Documentation contract for new callables. Existing inconsistencies are recorded for [#184](https://github.com/squid-farm/talewright/issues/184) and [#193](https://github.com/squid-farm/talewright/issues/193); no syntax changed. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
 

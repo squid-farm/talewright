@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
@@ -48,7 +49,12 @@ public sealed class ReaderTextGrammarTests
     [InlineData(@"`a \{b\} c`", "[C: a {b} c]")]
     [InlineData("`` a`b ``", "[C: a`b]")]
     [InlineData(@"\* \_ \[ \] \{ \} \\", "* _ [ ] { } \\")]
-    [InlineData(@"\. \# \> \& \a", @"\. \# \> \& \a")]
+    [InlineData(@"\. \# \> \& \= \a \1 \—", @". # > & = \a \1 \—")]
+    [InlineData(@"\{player}", "{player}")]
+    [InlineData(@"A \{player\} and \*emphasis* stay literal", "A {player} and *emphasis* stay literal")]
+    [InlineData(@"\* [Go] -> hall", "* [Go] -> hall")]
+    [InlineData(@"\> guide: Hello", "> guide: Hello")]
+    [InlineData(@"\= ordinary text", "= ordinary text")]
     [InlineData("line one\\\nline two", "line one\nline two")]
     [InlineData("She said \"hi\" (quietly) [aside]", "She said \"hi\" (quietly) [aside]")]
     public void Approved_reader_text_corpus_is_preserved(
@@ -71,6 +77,40 @@ public sealed class ReaderTextGrammarTests
         var actual = string.Concat(paragraph.Inlines.Select(Describe));
 
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Emphasis_matches_the_shared_editor_grammar_corpus()
+    {
+        var fixturePath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "reader-text-emphasis-parity.json");
+        var cases = JsonSerializer.Deserialize<EmphasisParityCase[]>(
+            File.ReadAllText(fixturePath),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        Assert.NotNull(cases);
+
+        foreach (var testCase in cases)
+        {
+            var source = new StorySource(new Dictionary<string, string>
+            {
+                [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+                ["main.tale"] = $"=== start\n{testCase.Input}\n-> END",
+            });
+            var result = StoryCompiler.Compile(source);
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+            var story = result.Story!;
+            var scene = story.GetScene(new SceneId("start"));
+            var document = new TemplateRenderer().Render(
+                CompilerTests.Templates(scene),
+                GameState.CreateInitial(story.World, 1));
+            var paragraph = Assert.IsType<RenderedParagraph>(Assert.Single(document.Blocks));
+            var actual = string.Concat(paragraph.Inlines.Select(Describe));
+
+            Assert.Equal(testCase.Expected, actual);
+        }
     }
 
     [Fact]
@@ -99,6 +139,44 @@ public sealed class ReaderTextGrammarTests
             new DiagnosticBag());
 
         Assert.InRange(result.WorkUnits, input.Length, 10 * input.Length);
+    }
+
+    [Fact]
+    public void Every_ascii_punctuation_character_can_be_escaped_as_reader_text()
+    {
+        const string punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+        foreach (var character in punctuation)
+        {
+            var diagnostics = new DiagnosticBag();
+            var inlines = InlineParser.Parse(
+                SourceText.Single("\\" + character, SourceLocation.None),
+                Symbols(),
+                diagnostics);
+
+            Assert.Empty(diagnostics.Items);
+            Assert.Equal(character.ToString(),
+                string.Concat(inlines.Select(inline => Assert.IsType<TextTemplate>(inline).Text)));
+        }
+    }
+
+    [Fact]
+    public void Paired_trailing_backslashes_render_as_one_literal_backslash()
+    {
+        const string inline = "line one\\\\";
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = $"=== start\n{inline}\n-> END",
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var scene = result.Story!.GetScene(new SceneId("start"));
+        var document = new TemplateRenderer().Render(
+            CompilerTests.Templates(scene),
+            GameState.CreateInitial(result.Story.World, 1));
+        var paragraph = Assert.IsType<RenderedParagraph>(Assert.Single(document.Blocks));
+        Assert.Equal("line one\\", string.Concat(paragraph.Inlines.Select(Describe)));
     }
 
     [Theory]
@@ -161,6 +239,8 @@ public sealed class ReaderTextGrammarTests
         RenderedLineBreak => "\n",
         _ => throw new NotSupportedException($"Unexpected rendered inline '{inline.GetType().Name}'."),
     };
+
+    private sealed record EmphasisParityCase(string Input, string Expected);
 
     private static string StyleName(TextStyle style)
     {

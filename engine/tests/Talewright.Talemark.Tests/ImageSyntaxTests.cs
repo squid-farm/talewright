@@ -140,11 +140,11 @@ public sealed class ImageSyntaxTests
     [InlineData("""{image("  ")}""", "non-empty path")]
     [InlineData("""{image("camp",)}""", "double quotes")]
     [InlineData("""{image("camp", alt)}""", "double quotes")]
+    [InlineData("""{image("ca\qmp", "Alt")}""", "Unknown image string escape")]
     [InlineData("""{image("camp", "Alt", "extra")}""", "Expected ')'")]
     [InlineData("""{image("camp" "Alt")}""", "Expected ')'")]
     [InlineData("""{image("camp", "Alt"}""", "Expected ')'")]
     [InlineData("""{image("camp")#upper}""", "Unexpected text")]
-    [InlineData("""{image("camp", "\q")}""", "Unknown image string escape")]
     [InlineData("""{image("ca\{mp", "Alt")}""", "Unknown image string escape")]
     [InlineData("""{image("camp", "unclosed)}""", "closing double quote")]
     [InlineData("""{image("camp")""", "closing '}'")]
@@ -160,7 +160,7 @@ public sealed class ImageSyntaxTests
     [Fact]
     public void Invalid_escape_has_an_exact_utf16_source_location()
     {
-        const string line = """🦑 {image("camp", "bad \q")}""";
+        const string line = """🦑 {image("ca\qmp", "alt")}""";
         var result = Compile("=== start\r\n" + line + "\r\n-> END");
         var error = Assert.Single(result.Errors, error => error.Code == "TW1014");
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf('\\') + 1), error.Location);
@@ -169,8 +169,6 @@ public sealed class ImageSyntaxTests
     [Theory]
     [InlineData("""{image("ca\{mp", "Alt")}""",
         """Unknown image string escape. Use '\"' for a quote or '\\' for a backslash.""")]
-    [InlineData("""{image("camp", "\q")}""",
-        """Unknown image string escape. Use '\"', '\\', or a reader-text escape such as '\{' or '\*'.""")]
     public void Invalid_escape_diagnostic_names_valid_spellings(string call, string message)
     {
         var result = Compile($"=== start\n{call}\n-> END");

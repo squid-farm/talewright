@@ -6,7 +6,7 @@ in subfolders, and any number of `*.tale` files.
 It lets you mix prose with bold, italic and code formatting, dialogue, choices and story rules. The
 YAML manifest is a separate settings file for the story's characters and world; it is not Talemark
 source. Talemark is not Markdown: it has its own small
-[reader-text grammar](talemark-operators.md#reader-text-grammar) for bold, italic and code, and a
+[reader-text grammar](talemark-operators.md#reader-text-grammar) for escapes, bold, italic and code, and a
 `.tale` file is not a general Markdown document.
 
 New to Talewright? Start with the [author guide](../guide/README.md). The examples below are a quick
@@ -396,11 +396,15 @@ Several conditional diverts may precede the choices; the first reached divert en
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
 by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 
+**Reader-text escapes.** A backslash before an ASCII punctuation or symbol character shows that
+character literally. For example, `\* [Go] -> hall` is prose, not a choice. A backslash before a
+letter, digit, space or non-ASCII character stays visible, as in `C:\stories` and `\—`.
+
 **Reader text is not Markdown.** Talemark implements its own small
 [reader-text grammar](talemark-operators.md#reader-text-grammar): word-boundary bold and italic,
-code spans and inline constructs. Italic may use `*emphasis*` or `_emphasis_`; bold may use
-`**strong**` or `__strong__`. Unsupported Markdown-like syntax, including links, entities,
-headings and lists, remains literal text.
+code spans, inline constructs and ASCII punctuation escapes. Italic may use
+`*emphasis*` or `_emphasis_`; bold may use `**strong**` or `__strong__`. Unsupported Markdown-like
+syntax, including links, entities, headings and lists, remains literal text.
 
 ## 3. Substitutions
 
@@ -547,10 +551,10 @@ braces in it are filename characters, not substitutions. Alt text is optional:
 `{image("maps/old_map-v2")}`.
 
 Inside either argument, `\"` means a quote and `\\` means a backslash. Any other backslash escape
-in the path is an error. Alt text also accepts the reader-text escapes `\{`, `\}`, `\[`, `\]`,
-`\*`, `\_` and `` \` ``; any other backslash escape is an error. Apostrophes, commas, parentheses
-and brackets are literal within the quotes. Whitespace is allowed around `image`, parentheses and
-arguments.
+in the path is an error. Alt text follows the reader-text escape rule: a backslash before any ASCII
+punctuation or symbol quotes that character, while a backslash before a letter, digit, whitespace
+or non-ASCII character stays visible. Apostrophes, commas, parentheses and brackets are literal
+within the quotes. Whitespace is allowed around `image`, parentheses and arguments.
 
 Alt text uses the same template language as prose, rendered with the state where the image appears:
 
@@ -562,7 +566,7 @@ That shows the guide's first name. Alt text always uses the reader-text grammar,
 substitutions, formatting and code spans work even when no substitution is present. The rendered
 alt is plain text, since an image description cannot keep bold or italic. For example,
 `"**The guide**"` reads `The guide`. Use `\"` for a quote and the reader-text escapes for literal
-delimiters; an unknown escape is TW1014.
+punctuation. Unknown letter escapes remain literal instead of producing TW1014.
 There is no nested `{image(...)}`. Describe the picture in words. A reference the story does not
 know, such as an unknown character, is an error at that reference.
 
