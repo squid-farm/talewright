@@ -156,8 +156,6 @@ Known inconsistencies, recorded for follow-up rather than changed here:
   and extensibility belong to [#193](https://github.com/squid-farm/talewright/issues/193).
 - General multi-argument modifiers are not implemented; only `#one-many` takes arguments
   (#184, #193).
-- Image alt text is read as reader text only when it contains `{`. The approved rule makes it always
-  reader text in [#401](https://github.com/squid-farm/talewright/issues/401).
 
 ## Structural markers
 
@@ -520,7 +518,7 @@ The language server uses the shared authoring completion provider.
 | [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal is handled in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers are tracked by [#403](https://github.com/squid-farm/talewright/issues/403). |
 | Alt text always reader text | Approved in [#399](https://github.com/squid-farm/talewright/issues/399); implemented in [#401](https://github.com/squid-farm/talewright/issues/401). |
 | Choice clauses | Both orders remain accepted; [#384](https://github.com/squid-farm/talewright/issues/384) diagnoses duplicate, incomplete and misplaced clauses. |
-| Line-directive escape | Not approved. Optional and decision-gated in [#404](https://github.com/squid-farm/talewright/issues/404). |
+| Line-directive escape | A leading backslash before ASCII punctuation is reader text, not a directive; it uses the same escape rule as prose ([#404](https://github.com/squid-farm/talewright/issues/404)). |
 | [Callable construct contract](#callable-construct-contract) | Documentation contract for new callables. Existing inconsistencies are recorded for [#184](https://github.com/squid-farm/talewright/issues/184) and [#193](https://github.com/squid-farm/talewright/issues/193); no syntax changed. |
 | Checkpoints/autosaves | Syntax is still to be chosen in [#54](https://github.com/squid-farm/talewright/issues/54) using the checklist. `@once` means storylet eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
 

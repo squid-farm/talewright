@@ -253,6 +253,32 @@ test('image alt text follows reader-text escapes while the path stays strict', (
   hasScope(String.raw`{image("camp\q", "alt")}`, String.raw`\q`, 'invalid.illegal.escape.tale');
 });
 
+test('reader-text highlighting escapes exactly the ASCII punctuation and symbols', () => {
+  const punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+  for (const character of punctuation) {
+    const escape = `\\${character}`;
+    const line = `text ${escape} end`;
+    const offset = line.indexOf(escape);
+    const token = tokens(line).tokens.find(item => item.startIndex <= offset && item.endIndex > offset + 1);
+    assert.ok(token?.scopes.includes('constant.character.escape.tale'), line);
+  }
+  for (const character of ['a', '1', ' ', '—']) {
+    const line = `text \\${character} end`;
+    const offset = line.indexOf('\\');
+    const token = tokens(line).tokens.find(item => item.startIndex <= offset && item.endIndex > offset);
+    assert.ok(!token.scopes.includes('constant.character.escape.tale'), line);
+  }
+});
+
+test('literal backslashes inside reader text do not suppress emphasis', () => {
+  for (const [line, text, scope] of [
+    [String.raw`*look \q here*`, 'here', 'markup.italic.markdown'],
+    [String.raw`*look \ here*`, 'here', 'markup.italic.markdown'],
+    [String.raw`**look \— here**`, 'here', 'markup.bold.markdown'],
+    [String.raw`**look \. here**`, 'here', 'markup.bold.markdown'],
+  ]) hasScope(line, text, scope);
+});
+
 test('choice conditions highlight only the exact requires marker', () => {
   const valid = '* [Continue] (requires: flag:ready) -> END';
   hasScope(valid, 'requires', 'keyword.control.tale');
