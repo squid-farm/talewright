@@ -196,6 +196,7 @@ test('the grammar leaves emphasis and reader-text escapes in image alt text to t
     assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.illegal.escape.tale')), line);
   }
   hasScope(String.raw`{image("camp", "a \q b")}`, String.raw`\q`, 'string.quoted.double.tale');
+  hasScope(String.raw`{image("camp\q", "alt")}`, String.raw`\q`, 'invalid.illegal.escape.tale');
 });
 
 test('choice conditions highlight only the exact requires marker', () => {
