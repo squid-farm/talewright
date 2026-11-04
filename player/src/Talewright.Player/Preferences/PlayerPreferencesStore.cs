@@ -11,10 +11,15 @@ public enum PlayerTheme
     Dark,
 }
 
-public sealed record PlayerPreferences(int Version, PlayerTheme Theme)
+public sealed record PlayerPreferences(int Version, PlayerTheme Theme, int TextSizePercent)
 {
     public const int CurrentVersion = 1;
-    public static PlayerPreferences Default { get; } = new(CurrentVersion, PlayerTheme.System);
+    public const int DefaultTextSizePercent = 100;
+    public static IReadOnlyList<int> SupportedTextSizes { get; } = Array.AsReadOnly([100, 125, 150, 175, 200]);
+    public static PlayerPreferences Default { get; } =
+        new(CurrentVersion, PlayerTheme.System, DefaultTextSizePercent);
+
+    public static bool IsSupportedTextSize(int percent) => SupportedTextSizes.Contains(percent);
 }
 
 public sealed class PlayerPreferencesStore(
@@ -51,6 +56,7 @@ public sealed class PlayerPreferencesStore(
 
         Current = Parse(value);
         await _module.InvokeVoidAsync("applyTheme", ThemeValue(Current.Theme));
+        await _module.InvokeVoidAsync("applyTextSize", Current.TextSizePercent);
         _initialized = true;
     }
 
@@ -60,25 +66,49 @@ public sealed class PlayerPreferencesStore(
         {
             throw new ArgumentOutOfRangeException(nameof(theme), theme, "Unknown player theme.");
         }
-        if (!_initialized || _module is null)
+        var module = _module;
+        if (!_initialized || module is null)
         {
             throw new InvalidOperationException("Player preferences must be initialized before they can be changed.");
         }
 
-        Current = new(PlayerPreferences.CurrentVersion, theme);
-        await _module.InvokeVoidAsync("applyTheme", ThemeValue(theme));
+        Current = Current with { Version = PlayerPreferences.CurrentVersion, Theme = theme };
+        await module.InvokeVoidAsync("applyTheme", ThemeValue(theme));
+        await PersistAsync(module);
+    }
+
+    public async Task SetTextSizeAsync(int textSizePercent)
+    {
+        if (!PlayerPreferences.IsSupportedTextSize(textSizePercent))
+        {
+            throw new ArgumentOutOfRangeException(nameof(textSizePercent), textSizePercent,
+                "Unknown player text size.");
+        }
+        var module = _module;
+        if (!_initialized || module is null)
+        {
+            throw new InvalidOperationException("Player preferences must be initialized before they can be changed.");
+        }
+
+        Current = Current with { Version = PlayerPreferences.CurrentVersion, TextSizePercent = textSizePercent };
+        await module.InvokeVoidAsync("applyTextSize", textSizePercent);
+        await PersistAsync(module);
+    }
+
+    private async Task PersistAsync(IJSObjectReference module)
+    {
         try
         {
             var value = JsonSerializer.Serialize(
-                new StoredPreferences(PlayerPreferences.CurrentVersion, ThemeValue(theme)),
+                new StoredPreferences(PlayerPreferences.CurrentVersion, ThemeValue(Current.Theme), Current.TextSizePercent),
                 JsonOptions);
-            await _module.InvokeVoidAsync("write", value);
+            await module.InvokeVoidAsync("write", value);
             Warning = null;
         }
         catch (JSException ex)
         {
             logger.LogError(ex, "Could not persist player preferences to browser storage.");
-            Warning = "This theme will only last for the current session because settings could not be saved.";
+            Warning = "These settings will only last for the current session because they could not be saved.";
         }
     }
 
@@ -113,7 +143,14 @@ public sealed class PlayerPreferencesStore(
             "dark" => PlayerTheme.Dark,
             _ => PlayerTheme.System,
         };
-        return new(PlayerPreferences.CurrentVersion, theme);
+        var textSizePercent = stored.TextSizePercent ?? PlayerPreferences.DefaultTextSizePercent;
+        if (!PlayerPreferences.IsSupportedTextSize(textSizePercent))
+        {
+            logger.LogWarning("Stored player text size is unsupported; using the default size.");
+            textSizePercent = PlayerPreferences.DefaultTextSizePercent;
+        }
+
+        return new(PlayerPreferences.CurrentVersion, theme, textSizePercent);
     }
 
     private static string ThemeValue(PlayerTheme theme) => theme switch
@@ -138,5 +175,5 @@ public sealed class PlayerPreferencesStore(
         }
     }
 
-    private sealed record StoredPreferences(int? Version, string? Theme);
+    private sealed record StoredPreferences(int? Version, string? Theme, int? TextSizePercent);
 }
