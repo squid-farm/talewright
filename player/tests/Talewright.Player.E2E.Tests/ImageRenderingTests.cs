@@ -115,13 +115,14 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
             === start
             Before **{image("map", "A useful map")}** after.
             > player: *{image("map", "Dialogue map")}*
-            * [Continue {image("map", "Choice map")}] -> END
+            * [Continue `{image("map", "Choice map")}`] -> END
             """, ["images/map.png"]);
         await Upload(fixture);
         foreach (var alt in new[] { "A useful map", "Dialogue map", "Choice map" })
             await Expect(Page.GetByRole(AriaRole.Img, new() { Name = alt, Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator(".tw-media-strong")).ToHaveCSSAsync("font-weight", "700");
         await Expect(Page.Locator(".tw-media-emphasis")).ToHaveCSSAsync("font-style", "italic");
+        await Expect(Page.Locator(".tw-media-code")).ToHaveCSSAsync("font-family", "monospace");
         await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync(
             ["This image could not be displayed.", "This image could not be displayed."]);
         await Choices.First.FocusAsync();

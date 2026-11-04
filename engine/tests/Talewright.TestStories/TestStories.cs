@@ -46,7 +46,7 @@ public static class TestStories
 
         > guide: Hello, {player:name}.
 
-        A line
+        A line\
         continued.
 
         {image("test-art", "Reserved artwork")}

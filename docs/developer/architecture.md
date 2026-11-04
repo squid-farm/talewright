@@ -377,7 +377,7 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
     and vars are known up front. It does not run the binder.
   - `TaleParser`: binds that syntax to scenes and steps. See the Talemark README for syntax/binding ownership.
   - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes
-    constructs, escapes, line breaks and bounded formatting directly; unsupported Markdown remains literal.
+    constructs, escapes, code spans and bounded formatting directly; unsupported Markdown remains literal.
   - `DelimiterScanner`: pairs enclosing delimiters and quoted strings; it does not parse the meaning inside them.
     Its modes reflect which delimiters matter in reader text, choice labels and code groups. The same quoted-string
     boundary logic is shared with `QuotedStringSyntax`, which also decodes escapes for the lexer and image arguments.

@@ -165,26 +165,11 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
             else
             {
                 Flush();
-                if (inline is RenderedLineBreak &&
-                    (merged.Count == 0 || merged[^1] is RenderedLineBreak))
-                {
-                    continue;
-                }
-
                 merged.Add(inline);
             }
         }
 
         Flush();
-        while (merged.Count > 0 && merged[0] is RenderedLineBreak)
-        {
-            merged.RemoveAt(0);
-        }
-
-        while (merged.Count > 0 && merged[^1] is RenderedLineBreak)
-        {
-            merged.RemoveAt(merged.Count - 1);
-        }
 
         for (var i = 0; i < merged.Count; i++)
         {

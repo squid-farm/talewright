@@ -227,7 +227,7 @@ ordinary prose and literal braces should remain comfortable to type. You can
 override these language-specific defaults in your VS Code settings.
 
 The grammar distinguishes scene headers, metadata, speech, effects, conditions,
-choices, substitutions, and checks. It also highlights bold and italic text,
+choices, substitutions, and checks. It also highlights bold, italic and code text,
 escapes and `{image("path", "alt text")}` calls. Old Markdown images are highlighted as
 deprecated and reported with replacement guidance. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
@@ -461,7 +461,7 @@ profile. Run packaging first.
    Open a sample `.tale` file and confirm the language indicator says **Talemark**.
 2. Compare a scene header, `@requires`, `> guide:`, a `~` effect, a choice, and a
    `::: skill-check` against ordinary prose. They should be distinguishable.
-3. Try `*emphasis*`, `**strong**`, literal backticks, a link, and an image
+3. Try `*emphasis*`, `**strong**`, inline backticks, a link, and an image
    placeholder. Confirm a line beginning `*emphasis*` is not styled as a choice.
 4. Write `\{literal\}` and toggle a line comment. Literal braces should not start
    a template, and `//` should comment the whole line.

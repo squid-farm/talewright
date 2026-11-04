@@ -220,8 +220,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Upload(TestStories.Linear);
         await Expect(Latest.Locator("strong").First).ToHaveTextAsync("bold");
         await Expect(Latest.Locator("em").First).ToHaveTextAsync("gentle");
-        await Expect(Latest).ToContainTextAsync("`code`");
-        await Expect(Latest.Locator("code")).ToHaveCountAsync(0);
+        await Expect(Latest.Locator("code")).ToHaveTextAsync("code");
         await Expect(Latest.Locator("strong em")).ToHaveTextAsync("combined");
         await Expect(Latest.Locator("br")).ToHaveCountAsync(1);
         await Expect(Latest.Locator("img")).ToBeHiddenAsync();
@@ -252,8 +251,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Latest.Locator(".tw-chosen")).ToHaveCountAsync(0);
         await Expect(Latest.Locator("strong").First).ToHaveTextAsync("bold");
         await Expect(Latest.Locator("em").First).ToHaveTextAsync("gentle");
-        await Expect(Latest).ToContainTextAsync("`code`");
-        await Expect(Latest.Locator("code")).ToHaveCountAsync(0);
+        await Expect(Latest.Locator("code")).ToHaveTextAsync("code");
         await Expect(Latest.Locator(".tw-speaker")).ToHaveTextAsync("Tomas");
         await Expect(Latest.Locator("br")).ToHaveCountAsync(1);
         await Driver.ClickAsync("Forward");

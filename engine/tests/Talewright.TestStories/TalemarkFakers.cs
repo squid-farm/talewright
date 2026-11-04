@@ -191,11 +191,13 @@ public static class MarkupFaker
 {
     public const string EmphasisDelimiter = "*";
     public const string StrongDelimiter = "**";
+    public const string CodeDelimiter = "`";
     public const string LinkClose = ")";
 
     public static string Strong(string text) => StrongDelimiter + FakerArgument.Required(text) + StrongDelimiter;
     public static string EmphasisOpen(string text) => EmphasisDelimiter + FakerArgument.Required(text);
     public static string Emphasis(string text) => EmphasisOpen(text) + EmphasisDelimiter;
+    public static string Code(string text) => CodeDelimiter + FakerArgument.Required(text) + CodeDelimiter;
     public static string LinkOpen(string label) => $"[{FakerArgument.Required(label)}](";
     public static string Link(string label, string target) => LinkOpen(label) + FakerArgument.Required(target) + LinkClose;
 }

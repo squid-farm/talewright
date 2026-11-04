@@ -64,6 +64,7 @@ public static class SceneVocabulary
     internal const char LegacyImageEscape = '\\';
     internal const char LegacyImageQuote = '"';
     internal const char EmphasisMarker = '_';
+    internal const char CodeMarker = '`';
 
     internal static readonly string[] MetadataSpellings = [Title, Requires, Tags, Priority, Once, Hub, HubLimit];
 

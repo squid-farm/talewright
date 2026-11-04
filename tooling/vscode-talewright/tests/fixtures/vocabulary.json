@@ -80,6 +80,8 @@
   {"owner":"scene","member":"CloseBracket","spelling":"]","line":"* [Go] -> END","scope":"punctuation.definition.label.end.tale","reference":"* [label]"},
   {"owner":"scene","member":"LegacyImageMarker","spelling":"!","line":"![alt](path)","scope":"invalid.deprecated.image.tale","reference":"![alt](path)"},
   {"owner":"scene","member":"EmphasisMarker","spelling":"_","line":"_emphasis_","scope":"markup.italic.markdown","reference":"_emphasis_"},
+  {"owner":"scene","member":"CodeMarker","spelling":"`","line":"`code`","scope":"punctuation.definition.raw.begin.markdown","reference":"`code`"},
+
   {"owner":"text","member":"EscapeMark","spelling":"\\","line":"Literal \\{brace\\}","scope":"constant.character.escape.tale","reference":"\\{"},
   {"owner":"text","member":"QuoteMark","spelling":"\"","line":"{image(\"camp\")}","scope":"string.quoted.double.tale","reference":"image(\"path\", \"alt text\")"},
 

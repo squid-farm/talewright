@@ -26,7 +26,7 @@ public sealed class PublishedImageTests(WebHostFixture host, ITestOutputHelper o
         await AssertState(state => Assert.Contains("Before", state.Passage));
         await AssertState(state => Assert.Contains("Hello from supporting configuration.", state.Passage));
         var decoded = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var alt in new[] { "A camp", "A pixel", "Strong camp", "Emphasized camp", "WebP pixel", "Conditional camp" })
+        foreach (var alt in new[] { "A camp", "A pixel", "Strong camp", "Emphasized camp", "Code pixel", "Conditional camp" })
         {
             if (Driver is NativePlayerDriver native)
             {
@@ -34,7 +34,7 @@ public sealed class PublishedImageTests(WebHostFixture host, ITestOutputHelper o
                 var timer = Stopwatch.StartNew();
                 while (!(await native.SnapshotAsync()).Descendants().Any(node =>
                     node.Role == "image" && node.Name == alt &&
-                    (alt is "A pixel" or "WebP pixel"
+                    (alt is "A pixel" or "Code pixel"
                         ? node.Bounds.Width is > 0 and <= 2 && node.Bounds.Height is > 0 and <= 2
                         : node.Bounds.Width > 100 && node.Bounds.Height > 100)))
                 {

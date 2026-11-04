@@ -268,12 +268,13 @@ public class CompilerTests
 
         var text = Render(story, story.GetScene(new SceneId("a")));
         Assert.Equal(
-            "Mara's torch gutters. Burns's map is `old`.\nThe guards' post. She carries a coil of rope.\n\nthe guards: Halt, Mara Burns!",
+            "Mara's torch gutters. Burns's map is old. The guards' post. She carries a coil of rope.\n\nthe guards: Halt, Mara Burns!",
             text);
 
         var paragraph = Assert.IsType<ParagraphTemplate>(Templates(story.GetScene(new SceneId("a")))[0]);
         Assert.Contains(paragraph.Inlines, i => i is StyledTemplate { Style: TextStyle.Strong });
         Assert.Contains(paragraph.Inlines, i => i is StyledTemplate { Style: TextStyle.Emphasis });
+        Assert.Contains(paragraph.Inlines, i => i is StyledTemplate { Style: TextStyle.Code });
     }
 
     [Fact]
@@ -947,7 +948,7 @@ public class CompilerTests
     public void Quoted_hash_is_literal_until_the_actual_modifier_boundary(string expression, string expected)
     {
         var story = Ok("=== a\n{" + expression + "}\n{if \"#\" == \"#\"}matched{/if}\n-> END");
-        Assert.Equal(expected + "\nmatched", Render(story, story.GetScene(new("a"))));
+        Assert.Equal(expected + " matched", Render(story, story.GetScene(new("a"))));
     }
 
     [Theory]

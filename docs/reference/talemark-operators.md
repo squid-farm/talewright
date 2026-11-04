@@ -161,7 +161,8 @@ Known inconsistencies, recorded for follow-up rather than changed here:
 
 These markers select a construct rather than taking part in arithmetic. Their precedence is
 **structural**: line directives are recognized before prose formatting; braces inside prose are
-recognized before bold and italic formatting. Each row gives its arguments and boundaries.
+recognized before bold, italic and code formatting. A code span does not hide a substitution.
+Each row gives its arguments and boundaries.
 Escaping follows the quote/prose rules above: a leading backslash before ASCII punctuation is
 handled as reader text, so `\* [Go] -> hall` is prose rather than a choice.
 
@@ -314,7 +315,7 @@ Broader typography and presentation remain in
 |---|---|---|---|---|
 | `**...**`, `__...__` | Bold prose, choice labels or dialogue. | Inline formatting after brace parsing; backslash can escape formatting punctuation. | `**Danger**` | Unmatched formatting markers generally remain text, not a Talemark error. |
 | `*...*`, `_..._` | Italic prose, choice labels or dialogue. A leading `* ` is a choice instead. | Same formatting stage and escaping. | `*Quietly*` | Same unmatched-marker behavior. |
-| Backticks | Ordinary reader text; they have no formatting or escaping role. | Literal punctuation. | `` `torch` `` | None. |
+| Backticks | Inline code text. Brace substitutions are still recognized before code formatting. | Backtick-delimited span after brace parsing. | `` `torch` `` | Not a block-code or brace-escape syntax. |
 | `![alt](path)` | Rejected legacy Markdown image form. | Detected after brace parsing, with the diagnostic mapped back to the author's source. | Replace `![A torch](torch)` with `{image("torch", "A torch")}`. | TW1015 names the quoted replacement. |
 | `[text](target)` | Literal reader text; it is not a hyperlink feature. | No link parsing or target validation. | `[Go](https://example.org)` | None. |
 
@@ -323,7 +324,7 @@ Broader typography and presentation remain in
 **Implemented.** [ADR 0006](../developer/adr/0006-talemark-reader-text.md) records
 the decision. [#400](https://github.com/squid-farm/talewright/issues/400) adds the bounded scanner and
 [#401](https://github.com/squid-farm/talewright/issues/401) replaces Markdig with these rules.
-The [escape and line-break updates](#escapes) remove the remaining unneeded Markdown-inspired behavior.
+The [escape update](#escapes) applies a single punctuation rule across reader text.
 CommonMark is not the specification. Anything not listed here is literal text.
 
 ### Text units
@@ -331,22 +332,25 @@ CommonMark is not the specification. Anything not listed here is literal text.
 Reader text is parsed one *text unit* at a time:
 
 - **Paragraph**: consecutive prose lines, ended by a blank line or a line directive. A `//`
-  comment line is skipped without ending the paragraph. Each line is trimmed, and each authored
-  line break renders as a line break.
+  comment line is skipped without ending the paragraph. Each line is trimmed, and lines are joined
+  by a single space.
 - **Speech text**: the rest of a `>` line after the speaker's `:`.
 - **Choice label**: the contents of the label brackets.
 - **Image alt text**: the second quoted argument of `image(...)`.
 
-Formatting and inline conditions never cross a text unit's boundary. An inline construct may span
-lines only inside a paragraph. Block directives, including block `{if}` lines, are single lines.
+Formatting, code spans and inline conditions never cross a text unit's boundary. An inline
+construct may span lines only inside a paragraph. Block directives, including block `{if}` lines,
+are single lines.
 
 ### Order of recognition
 
 1. Line directives decide the text units.
-2. Within a unit, a single left-to-right scan recognizes escapes, inline constructs, then emphasis
-   and strong delimiters. Inline constructs are atoms: a `*` or `_` inside `{ }` is never formatting.
-3. Inline `{if}`, `{else}` and `{/if}` pair within their text unit. Otherwise they report TW1005.
-   Inline conditions nest at most 64 deep (TW1016).
+2. Within a unit, a single left-to-right scan recognizes escapes, then inline constructs, then
+   code spans, then emphasis and strong delimiters. Inline constructs are atoms: a `*`, `_` or
+   backtick inside `{ }` is never formatting. Code spans hide formatting but not inline constructs
+   or escapes.
+3. Inline `{if}`, `{else}` and `{/if}` pair only with markers in the same formatting span or code
+   span. Otherwise they report TW1005. Inline conditions nest at most 64 deep (TW1016).
 
 ### Escapes
 
@@ -354,18 +358,17 @@ A backslash before any ASCII punctuation or symbol character quotes exactly that
 backslash is removed, and the character is literal rather than opening syntax. `\\` therefore
 shows one backslash. Backslashes before letters, digits, whitespace or non-ASCII characters stay
 visible: `C:\stories`, `\a` and `\—` display as written. This applies in prose, dialogue, choice
-labels and image alt text. A quoted image path remains strict; a quoted alt also uses `\"` for a
-quote. Unknown letter escapes in alt text remain literal.
+labels and image alt text, including inside code spans. A quoted image path remains strict; a
+quoted alt also uses `\"` for a quote. Unknown letter escapes in alt text remain literal.
 
-A line-ending unpaired `\` reports TW1017; remove it because line breaks render as written. A
-line-ending `\\` shows one literal backslash and is not an error. A line whose content renders
-empty, such as a false inline conditional on its own line, does not leave an empty line. A blank
-line still ends the paragraph.
+A trailing `\` on a paragraph line followed by another line of the same paragraph is a hard line
+break. On a paragraph's last line, or in speech text and labels, it is a literal backslash.
+Trailing spaces never create a break.
 
 ### Emphasis and strong
 
 - `*` and `_` are the only delimiter characters. A *run* is a maximal sequence of the same
-  character that is not escaped and not inside an inline construct.
+  character that is not escaped and not inside an inline construct or code span.
 - A run of one marks emphasis and a run of two marks strong. A run of three or more is literal, so
   write `**_both_**` instead of `***both***`.
 - A word character is a Unicode letter or digit. Treat the start and end of a text unit as
@@ -386,6 +389,13 @@ line still ends the paragraph.
   opener.
 - Matched spans nest at most 64 deep. A deeper opening run reports TW1016 and is literal.
   Unmatched opening runs remain literal and do not count toward this limit.
+
+### Code spans
+
+A run of *n* backticks opens a code span, which closes at the next run of exactly *n* backticks.
+An unmatched run is literal. Inside, emphasis and strong do not apply. Inline constructs and
+escapes still do. If the content both begins and ends with a space and is not all spaces, one
+space is removed from each end. A line join inside a paragraph is a space.
 
 ### Quotes, parentheses and brackets
 
@@ -441,9 +451,9 @@ escaped as `\"`; the path is inserted verbatim. Thus `![A "torch"](torch)` sugge
 ### Image alt text
 
 Alt text always uses this grammar, whether or not it contains `{`. The reader sees plain text:
-formatting is dropped, and backticks remain ordinary text. Its escapes are `\"` plus the
-reader-text punctuation rule; unknown letter escapes remain literal. A nested `{image(...)}` still
-reports TW1014. Missing-alt warnings are decided from the authored alt, as today.
+formatting is dropped, code-span text is kept, and a hard break becomes a space. Its escapes are
+`\"` plus the reader-text punctuation rule; unknown letter escapes remain literal. A nested
+`{image(...)}` still reports TW1014. Missing-alt warnings are decided from the authored alt, as today.
 
 ### Example corpus
 
@@ -468,12 +478,12 @@ strong and `[C: ...]` is code.
 | 13 | `*a **b* c**` | `[I: a b c]` | `*a [B: b* c]` |
 | 14 | `**unclosed and *also` | Literal. | Literal. |
 | 15 | `_under_ and __strong__` | `[I: under] and [B: strong]` | Same. |
-| 16 | ``` `code {player:first-name} **x**` ``` | `[C: code Ada **x**]` | `` `code Ada [B: x]` `` |
-| 17 | ``` `a \{b\} c` ``` | `[C: a \{b\} c]` | `` `a {b} c` `` |
-| 18 | ```` `` a`b `` ```` | ``` [C: a`b] ``` | ```` `` a`b `` ```` |
+| 16 | ``` `code {player:first-name} **x**` ``` | `[C: code Ada **x**]` | Same. |
+| 17 | ``` `a \{b\} c` ``` | `[C: a \{b\} c]` | `[C: a {b} c]` |
+| 18 | ```` `` a`b `` ```` | ``` [C: a`b] ``` | Same. |
 | 19 | `\* \_ \[ \] \{ \} \\` | `* _ [ ] { } \` | Same. |
 | 20 | `\. \# \> \& \a` | `. # > & \a` | `. # > & \a` |
-| 21 | `line one\` ⏎ `line two` | Hard break. | TW1017; remove `\` and the authored newline remains. |
+| 21 | `line one\` ⏎ `line two` | Hard break. | Same. |
 | 22 | `She said "hi" (quietly) [aside]` | Literal. | Same. |
 | 23 | `* [Open [the] door] -> END` | Label `Open [the] door`. | Same. |
 | 24 | `* [Open [door] -> END` | TW1011. | Same. |
@@ -485,7 +495,7 @@ strong and `[C: ...]` is code.
 | 30 | `{if flag:a and` ⏎ `flag:b}Both.{/if}` | Works. | Same. |
 | 31 | `{image("portrait", "**The guide**")}` | Alt `**The guide**`. | Alt `The guide`. |
 | 32 | `{image("portrait", "**{guide:first-name}**")}` | Alt `Bea`. | Same. |
-| 33 | ``` {image("portrait", "`code` and \\ slash")} ``` | Alt ``` `code` and \ slash ```. | Alt ``` `code` and \ slash ```. |
+| 33 | ``` {image("portrait", "`code` and \\ slash")} ``` | Alt ``` `code` and \ slash ```. | Alt `code and \ slash`. |
 | 34 | `{image("portrait", "a \* b")}` | TW1014. | Alt `a * b`. |
 | 35 | `![A torch](torch)` | TW1015. | Same. |
 | 36 | `![a [b]](p)` | TW1015. | Literal. |
@@ -514,7 +524,7 @@ The language server uses the shared authoring completion provider.
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/modifier strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Prose `\{` and `\}` also work. |
 | Comma-separated multi-argument modifiers | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future modifier work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
-| Formatting beyond bold and italic | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
+| Formatting beyond bold, italic and code | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new modifier here. |
 | [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal is handled in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers are tracked by [#403](https://github.com/squid-farm/talewright/issues/403). |
 | Alt text always reader text | Approved in [#399](https://github.com/squid-farm/talewright/issues/399); implemented in [#401](https://github.com/squid-farm/talewright/issues/401). |
 | Choice clauses | Both orders remain accepted; [#384](https://github.com/squid-farm/talewright/issues/384) diagnoses duplicate, incomplete and misplaced clauses. |

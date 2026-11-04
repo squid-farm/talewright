@@ -55,7 +55,7 @@ public partial class LostRelicTests
     private static void MeetSpiral(StoryHistory history)
     {
         Choose(history, "Answer the Spiral");
-        Assert.Contains("Xe\nhas a question", history.Current.Document.ToPlainText());
+        Assert.Contains("Xe has a question", history.Current.Document.ToPlainText());
         Choose(history, "Accept the spiral mark");
         AssertMarks(history, 1);
         Assert.Equal(0, history.State.GetItemCount(new("spiral"), new("glyph-mark")));

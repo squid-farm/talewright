@@ -235,29 +235,40 @@
         {"match": "\\\\[!-~&&[^A-Za-z0-9]]", "name": "constant.character.escape.tale"},
         {"include": "#template"},
         {
+          "begin": "(`+)(?=(?:(?!\\1(?!`))(?:\\\\.|.))*\\1(?!`))",
+          "beginCaptures": {"1": {"name": "punctuation.definition.raw.begin.markdown"}},
+          "end": "\\1(?!`)|(?=$)",
+          "endCaptures": {"0": {"name": "punctuation.definition.raw.end.markdown"}},
+          "name": "markup.inline.raw.string.markdown",
+          "patterns": [
+            {"include": "#template"},
+            {"match": "\\\\[!-~&&[^A-Za-z0-9]]", "name": "constant.character.escape.tale"}
+          ]
+        },
+        {
           "comment": "Strong delimiters use the reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s*\\\\])\\*\\*(?![\\p{L}\\p{N}*]))",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)(?:\\\\[^\\s]|[^\\s*\\\\])\\*\\*(?![\\p{L}\\p{N}*]))",
           "end": "(?:(?<=[^\\s*\\\\])|(?<=\\\\[^\\s]))\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
           "comment": "Underscore strong uses the same reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}_])__(?!_)(?=[^\\s_])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s_\\\\])__(?![\\p{L}\\p{N}_]))",
+          "begin": "(?<![\\p{L}\\p{N}_])__(?!_)(?=[^\\s_])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)(?:\\\\[^\\s]|[^\\s_\\\\])__(?![\\p{L}\\p{N}_]))",
           "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[^\\s]))__(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
           "comment": "A single star marks emphasis using the reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}*])\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s*\\\\])\\*(?![\\p{L}\\p{N}*]))",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)(?:\\\\[^\\s]|[^\\s*\\\\])\\*(?![\\p{L}\\p{N}*]))",
           "end": "(?:(?<=[^\\s*\\\\])|(?<=\\\\[^\\s]))\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
           "comment": "Underscore emphasis uses the same reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}_])_(?!_)(?=[^\\s_])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s_\\\\])_(?![\\p{L}\\p{N}_]))",
+          "begin": "(?<![\\p{L}\\p{N}_])_(?!_)(?=[^\\s_])(?=(?:(?:\\\\.|`[^`]*`|[^\\\\`])*?)(?:\\\\[^\\s]|[^\\s_\\\\])_(?![\\p{L}\\p{N}_]))",
           "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[^\\s]))_(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]

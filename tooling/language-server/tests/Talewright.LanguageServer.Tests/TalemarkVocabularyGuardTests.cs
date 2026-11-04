@@ -90,6 +90,7 @@ public sealed class TalemarkVocabularyGuardTests
         Assert.Contains("]", lineMarkers);
         Assert.Contains("!", lineMarkers);
         Assert.Contains("_", lineMarkers);
+        Assert.Contains("`", lineMarkers);
         Assert.Contains("\\", lineMarkers);
         Assert.Contains("\"", lineMarkers);
 

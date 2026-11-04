@@ -81,13 +81,13 @@ public sealed class ImageSyntaxTests
     }
 
     [Fact]
-    public void Backticks_are_literal_and_do_not_disable_inline_constructs()
+    public void Images_in_code_formatting_do_not_leak_internal_placeholders()
     {
         var story = Story("=== start\n`{image(\"camp\")}`\n-> END");
         var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);
-        Assert.Equal("`", Assert.IsType<TextTemplate>(paragraph.Inlines[0]).Text);
-        Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), paragraph.Inlines[1]);
-        Assert.Equal("`", Assert.IsType<TextTemplate>(paragraph.Inlines[2]).Text);
+        var code = Assert.IsType<StyledTemplate>(paragraph.Inlines.Single());
+        Assert.Equal(TextStyle.Code, code.Style);
+        Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), code.Children.Single());
     }
 
     [Fact]
