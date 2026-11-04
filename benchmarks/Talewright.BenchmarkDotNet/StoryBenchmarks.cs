@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using BenchmarkDotNet.Attributes;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
@@ -295,10 +293,7 @@ public class StoryBenchmarks
 
     private static byte[] CreateSaveAtCursor(byte[] saveBytes, int cursor)
     {
-        var save = JsonNode.Parse(saveBytes)?.AsObject()
-            ?? throw new InvalidOperationException("Could not parse the benchmark save.");
-        save["cursor"] = cursor;
-        return JsonSerializer.SerializeToUtf8Bytes(save);
+        return SaveFormat.Write(SaveFormat.Read(saveBytes) with { Cursor = cursor });
     }
 
     private static StoryDefinition Compile(StorySource source)

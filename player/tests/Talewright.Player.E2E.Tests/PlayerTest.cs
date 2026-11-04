@@ -184,6 +184,28 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected async Task Choose(string label) =>
         await Driver.ChooseAsync(label);
 
+    /// <summary>Writes raw save bytes to the browser save store. Saves are binary, so they cross into the page as base64.</summary>
+    protected async Task WriteBrowserSaveAsync(string storyId, string slot, byte[] bytes, bool overwrite = false) =>
+        await Page.EvaluateAsync("""
+            async ({storyId, slot, base64, overwrite}) => {
+                const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                await module.write(storyId, slot, Uint8Array.from(atob(base64), c => c.charCodeAt(0)), overwrite);
+            }
+            """, new { storyId, slot, base64 = Convert.ToBase64String(bytes), overwrite });
+
+    protected async Task<byte[]> ReadBrowserSaveAsync(string storyId, string slot) =>
+        Convert.FromBase64String(await Page.EvaluateAsync<string>("""
+            async ({storyId, slot}) => {
+                const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                const bytes = await module.read(storyId, slot);
+                let text = '';
+                for (let i = 0; i < bytes.length; i += 0x8000) {
+                    text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+                }
+                return btoa(text);
+            }
+            """, new { storyId, slot }));
+
     internal static bool IsReloadCancellation(bool reloading, string resourceType, string url, string? failure) =>
         reloading && resourceType == "image" && url.StartsWith("blob:", StringComparison.Ordinal)
         && failure == "Load request cancelled";

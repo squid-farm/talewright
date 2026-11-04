@@ -562,8 +562,7 @@ sequenceDiagram
 
 Steps carry stable source-position IDs and spans. Choice keys still count choice steps in source order.
 Shared structural walks exclude steps beyond guaranteed exits, keeping validator reachability consistent
-with the model consumed by the story map. The replay fingerprint salt is `talewright-replay-v2`; the
-player save format itself is unchanged.
+with the model consumed by the story map. The replay fingerprint salt is `talewright-replay-v2`.
 
 Invalid keys throw `InvalidOperationException` listing the valid ones. The UI only ever sends keys it was given.
 
@@ -571,7 +570,7 @@ Invalid keys throw `InvalidOperationException` listing the valid ones. The UI on
 
 ```mermaid
 flowchart LR
-  subgraph save["Save bytes (JSON)"]
+  subgraph save["Save bytes (.twsave)"]
     direction TB
     f1["format + story id/version"]
     f2["content fingerprint"]
@@ -589,8 +588,9 @@ _cursor_ choice keys.
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
 format/story versions and source/extension fingerprint. Unknown/corrupt/incompatible saves are rejected,
-not silently migrated. The current save format requires a character field, null for fixed-protagonist
-stories. Pre-v1 format and replay contracts may change without support for previous versions.
+not silently migrated. Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
+see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
+stories omit the character. Pre-v1 replay contracts may change without support for previous versions.
 
 ---
 

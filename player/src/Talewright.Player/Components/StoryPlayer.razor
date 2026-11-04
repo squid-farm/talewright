@@ -24,7 +24,10 @@
     {
         <section class="tw-resume-prompt" aria-label="Autosave unavailable">
             <p class="tw-error" role="alert">@_autosaveStartupError</p>
-            <button type="button" class="tw-choice" @onclick="RetryAutosaveCheckAsync">Retry autosave check</button>
+            @if (_autosaveReadFailed)
+            {
+                <button type="button" class="tw-choice" @onclick="RetryAutosaveCheckAsync">Retry autosave check</button>
+            }
             <button type="button" class="tw-choice" @onclick="StartNewGame">Start a new game</button>
         </section>
     }
@@ -35,6 +38,11 @@
                    Message="@(_showSaves ? null : _saveMessage)" Error="_saveError"
                    ReadingHistory="_showHistory" OnHistory="ToggleHistory"
                    OnBack="Back" OnForward="Forward" OnQuickSave="QuickSaveAsync" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit" />
+
+    @if (_recoveredAutosaveSlot is not null)
+    {
+        <p class="tw-save-status" role="status">Your earlier autosave was kept as “@_recoveredAutosaveSlot” in Saves.</p>
+    }
 
     @if (_autosaveError is not null)
     {
@@ -117,6 +125,14 @@
     [Parameter]
     public bool AutosaveResumeChecked { get; set; }
 
+    /// <summary>Whether a failed host check left an autosave to preserve before writing a new one.</summary>
+    [Parameter]
+    public bool PreserveRejectedAutosave { get; set; }
+
+    /// <summary>The rejected autosave bytes, if the host could read them.</summary>
+    [Parameter]
+    public byte[]? RejectedAutosaveData { get; set; }
+
     private IReadOnlyList<HistoryFrame> _transcript => _session.Transcript;
     private ElementReference _transcriptElement;
     private StoryHistory _session = default!;
@@ -142,6 +158,9 @@
     private bool _resumePrompt;
     private StoryHistory? _startupResumeHistory;
     private string? _autosaveStartupError;
+    private bool _autosaveReadFailed;
+    private AutosaveRecovery? _autosaveRecovery;
+    private string? _recoveredAutosaveSlot;
     private string? _autosaveError;
     private bool _autosavePending;
     private bool _initialAutosavePending;
@@ -160,6 +179,11 @@
             _resumePrompt = false;
             _startupResumeHistory = null;
             _autosaveStartupError = null;
+            _autosaveReadFailed = false;
+            _autosaveRecovery = PreserveRejectedAutosave && SaveStore is { } store
+                ? new AutosaveRecovery(store, Story.Id, RejectedAutosaveData)
+                : null;
+            _recoveredAutosaveSlot = null;
         }
 
         if (Visible && !_wasVisible)
@@ -200,23 +224,28 @@
 
     private async Task CheckAutosaveForResumeAsync(StoryDefinition story, ISaveStore saveStore, int generation)
     {
+        byte[]? bytes = null;
         try
         {
-            var bytes = await saveStore.ReadAutosaveAsync(story.Id);
+            bytes = await saveStore.ReadAutosaveAsync(story.Id);
             if (generation == _generation)
             {
                 _startupResumeHistory = StoryHistory.Restore(story, bytes);
                 _resumePrompt = true;
                 _autosaveStartupError = null;
+                _autosaveReadFailed = false;
+                _autosaveRecovery = null;
             }
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException) when (bytes is null)
         {
             if (generation == _generation)
             {
                 _startupResumeHistory = null;
                 _resumePrompt = false;
                 _autosaveStartupError = null;
+                _autosaveReadFailed = false;
+                _autosaveRecovery = null;
             }
         }
         catch (Exception ex) when (IsAutosaveFailure(ex) || ex is InvalidDataException)
@@ -225,7 +254,9 @@
             {
                 _startupResumeHistory = null;
                 _resumePrompt = false;
-                _autosaveStartupError = $"Couldn't check this story's autosave: {ex.Message}";
+                _autosaveReadFailed = bytes is null;
+                _autosaveRecovery = new AutosaveRecovery(saveStore, story.Id, bytes);
+                _autosaveStartupError = bytes is null ? $"Couldn't read this story's autosave: {ex.Message}" : ex.Message;
             }
         }
         finally
@@ -280,10 +311,13 @@
 
     private async Task QueueAutosaveAsync()
     {
-        if (SaveStore is null) return;
+        var store = SaveStore;
+        if (store is null) return;
 
         var sequence = ++_autosaveSequence;
         var generation = _generation;
+        var storyId = Story.Id;
+        var recovery = _autosaveRecovery;
         byte[] data;
         try
         {
@@ -299,38 +333,57 @@
 
         _autosavePending = true;
         var previous = _autosaveTail;
-        var current = PersistAutosaveAfterAsync(previous, data, generation, sequence);
+        var current = PersistAutosaveAfterAsync(previous, store, storyId, recovery, data, generation, sequence);
         _autosaveTail = current;
         await current;
     }
 
-    private async Task PersistAutosaveAfterAsync(Task previous, byte[] data, int generation, int sequence)
+    private async Task PersistAutosaveAfterAsync(Task previous, ISaveStore store, string storyId,
+        AutosaveRecovery? recovery, byte[] data, int generation, int sequence)
     {
         await previous;
-        if (_disposed || generation != _generation || sequence != _autosaveSequence) return;
+        if (!AutosaveIsCurrent(generation, sequence)) return;
 
         try
         {
-            await SaveStore!.WriteAutosaveAsync(Story.Id, data);
+            if (recovery is null)
+            {
+                await store.WriteAutosaveAsync(storyId, data);
+            }
+            else
+            {
+                if (!recovery.UsesStore(store))
+                {
+                    throw new InvalidOperationException("Save storage changed before the earlier autosave could be preserved.");
+                }
+                if (!await recovery.WriteAsync(data, () => AutosaveIsCurrent(generation, sequence))) return;
+            }
         }
         catch (Exception ex) when (IsAutosaveFailure(ex))
         {
-            if (!_disposed && generation == _generation && sequence == _autosaveSequence)
+            if (AutosaveIsCurrent(generation, sequence))
             {
                 _autosavePending = false;
-                _autosaveError = AutosaveFailureMessage(ex);
+                _recoveredAutosaveSlot = recovery?.RecoveredSlot;
+                _autosaveError = recovery is { NeedsPreservation: true }
+                    ? AutosaveRecoveryFailureMessage(ex)
+                    : AutosaveFailureMessage(ex);
                 await InvokeAsync(StateHasChanged);
             }
             return;
         }
 
-        if (!_disposed && generation == _generation && sequence == _autosaveSequence)
+        if (AutosaveIsCurrent(generation, sequence))
         {
             _autosavePending = false;
+            _recoveredAutosaveSlot = recovery?.RecoveredSlot;
             _autosaveError = null;
             await InvokeAsync(StateHasChanged);
         }
     }
+
+    private bool AutosaveIsCurrent(int generation, int sequence) =>
+        !_disposed && generation == _generation && sequence == _autosaveSequence;
 
     private static bool IsAutosaveFailure(Exception ex) =>
         ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or
@@ -340,6 +393,9 @@
 
     private static string AutosaveFailureMessage(Exception ex) =>
         $"Couldn't save your latest progress automatically. Any previous autosave is preserved. {ex.Message} Fix the storage problem or choose Retry autosave.";
+
+    private static string AutosaveRecoveryFailureMessage(Exception ex) =>
+        $"Couldn't preserve your earlier autosave, so automatic saving is paused to avoid replacing it. Try Quick Save or a named save. {ex.Message} Fix the storage problem or choose Retry autosave.";
 
     private async Task Choose(ChoiceView choice)
     {

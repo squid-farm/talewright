@@ -47,7 +47,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         {
             var storyId = fixture.Compile().Id;
             var bytes = await new FileSaveStore(NativeSaveRoot).ReadQuickAsync(storyId);
-            path = Directory.EnumerateFiles(NativeSaveRoot, "quick.json", SearchOption.AllDirectories)
+            path = Directory.EnumerateFiles(NativeSaveRoot, "quick" + SaveFormat.FileExtension, SearchOption.AllDirectories)
                 .Single(file => File.ReadAllBytes(file).SequenceEqual(bytes));
             backup = path + ".test-backup";
             File.Move(path, backup);
@@ -238,16 +238,11 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         var storyId = first.Compile().Id;
         if (PlayerTarget.IsDesktop)
         {
-            await new FileSaveStore(NativeSaveRoot).WriteQuickAsync(storyId, "{broken"u8.ToArray());
+            await new FileSaveStore(NativeSaveRoot).WriteQuickAsync(storyId, "broken"u8.ToArray());
         }
         else
         {
-            await Page.EvaluateAsync("""
-                async storyId => {
-                    const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                    await module.write(storyId, '\0quick', new TextEncoder().encode('{broken'), true);
-                }
-                """, storyId);
+            await WriteBrowserSaveAsync(storyId, "\0quick", "broken"u8.ToArray(), overwrite: true);
         }
         await Driver.ClickAsync("Saves");
         await ClickLoad("quick");
@@ -317,7 +312,7 @@ public sealed class QuickSaveTests(WebHostFixture host, ITestOutputHelper output
         var storyId = fixture.Compile().Id;
         var store = new FileSaveStore(NativeSaveRoot);
         var original = await store.ReadQuickAsync(storyId);
-        var path = Directory.EnumerateFiles(NativeSaveRoot, "quick.json", SearchOption.AllDirectories)
+        var path = Directory.EnumerateFiles(NativeSaveRoot, "quick" + SaveFormat.FileExtension, SearchOption.AllDirectories)
             .Single(file => File.ReadAllBytes(file).SequenceEqual(original));
         await Choose("Walk onward");
         var backup = path + ".test-backup";

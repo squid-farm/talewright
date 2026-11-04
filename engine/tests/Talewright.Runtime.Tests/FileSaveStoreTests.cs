@@ -24,7 +24,7 @@ public sealed class FileSaveStoreTests : IDisposable
         await Assert.ThrowsAsync<ArgumentException>(() => Store.WriteAsync("story", SaveEntry.QuickSlot, [6], overwrite: true));
         await Assert.ThrowsAsync<ArgumentException>(() => Store.ReadAsync("story", SaveEntry.QuickSlot));
         Assert.Equal(new byte[] { 5 }, await Store.ReadQuickAsync("story"));
-        Assert.Equal(2, Directory.EnumerateFiles(_root, "quick.json", SearchOption.AllDirectories).Count());
+        Assert.Equal(2, Directory.EnumerateFiles(_root, "quick" + SaveFormat.FileExtension, SearchOption.AllDirectories).Count());
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class FileSaveStoreTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             Store.WriteQuickAsync("story", new byte[StoryHistory.MaxSaveBytes + 1]));
         Assert.Equal(new byte[] { 1 }, await Store.ReadQuickAsync("story"));
-        var target = Directory.GetFiles(_root, "quick.json", SearchOption.AllDirectories).Single();
+        var target = Directory.GetFiles(_root, "quick" + SaveFormat.FileExtension, SearchOption.AllDirectories).Single();
         var backup = target + ".backup";
         File.Move(target, backup);
         Directory.CreateDirectory(target);
@@ -71,7 +71,7 @@ public sealed class FileSaveStoreTests : IDisposable
             (await Store.ListEntriesAsync("story")).Select(entry => entry.Slot));
         await Assert.ThrowsAsync<ArgumentException>(() =>
             Store.WriteAsync("story", SaveEntry.AutosaveSlot, [6], overwrite: true));
-        Assert.Equal(2, Directory.EnumerateFiles(_root, "autosave.json", SearchOption.AllDirectories).Count());
+        Assert.Equal(2, Directory.EnumerateFiles(_root, "autosave" + SaveFormat.FileExtension, SearchOption.AllDirectories).Count());
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class FileSaveStoreTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() => Store.WriteAutosaveAsync("story", []));
         Assert.Equal(new byte[] { 1 }, await Store.ReadAutosaveAsync("story"));
 
-        var target = Directory.GetFiles(_root, "autosave.json", SearchOption.AllDirectories).Single();
+        var target = Directory.GetFiles(_root, "autosave" + SaveFormat.FileExtension, SearchOption.AllDirectories).Single();
         var backup = target + ".backup";
         File.Move(target, backup);
         Directory.CreateDirectory(target);
@@ -101,12 +101,12 @@ public sealed class FileSaveStoreTests : IDisposable
     [Fact]
     public async Task Catalog_lists_quick_metadata_once_and_preserves_damaged_checkpoint()
     {
-        var json = """
-            {"formatVersion":2,"storyId":"story","storyVersion":"1","contentFingerprint":"fingerprint",
-             "seed":7,"choices":[],"cursor":0,"character":null,
-             "summary":{"sceneTitle":"A scene","savedAt":"2026-10-23T00:00:00Z","characterName":"Mara"}}
-            """;
-        await Store.WriteQuickAsync("story", System.Text.Encoding.UTF8.GetBytes(json));
+        var save = SaveFormat.Write(new SavedGame
+        {
+            StoryId = "story", StoryVersion = "1", ContentFingerprint = "fingerprint", Seed = 7, Choices = [], Cursor = 0,
+            Summary = new("A scene", new DateTimeOffset(2026, 10, 23, 0, 0, 0, TimeSpan.Zero), "Mara"),
+        });
+        await Store.WriteQuickAsync("story", save);
         var entry = Assert.Single(await Store.ListEntriesAsync("story"));
         Assert.True(entry.IsQuick);
         Assert.Equal("Quick Save checkpoint", entry.DisplayName);
@@ -124,7 +124,7 @@ public sealed class FileSaveStoreTests : IDisposable
     {
         await Store.WriteAsync("story", "Malformed", "{broken"u8.ToArray());
         await Store.WriteAsync("story", "Oversized", [1]);
-        var path = Directory.GetFiles(_root, "*.json", SearchOption.AllDirectories)
+        var path = Directory.GetFiles(_root, "*" + SaveFormat.FileExtension, SearchOption.AllDirectories)
             .Single(file => File.ReadAllBytes(file).SequenceEqual(new byte[] { 1 }));
         await using (var stream = File.OpenWrite(path))
         {
@@ -168,7 +168,7 @@ public sealed class FileSaveStoreTests : IDisposable
         await Store.WriteAsync("story", "aaa", [1]);
         await Store.WriteAsync("story", "aaG", [2]);
         await Store.WriteAsync("story", "café", [3]);
-        var files = Directory.GetFiles(_root, "*.json", SearchOption.AllDirectories);
+        var files = Directory.GetFiles(_root, "*" + SaveFormat.FileExtension, SearchOption.AllDirectories);
         Assert.Equal(files.Length, files.Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.Equal(["aaG", "aaa", "café"], await Store.ListAsync("story"));
         await Store.WriteAsync("story", "aaG", [4], overwrite: true);
@@ -213,7 +213,7 @@ public sealed class FileSaveStoreTests : IDisposable
     public async Task Reads_enforce_size_before_allocating()
     {
         await Store.WriteAsync("story", "slot", [1]);
-        var path = Directory.GetFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        var path = Directory.GetFiles(_root, "*" + SaveFormat.FileExtension, SearchOption.AllDirectories).Single();
         await using (var stream = File.OpenWrite(path))
         {
             stream.SetLength(StoryHistory.MaxSaveBytes + 1);

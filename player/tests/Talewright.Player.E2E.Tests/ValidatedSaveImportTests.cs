@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json.Nodes;
 using Talewright.Player.Saves;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
@@ -41,26 +39,18 @@ public sealed class ValidatedSaveImportTests : IDisposable
         var store = new FileSaveStore(_directory);
         await store.WriteAsync(story.Id, "Slot", original);
 
-        var format = JsonNode.Parse(original)!;
-        format["formatVersion"] = 999;
-        var otherStory = JsonNode.Parse(original)!;
-        otherStory["storyId"] = "other";
-        var otherVersion = JsonNode.Parse(original)!;
-        otherVersion["storyVersion"] = "other";
-        var fingerprint = JsonNode.Parse(original)!;
-        fingerprint["contentFingerprint"] = "other";
-        var replay = JsonNode.Parse(original)!;
-        replay["choices"] = new JsonArray("not-a-choice");
-        replay["cursor"] = 1;
+        var save = SaveFormat.Read(original);
         var invalid = new[]
         {
             Array.Empty<byte>(),
-            "{broken"u8.ToArray(),
-            Encoding.UTF8.GetBytes(format.ToJsonString()),
-            Encoding.UTF8.GetBytes(otherStory.ToJsonString()),
-            Encoding.UTF8.GetBytes(otherVersion.ToJsonString()),
-            Encoding.UTF8.GetBytes(fingerprint.ToJsonString()),
-            Encoding.UTF8.GetBytes(replay.ToJsonString()),
+            "broken"u8.ToArray(),
+            """{"formatVersion":2}"""u8.ToArray(),
+            original[..^1],
+            [.. original[..4], 99, .. original[5..]],
+            SaveFormat.Write(save with { StoryId = "other" }),
+            SaveFormat.Write(save with { StoryVersion = "other" }),
+            SaveFormat.Write(save with { ContentFingerprint = "other" }),
+            SaveFormat.Write(save with { Choices = ["not-a-choice"], Cursor = 1 }),
             new byte[StoryHistory.MaxSaveBytes + 1],
         };
         foreach (var bytes in invalid)

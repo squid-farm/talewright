@@ -6,6 +6,9 @@ namespace Talewright.Runtime.Saves;
 /// <summary>Per-user desktop saves. Each replacement is a same-directory atomic rename.</summary>
 public sealed class FileSaveStore(string root) : ISaveStore
 {
+    private const string QuickFile = "quick" + SaveFormat.FileExtension;
+    private const string AutosaveFile = "autosave" + SaveFormat.FileExtension;
+
     public static string DefaultRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Talewright", "saves");
 
@@ -19,7 +22,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
     {
         SaveNames.Validate(storyId, slot);
         var name = Convert.ToHexString(Encoding.UTF8.GetBytes(slot));
-        return Path.Combine(StoryDirectory(storyId), name + ".json");
+        return Path.Combine(StoryDirectory(storyId), name + SaveFormat.FileExtension);
     }
 
     public Task<IReadOnlyList<string>> ListAsync(string storyId)
@@ -28,7 +31,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
         string[] paths;
         try
         {
-            paths = Directory.GetFiles(directory, "*.json");
+            paths = Directory.GetFiles(directory, "*" + SaveFormat.FileExtension);
         }
         catch (DirectoryNotFoundException)
         {
@@ -38,7 +41,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
         var slots = new List<string>();
         foreach (var path in paths)
         {
-            if (Path.GetFileName(path) is "quick.json" or "autosave.json")
+            if (Path.GetFileName(path) == QuickFile || Path.GetFileName(path) == AutosaveFile)
             {
                 continue;
             }
@@ -60,15 +63,15 @@ public sealed class FileSaveStore(string root) : ISaveStore
 
     public Task<byte[]> ReadAsync(string storyId, string slot) => ReadFileAsync(SlotPath(storyId, slot));
 
-    public Task<byte[]> ReadQuickAsync(string storyId) => ReadFileAsync(Path.Combine(StoryDirectory(storyId), "quick.json"));
+    public Task<byte[]> ReadQuickAsync(string storyId) => ReadFileAsync(Path.Combine(StoryDirectory(storyId), QuickFile));
 
     public Task WriteQuickAsync(string storyId, byte[] data) =>
-        WriteFileAsync(Path.Combine(StoryDirectory(storyId), "quick.json"), data, overwrite: true);
+        WriteFileAsync(Path.Combine(StoryDirectory(storyId), QuickFile), data, overwrite: true);
 
-    public Task<byte[]> ReadAutosaveAsync(string storyId) => ReadFileAsync(Path.Combine(StoryDirectory(storyId), "autosave.json"));
+    public Task<byte[]> ReadAutosaveAsync(string storyId) => ReadFileAsync(Path.Combine(StoryDirectory(storyId), AutosaveFile));
 
     public Task WriteAutosaveAsync(string storyId, byte[] data) =>
-        WriteFileAsync(Path.Combine(StoryDirectory(storyId), "autosave.json"), data, overwrite: true);
+        WriteFileAsync(Path.Combine(StoryDirectory(storyId), AutosaveFile), data, overwrite: true);
 
     private static async Task<byte[]> ReadFileAsync(string path)
     {

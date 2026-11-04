@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Playwright;
+using Talewright.Runtime.Saves;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -265,15 +266,11 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Latest).ToContainTextAsync("Runtime visits 46.");
     }
 
-    private async Task<string> SavedProgress() => await Page.EvaluateAsync<string>("""
-        async () => {
-            const store = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-            const data = await store.read('image-test', '\0quick');
-            const save = JSON.parse(new TextDecoder().decode(data));
-            delete save.summary;
-            return JSON.stringify(save);
-        }
-        """);
+    private async Task<string> SavedProgress()
+    {
+        var save = SaveFormat.Read(await ReadBrowserSaveAsync("image-test", "\0quick")) with { Summary = null };
+        return Convert.ToBase64String(SaveFormat.Write(save));
+    }
 
     private static ImageStoryFiles CreateStory(bool images = false)
     {

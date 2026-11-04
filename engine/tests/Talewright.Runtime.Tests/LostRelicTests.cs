@@ -372,7 +372,7 @@ public partial class LostRelicTests
         var history = History();
         Choose(history, "Continue");
         var events = history.Events.ToArray();
-        Assert.Contains("incompatible", Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes)).Message);
+        Assert.StartsWith("Version 0.3.0 of ", Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes)).Message);
         Assert.Equal(events, history.Events);
     }
 
