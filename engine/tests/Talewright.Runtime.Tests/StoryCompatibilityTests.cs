@@ -128,7 +128,7 @@ public sealed class StoryCompatibilityTests
         var predicates = new NamedPredicateRegistry().Register("Switch", _ => !vary || calls++ == 0);
         var start = differentEvents
             ? "{if @Switch}\n~ set flag:seen\n{/if}\n* [Continue] -> finish"
-            : "* [Continue] (requires: @Switch) -> finish\n* [Leave] -> END";
+            : "* [Continue] (requires @Switch) -> finish\n* [Leave] -> END";
         var source = new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
