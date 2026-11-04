@@ -68,7 +68,6 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['@hub any(camp, temple)', '@hub', 'keyword.control.metadata.tale'],
     ['@hub-limit 3', '@hub-limit', 'keyword.control.metadata.tale'],
     ['@once', '@once', 'keyword.control.metadata.tale'],
-    ['@title The **sealed** door', 'sealed', 'markup.bold.markdown'],
     ['> guide: Hello {player:first-name}.', 'guide', 'entity.name.tag.character.tale'],
     ['> guide: Hello {player:first-name}.', 'first-name', 'variable.other.member.tale'],
     ['{faction:guild.name:name}', 'guild.name', 'variable.other.member.tale'],
@@ -102,7 +101,6 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['~ var:torches += 1', '~', 'keyword.operator.effect.tale'],
     ['~ var:torches += 1', '+=', 'keyword.operator.tale'],
     ['* [Read **glyphs**] (requires: player:int >= 12) { player:hp -= 2 } -> temple.hall', '*', 'punctuation.definition.choice.tale'],
-    ['* [Read **glyphs**] (requires: player:int >= 12) { player:hp -= 2 } -> temple.hall', 'glyphs', 'markup.bold.markdown'],
     ['* [Read] (requires: player:int >= 12) -> temple.hall', 'requires', 'keyword.control.tale'],
     ['* [Read] (requires: player:int >= 12) -> temple.hall', 'temple.hall', 'entity.name.section.target.tale'],
     ['* -> END', '*', 'punctuation.definition.choice.tale'],
@@ -119,19 +117,17 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['{if visited(temple.hall)}Yes{/if}', 'visited', 'support.function.tale'],
     ['{player:first-name#possessive}', '#possessive', 'support.function.modifier.tale'],
     ['{if var:count == 12}', '12', 'constant.numeric.tale'],
-    ['*emphasis* and **strong**', 'emphasis', 'markup.italic.markdown'],
-    ['*emphasis* and **strong**', 'strong', 'markup.bold.markdown'],
     ['**{player:first-name}**', 'first-name', 'variable.other.member.tale'],
-    ['![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale'],
     ['{image("maps/camp", "A camp")}', 'image', 'support.function.image.tale'],
     ['{image("maps/camp", "A } camp")}', 'camp"', 'string.quoted.double.tale'],
     ['{image("camp", "He said \\"Go\\".")}', '\\"', 'constant.character.escape.tale'],
     ['* [{image("camp", "A ] camp")} Go] -> END', 'A ] camp', 'string.quoted.double.tale'],
     ['> guide: {image("camp", "Camp")}', 'image', 'support.function.image.tale'],
     ['{image("camp", "{player:first-name} at the gate")}', 'first-name', 'variable.other.member.tale'],
-    ['{image("camp", "**The guide**")}', 'The guide', 'markup.bold.markdown'],
     [String.raw`{image("camp", "a \* b")}`, String.raw`\*`, 'constant.character.escape.tale'],
     [String.raw`{image("camp", "a \[door\]")}`, String.raw`\[`, 'constant.character.escape.tale'],
+    [String.raw`{image("camp", "a \. b")}`, String.raw`\.`, 'constant.character.escape.tale'],
+    [String.raw`{image("camp", "a \\ b")}`, String.raw`\\`, 'constant.character.escape.tale'],
     ['{image("camp", "\\{literal\\}")}', '\\{', 'constant.character.escape.tale'],
     ['{image("{player:name}", "Camp")}', 'player', 'string.quoted.double.tale'],
     ['{image:name}', 'name', 'variable.other.member.tale'],
@@ -141,19 +137,7 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'END', 'entity.name.section.target.tale'],
     ['* [Go] (requires: (visited(a) or visited(b)) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
     ['{if visited(start) and player:hp > 0}Yes{/if}', 'hp', 'variable.other.member.tale'],
-    ['__snake__case__ after', 'case', 'markup.bold.markdown'],
-    ['_snake_case_words_ after', 'case_words', 'markup.italic.markdown'],
-    ['**bold** text', 'bold', 'markup.bold.markdown'],
-    ['*it* text', 'it', 'markup.italic.markdown'],
-    ['**a*b** after', 'b', 'markup.bold.markdown'],
-    ['**real \\** still bold** after', 'still bold', 'markup.bold.markdown'],
-    ['*real \\* still italic* after', 'still italic', 'markup.italic.markdown'],
-    ['__real \\__ still bold__ after', 'still bold', 'markup.bold.markdown'],
-    ['_real \\_ still italic_ after', 'still italic', 'markup.italic.markdown'],
-    ['**bold *italic* bold**', 'italic', 'markup.italic.markdown'],
-    ['**bold *italic* bold**', 'bold', 'markup.bold.markdown'],
     ['[Hello {player:first-name}](https://example.org)', 'first-name', 'variable.other.member.tale'],
-    ['[**Bold** {player:name} [x]](<https://example.org>)', 'Bold', 'markup.bold.markdown'],
     ['[**Bold** {player:name} [x]](<https://example.org>)', 'name', 'variable.other.member.tale'],
   ]) hasScope(line, text, scope);
   const path = '{image("{player:name}", "Camp")}';
@@ -178,7 +162,6 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
   hasScope(String.raw`a \. b`, String.raw`\.`, 'constant.character.escape.tale');
   hasScope(String.raw`a \— b`, String.raw`—`, 'text.tale');
   assert.ok(!tokens('A -> sign in prose').tokens.some(token => token.scopes.includes('keyword.control.divert.tale')));
-  assert.ok(!tokens('snake_case_words').tokens.some(token => token.scopes.includes('markup.italic.markdown')));
   for (const [line, text] of [
     ['__snake__case__ after', 'after'], ['_snake_case_words_ after', 'after'],
     ['**a*b** after', 'after'], ['*a**b**c* after', 'after'], ['***both*** after', 'after'],
@@ -196,29 +179,23 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     const token = tokens(line).tokens.find(token => token.startIndex <= offset && token.endIndex > offset);
     assert.ok(!token.scopes.some(scope => scope.startsWith('markup.') || scope.startsWith('meta.link')), `${line}: ${text} should be outside formatting, got ${token.scopes.join(', ')}`);
   }
-  hasScope('**a*b** after', '*b', 'markup.bold.markdown');
-  assert.ok(!tokens('**a*b** after').tokens.some(token => token.scopes.includes('markup.italic.markdown')), 'unmatched * inside strong stays literal');
-  hasScope('**bold *italic* bold**', 'italic', 'markup.italic.markdown');
-  hasScope('**bold *italic* bold**', 'bold', 'markup.bold.markdown');
-  hasScope('*(door)*', '(door)', 'markup.italic.markdown');
-  hasScope('*door!*', 'door!', 'markup.italic.markdown');
-  hasScope('_(door)_', '(door)', 'markup.italic.markdown');
-  hasScope('_door!_', 'door!', 'markup.italic.markdown');
-  hasScope('**(door)**', '(door)', 'markup.bold.markdown');
-  hasScope('__door!__', 'door!', 'markup.bold.markdown');
-  for (const line of ['**_combined_**', '__*combined*__', '_**combined**_', '*__combined__*']) {
-    hasScope(line, 'combined', 'markup.bold.markdown');
-    hasScope(line, 'combined', 'markup.italic.markdown');
-  }
   hasScope(String.raw`\*literal\*`, String.raw`\*`, 'constant.character.escape.tale');
-  hasScope('![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale');
-  for (const line of ['![a [b]](p)', String.raw`![a\]](p)`, '![a](p(q))']) {
-    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.deprecated.image.tale')), line);
-  }
   const requires = '* [Continue] (requires: visited(start) and player:hp > 0) -> END';
   const close = requires.indexOf(') ->');
   const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);
   assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
+});
+
+test('the grammar leaves emphasis and reader-text escapes in image alt text to the compiler rules', () => {
+  for (const line of ['*emphasis* and **strong**', '_emphasis_ and __strong__', '![torch](torch.png)',
+    '* [Read **glyphs**] -> END', '@title The **sealed** door', '{image("camp", "**The guide**")}']) {
+    const scopes = tokens(line).tokens.flatMap(token => token.scopes);
+    assert.ok(!scopes.some(scope => scope.startsWith('markup.') || scope.startsWith('invalid.deprecated')), `${line}: ${scopes.join(', ')}`);
+  }
+  for (const line of [String.raw`{image("camp", "a \q b")}`, String.raw`{image("camp", "a \. b")}`, String.raw`{image("camp", "a \ b")}`]) {
+    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.illegal.escape.tale')), line);
+  }
+  hasScope(String.raw`{image("camp", "a \q b")}`, String.raw`\q`, 'string.quoted.double.tale');
 });
 
 test('choice conditions highlight only the exact requires marker', () => {
