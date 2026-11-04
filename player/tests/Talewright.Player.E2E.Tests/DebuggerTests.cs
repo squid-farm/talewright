@@ -251,7 +251,7 @@ public sealed class DebuggerTests
             await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
                 === start
                 Textless start.
-                * [Locked] (requires: flag:ready) -> END
+                * [Locked] (requires flag:ready) -> END
                 * -> next
                 === next
                 Textless destination.
@@ -297,7 +297,7 @@ public sealed class DebuggerTests
                 === scene{{i}}
                 @title Chapter {{i}}
                 Late scene {{i}}.
-                * [Prepared] (requires: flag:ready) -> END
+                * [Prepared] (requires flag:ready) -> END
                 * [Wait] -> END
                 """)));
             await WaitFor(driver, "Scene setup");
@@ -415,7 +415,7 @@ public sealed class DebuggerTests
             === start
             ~ var:count += 1
             Live count {var:count}.
-            * [Prepared] (requires: flag:ready) -> target
+            * [Prepared] (requires flag:ready) -> target
             * [Wait] -> start
             === target
             @requires not flag:ready
@@ -621,7 +621,7 @@ public sealed class DebuggerTests
                 === scene{{i}}
                 @title Chapter {{i}}
                 Before scene{{i}}. Count {var:count}. {player:first-name}.
-                * [Prepared] (requires: flag:ready) -> check
+                * [Prepared] (requires flag:ready) -> check
                 * [Wait] -> END
                 """)) + """
 

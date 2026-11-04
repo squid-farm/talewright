@@ -269,7 +269,7 @@ The authoritative spec is the [Talemark syntax reference](../reference/talemark-
 - A story is a folder: `story.talewright.yaml` (schema, characters, factions, items, triggers) + `*.tale` files.
 - A `.tale` file holds many scenes (`=== scene.id` + `@title/@requires/@tags/@priority/@once/@hub` metadata).
 - Prose uses Talemark reader text with `{player:first-name#possessive}` substitutions and `{if}/{else}/{/if}` conditionals.
-- `> who: text` speaker lines, `~ effect` lines, `* [label] (requires: expr) { effects } -> target` choices, `-> target` diverts.
+- `> who: text` speaker lines, `~ effect` lines, `* [label] (requires expr) { effects } -> target` choices, `-> target` diverts.
 - `skill-check` on a choice or as a `::: skill-check` block.
 
 Not in v0: inline function definitions, loops, ink-style tunnels/threads, visible-but-locked choices.

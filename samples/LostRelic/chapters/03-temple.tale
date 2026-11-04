@@ -8,8 +8,8 @@
 A door of a single slab blocks the top of the stair. Three glyphs are cut deep into it: a spiral, a closed
 eye, a hand.
 
-* [Trace the glyphs and press the hand] (requires: flag:knows-glyphs) { faction:explorers-guild:standing += 5; player:xp += 50 } -> temple.hall
-* [Close your eyes] (requires: not visited(dream.arrival)) -> dream.arrival
+* [Trace the glyphs and press the hand] (requires flag:knows-glyphs) { faction:explorers-guild:standing += 5; player:xp += 50 } -> temple.hall
+* [Close your eyes] (requires not visited(dream.arrival)) -> dream.arrival
 * [Force the door] skill-check athletics dc 14
   success: { set flag:door-damaged; faction:explorers-guild:standing -= 10 } -> temple.hall
   failure: { player:hp -= 2 } -> temple.side

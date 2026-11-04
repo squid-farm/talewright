@@ -15,7 +15,7 @@ public sealed class StoryProjectValidatorTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
             "game:\n  id: build\n  title: Build\n  start: a\n  ruleset: {base: custom}\ncharacters:\n  player: {first-name: Author}\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"),
-            "=== a\n{player:first-name#greeting}\n* [Continue] (requires: @Ready) -> END\n* -> END\n");
+            "=== a\n{player:first-name#greeting}\n* [Continue] (requires @Ready) -> END\n* -> END\n");
     }
 
     private static CompilerOptions Options() => new()
@@ -40,7 +40,7 @@ public sealed class StoryProjectValidatorTests : IDisposable
     public void Choice_availability_warning_is_reported_in_build_format_without_rejecting_the_story()
     {
         File.WriteAllText(Path.Combine(_root, "main.tale"),
-            "=== a\n* [Continue] (requires: @Ready) -> END\n");
+            "=== a\n* [Continue] (requires @Ready) -> END\n");
         using var output = new StringWriter();
 
         Assert.Equal(0, StoryProjectValidator.Validate(_root, Options(), output));

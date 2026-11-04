@@ -22,15 +22,15 @@ public sealed class ChoiceAvailabilityTests
     public static TheoryData<string, string> UnsafeStories => new()
     {
         { "all choices conditional", """
-            * [Ready] (requires: flag:ready) -> END
-            * [Gold] (requires: var:gold > 5) -> END
+            * [Ready] (requires flag:ready) -> END
+            * [Gold] (requires var:gold > 5) -> END
             """ },
         { "complementary requirements", """
-            * [More] (requires: var:gold > 5) -> END
-            * [Less] (requires: var:gold <= 5) -> END
+            * [More] (requires var:gold > 5) -> END
+            * [Less] (requires var:gold <= 5) -> END
             """ },
         { "conditional textless choice", """
-            * (requires: flag:ready) -> END
+            * (requires flag:ready) -> END
             """ },
         { "if without else", """
             {if flag:ready}
@@ -41,7 +41,7 @@ public sealed class ChoiceAvailabilityTests
             {if flag:ready}
             * [Ready] -> END
             {else}
-            * [Gold] (requires: var:gold > 5) -> END
+            * [Gold] (requires var:gold > 5) -> END
             {/if}
             """ },
         { "nested branch without an option", """
@@ -65,7 +65,7 @@ public sealed class ChoiceAvailabilityTests
             {if flag:ready}
             -> END
             {/if}
-            * [Gold] (requires: var:gold > 5) -> END
+            * [Gold] (requires var:gold > 5) -> END
             """ },
         { "hub with no authored choices", """
             @hub offer
@@ -76,7 +76,7 @@ public sealed class ChoiceAvailabilityTests
             """ },
         { "hub with only conditional choices", """
             @hub offer
-            * [Ready] (requires: flag:ready) -> END
+            * [Ready] (requires flag:ready) -> END
             === offer
             @tags offer
             @requires false
@@ -87,13 +87,13 @@ public sealed class ChoiceAvailabilityTests
             success: -> END
             failure:
             :::
-            * [Ready] (requires: flag:ready) -> END
+            * [Ready] (requires flag:ready) -> END
             """ },
         { "unreachable safe literal branch", """
             {if false}
             * [Unreachable] -> END
             {else}
-            * [Ready] (requires: flag:ready) -> END
+            * [Ready] (requires flag:ready) -> END
             {/if}
             """ },
     };
@@ -117,11 +117,11 @@ public sealed class ChoiceAvailabilityTests
     public static TheoryData<string, string> SafeStories => new()
     {
         { "one unconditional choice", """
-            * [Ready] (requires: flag:ready) -> END
+            * [Ready] (requires flag:ready) -> END
             * [Leave] -> END
             """ },
         { "unconditional textless choice", """
-            * [Ready] (requires: flag:ready) -> END
+            * [Ready] (requires flag:ready) -> END
             * -> END
             """ },
         { "unconditional skill-check choice", """
@@ -194,7 +194,7 @@ public sealed class ChoiceAvailabilityTests
             """ },
         { "literal false selects the else branch", """
             {if false}
-            * [Unreachable] (requires: flag:ready) -> END
+            * [Unreachable] (requires flag:ready) -> END
             {else}
             * [Leave] -> END
             {/if}
@@ -219,7 +219,7 @@ public sealed class ChoiceAvailabilityTests
     {
         var choices = Compile("""
             -> END
-            * [Unreachable] (requires: flag:ready) -> END
+            * [Unreachable] (requires flag:ready) -> END
             """);
         Assert.True(choices.Success, string.Join("\n", choices.Diagnostics));
         Assert.Equal("TW3012", Assert.Single(choices.Warnings).Code);
@@ -239,9 +239,9 @@ public sealed class ChoiceAvailabilityTests
     public void Each_unsafe_scene_is_reported_at_its_own_header()
     {
         var result = Compile("""
-            * [Maybe] (requires: flag:ready) -> second
+            * [Maybe] (requires flag:ready) -> second
             === second
-            * [Maybe] (requires: flag:ready) -> END
+            * [Maybe] (requires flag:ready) -> END
             """);
 
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));

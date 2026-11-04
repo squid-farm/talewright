@@ -16,7 +16,7 @@ public sealed class PerformanceCorpusTests
         Assert.Equal(100, first.Metadata.SceneCount);
         Assert.Equal(110, first.Metadata.ChoiceCount);
         Assert.Equal(512 * 1024, first.Metadata.ExpandedBytes);
-        Assert.Equal("db3965b7d0dfff072710a0f31991f8e7c1918d99354ec459550918450f579a37", first.Metadata.Sha256);
+        Assert.Equal("12f030a558aeb8f3d80e45655c0caf3b1703ec88f1201006665e7012fcbbac5e", first.Metadata.Sha256);
         Assert.True(first.Metadata.CompressedBytes < 20 * 1024 * 1024);
 
         var directoryStory = Compile(StorySource.FromDirectory(first.Root));

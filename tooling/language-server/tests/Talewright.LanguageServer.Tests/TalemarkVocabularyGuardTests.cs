@@ -75,7 +75,7 @@ public sealed class TalemarkVocabularyGuardTests
         Assert.Contains("var:", words);
         Assert.Contains("===", words);
         Assert.Contains("->", words);
-        Assert.Contains("(requires:", words);
+        Assert.Contains("(requires", words);
         Assert.Contains("skill-check", words);
         Assert.Contains("one-many", words);
         Assert.Contains("capitalize", words);

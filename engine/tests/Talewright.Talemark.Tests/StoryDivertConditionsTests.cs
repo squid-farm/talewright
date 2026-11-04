@@ -56,7 +56,7 @@ public sealed class StoryDivertConditionsTests
             {/if}
             === choose
             {if flag:ready or var:coins > 1}
-            * [Climb] (requires: player:dex >= 10) skill-check athletics dc 10
+            * [Climb] (requires player:dex >= 10) skill-check athletics dc 10
             success: -> destination
             failure: -> elsewhere
             {/if}

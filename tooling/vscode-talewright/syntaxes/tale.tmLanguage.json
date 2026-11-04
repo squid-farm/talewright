@@ -44,7 +44,7 @@
       "patterns": [{"include": "#expression"}]
     },
     {
-      "begin": "^\\s*(\\*)(?=\\s*\\[|[\\t ]+(?:\\(requires:|\\{|->)|\\s*$)",
+      "begin": "^\\s*(\\*)(?=\\s*\\[|[\\t ]+(?:\\(requires[\\t ]+|\\{|->)|\\s*$)",
       "beginCaptures": {"1": {"name": "punctuation.definition.choice.tale"}},
       "end": "$",
       "patterns": [
@@ -57,7 +57,7 @@
           "patterns": [{"include": "#inline"}]
         },
         {
-          "begin": "(\\()(requires)(:)",
+          "begin": "(\\()(requires)([\\t ]+)(?![\\t ]*:)",
           "beginCaptures": {
             "1": {"name": "punctuation.section.condition.begin.tale"},
             "2": {"name": "keyword.control.tale"},

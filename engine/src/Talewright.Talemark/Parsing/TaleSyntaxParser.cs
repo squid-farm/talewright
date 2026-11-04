@@ -488,19 +488,18 @@ internal static class TaleSyntaxParser
             {
                 var column = indent + 1 + pos;
                 var remaining = rest.AsSpan(pos);
-                if (remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal))
+                if (ChoiceSyntax.TryReadChoiceRequires(rest, pos, _cancellationToken, out var valueStart))
                 {
                     if (hasRequires)
                         Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                            $"Duplicate '{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' condition. " +
+                            $"Duplicate '{SceneVocabulary.ChoiceRequiresExample}' condition. " +
                             "A choice accepts only one.", column);
-                    var valueStart = pos + SceneVocabulary.ChoiceRequires.Length;
                     if (!clauseScan.TryGetClose(pos, out var end))
                     {
                         Clause(new(TaleClauseKind.UnclosedRequires, column, indent + 1 + valueStart,
                             rest.Length - valueStart));
                         Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                            $"'{SceneVocabulary.ChoiceRequires}' is missing its closing " +
+                            $"'{SceneVocabulary.ChoiceRequiresExample}' is missing its closing " +
                             $"'{ExpressionVocabulary.CloseParen}'.", column);
                         return true;
                     }
@@ -563,26 +562,19 @@ internal static class TaleSyntaxParser
                     _check = (line.Line, column, false, false, false);
                     pos = rest.Length;
                 }
-                else if (remaining[0] == ExpressionVocabulary.OpenParen &&
-                         ChoiceSyntax.TryReadSpacedRequires(rest, pos, _cancellationToken, out var expressionStart))
-                {
-                    var expressionEnd = clauseScan.TryGetClose(pos, out var end) ? end : rest.Length;
-                    Clause(new(TaleClauseKind.MisspelledRequires, column, indent + 1 + expressionStart,
-                        expressionEnd - expressionStart));
-                    var spelling = ChoiceSyntax.Excerpt(rest.AsSpan(pos, expressionStart - pos));
-                    Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                        $"Choice conditions use the exact marker " +
-                        $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}'. " +
-                        $"'{spelling}' is not recognized.", column);
-                    return true;
-                }
                 else
                 {
+                    if (remaining[0] == ExpressionVocabulary.OpenParen)
+                    {
+                        var end = clauseScan.TryGetClose(pos, out var close) ? close : rest.Length;
+                        Clause(new(TaleClauseKind.InvalidCondition, column, column + 1, end - pos - 1));
+                    }
+
                     var help = !hasLabel
                         ? $"Use '{SceneVocabulary.ChoiceMarker} {SceneVocabulary.OpenBracket}label" +
                           $"{SceneVocabulary.CloseBracket} ...' or a textless '{SceneVocabulary.ChoiceMarker} ... " +
                           $"{SceneVocabulary.Divert} target'."
-                        : $"Expected {SceneVocabulary.ChoiceRequires} …{ExpressionVocabulary.CloseParen}, " +
+                        : $"Expected {SceneVocabulary.ChoiceRequiresExample}, " +
                           $"{SceneVocabulary.InlineOpen} effects " +
                           $"{SceneVocabulary.InlineClose}, {SceneVocabulary.Divert} target or {SceneVocabulary.SkillCheck}.";
                     var excerpt = ChoiceSyntax.Excerpt(remaining);
@@ -652,12 +644,17 @@ internal static class TaleSyntaxParser
         {
             var remaining = text.AsSpan(pos);
             if (remaining[0] == ExpressionVocabulary.OpenParen &&
-                ChoiceSyntax.TryReadSpacedRequires(text, pos, _cancellationToken, out _))
+                ChoiceSyntax.TryReadChoiceRequires(text, pos, _cancellationToken, out _))
             {
-                var terminal = afterCheck ? "the skill check" : "the divert";
+                var conditionMessage = insideBlock
+                    ? $"'{SceneVocabulary.ChoiceRequiresExample}' is misplaced after the block skill check."
+                    : afterCheck
+                        ? $"'{SceneVocabulary.ChoiceRequiresExample}' is misplaced after the skill check. " +
+                          $"Put the condition before '{SceneVocabulary.SkillCheck}'."
+                        : $"'{SceneVocabulary.ChoiceRequiresExample}' is misplaced after the divert. " +
+                          $"Put the condition before '{SceneVocabulary.Divert}'.";
                 Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                    $"Choice conditions use the exact marker '{SceneVocabulary.ChoiceRequires}" +
-                    $"{ExpressionVocabulary.CloseParen}' and cannot follow {terminal}.", column + pos);
+                    conditionMessage, column + pos);
                 return;
             }
 
@@ -672,15 +669,6 @@ internal static class TaleSyntaxParser
                 SceneVocabulary.InlineOpen =>
                     $"Effect block is misplaced after the divert. Put '{SceneVocabulary.InlineOpen} effects " +
                     $"{SceneVocabulary.InlineClose}' before '{SceneVocabulary.Divert}'.",
-                _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) && insideBlock =>
-                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
-                    "block skill check.",
-                _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) && afterCheck =>
-                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
-                    $"skill check. Put the condition before '{SceneVocabulary.SkillCheck}'.",
-                _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) =>
-                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
-                    $"divert. Put the condition before '{SceneVocabulary.Divert}'.",
                 _ when remaining.StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal) && afterCheck =>
                     $"Divert is misplaced after the skill check. Outcomes belong on " +
                     $"'{SceneVocabulary.SuccessOutcome}' and '{SceneVocabulary.FailureOutcome}' lines.",
@@ -905,14 +893,17 @@ internal static class TaleSyntaxParser
             }
 
             diagnostics.AddRange(_diagnostics);
-            var message = $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} {unclosed}" +
-                          $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.";
-            if (_suppressedDepth > 0)
-                diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _suppressedAt.Line,
-                    _suppressedAt.Column));
-            for (var index = _blocks.Count - 1; index >= 0; index--)
-                diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _blocks[index].Line,
-                    _blocks[index].Column));
+            if (_suppressedDepth > 0 || _blocks.Count > 0)
+            {
+                var message = $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} {unclosed}" +
+                              $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.";
+                if (_suppressedDepth > 0)
+                    diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _suppressedAt.Line,
+                        _suppressedAt.Column));
+                for (var index = _blocks.Count - 1; index >= 0; index--)
+                    diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _blocks[index].Line,
+                        _blocks[index].Column));
+            }
             return new TaleSceneSyntax(Start, Line, _headerIndent, _headerLength, _id, Lines.ToArray(),
                 _parts.ToArray(), _clauses.ToArray(), endLine - Line, diagnostics.ToArray());
         }

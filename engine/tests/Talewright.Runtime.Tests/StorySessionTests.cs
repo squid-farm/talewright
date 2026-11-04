@@ -68,7 +68,7 @@ public class StorySessionTests
     {
         var session = new StorySession(Compile("""
             === camp
-            * [Climb] (requires: player has rope) -> END
+            * [Climb] (requires player has rope) -> END
             * [Walk] -> END
             """));
 
