@@ -125,6 +125,7 @@ public sealed class ChoiceDiagnosticsTests
     [InlineData("* [Go] { set flag:weapon.|", "weapon.known", "weapon.")]
     [InlineData("* [Go] { set flag:weapon.|known", "weapon.known", "weapon.known")]
     [InlineData("* [Go] ( requires : flag:weapon.|", "weapon.known", "weapon.")]
+    [InlineData("* [Go] (invalid : flag:weapon.|", "weapon.known", "weapon.")]
     [InlineData("* -> weapon.|", "weapon.keep", "weapon.")]
     [InlineData("* -> weapon.|keep", "weapon.keep", "weapon.keep")]
     public void Dotted_prefixes_in_partial_choices_replace_the_whole_token(string line, string expected, string token)

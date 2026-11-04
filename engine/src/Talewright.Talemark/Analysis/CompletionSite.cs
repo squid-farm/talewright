@@ -88,14 +88,16 @@ internal static class ExpressionCompletion
             else if (before is [.., { Kind: TokenKind.Identifier } member, { Kind: TokenKind.Colon }] &&
                      tokenIndex >= 4 &&
                      tokens[tokenIndex - 4] is { Kind: TokenKind.Identifier } owner &&
-                     tokens[tokenIndex - 3].Kind == TokenKind.Colon)
+                     tokens[tokenIndex - 3].Kind == TokenKind.Colon &&
+                     (owner.Is(Faction) || owner.Is(Item) ||
+                      kind != ExpressionContextKind.Number && member.Is(Pronoun) &&
+                      symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name))))
             {
                 if (owner.Is(Faction))
                     keywords = [.. FactionProperties];
                 else if (owner.Is(Item))
                     keywords = [.. ItemProperties];
-                else if (kind != ExpressionContextKind.Number && member.Is(Pronoun) &&
-                         symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)))
+                else
                 {
                     keywords = [.. PronounProperties];
                     details = PronounFormDetails;

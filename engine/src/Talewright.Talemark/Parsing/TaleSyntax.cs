@@ -153,8 +153,8 @@ internal enum TaleClauseKind : byte
     /// <summary><c>(requires </c> without its closing parenthesis; the value runs to the line end.</summary>
     UnclosedRequires,
 
-    /// <summary>A legacy colon-separated requires marker; the value is the condition.</summary>
-    LegacyRequires,
+    /// <summary>Unexpected parenthesized choice text, retained for partial expression analysis.</summary>
+    InvalidCondition,
 
     /// <summary><c>{ effects }</c>; the value is the text between the braces.</summary>
     Effects,

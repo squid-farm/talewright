@@ -434,7 +434,8 @@ internal sealed partial class TaleParser
                     ExpressionParser.ReportStringErrors(value, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
                 case TaleClauseKind.Requires:
-                    var condition = ExpressionParser.ParseCondition(value, location, _symbols, _diagnostics);
+                    var condition = ExpressionParser.ParseCondition(value, location, _symbols, _diagnostics,
+                        highlightUnexpectedTokens: true);
                     if (!hasRequires)
                         requires = condition;
                     hasRequires = true;
@@ -446,8 +447,8 @@ internal sealed partial class TaleParser
                     var tokens = _symbols.Analysis?.Expression(context, value, location) ?? Lexer.Tokenize(value);
                     ExpressionParser.ReportStringErrors(tokens, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
-                case TaleClauseKind.LegacyRequires:
-                    _symbols.Analysis?.Expression(ExpressionContextKind.Condition, value, location);
+                case TaleClauseKind.InvalidCondition when _symbols.Analysis is not null:
+                    _symbols.Analysis.Expression(ExpressionContextKind.Condition, value, location);
                     break;
                 case TaleClauseKind.Effects:
                     var parsedEffects = ExpressionParser.ParseEffects(value, location, _symbols, _diagnostics) ?? [];

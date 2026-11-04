@@ -112,8 +112,7 @@ internal static class ChoiceSyntax
                 marker = SceneVocabulary.Divert;
             }
             else if (IsBoundary(text, index) &&
-                     (TryReadChoiceRequires(text, index, cancellationToken, out _) ||
-                      TryReadLegacyRequires(text, index, cancellationToken, out _)))
+                     TryReadChoiceRequires(text, index, cancellationToken, out _))
             {
                 marker = SceneVocabulary.ChoiceRequiresExample;
             }
@@ -143,57 +142,17 @@ internal static class ChoiceSyntax
 
         var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
         var index = open + SceneVocabulary.ChoiceRequires.Length;
-        if (index >= text.Length || !char.IsWhiteSpace(text[index]))
+        // Let the expression parser report a separator at the offending character.
+        if (index >= text.Length ||
+            (!char.IsWhiteSpace(text[index]) && text[index] != ExpressionVocabulary.Separator))
             return false;
         while (index < text.Length && char.IsWhiteSpace(text[index]))
         {
             checkpoint?.Check();
             index++;
         }
-
-        if (index < text.Length && text[index] == ExpressionVocabulary.Separator)
-            return false;
 
         expressionStart = index;
-        return true;
-    }
-
-    public static bool TryReadLegacyRequires(string text, int open, CancellationToken cancellationToken,
-        out int expressionStart)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        expressionStart = 0;
-        if (text[open] != ExpressionVocabulary.OpenParen)
-            return false;
-
-        var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
-        var index = open + 1;
-        while (index < text.Length && char.IsWhiteSpace(text[index]))
-        {
-            checkpoint?.Check();
-            index++;
-        }
-        if (!text.AsSpan(index).StartsWith(SceneVocabulary.Requires, StringComparison.Ordinal))
-            return false;
-
-        index += SceneVocabulary.Requires.Length;
-        if (index < text.Length && !char.IsWhiteSpace(text[index]) &&
-            text[index] != ExpressionVocabulary.Separator)
-            return false;
-        while (index < text.Length && char.IsWhiteSpace(text[index]))
-        {
-            checkpoint?.Check();
-            index++;
-        }
-        if (index >= text.Length || text[index] != ExpressionVocabulary.Separator)
-            return false;
-
-        expressionStart = index + 1;
-        while (expressionStart < text.Length && char.IsWhiteSpace(text[expressionStart]))
-        {
-            checkpoint?.Check();
-            expressionStart++;
-        }
         return true;
     }
 
@@ -209,8 +168,7 @@ internal static class ChoiceSyntax
             if (current == SceneVocabulary.InlineOpen ||
                 text.AsSpan(index).StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal) ||
                 current == ExpressionVocabulary.OpenParen &&
-                (TryReadChoiceRequires(text, index, cancellationToken, out _) ||
-                 TryReadLegacyRequires(text, index, cancellationToken, out _)))
+                TryReadChoiceRequires(text, index, cancellationToken, out _))
                 return index;
             if (current is TextVocabulary.QuoteMark or ExpressionVocabulary.OpenParen or SceneVocabulary.OpenBracket)
             {

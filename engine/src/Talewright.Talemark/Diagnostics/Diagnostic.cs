@@ -21,6 +21,9 @@ public readonly record struct SourceLocation(string File, int Line, int Column)
 /// </summary>
 public sealed record Diagnostic(DiagnosticSeverity Severity, string Code, string Message, SourceLocation Location)
 {
+    /// <summary>Exclusive end of the source range, or null for a point diagnostic.</summary>
+    public SourceLocation? EndLocation { get; init; }
+
     public override string ToString() => $"{Location}: {Severity.ToString().ToLowerInvariant()} {Code}: {Message}";
 }
 
@@ -35,6 +38,9 @@ public sealed class DiagnosticBag
 
     public void Error(string code, string message, SourceLocation location) =>
         _items.Add(new Diagnostic(DiagnosticSeverity.Error, code, message, location));
+
+    public void Error(string code, string message, SourceLocation location, SourceLocation endLocation) =>
+        _items.Add(new Diagnostic(DiagnosticSeverity.Error, code, message, location) { EndLocation = endLocation });
 
     public void Warning(string code, string message, SourceLocation location) =>
         _items.Add(new Diagnostic(DiagnosticSeverity.Warning, code, message, location));

@@ -562,20 +562,14 @@ internal static class TaleSyntaxParser
                     _check = (line.Line, column, false, false, false);
                     pos = rest.Length;
                 }
-                else if (remaining[0] == ExpressionVocabulary.OpenParen &&
-                         ChoiceSyntax.TryReadLegacyRequires(rest, pos, _cancellationToken, out var expressionStart))
-                {
-                    var expressionEnd = clauseScan.TryGetClose(pos, out var end) ? end : rest.Length;
-                    Clause(new(TaleClauseKind.LegacyRequires, column, indent + 1 + expressionStart,
-                        expressionEnd - expressionStart));
-                    var replacement = ChoiceRequiresReplacement(rest, expressionStart, expressionEnd);
-                    Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                        $"Choice requirements no longer use a colon. Replace the old form with '{replacement}'.",
-                        column);
-                    return true;
-                }
                 else
                 {
+                    if (remaining[0] == ExpressionVocabulary.OpenParen)
+                    {
+                        var end = clauseScan.TryGetClose(pos, out var close) ? close : rest.Length;
+                        Clause(new(TaleClauseKind.InvalidCondition, column, column + 1, end - pos - 1));
+                    }
+
                     var help = !hasLabel
                         ? $"Use '{SceneVocabulary.ChoiceMarker} {SceneVocabulary.OpenBracket}label" +
                           $"{SceneVocabulary.CloseBracket} ...' or a textless '{SceneVocabulary.ChoiceMarker} ... " +
@@ -649,19 +643,6 @@ internal static class TaleSyntaxParser
             bool insideBlock)
         {
             var remaining = text.AsSpan(pos);
-            var terminal = afterCheck ? "the skill check" : "the divert";
-            if (remaining[0] == ExpressionVocabulary.OpenParen &&
-                ChoiceSyntax.TryReadLegacyRequires(text, pos, _cancellationToken, out var expressionStart))
-            {
-                var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, pos, _cancellationToken);
-                var expressionEnd = scan.TryGetClose(pos, out var end) ? end : text.Length;
-                var replacement = ChoiceRequiresReplacement(text, expressionStart, expressionEnd);
-                Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                    $"Choice requirements no longer use a colon. Replace the old form with '{replacement}' " +
-                    $"before {terminal}.", column + pos);
-                return;
-            }
-
             if (remaining[0] == ExpressionVocabulary.OpenParen &&
                 ChoiceSyntax.TryReadChoiceRequires(text, pos, _cancellationToken, out _))
             {
@@ -695,16 +676,6 @@ internal static class TaleSyntaxParser
                      $"{(afterCheck ? "skill check" : "divert")}.",
             };
             Error(line, CompilerDiagnosticCodes.MalformedChoice, message, column + pos);
-        }
-
-        private static string ChoiceRequiresReplacement(string text, int expressionStart, int expressionEnd)
-        {
-            var source = text.AsSpan(expressionStart, expressionEnd - expressionStart).Trim();
-            if (source.IsEmpty)
-                return SceneVocabulary.ChoiceRequiresExample;
-
-            var expression = ChoiceSyntax.Excerpt(source);
-            return $"({SceneVocabulary.Requires} {expression})";
         }
 
         // ---- skill checks ----------------------------------------------------------------------------------------------
@@ -922,14 +893,17 @@ internal static class TaleSyntaxParser
             }
 
             diagnostics.AddRange(_diagnostics);
-            var message = $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} {unclosed}" +
-                          $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.";
-            if (_suppressedDepth > 0)
-                diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _suppressedAt.Line,
-                    _suppressedAt.Column));
-            for (var index = _blocks.Count - 1; index >= 0; index--)
-                diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _blocks[index].Line,
-                    _blocks[index].Column));
+            if (_suppressedDepth > 0 || _blocks.Count > 0)
+            {
+                var message = $"{SceneVocabulary.InlineOpen}{SceneVocabulary.If}{SceneVocabulary.InlineClose} {unclosed}" +
+                              $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}.";
+                if (_suppressedDepth > 0)
+                    diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _suppressedAt.Line,
+                        _suppressedAt.Column));
+                for (var index = _blocks.Count - 1; index >= 0; index--)
+                    diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _blocks[index].Line,
+                        _blocks[index].Column));
+            }
             return new TaleSceneSyntax(Start, Line, _headerIndent, _headerLength, _id, Lines.ToArray(),
                 _parts.ToArray(), _clauses.ToArray(), endLine - Line, diagnostics.ToArray());
         }
