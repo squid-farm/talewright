@@ -28,7 +28,7 @@ public sealed class StoryCompletionTests
     [InlineData("-> sec|", "second")]
     [InlineData("* [Go] -> sec|", "second")]
     [InlineData("* -> sec|", "second")]
-    [InlineData("* (requires: flag:re|) -> END", "ready")]
+    [InlineData("* (requires flag:re|) -> END", "ready")]
     [InlineData("* { set flag:re| } -> END", "ready")]
     [InlineData("-> |", "END")]
     [InlineData("> gu|", "guide")]

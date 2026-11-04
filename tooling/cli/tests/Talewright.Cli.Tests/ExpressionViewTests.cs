@@ -183,8 +183,8 @@ public sealed partial class ExpressionViewTests
                 """ + extraYaml,
             ["main.tale"] = tale ?? $"""
                 === hall
-                * [Light] (requires: {Compound}) -> cave
-                * [Ready] (requires: flag:ready and player has lantern) -> cave
+                * [Light] (requires {Compound}) -> cave
+                * [Ready] (requires flag:ready and player has lantern) -> cave
                 === cave
                 The cave.
                 -> END

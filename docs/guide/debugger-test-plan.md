@@ -42,13 +42,13 @@ triggers:
 === scene1
 ~ var:count += 1
 Opening. Count {var:count}.
-* [Prepared] (requires: flag:ready) -> scene1000
+* [Prepared] (requires flag:ready) -> scene1000
 * [Wait] -> scene1
 === scene1000
 @title Late chapter
 ~ var:count += 2
 Late chapter. {player:first-name}. Count {var:count}.
-* [Attempt] (requires: flag:ready) -> check
+* [Attempt] (requires flag:ready) -> check
 * [Return] -> scene1
 === check
 Check passage.

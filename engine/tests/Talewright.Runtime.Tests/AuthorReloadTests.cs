@@ -190,7 +190,7 @@ public sealed class AuthorReloadTests
         {
             "label" => Tale.Replace("[Travel]", "[Different meaning]"),
             "effect" => Tale.Replace("~ set flag:ready", "~ set flag:ready\n~ var:count += 1"),
-            "condition" => Tale.Replace("[Travel]", "[Travel] (requires: flag:ready)"),
+            "condition" => Tale.Replace("[Travel]", "[Travel] (requires flag:ready)"),
             _ => Tale.Replace("[Travel] -> current", "[Travel] -> next"),
         };
         var events = original.Events;
@@ -305,7 +305,7 @@ public sealed class AuthorReloadTests
 
     [Theory]
     [InlineData("{if flag:ready}**{player:first-name#custom}**{/if}")]
-    [InlineData("* [Hidden {player:first-name#custom}] (requires: flag:ready) -> END")]
+    [InlineData("* [Hidden {player:first-name#custom}] (requires flag:ready) -> END")]
     [InlineData("> player: {player:first-name#custom}")]
     public void Candidate_only_custom_modifiers_are_rejected_even_in_unexecuted_templates(string content)
     {

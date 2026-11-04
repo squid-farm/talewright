@@ -254,7 +254,7 @@ public sealed class TaleSyntaxTests
     [Fact]
     public void Choice_clauses_locate_label_condition_effects_and_divert()
     {
-        var syntax = Parse("=== a\n* [Go] (requires: flag:f) { set flag:g } -> next");
+        var syntax = Parse("=== a\n* [Go] (requires flag:f) { set flag:g } -> next");
         var scene = syntax.Scenes[0];
         var line = Assert.Single(scene.Lines);
 
@@ -262,18 +262,18 @@ public sealed class TaleSyntaxTests
         Assert.Equal(
         [
             (TaleClauseKind.Label, 2, "Go"), (TaleClauseKind.Requires, 7, "flag:f"),
-            (TaleClauseKind.Effects, 26, "set flag:g"), (TaleClauseKind.Divert, 41, "next"),
+            (TaleClauseKind.Effects, 25, "set flag:g"), (TaleClauseKind.Divert, 40, "next"),
         ], scene.Clauses(line).ToArray().Select(clause =>
             (clause.Kind, clause.Start, syntax.Value(scene, line, clause).ToString().Trim())));
     }
 
     [Theory]
     [InlineData("* [Go -> next", 2)]
-    [InlineData("* [Go] (requires: flag:f -> next", 7)]
+    [InlineData("* [Go] (requires flag:f -> next", 7)]
     [InlineData("* [Go] { set flag:g -> next", 7)]
     [InlineData("* [Go] (require flag:f) -> next", 7)]
     [InlineData("* [Go] next", 7)]
-    [InlineData("* (requires: flag:f)", 0)]
+    [InlineData("* (requires flag:f)", 0)]
     [InlineData("* skill-check dex dc 5", 0)]
     public void Malformed_choices_are_dropped_by_syntax(string text, int column)
     {
@@ -286,7 +286,7 @@ public sealed class TaleSyntaxTests
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: flag:f) (requires: flag:g) -> next")]
+    [InlineData("* [Go] (requires flag:f) (requires flag:g) -> next")]
     [InlineData("* [Go] -> next then")]
     [InlineData("* [Go] -> 1bad")]
     public void Recoverable_choice_errors_keep_the_choice(string text)

@@ -77,11 +77,11 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
             TestStories.DefaultManifest($"textless-{Guid.NewGuid():N}").Build(), """
             === start
             Visits {var:visits}.
-            * [Open] (requires: flag:ready) -> final
+            * [Open] (requires flag:ready) -> final
             * -> road
             === road
             The road.
-            * (requires: not flag:ready) { set flag:ready; var:visits += 1 } -> start
+            * (requires not flag:ready) { set flag:ready; var:visits += 1 } -> start
             * [Stop] -> final
             === final
             The end.

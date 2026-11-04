@@ -18,7 +18,7 @@ public sealed class ChoiceAvailabilityTests : IDisposable
             """);
         File.WriteAllText(Path.Combine(_root, "main.tale"), """
             === start
-            * [Maybe] (requires: flag:ready) -> END
+            * [Maybe] (requires flag:ready) -> END
             """);
     }
 

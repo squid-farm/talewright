@@ -115,7 +115,7 @@ You have a moment before its gaze returns.
 * [Slip beneath its gaze] skill-check stealth dc 13
   success: -> dream.eye-mark
   failure: -> dream.watcher-failed
-* [Meet its gaze without flinching] (requires: player:courage >= 6) -> dream.eye-mark
+* [Meet its gaze without flinching] (requires player:courage >= 6) -> dream.eye-mark
 * [Wake rather than face it] -> dream.wake
 
 === dream.watcher-failed
@@ -154,7 +154,7 @@ The hall stretches away. You gather yourself before trying another way.
 {/if}
 {/if}
 
-* [Promise the guild an honest account] (requires: faction:explorers-guild:tier >= neutral) { set flag:dream-promise; faction:explorers-guild:standing += 5 } -> dream.hub
+* [Promise the guild an honest account] (requires faction:explorers-guild:tier >= neutral) { set flag:dream-promise; faction:explorers-guild:standing += 5 } -> dream.hub
 * [Refuse to speak for the guild] { faction:explorers-guild:standing -= 10 } -> dream.hub
 
 === dream.hands

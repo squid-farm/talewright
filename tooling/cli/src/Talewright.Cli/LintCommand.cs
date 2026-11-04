@@ -64,9 +64,7 @@ public sealed class LintCommand : Command<LintSettings>
 
         var analysis = StoryAnalyzer.Analyze(source);
         var result = StoryLintAnalyzer.Analyze(analysis, configuration);
-        var compilerDiagnostics = result.CompilerDiagnostics.Select(diagnostic => new DiagnosticOutput(
-            diagnostic.Code, diagnostic.Severity.ToString().ToLowerInvariant(), diagnostic.Message,
-            diagnostic.Location.File, diagnostic.Location.Line, diagnostic.Location.Column));
+        var compilerDiagnostics = result.CompilerDiagnostics.Select(DiagnosticOutput.FromCompiler);
         var lintDiagnostics = result.RuleDiagnostics.Select(diagnostic => new DiagnosticOutput(
             diagnostic.Code, diagnostic.Severity.ToString().ToLowerInvariant(), diagnostic.Message,
             diagnostic.Range.Start.File, diagnostic.Range.Start.Line, diagnostic.Range.Start.Column,

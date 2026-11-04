@@ -119,7 +119,7 @@ public sealed class ExpressionTokenBufferTests
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: \"bad\\q")]
+    [InlineData("* [Go] (requires \"bad\\q")]
     [InlineData("* [Go] { var:word = \"bad\\q")]
     [InlineData("{if \"bad\\q")]
     [InlineData("{\"bad\\q")]
