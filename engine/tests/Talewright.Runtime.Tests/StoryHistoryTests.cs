@@ -75,17 +75,15 @@ public class StoryHistoryTests
     }
 
     [Theory]
-    [InlineData(new byte[] { 0x0A, 0x05, (byte)'a' })] // Scene title length runs past the summary.
-    [InlineData(new byte[] { 0x0A, 0x01, (byte)'a' })] // No save time.
-    [InlineData(new byte[] { 0x10, 0x01 })] // No scene title.
-    [InlineData(new byte[] { 0x0A, 0x01, (byte)'a', 0x10, 0x01, 0x18, 0x90, 0x0E })] // Offset beyond 14 hours.
-    [InlineData(new byte[] { 0x0A, 0x02, 0xC3, 0x28, 0x10, 0x01 })] // Invalid UTF-8 title.
+    [InlineData(new byte[] { 0xC1 })]
+    [InlineData(new byte[] { 0x91 })]
+    [InlineData(new byte[] { 0x91, 0xC1 })]
     public void Unreadable_summary_does_not_prevent_loading_replay(byte[] summary)
     {
         var history = new StoryHistory(Compile(), 7);
-        var extra = new ProtoWriter();
-        extra.WriteBytes(SaveFields.Summary, summary);
-        var bytes = AppendFields(history.Save(), extra);
+        var payload = SaveFormat.ToPayload(SaveFormat.Read(history.Save()));
+        payload.Summary = summary;
+        var bytes = SaveFormat.Pack(SaveFormat.EncodeBody(payload));
         var entry = StoryHistory.DescribeSave("Damaged details", bytes);
         Assert.Null(entry.Summary);
         Assert.Contains("unreadable", entry.Warning);
@@ -239,7 +237,6 @@ public class StoryHistoryTests
     [InlineData("story-version", "Version other of History has changed")]
     [InlineData("fingerprint", "History has changed")]
     [InlineData("cursor", "history is damaged")]
-    [InlineData("choice-index", "history is damaged")]
     [InlineData("choice", "cannot continue")]
     public void Invalid_saves_preserve_active_session(string damage, string message)
     {
@@ -255,15 +252,6 @@ public class StoryHistoryTests
             "story-version" => Mutate(before, save => save with { StoryVersion = "other" }),
             "fingerprint" => Mutate(before, save => save with { ContentFingerprint = "changed" }),
             "cursor" => Mutate(before, save => save with { Cursor = 3 }),
-            "choice-index" => SaveFormat.Pack(Body(new SavedGame
-            {
-                StoryId = "history", StoryVersion = "1", ContentFingerprint = history.Story.ContentFingerprint!,
-                Seed = 7, Cursor = 0, Choices = [],
-            }, writer =>
-            {
-                writer.WriteString(SaveFields.ChoiceKeys, "c0");
-                writer.WritePackedUInt32(SaveFields.Choices, [1]);
-            })),
             "choice" => Mutate(before, save => save with { Choices = ["missing"] }),
             _ => throw new ArgumentOutOfRangeException(nameof(damage)),
         };
@@ -406,18 +394,10 @@ public class StoryHistoryTests
     }
 
     [Fact]
-    public void Oversized_choice_history_is_rejected_and_unknown_fields_are_ignored()
+    public void Oversized_choice_history_is_rejected()
     {
         var history = new StoryHistory(Compile(), 7);
         history.Choose("c0");
-        var extra = new ProtoWriter();
-        extra.WriteUInt64(100, 1);
-        extra.WriteString(101, "future");
-        extra.WriteFixed64(102, 3);
-        var withUnknown = AppendFields(history.Save(), extra);
-        AssertEquivalent(history, StoryHistory.Restore(history.Story, withUnknown));
-        Assert.Equal(history.ProgressKey, StoryHistory.DescribeSave("future", withUnknown).ProgressKey);
-
         var oversized = Mutate(history.Save(), save => save with
         {
             Choices = Enumerable.Repeat("c0", StoryHistory.MaxChoices + 1).ToArray(),
@@ -469,19 +449,6 @@ public class StoryHistoryTests
 
     private static byte[] Mutate(byte[] save, Func<SavedGame, SavedGame> change) =>
         SaveFormat.Write(change(SaveFormat.Read(save)));
-
-    private static byte[] Body(SavedGame save, Action<ProtoWriter> extra)
-    {
-        var writer = new ProtoWriter();
-        extra(writer);
-        return [.. SaveFormat.EncodeBody(save), .. writer.WrittenSpan];
-    }
-
-    private static byte[] AppendFields(byte[] save, ProtoWriter extra)
-    {
-        var body = SaveFormat.EncodeBody(SaveFormat.Read(save, out _));
-        return SaveFormat.Pack([.. body, .. extra.WrittenSpan]);
-    }
 
     private static void AssertEquivalent(StoryHistory expected, StoryHistory actual)
     {

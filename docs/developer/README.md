@@ -17,7 +17,7 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [CLI setup details](cli-setup.md) | Download verification, system dependencies, .NET tools and source builds |
 | [UI test container image](ui-test-image.md) | Build/publish process and CI image rollout for browser/Linux player tests |
 | [Nx CI orchestration](nx-ci.md) | Affected selection, task graph, developer commands, and verification matrix |
-| [Save format](save-format.md) | Binary save layout, schema, field-number rules, limits and protobuf conformance audit |
+| [Save format](save-format.md) | MessagePack array layout, positional-key rules and limits |
 | [Performance](performance.md) | Recorded benchmark results and how they were measured |
 | [Performance scorecard](performance-scorecard.md) | Cross-host baseline, measured dimensions, limitations, and budget status |
 | [Testing](../../tests/README.md) | Unit, browser, desktop and performance test suites |

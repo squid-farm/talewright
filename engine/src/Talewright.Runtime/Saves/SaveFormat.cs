@@ -1,5 +1,8 @@
+using System.Buffers;
 using System.Collections.ObjectModel;
 using System.IO.Compression;
+using System.Text;
+using MessagePack;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime.Saves;
@@ -17,13 +20,10 @@ public sealed record SavedGame
     public SaveSummary? Summary { get; init; }
 }
 
-/// <summary>
-/// Reads and writes save files: a short header followed by a zlib-compressed protobuf-wire message.
-/// The field layout is documented in docs/developer/save-format.md and save-format.proto.
-/// </summary>
+/// <summary>Reads and writes save files: a short header followed by a zlib-compressed MessagePack array.</summary>
 public static class SaveFormat
 {
-    public const int Version = 3;
+    public const int Version = 4;
     /// <summary>File extension for saves on disk and exported backups.</summary>
     public const string FileExtension = ".twsave";
     public const int MaxSaveBytes = 2 * 1024 * 1024;
@@ -31,6 +31,11 @@ public static class SaveFormat
     public const int MaxChoices = 10_000;
     public const int MaxChoiceKeyLength = 512;
     public const int MaxCharacterStats = 1_000;
+
+    private const int HeaderLength = 4 + 1 + sizeof(uint);
+    private const int MaxArrayFields = 32;
+    private static readonly MessagePackSerializerOptions SerializerOptions =
+        MessagePackSerializerOptions.Standard.WithSecurity(MessagePackSecurity.UntrustedData);
 
     internal const string MalformedMessage = "This saved game is malformed or damaged. Choose another save or start a new game.";
     internal const string UnsupportedMessage = "This saved game uses an unsupported format. Open it with the player version that created it.";
@@ -41,16 +46,25 @@ public static class SaveFormat
     internal static ReadOnlySpan<byte> Magic => "TWSV"u8;
 
     /// <summary>Encodes and compresses a save. The result is checked against <see cref="MaxSaveBytes"/> by the caller.</summary>
-    public static byte[] Write(SavedGame save) => Pack(EncodeBody(save));
+    public static byte[] Write(SavedGame save)
+    {
+        var body = EncodeBody(save);
+        if (body.Length > MaxDecodedBytes)
+        {
+            throw new InvalidOperationException("This playthrough is too large to save (maximum 8 MiB uncompressed). You can continue playing, but this save could not be created.");
+        }
+
+        return Pack(body);
+    }
 
     internal static byte[] Pack(ReadOnlySpan<byte> body)
     {
         using var output = new MemoryStream();
         output.Write(Magic);
         output.WriteByte(Version);
-        var length = new ProtoWriter();
-        length.WriteVarint((uint)body.Length);
-        output.Write(length.WrittenSpan);
+        Span<byte> length = stackalloc byte[sizeof(uint)];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(length, checked((uint)body.Length));
+        output.Write(length);
         using (var zlib = new ZLibStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
         {
             zlib.Write(body);
@@ -65,168 +79,345 @@ public static class SaveFormat
     internal static SavedGame Read(ReadOnlySpan<byte> data, out bool summaryDamaged) =>
         DecodeBody(Decompress(data), out summaryDamaged);
 
-    internal static byte[] EncodeBody(SavedGame save)
-    {
-        var writer = new ProtoWriter();
-        writer.WriteString(SaveFields.StoryId, save.StoryId);
-        writer.WriteString(SaveFields.StoryVersion, save.StoryVersion);
-        writer.WriteString(SaveFields.ContentFingerprint, save.ContentFingerprint);
-        writer.WriteFixed64(SaveFields.Seed, save.Seed);
-        writer.WriteUInt64(SaveFields.Cursor, (uint)save.Cursor);
-        if (save.Character is { } character)
-        {
-            writer.WriteMessage(SaveFields.Character, w => WriteCharacter(w, character));
-        }
+    internal static byte[] EncodeBody(SavedGame save) =>
+        EncodeBody(ToPayload(save));
 
-        var keys = new Dictionary<string, uint>(StringComparer.Ordinal);
-        var indices = new uint[save.Choices.Count];
-        for (var i = 0; i < indices.Length; i++)
-        {
-            var key = save.Choices[i];
-            if (!keys.TryGetValue(key, out var index))
-            {
-                index = (uint)keys.Count;
-                keys.Add(key, index);
-                writer.WriteString(SaveFields.ChoiceKeys, key);
-            }
-
-            indices[i] = index;
-        }
-
-        writer.WritePackedUInt32(SaveFields.Choices, indices);
-        if (save.Summary is { } summary)
-        {
-            writer.WriteMessage(SaveFields.Summary, w => WriteSummary(w, summary));
-        }
-
-        return writer.WrittenSpan.ToArray();
-    }
+    internal static byte[] EncodeBody(SavePayload payload) =>
+        MessagePackSerializer.Serialize(payload, SerializerOptions);
 
     internal static SavedGame DecodeBody(ReadOnlySpan<byte> body, out bool summaryDamaged)
     {
-        var reader = new ProtoReader(body);
-        string storyId = "", storyVersion = "", fingerprint = "";
-        ulong seed = 0;
-        uint cursor = 0;
-        CharacterBuilder? character = null;
-        SummaryBuilder? summary = null;
-        summaryDamaged = false;
-        var keys = new List<string>();
-        var indices = new List<uint>();
-        while (!reader.End)
-        {
-            var (field, wireType) = reader.ReadTag();
-            switch (field, wireType)
-            {
-                case (SaveFields.StoryId, ProtoWriter.LengthDelimited):
-                    storyId = reader.ReadString();
-                    break;
-                case (SaveFields.StoryVersion, ProtoWriter.LengthDelimited):
-                    storyVersion = reader.ReadString();
-                    break;
-                case (SaveFields.ContentFingerprint, ProtoWriter.LengthDelimited):
-                    fingerprint = reader.ReadString();
-                    break;
-                case (SaveFields.Seed, ProtoWriter.Fixed64):
-                    seed = reader.ReadFixed64();
-                    break;
-                case (SaveFields.Cursor, ProtoWriter.Varint):
-                    cursor = reader.ReadUInt32();
-                    break;
-                case (SaveFields.Character, ProtoWriter.LengthDelimited):
-                    // Repeated embedded messages merge, as the protobuf specification requires.
-                    character ??= new CharacterBuilder();
-                    character.Merge(reader.ReadBytes());
-                    break;
-                case (SaveFields.ChoiceKeys, ProtoWriter.LengthDelimited):
-                    var key = reader.ReadString();
-                    if (keys.Count >= MaxChoices || key.Length is 0 or > MaxChoiceKeyLength)
-                    {
-                        throw new InvalidDataException(HistoryMessage);
-                    }
-
-                    keys.Add(key);
-                    break;
-                case (SaveFields.Choices, ProtoWriter.LengthDelimited):
-                    var packed = new ProtoReader(reader.ReadBytes());
-                    while (!packed.End)
-                    {
-                        AddChoice(indices, packed.ReadUInt32());
-                    }
-
-                    break;
-                case (SaveFields.Choices, ProtoWriter.Varint):
-                    // Parsers must accept unpacked encodings of packable repeated fields.
-                    AddChoice(indices, reader.ReadUInt32());
-                    break;
-                case (SaveFields.Summary, ProtoWriter.LengthDelimited):
-                    var bytes = reader.ReadBytes();
-                    if (!summaryDamaged)
-                    {
-                        try
-                        {
-                            summary ??= new SummaryBuilder();
-                            summary.Merge(bytes);
-                        }
-                        catch (InvalidDataException)
-                        {
-                            summaryDamaged = true;
-                        }
-                    }
-
-                    break;
-                default:
-                    // Unknown fields, and known fields with an unexpected wire type, are skipped like Google's parsers.
-                    reader.Skip(wireType);
-                    break;
-            }
-        }
-
-        if (storyId.Length == 0)
+        var payload = Deserialize<SavePayload>(body, ValidateShape);
+        if (string.IsNullOrEmpty(payload.StoryId))
         {
             throw new InvalidDataException(MalformedMessage);
         }
 
-        var choices = new string[indices.Count];
-        for (var i = 0; i < choices.Length; i++)
-        {
-            choices[i] = indices[i] < keys.Count ? keys[(int)indices[i]] : throw new InvalidDataException(HistoryMessage);
-        }
-
-        if (cursor > choices.Length)
+        if (payload.Choices is null || payload.Choices.Count > MaxChoices
+            || payload.Choices.Any(key => string.IsNullOrEmpty(key) || key.Length > MaxChoiceKeyLength))
         {
             throw new InvalidDataException(HistoryMessage);
         }
 
-        SaveSummary? saveSummary = null;
-        if (summary is not null && !summaryDamaged)
+        if (payload.Cursor < 0 || payload.Cursor > payload.Choices.Count)
         {
-            saveSummary = summary.Build();
-            summaryDamaged = saveSummary is null;
+            throw new InvalidDataException(HistoryMessage);
+        }
+
+        var character = payload.Character is null ? null : FromPayload(payload.Character);
+        SaveSummary? summary = null;
+        summaryDamaged = false;
+        if (payload.Summary is not null)
+        {
+            try
+            {
+                summary = FromPayload(Deserialize<SummaryPayload>(payload.Summary, ValidateSummary));
+                summaryDamaged = summary is null;
+            }
+            catch (InvalidDataException)
+            {
+                summaryDamaged = true;
+            }
         }
 
         return new SavedGame
         {
-            StoryId = storyId,
-            StoryVersion = storyVersion,
-            ContentFingerprint = fingerprint,
-            Seed = seed,
-            Cursor = (int)cursor,
-            Choices = choices,
-            Character = character?.Build(),
-            Summary = saveSummary,
+            StoryId = payload.StoryId,
+            StoryVersion = payload.StoryVersion ?? "",
+            ContentFingerprint = payload.ContentFingerprint ?? "",
+            Seed = payload.Seed,
+            Cursor = payload.Cursor,
+            Choices = payload.Choices,
+            Character = character,
+            Summary = summary,
         };
     }
 
-    private static void AddChoice(List<uint> indices, uint index)
+    internal static SavePayload ToPayload(SavedGame save)
     {
-        if (indices.Count >= MaxChoices)
+        var payload = new SavePayload
+        {
+            StoryId = save.StoryId,
+            StoryVersion = save.StoryVersion,
+            ContentFingerprint = save.ContentFingerprint,
+            Seed = save.Seed,
+            Cursor = save.Cursor,
+            Choices = save.Choices.ToList(),
+        };
+        if (save.Character is { } character)
+        {
+            payload.Character = new CharacterPayload
+            {
+                FirstName = character.FirstName,
+                LastName = character.LastName,
+                Pronouns = character.Pronouns,
+                Preset = character.Preset,
+                Stats = character.Stats.OrderBy(stat => stat.Key, StringComparer.Ordinal)
+                    .Select(stat => new StatPayload { Id = stat.Key, Value = stat.Value })
+                    .ToList(),
+            };
+        }
+
+        if (save.Summary is { } summary)
+        {
+            payload.Summary = MessagePackSerializer.Serialize(new SummaryPayload
+            {
+                SceneTitle = summary.SceneTitle,
+                SavedAtUtcTicks = summary.SavedAt.UtcTicks,
+                OffsetMinutes = (int)summary.SavedAt.Offset.TotalMinutes,
+                CharacterName = summary.CharacterName,
+            }, SerializerOptions);
+        }
+
+        return payload;
+    }
+
+    private static CharacterSelection FromPayload(CharacterPayload payload)
+    {
+        if (payload.Stats is null || payload.Stats.Count > MaxCharacterStats)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        var stats = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var stat in payload.Stats)
+        {
+            if (stat is null || stat.Id is null)
+            {
+                throw new InvalidDataException(MalformedMessage);
+            }
+
+            stats[stat.Id] = stat.Value;
+        }
+
+        return new CharacterSelection
+        {
+            FirstName = payload.FirstName,
+            LastName = payload.LastName,
+            Pronouns = payload.Pronouns,
+            Preset = payload.Preset,
+            Stats = new ReadOnlyDictionary<string, int>(stats),
+        };
+    }
+
+    private static SaveSummary? FromPayload(SummaryPayload payload)
+    {
+        const int maxOffsetMinutes = 14 * 60;
+        if (string.IsNullOrWhiteSpace(payload.SceneTitle) || payload.SavedAtUtcTicks <= 0
+            || payload.SavedAtUtcTicks > DateTime.MaxValue.Ticks
+            || payload.OffsetMinutes < -maxOffsetMinutes || payload.OffsetMinutes > maxOffsetMinutes)
+        {
+            return null;
+        }
+
+        var savedAt = new DateTimeOffset(payload.SavedAtUtcTicks, TimeSpan.Zero);
+        var offset = TimeSpan.FromMinutes(payload.OffsetMinutes);
+        var localTicks = savedAt.UtcTicks + offset.Ticks;
+        return localTicks < DateTime.MinValue.Ticks || localTicks > DateTime.MaxValue.Ticks
+            ? null
+            : new SaveSummary(payload.SceneTitle, savedAt.ToOffset(offset), payload.CharacterName);
+    }
+
+    private delegate void ValidateMessagePack(ref MessagePackReader reader);
+
+    private static T Deserialize<T>(ReadOnlySpan<byte> data, ValidateMessagePack validate)
+    {
+        try
+        {
+            var bytes = data.ToArray();
+            var reader = new MessagePackReader(new ReadOnlySequence<byte>(bytes));
+            validate(ref reader);
+            reader = new MessagePackReader(new ReadOnlySequence<byte>(bytes));
+            var value = MessagePackSerializer.Deserialize<T>(ref reader, SerializerOptions);
+            if (!reader.End)
+            {
+                throw new InvalidDataException(MalformedMessage);
+            }
+
+            return value;
+        }
+        catch (InvalidDataException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is MessagePackSerializationException or EndOfStreamException
+            or InvalidOperationException or ArgumentException or OverflowException)
+        {
+            throw new InvalidDataException(MalformedMessage, ex);
+        }
+    }
+
+    private static void ValidateShape(ref MessagePackReader reader)
+    {
+        var count = reader.ReadArrayHeader();
+        if (count > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        for (var field = 0; field < count; field++)
+        {
+            switch (field)
+            {
+                case 0:
+                case 1:
+                case 2:
+                    ReadString(ref reader);
+                    break;
+                case 3:
+                    reader.ReadUInt64();
+                    break;
+                case 4:
+                    reader.ReadInt32();
+                    break;
+                case 5:
+                    ValidateCharacter(ref reader);
+                    break;
+                case 6:
+                    ValidateChoices(ref reader);
+                    break;
+                case 7:
+                    if (!reader.TryReadNil())
+                    {
+                        reader.ReadBytes();
+                    }
+
+                    break;
+                default:
+                    reader.Skip();
+                    break;
+            }
+        }
+
+        if (!reader.End)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+    }
+
+    private static void ValidateCharacter(ref MessagePackReader reader)
+    {
+        if (reader.TryReadNil())
+        {
+            return;
+        }
+
+        var count = reader.ReadArrayHeader();
+        if (count > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        for (var field = 0; field < count; field++)
+        {
+            if (field < 4)
+            {
+                ReadNullableString(ref reader);
+            }
+            else if (field == 4)
+            {
+                var stats = reader.ReadArrayHeader();
+                if (stats > MaxCharacterStats)
+                {
+                    throw new InvalidDataException(MalformedMessage);
+                }
+
+                for (var i = 0; i < stats; i++)
+                {
+                    ValidateStat(ref reader);
+                }
+            }
+            else
+            {
+                reader.Skip();
+            }
+        }
+    }
+
+    private static void ValidateStat(ref MessagePackReader reader)
+    {
+        var count = reader.ReadArrayHeader();
+        if (count > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        for (var field = 0; field < count; field++)
+        {
+            switch (field)
+            {
+                case 0:
+                    ReadString(ref reader);
+                    break;
+                case 1:
+                    reader.ReadInt32();
+                    break;
+                default:
+                    reader.Skip();
+                    break;
+            }
+        }
+    }
+
+    private static void ValidateChoices(ref MessagePackReader reader)
+    {
+        var count = reader.ReadArrayHeader();
+        if (count > MaxChoices)
         {
             throw new InvalidDataException(HistoryMessage);
         }
 
-        indices.Add(index);
+        for (var i = 0; i < count; i++)
+        {
+            var key = ReadString(ref reader);
+            if (key.Length is 0 or > MaxChoiceKeyLength)
+            {
+                throw new InvalidDataException(HistoryMessage);
+            }
+        }
     }
+
+    private static void ValidateSummary(ref MessagePackReader reader)
+    {
+        var count = reader.ReadArrayHeader();
+        if (count > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        for (var field = 0; field < count; field++)
+        {
+            switch (field)
+            {
+                case 0:
+                    ReadString(ref reader);
+                    break;
+                case 1:
+                    reader.ReadInt64();
+                    break;
+                case 2:
+                    reader.ReadInt32();
+                    break;
+                case 3:
+                    ReadNullableString(ref reader);
+                    break;
+                default:
+                    reader.Skip();
+                    break;
+            }
+        }
+
+        if (!reader.End)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+    }
+
+    private static string ReadString(ref MessagePackReader reader) =>
+        reader.ReadString() ?? throw new InvalidDataException(MalformedMessage);
+
+    private static string? ReadNullableString(ref MessagePackReader reader) =>
+        reader.TryReadNil() ? null : ReadString(ref reader);
 
     private static byte[] Decompress(ReadOnlySpan<byte> data)
     {
@@ -242,31 +433,33 @@ public static class SaveFormat
 
         if (!data.StartsWith(Magic))
         {
-            // Earlier players wrote JSON saves; report them as an older format rather than as damage.
             var text = data.TrimStart(" \t\r\n"u8);
             throw new InvalidDataException(text.Length > 0 && text[0] == (byte)'{' ? UnsupportedMessage : MalformedMessage);
         }
 
-        if (data.Length == Magic.Length || data[Magic.Length] != Version)
+        if (data.Length <= Magic.Length || data[Magic.Length] != Version)
         {
             throw new InvalidDataException(data.Length == Magic.Length ? MalformedMessage : UnsupportedMessage);
         }
 
-        var header = new ProtoReader(data[(Magic.Length + 1)..]);
-        var declared = header.ReadVarint();
+        if (data.Length < HeaderLength)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        var declared = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(Magic.Length + 1, sizeof(uint)));
         if (declared > MaxDecodedBytes)
         {
             throw new InvalidDataException(MalformedMessage);
         }
 
-        var compressed = data[(Magic.Length + 1 + header.Position)..].ToArray();
+        var compressed = data[HeaderLength..].ToArray();
         try
         {
             using var zlib = new ZLibStream(new MemoryStream(compressed, writable: false), CompressionMode.Decompress);
             using var body = new MemoryStream();
             var chunk = new byte[16 * 1024];
             int read;
-            // Read at most one byte past the declared length so a decompression bomb stops early.
             while ((read = zlib.Read(chunk, 0, (int)Math.Min(chunk.Length, (long)declared + 1 - body.Length))) > 0)
             {
                 body.Write(chunk, 0, read);
@@ -276,11 +469,8 @@ public static class SaveFormat
                 }
             }
 
-            // .NET accepts a truncated zlib stream, even one missing its Adler-32 trailer. The declared length catches
-            // truncated data, and requiring the file to end with the body's checksum catches a missing or extra trailer.
             var decoded = body.ToArray();
-            return decoded.Length == (long)declared
-                && compressed.Length >= 4
+            return decoded.Length == (long)declared && compressed.Length >= 4
                 && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(compressed.AsSpan(compressed.Length - 4)) == Adler32(decoded)
                     ? decoded
                     : throw new InvalidDataException(MalformedMessage);
@@ -298,7 +488,6 @@ public static class SaveFormat
         uint a = 1, b = 0;
         while (data.Length > 0)
         {
-            // 5552 is the most bytes that can be summed before b could overflow 32 bits.
             var chunk = data[..Math.Min(data.Length, 5552)];
             foreach (var value in chunk)
             {
@@ -313,192 +502,4 @@ public static class SaveFormat
 
         return (b << 16) | a;
     }
-
-    private static void WriteCharacter(ProtoWriter writer, CharacterSelection character)
-    {
-        WriteOptional(writer, SaveFields.CharacterFirstName, character.FirstName);
-        WriteOptional(writer, SaveFields.CharacterLastName, character.LastName);
-        WriteOptional(writer, SaveFields.CharacterPronouns, character.Pronouns);
-        WriteOptional(writer, SaveFields.CharacterPreset, character.Preset);
-        foreach (var (id, value) in character.Stats.OrderBy(stat => stat.Key, StringComparer.Ordinal))
-        {
-            writer.WriteMessage(SaveFields.CharacterStats, stat =>
-            {
-                stat.WriteString(SaveFields.StatId, id);
-                stat.WriteSInt32(SaveFields.StatValue, value);
-            });
-        }
-    }
-
-    private static void WriteSummary(ProtoWriter writer, SaveSummary summary)
-    {
-        writer.WriteString(SaveFields.SummarySceneTitle, summary.SceneTitle);
-        writer.WriteUInt64(SaveFields.SummarySavedAtUtcTicks, (ulong)summary.SavedAt.UtcTicks);
-        writer.WriteSInt32(SaveFields.SummaryOffsetMinutes, (int)summary.SavedAt.Offset.TotalMinutes);
-        WriteOptional(writer, SaveFields.SummaryCharacterName, summary.CharacterName);
-    }
-
-    private static void WriteOptional(ProtoWriter writer, int field, string? value)
-    {
-        if (value is not null)
-        {
-            writer.WriteString(field, value);
-        }
-    }
-
-    private sealed class CharacterBuilder
-    {
-        private string? _firstName, _lastName, _pronouns, _preset;
-        private readonly Dictionary<string, int> _stats = new(StringComparer.Ordinal);
-
-        public void Merge(ReadOnlySpan<byte> data)
-        {
-            var reader = new ProtoReader(data);
-            while (!reader.End)
-            {
-                var (field, wireType) = reader.ReadTag();
-                switch (field, wireType)
-                {
-                    case (SaveFields.CharacterFirstName, ProtoWriter.LengthDelimited):
-                        _firstName = reader.ReadString();
-                        break;
-                    case (SaveFields.CharacterLastName, ProtoWriter.LengthDelimited):
-                        _lastName = reader.ReadString();
-                        break;
-                    case (SaveFields.CharacterPronouns, ProtoWriter.LengthDelimited):
-                        _pronouns = reader.ReadString();
-                        break;
-                    case (SaveFields.CharacterPreset, ProtoWriter.LengthDelimited):
-                        _preset = reader.ReadString();
-                        break;
-                    case (SaveFields.CharacterStats, ProtoWriter.LengthDelimited):
-                        MergeStat(reader.ReadBytes());
-                        break;
-                    default:
-                        reader.Skip(wireType);
-                        break;
-                }
-            }
-        }
-
-        private void MergeStat(ReadOnlySpan<byte> data)
-        {
-            var reader = new ProtoReader(data);
-            string id = "";
-            var value = 0;
-            while (!reader.End)
-            {
-                var (field, wireType) = reader.ReadTag();
-                switch (field, wireType)
-                {
-                    case (SaveFields.StatId, ProtoWriter.LengthDelimited):
-                        id = reader.ReadString();
-                        break;
-                    case (SaveFields.StatValue, ProtoWriter.Varint):
-                        value = reader.ReadSInt32();
-                        break;
-                    default:
-                        reader.Skip(wireType);
-                        break;
-                }
-            }
-
-            if (!_stats.ContainsKey(id) && _stats.Count >= MaxCharacterStats)
-            {
-                throw new InvalidDataException(MalformedMessage);
-            }
-
-            // Like protobuf maps, a repeated stat id keeps the last value.
-            _stats[id] = value;
-        }
-
-        public CharacterSelection Build() => new()
-        {
-            FirstName = _firstName,
-            LastName = _lastName,
-            Pronouns = _pronouns,
-            Preset = _preset,
-            Stats = new ReadOnlyDictionary<string, int>(new Dictionary<string, int>(_stats, StringComparer.Ordinal)),
-        };
-    }
-
-    private sealed class SummaryBuilder
-    {
-        private string _sceneTitle = "";
-        private ulong _savedAtUtcTicks;
-        private int _offsetMinutes;
-        private string? _characterName;
-
-        public void Merge(ReadOnlySpan<byte> data)
-        {
-            var reader = new ProtoReader(data);
-            while (!reader.End)
-            {
-                var (field, wireType) = reader.ReadTag();
-                switch (field, wireType)
-                {
-                    case (SaveFields.SummarySceneTitle, ProtoWriter.LengthDelimited):
-                        _sceneTitle = reader.ReadString();
-                        break;
-                    case (SaveFields.SummarySavedAtUtcTicks, ProtoWriter.Varint):
-                        _savedAtUtcTicks = reader.ReadVarint();
-                        break;
-                    case (SaveFields.SummaryOffsetMinutes, ProtoWriter.Varint):
-                        _offsetMinutes = reader.ReadSInt32();
-                        break;
-                    case (SaveFields.SummaryCharacterName, ProtoWriter.LengthDelimited):
-                        _characterName = reader.ReadString();
-                        break;
-                    default:
-                        reader.Skip(wireType);
-                        break;
-                }
-            }
-        }
-
-        /// <summary>Returns null when the details are present but unusable.</summary>
-        public SaveSummary? Build()
-        {
-            if (string.IsNullOrWhiteSpace(_sceneTitle) || _savedAtUtcTicks == 0 || _savedAtUtcTicks > (ulong)DateTime.MaxValue.Ticks
-                || Math.Abs(_offsetMinutes) > 14 * 60)
-            {
-                return null;
-            }
-
-            var savedAt = new DateTimeOffset((long)_savedAtUtcTicks, TimeSpan.Zero);
-            var offset = TimeSpan.FromMinutes(_offsetMinutes);
-            var local = savedAt.UtcTicks + offset.Ticks;
-            return local < DateTime.MinValue.Ticks || local > DateTime.MaxValue.Ticks
-                ? null
-                : new(_sceneTitle, savedAt.ToOffset(offset), _characterName);
-        }
-    }
-}
-
-/// <summary>Field numbers. They are permanent: never reuse or retype one; reserve removed numbers.</summary>
-internal static class SaveFields
-{
-    public const int StoryId = 1;
-    public const int StoryVersion = 2;
-    public const int ContentFingerprint = 3;
-    public const int Seed = 4;
-    public const int Cursor = 5;
-    public const int Character = 6;
-    public const int ChoiceKeys = 7;
-    public const int Choices = 8;
-    public const int Summary = 9;
-
-    public const int CharacterFirstName = 1;
-    public const int CharacterLastName = 2;
-    public const int CharacterPronouns = 3;
-    public const int CharacterPreset = 4;
-    public const int CharacterStats = 5;
-
-    public const int StatId = 1;
-    public const int StatValue = 2;
-
-    public const int SummarySceneTitle = 1;
-    public const int SummarySavedAtUtcTicks = 2;
-    public const int SummaryOffsetMinutes = 3;
-    public const int SummaryCharacterName = 4;
 }

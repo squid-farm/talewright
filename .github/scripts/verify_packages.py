@@ -144,6 +144,8 @@ def verify(directory, version):
                 if any(name.casefold() in tooling for name in dependencies) or any(
                         Path(name).name.casefold().startswith(tuple(name + "." for name in tooling)) for name in names):
                     raise ValueError(f"{path}: runtime package includes authoring infrastructure")
+            if identity == "Talewright" and "MessagePack" not in dependencies:
+                raise ValueError(f"{path}: engine package must declare its MessagePack runtime dependency")
             if identity == "Talewright.Cli":
                 settings = ET.fromstring(package.read("tools/net10.0/any/DotnetToolSettings.xml"))
                 command = settings.find("Commands/Command")
@@ -153,6 +155,9 @@ def verify(directory, version):
                 for assembly in ENGINE_ASSEMBLIES | {"Talewright.Player"}:
                     if f"tools/net10.0/any/{assembly}.dll" not in names:
                         raise ValueError(f"{path}: missing CLI compiler assembly {assembly}")
+                for assembly in ("MessagePack", "MessagePack.Annotations", "Microsoft.NET.StringTools"):
+                    if f"tools/net10.0/any/{assembly}.dll" not in names:
+                        raise ValueError(f"{path}: missing CLI serializer dependency {assembly}")
                 for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
                     extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
                     if f"tools/net10.0/any/runtimes/{rid}/native/Photino.Native.{extension}" not in names:
