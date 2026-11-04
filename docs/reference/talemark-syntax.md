@@ -631,7 +631,7 @@ Desktop publications use the adjacent story folder. Keep the complete published 
 See [sharing and artwork guidance](../guide/sharing-your-story.md#artwork-and-hosting-size) for
 hosting-size warnings and platform verification limits.
 
-The old `![alt](path)` form is an error with a quoted `{image("path", "alt")}` replacement.
+The `![alt](path)` form is an unexpected reader-text syntax error.
 The proposed `@image(...)` form was not shipped and is not supported.
 
 ## 4. Expressions

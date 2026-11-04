@@ -315,7 +315,7 @@ Broader typography and presentation remain in
 | `**...**`, `__...__` | Bold prose, choice labels or dialogue. | Inline formatting after brace parsing; backslash can escape formatting punctuation. | `**Danger**` | Unmatched formatting markers generally remain text, not a Talemark error. |
 | `*...*`, `_..._` | Italic prose, choice labels or dialogue. A leading `* ` is a choice instead. | Same formatting stage and escaping. | `*Quietly*` | Same unmatched-marker behavior. |
 | Backticks | Ordinary reader text; they have no formatting or escaping role. | Literal punctuation. | `` `torch` `` | None. |
-| `![alt](path)` | Rejected legacy Markdown image form. | Detected after brace parsing, with the diagnostic mapped back to the author's source. | Replace `![A torch](torch)` with `{image("torch", "A torch")}`. | TW1015 names the quoted replacement. |
+| `![alt](path)` | Rejected Markdown image form. | Detected after brace parsing, with the diagnostic mapped back to the author's source. | Use `{image("torch", "A torch")}`. | TW1015 reports unexpected reader-text syntax. |
 | `[text](target)` | Literal reader text; it is not a hyperlink feature. | No link parsing or target validation. | `[Go](https://example.org)` | None. |
 
 ## Reader-text grammar
@@ -433,10 +433,8 @@ that `!` is literal and scanning resumes at the next character; a later independ
 still match.
 The matcher does not balance or unescape brackets or parentheses. A nested bracket in alt text,
 an escape such as `![a\]](p)`, a nested parenthesis such as `![a](p(q))`, or any line break makes
-the whole candidate literal. It does not decode Markdown escapes or entities. The captures contain
-no backslashes by definition. In the replacement, the alt is otherwise preserved, with each `"`
-escaped as `\"`; the path is inserted verbatim. Thus `![A "torch"](torch)` suggests
-`{image("torch", "A \"torch\"")}`. TW1015 points at the opening `!`.
+the whole candidate literal. It does not decode Markdown escapes or entities. TW1015 points at
+the opening `!` and reports unexpected reader-text syntax.
 
 ### Image alt text
 

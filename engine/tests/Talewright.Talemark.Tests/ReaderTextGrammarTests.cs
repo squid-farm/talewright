@@ -22,6 +22,10 @@ public sealed class ReaderTextGrammarTests
     [InlineData("[Inventory]: empty", "[Inventory]: empty")]
     [InlineData("[the inn][1] is here", "[the inn][1] is here")]
     [InlineData("[Go](https://example.org) now", "[Go](https://example.org) now")]
+    [InlineData("![a [b]](p)", "![a [b]](p)")]
+    [InlineData("![a](p(q))", "![a](p(q))")]
+    [InlineData("An unfinished ![image] remains prose.", "An unfinished ![image] remains prose.")]
+    [InlineData(@"\![alt](path)", "![alt](path)")]
     [InlineData("&amp; &copy; &#65;", "&amp; &copy; &#65;")]
     [InlineData("<b>tag</b>, https://example.org", "<b>tag</b>, https://example.org")]
     [InlineData("# Not heading; - not list; 1. not list", "# Not heading; - not list; 1. not list")]
@@ -138,6 +142,22 @@ public sealed class ReaderTextGrammarTests
             new DiagnosticBag());
 
         Assert.InRange(result.WorkUnits, input.Length, 10 * input.Length);
+    }
+
+    [Fact]
+    public void Rejected_image_text_keeps_its_formatting_boundaries()
+    {
+        var diagnostics = new DiagnosticBag();
+        var inlines = InlineParser.Parse(
+            SourceText.Single("**![a](p)** and ![a](p)*after*", SourceLocation.None),
+            Symbols(), diagnostics);
+
+        Assert.Equal(2, diagnostics.Items.Count(item => item.Code == CompilerDiagnosticCodes.LegacyImageSyntax));
+        var styled = Assert.IsType<StyledTemplate>(inlines[0]);
+        Assert.Equal(TextStyle.Strong, styled.Style);
+        Assert.Equal("![a](p)", Assert.IsType<TextTemplate>(Assert.Single(styled.Children)).Text);
+        Assert.Equal(" and ![a](p)*after*",
+            string.Concat(inlines.Skip(1).Select(inline => Assert.IsType<TextTemplate>(inline).Text)));
     }
 
     [Fact]
