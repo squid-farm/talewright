@@ -234,17 +234,34 @@
       "patterns": [
         {"match": "\\\\[!-/:-@\\[\\\\\\]^_`{|}~]","name": "constant.character.escape.tale"},
         {"include": "#template"},
-        {"include": "text.html.markdown#bold"},
-        {"include": "text.html.markdown#italic"}
-      ]
-    }
-  },
-  "injections": {
-    "L:text.tale markup.bold.markdown, L:text.tale markup.italic.markdown": {
-      "comment": "Emphasis comes from VS Code's Markdown grammar; keep Talemark escapes and templates inside it.",
-      "patterns": [
-        {"match": "\\\\[!-/:-@\\[\\\\\\]^_`{|}~]", "name": "constant.character.escape.tale"},
-        {"include": "#template"}
+        {
+          "comment": "Strong delimiters use the reader-text flanking rules.",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\\\])*?)(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\s*\\\\])\\*\\*(?![\\p{L}\\p{N}*]))",
+          "end": "(?:(?<=[^\\s*\\\\])|(?<=\\\\[!-/:-@\\[\\\\\\]^_`{|}~]))\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
+          "name": "markup.bold.markdown",
+          "patterns": [{"include": "#inline"}]
+        },
+        {
+          "comment": "Underscore strong uses the same reader-text flanking rules.",
+          "begin": "(?<![\\p{L}\\p{N}_])__(?!_)(?=[^\\s_])(?=(?:(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\\\])*?)(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\s_\\\\])__(?![\\p{L}\\p{N}_]))",
+          "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[!-/:-@\\[\\\\\\]^_`{|}~]))__(?![\\p{L}\\p{N}_])|(?=$)",
+          "name": "markup.bold.markdown",
+          "patterns": [{"include": "#inline"}]
+        },
+        {
+          "comment": "A single star marks emphasis using the reader-text flanking rules.",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\\\])*?)(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\s*\\\\])\\*(?![\\p{L}\\p{N}*]))",
+          "end": "(?:(?<=[^\\s*\\\\])|(?<=\\\\[!-/:-@\\[\\\\\\]^_`{|}~]))\\*(?![\\p{L}\\p{N}*])|(?=$)",
+          "name": "markup.italic.markdown",
+          "patterns": [{"include": "#inline"}]
+        },
+        {
+          "comment": "Underscore emphasis uses the same reader-text flanking rules.",
+          "begin": "(?<![\\p{L}\\p{N}_])_(?!_)(?=[^\\s_])(?=(?:(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\\\])*?)(?:\\\\[!-/:-@\\[\\\\\\]^_`{|}~]|[^\\s_\\\\])_(?![\\p{L}\\p{N}_]))",
+          "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[!-/:-@\\[\\\\\\]^_`{|}~]))_(?![\\p{L}\\p{N}_])|(?=$)",
+          "name": "markup.italic.markdown",
+          "patterns": [{"include": "#inline"}]
+        }
       ]
     }
   }

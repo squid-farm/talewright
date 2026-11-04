@@ -7,21 +7,12 @@
   "icon": "icon.png",
   "license": "MPL-2.0",
   "main": "./dist/extension.cjs",
-  "activationEvents": [
-    "onLanguage:tale",
-    "onLanguage:yaml",
-    "workspaceContains:**/story.talewright.yaml",
-    "onTaskType:talewright"
-  ],
+  "activationEvents": ["onLanguage:tale", "onLanguage:yaml", "workspaceContains:**/story.talewright.yaml", "onTaskType:talewright"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
       "description": "Live validation launches the bundled language server (or an explicit development override) only in trusted workspaces.",
-      "restrictedConfigurations": [
-        "talewright.languageServer.command",
-        "talewright.languageServer.args",
-        "talewright.cli.executablePath"
-      ]
+      "restrictedConfigurations": ["talewright.languageServer.command", "talewright.languageServer.args", "talewright.cli.executablePath"]
     }
   },
   "repository": {
@@ -39,38 +30,14 @@
   ],
   "contributes": {
     "commands": [
-      {
-        "command": "talewright.validateStory",
-        "title": "Talewright: Validate Story"
-      },
-      {
-        "command": "talewright.publishStoryZip",
-        "title": "Talewright: Publish Story ZIP"
-      },
-      {
-        "command": "talewright.openAuthorDebugger",
-        "title": "Talewright: Open Author Debugger"
-      },
-      {
-        "command": "talewright.playFromScene",
-        "title": "Talewright: Play From This Scene"
-      },
-      {
-        "command": "talewright.runStory",
-        "title": "Talewright: Run Story"
-      },
-      {
-        "command": "talewright.newStory",
-        "title": "Talewright: New Story"
-      },
-      {
-        "command": "talewright.setUpCli",
-        "title": "Talewright: Set Up CLI"
-      },
-      {
-        "command": "talewright.togglePreviewHints",
-        "title": "Talewright: Toggle Substitution Preview Hints"
-      }
+      { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
+      { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
+      { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" },
+      { "command": "talewright.playFromScene", "title": "Talewright: Play From This Scene" },
+      { "command": "talewright.runStory", "title": "Talewright: Run Story" },
+      { "command": "talewright.newStory", "title": "Talewright: New Story" },
+      { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" },
+      { "command": "talewright.togglePreviewHints", "title": "Talewright: Toggle Substitution Preview Hints" }
     ],
     "menus": {
       "editor/context": [
@@ -87,78 +54,25 @@
         }
       ]
     },
-    "taskDefinitions": [
-      {
-        "type": "talewright",
-        "required": [
-          "command",
-          "story"
-        ],
-        "properties": {
-          "command": {
-            "type": "string",
-            "enum": [
-              "debug",
-              "run"
-            ],
-            "description": "Open the native Author Debugger or play the story in the normal player."
-          },
-          "story": {
-            "type": "string",
-            "description": "Canonical story-root path within an open workspace folder. Relative paths in workspace-scoped tasks must identify exactly one story across the open folders."
-          },
-          "scene": {
-            "type": "string",
-            "description": "Optional scene ID to open in the Author Debugger; only valid with command \"debug\"."
-          }
-        }
+    "taskDefinitions": [{
+      "type": "talewright",
+      "required": ["command", "story"],
+      "properties": {
+        "command": { "type": "string", "enum": ["debug", "run"], "description": "Open the native Author Debugger or play the story in the normal player." },
+        "story": { "type": "string", "description": "Canonical story-root path within an open workspace folder. Relative paths in workspace-scoped tasks must identify exactly one story across the open folders." },
+        "scene": { "type": "string", "description": "Optional scene ID to open in the Author Debugger; only valid with command \"debug\"." }
       }
-    ],
+    }],
     "configuration": {
       "title": "Talewright",
       "properties": {
-        "talewright.cli.executablePath": {
-          "type": "string",
-          "default": "",
-          "scope": "resource",
-          "description": "Absolute path to the separately installed Talewright CLI executable. Leave empty to use talewright on PATH or in ~/.dotnet/tools. Use Talewright: Set Up CLI for explicit installation guidance; never uses the bundled language server."
-        },
-        "talewright.codeLens.playFromScene": {
-          "type": "boolean",
-          "default": true,
-          "scope": "resource",
-          "description": "Show a Play from here code lens above each scene in Talemark files."
-        },
-        "talewright.languageServer.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable shared live diagnostics, completion, and hover. Reload the window after changing settings."
-        },
-        "talewright.languageServer.command": {
-          "type": "string",
-          "default": "",
-          "description": "Leave empty to use the bundled platform-specific server. Linux x64 is runtime-tested; other platforms have provisional support. Set an executable explicitly only for development; never installed or built automatically."
-        },
-        "talewright.languageServer.args": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [
-            "--stdio"
-          ],
-          "description": "Server arguments; for a local build use dotnet with the server DLL followed by --stdio."
-        },
-        "talewright.languageServer.metadataPath": {
-          "type": "string",
-          "default": "",
-          "description": "Explicit data-only authoring metadata file, absolute or relative to each story root."
-        },
-        "talewright.languageServer.requiresProjectMetadata": {
-          "type": "boolean",
-          "default": false,
-          "description": "Require exported project registrations, including for external/nested C# projects. Missing metadata produces TW5001."
-        }
+        "talewright.cli.executablePath": { "type": "string", "default": "", "scope": "resource", "description": "Absolute path to the separately installed Talewright CLI executable. Leave empty to use talewright on PATH or in ~/.dotnet/tools. Use Talewright: Set Up CLI for explicit installation guidance; never uses the bundled language server." },
+        "talewright.codeLens.playFromScene": { "type": "boolean", "default": true, "scope": "resource", "description": "Show a Play from here code lens above each scene in Talemark files." },
+        "talewright.languageServer.enabled": { "type": "boolean", "default": true, "description": "Enable shared live diagnostics, completion, and hover. Reload the window after changing settings." },
+        "talewright.languageServer.command": { "type": "string", "default": "", "description": "Leave empty to use the bundled platform-specific server. Linux x64 is runtime-tested; other platforms have provisional support. Set an executable explicitly only for development; never installed or built automatically." },
+        "talewright.languageServer.args": { "type": "array", "items": { "type": "string" }, "default": ["--stdio"], "description": "Server arguments; for a local build use dotnet with the server DLL followed by --stdio." },
+        "talewright.languageServer.metadataPath": { "type": "string", "default": "", "description": "Explicit data-only authoring metadata file, absolute or relative to each story root." },
+        "talewright.languageServer.requiresProjectMetadata": { "type": "boolean", "default": false, "description": "Require exported project registrations, including for external/nested C# projects. Missing metadata produces TW5001." }
       }
     },
     "configurationDefaults": {
@@ -195,9 +109,7 @@
     ],
     "yamlValidation": [
       {
-        "fileMatch": [
-          "*.talewright.yaml"
-        ],
+        "fileMatch": ["*.talewright.yaml"],
         "url": "./schemas/story.schema.json"
       }
     ]
@@ -213,11 +125,10 @@
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.0.0",
     "ajv": "^8.20.0",
-    "esbuild": "^0.25.0",
-    "tm-grammars": "1.32.22",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.3.2",
     "yaml": "^2.9.1"

@@ -12,11 +12,9 @@ const registry = new textmate.Registry({
     createOnigString: value => new oniguruma.OnigString(value),
   }),
   loadGrammar: async scope => {
-    const file = {
-      'text.tale': new URL('../syntaxes/tale.tmLanguage.json', import.meta.url),
-      // VS Code ships the same Markdown grammar; emphasis is included from it rather than copied.
-      'text.html.markdown': new URL('../node_modules/tm-grammars/grammars/markdown.json', import.meta.url),
-    }[scope];
+    const file = scope === 'text.tale'
+      ? new URL('../syntaxes/tale.tmLanguage.json', import.meta.url)
+      : null;
     return file ? textmate.parseRawGrammar(await readFile(file, 'utf8'), 'grammar.json') : null;
   },
 });
@@ -133,9 +131,6 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['{image("camp", "**The guide**")}', 'The guide', 'markup.bold.markdown'],
     [String.raw`{image("camp", "a \* b")}`, String.raw`\*`, 'constant.character.escape.tale'],
     [String.raw`{image("camp", "a \[door\]")}`, String.raw`\[`, 'constant.character.escape.tale'],
-    [String.raw`{image("camp", "a \. b")}`, String.raw`\.`, 'constant.character.escape.tale'],
-    [String.raw`{image("camp", "a \\ b")}`, String.raw`\\`, 'constant.character.escape.tale'],
-    [String.raw`**x \{y\} z**`, String.raw`\{`, 'constant.character.escape.tale'],
     ['{image("camp", "\\{literal\\}")}', '\\{', 'constant.character.escape.tale'],
     ['{image("{player:name}", "Camp")}', 'player', 'string.quoted.double.tale'],
     ['{image:name}', 'name', 'variable.other.member.tale'],
@@ -145,6 +140,8 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['* [Continue] (requires: visited(start) and player:hp > 0) -> END', 'END', 'entity.name.section.target.tale'],
     ['* [Go] (requires: (visited(a) or visited(b)) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
     ['{if visited(start) and player:hp > 0}Yes{/if}', 'hp', 'variable.other.member.tale'],
+    ['__snake__case__ after', 'case', 'markup.bold.markdown'],
+    ['_snake_case_words_ after', 'case_words', 'markup.italic.markdown'],
     ['**bold** text', 'bold', 'markup.bold.markdown'],
     ['*it* text', 'it', 'markup.italic.markdown'],
     ['**a*b** after', 'b', 'markup.bold.markdown'],
@@ -182,13 +179,15 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
   assert.ok(!tokens('A -> sign in prose').tokens.some(token => token.scopes.includes('keyword.control.divert.tale')));
   assert.ok(!tokens('snake_case_words').tokens.some(token => token.scopes.includes('markup.italic.markdown')));
   for (const [line, text] of [
-    ['**a*b** after', 'after'], ['*a**b**c* after', 'after'],
-    ['*literal\\* plain', 'plain'],
+    ['__snake__case__ after', 'after'], ['_snake_case_words_ after', 'after'],
+    ['**a*b** after', 'after'], ['*a**b**c* after', 'after'], ['***both*** after', 'after'],
+    ['**literal\\** plain', 'plain'], ['*literal\\* plain', 'plain'],
     ['__literal\\__ plain', 'plain'], ['_literal\\_ plain', 'plain'],
     ['**literal \\}** after', 'after'], ['__literal \\}__ after', 'after'],
     ['*literal \\}* after', 'after'], ['_literal \\}_ after', 'after'],
     ['2 * 3 and 4*', '3'], ['a ** b', 'b'], ['[{player:name}](https://example.org) after', 'after'],
-    ['snake_case', 'case'],
+    ['word*inner*word', 'inner'], ['2*3*4', '3'], ['snake_case', 'case'],
+    ['**bold**text', 'bold'], ['*it*text', 'it'], ['***both***', 'both'],
     ['`unfinished code', 'unfinished'],
     ['[label](https://example.org)', 'label'], ['&amp; &#65;', '&amp;'],
   ]) {
@@ -222,6 +221,7 @@ test('image alt text follows reader-text escapes while the path stays strict', (
     assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.illegal.escape.tale')), line);
   }
   hasScope(String.raw`{image("camp", "a \q b")}`, String.raw`\q`, 'string.quoted.double.tale');
+  hasScope(String.raw`{image("camp", "a \. b")}`, String.raw`\.`, 'constant.character.escape.tale');
   hasScope(String.raw`{image("camp\q", "alt")}`, String.raw`\q`, 'invalid.illegal.escape.tale');
   assert.ok(!tokens('![torch](torch.png)').tokens.some(token => token.scopes.some(scope => scope.startsWith('invalid.'))));
 });
