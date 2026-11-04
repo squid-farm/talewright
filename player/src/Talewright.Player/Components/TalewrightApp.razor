@@ -20,7 +20,41 @@ else
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
         <CascadingValue Value="_loaded!.Images">
         <div hidden="@_showLibrary" @key="_loaded">
-            @if (_story.Creation is not null && _character is null)
+            @if (!_resumeCheckComplete)
+            {
+                <section class="tw-resume-prompt" aria-label="Checking saved progress" aria-busy="true">
+                    <p>Checking for an autosave…</p>
+                </section>
+            }
+            else if (_resumeHistory is not null && !_resumeAccepted)
+            {
+                <section class="tw-resume-prompt" aria-labelledby="tw-resume-heading">
+                    <h2 id="tw-resume-heading">Resume this story?</h2>
+                    <p>An autosave is available. You can resume it or start a new playthrough.</p>
+                    @if (_resumeSummary is { } summary)
+                    {
+                        <p>@summary.SceneTitle
+                            @if (!string.IsNullOrWhiteSpace(summary.CharacterName))
+                            {
+                                <span> · @summary.CharacterName</span>
+                            }
+                            <span aria-hidden="true"> · </span>
+                            <time datetime="@summary.SavedAt.UtcDateTime.ToString("O")">@summary.SavedAt.ToLocalTime().ToString("g")</time>
+                        </p>
+                    }
+                    <button type="button" class="tw-choice" @onclick="ResumeAutosave">Resume saved game</button>
+                    <button type="button" class="tw-choice" @onclick="StartNewGame">Start a new game</button>
+                </section>
+            }
+            else if (_resumeCheckError is not null)
+            {
+                <section class="tw-resume-prompt" aria-label="Autosave unavailable">
+                    <p class="tw-error" role="alert">@_resumeCheckError</p>
+                    <button type="button" class="tw-choice" @onclick="RetryAutosaveCheckAsync">Retry autosave check</button>
+                    <button type="button" class="tw-choice" @onclick="StartNewGame">Start a new game</button>
+                </section>
+            }
+            else if (_story.Creation is not null && _character is null)
             {
                 <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
                 @if (LibraryEnabled)
@@ -30,7 +64,7 @@ else
             }
             else
             {
-                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="Services.GetService<ISaveStore>()" SaveExporter="Services.GetService<ISaveFileExporter>()" />
+                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" />
             }
         </div>
         </CascadingValue>
@@ -138,9 +172,15 @@ else
     private CharacterSelection? _character;
     private bool _showLibrary;
     private bool _preferencesReady;
+    private bool _resumeCheckComplete = true;
+    private bool _resumeAccepted;
+    private StoryHistory? _resumeHistory;
+    private SaveSummary? _resumeSummary;
+    private string? _resumeCheckError;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
     private string? _failedTitle;
+    private ISaveStore? SaveStore => Services.GetService<ISaveStore>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -173,7 +213,7 @@ else
         {
             candidate = await Library.OpenAsync(entry.Id);
             if (_disposed || generation != _openGeneration) return;
-            await CompileAsync(candidate, entry.Title);
+            await CompileAsync(candidate, entry.Title, generation);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException)
         {
@@ -210,7 +250,7 @@ else
             {
                 if (candidate is null) await buffer.DisposeAsync();
             }
-            await CompileAsync(candidate, e.File.Name);
+            await CompileAsync(candidate, e.File.Name, generation);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
@@ -223,7 +263,7 @@ else
         }
     }
 
-    private async Task CompileAsync(LoadedStory loaded, string title)
+    private async Task CompileAsync(LoadedStory loaded, string title, long generation)
     {
         var result = StoryCompiler.Compile(loaded.Source, Options);
         _diagnostics = result.Diagnostics;
@@ -233,10 +273,16 @@ else
             _loaded = loaded;
             _story = result.Story;
             _character = null;
+            _resumeAccepted = false;
+            _resumeHistory = null;
+            _resumeSummary = null;
+            _resumeCheckError = null;
+            _resumeCheckComplete = false;
             _showLibrary = false;
             _diagnostics = [];
             if (previous is not null) await previous.DisposeAsync();
             await OnTitleChanged.InvokeAsync(_story!.Title);
+            await CheckAutosaveAsync(_story, generation);
         }
         else
         {
@@ -249,6 +295,73 @@ else
         _error = null;
         _failedTitle = null;
         _diagnostics = [];
+    }
+
+    private async Task CheckAutosaveAsync(StoryDefinition story, long generation)
+    {
+        var store = SaveStore;
+        if (store is null)
+        {
+            _resumeCheckComplete = true;
+            return;
+        }
+
+        try
+        {
+            var bytes = await store.ReadAutosaveAsync(story.Id);
+            if (_disposed || generation != _openGeneration) return;
+            _resumeHistory = StoryHistory.Restore(story, bytes);
+            _resumeSummary = StoryHistory.DescribeSave(SaveEntry.AutosaveSlot, bytes).Summary;
+        }
+        catch (FileNotFoundException)
+        {
+            if (!_disposed && generation == _openGeneration)
+            {
+                _resumeHistory = null;
+                _resumeSummary = null;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException or ApplicationException or JSException)
+        {
+            if (!_disposed && generation == _openGeneration)
+            {
+                _resumeHistory = null;
+                _resumeSummary = null;
+                _resumeCheckError = $"Couldn't check this story's autosave: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (!_disposed && generation == _openGeneration)
+            {
+                _resumeCheckComplete = true;
+            }
+        }
+    }
+
+    private Task RetryAutosaveCheckAsync()
+    {
+        if (_story is null) return Task.CompletedTask;
+        _resumeCheckComplete = false;
+        _resumeCheckError = null;
+        return CheckAutosaveAsync(_story, _openGeneration);
+    }
+
+    private void ResumeAutosave()
+    {
+        if (_resumeHistory is null) throw new InvalidOperationException("No autosave is available to resume.");
+        _character = _resumeHistory.Character;
+        _resumeAccepted = true;
+    }
+
+    private void StartNewGame()
+    {
+        _resumeHistory = null;
+        _resumeSummary = null;
+        _resumeCheckError = null;
+        _resumeAccepted = false;
+        _resumeCheckComplete = true;
+        _character = null;
     }
 
     private void CharacterCreated(CharacterSelection character) => _character = character;

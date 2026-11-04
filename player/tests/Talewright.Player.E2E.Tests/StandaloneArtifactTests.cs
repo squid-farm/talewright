@@ -99,6 +99,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
             await ReloadAsync();
         }
 
+        await Driver.ClickAsync("Start a new game");
         if (creation)
         {
             await AssertLibraryUnavailable(duringCreation: true);

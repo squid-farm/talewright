@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Threading.Channels;
+using System.Diagnostics;
 using Talewright.Authoring;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
@@ -14,6 +15,7 @@ public sealed class LanguageServer
     private readonly TextWriter _errors;
     private readonly Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? _analyze;
     private readonly Func<TimeSpan, CancellationToken, Task>? _delay;
+    private readonly Action<DiagnosticPublication>? _measure;
     private readonly Channel<object> _events = Channel.CreateUnbounded<object>(new() { SingleReader = true });
     private readonly Dictionary<string, Story> _stories = new(PathComparer);
     private readonly Dictionary<string, Document> _documents = new(PathComparer);
@@ -39,17 +41,21 @@ public sealed class LanguageServer
 
     internal LanguageServer(Stream input, Stream output, TextWriter errors,
         Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? analyze,
-        Func<TimeSpan, CancellationToken, Task>? delay)
+        Func<TimeSpan, CancellationToken, Task>? delay, Action<DiagnosticPublication>? measure = null)
     {
         _protocol = new(input, output);
         _errors = errors;
         _analyze = analyze;
         _delay = delay;
+        _measure = measure;
     }
 
     private static StringComparer PathComparer => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
     private sealed record Document(string Root, int Version, string Text);
-    private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error);
+    private sealed record Completed(Story Story, long Generation, AnalysisUpdate? Update, Exception? Error,
+        SharedAnalysis? Shared = null);
+    internal sealed record DiagnosticPublication(string Root, long Revision, TimeSpan Debounce, TimeSpan Queue,
+        TimeSpan Analysis, TimeSpan Dispatch, TimeSpan Conversion, TimeSpan Publication, int ParsedFiles, int CachedFiles);
     private sealed record RequestFinished(PendingRequest Request, Task<SemanticResult> Task);
     private sealed record SemanticResult(object? Value, StoryAnalysis? Previous = null, SourceRange? Target = null,
         int? ErrorCode = null, string? ErrorMessage = null, Exception? Error = null);
@@ -73,6 +79,7 @@ public sealed class LanguageServer
     private sealed record ProtocolError(int Code, string Message);
     private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions }
     private const int DiagnosticLimit = 200;
+    private static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(150);
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
         Story story, Feature feature, SourceLocation position, SourceLocation end, bool markdown,
         bool documentChangesSupported, bool createFileOperationSupported,
@@ -925,6 +932,7 @@ public sealed class LanguageServer
         foreach (var path in story.Published) replacement.Published.Add(path);
         foreach (var (path, document) in _documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)))
             replacement.Workspace.Open(Relative(story.Root, path), document.Version, document.Text);
+        replacement.Workspace.ReuseSyntaxFrom(story.Workspace);
         _stories[story.Root] = replacement;
         return replacement;
     }
@@ -940,7 +948,7 @@ public sealed class LanguageServer
             _events.Writer.TryWrite(new Completed(story, generation, null, error));
             return;
         }
-        var shared = story.Workspace.ScheduleAnalysis(TimeSpan.FromMilliseconds(150));
+        var shared = story.Workspace.ScheduleAnalysis(DiagnosticsDebounce);
         story.Pending = shared;
         var task = ObserveAnalysisAsync(story, generation, shared);
         _analyses.RemoveAll(task => task.IsCompletedSuccessfully);
@@ -962,12 +970,13 @@ public sealed class LanguageServer
             }
             else
             {
-                _events.Writer.TryWrite(new Completed(story, generation, completed.Result, null));
+                _events.Writer.TryWrite(new Completed(story, generation, completed.Result, null, shared));
             }
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 
     private async Task PublishAsync(Completed completed, CancellationToken cancellationToken)
     {
+        var publishStarted = Stopwatch.GetTimestamp();
         var story = completed.Story;
         if (_shutdown || !_stories.TryGetValue(story.Root, out var current) || !ReferenceEquals(story, current) ||
             story.Generation != completed.Generation) return;
@@ -1001,6 +1010,7 @@ public sealed class LanguageServer
             return;
         }
         if (completed.Update is not { Published: true } update) return;
+        var conversionStarted = Stopwatch.GetTimestamp();
         var lintResult = StoryLintAnalyzer.Analyze(update.Analysis, story.LintConfiguration);
         var groups = new Dictionary<string, List<EditorDiagnostic>>(PathComparer);
         var lineMaps = new Dictionary<string, LineMap>(StringComparer.Ordinal);
@@ -1024,16 +1034,30 @@ public sealed class LanguageServer
         var paths = groups.Keys.Concat(story.Published)
             .Concat(_documents.Where(pair => PathComparer.Equals(pair.Value.Root, story.Root)).Select(pair => pair.Key))
             .Distinct(PathComparer).Where(Owns).Order(PathComparer).ToArray();
+        var conversion = Stopwatch.GetElapsedTime(conversionStarted);
+        var publication = TimeSpan.Zero;
         foreach (var path in paths)
         {
+            conversionStarted = Stopwatch.GetTimestamp();
             var diagnostics = groups.TryGetValue(path, out var found) ? found : [];
-            await NotifyAsync("textDocument/publishDiagnostics", new
+            var parameters = new
             {
                 uri = UriFromPath(path),
                 version = _documents.TryGetValue(path, out var document) ? (int?)document.Version : null,
                 diagnostics = diagnostics.Count == 0 ? [] : LimitDiagnostics(diagnostics, Lines(Relative(story.Root, path)))
-            }, cancellationToken);
+            };
+            conversion += Stopwatch.GetElapsedTime(conversionStarted);
+            var publicationStarted = Stopwatch.GetTimestamp();
+            await NotifyAsync("textDocument/publishDiagnostics", parameters, cancellationToken);
+            publication += Stopwatch.GetElapsedTime(publicationStarted);
         }
+        if (_measure is not null && completed.Shared is { } shared)
+            _measure(new(story.Root, update.Revision,
+                Stopwatch.GetElapsedTime(shared.ScheduledAt, shared.ReadyAt),
+                Stopwatch.GetElapsedTime(shared.ReadyAt, shared.StartedAt),
+                Stopwatch.GetElapsedTime(shared.StartedAt, shared.FinishedAt),
+                Stopwatch.GetElapsedTime(shared.FinishedAt, publishStarted),
+                conversion, publication, shared.ParsedFiles, shared.CachedFiles));
         story.Published.Clear();
         foreach (var path in groups.Keys) story.Published.Add(path);
         story.PublishedAnalysis = update.Analysis;

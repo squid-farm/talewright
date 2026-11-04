@@ -143,7 +143,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "Exported save file did not appear.");
             await Task.Delay(100);
         }
-        Assert.Equal(await new FileSaveStore(FileSaveStore.DefaultRoot).ReadAsync(story.Id, slot),
+        Assert.Equal(await new FileSaveStore(NativeSaveRoot).ReadAsync(story.Id, slot),
             await File.ReadAllBytesAsync(path));
     }
 

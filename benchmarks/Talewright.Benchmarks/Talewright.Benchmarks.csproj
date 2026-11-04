@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../tooling/authoring/src/Talewright.Authoring/Talewright.Authoring.csproj" />
+    <ProjectReference Include="../../tooling/language-server/src/Talewright.LanguageServer/Talewright.LanguageServer.csproj" />
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
     <ProjectReference Include="../../engine/tests/Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>

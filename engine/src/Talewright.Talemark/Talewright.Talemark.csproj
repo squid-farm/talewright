@@ -15,6 +15,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Talewright.Talemark.Tests" />
+    <InternalsVisibleTo Include="Talewright.Authoring" />
+    <InternalsVisibleTo Include="Talewright.Authoring.Tests" />
+    <InternalsVisibleTo Include="Talewright.Benchmarks" />
   </ItemGroup>
 
   <PropertyGroup>

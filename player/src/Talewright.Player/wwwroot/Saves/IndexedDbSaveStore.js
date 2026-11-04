@@ -58,7 +58,7 @@ async function execute(mode, operation) {
 
 export async function list(storyId) {
     const keys = await execute("readonly", store => store.index("storyId").getAllKeys(IDBKeyRange.only(storyId)));
-    return keys.map(key => key[1]).filter(slot => slot !== "\0quick").sort();
+    return keys.map(key => key[1]).filter(slot => slot !== "\0quick" && slot !== "\0autosave").sort();
 }
 
 export async function read(storyId, slot) {

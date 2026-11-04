@@ -32,6 +32,134 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
+    public async Task Quiet_window_coalesces_a_burst_without_starting_analysis_per_keystroke()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        await client.Initialize();
+        await PublishInitial(control, client, Original);
+
+        Gate? latest = null;
+        for (var version = 2; version <= 25; version++)
+        {
+            await client.Change("start.tale", Tale($"Edit {version}."), version);
+            latest = await control.NextDelay();
+            Assert.Equal(TimeSpan.FromMilliseconds(150), latest.Duration);
+        }
+        await client.Barrier(2);
+        Assert.Equal(1, control.AnalysisCount);
+        latest!.Release();
+        var analysis = await control.NextAnalysis();
+        Assert.Equal(Tale("Edit 25."), analysis.Source.Files["start.tale"]);
+        analysis.Release();
+        await client.Diagnostics("start.tale", 25);
+        await client.Barrier(3);
+        Assert.Equal(2, control.AnalysisCount);
+        for (var version = 2; version < 25; version++)
+            Assert.False(client.HasDiagnostics("start.tale", version));
+    }
+
+    [Fact]
+    public async Task Edits_during_running_analysis_cancel_it_and_publish_only_the_latest()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        await client.Initialize();
+        await PublishInitial(control, client, Original);
+        await client.Change("start.tale", Changed, 2);
+        (await control.NextDelay()).Release();
+        var running = await control.NextAnalysis();
+
+        Gate? latest = null;
+        for (var version = 3; version <= 25; version++)
+        {
+            await client.Change("start.tale", Tale($"Burst {version}."), version);
+            latest = await control.NextDelay();
+            Assert.Equal(TimeSpan.FromMilliseconds(150), latest.Duration);
+        }
+        Assert.True(running.CancellationRequested);
+        Assert.Equal(2, control.AnalysisCount);
+        latest!.Release();
+        var settled = await control.NextAnalysis();
+        Assert.Equal(Tale("Burst 25."), settled.Source.Files["start.tale"]);
+        settled.Release();
+        await client.Diagnostics("start.tale", 25);
+        await client.Barrier(2);
+        Assert.Equal(3, control.AnalysisCount);
+        for (var version = 2; version < 25; version++)
+            Assert.False(client.HasDiagnostics("start.tale", version));
+    }
+
+    [Fact]
+    public async Task Paced_typing_burst_does_not_restart_analysis_for_each_edit()
+    {
+        var control = new AnalysisControl(realDelays: true);
+        await using var client = new InProcessClient(control);
+        await client.Initialize();
+        await client.Open("start.tale", Original, 1);
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 1);
+
+        await client.Change("start.tale", Changed, 2);
+        var running = await control.NextAnalysis();
+        Assert.Equal(2, control.AnalysisCount);
+
+        for (var version = 3; version <= 8; version++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(60));
+            Assert.Equal(2, control.AnalysisCount);
+            await client.Change("start.tale", Tale($"Paced {version}."), version);
+            await client.Barrier(version);
+            Assert.Equal(2, control.AnalysisCount);
+        }
+
+        Assert.True(running.CancellationRequested);
+        var settled = await control.NextAnalysis();
+        Assert.Equal(Tale("Paced 8."), settled.Source.Files["start.tale"]);
+        settled.Release();
+        await client.Diagnostics("start.tale", 8);
+        Assert.Equal(3, control.AnalysisCount);
+    }
+
+    [Fact]
+    public async Task Real_analyzer_reuses_syntax_across_watch_reload_and_disk_fallback_on_close()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control, realAnalyzer: true);
+        await client.Initialize();
+        await client.Open("start.tale", Original, 1);
+        (await control.NextDelay()).Release();
+        var initial = await control.NextPublication();
+        await client.Diagnostics("start.tale", 1);
+        Assert.Equal((1, 1), (initial.ParsedFiles, initial.CachedFiles));
+
+        client.Write("next.tale", Target);
+        await client.Watch("next.tale", 1);
+        (await control.NextDelay()).Release();
+        var added = await control.NextPublication();
+        await client.Diagnostics("start.tale", 1);
+        Assert.Equal((1, 2), (added.ParsedFiles, added.CachedFiles));
+
+        client.Write("start.tale", Changed);
+        await client.Watch("start.tale", 2);
+        (await control.NextDelay()).Release();
+        var overlay = await control.NextPublication();
+        await client.Diagnostics("start.tale", 1);
+        Assert.Equal((0, 2), (overlay.ParsedFiles, overlay.CachedFiles));
+
+        await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("start.tale") } });
+        (await control.NextDelay()).Release();
+        var closed = await control.NextPublication();
+        Assert.Equal((1, 2), (closed.ParsedFiles, closed.CachedFiles));
+
+        client.Delete("next.tale");
+        await client.Watch("next.tale", 3);
+        (await control.NextDelay()).Release();
+        var deleted = await control.NextPublication();
+        Assert.Equal((0, 1), (deleted.ParsedFiles, deleted.CachedFiles));
+    }
+
+    [Fact]
     public async Task Change_then_completion_shares_one_analysis()
     {
         var control = new AnalysisControl();
@@ -400,16 +528,22 @@ public sealed class ConcurrencyTests
         private readonly List<TaskCompletionSource> _pending = [];
         private readonly Channel<Gate> _delays = Channel.CreateUnbounded<Gate>();
         private readonly Channel<AnalysisCall> _analyses = Channel.CreateUnbounded<AnalysisCall>();
+        private readonly Channel<LanguageServer.DiagnosticPublication> _publications =
+            Channel.CreateUnbounded<LanguageServer.DiagnosticPublication>();
+        private readonly bool _realDelays;
         private bool _releaseAll;
         private int _analysisCount;
+
+        public AnalysisControl(bool realDelays = false) => _realDelays = realDelays;
 
         public int AnalysisCount => Volatile.Read(ref _analysisCount);
 
         public Task Delay(TimeSpan delay, CancellationToken cancellationToken)
         {
             if (delay == TimeSpan.Zero) return Task.CompletedTask;
+            if (_realDelays) return Task.Delay(delay, cancellationToken);
             var gate = NewGate();
-            _delays.Writer.TryWrite(new Gate(gate));
+            _delays.Writer.TryWrite(new Gate(gate, delay));
             return gate.Task.WaitAsync(cancellationToken);
         }
 
@@ -424,6 +558,9 @@ public sealed class ConcurrencyTests
 
         public Task<Gate> NextDelay() => _delays.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         public Task<AnalysisCall> NextAnalysis() => _analyses.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        public Task<LanguageServer.DiagnosticPublication> NextPublication() =>
+            _publications.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        public void Measure(LanguageServer.DiagnosticPublication publication) => _publications.Writer.TryWrite(publication);
 
         public void ReleaseAll()
         {
@@ -446,8 +583,9 @@ public sealed class ConcurrencyTests
         }
     }
 
-    private class Gate(TaskCompletionSource completion)
+    private class Gate(TaskCompletionSource completion, TimeSpan? duration = null)
     {
+        public TimeSpan? Duration { get; } = duration;
         public void Release() => completion.TrySetResult();
         public void Fail(Exception exception) => completion.TrySetException(exception);
     }
@@ -474,7 +612,7 @@ public sealed class ConcurrencyTests
 
         public string Root { get; } = Path.Combine(Path.GetTempPath(), $"talewright-lsp-concurrency-{Guid.NewGuid():N}");
 
-        public InProcessClient(AnalysisControl control)
+        public InProcessClient(AnalysisControl control, bool realAnalyzer = false)
         {
             _control = control;
             Directory.CreateDirectory(Root);
@@ -484,7 +622,8 @@ public sealed class ConcurrencyTests
             _serverInput = new AnonymousPipeClientStream(PipeDirection.In, _toServer.ClientSafePipeHandle);
             _serverOutput = new AnonymousPipeClientStream(PipeDirection.Out, _fromServer.ClientSafePipeHandle);
             _protocol = new Protocol(_fromServer, _toServer);
-            _server = new LanguageServer(_serverInput, _serverOutput, _errors, control.Analyze, control.Delay).RunAsync();
+            _server = new LanguageServer(_serverInput, _serverOutput, _errors,
+                realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null).RunAsync();
         }
 
         private string PathOf(string name) => Path.Combine(Root, name);

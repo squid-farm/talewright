@@ -111,7 +111,8 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
     [InlineData("* { set flag:ready }")]
     public async Task Textless_choices_without_a_destination_report_tw1011(string choice)
     {
-        await Upload(new StoryFixture("invalid-textless", TestStories.DefaultYaml, $"=== start\n{choice}"));
+        var fixture = new StoryFixture("invalid-textless", TestStories.DefaultYaml, $"=== start\n{choice}");
+        await UploadBytes("invalid-textless.zip", fixture.Zip());
         await AssertState(state => Assert.Contains("TW1011", state.Library));
     }
 

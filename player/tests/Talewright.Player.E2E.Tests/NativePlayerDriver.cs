@@ -27,11 +27,12 @@ public sealed record AccessibleNode(
 }
 
 public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null,
-    bool windowInChildProcess = false) : IPlayerDriver
+    bool windowInChildProcess = false, string? xdgDataHome = null) : IPlayerDriver
 {
     private Process? _adapter;
     private Task<string>? _stderr;
     private bool _protocolFailed;
+    private readonly string? _dataHome = xdgDataHome ?? (executableOverride is null ? Path.Combine(artifacts, "xdg-data") : null);
     private readonly string _temporary = Path.Combine(Path.GetTempPath(), "talewright-driver-" + Guid.NewGuid().ToString("N"));
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
@@ -56,6 +57,11 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
             foreach (var argument in new[] { helper, "adapter", "--executable", executable, "--output", artifacts })
             {
                 start.ArgumentList.Add(argument);
+            }
+            if (_dataHome is not null)
+            {
+                Directory.CreateDirectory(_dataHome);
+                start.Environment["XDG_DATA_HOME"] = _dataHome;
             }
             if (windowInChildProcess)
             {

@@ -33,20 +33,21 @@ public static class StoryCompiler
         => CompileCore(source, options ?? CompilerOptions.Default, null, CancellationToken.None);
 
     internal static CompilationResult CompileForAnalysis(StorySource source, CompilerOptions options, AnalysisCollector collector,
-        CancellationToken cancellationToken)
-        => CompileCore(source, options, collector, cancellationToken);
+        CancellationToken cancellationToken, Func<string, string, CancellationToken, TaleFileSyntax>? syntax = null)
+        => CompileCore(source, options, collector, cancellationToken, syntax);
 
     private static CompilationResult CompileCore(StorySource source, CompilerOptions options, AnalysisCollector? analysis,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Func<string, string, CancellationToken, TaleFileSyntax>? parseSyntax = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        parseSyntax ??= static (_, text, token) => TaleSyntaxParser.Parse(text, token);
         var diagnostics = new DiagnosticBag();
         analysis?.Registrations();
 
         if (!source.Files.ContainsKey(StorySource.ManifestFileName))
         {
             diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "The story has no story.talewright.yaml at its root.", new SourceLocation(StorySource.ManifestFileName, 0, 0));
-            analysis?.DiscoverWithoutManifest(cancellationToken);
+            analysis?.DiscoverWithoutManifest(cancellationToken, parseSyntax);
             return new CompilationResult(null, diagnostics.Items);
         }
 
@@ -55,7 +56,7 @@ public static class StoryCompiler
         cancellationToken.ThrowIfCancellationRequested();
         if (manifest is null)
         {
-            analysis?.DiscoverWithoutManifest(cancellationToken);
+            analysis?.DiscoverWithoutManifest(cancellationToken, parseSyntax);
             return new CompilationResult(null, diagnostics.Items);
         }
 
@@ -83,7 +84,7 @@ public static class StoryCompiler
         foreach (var (path, text) in taleFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var syntax = TaleSyntaxParser.Parse(text, cancellationToken);
+            var syntax = parseSyntax(path, text, cancellationToken);
             syntaxes.Add((path, syntax));
             TaleDeclarations.Collect(path, syntax, (id, location) =>
             {

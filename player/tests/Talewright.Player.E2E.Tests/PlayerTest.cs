@@ -21,6 +21,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
     protected ILocator SaveStatus => Page.GetByRole(AriaRole.Status).And(Page.Locator(".tw-save-status"));
+    protected string NativeSaveRoot => Path.Combine(_artifacts, "xdg-data", "Talewright", "saves");
     protected virtual bool AutoStartDesktop => true;
     protected virtual bool StartsInLibrary => true;
 
@@ -30,7 +31,9 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         output.WriteLine($"Evidence: {_artifacts}");
         if (PlayerTarget.IsDesktop)
         {
-            Driver = new NativePlayerDriver(_artifacts);
+            var dataHome = Path.Combine(_artifacts, "xdg-data");
+            Directory.CreateDirectory(dataHome);
+            Driver = new NativePlayerDriver(_artifacts, xdgDataHome: dataHome);
             if (AutoStartDesktop)
             {
                 await Driver.StartAsync();
@@ -86,11 +89,97 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         }
     }
 
-    protected async Task Upload(StoryFixture fixture, string prefix = "") =>
+    protected async Task Upload(StoryFixture fixture, string prefix = "", bool resumeAutosave = false)
+    {
         await UploadBytes(fixture.Id + ".zip", fixture.Zip(prefix));
+        await ResolveAutosavePromptAsync(resumeAutosave);
+    }
 
     protected async Task UploadBytes(string name, byte[] bytes) =>
         await Driver.UploadAsync(name, bytes);
+
+    private async Task ResolveAutosavePromptAsync(bool resumeAutosave)
+    {
+        if (Driver is NativePlayerDriver native)
+        {
+            var timer = Stopwatch.StartNew();
+            AccessibleNode[] nodes;
+            var ready = false;
+            while (true)
+            {
+                nodes = (await native.SnapshotAsync()).Descendants().ToArray();
+                if (nodes.Any(node =>
+                        node.Name is "Resume saved game" or "Start story" or "Start a new game" or "Current passage"))
+                {
+                    ready = true;
+                    break;
+                }
+                if (timer.Elapsed >= TimeSpan.FromSeconds(15))
+                {
+                    break;
+                }
+
+                await Task.Delay(100);
+            }
+
+            if (!ready)
+            {
+                throw new Xunit.Sdk.XunitException("Timed out waiting for the uploaded story to become playable.");
+            }
+
+            var hasResume = nodes.Any(node => node.Role == "push button" && node.Name == "Resume saved game");
+            if (resumeAutosave && !hasResume)
+            {
+                throw new Xunit.Sdk.XunitException("Expected an autosave resume prompt after uploading the story.");
+            }
+            if (hasResume)
+            {
+                await Driver.ClickAsync(resumeAutosave ? "Resume saved game" : "Start a new game");
+            }
+            else if (!resumeAutosave && nodes.Any(node => node.Role == "push button" && node.Name == "Start a new game"))
+            {
+                await Driver.ClickAsync("Start a new game");
+            }
+
+            return;
+        }
+
+        await Page.WaitForFunctionAsync("""
+            () => {
+                const visible = element => element !== null && element.checkVisibility();
+                if (visible(document.querySelector('.tw-library'))) return false;
+                const resume = document.querySelector('[aria-labelledby="tw-resume-heading"]');
+                const passage = document.querySelector('[aria-label="Current passage"]');
+                const buttons = Array.from(document.querySelectorAll('button')).filter(visible)
+                    .map(button => button.textContent.trim());
+                return visible(resume) || visible(passage) ||
+                    buttons.includes('Start story') || buttons.includes('Start a new game');
+            }
+            """, null, new() { Timeout = 15_000 });
+
+        var resumeButton = Page.GetByRole(AriaRole.Button, new() { Name = "Resume saved game", Exact = true });
+        var hasResumePrompt = await resumeButton.IsVisibleAsync();
+        if (resumeAutosave && !hasResumePrompt)
+        {
+            throw new Xunit.Sdk.XunitException("Expected an autosave resume prompt after uploading the story.");
+        }
+        if (hasResumePrompt)
+        {
+            await Page.GetByRole(AriaRole.Button, new()
+            {
+                Name = resumeAutosave ? "Resume saved game" : "Start a new game",
+                Exact = true,
+            }).ClickAsync();
+        }
+        else if (!resumeAutosave)
+        {
+            var startNew = Page.GetByRole(AriaRole.Button, new() { Name = "Start a new game", Exact = true });
+            if (await startNew.IsVisibleAsync())
+            {
+                await startNew.ClickAsync();
+            }
+        }
+    }
 
     protected async Task Choose(string label) =>
         await Driver.ChooseAsync(label);

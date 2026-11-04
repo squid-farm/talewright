@@ -33,6 +33,7 @@ public sealed class NativeCliRunTests
         await using (var player = Driver())
         {
             await player.StartAsync("run", story.Root);
+            await player.ClickAsync("Start a new game");
             await WaitFor(player, snapshot => snapshot.Content.Contains("First run passage.", StringComparison.Ordinal));
             await player.ClickAsync("Saves");
             await player.ClickAsync("Load Quick Save checkpoint");
