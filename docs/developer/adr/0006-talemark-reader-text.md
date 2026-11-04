@@ -3,6 +3,11 @@
 **Status:** Accepted. Supersedes only the Markdig portion of [ADR 0003](0003-tale-markup.md).
 Implementation is tracked in [#392](https://github.com/squid-farm/talewright/issues/392).
 
+The backtick-span, trailing-backslash hard-break and delimiter-only escape decisions below were
+superseded by [#404](https://github.com/squid-farm/talewright/issues/404) and
+[#497](https://github.com/squid-farm/talewright/issues/497). Use the current
+[reader-text grammar](../../reference/talemark-operators.md#reader-text-grammar) for active rules.
+
 ## Context
 
 ADR 0003 parsed the prose inside Talemark with Markdig, a CommonMark library. Talemark already

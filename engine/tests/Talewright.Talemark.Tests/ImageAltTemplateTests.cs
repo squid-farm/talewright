@@ -81,10 +81,14 @@ public sealed class ImageAltTemplateTests
             === gate
             {image("portrait", "\{guide:first-name\} meets {guide:first-name}")}
             {image("portrait", "Say \"{guide:first-name}\" and \\")}
-            {image("portrait", "a \* \_ \` \[door\] b")}
+            {image("portrait", "a \* \_ \` \[door\] \q \1 \— \. b")}
             -> END
             """);
-        Assert.Equal(["{guide:first-name} meets Bea", "Say \"Bea\" and \\", "a * _ ` [door] b"], Alts(story));
+        Assert.Equal([
+            "{guide:first-name} meets Bea",
+            "Say \"Bea\" and \\",
+            "a * _ ` [door] \\q \\1 \\— . b",
+        ], Alts(story));
     }
 
     [Theory]

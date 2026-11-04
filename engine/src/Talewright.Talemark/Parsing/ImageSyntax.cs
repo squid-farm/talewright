@@ -156,29 +156,32 @@ internal static class ImageSyntax
 
                 if (unit.Escaped)
                 {
-                    if (unit.End == i + 1 ||
-                        (unit.Character != TextVocabulary.QuoteMark && !DelimiterScanner.IsReaderTextEscape(unit.Character)))
-                    {
-                        AnalyzePartial(trimTrailingCall: false);
-                        Error($"Unknown image string escape. Use '{TextVocabulary.EscapeMark}{TextVocabulary.QuoteMark}', " +
-                            $"'{TextVocabulary.EscapeMark}{TextVocabulary.EscapeMark}', or a reader-text escape such as " +
-                            $"'{TextVocabulary.EscapeMark}{SceneVocabulary.InlineOpen}' or " +
-                            $"'{TextVocabulary.EscapeMark}{SceneVocabulary.ChoiceMarker}'.", i);
-                        return false;
-                    }
-
                     var next = unit.Character;
                     i = unit.End;
-                    if (next is TextVocabulary.QuoteMark or TextVocabulary.EscapeMark)
+                    if (next == TextVocabulary.QuoteMark)
                     {
                         templateText.Append(next);
                         plain.Append(next);
                         locations.Add(source.Locate(i - 1));
                     }
-                    else
+                    else if (next == TextVocabulary.EscapeMark)
+                    {
+                        templateText.Append(TextVocabulary.EscapeMark).Append(TextVocabulary.EscapeMark);
+                        plain.Append(next);
+                        locations.Add(source.Locate(i - 2));
+                        locations.Add(source.Locate(i - 1));
+                    }
+                    else if (DelimiterScanner.IsReaderTextEscape(next))
                     {
                         templateText.Append(TextVocabulary.EscapeMark).Append(next);
                         plain.Append(next);
+                        locations.Add(source.Locate(i - 2));
+                        locations.Add(source.Locate(i - 1));
+                    }
+                    else
+                    {
+                        templateText.Append(TextVocabulary.EscapeMark).Append(next);
+                        plain.Append(TextVocabulary.EscapeMark).Append(next);
                         locations.Add(source.Locate(i - 2));
                         locations.Add(source.Locate(i - 1));
                     }

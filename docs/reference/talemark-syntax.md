@@ -3,10 +3,11 @@
 A story is a **folder** containing one `story.talewright.yaml`, optional supporting `*.talewright.yaml` files
 in subfolders, and any number of `*.tale` files.
 **Talemark** is the story-authoring language that powers Talewright stories, written in `.tale` files.
-It lets you mix prose with bold, italic and code formatting, dialogue, choices and story rules. The
+It lets you mix prose with bold and italic formatting, dialogue, choices and story rules. Backticks
+are ordinary text.
 YAML manifest is a separate settings file for the story's characters and world; it is not Talemark
 source. Talemark is not Markdown: it has its own small
-[reader-text grammar](talemark-operators.md#reader-text-grammar) for bold, italic and code, and a
+[reader-text grammar](talemark-operators.md#reader-text-grammar) for escapes, bold and italic, and a
 `.tale` file is not a general Markdown document.
 
 New to Talewright? Start with the [author guide](../guide/README.md). The examples below are a quick
@@ -282,7 +283,7 @@ Not included: point-buy, class designers or race systems.
 @priority 10
 @once
 
-Prose paragraph with **strong**, *emphasis* and `code`.
+Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 {player:first-name#possessive} torch gutters as cold air spills out.
 
 > guide: Careful, {player:first-name}. Nobody has opened this in a thousand years.
@@ -305,7 +306,7 @@ Prose paragraph with **strong**, *emphasis* and `code`.
 | `@hub all(tag, tag)`                               | Offer scenes that have every listed tag.                                                      |
 | `@hub any(tag, tag)`                               | Offer scenes that have at least one listed tag.                                               |
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
-| blank-line separated text                          | Paragraphs (bold, italic and code formatting).                                                  |
+| blank-line separated text                          | Paragraphs (bold and italic formatting).                                                       |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
@@ -398,9 +399,13 @@ by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 
 **Reader text is not Markdown.** Talemark implements its own small
 [reader-text grammar](talemark-operators.md#reader-text-grammar): word-boundary bold and italic,
-code spans and inline constructs. Italic may use `*emphasis*` or `_emphasis_`; bold may use
-`**strong**` or `__strong__`. Unsupported Markdown-like syntax, including links, entities,
-headings and lists, remains literal text.
+inline constructs and ASCII punctuation escapes. Backticks are ordinary text. Italic may use
+`*emphasis*` or `_emphasis_`; bold may use `**strong**` or `__strong__`. Unsupported Markdown-like
+syntax, including links, entities, headings and lists, remains literal text.
+
+Each line break inside a paragraph renders as a line break. A line whose content renders empty,
+such as an inline conditional whose condition is false, does not leave an empty line. A trailing
+unpaired backslash reports TW1017; remove it.
 
 ## 3. Substitutions
 
@@ -547,10 +552,10 @@ braces in it are filename characters, not substitutions. Alt text is optional:
 `{image("maps/old_map-v2")}`.
 
 Inside either argument, `\"` means a quote and `\\` means a backslash. Any other backslash escape
-in the path is an error. Alt text also accepts the reader-text escapes `\{`, `\}`, `\[`, `\]`,
-`\*`, `\_` and `` \` ``; any other backslash escape is an error. Apostrophes, commas, parentheses
-and brackets are literal within the quotes. Whitespace is allowed around `image`, parentheses and
-arguments.
+in the path is an error. Alt text follows the reader-text escape rule: a backslash before any ASCII
+punctuation or symbol quotes that character, while a backslash before a letter, digit, whitespace
+or non-ASCII character stays visible. Apostrophes, commas, parentheses and brackets are literal
+within the quotes. Whitespace is allowed around `image`, parentheses and arguments.
 
 Alt text uses the same template language as prose, rendered with the state where the image appears:
 
@@ -559,10 +564,10 @@ Alt text uses the same template language as prose, rendered with the state where
 ```
 
 That shows the guide's first name. Alt text always uses the reader-text grammar, so `{if}`,
-substitutions, formatting and code spans work even when no substitution is present. The rendered
-alt is plain text, since an image description cannot keep bold or italic. For example,
-`"**The guide**"` reads `The guide`. Use `\"` for a quote and the reader-text escapes for literal
-delimiters; an unknown escape is TW1014.
+substitutions and formatting work even when no substitution is present. Backticks are ordinary
+text. The rendered alt is plain text, since an image description cannot keep bold or italic. For
+example, `"**The guide**"` reads `The guide`. Use `\"` for a quote and the reader-text escapes for
+literal punctuation. Unknown letter escapes remain literal instead of producing TW1014.
 There is no nested `{image(...)}`. Describe the picture in words. A reference the story does not
 know, such as an unknown character, is an error at that reference.
 
@@ -571,7 +576,7 @@ The parser preserves a literal alt after escape decoding, including empty or whi
 Images work wherever narrative templates work: prose, dialogue, choice labels, formatting and
 conditions. There is no image-specific surface allowlist or author image-size limit. Plain-string
 fields such as scene titles do not gain template support. To show the syntax literally in prose,
-escape its outer braces: `\{image("camp")\}`. Code formatting alone does not escape a template.
+escape its outer braces: `\{image("camp")\}`. Backticks do not escape a template.
 The character reference `{image:name}` still means the `name` property of the character `image`.
 
 Compilation, `talewright validate` and editor analysis check path safety, supported formats,

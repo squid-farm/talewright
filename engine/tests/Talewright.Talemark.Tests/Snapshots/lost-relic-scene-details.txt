@@ -1,5 +1,5 @@
 scene|dream.spiral|Answer the Spiral|tags=dream,keeper|requires=|once=true|priority=20|hub=|hub-limit=
-prose|0|step:51:1|condition=|paragraph({spiral:first-name#capitalize} turns without moving. {spiral:pronoun#capitalize} {spiral:pronoun#one-many("has","have")} a question; the answer should be yours.)
+prose|0|step:51:1|condition=|paragraph({spiral:first-name#capitalize} turns without moving. {spiral:pronoun#capitalize}\n{spiral:pronoun#one-many("has","have")} a question; the answer should be yours.)
 prose|1|step:54:1|condition=|speech(spiral:What is the watchword?)
 prose|3|step:57:1|condition=var:watchword == ""|speech(spiral:A retired word leaves no echo. Silence is an honest answer.)
 prose|5|step:60:1|condition=not var:watchword == "" and var:watch-note == ""|speech(spiral:"{var:watchword}"? A suggestion, never recorded. You have not yet agreed on who should answer.)

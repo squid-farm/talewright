@@ -122,8 +122,6 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['*emphasis* and **strong**', 'emphasis', 'markup.italic.markdown'],
     ['*emphasis* and **strong**', 'strong', 'markup.bold.markdown'],
     ['**{player:first-name}**', 'first-name', 'variable.other.member.tale'],
-    ['Use `code` here.', 'code', 'markup.inline.raw.string.markdown'],
-    ['Use ``a`b`` here.', 'a`b', 'markup.inline.raw.string.markdown'],
     ['![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale'],
     ['{image("maps/camp", "A camp")}', 'image', 'support.function.image.tale'],
     ['{image("maps/camp", "A } camp")}', 'camp"', 'string.quoted.double.tale'],
@@ -169,12 +167,16 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     '*emphasis*', '**strong**', 'A -> sign in prose', 'Write @title here.',
     'Literal \\{player:first-name\\}', '// * [choice] -> END',
     '`* [not a choice]`',
+    'Backticks are ordinary text: `code`.',
   ]) {
     const scopes = tokens(line).tokens.flatMap(token => token.scopes);
     assert.ok(!scopes.includes('punctuation.definition.choice.tale'), line);
     assert.ok(!scopes.includes('keyword.control.metadata.tale'), line);
   }
   assert.ok(!tokens('Literal \\{player:first-name\\}').tokens.some(token => token.scopes.includes('meta.template.tale')));
+  assert.ok(!tokens('Backticks are ordinary text: `code`.').tokens.some(token => token.scopes.includes('markup.inline.raw.string.markdown')));
+  hasScope(String.raw`a \. b`, String.raw`\.`, 'constant.character.escape.tale');
+  hasScope(String.raw`a \— b`, String.raw`—`, 'text.tale');
   assert.ok(!tokens('A -> sign in prose').tokens.some(token => token.scopes.includes('keyword.control.divert.tale')));
   assert.ok(!tokens('snake_case_words').tokens.some(token => token.scopes.includes('markup.italic.markdown')));
   for (const [line, text] of [
@@ -184,7 +186,6 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     ['__literal\\__ plain', 'plain'], ['_literal\\_ plain', 'plain'],
     ['**literal \\}** after', 'after'], ['__literal \\}__ after', 'after'],
     ['*literal \\}* after', 'after'], ['_literal \\}_ after', 'after'],
-    ['An *unfinished `code*` after', 'after'],
     ['2 * 3 and 4*', '3'], ['a ** b', 'b'], ['[{player:name}](https://example.org) after', 'after'],
     ['word*inner*word', 'inner'], ['2*3*4', '3'], ['snake_case', 'case'],
     ['**bold**text', 'bold'], ['*it*text', 'it'], ['***both***', 'both'],
@@ -209,7 +210,6 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     hasScope(line, 'combined', 'markup.bold.markdown');
     hasScope(line, 'combined', 'markup.italic.markdown');
   }
-  hasScope('Use ``a`b`` here.', 'a`b', 'markup.inline.raw.string.markdown');
   hasScope(String.raw`\*literal\*`, String.raw`\*`, 'constant.character.escape.tale');
   hasScope('![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale');
   for (const line of ['![a [b]](p)', String.raw`![a\]](p)`, '![a](p(q))']) {
