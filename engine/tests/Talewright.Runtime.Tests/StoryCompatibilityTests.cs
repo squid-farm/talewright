@@ -162,7 +162,7 @@ public sealed class StoryCompatibilityTests
         vary = true;
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(target, bytes));
         Assert.Equal(2, calls);
-        if (updated) Assert.StartsWith("Cursor replay has changed", error.Message);
+        if (updated) Assert.StartsWith("Version 0.0.0 of Cursor replay has changed", error.Message);
     }
 
     [Fact]
@@ -232,6 +232,25 @@ public sealed class StoryCompatibilityTests
         Assert.Equal(bytes, original.Save());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Changed_offered_choices_at_the_saved_cursor_are_rejected(bool afterAChoice)
+    {
+        var original = Create(Compile());
+        if (afterAChoice)
+        {
+            original.Choose("c0");
+        }
+
+        var bytes = original.Save();
+        var updated = Compile(version: "2",
+            choiceLabel: afterAChoice ? "Investigate" : "A different decision",
+            middleChoiceLabel: afterAChoice ? "A different decision" : "Continue");
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
+    }
+
     [Fact]
     public void Restored_legacy_progress_retains_its_source_key_without_trusting_damaged_evidence()
     {
@@ -254,7 +273,7 @@ public sealed class StoryCompatibilityTests
     public void Initial_evidence_has_a_frozen_encoding()
     {
         var history = new StoryHistory(TestStories.Linear.Compile(), 42);
-        Assert.Equal("01F9F3379B6D0F6C4E5AE9FB8120814F144BF32D8348B6C0FDB98D3F6B446C7CCC",
+        Assert.Equal("01A798A6261EA551898FCBAF38D69A048FA96FD9B23B9C098EBC626B460DE874EB",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -266,7 +285,7 @@ public sealed class StoryCompatibilityTests
         history.Choose("c0");
         history.Back();
 
-        Assert.Equal("0148F0458CA63A0085DCB1CD31646E167277BE2CA1FF6A0AFE1CCC7A5A84554FE5",
+        Assert.Equal("01F26EB70E51571DC6A7AE8A17AC17E484E51EFE6F24BF39B5420E468C6D03AC39",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -300,7 +319,7 @@ public sealed class StoryCompatibilityTests
     private static StoryDefinition Compile(string version = "1", string prose = "Original narrative.",
         bool insertChoice = false, string choiceLabel = "Investigate", int reward = 1, int difficulty = 12,
         int presetHp = 15, bool allowShe = true, string? compatibilityId = null, int startEffect = 0,
-        int initialScore = 0)
+        int initialScore = 0, string middleChoiceLabel = "Continue")
     {
         var manifest = new ManifestFaker("compatibility", "Compatibility", "start")
         {
@@ -321,7 +340,7 @@ public sealed class StoryCompatibilityTests
         lines.Add(ChoiceFaker.Create("END", "Leave"));
         lines.Add(SceneFaker.Header("middle"));
         lines.Add("The middle.");
-        lines.Add(ChoiceFaker.Create("finish", "Continue", effect: EffectFaker.Increase(score, reward)));
+        lines.Add(ChoiceFaker.Create("finish", middleChoiceLabel, effect: EffectFaker.Increase(score, reward)));
         lines.Add(ChoiceFaker.Create("END", "Quit"));
         lines.Add(SceneFaker.Header("finish"));
         lines.Add("Finished.");

@@ -415,7 +415,7 @@ public class StoryHistoryTests
         var legacy = Mutate(save, data => data with { ReplayEvidence = null });
         var error = Assert.Throws<InvalidDataException>(() =>
             StoryHistory.Restore(updated, legacy));
-        Assert.Equal("History has changed, and this save is no longer compatible. Open it with the story and player version that created it.", error.Message);
+        Assert.Equal("Version 1 of History has changed, and this save is no longer compatible. Open it with the story and player version that created it.", error.Message);
         AssertEquivalent(history, StoryHistory.Restore(updated, save));
     }
 

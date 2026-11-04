@@ -415,7 +415,8 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
 - `Components/StoryPlayer.razor`: one playthrough. Keeps a transcript of past frames (echoing the chosen label),
   shows current choices, Back/Forward, named manual saves and Restart/Library buttons. Its collocated `StoryPlayer.razor.js` module scrolls the
   newest frame to the top of the viewport and focuses it (moving screen readers to it); plain `focus()` would
-  not scroll a frame that is already partly visible.
+  not scroll a frame that is already partly visible. A delayed initial reveal does not steal focus from
+  a control the player has already selected.
 - `Components/DocumentView.razor`, `InlineView.razor`: `RenderedDocument` → HTML (`<p>`, `<em>`, `<strong>`,
   `<code>`). `RenderedMedia` preserves inherited style and renders through `MediaView` on all narrative
   surfaces, including choices and chosen-label history.

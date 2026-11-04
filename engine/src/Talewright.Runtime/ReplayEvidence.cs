@@ -12,13 +12,14 @@ internal static class ReplayEvidence
 
     public static bool IsValid(byte[] evidence) => evidence.Length == Length && evidence[0] == Version;
 
-    public static byte[] Encode(byte[] digest, int cursor)
+    public static byte[] Encode(byte[] digest, int cursor, StoryFrame current)
     {
         var bound = Hash(writer =>
         {
             writer.WriteStringValue("cursor");
             writer.WriteBase64StringValue(digest);
             writer.WriteNumberValue(cursor);
+            WriteFrame(writer, current);
         });
         var evidence = new byte[Length];
         evidence[0] = Version;
@@ -26,8 +27,8 @@ internal static class ReplayEvidence
         return evidence;
     }
 
-    public static bool Matches(byte[] evidence, byte[] digest, int cursor) =>
-        IsValid(evidence) && CryptographicOperations.FixedTimeEquals(evidence, Encode(digest, cursor));
+    public static bool Matches(byte[] evidence, byte[] digest, int cursor, StoryFrame current) =>
+        IsValid(evidence) && CryptographicOperations.FixedTimeEquals(evidence, Encode(digest, cursor, current));
 
     public static byte[] Start(StoryDefinition story, StorySession session, CharacterSelection? character) =>
         Hash(writer =>

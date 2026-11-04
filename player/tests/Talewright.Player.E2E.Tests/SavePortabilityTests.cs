@@ -77,7 +77,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             (valid[..^1], "malformed"),
             ([.. valid[..4], 99, .. valid[5..]], "unsupported format"),
             ("""{"formatVersion":2,"storyId":"player-test"}"""u8.ToArray(), "unsupported format"),
-            (SaveFormat.Write(decoded with { ContentFingerprint = "different" }), $"{story.Title} has changed"),
+            (SaveFormat.Write(decoded with { ContentFingerprint = "different" }), $"Version {story.Version} of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { StoryId = "different" }), "different story"),
             (SaveFormat.Write(decoded with { StoryVersion = "different" }), $"Version different of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { Choices = ["not-a-choice"] }), "cannot continue"),

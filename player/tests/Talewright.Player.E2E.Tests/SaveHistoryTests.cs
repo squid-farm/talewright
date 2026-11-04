@@ -177,9 +177,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load " + slot);
         await Driver.ClickAsync("Load save");
-        var subject = olderVersion ? "Version 0.3.0 of The Lost Relic" : "The Lost Relic";
         await AssertDialogText(text => Assert.Contains(
-            $"{subject} has changed, and this save is no longer compatible", text));
+            $"Version {(olderVersion ? "0.3.0" : "0.4.0")} of The Lost Relic has changed, and this save is no longer compatible", text));
         await Driver.ClickAsync("Close saves");
         await AssertState(state =>
         {

@@ -155,7 +155,7 @@ public sealed class StoryHistory
             Cursor = Cursor,
             Character = Character,
             Summary = summary,
-            ReplayEvidence = _evidence is null ? null : ReplayEvidence.Encode(_evidence[^1], Cursor),
+            ReplayEvidence = _evidence is null ? null : ReplayEvidence.Encode(_evidence[^1], Cursor, Current),
         };
     }
 
@@ -250,12 +250,6 @@ public sealed class StoryHistory
             throw Incompatible(story, save, ex);
         }
 
-        if (save.ReplayEvidence is { } savedEvidence
-            && (evidence is null || !ReplayEvidence.Matches(savedEvidence, evidence[^1], save.Cursor)))
-        {
-            throw ReplayMismatch(story, save, changed);
-        }
-
         if (timeline.CanForward)
         {
             var expectedFrame = frames[timeline.Position].Frame;
@@ -278,6 +272,12 @@ public sealed class StoryHistory
             }
         }
 
+        if (save.ReplayEvidence is { } savedEvidence
+            && (evidence is null || !ReplayEvidence.Matches(savedEvidence, evidence[^1], save.Cursor, session.Current!)))
+        {
+            throw ReplayMismatch(story, save, changed);
+        }
+
         return new StoryHistory(story, character, session, frames, save.Choices, timeline, evidence, KeyOf(save));
     }
 
@@ -290,8 +290,7 @@ public sealed class StoryHistory
     private static InvalidDataException Incompatible(StoryDefinition story, SavedGame save, Exception? inner = null)
     {
         var version = save.StoryVersion;
-        var subject = version != story.Version && !string.IsNullOrWhiteSpace(version)
-            && version.Length <= 64 && !version.Any(char.IsControl)
+        var subject = !string.IsNullOrWhiteSpace(version) && version.Length <= 64 && !version.Any(char.IsControl)
             ? $"Version {version} of {story.Title}" : story.Title;
         return new InvalidDataException($"{subject} has changed, and this save is no longer compatible. Open it with the story and player version that created it.", inner);
     }

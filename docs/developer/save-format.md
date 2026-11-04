@@ -109,7 +109,8 @@ identity and fresh evidence.
 The evidence is a SHA-256 chain over the start and each recorded choice. The start binds the story id,
 replay/extension identity, seed, character selection and start events. Each choice binds its scene,
 the keys and rendered labels of all offered choices, the selected key, and every resulting gameplay
-event and field. A final digest also binds the cursor. Canonical, source-generated JSON feeds the hash;
+event and field. A final digest also binds the cursor and the choices currently offered at that cursor.
+Canonical, source-generated JSON feeds the hash;
 the encoding and test vectors are pinned by `StoryCompatibilityTests`. Change the evidence version
 when its canonical encoding or meaning changes. The evidence is a compatibility check, not an
 authentication mechanism.
