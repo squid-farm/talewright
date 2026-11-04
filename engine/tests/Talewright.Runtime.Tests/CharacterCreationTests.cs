@@ -1,7 +1,7 @@
-using System.Text.Json.Nodes;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
+using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
@@ -94,10 +94,13 @@ public sealed class CharacterCreationTests
         var history = new StoryHistory(story, character: valid with { Stats = stats });
         stats["str"] = 999;
         Assert.Equal(12, history.Character!.Stats["str"]);
-        var json = JsonNode.Parse(history.Save())!;
-        json["character"]!["stats"]!["str"] = 999;
+        var save = SaveFormat.Read(history.Save());
+        var tampered = SaveFormat.Write(save with
+        {
+            Character = save.Character! with { Stats = new Dictionary<string, int>(save.Character.Stats) { ["str"] = 999 } },
+        });
         Assert.Contains("Invalid saved character", Assert.Throws<InvalidDataException>(() =>
-            StoryHistory.Restore(story, System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()))).Message);
+            StoryHistory.Restore(story, tampered)).Message);
     }
 
     [Fact]
@@ -130,18 +133,15 @@ public sealed class CharacterCreationTests
     }
 
     [Fact]
-    public void Saves_require_the_character_field_even_for_predefined_stories()
+    public void Predefined_story_saves_omit_the_character_and_reject_a_saved_one()
     {
         var story = Story(creation: false);
         var history = new StoryHistory(story, 42);
         var bytes = history.Save();
-        var json = JsonNode.Parse(bytes)!.AsObject();
-        Assert.True(json.ContainsKey("character"));
-        Assert.Null(json["character"]);
-        json.Remove("character");
-        var error = Assert.Throws<InvalidDataException>(() =>
-            StoryHistory.Restore(story, System.Text.Encoding.UTF8.GetBytes(json.ToJsonString())));
-        Assert.Contains("malformed", error.Message);
+        Assert.Null(SaveFormat.Read(bytes).Character);
+        var tampered = SaveFormat.Write(SaveFormat.Read(bytes) with { Character = new CharacterSelection() });
+        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(story, tampered));
+        Assert.Contains("Invalid saved character", error.Message);
         Assert.Equal(bytes, history.Save());
     }
 }

@@ -150,7 +150,8 @@ class PackageBoundaryTests(unittest.TestCase):
         if identity == "Talewright":
             groups = []
             for framework in ENGINE_FRAMEWORKS:
-                groups.append(f'<group targetFramework="{framework}" />')
+                groups.append(f'<group targetFramework="{framework}">'
+                              '<dependency id="MessagePack" version="3.1.12" /></group>')
             dependencies = "<dependencies>" + "".join(groups) + "</dependencies>"
         with ZipFile(path, "w") as package:
             package.writestr(f"{identity}.nuspec", f"""<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
@@ -193,6 +194,8 @@ class PackageBoundaryTests(unittest.TestCase):
                                  '<DotNetCliTool><Commands><Command Name="talewright" '
                                  'EntryPoint="Talewright.Cli.dll" Runner="dotnet" /></Commands></DotNetCliTool>')
                 for assembly in ENGINE_ASSEMBLIES | {"Talewright.Player"}:
+                    package.writestr(prefix + assembly + ".dll", "")
+                for assembly in ("MessagePack", "MessagePack.Annotations", "Microsoft.NET.StringTools"):
                     package.writestr(prefix + assembly + ".dll", "")
                 for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
                     extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
@@ -316,7 +319,7 @@ class PackageBoundaryTests(unittest.TestCase):
                 verify(directory, "1.2.3")
 
     def test_oldest_framework_requires_assemblies_and_dependency_group(self):
-        for missing in ("lib/net8.0/Talewright.Runtime.dll", "group"):
+        for missing in ("lib/net8.0/Talewright.Runtime.dll", "group", "MessagePack"):
             with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
                 engine = self.write_package(directory, "Talewright")
@@ -328,10 +331,16 @@ class PackageBoundaryTests(unittest.TestCase):
                     group = groups.find("{*}group[@targetFramework='net8.0']")
                     groups.remove(group)
                     entries["Talewright.nuspec"] = ET.tostring(spec)
+                elif missing == "MessagePack":
+                    spec = ET.fromstring(entries["Talewright.nuspec"])
+                    for group in spec.findall(".//{*}group"):
+                        for dependency in group.findall("{*}dependency[@id='MessagePack']"):
+                            group.remove(dependency)
+                    entries["Talewright.nuspec"] = ET.tostring(spec)
                 with ZipFile(engine, "w") as package:
                     for name, content in entries.items():
                         package.writestr(name, content)
-                with self.assertRaisesRegex(ValueError, "missing engine assembly asset|framework dependency groups"):
+                with self.assertRaisesRegex(ValueError, "missing engine assembly asset|framework dependency groups|MessagePack"):
                     verify(directory, "1.2.3")
 
     def test_missing_debugger_asset_fails(self):

@@ -63,12 +63,7 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
         Page.SetDefaultTimeout(180_000);
         await Upload(fixture);
         await Expect(Latest).ToContainTextAsync("Visit 1.");
-        await Page.EvaluateAsync("""
-            async json => {
-                const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
-                await module.write('history-navigation', 'Navigation', new TextEncoder().encode(json), false);
-            }
-            """, Encoding.UTF8.GetString(save));
+        await WriteBrowserSaveAsync("history-navigation", "Navigation", save);
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load Navigation");
         await Driver.ClickAsync("Load save");

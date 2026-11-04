@@ -12,22 +12,22 @@ public sealed class SaveFileExporterTests : IDisposable
     [Fact]
     public void Suggested_names_are_portable_bounded_and_keep_both_labels()
     {
-        Assert.Equal("A_story - Before_the_door.json", SaveFileName.Create("A/story", "Before:the*door"));
-        Assert.Equal("Café - 回廊.json", SaveFileName.Create("Café", "回廊"));
-        Assert.Equal("Story - Save.json", SaveFileName.Create("...", " "));
-        Assert.Equal("A - B.json", SaveFileName.Create("A . ", "B. "));
+        Assert.Equal("A_story - Before_the_door.twsave", SaveFileName.Create("A/story", "Before:the*door"));
+        Assert.Equal("Café - 回廊.twsave", SaveFileName.Create("Café", "回廊"));
+        Assert.Equal("Story - Save.twsave", SaveFileName.Create("...", " "));
+        Assert.Equal("A - B.twsave", SaveFileName.Create("A . ", "B. "));
 
         var longName = SaveFileName.Create(new string('界', 100), string.Concat(Enumerable.Repeat("🚀", 100)));
-        Assert.True(Encoding.UTF8.GetByteCount(longName) <= 188);
+        Assert.True(Encoding.UTF8.GetByteCount(longName) <= 190);
         Assert.DoesNotContain('\uFFFD', longName);
-        Assert.EndsWith(".json", longName);
+        Assert.EndsWith(".twsave", longName);
     }
 
     [Fact]
     public async Task Local_export_uses_selected_path_and_cancel_keeps_existing_file()
     {
         Directory.CreateDirectory(_directory);
-        var destination = Path.Combine(_directory, "chosen.json");
+        var destination = Path.Combine(_directory, "chosen.twsave");
         await File.WriteAllBytesAsync(destination, [1]);
         string? selected = null;
         string? suggested = null;
@@ -37,11 +37,11 @@ public sealed class SaveFileExporterTests : IDisposable
             return Task.FromResult(selected);
         });
 
-        Assert.False(await exporter.ExportAsync("Story - Slot.json", [2, 3]));
-        Assert.Equal("Story - Slot.json", suggested);
+        Assert.False(await exporter.ExportAsync("Story - Slot.twsave", [2, 3]));
+        Assert.Equal("Story - Slot.twsave", suggested);
         Assert.Equal(new byte[] { 1 }, await File.ReadAllBytesAsync(destination));
         selected = destination;
-        Assert.True(await exporter.ExportAsync("Story - Slot.json", [2, 3]));
+        Assert.True(await exporter.ExportAsync("Story - Slot.twsave", [2, 3]));
         Assert.Equal(new byte[] { 2, 3 }, await File.ReadAllBytesAsync(destination));
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp"));
     }
@@ -51,10 +51,10 @@ public sealed class SaveFileExporterTests : IDisposable
     {
         Directory.CreateDirectory(_directory);
         var exporter = new LocalSaveFileExporter(_ => Task.FromResult<string?>(_directory));
-        await Assert.ThrowsAsync<InvalidDataException>(() => exporter.ExportAsync("save.json", []));
+        await Assert.ThrowsAsync<InvalidDataException>(() => exporter.ExportAsync("save.twsave", []));
         await Assert.ThrowsAsync<InvalidDataException>(() =>
-            exporter.ExportAsync("save.json", new byte[StoryHistory.MaxSaveBytes + 1]));
-        await Assert.ThrowsAnyAsync<IOException>(() => exporter.ExportAsync("save.json", [1]));
+            exporter.ExportAsync("save.twsave", new byte[StoryHistory.MaxSaveBytes + 1]));
+        await Assert.ThrowsAnyAsync<IOException>(() => exporter.ExportAsync("save.twsave", [1]));
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp"));
     }
 
@@ -63,7 +63,7 @@ public sealed class SaveFileExporterTests : IDisposable
     {
         var queued = new TaskCompletionSource<Action>(TaskCreationOptions.RunContinuationsAsynchronously);
         string? actualName = null;
-        var pending = NativeSaveFileDialog.DispatchAsync("Story - Slot.json",
+        var pending = NativeSaveFileDialog.DispatchAsync("Story - Slot.twsave",
             action => queued.SetResult(action),
             name =>
             {
@@ -75,14 +75,14 @@ public sealed class SaveFileExporterTests : IDisposable
         Assert.False(pending.IsCompleted);
         callback();
         Assert.Null(await pending);
-        Assert.Equal("Story - Slot.json", actualName);
+        Assert.Equal("Story - Slot.twsave", actualName);
     }
 
     [Fact]
     public async Task Native_dialog_propagates_errors_from_the_ui_thread()
     {
         var error = await Assert.ThrowsAsync<IOException>(() =>
-            NativeSaveFileDialog.DispatchAsync("save.json", action => action(), _ =>
+            NativeSaveFileDialog.DispatchAsync("save.twsave", action => action(), _ =>
                 throw new IOException("The chooser failed.")));
         Assert.Equal("The chooser failed.", error.Message);
     }

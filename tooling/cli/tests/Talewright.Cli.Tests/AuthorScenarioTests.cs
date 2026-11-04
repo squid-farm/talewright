@@ -230,7 +230,7 @@ public sealed class AuthorScenarioTests : IDisposable
         save.Choose("c0");
         save.Back();
         var bytes = save.Save();
-        model.PlayerSavePath = Path.Combine(_root, "player.json");
+        model.PlayerSavePath = Path.Combine(_root, "player" + SaveFormat.FileExtension);
         await File.WriteAllBytesAsync(model.PlayerSavePath, bytes);
         await model.ImportPlayerSave();
         Assert.Null(model.Error);
@@ -242,9 +242,8 @@ public sealed class AuthorScenarioTests : IDisposable
         await model.ExportScenario();
         Assert.Equal(bytes, await File.ReadAllBytesAsync(model.PlayerSavePath));
         var session = model.Session;
-        var malformed = JsonNode.Parse(bytes)!;
-        malformed["contentFingerprint"] = "other-source";
-        await File.WriteAllTextAsync(model.PlayerSavePath, malformed.ToJsonString());
+        var mismatched = SaveFormat.Write(SaveFormat.Read(bytes) with { ContentFingerprint = "other-source" });
+        await File.WriteAllBytesAsync(model.PlayerSavePath, mismatched);
         await model.ImportPlayerSave();
         Assert.NotNull(model.Error);
         Assert.Same(session, model.Session);
@@ -258,7 +257,7 @@ public sealed class AuthorScenarioTests : IDisposable
         {
             Path.Combine(_story, "main.tale"),
             Path.Combine(_story, "nested", "test.twscenario"),
-            Path.Combine(_root, "player.json"),
+            Path.Combine(_root, "player" + SaveFormat.FileExtension),
             Path.Combine(FileSaveStore.DefaultRoot, "never-written.twscenario"),
         })
         {
@@ -275,7 +274,7 @@ public sealed class AuthorScenarioTests : IDisposable
             await model.ExportScenario();
             Assert.Contains("outside", model.Error);
             Assert.False(File.Exists(Path.Combine(_story, "test.twscenario")));
-            var playerCopy = Path.Combine(_root, "player-copy.json");
+            var playerCopy = Path.Combine(_root, "player-copy" + SaveFormat.FileExtension);
             var originalSave = new StoryHistory(model.Story!, 42).Save();
             await File.WriteAllBytesAsync(playerCopy, originalSave);
             var fileLink = Path.Combine(_root, "disguised.twscenario");

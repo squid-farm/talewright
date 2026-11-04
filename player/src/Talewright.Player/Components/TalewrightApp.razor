@@ -50,7 +50,10 @@ else
             {
                 <section class="tw-resume-prompt" aria-label="Autosave unavailable">
                     <p class="tw-error" role="alert">@_resumeCheckError</p>
-                    <button type="button" class="tw-choice" @onclick="RetryAutosaveCheckAsync">Retry autosave check</button>
+                    @if (_resumeReadFailed)
+                    {
+                        <button type="button" class="tw-choice" @onclick="RetryAutosaveCheckAsync">Retry autosave check</button>
+                    }
                     <button type="button" class="tw-choice" @onclick="StartNewGame">Start a new game</button>
                 </section>
             }
@@ -64,7 +67,7 @@ else
             }
             else
             {
-                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" />
+                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" PreserveRejectedAutosave="_preserveRejectedAutosave" RejectedAutosaveData="_rejectedAutosaveData" />
             }
         </div>
         </CascadingValue>
@@ -177,6 +180,9 @@ else
     private StoryHistory? _resumeHistory;
     private SaveSummary? _resumeSummary;
     private string? _resumeCheckError;
+    private bool _resumeReadFailed;
+    private bool _preserveRejectedAutosave;
+    private byte[]? _rejectedAutosaveData;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
     private string? _failedTitle;
@@ -277,6 +283,9 @@ else
             _resumeHistory = null;
             _resumeSummary = null;
             _resumeCheckError = null;
+            _resumeReadFailed = false;
+            _preserveRejectedAutosave = false;
+            _rejectedAutosaveData = null;
             _resumeCheckComplete = false;
             _showLibrary = false;
             _diagnostics = [];
@@ -306,19 +315,24 @@ else
             return;
         }
 
+        byte[]? bytes = null;
         try
         {
-            var bytes = await store.ReadAutosaveAsync(story.Id);
+            bytes = await store.ReadAutosaveAsync(story.Id);
             if (_disposed || generation != _openGeneration) return;
             _resumeHistory = StoryHistory.Restore(story, bytes);
             _resumeSummary = StoryHistory.DescribeSave(SaveEntry.AutosaveSlot, bytes).Summary;
+            _resumeReadFailed = false;
+            _rejectedAutosaveData = null;
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException) when (bytes is null)
         {
             if (!_disposed && generation == _openGeneration)
             {
                 _resumeHistory = null;
                 _resumeSummary = null;
+                _resumeReadFailed = false;
+                _rejectedAutosaveData = null;
             }
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException or ApplicationException or JSException)
@@ -327,7 +341,9 @@ else
             {
                 _resumeHistory = null;
                 _resumeSummary = null;
-                _resumeCheckError = $"Couldn't check this story's autosave: {ex.Message}";
+                _resumeReadFailed = bytes is null;
+                _rejectedAutosaveData = bytes;
+                _resumeCheckError = bytes is null ? $"Couldn't read this story's autosave: {ex.Message}" : ex.Message;
             }
         }
         finally
@@ -356,6 +372,7 @@ else
 
     private void StartNewGame()
     {
+        _preserveRejectedAutosave = _resumeCheckError is not null;
         _resumeHistory = null;
         _resumeSummary = null;
         _resumeCheckError = null;

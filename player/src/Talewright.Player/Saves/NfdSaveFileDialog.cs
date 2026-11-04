@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Talewright.Runtime.Saves;
 
 namespace Talewright.Player.Saves;
 
@@ -39,8 +40,8 @@ internal static class NfdSaveFileDialog
         nint folder = nint.Zero, name = nint.Zero;
         try
         {
-            filterName = Marshal.StringToCoTaskMemUTF8("JSON saved game");
-            extensions = Marshal.StringToCoTaskMemUTF8("json");
+            filterName = Marshal.StringToCoTaskMemUTF8("Talewright saved game");
+            extensions = Marshal.StringToCoTaskMemUTF8(SaveFormat.FileExtension[1..]);
             filter = Marshal.AllocHGlobal(Marshal.SizeOf<Filter>());
             Marshal.StructureToPtr(new Filter { Name = filterName, Extensions = extensions }, filter, false);
             var defaultFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

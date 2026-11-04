@@ -155,7 +155,7 @@ Keep a copy of the successful export. Test on copies only:
 - Enter a nonexistent scenario path and import. Expect an error; the active passage/history stays.
 - Copy the scenario, change `formatVersion` to `999`, and import it. Expect rejection, not a fresh
   scene or partially adopted state. The input file is never rewritten.
-- Try exporting to `main.tale`, a `.json` player-save path, or a `.twscenario` **inside** the story
+- Try exporting to `main.tale`, a `.twsave` player-save path, or a `.twscenario` **inside** the story
   folder. All must fail without modifying/creating source or player slots.
 - With no pending redo (go Forward first), edit the currently displayed scene's prose and save.
   Exact import of the older scenario must now reject its source identity.

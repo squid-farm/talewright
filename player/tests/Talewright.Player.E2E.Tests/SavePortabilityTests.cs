@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text;
-using System.Text.Json.Nodes;
 using Microsoft.Playwright;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
@@ -29,19 +27,24 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         await Expect(SaveStatus).ToContainTextAsync("Saved 'Before the door'.");
 
         var download = await Page.RunAndWaitForDownloadAsync(() => Driver.ClickAsync("Export Before the door"));
-        Assert.Equal("Player Test - Before the door.json", download.SuggestedFilename);
+        Assert.Equal("Player Test - Before the door" + SaveFormat.FileExtension, download.SuggestedFilename);
         await using var stream = await download.CreateReadStreamAsync();
         using var buffer = new MemoryStream();
         await stream.CopyToAsync(buffer);
         var bytes = buffer.ToArray();
         Assert.Equal(await ReadStoredAsync(fixture.Compile().Id, "Before the door"), bytes);
+        // A WASM-written save decodes and restores on the desktop runtime; compare decoded saves, not Deflate bytes.
+        var story = fixture.Compile();
+        var decoded = SaveFormat.Read(bytes);
+        Assert.Equal((story.Id, story.Version, 0), (decoded.StoryId, decoded.StoryVersion, decoded.Cursor));
+        Assert.Equal(StoryHistory.Restore(story, bytes).ProgressKey, StoryHistory.DescribeSave("Before the door", bytes).ProgressKey);
 
         await Driver.ClickAsync("Close saves");
         await Choose("Walk onward");
         await Observe(new(null, "Second passage text."));
         await Driver.ClickAsync("Saves");
         await Page.GetByLabel("Save name", new() { Exact = true }).FillAsync("Imported");
-        await ImportAsync("backup.json", bytes);
+        await ImportAsync("backup" + SaveFormat.FileExtension, bytes);
         await Expect(SaveStatus).ToContainTextAsync("Imported 'Imported'.");
         await Driver.ClickAsync("Close saves");
         await Observe(new(null, "Second passage text."));
@@ -67,40 +70,33 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         await Expect(SaveStatus).ToContainTextAsync("Saved 'My save'.");
         var original = await ReadStoredAsync(story.Id, "My save");
 
-        var unsupported = JsonNode.Parse(valid)!;
-        unsupported["formatVersion"] = 999;
-        var incompatible = JsonNode.Parse(valid)!;
-        incompatible["contentFingerprint"] = "different";
-        var otherStory = JsonNode.Parse(valid)!;
-        otherStory["storyId"] = "different";
-        var otherVersion = JsonNode.Parse(valid)!;
-        otherVersion["storyVersion"] = "different";
-        var badReplay = JsonNode.Parse(valid)!;
-        badReplay["choices"] = new JsonArray("not-a-choice");
+        var decoded = SaveFormat.Read(valid);
         var invalid = new (byte[] Bytes, string Message)[]
         {
-            ("{broken"u8.ToArray(), "malformed"),
-            (Encoding.UTF8.GetBytes(unsupported.ToJsonString()), "unsupported format"),
-            (Encoding.UTF8.GetBytes(incompatible.ToJsonString()), "incompatible"),
-            (Encoding.UTF8.GetBytes(otherStory.ToJsonString()), "different story"),
-            (Encoding.UTF8.GetBytes(otherVersion.ToJsonString()), "incompatible"),
-            (Encoding.UTF8.GetBytes(badReplay.ToJsonString()), "cannot continue"),
+            ("broken"u8.ToArray(), "malformed"),
+            (valid[..^1], "malformed"),
+            ([.. valid[..4], 99, .. valid[5..]], "unsupported format"),
+            ("""{"formatVersion":2,"storyId":"player-test"}"""u8.ToArray(), "unsupported format"),
+            (SaveFormat.Write(decoded with { ContentFingerprint = "different" }), $"Version {story.Version} of {story.Title} has changed"),
+            (SaveFormat.Write(decoded with { StoryId = "different" }), "different story"),
+            (SaveFormat.Write(decoded with { StoryVersion = "different" }), $"Version different of {story.Title} has changed"),
+            (SaveFormat.Write(decoded with { Choices = ["not-a-choice"] }), "cannot continue"),
             (new byte[StoryHistory.MaxSaveBytes + 1], "too large"),
         };
         foreach (var (bytes, message) in invalid)
         {
-            await ImportAsync("invalid.json", bytes);
+            await ImportAsync("invalid" + SaveFormat.FileExtension, bytes);
             await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync(message);
             Assert.Equal(original, await ReadStoredAsync(story.Id, "My save"));
             await Expect(Page.GetByRole(AriaRole.Region, new() { Name = "Confirm import" })).ToHaveCountAsync(0);
         }
 
-        await ImportAsync("valid.json", valid);
+        await ImportAsync("valid" + SaveFormat.FileExtension, valid);
         var confirmation = Page.GetByRole(AriaRole.Region, new() { Name = "Confirm import" });
         await Expect(confirmation).ToBeVisibleAsync();
         await Driver.ClickAsync("Keep existing save");
         Assert.Equal(original, await ReadStoredAsync(story.Id, "My save"));
-        await ImportAsync("valid.json", valid);
+        await ImportAsync("valid" + SaveFormat.FileExtension, valid);
         await Driver.ClickAsync("Replace with imported save");
         await Expect(SaveStatus).ToContainTextAsync("Imported 'My save'.");
         Assert.Equal(valid, await ReadStoredAsync(story.Id, "My save"));
@@ -123,7 +119,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         // Test-only deviation: the native chooser is bypassed by the isolated test runner.
         var directory = Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY")
             ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py.");
-        var path = Path.Combine(directory, $"Player Test - {slot}.json");
+        var path = Path.Combine(directory, $"Player Test - {slot}{SaveFormat.FileExtension}");
         await Upload(fixture);
         await Driver.ClickAsync("Saves");
         var native = Assert.IsType<NativePlayerDriver>(Driver);
@@ -160,7 +156,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         await Driver.ClickAsync("Saves");
         var native = Assert.IsType<NativePlayerDriver>(Driver);
         await native.FillAsync("Save name", "Imported");
-        await native.UploadSaveAsync("backup.json", advanced.Save());
+        await native.UploadSaveAsync("backup" + SaveFormat.FileExtension, advanced.Save());
         var timer = Stopwatch.StartNew();
         while (!(await native.SnapshotAsync()).Content.Contains("Imported 'Imported'.", StringComparison.Ordinal))
         {
@@ -183,7 +179,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         await input.SetInputFilesAsync(new FilePayload
         {
             Name = name,
-            MimeType = "application/json",
+            MimeType = "application/octet-stream",
             Buffer = bytes,
         });
         await Page.WaitForFunctionAsync("element => !element.isConnected", previous);

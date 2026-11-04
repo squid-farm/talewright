@@ -7,6 +7,14 @@
     <ProjectReference Include="../Talewright.Talemark/Talewright.Talemark.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.Runtime.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

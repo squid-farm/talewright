@@ -37,7 +37,7 @@ public static class AuthorScenarioFiles
         var target = Path.GetFullPath(path);
         if (!string.Equals(Path.GetExtension(target), AuthorScenario.FileExtension, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("Author exports must use the .twscenario extension, not a player .json save.");
+            throw new ArgumentException("Author exports must use the .twscenario extension, not a player save.");
         }
         var resolved = Resolve(target);
         if (!string.Equals(Path.GetExtension(resolved), AuthorScenario.FileExtension, StringComparison.OrdinalIgnoreCase))

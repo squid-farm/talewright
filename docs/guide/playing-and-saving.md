@@ -88,10 +88,16 @@ exists only in the autosave. A failed autosave leaves the previous recovery save
 intact, lets you continue playing and offers **Retry autosave**. Autosave is not a backup or save
 migration: saves still depend on the exact story and player compatibility.
 
+If the autosave cannot be loaded and you start a new game, Talewright keeps its original bytes as a
+separate **Recovered autosave** named save before writing the new autosave. Find it in **Saves**;
+it may still need the earlier story or player version to load. If the old autosave cannot be read or
+preserved, automatic saving pauses rather than replacing it. Try a named save or Quick Save, then
+fix the storage problem and choose **Retry autosave**.
+
 ### Backing up and moving saves
 
 Open **Saves** and select **Export** beside a named save or Quick Save checkpoint. The web player
-downloads a JSON save file using the story title and save name. The desktop player opens a native
+downloads a `.twsave` save file using the story title and save name. The desktop player opens a native
 save dialog with a suggested filename containing the story title and save name. You can change
 the name or location before saving.
 Keep the file somewhere safe before clearing browser data or moving to another device.
@@ -101,6 +107,7 @@ under **Import save file**. If that name already exists, confirm before replacin
 the file against the same story and player compatibility rules as loading; a damaged or incompatible
 file leaves your existing saves and current playthrough unchanged. Import adds a named save; it does
 not load it or replace the separate Quick Save checkpoint. Select **Load** to play it.
+Save files are compressed binary files, not text, and editing one makes it fail to load.
 Backups can move between web and desktop when the story files and player save format are compatible.
 
 ## Updating a story with existing saves
