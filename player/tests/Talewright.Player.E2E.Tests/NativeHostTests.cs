@@ -60,6 +60,38 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Hiding_mechanical_notes_removes_them_from_the_desktop_accessibility_tree()
+    {
+        await Driver.StartAsync();
+        await Upload(TestStories.Progression);
+        await Choose("Collect relic");
+        var before = await Driver.ObserveAsync();
+        Assert.Contains("Level 2!", before.Transcript);
+
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var dialog = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "dialog" && node.Name == "Settings");
+        Assert.Single(dialog.Descendants(),
+            node => node.Role == "check box" && node.Name == "Hide mechanical notes");
+
+        await Driver.PressAsync("Tab");
+        await Driver.PressAsync("Tab");
+        Assert.True(Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "check box" && node.Name == "Hide mechanical notes").Focused);
+        await Driver.PressAsync("Space");
+        await Driver.ClickAsync("Close settings");
+
+        var hidden = await Driver.ObserveAsync();
+        Assert.DoesNotContain("Level 2!", hidden.Transcript);
+        await Driver.ChooseAsync("Donate relic");
+        var future = await Driver.ObserveAsync();
+        Assert.Contains("The donation is complete.", future.Passage);
+        Assert.DoesNotContain("Test Guild +20", future.Transcript);
+    }
+
+    [Fact]
     public async Task Maximum_text_size_reflows_the_desktop_player_and_keeps_toolbar_controls_visible()
     {
         await Driver.StartAsync();

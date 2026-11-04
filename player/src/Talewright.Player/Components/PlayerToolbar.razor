@@ -55,6 +55,10 @@
             <option value="@textSize">@textSize%</option>
         }
     </select>
+    <label class="tw-settings-toggle">
+        <input type="checkbox" checked="@_hideMechanicalNotes" @onchange="ChangeHideMechanicalNotes" />
+        Hide mechanical notes
+    </label>
     @if (Preferences.Warning is not null)
     {
         <p class="tw-error" role="status">@Preferences.Warning</p>
@@ -98,11 +102,13 @@
     private bool _focusMenu;
     private PlayerTheme _theme = PlayerTheme.System;
     private int _textSizePercent = PlayerPreferences.DefaultTextSizePercent;
+    private bool _hideMechanicalNotes;
 
     protected override void OnInitialized()
     {
         _theme = Preferences.Current.Theme;
         _textSizePercent = Preferences.Current.TextSizePercent;
+        _hideMechanicalNotes = Preferences.Current.HideMechanicalNotes;
     }
 
     protected override void OnParametersSet()
@@ -172,6 +178,17 @@
 
         await Preferences.SetTextSizeAsync(textSizePercent);
         _textSizePercent = textSizePercent;
+    }
+
+    private async Task ChangeHideMechanicalNotes(ChangeEventArgs args)
+    {
+        if (args.Value is not bool hide)
+        {
+            throw new InvalidOperationException("Hide mechanical notes must be a checkbox value.");
+        }
+
+        await Preferences.SetHideMechanicalNotesAsync(hide);
+        _hideMechanicalNotes = hide;
     }
 
     private async Task CancelRestart() =>
