@@ -267,7 +267,7 @@ internal static class DelimiterScanner
     }
 
     internal static bool IsReaderTextEscape(char character) =>
-        character is >= '!' and <= '/' or >= ':' and <= '@' or >= '[' and <= '`' or >= '{' and <= '~';
+        character <= 0x7F && (char.IsPunctuation(character) || char.IsSymbol(character));
 
     private static bool TryGetDelimiter(
         char character,
