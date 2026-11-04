@@ -144,6 +144,7 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['*emphasis* and **strong**', 'emphasis', 'markup.italic.markdown'],
     ['*emphasis* and **strong**', 'strong', 'markup.bold.markdown'],
     ['**{player:first-name}**', 'first-name', 'variable.other.member.tale'],
+    ['![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale'],
     ['{image("maps/camp", "A camp")}', 'image', 'support.function.image.tale'],
     ['{image("maps/camp", "A } camp")}', 'camp"', 'string.quoted.double.tale'],
     ['{image("camp", "He said \\"Go\\".")}', '\\"', 'constant.character.escape.tale'],
@@ -233,6 +234,10 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     hasScope(line, 'combined', 'markup.italic.markdown');
   }
   hasScope(String.raw`\*literal\*`, String.raw`\*`, 'constant.character.escape.tale');
+  hasScope('![torch](torch.png)', 'torch.png', 'invalid.deprecated.image.tale');
+  for (const line of ['![a [b]](p)', String.raw`![a\]](p)`, '![a](p(q))']) {
+    assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.deprecated.image.tale')), line);
+  }
   const requires = '* [Continue] (requires: visited(start) and player:hp > 0) -> END';
   const close = requires.indexOf(') ->');
   const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);
@@ -246,7 +251,6 @@ test('image alt text follows reader-text escapes while the path stays strict', (
   hasScope(String.raw`{image("camp", "a \q b")}`, String.raw`\q`, 'string.quoted.double.tale');
   hasScope(String.raw`{image("camp", "a \. b")}`, String.raw`\.`, 'constant.character.escape.tale');
   hasScope(String.raw`{image("camp\q", "alt")}`, String.raw`\q`, 'invalid.illegal.escape.tale');
-  assert.ok(!tokens('![torch](torch.png)').tokens.some(token => token.scopes.some(scope => scope.startsWith('invalid.'))));
 });
 
 test('choice conditions highlight only the exact requires marker', () => {

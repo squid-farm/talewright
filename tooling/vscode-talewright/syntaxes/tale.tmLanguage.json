@@ -261,6 +261,10 @@
           "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[!-/:-@\\[\\\\\\]^_`{|}~]))_(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
+        },
+        {
+          "match": "!\\[[^\\[\\]{}\\\\\\r\\n]*\\]\\([^\\s()\"{}\\\\\\r\\n]+\\)",
+          "name": "invalid.deprecated.image.tale"
         }
       ]
     }
