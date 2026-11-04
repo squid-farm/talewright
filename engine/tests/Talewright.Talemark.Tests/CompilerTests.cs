@@ -80,6 +80,15 @@ public class CompilerTests
         return error;
     }
 
+    private static void AssertYamlKeyLocation(Diagnostic diagnostic, string yaml, string key)
+    {
+        var offset = yaml.IndexOf(key, StringComparison.Ordinal);
+        Assert.True(offset >= 0);
+        Assert.Equal(new SourceLocation("story.talewright.yaml",
+            yaml[..offset].Count(character => character == '\n') + 1,
+            offset - yaml.LastIndexOf('\n', offset)), diagnostic.Location);
+    }
+
     private static string Render(StoryDefinition story, SceneDefinition scene, GameState? state = null) =>
         new TemplateRenderer().Render(Templates(scene), state ?? GameState.CreateInitial(story.World, 1)).ToPlainText();
 
@@ -792,7 +801,7 @@ public class CompilerTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void Obsolete_plural_is_an_error_even_with_a_replacement(bool pronounLevel, bool withReplacement)
+    public void Unknown_plural_key_is_an_error_even_with_a_valid_agreement(bool pronounLevel, bool withReplacement)
     {
         var yaml = pronounLevel
             ? Yaml.Replace("pronouns: she", "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs }, reflexive: xemself, plural: false"
@@ -801,11 +810,28 @@ public class CompilerTests
         var result = Compile("=== a\n-> END", yaml);
         Assert.False(result.Success);
         Assert.Null(result.Story);
-        var error = Assert.Single(result.Errors, d => d.Message.Contains("obsolete 'plural'"));
-        Assert.Equal("TW4003", error.Code);
-        Assert.Equal("story.talewright.yaml", error.Location.File);
-        Assert.Contains(pronounLevel ? "agreement: singular" : "name-agreement: singular", error.Message);
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "TW4006");
+        var error = Assert.Single(result.Errors, d => d.Code == "TW4006");
+        var allowed = pronounLevel
+            ? "subject, object, possessive-pronoun, reflexive, agreement"
+            : "first-name, last-name, pronouns, stats, inventory, name-agreement";
+        Assert.Equal($"Unknown key 'plural'. Expected one of: {allowed}.", error.Message);
+        AssertYamlKeyLocation(error, yaml, "plural:");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Unknown_item_plural_key_uses_the_same_diagnostic(bool withAgreement)
+    {
+        var agreement = withAgreement ? ", name-agreement: plural" : "";
+        var yaml = Yaml.Replace("rope: { name: coil of rope }",
+            $"rope: {{ name: coil of rope, plural: true{agreement} }}");
+        var result = Compile("=== a\n-> END", yaml);
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW4006");
+
+        Assert.False(result.Success);
+        Assert.Equal("Unknown key 'plural'. Expected one of: name, modifiers, name-agreement, uncountable.", error.Message);
+        AssertYamlKeyLocation(error, yaml, "plural:");
     }
 
     [Fact]
@@ -929,7 +955,7 @@ public class CompilerTests
     }
 
     [Theory]
-    [InlineData("possessive: xyr, possessive-pronoun: xyrs", "TW4003", "Use 'possessive-pronoun: { determiner: xer, independent: xers }'")]
+    [InlineData("possessive: xyr, possessive-pronoun: xyrs", "TW4006", "Unknown key 'possessive'.")]
     [InlineData("possessive-pronoun: xyrs", "TW4003", "must be a mapping")]
     [InlineData("possessive-pronoun: null", "TW4003", "must be a mapping")]
     [InlineData("possessive-pronoun: []", "TW4003", "must be a mapping")]
@@ -946,15 +972,49 @@ public class CompilerTests
         Assert.Contains(message, error.Message);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Unknown_flat_possessive_is_an_error_with_or_without_the_required_mapping(bool withMapping)
+    {
+        var mapping = withMapping ? ", possessive-pronoun: { determiner: xyr, independent: xyrs }" : "";
+        var yaml = Yaml.Replace("pronouns: she",
+            $"pronouns: {{ subject: xe, object: xem, reflexive: xemself, agreement: singular, possessive: xyr{mapping} }}");
+        var result = Compile("=== a\n-> END", yaml);
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW4006");
+
+        Assert.False(result.Success);
+        Assert.Equal("Unknown key 'possessive'. Expected one of: subject, object, possessive-pronoun, reflexive, agreement.",
+            error.Message);
+        AssertYamlKeyLocation(error, yaml, "possessive:");
+        Assert.Equal(!withMapping, result.Errors.Any(diagnostic =>
+            diagnostic.Code == "TW4002" && diagnostic.Message.StartsWith("Missing required 'possessive-pronoun'.", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Unknown_flat_possessive_does_not_hide_an_invalid_required_mapping()
+    {
+        var yaml = Yaml.Replace("pronouns: she",
+            "pronouns: { subject: xe, object: xem, reflexive: xemself, agreement: singular, possessive: xyr, possessive-pronoun: xyrs }");
+        var result = Compile("=== a\n-> END", yaml);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, diagnostic => diagnostic.Code == "TW4006" &&
+            diagnostic.Message.StartsWith("Unknown key 'possessive'.", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, diagnostic => diagnostic.Code == "TW4003" &&
+            diagnostic.Message.Contains("'possessive-pronoun' must be a mapping", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Unknown_custom_possessive_keys_are_reported()
     {
         var yaml = Yaml.Replace("pronouns: she",
             "pronouns: { subject: xe, object: xem, possessive-pronoun: { determiner: xyr, independent: xyrs, other: xer }, reflexive: xemself, agreement: singular }");
         var result = Compile("=== a\n-> END", yaml);
-        var warning = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == "TW4006");
-        Assert.Contains("Unknown key 'other'", warning.Message);
-        Assert.Contains("determiner, independent", warning.Message);
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW4006");
+        Assert.False(result.Success);
+        Assert.Contains("Unknown key 'other'", error.Message);
+        Assert.Contains("determiner, independent", error.Message);
     }
 
     [Theory]

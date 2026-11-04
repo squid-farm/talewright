@@ -99,7 +99,7 @@ public sealed class CompilerDiagnosticCoverageTests
             game: {id: coverage, title: Coverage, start: start}
             characters: {player: {first-name: Ada, stats: {bogus: 1}}}
             """)),
-        Warning("TW4006", Story("=== start\n-> END", MinimalYaml + "\nunknown: true")),
+        Error("TW4006", Story("=== start\n-> END", MinimalYaml + "\nunknown: true")),
         Error("TW4007", new StorySource(new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = TestStories.DefaultYaml,

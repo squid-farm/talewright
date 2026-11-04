@@ -100,6 +100,30 @@ public sealed class ValidationTests : IDisposable
     }
 
     [Theory]
+    [InlineData("validate", false)]
+    [InlineData("validate", true)]
+    [InlineData("lint", false)]
+    [InlineData("lint", true)]
+    public void Unknown_configuration_keys_fail_with_error_severity(string command, bool warningsAsErrors)
+    {
+        File.AppendAllText(Path.Combine(_root, "story.talewright.yaml"), "unexpected: true\n");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var args = new List<string> { command, _root, "--format", "json" };
+        if (warningsAsErrors) args.Add("--warnings-as-errors");
+        var code = CommandLine.Run(args.ToArray(), output, error);
+        using var json = JsonDocument.Parse(output.ToString());
+        var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
+            item => item.GetProperty("code").GetString() == "TW4006");
+
+        Assert.Equal(1, code);
+        Assert.False(json.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+        Assert.Equal("story.talewright.yaml", diagnostic.GetProperty("file").GetString());
+        Assert.StartsWith("Unknown key 'unexpected'.", diagnostic.GetProperty("message").GetString());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Hosting_advisory_is_stderr_only_and_does_not_fail_warnings_as_errors(bool json)

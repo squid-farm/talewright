@@ -22,5 +22,5 @@
   { "file": "boolean-no.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
   { "file": "boolean-other-scalars.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
   { "file": "boolean-null.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 5, "column": 9 }, { "line": 7, "column": 11 }, { "line": 13, "column": 18 }, { "line": 18, "column": 11 }] },
-  { "file": "unknown-key.yaml", "schemaValid": false, "compilerCodes": ["TW4006", "TW4006", "TW4006"], "warningLocations": [{ "line": 5, "column": 3 }, { "line": 9, "column": 5 }, { "line": 10, "column": 1 }] }
+  { "file": "unknown-key.yaml", "schemaValid": false, "compilerCodes": ["TW4006", "TW4006", "TW4006"], "unknownKeyLocations": [{ "line": 5, "column": 3 }, { "line": 9, "column": 5 }, { "line": 10, "column": 1 }] }
 ]

@@ -4,6 +4,7 @@ using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Tests;
@@ -55,6 +56,83 @@ public sealed class ModularConfigurationTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Empty(result.Diagnostics);
         return result.Story!;
+    }
+
+    [Fact]
+    public void Unknown_keys_in_root_and_supporting_files_are_errors_at_the_authored_keys()
+    {
+        var files = Files();
+        files[StorySource.ManifestFileName] += "unknown-root: true\n";
+        files["a/people.talewright.yaml"] = """
+            characters:
+              player:
+                first-name: Ada
+                inventory: [rope]
+                surprise: true
+              guide: { first-name: Bea }
+            unknown-fragment: true
+            """;
+        var source = new StorySource(files, ["images/camp.png"]);
+        var result = StoryCompiler.Compile(source);
+        var errors = result.Errors.Where(error => error.Code == "TW4006")
+            .OrderBy(error => error.Location.File, StringComparer.Ordinal)
+            .ThenBy(error => error.Location.Line)
+            .ToArray();
+
+        Assert.False(result.Success);
+        Assert.Null(result.Story);
+        Assert.Equal(3, errors.Length);
+        Assert.All(errors, error => Assert.Equal(DiagnosticSeverity.Error, error.Severity));
+        Assert.Equal(
+            [new SourceLocation("a/people.talewright.yaml", 5, 5),
+                new SourceLocation("a/people.talewright.yaml", 7, 1),
+                new SourceLocation(StorySource.ManifestFileName, 2, 1)],
+            errors.Select(error => error.Location));
+        Assert.Equal(result.Diagnostics, StoryAnalyzer.Analyze(source).Diagnostics);
+    }
+
+    [Fact]
+    public void Non_scalar_configuration_keys_are_errors()
+    {
+        var files = Files();
+        files[StorySource.ManifestFileName] += "? [invalid, key]\n: true\n";
+        var result = StoryCompiler.Compile(new StorySource(files, ["images/camp.png"]));
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW4006");
+
+        Assert.False(result.Success);
+        Assert.Equal(StorySource.ManifestFileName, error.Location.File);
+        Assert.StartsWith("Configuration keys must be scalar values.", error.Message);
+    }
+
+    [Fact]
+    public void Former_field_names_remain_valid_as_dynamic_entity_ids()
+    {
+        var files = new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: { id: dynamic-keys, title: Dynamic keys, start: start }
+                characters:
+                  player: { first-name: Ada }
+                  plural: { first-name: Bea }
+                  possessive: { first-name: Cal }
+                items: { plural: Many, possessive: Mine }
+                factions: { plural: {}, possessive: {} }
+                flags: [plural, possessive]
+                vars: { plural: 0, possessive: 0 }
+                """,
+            ["main.tale"] = "=== start\n-> END\n",
+        };
+        var result = StoryCompiler.Compile(new StorySource(files));
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Empty(result.Diagnostics);
+        var world = result.Story!.World;
+        Assert.Contains(new EntityId("plural"), world.Characters.Keys);
+        Assert.Contains(new EntityId("possessive"), world.Characters.Keys);
+        Assert.Contains(new ItemId("plural"), world.Items.Keys);
+        Assert.Contains(new FactionId("possessive"), world.Factions.Keys);
+        Assert.Contains(new FlagId("plural"), world.Flags);
+        Assert.Contains(new VarId("possessive"), world.Variables.Keys);
     }
 
     private static void Equivalent(StoryDefinition expected, StoryDefinition actual)

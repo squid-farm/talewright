@@ -252,11 +252,6 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
         if (node is YamlMappingNode map)
         {
             _yaml.CheckKeys(map, "subject", "object", "possessive-pronoun", "reflexive", "agreement");
-            if (Get(map, "possessive") is { } oldPossessive)
-            {
-                _yaml.Error(oldPossessive, CompilerDiagnosticCodes.InvalidConfigurationValue, "The flat 'possessive' field is no longer supported. Use 'possessive-pronoun: { determiner: xer, independent: xers }'.", 0);
-            }
-
             var possessive = Get(map, "possessive-pronoun");
             var determiner = "determiner";
             var independent = "independent";

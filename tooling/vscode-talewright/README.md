@@ -316,8 +316,8 @@ report structural errors differently from compiler diagnostics. The reader
 currently accepts some scalar spellings or YAML forms beyond the schema's
 documented canonical values; use the forms in the examples for portable feedback.
 For example, faction values must be mappings (`guild: {name: Guild}`): the
-compiler silently ignores a scalar faction display name. Unknown keys are schema
-errors but compiler warnings (`TW4006`). Creation preset IDs must contain a
+compiler silently ignores a scalar faction display name. Unknown keys are errors
+in both schema validation and the compiler (`TW4006`). Creation preset IDs must contain a
 non-whitespace character and be no longer than 80 characters.
 
 Under `vars`, integers and quoted text (including `""` and `"12"`) are supported.
