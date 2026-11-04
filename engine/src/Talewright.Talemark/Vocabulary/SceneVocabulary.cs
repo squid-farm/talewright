@@ -48,7 +48,8 @@ public static class SceneVocabulary
     internal const string HubLimit = "hub-limit";
     internal const string HubAllPrefix = "all(";
     internal const string HubAnyPrefix = "any(";
-    internal const string ChoiceRequires = "(" + Requires + ":";
+    internal const string ChoiceRequires = "(" + Requires;
+    internal static readonly string ChoiceRequiresExample = "(" + Requires + " expression)";
 
     internal const char MetadataMarker = '@';
     internal const char SpeechMarker = '>';

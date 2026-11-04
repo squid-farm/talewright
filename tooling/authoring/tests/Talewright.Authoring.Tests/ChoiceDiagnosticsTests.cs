@@ -29,7 +29,7 @@ public sealed class ChoiceDiagnosticsTests
     [InlineData("* [Go to the")]
     [InlineData("* [Hello {player:first-name}")]
     [InlineData("* [Hello {player:first-name")]
-    [InlineData("* [Go] (requires: flag:weapon.")]
+    [InlineData("* [Go] (requires flag:weapon.")]
     [InlineData("* [Go] { set flag:weapon.")]
     [InlineData("* [Go] ( requires : flag:weapon.")]
     public void Partial_choice_analysis_matches_the_compiler_without_scratch_diagnostics(string line)
@@ -58,9 +58,9 @@ public sealed class ChoiceDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("* [Hello {player:first-name} (requires: flag:ready) { set flag:weapon.known } -> END")]
+    [InlineData("* [Hello {player:first-name} (requires flag:ready) { set flag:weapon.known } -> END")]
     [InlineData("* [Hello {player:first-name} -> END { set flag:weapon.known }")]
-    [InlineData("* [Hello {player:first-name} { set flag:weapon.known } (requires: flag:ready)")]
+    [InlineData("* [Hello {player:first-name} { set flag:weapon.known } (requires flag:ready)")]
     [InlineData("* [Hello {player:first-name} -> second { set flag:weapon.")]
     public void Ambiguous_missing_bracket_analysis_stops_at_the_first_clause(string line)
     {
@@ -120,8 +120,8 @@ public sealed class ChoiceDiagnosticsTests
     [Theory]
     [InlineData("* [Take {item:weapon.|", "weapon.knife,weapon.sword", "weapon.")]
     [InlineData("* [Take {item:weapon.|sword", "weapon.knife,weapon.sword", "weapon.sword")]
-    [InlineData("* [Go] (requires: flag:weapon.|", "weapon.known", "weapon.")]
-    [InlineData("* [Go] (requires: flag:weapon.|known", "weapon.known", "weapon.known")]
+    [InlineData("* [Go] (requires flag:weapon.|", "weapon.known", "weapon.")]
+    [InlineData("* [Go] (requires flag:weapon.|known", "weapon.known", "weapon.known")]
     [InlineData("* [Go] { set flag:weapon.|", "weapon.known", "weapon.")]
     [InlineData("* [Go] { set flag:weapon.|known", "weapon.known", "weapon.known")]
     [InlineData("* [Go] ( requires : flag:weapon.|", "weapon.known", "weapon.")]

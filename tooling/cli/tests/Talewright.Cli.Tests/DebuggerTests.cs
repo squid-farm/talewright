@@ -199,7 +199,7 @@ public sealed class DebuggerTests : IDisposable
         const string tale = """
             === scene1
             Count {var:count}.
-            * [Prepared] (requires: flag:ready) -> target
+            * [Prepared] (requires flag:ready) -> target
             * [Wait] -> scene1
             === target
             ~ var:count += 1

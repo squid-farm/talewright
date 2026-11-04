@@ -488,19 +488,18 @@ internal static class TaleSyntaxParser
             {
                 var column = indent + 1 + pos;
                 var remaining = rest.AsSpan(pos);
-                if (remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal))
+                if (ChoiceSyntax.TryReadChoiceRequires(rest, pos, _cancellationToken, out var valueStart))
                 {
                     if (hasRequires)
                         Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                            $"Duplicate '{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' condition. " +
+                            $"Duplicate '{SceneVocabulary.ChoiceRequiresExample}' condition. " +
                             "A choice accepts only one.", column);
-                    var valueStart = pos + SceneVocabulary.ChoiceRequires.Length;
                     if (!clauseScan.TryGetClose(pos, out var end))
                     {
                         Clause(new(TaleClauseKind.UnclosedRequires, column, indent + 1 + valueStart,
                             rest.Length - valueStart));
                         Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                            $"'{SceneVocabulary.ChoiceRequires}' is missing its closing " +
+                            $"'{SceneVocabulary.ChoiceRequiresExample}' is missing its closing " +
                             $"'{ExpressionVocabulary.CloseParen}'.", column);
                         return true;
                     }
@@ -564,16 +563,15 @@ internal static class TaleSyntaxParser
                     pos = rest.Length;
                 }
                 else if (remaining[0] == ExpressionVocabulary.OpenParen &&
-                         ChoiceSyntax.TryReadSpacedRequires(rest, pos, _cancellationToken, out var expressionStart))
+                         ChoiceSyntax.TryReadLegacyRequires(rest, pos, _cancellationToken, out var expressionStart))
                 {
                     var expressionEnd = clauseScan.TryGetClose(pos, out var end) ? end : rest.Length;
-                    Clause(new(TaleClauseKind.MisspelledRequires, column, indent + 1 + expressionStart,
+                    Clause(new(TaleClauseKind.LegacyRequires, column, indent + 1 + expressionStart,
                         expressionEnd - expressionStart));
-                    var spelling = ChoiceSyntax.Excerpt(rest.AsSpan(pos, expressionStart - pos));
+                    var replacement = ChoiceRequiresReplacement(rest, expressionStart, expressionEnd);
                     Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                        $"Choice conditions use the exact marker " +
-                        $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}'. " +
-                        $"'{spelling}' is not recognized.", column);
+                        $"Choice requirements no longer use a colon. Replace the old form with '{replacement}'.",
+                        column);
                     return true;
                 }
                 else
@@ -582,7 +580,7 @@ internal static class TaleSyntaxParser
                         ? $"Use '{SceneVocabulary.ChoiceMarker} {SceneVocabulary.OpenBracket}label" +
                           $"{SceneVocabulary.CloseBracket} ...' or a textless '{SceneVocabulary.ChoiceMarker} ... " +
                           $"{SceneVocabulary.Divert} target'."
-                        : $"Expected {SceneVocabulary.ChoiceRequires} …{ExpressionVocabulary.CloseParen}, " +
+                        : $"Expected {SceneVocabulary.ChoiceRequiresExample}, " +
                           $"{SceneVocabulary.InlineOpen} effects " +
                           $"{SceneVocabulary.InlineClose}, {SceneVocabulary.Divert} target or {SceneVocabulary.SkillCheck}.";
                     var excerpt = ChoiceSyntax.Excerpt(remaining);
@@ -651,13 +649,31 @@ internal static class TaleSyntaxParser
             bool insideBlock)
         {
             var remaining = text.AsSpan(pos);
+            var terminal = afterCheck ? "the skill check" : "the divert";
             if (remaining[0] == ExpressionVocabulary.OpenParen &&
-                ChoiceSyntax.TryReadSpacedRequires(text, pos, _cancellationToken, out _))
+                ChoiceSyntax.TryReadLegacyRequires(text, pos, _cancellationToken, out var expressionStart))
             {
-                var terminal = afterCheck ? "the skill check" : "the divert";
+                var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, pos, _cancellationToken);
+                var expressionEnd = scan.TryGetClose(pos, out var end) ? end : text.Length;
+                var replacement = ChoiceRequiresReplacement(text, expressionStart, expressionEnd);
                 Error(line, CompilerDiagnosticCodes.MalformedChoice,
-                    $"Choice conditions use the exact marker '{SceneVocabulary.ChoiceRequires}" +
-                    $"{ExpressionVocabulary.CloseParen}' and cannot follow {terminal}.", column + pos);
+                    $"Choice requirements no longer use a colon. Replace the old form with '{replacement}' " +
+                    $"before {terminal}.", column + pos);
+                return;
+            }
+
+            if (remaining[0] == ExpressionVocabulary.OpenParen &&
+                ChoiceSyntax.TryReadChoiceRequires(text, pos, _cancellationToken, out _))
+            {
+                var conditionMessage = insideBlock
+                    ? $"'{SceneVocabulary.ChoiceRequiresExample}' is misplaced after the block skill check."
+                    : afterCheck
+                        ? $"'{SceneVocabulary.ChoiceRequiresExample}' is misplaced after the skill check. " +
+                          $"Put the condition before '{SceneVocabulary.SkillCheck}'."
+                        : $"'{SceneVocabulary.ChoiceRequiresExample}' is misplaced after the divert. " +
+                          $"Put the condition before '{SceneVocabulary.Divert}'.";
+                Error(line, CompilerDiagnosticCodes.MalformedChoice,
+                    conditionMessage, column + pos);
                 return;
             }
 
@@ -672,15 +688,6 @@ internal static class TaleSyntaxParser
                 SceneVocabulary.InlineOpen =>
                     $"Effect block is misplaced after the divert. Put '{SceneVocabulary.InlineOpen} effects " +
                     $"{SceneVocabulary.InlineClose}' before '{SceneVocabulary.Divert}'.",
-                _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) && insideBlock =>
-                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
-                    "block skill check.",
-                _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) && afterCheck =>
-                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
-                    $"skill check. Put the condition before '{SceneVocabulary.SkillCheck}'.",
-                _ when remaining.StartsWith(SceneVocabulary.ChoiceRequires, StringComparison.Ordinal) =>
-                    $"'{SceneVocabulary.ChoiceRequires}{ExpressionVocabulary.CloseParen}' is misplaced after the " +
-                    $"divert. Put the condition before '{SceneVocabulary.Divert}'.",
                 _ when remaining.StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal) && afterCheck =>
                     $"Divert is misplaced after the skill check. Outcomes belong on " +
                     $"'{SceneVocabulary.SuccessOutcome}' and '{SceneVocabulary.FailureOutcome}' lines.",
@@ -688,6 +695,16 @@ internal static class TaleSyntaxParser
                      $"{(afterCheck ? "skill check" : "divert")}.",
             };
             Error(line, CompilerDiagnosticCodes.MalformedChoice, message, column + pos);
+        }
+
+        private static string ChoiceRequiresReplacement(string text, int expressionStart, int expressionEnd)
+        {
+            var source = text.AsSpan(expressionStart, expressionEnd - expressionStart).Trim();
+            if (source.IsEmpty)
+                return SceneVocabulary.ChoiceRequiresExample;
+
+            var expression = ChoiceSyntax.Excerpt(source);
+            return $"({SceneVocabulary.Requires} {expression})";
         }
 
         // ---- skill checks ----------------------------------------------------------------------------------------------

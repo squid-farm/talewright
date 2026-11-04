@@ -446,7 +446,7 @@ internal sealed partial class TaleParser
                     var tokens = _symbols.Analysis?.Expression(context, value, location) ?? Lexer.Tokenize(value);
                     ExpressionParser.ReportStringErrors(tokens, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
-                case TaleClauseKind.MisspelledRequires:
+                case TaleClauseKind.LegacyRequires:
                     _symbols.Analysis?.Expression(ExpressionContextKind.Condition, value, location);
                     break;
                 case TaleClauseKind.Effects:

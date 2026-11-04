@@ -121,7 +121,7 @@ public sealed class CompletionSiteQueryTests
             {
                 [StorySource.ManifestFileName] = Manifest.ReplaceLineEndings("\r\n"),
                 ["main.tale"] = "=== start\r\n{var:gold}{flag:met} {hero:pronoun#one-many(\"is\", \"are\")}\r\n" +
-                    "* [Go {var:gold} (requires: flag:met) { set flag:met } -> start\r\n{var:\r\n-> END",
+                    "* [Go {var:gold} (requires flag:met) { set flag:met } -> start\r\n{var:\r\n-> END",
             }),
         };
         foreach (var source in sources)

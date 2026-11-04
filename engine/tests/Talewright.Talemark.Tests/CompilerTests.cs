@@ -315,7 +315,7 @@ public class CompilerTests
         var story = Ok("""
             === a
             Pick.
-            * [Read the glyphs] (requires: player:int >= 12) -> b
+            * [Read the glyphs] (requires player:int >= 12) -> b
             * [Shove {player:first-name}] { faction:guild:standing -= 5; give player relic; set flag:shoved } -> b
             * [Leave] -> END
             === b
@@ -426,8 +426,8 @@ public class CompilerTests
     [Fact]
     public void Reports_type_errors_with_locations()
     {
-        var error = Error("=== a\n* [x] (requires: player:dex + 1) -> END", "TW2003");
-        Assert.Equal(new SourceLocation("main.tale", 2, 18), error.Location);
+        var error = Error("=== a\n* [x] (requires player:dex + 1) -> END", "TW2003");
+        Assert.Equal(new SourceLocation("main.tale", 2, 17), error.Location);
 
         Error("=== a\n{if player:first-name > 3}x{/if}\n-> END", "TW2003");
         Error("=== a\n~ var:torches = \"three\"\n-> END", "TW2003");

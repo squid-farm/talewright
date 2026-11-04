@@ -162,7 +162,7 @@ public static class ChoiceFaker
     public static string Create(string target, string? label = null, string? requires = null, string? effect = null)
     {
         var choice = label is null ? "*" : Open(label);
-        var condition = requires is null ? "" : $" (requires: {requires})";
+        var condition = requires is null ? "" : $" (requires {requires})";
         var effects = effect is null ? "" : $" {EffectFaker.Inline(effect)}";
         return $"{choice}{condition}{effects} {DivertFaker.To(target)}";
     }
