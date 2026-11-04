@@ -177,13 +177,10 @@ Avoid publishing two builds to the same path at once. Without force, publish sto
 appears or an approved file observably changes during the build. This is a safety check, not a lock
 against every possible filesystem race; see the [replacement policy](../reference/cli.md#advanced-replacing-an-existing-archive).
 
-Saves with replay evidence can survive updates, such as prose corrections, if each player's recorded
-choices, offered labels and resulting gameplay events still match. Changes to choices, effects, checks,
-triggers or character creation can make a save incompatible; a change that affects only one path
-may reject only saves that took it. Changed world defaults can affect resumed state even when the
-recorded path matches, so keep gameplay defaults stable when preserving state matters. Player or
-extension compatibility changes can also prevent loading. Keep a copy of each released build so
-players can open older or incompatible saves with it.
+Released save support requires the exact story revision; even a prose correction can break that
+contract. Player or extension changes can also prevent loading. Keep a copy of each released build so
+players can reopen their saves with it. A same-path update check is being prototyped, but has no
+approved supported transition yet; do not advertise cross-revision compatibility based on it.
 See [updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves).
 
 All options and limits: [CLI reference: publish](../reference/cli.md#publish).

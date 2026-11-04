@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 using Talewright.Testing;
 using Talewright.Player.Library;
 using Talewright.Core.Identity;
@@ -556,18 +557,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     [Trait("Host", "Browser")]
     public async Task Choice_limit_is_visible_and_keeps_save_back_and_restart_usable()
     {
-        var fixture = Fixture() with { Tale = "=== start\nAt the limit.\n* [Again] -> start" };
-        var source = new StorySource(new Dictionary<string, string>
-        {
-            ["story.talewright.yaml"] = fixture.Yaml,
-            ["chapters/main.tale"] = fixture.Tale,
-        });
-        var story = StoryCompiler.Compile(source).Story!;
-        var saved = SaveFormat.Write(SaveFormat.Read(new StoryHistory(story).Save()) with
-        {
-            Choices = Enumerable.Repeat("c0", StoryHistory.MaxChoices).ToArray(),
-            Cursor = StoryHistory.MaxChoices,
-        });
+        var (fixture, story, saved) = CreateChoiceLimitSave();
         await Upload(fixture);
         await WriteBrowserSaveAsync(story.Id, "Limit", saved);
         await Driver.ClickAsync("Saves");
@@ -594,5 +584,24 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Choose("Again");
         await Observe(new(null, "At the limit."));
+    }
+
+    internal static (StoryFixture Fixture, StoryDefinition Story, byte[] Bytes) CreateChoiceLimitSave()
+    {
+        var fixture = Fixture() with { Tale = "=== start\nAt the limit.\n* [Again] -> start" };
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = fixture.Yaml,
+            ["chapters/main.tale"] = fixture.Tale,
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var history = new StoryHistory(story, 7);
+        for (var i = 0; i < StoryHistory.MaxChoices; i++)
+        {
+            history.Choose("c0");
+        }
+        return (fixture, story, history.Save());
     }
 }

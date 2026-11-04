@@ -278,9 +278,12 @@ validates a separate candidate, including redo choices. Only replace an active h
 The version-4 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices,
 cursor, character selection and compact replay evidence. Fixed-protagonist stories use a null
 character; creation stories require a valid selection. Previous save formats are unsupported.
-Evidence can verify the same recorded path across a story update; older format-4 saves without evidence
-need their original revision before they can be re-saved with evidence. See
-[Save format](../../../docs/developer/save-format.md#compatibility) for the contract and limits.
+Cross-revision verification is an experimental candidate, not an approved supported update path.
+Representative preview-tester evidence and explicit lead approval of the exact contract and
+legacy-save treatment remain outstanding. The candidate requires older format-4 saves without
+evidence to use their original revision before re-saving with evidence; that is a proposal, not an
+approved migration procedure. See
+[Save format](../../../docs/developer/save-format.md#compatibility) for the proposed contract and limits.
 `Save(CaptureSummary(DateTimeOffset.UtcNow))` embeds optional scene/title, capture time and
 effective character-name metadata in the same atomic payload. `Save()` without metadata omits the
 summary; this is a current optional display feature, not an older-save compatibility contract.
@@ -288,8 +291,9 @@ Malformed summary values do not prevent otherwise-valid replay restoration.
 `SaveCatalog.ListEntriesAsync` parses bounded payloads without replay, returning missing/unreadable
 details explicitly. `StoryHistory.ProgressKey` and each entry's matching key hash the canonical
 full replay payload excluding summary metadata. `RestoredProgressKey` also identifies a successfully
-loaded original slot until the timeline changes, including across a compatible update. The player checks those keys against actual
-persisted slots before replacing a session; timestamps do not influence load protection.
+loaded original slot until the timeline changes, including in the candidate update path. The player
+checks those keys against actual persisted slots before replacing a session; timestamps do not
+influence load protection.
 The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
 unsupported formats and incompatible stories fail explicitly. General migration is not attempted.
 

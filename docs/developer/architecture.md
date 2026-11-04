@@ -568,6 +568,10 @@ Invalid keys throw `InvalidOperationException` listing the valid ones. The UI on
 
 **Saves, restore and Back/Forward.** Saves store replay inputs, never the event log or state:
 
+The diagram includes prototype replay evidence for
+[#478](https://github.com/squid-farm/talewright/issues/478). Cross-revision loading is not an approved
+release contract; representative tester cases and explicit lead approval remain outstanding.
+
 ```mermaid
 flowchart LR
   subgraph save["Save bytes (.twsave)"]
@@ -588,9 +592,10 @@ _cursor_ choice keys.
 
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
-format/story versions, source/extension fingerprint and compact replay evidence. An updated story can
-load when the full recorded path verifies; unknown/corrupt/incompatible saves are rejected without
-rewriting the original. Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
+format/story versions, source/extension fingerprint and prototype replay evidence. The candidate
+implementation checks the full recorded path against an updated story, but released support remains
+exact-revision only. Unknown/corrupt/incompatible saves are rejected without rewriting the original.
+Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
 see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
 stories omit the character. Pre-v1 replay contracts may change without support for previous versions.
 
@@ -675,8 +680,8 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 
 ## 9. Known limitations and seams left for later
 
-- **Limited save compatibility.** Verified paths can cross story updates, but arbitrary edits,
-  extension/replay changes and general format or story migrations are not supported; broader migration is M8.
+- **No approved cross-revision save path.** Same-path verification is a prototype pending tester
+  evidence and explicit contract approval; broader format and story migration remains M8.
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
 - **Media adapters.** Native folder player/debugger and built-in embedded samples display images.

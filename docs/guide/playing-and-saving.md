@@ -121,21 +121,19 @@ Backups can move between web and desktop when the story files and player save fo
 
 ## Updating a story with existing saves
 
-Saves made with replay evidence can survive a story update when the player's recorded path still
-replays with the same offered choices, character and gameplay events, including rolls and the redo
-branch. A prose correction can therefore work, but changes to choices, effects, checks, triggers or
-character creation may make a save incompatible. Compatibility is checked for each save; arbitrary
-story edits are not guaranteed to work. Talewright leaves the original save and current game untouched
-if the check fails.
+Released save support requires the exact story revision. Keep a copy of every released story so
+players can reopen saves with the version that created them. Before v1, player or extension updates
+may also make saves unsupported. Failed loads leave the original save and current game untouched.
 
-The check preserves the recorded path, not a snapshot of every world default. A changed default that
-did not alter recorded events can affect the resumed state or future play. Authors should keep
-gameplay defaults stable when they want the same state after an update.
+A same-path story-update check is being prototyped in
+[#478](https://github.com/squid-farm/talewright/issues/478). It is not an approved supported update
+path: representative preview-tester cases and explicit lead approval of the contract, including
+pre-compatibility preview saves, are still required. Do not promise players that an update will
+preserve their saves or use reopening and re-saving as an approved migration procedure.
 
-Format-4 saves created before replay evidence (including any `1.0.0-preview.1` saves without it) need
-their exact original story first. Open and save them there using an evidence-aware player before
-trying the updated story. Older unsupported formats cannot be upgraded this way. Before v1, player
-or extension updates may also make saves unsupported. General save migration remains planned
+The [proposed contract](../developer/save-format.md#proposed-story-update-contract) describes the
+candidate behavior and its limits, including why matching recorded events does not preserve every
+world default. General save migration remains planned
 ([#39](https://github.com/squid-farm/talewright/issues/39)).
 
 ## Character creation

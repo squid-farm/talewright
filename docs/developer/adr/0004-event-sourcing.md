@@ -9,9 +9,10 @@
 Player saves identify the format and story identity/version and include the source/extension compatibility
 fingerprint. They reject corrupt, unsupported, and incompatible data explicitly. Restore builds a replacement
 session before adopting it, so a failed load does not partially mutate the active session or overwrite the
-original save. Compact replay evidence now permits a recorded path to be checked against an updated
-story; it does not persist the event log or a state snapshot. See [Save format](../save-format.md)
-for the supported path and its limits.
+original save. Released support is exact-revision only. Compact replay evidence is a prototype for
+checking an updated story, not an approved compatibility contract; it does not persist the event log
+or a state snapshot. The proposed path and legacy-save treatment still need representative
+preview-tester evidence and explicit lead approval. See [Save format](../save-format.md#compatibility).
 
 Event sourcing does not by itself make saves compatible with changed stories or event schemas. Migration
 machinery has its own M8 milestone with explicit old/new contracts and fixtures; it is not part of M3

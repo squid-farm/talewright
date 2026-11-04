@@ -13,6 +13,28 @@ public sealed class ValidatedSaveImportTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"talewright-import-{Guid.NewGuid():N}");
 
     [Fact]
+    public void Browser_choice_limit_fixture_has_valid_evidence_and_restores_at_the_exact_boundary()
+    {
+        var (_, story, bytes) = SaveHistoryTests.CreateChoiceLimitSave();
+        var saved = SaveFormat.Read(bytes);
+        Assert.NotNull(saved.ReplayEvidence);
+        Assert.Equal(StoryHistory.MaxChoices, saved.Choices.Count);
+        Assert.Equal(StoryHistory.MaxChoices, saved.Cursor);
+
+        var history = StoryHistory.Restore(story, bytes);
+        Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
+        Assert.Equal(StoryHistory.MaxChoices + 1, history.Transcript.Count);
+        Assert.Throws<InvalidOperationException>(() => history.Choose("c0"));
+        Assert.Equal(bytes, history.Save());
+
+        history.Back();
+        Assert.Equal(StoryHistory.MaxChoices - 1, history.Cursor);
+        history.Forward();
+        Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
+        Assert.Equal(bytes, history.Save());
+    }
+
+    [Fact]
     public async Task Validated_import_preserves_exact_bytes_and_requires_explicit_overwrite()
     {
         var story = TestStories.Linear.Compile();
