@@ -497,7 +497,7 @@ public class CompilerTests
             """;
         var story = Ok("""
             === camp.arrival
-            {faction:guild:name} / {faction:guild:tier} / {faction:guild.name}
+            {faction:guild:name} / {faction:guild:tier} / {faction:guild.name} / {faction:guild.name:tier}
             {player:pronoun}
             -> END
             """, yaml);
@@ -519,12 +519,15 @@ public class CompilerTests
     }
 
     [Theory]
-    [InlineData("{faction:guild.name}", "faction:guild:name")]
-    [InlineData("{faction:missing.tier}", "faction:missing:tier")]
-    public void Dotted_property_access_reports_its_colon_replacement(string reference, string replacement)
+    [InlineData("{faction:guild.name}", "guild.name")]
+    [InlineData("{faction:missing.tier}", "missing.tier")]
+    [InlineData("{faction:missing.standing}", "missing.standing")]
+    [InlineData("{faction:missing.name:tier}", "missing.name")]
+    public void Unknown_dotted_faction_references_use_the_standard_diagnostic(string reference, string id)
     {
         var error = Error($"=== a\n{reference}\n-> END", "TW2001");
-        Assert.Contains(replacement, error.Message);
+        Assert.Equal($"Unknown faction '{id}'.", error.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, reference.IndexOf(':') + 2), error.Location);
     }
 
     [Theory]
