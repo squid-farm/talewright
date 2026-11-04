@@ -185,6 +185,7 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
     ['__literal\\__ plain', 'plain'], ['_literal\\_ plain', 'plain'],
     ['**literal \\}** after', 'after'], ['__literal \\}__ after', 'after'],
     ['*literal \\}* after', 'after'], ['_literal \\}_ after', 'after'],
+    ['An *unfinished `code*` after', 'after'],
     ['2 * 3 and 4*', '3'], ['a ** b', 'b'], ['[{player:name}](https://example.org) after', 'after'],
     ['word*inner*word', 'inner'], ['2*3*4', '3'], ['snake_case', 'case'],
     ['**bold**text', 'bold'], ['*it*text', 'it'], ['***both***', 'both'],
