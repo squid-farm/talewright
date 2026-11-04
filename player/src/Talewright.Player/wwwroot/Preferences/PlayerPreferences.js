@@ -24,3 +24,10 @@ export function applyTextSize(textSizePercent) {
     document.documentElement.dataset.twTextSize = String(textSizePercent);
     document.documentElement.style.setProperty("--tw-base-font-size", `${18 * textSizePercent / 100}px`);
 }
+
+export function applyHideMechanicalNotes(hide) {
+    if (typeof hide !== "boolean") {
+        throw new TypeError("Mechanical-note preference must be a boolean.");
+    }
+    document.documentElement.dataset.twHideMechanicalNotes = String(hide);
+}

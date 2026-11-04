@@ -69,6 +69,8 @@ button { font: inherit; color: inherit; }
 .tw-settings { box-sizing: border-box; width: min(28rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); padding: 1rem; color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; font-family: var(--tw-ui-font); overflow-wrap: anywhere; }
 .tw-settings::backdrop { background: #0008; }
 .tw-settings label { display: block; margin: 1rem 0 .25rem; }
+.tw-settings .tw-settings-toggle { display: flex; align-items: center; gap: .5rem; }
+.tw-settings .tw-settings-toggle input { margin: 0; }
 .tw-settings select { box-sizing: border-box; width: 100%; padding: .5rem; color: var(--tw-fg); background: var(--tw-bg); border: 1px solid var(--tw-border); font: inherit; }
 .tw-settings-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
 @media (max-width: 52rem) {
@@ -120,6 +122,7 @@ button { font: inherit; color: inherit; }
 .tw-speech { margin-left: 1rem; }
 .tw-speaker { font-variant: small-caps; font-weight: bold; margin-right: 0.5rem; }
 .tw-note { font-family: var(--tw-ui-font); font-size: 0.85rem; color: var(--tw-muted); border-left: 3px solid var(--tw-border); padding-left: 0.75rem; margin: 0.25rem 0; }
+:root[data-tw-hide-mechanical-notes="true"] .tw-note { display: none; }
 .tw-chosen { color: var(--tw-accent); font-style: italic; }
 .tw-the-end { font-size: 1.4rem; text-align: center; margin: 2rem 0 1rem; letter-spacing: 0.2em; text-transform: uppercase; }
 

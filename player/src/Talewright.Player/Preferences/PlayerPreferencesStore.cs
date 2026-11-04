@@ -11,13 +11,13 @@ public enum PlayerTheme
     Dark,
 }
 
-public sealed record PlayerPreferences(int Version, PlayerTheme Theme, int TextSizePercent)
+public sealed record PlayerPreferences(int Version, PlayerTheme Theme, int TextSizePercent, bool HideMechanicalNotes)
 {
     public const int CurrentVersion = 1;
     public const int DefaultTextSizePercent = 100;
     public static IReadOnlyList<int> SupportedTextSizes { get; } = Array.AsReadOnly([100, 125, 150, 175, 200]);
     public static PlayerPreferences Default { get; } =
-        new(CurrentVersion, PlayerTheme.System, DefaultTextSizePercent);
+        new(CurrentVersion, PlayerTheme.System, DefaultTextSizePercent, false);
 
     public static bool IsSupportedTextSize(int percent) => SupportedTextSizes.Contains(percent);
 }
@@ -57,6 +57,7 @@ public sealed class PlayerPreferencesStore(
         Current = Parse(value);
         await _module.InvokeVoidAsync("applyTheme", ThemeValue(Current.Theme));
         await _module.InvokeVoidAsync("applyTextSize", Current.TextSizePercent);
+        await _module.InvokeVoidAsync("applyHideMechanicalNotes", Current.HideMechanicalNotes);
         _initialized = true;
     }
 
@@ -95,12 +96,26 @@ public sealed class PlayerPreferencesStore(
         await PersistAsync(module);
     }
 
+    public async Task SetHideMechanicalNotesAsync(bool hide)
+    {
+        var module = _module;
+        if (!_initialized || module is null)
+        {
+            throw new InvalidOperationException("Player preferences must be initialized before they can be changed.");
+        }
+
+        Current = Current with { Version = PlayerPreferences.CurrentVersion, HideMechanicalNotes = hide };
+        await module.InvokeVoidAsync("applyHideMechanicalNotes", hide);
+        await PersistAsync(module);
+    }
+
     private async Task PersistAsync(IJSObjectReference module)
     {
         try
         {
             var value = JsonSerializer.Serialize(
-                new StoredPreferences(PlayerPreferences.CurrentVersion, ThemeValue(Current.Theme), Current.TextSizePercent),
+                new StoredPreferences(PlayerPreferences.CurrentVersion, ThemeValue(Current.Theme),
+                    Current.TextSizePercent, Current.HideMechanicalNotes),
                 JsonOptions);
             await module.InvokeVoidAsync("write", value);
             Warning = null;
@@ -150,7 +165,8 @@ public sealed class PlayerPreferencesStore(
             textSizePercent = PlayerPreferences.DefaultTextSizePercent;
         }
 
-        return new(PlayerPreferences.CurrentVersion, theme, textSizePercent);
+        return new(PlayerPreferences.CurrentVersion, theme, textSizePercent,
+            stored.HideMechanicalNotes ?? false);
     }
 
     private static string ThemeValue(PlayerTheme theme) => theme switch
@@ -175,5 +191,6 @@ public sealed class PlayerPreferencesStore(
         }
     }
 
-    private sealed record StoredPreferences(int? Version, string? Theme, int? TextSizePercent);
+    private sealed record StoredPreferences(
+        int? Version, string? Theme, int? TextSizePercent, bool? HideMechanicalNotes);
 }

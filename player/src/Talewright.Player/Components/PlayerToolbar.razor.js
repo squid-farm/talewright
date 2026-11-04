@@ -41,7 +41,8 @@ export function initialize(bar, toggle, menu, confirmation, settings = null) {
     };
     const settingsKeydown = event => {
         if (event.key !== "Tab") return;
-        const controls = [...settings.querySelectorAll("button:not(:disabled), select:not(:disabled)")]
+        const controls = [...settings.querySelectorAll(
+            "button:not(:disabled), select:not(:disabled), input:not(:disabled)")]
             .filter(element => element.getClientRects().length);
         const index = controls.indexOf(document.activeElement);
         if (index < 0 || (!event.shiftKey && index === controls.length - 1) ||

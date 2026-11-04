@@ -29,6 +29,8 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Page.GetByLabel("Text size", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Hide mechanical notes", new() { Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(theme).ToBeFocusedAsync();
@@ -81,6 +83,69 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
             "element => getComputedStyle(element).fontSize"));
         Assert.Equal("rgb(28, 26, 23)", await Page.Locator("body").EvaluateAsync<string>(
             "element => getComputedStyle(element).backgroundColor"));
+
+        await Upload(TestStories.Progression);
+        await Choose("Collect relic");
+        await Expect(Page.Locator(".tw-note").First).ToBeVisibleAsync();
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        await Expect(Page.GetByLabel("Hide mechanical notes", new() { Exact = true })).Not.ToBeCheckedAsync();
+        await Page.Keyboard.PressAsync("Escape");
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Hiding_mechanical_notes_is_persistent_and_only_changes_presentation()
+    {
+        await Upload(TestStories.Progression);
+        await Choose("Collect relic");
+        await Expect(Latest.GetByRole(AriaRole.Status).Filter(new() { HasTextString = "Level 2!" }))
+            .ToBeVisibleAsync();
+
+        var notes = Page.Locator(".tw-note");
+        var initialNoteCount = await notes.CountAsync();
+        Assert.True(initialNoteCount > 0);
+        var choicesBefore = (await Driver.ObserveAsync()).Choices;
+
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        var hide = Page.GetByLabel("Hide mechanical notes", new() { Exact = true });
+        await Expect(hide).Not.ToBeCheckedAsync();
+        await hide.CheckAsync();
+        await AssertAllHiddenAsync(notes);
+        Assert.Equal(initialNoteCount, await notes.CountAsync());
+        Assert.Equal(choicesBefore, (await Driver.ObserveAsync()).Choices);
+        Assert.True(await Page.EvaluateAsync<bool>(
+            "() => JSON.parse(localStorage.getItem('talewright.player.preferences')).hideMechanicalNotes"));
+        await Page.Keyboard.PressAsync("Escape");
+
+        await Choose("Donate relic");
+        await Expect(Latest).ToContainTextAsync("The donation is complete.");
+        var futureNotes = Page.Locator(".tw-latest .tw-note");
+        Assert.True(await futureNotes.CountAsync() > 0, "The next passage should contain a new mechanical note.");
+        await AssertAllHiddenAsync(futureNotes);
+        var pastNotes = Page.Locator(".tw-past .tw-note");
+        Assert.True(await pastNotes.CountAsync() > 0);
+        await AssertAllHiddenAsync(pastNotes);
+
+        var frameCount = await Page.Locator(".tw-frame").CountAsync();
+        await Driver.ClickAsync("History");
+        await AssertAllHiddenAsync(Page.Locator(".tw-history .tw-note"));
+        Assert.Equal(frameCount, await Page.Locator(".tw-history-frame").CountAsync());
+        await Driver.ClickAsync("Return to play");
+        await Driver.ClickAsync("Back");
+        await Expect(Latest).ToContainTextAsync("Level 2.");
+        await Driver.ClickAsync("Forward");
+        await Expect(Latest).ToContainTextAsync("The donation is complete.");
+
+        await ReloadAsync();
+        await Upload(TestStories.Progression);
+        await Choose("Collect relic");
+        await AssertAllHiddenAsync(Page.Locator(".tw-note"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        await Expect(hide).ToBeCheckedAsync();
+        await Page.Keyboard.PressAsync("Escape");
     }
 
     [Fact]
@@ -212,5 +277,15 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
             "Settings dialog should fit in a narrow window.");
         Assert.True(await textSize.EvaluateAsync<bool>("element => element.getBoundingClientRect().right <= innerWidth"));
         await Page.Keyboard.PressAsync("Escape");
+    }
+
+    private static async Task AssertAllHiddenAsync(ILocator elements)
+    {
+        var matches = await elements.AllAsync();
+        Assert.NotEmpty(matches);
+        foreach (var element in matches)
+        {
+            await Expect(element).ToBeHiddenAsync();
+        }
     }
 }
