@@ -1,9 +1,9 @@
 # Save format
 
 Player saves, Quick Save, autosave and exported backups all use one binary format, stored with the
-`.twsave` extension. A save holds replay inputs only: story identity, seed, character choices and the
-choice history. It never stores the event log or game state. Restoring replays the choices into a
-fresh session (see [Architecture](architecture.md)).
+`.twsave` extension. A save holds replay inputs and compact replay evidence: story identity, seed,
+character choices and the choice history. It never stores the event log or game state. Restoring
+replays the choices into a fresh session (see [Architecture](architecture.md)).
 
 Code and the generated MessagePack formatters:
 [`SaveFormat.cs`](../../engine/src/Talewright.Runtime/Saves/SaveFormat.cs) and
@@ -30,6 +30,7 @@ The body is an array-keyed MessagePack object. Its positions are the schema:
 | 5 | Character selection | nil or a five-element array |
 | 6 | Choice history | array of choice-key strings |
 | 7 | Display summary | nil or a binary value containing a MessagePack summary array |
+| 8 | Replay evidence | nil or a 33-byte binary value: evidence version followed by a SHA-256 digest |
 
 The character array is `[first name, last name, pronouns, preset, stats]`. Optional strings are
 `nil`; `stats` is an array of `[id, value]` arrays, sorted by id before writing. The summary array
@@ -60,8 +61,8 @@ The save format does not depend on reflection, typeless deserialization, or dyna
 the generated formatter works in desktop and Blazor WebAssembly builds.
 
 `SaveFormatTests` enforces these rules:
-- A frozen v4 sample must keep loading. Regenerate it only for a deliberate format change with
-  `TALEWRIGHT_REGENERATE_SAVE_SAMPLES=1`.
+- A frozen v4 sample from before replay evidence must keep loading; its bytes are pinned separately
+  from the current writer's extended array.
 - The top-level and nested array positions, types, and ordering are checked against a representative
   save.
 - Missing trailing fields and unknown trailing fields are covered.
@@ -78,6 +79,7 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 | Choice key | 1–512 characters | Saving and reading |
 | Character stats | 1,000 | Reading; array size checked before deserialization |
 | Summary UTC offset | ±14 hours | Reading (invalid details are dropped, not fatal) |
+| Replay evidence | 33 bytes, version 1 | Reading; malformed evidence rejects the save |
 
 Collection counts are checked with `MessagePackReader` before the generated deserializer allocates
 their lists. Other decoded structures are bounded by the 8 MiB body limit. A repeated-choice
@@ -85,14 +87,40 @@ playthrough of about 200 choices compresses below 4 KiB.
 
 ## Compatibility
 
-A save loads only into the same story id, story version and content fingerprint. The fingerprint
-covers every story source file and extension identity, so any edit to the story breaks existing saves.
+A save must have the same story id. With matching version and content fingerprint it can replay as
+before, and any evidence present is verified. Across changed source or story versions, it additionally
+needs version-1 replay evidence and the same engine replay/extension identity. The runtime validates
+the character, replays the entire choice history including redo, and accepts only when the evidence
+matches. It also checks that reconstructing the visible cursor reproduces the validated prefix and
+offered choices. The old bytes are never rewritten by loading. A later save uses the current story
+identity and fresh evidence.
+
+The evidence is a SHA-256 chain over the start and each recorded choice. The start binds the story id,
+replay/extension identity, seed, character selection and start events. Each choice binds its scene,
+the keys and rendered labels of all offered choices, the selected key, and every resulting gameplay
+event and field. A final digest also binds the cursor. Canonical, source-generated JSON feeds the hash;
+the encoding and test vectors are pinned by `StoryCompatibilityTests`. Change the evidence version
+when its canonical encoding or meaning changes. The evidence is a compatibility check, not an
+authentication mechanism.
+
+This first path is intentionally conservative about selected choices and their offered labels. Prose
+edits can work, but changed choices, effects or rolls on the recorded timeline are rejected when their
+evidence differs. It compares the played path, not a saved state snapshot: an updated world's unused
+defaults can change the resumed state or future play even when the recorded events still match.
+General mappings and format migration are not implemented.
+
+Format-4 saves without evidence—including any `1.0.0-preview.1` saves made without it—can load only
+against their exact original story and compatible player. Reopening them there with an evidence-aware
+player and saving again adds evidence; that new save can then be checked against an update. Older
+unsupported formats cannot use this path. Manually constructed stories without a replay/extension
+identity remain exact-revision only.
+
 The author-facing rules are in [Sharing your story](../guide/sharing-your-story.md) and
 [Updating a story with existing saves](../guide/playing-and-saving.md#updating-a-story-with-existing-saves).
 
 Player messages:
-- A version or fingerprint mismatch: "Version X of Title has changed, and this save is no longer
-  compatible…" ("Title has changed…" when no version is known).
+- An incompatible update: "Version X of Title has changed, and this save is no longer compatible…"
+  when the version changed; otherwise "Title has changed…".
 - A different story: "This save belongs to a different story…".
 - Replay failure: a generic incompatible-or-damaged message, with no choice number.
 

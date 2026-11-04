@@ -153,7 +153,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Bundled_sample_rejects_older_version_save_visibly_without_replacing_progress_or_bytes(bool olderVersion)
+    public async Task Bundled_sample_rejects_unproven_or_invalid_save_without_replacing_progress_or_bytes(bool olderVersion)
     {
         var source = await new EmbeddedStoryLibrary(typeof(SaveHistoryTests).Assembly).LoadAsync("LostRelic");
         var files = source.Files.ToDictionary();
@@ -162,7 +162,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var old = result.Story!;
         var history = new StoryHistory(old, 42, old.Creation!.Default(old.World.Characters[EntityId.Player]));
-        var bytes = history.Save();
+        var bytes = SaveFormat.Write(SaveFormat.Read(history.Save()) with { ReplayEvidence = null });
         if (!olderVersion)
         {
             bytes = SaveFormat.Write(SaveFormat.Read(bytes) with { StoryVersion = "0.4.0", ContentFingerprint = "before-the-dream" });
@@ -176,8 +176,9 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Load " + slot);
         await Driver.ClickAsync("Load save");
+        var subject = olderVersion ? "Version 0.3.0 of The Lost Relic" : "The Lost Relic";
         await AssertDialogText(text => Assert.Contains(
-            $"Version {(olderVersion ? "0.3.0" : "0.4.0")} of The Lost Relic has changed, and this save is no longer compatible", text));
+            $"{subject} has changed, and this save is no longer compatible", text));
         await Driver.ClickAsync("Close saves");
         await AssertState(state =>
         {

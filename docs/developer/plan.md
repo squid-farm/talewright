@@ -287,8 +287,9 @@ Not in v0: inline function definitions, loops, ink-style tunnels/threads, visibl
   - character creation ([#43](https://github.com/squid-farm/talewright/issues/43)).
 
   All listed feature slices are delivered; the details below summarize the implemented outcome.
-  Saves are manual named slots with explicit overwrite; compatibility is exact story ID/version/source
-  fingerprint plus extension compatibility ID, with no migration or autosave.
+  At M2, saves were manual named slots with explicit overwrite and exact story/source compatibility.
+  Later work added autosave and [verified paths across story updates](save-format.md#compatibility);
+  general migration remains separate.
   `publish` defaults to story-only; `-a --target web|desktop` includes the complete player.
   Desktop defaults to one archive of six self-contained native builds and selecting launchers, not
   one portable binary. Creation is opt-in author-bounded names/pronouns/presets/stat choices, not

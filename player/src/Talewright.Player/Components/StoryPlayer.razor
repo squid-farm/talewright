@@ -508,13 +508,17 @@
         _slots = slots;
         var currentProgress = _session.TryProgressKey(out var progressKey) ? progressKey : null;
         // The autosave is replaced by the next choice, so it does not protect progress from a load.
-        if (currentProgress is null || !_slots.Any(entry => !entry.IsAutosave && entry.ProgressKey == currentProgress))
+        if (!HasProtectedProgress(_slots, currentProgress, _session.RestoredProgressKey))
         {
             _pendingLoad = slot;
             return;
         }
         await LoadAsync(slot, generation);
     });
+
+    internal static bool HasProtectedProgress(IEnumerable<SaveEntry> slots, string? currentProgress, string? restoredProgress) =>
+        currentProgress is not null && slots.Any(entry => !entry.IsAutosave &&
+            (entry.ProgressKey == currentProgress || (restoredProgress is not null && entry.ProgressKey == restoredProgress)));
 
     private Task ConfirmLoadAsync()
     {

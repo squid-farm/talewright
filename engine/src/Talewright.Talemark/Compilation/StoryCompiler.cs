@@ -28,6 +28,8 @@ namespace Talewright.Talemark.Compilation;
 /// </remarks>
 public static class StoryCompiler
 {
+    private const string ReplayVersion = "talewright-replay-v2";
+
     /// <summary>Compiles <paramref name="source"/>.</summary>
     public static CompilationResult Compile(StorySource source, CompilerOptions? options = null)
         => CompileCore(source, options ?? CompilerOptions.Default, null, CancellationToken.None);
@@ -163,6 +165,8 @@ public static class StoryCompiler
             Title = manifest.Title,
             Version = manifest.Version,
             ContentFingerprint = Fingerprint(source, options.CompatibilityId),
+            ReplayCompatibilityId = string.IsNullOrWhiteSpace(options.CompatibilityId)
+                ? null : $"{ReplayVersion}\n{options.CompatibilityId}",
             UndoEnabled = manifest.UndoEnabled,
             Creation = manifest.Creation,
             Start = new SceneId(manifest.Start),
@@ -209,7 +213,7 @@ public static class StoryCompiler
             } while (!completed);
         }
 
-        Append("talewright-replay-v2");
+        Append(ReplayVersion);
         Append(compatibilityId);
         foreach (var (path, text) in source.Files.OrderBy(f => f.Key, StringComparer.Ordinal))
         {
