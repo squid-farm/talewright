@@ -315,7 +315,7 @@ public class CompilerTests
         var story = Ok("""
             === a
             Pick.
-            * [Read the glyphs] (requires: player:int >= 12) -> b
+            * [Read the glyphs] (requires player:int >= 12) -> b
             * [Shove {player:first-name}] { faction:guild:standing -= 5; give player relic; set flag:shoved } -> b
             * [Leave] -> END
             === b
@@ -426,8 +426,8 @@ public class CompilerTests
     [Fact]
     public void Reports_type_errors_with_locations()
     {
-        var error = Error("=== a\n* [x] (requires: player:dex + 1) -> END", "TW2003");
-        Assert.Equal(new SourceLocation("main.tale", 2, 18), error.Location);
+        var error = Error("=== a\n* [x] (requires player:dex + 1) -> END", "TW2003");
+        Assert.Equal(new SourceLocation("main.tale", 2, 17), error.Location);
 
         Error("=== a\n{if player:first-name > 3}x{/if}\n-> END", "TW2003");
         Error("=== a\n~ var:torches = \"three\"\n-> END", "TW2003");
@@ -497,7 +497,7 @@ public class CompilerTests
             """;
         var story = Ok("""
             === camp.arrival
-            {faction:guild:name} / {faction:guild:tier} / {faction:guild.name}
+            {faction:guild:name} / {faction:guild:tier} / {faction:guild.name} / {faction:guild.name:tier}
             {player:pronoun}
             -> END
             """, yaml);
@@ -519,12 +519,15 @@ public class CompilerTests
     }
 
     [Theory]
-    [InlineData("{faction:guild.name}", "faction:guild:name")]
-    [InlineData("{faction:missing.tier}", "faction:missing:tier")]
-    public void Dotted_property_access_reports_its_colon_replacement(string reference, string replacement)
+    [InlineData("{faction:guild.name}", "guild.name")]
+    [InlineData("{faction:missing.tier}", "missing.tier")]
+    [InlineData("{faction:missing.standing}", "missing.standing")]
+    [InlineData("{faction:missing.name:tier}", "missing.name")]
+    public void Unknown_dotted_faction_references_use_the_standard_diagnostic(string reference, string id)
     {
         var error = Error($"=== a\n{reference}\n-> END", "TW2001");
-        Assert.Contains(replacement, error.Message);
+        Assert.Equal($"Unknown faction '{id}'.", error.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, reference.IndexOf(':') + 2), error.Location);
     }
 
     [Theory]

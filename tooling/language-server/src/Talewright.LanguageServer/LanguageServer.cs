@@ -1110,10 +1110,14 @@ public sealed class LanguageServer
     private static object ToDiagnostic(Diagnostic diagnostic, LineMap lines)
     {
         var position = lines.Position(diagnostic.Location);
-        var point = new { line = position.Line, character = position.Character };
+        var endPosition = diagnostic.EndLocation is { } end ? lines.Position(end) : position;
         return new
         {
-            range = new { start = point, end = point },
+            range = new
+            {
+                start = new { line = position.Line, character = position.Character },
+                end = new { line = endPosition.Line, character = endPosition.Character }
+            },
             severity = diagnostic.Severity == DiagnosticSeverity.Error ? 1 : 2,
             code = diagnostic.Code,
             source = "talewright",

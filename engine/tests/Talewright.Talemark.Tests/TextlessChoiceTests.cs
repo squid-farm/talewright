@@ -21,9 +21,9 @@ public sealed class TextlessChoiceTests
     [Theory]
     [InlineData("* -> road", "road", false, false)]
     [InlineData("* -> END", "END", false, false)]
-    [InlineData("* (requires: flag:ready) -> road", "road", true, false)]
+    [InlineData("* (requires flag:ready) -> road", "road", true, false)]
     [InlineData("* { set flag:left } -> END", "END", false, true)]
-    [InlineData("* (requires: flag:ready) { set flag:left } -> road", "road", true, true)]
+    [InlineData("* (requires flag:ready) { set flag:left } -> road", "road", true, true)]
     public void Textless_choices_parse_destinations_requirements_and_effects(
         string line, string target, bool hasRequirement, bool hasEffect)
     {
@@ -43,7 +43,7 @@ public sealed class TextlessChoiceTests
         var result = Compile("""
             === start
             * [First] -> road
-            * (requires: flag:ready) { set flag:left; var:count += 1 } -> road
+            * (requires flag:ready) { set flag:left; var:count += 1 } -> road
             * [] -> END
             * -> END
             === road
@@ -65,8 +65,8 @@ public sealed class TextlessChoiceTests
     [InlineData("*")]
     [InlineData("*   ")]
     [InlineData("* { set flag:left }")]
-    [InlineData("* (requires: flag:ready)")]
-    [InlineData("* (requires: flag:ready) { set flag:left }")]
+    [InlineData("* (requires flag:ready)")]
+    [InlineData("* (requires flag:ready) { set flag:left }")]
     public void Textless_choices_without_a_divert_report_tw1011(string line)
     {
         var result = Compile($"=== start\n{line}");
@@ -79,7 +79,7 @@ public sealed class TextlessChoiceTests
     [Theory]
     [InlineData("* ->", "TW1010")]
     [InlineData("* -> missing", "TW2002")]
-    [InlineData("* (requires: flag:ready -> END", "TW1011")]
+    [InlineData("* (requires flag:ready -> END", "TW1011")]
     [InlineData("* { set flag:left -> END", "TW1011")]
     [InlineData("* skill-check athletics dc 1", "TW1011")]
     [InlineData("* missing label", "TW1011")]

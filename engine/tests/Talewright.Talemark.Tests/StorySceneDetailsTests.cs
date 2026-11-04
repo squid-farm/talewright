@@ -39,7 +39,7 @@ public sealed class StorySceneDetailsTests
         :::
         {/if}
 
-        * [Take {item:rope}] (requires: player has rope) { take player rope } -> END
+        * [Take {item:rope}] (requires player has rope) { take player rope } -> END
         * [Climb] skill-check athletics dc 13
           success: { set flag:climbed } -> END
           failure: { set flag:slipped } -> END

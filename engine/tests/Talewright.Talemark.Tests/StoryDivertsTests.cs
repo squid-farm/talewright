@@ -41,7 +41,7 @@ public sealed class StoryDivertsTests
             success: -> road
             failure: { set flag:ready }
             :::
-            * [Go] (requires: flag:ready) -> road
+            * [Go] (requires flag:ready) -> road
             * -> road
             * [Climb] skill-check athletics dc 10
               success: -> END

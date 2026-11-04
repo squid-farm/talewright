@@ -26,7 +26,7 @@ Its `.tale` files combine bold and italic formatting, dialogue, choices, conditi
 * [Climb the collapsed wall] skill-check athletics dc 14
   success: -> temple.upper
   failure: { player:hp -= 2 } -> temple.fall
-* [Read the glyphs] (requires: player:int >= 12) -> temple.glyphs
+* [Read the glyphs] (requires player:int >= 12) -> temple.glyphs
 ```
 
 ![The Lost Relic sample story being played in the web player](docs/images/playing.png)

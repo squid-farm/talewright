@@ -83,7 +83,7 @@ public sealed class AuthorInspectionTests
         var calls = 0;
         var story = Compile("""
             === start
-            * [Hidden] (requires: player:str >= 15 and @Never) -> END
+            * [Hidden] (requires player:str >= 15 and @Never) -> END
             * [Wait] -> END
             """, predicates: new NamedPredicateRegistry().Register("Never", _ => { calls++; return true; }));
         var session = Start(story);
@@ -286,7 +286,7 @@ public sealed class AuthorInspectionTests
         var story = Compile("""
             === start
             -> target
-            * [Unused] (requires: @Never) -> END
+            * [Unused] (requires @Never) -> END
             === target
             -> END
             """, predicates: new NamedPredicateRegistry().Register("Never", _ => { calls++; return true; }));
@@ -311,7 +311,7 @@ public sealed class AuthorInspectionTests
             success: { var:count += 1 } -> target
             failure: { var:count += 2 } -> target
             :::
-            * [Unused] (requires: @Never) -> END
+            * [Unused] (requires @Never) -> END
             === target
             @tags hub
             @requires @Never
@@ -391,7 +391,7 @@ public sealed class AuthorInspectionTests
         var story = Compile("""
             === start
             ~ var:count += 1
-            * [Try] (requires: @Counted) skill-check athletics dc 12
+            * [Try] (requires @Counted) skill-check athletics dc 12
             success: { set flag:ready } -> start
             failure: -> start
             * [End] -> END
@@ -440,7 +440,7 @@ public sealed class AuthorInspectionTests
         var calls = 0;
         var story = Compile("""
             === start
-            * [Wait] (requires: @Counted) -> start
+            * [Wait] (requires @Counted) -> start
             """, predicates: new NamedPredicateRegistry().Register("Counted", _ => { calls++; return true; }));
         var session = Start(story);
         Assert.Equal(1, calls);
@@ -467,7 +467,7 @@ public sealed class AuthorInspectionTests
             === start
             * [Break] -> bad
             === bad
-            * [Hidden] (requires: @Broken) -> END
+            * [Hidden] (requires @Broken) -> END
             """, predicates: new NamedPredicateRegistry().Register("Broken", _ => throw new InvalidOperationException("broken")));
         var session = Start(story);
         var decisions = session.Decisions;

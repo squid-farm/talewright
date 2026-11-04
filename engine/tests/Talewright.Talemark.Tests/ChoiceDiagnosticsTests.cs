@@ -26,10 +26,10 @@ public sealed class ChoiceDiagnosticsTests
     {
         var result = Compile("""
             === start
-            * [Read] (requires: flag:ready) { set flag:left } -> END
-            * [Shove] { set flag:left } (requires: flag:ready) -> END
-            * (requires: flag:ready) { set flag:left } -> END
-            * { set flag:left } (requires: flag:ready) -> END
+            * [Read] (requires flag:ready) { set flag:left } -> END
+            * [Shove] { set flag:left } (requires flag:ready) -> END
+            * (requires flag:ready) { set flag:left } -> END
+            * { set flag:left } (requires flag:ready) -> END
             * -> END
             """);
 
@@ -46,7 +46,7 @@ public sealed class ChoiceDiagnosticsTests
     [Theory]
     [InlineData("* [Go -> hall] -> END")]
     [InlineData("* [Say \"hello\" (quietly)] -> END")]
-    [InlineData("* [Open [the] door \\] {var:count}] (requires: (flag:ready)) -> END")]
+    [InlineData("* [Open [the] door \\] {var:count}] (requires (flag:ready)) -> END")]
     public void Closed_labels_keep_reader_text_delimiters(string line)
     {
         var result = Compile("=== start\n" + line + "\n* -> END");
@@ -56,7 +56,7 @@ public sealed class ChoiceDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: flag:ready) (requires: flag:left) -> END", "(requires:", "Duplicate '(requires:)'")]
+    [InlineData("* [Go] (requires flag:ready) (requires flag:left) -> END", "(requires ", "Duplicate '(requires expression)'")]
     [InlineData("* [Go] { set flag:left } { set flag:ready } -> END", "{", "Duplicate effect block")]
     public void Duplicate_clauses_are_rejected_at_the_second_occurrence(string line, string marker, string message)
     {
@@ -71,7 +71,7 @@ public sealed class ChoiceDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: flag:ready) (requires: flag:left", "Duplicate '(requires:)'", "missing its closing ')'")]
+    [InlineData("* [Go] (requires flag:ready) (requires flag:left", "Duplicate '(requires expression)'", "missing its closing ')'")]
     [InlineData("* [Go] { set flag:left } { set flag:ready", "Duplicate effect block", "missing its closing '}'")]
     public void Duplicate_incomplete_clauses_keep_both_relevant_diagnostics(string line, string duplicate, string unclosed)
     {
@@ -84,7 +84,7 @@ public sealed class ChoiceDiagnosticsTests
 
     [Theory]
     [InlineData("* [Go -> END", "->")]
-    [InlineData("* [Hello {player:first-name} (requires: flag:ready)", "(requires:")]
+    [InlineData("* [Hello {player:first-name} (requires flag:ready)", "(requires expression)")]
     [InlineData("* [Go { set flag:left", "{")]
     [InlineData("* [Go -> hall -> END", null)]
     [InlineData("* [Say \"-> hall\"", null)]
@@ -92,7 +92,7 @@ public sealed class ChoiceDiagnosticsTests
     [InlineData("* [Go [unfinished -> END", null)]
     [InlineData("* [Go { set flag:left -> END", null)]
     [InlineData("* [Go { set flag:left } -> END", null)]
-    [InlineData("* [Go (requires: flag:ready { set flag:left", null)]
+    [InlineData("* [Go (requires flag:ready { set flag:left", null)]
     [InlineData("* [Go to the", null)]
     [InlineData("* [Hello {player:first-name}", null)]
     [InlineData("* [Hello {player:first-name", null)]
@@ -112,20 +112,36 @@ public sealed class ChoiceDiagnosticsTests
 
     [Theory]
     [InlineData("( requires :")]
-    [InlineData("(requires :")]
     [InlineData("( requires:")]
-    public void Requires_whitespace_names_the_exact_marker(string spelling)
+    public void Legacy_requires_with_whitespace_uses_generic_invalid_choice_diagnostic(string spelling)
     {
         var line = $"* [Go] {spelling} flag:ready) -> END";
         var diagnostic = Assert.Single(Compile("=== start\n" + line).Diagnostics);
 
         Assert.Equal("TW1011", diagnostic.Code);
-        Assert.Contains("exact marker '(requires:)'", diagnostic.Message);
+        Assert.StartsWith($"Unexpected '{spelling} flag:ready) -> END' in choice.", diagnostic.Message);
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf('(') + 1), diagnostic.Location);
     }
 
     [Theory]
-    [InlineData("* [Go] (requires: flag:ready", "'(requires:' is missing its closing ')'.")]
+    [InlineData("* [Go] (requires: flag:ready) -> END")]
+    [InlineData("* (requires: flag:ready) -> END")]
+    [InlineData("* [Go] (requires:) -> END")]
+    [InlineData("* [Go] (requires : flag:ready) -> END")]
+    [InlineData("  * [Go] (requires\t: flag:ready) -> END")]
+    public void Legacy_requires_colon_is_reported_as_an_unexpected_expression_token(string line)
+    {
+        var diagnostic = Assert.Single(Compile("=== start\n" + line).Diagnostics);
+
+        Assert.Equal("TW1001", diagnostic.Code);
+        Assert.Equal("Unexpected ':'.", diagnostic.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf(':') + 1), diagnostic.Location);
+        Assert.Equal(diagnostic.Location.Offset(1), diagnostic.EndLocation);
+    }
+
+    [Theory]
+    [InlineData("* [Go] (requires flag:ready", "'(requires expression)' is missing its closing ')'.")]
+    [InlineData("* [Go] (requires: flag:ready", "'(requires expression)' is missing its closing ')'.")]
     [InlineData("* [Go] { set flag:ready", "Effect block is missing its closing '}'.")]
     public void Incomplete_choice_clauses_report_only_their_own_error(string line, string message)
     {
@@ -171,7 +187,8 @@ public sealed class ChoiceDiagnosticsTests
 
     [Theory]
     [InlineData("* [Go] -> END { set flag:left }", "{", "Effect block is misplaced after the divert.")]
-    [InlineData("* [Go] -> END (requires: flag:ready)", "(requires:", "'(requires:)' is misplaced after the divert.")]
+    [InlineData("* [Go] -> END (requires flag:ready)", "(requires ", "'(requires expression)' is misplaced after the divert.")]
+    [InlineData("* [Go] -> END (requires: flag:ready)", "(requires:", "'(requires expression)' is misplaced after the divert.")]
     [InlineData("* [Go] -> END junk", "junk", "Unexpected 'junk' after the divert.")]
     [InlineData("* [Go] -> END{ set flag:left }", "{", "Effect block is misplaced after the divert.")]
     public void Trailing_choice_text_is_not_folded_into_the_target(string line, string marker, string message)
@@ -185,17 +202,21 @@ public sealed class ChoiceDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("* [Go] -> END ( requires : flag:ready)", "divert")]
-    [InlineData("* [Go] skill-check athletics dc 1 ( requires : flag:ready)", "skill check")]
-    public void Misplaced_spaced_requires_names_both_the_marker_and_terminal(string line, string terminal)
+    [InlineData("* [Go] -> END ( requires : flag:ready)", "divert", "TW1011",
+        "Unexpected '( requires : flag:ready)' after the divert.", null)]
+    [InlineData("* [Go] skill-check athletics dc 1 ( requires : flag:ready)", "skill check", "TW1001",
+        "Unexpected '('.", "TW3003")]
+    public void Misplaced_legacy_requires_remain_hard_errors(
+        string line, string terminal, string expectedCode, string expectedMessage, string? additionalCode)
     {
         var outcomes = terminal == "skill check" ? "\nsuccess: -> END\nfailure: -> END" : "";
-        var diagnostic = Assert.Single(Compile("=== start\n" + line + outcomes).Diagnostics);
+        var result = Compile("=== start\n" + line + outcomes);
+        var diagnostic = Assert.Single(result.Diagnostics, item => item.Code == expectedCode);
 
-        Assert.Equal("TW1011", diagnostic.Code);
-        Assert.Contains("exact marker '(requires:)'", diagnostic.Message);
-        Assert.Contains($"cannot follow the {terminal}", diagnostic.Message);
+        Assert.Equal(expectedMessage, diagnostic.Message);
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf('(') + 1), diagnostic.Location);
+        Assert.Equal(additionalCode is null ? [expectedCode] : [expectedCode, additionalCode],
+            result.Diagnostics.Select(item => item.Code));
     }
 
     [Fact]
@@ -214,7 +235,7 @@ public sealed class ChoiceDiagnosticsTests
     [Theory]
     [InlineData("* [Try] skill-check athletics dc 14 { set flag:left }", "{", "Effect block is misplaced")]
     [InlineData("* [Try] skill-check athletics dc 14 -> END", "->", "Divert is misplaced")]
-    [InlineData("* [Try] skill-check athletics dc 14 (requires: flag:ready)", "(requires:", "'(requires:)' is misplaced")]
+    [InlineData("* [Try] skill-check athletics dc 14 (requires flag:ready)", "(requires ", "'(requires expression)' is misplaced")]
     public void Skill_check_dc_stops_at_a_top_level_clause(string line, string marker, string message)
     {
         var result = Compile("=== start\n" + line + "\nsuccess: -> END\nfailure: -> END");
@@ -280,19 +301,20 @@ public sealed class ChoiceDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("(requires: flag:ready)", "'(requires:)' is misplaced after the block skill check.")]
-    [InlineData("( requires : flag:ready)", "exact marker '(requires:)'")]
-    public void Block_checks_do_not_suggest_putting_choice_conditions_before_skill_check(
-        string condition, string expectedMessage)
+    [InlineData("(requires flag:ready)", "TW1011", "'(requires expression)' is misplaced after the block skill check.", null)]
+    [InlineData("( requires : flag:ready)", "TW1001", "Unexpected '('.", "TW3002")]
+    public void Block_checks_report_invalid_choice_condition_syntax_without_reordering_hint(
+        string condition, string expectedCode, string expectedMessage, string? additionalCode)
     {
         var line = $"::: skill-check athletics dc 1 {condition}";
         var result = Compile($"=== start\n{line}\nsuccess: -> END\nfailure: -> END\n:::");
-        var diagnostic = Assert.Single(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Diagnostics, item => item.Code == expectedCode);
 
-        Assert.Equal("TW1011", diagnostic.Code);
-        Assert.Contains(expectedMessage, diagnostic.Message);
+        Assert.Equal(expectedMessage, diagnostic.Message);
         Assert.DoesNotContain("before 'skill-check'", diagnostic.Message);
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf('(') + 1), diagnostic.Location);
+        Assert.Equal(additionalCode is null ? [expectedCode] : [expectedCode, additionalCode],
+            result.Diagnostics.Select(item => item.Code));
     }
 
     [Fact]
@@ -392,8 +414,6 @@ public sealed class ChoiceDiagnosticsTests
         var scan = DelimiterScanner.Scan("[unfinished", DelimiterScanMode.ChoiceLabel);
         Assert.Throws<OperationCanceledException>(() =>
             ChoiceSyntax.FindMissingBracketHint("[unfinished", 0, scan, source.Token));
-        Assert.Throws<OperationCanceledException>(() =>
-            ChoiceSyntax.TryReadSpacedRequires("( requires : flag:ready)", 0, source.Token, out _));
         var codeScan = DelimiterScanner.Scan("{", DelimiterScanMode.CodeGroup);
         Assert.Throws<OperationCanceledException>(() =>
             ChoiceSyntax.FindTrailingClause("{", 0, codeScan, 0, source.Token));

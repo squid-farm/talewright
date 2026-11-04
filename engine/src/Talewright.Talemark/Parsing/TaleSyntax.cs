@@ -147,14 +147,14 @@ internal enum TaleClauseKind : byte
     /// <summary>Unclosed image call inside an unclosed label; the value runs from after the brace to the line end.</summary>
     UnclosedImage,
 
-    /// <summary><c>(requires: …)</c>; the value is the condition.</summary>
+    /// <summary><c>(requires …)</c>; the value is the condition.</summary>
     Requires,
 
-    /// <summary><c>(requires:</c> without its closing parenthesis; the value runs to the line end.</summary>
+    /// <summary><c>(requires </c> without its closing parenthesis; the value runs to the line end.</summary>
     UnclosedRequires,
 
-    /// <summary>A spaced or misspelled requires marker; the value is the condition.</summary>
-    MisspelledRequires,
+    /// <summary>Unexpected parenthesized choice text, retained for partial expression analysis.</summary>
+    InvalidCondition,
 
     /// <summary><c>{ effects }</c>; the value is the text between the braces.</summary>
     Effects,

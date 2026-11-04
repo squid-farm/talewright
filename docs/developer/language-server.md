@@ -58,9 +58,10 @@ didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover
 textDocument/definition, and workspace/didChangeWatchedFiles. Documents are the
 root `story.talewright.yaml`, supporting `*.talewright.yaml` files (case-sensitive
 suffix), and `.tale` files; other YAML is ignored. Positions
-are UTF-16 and zero-based. Compiler point locations become zero-width ranges,
-clamped to the current file; codes, messages, and error/warning severities remain
-the compiler's. Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
+are UTF-16 and zero-based. Compiler diagnostics with an end position use that range;
+point locations become zero-width ranges. Both are clamped to the current file,
+and codes, messages, and error/warning severities remain the compiler's.
+Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
 returns a complete list with explicit `textEdit` replacement ranges. Hover returns
 source-aware help with authored-default previews, and definition returns the authored declaration;
 signature help, rename, formatting, and autofixes are not advertised.

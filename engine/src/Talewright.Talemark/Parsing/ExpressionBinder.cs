@@ -200,19 +200,7 @@ internal sealed class ExpressionBinder
             {
                 var faction = new FactionId(path);
                 if (!_symbols.World.Factions.ContainsKey(faction))
-                {
-                    var dot = path.LastIndexOf('.');
-                    var oldMember = dot < 0 ? string.Empty : path[(dot + 1)..];
-                    var oldId = dot < 0 ? string.Empty : path[..dot];
-                    if (member is null && oldMember is ExpressionVocabulary.Name or ExpressionVocabulary.Tier)
-                    {
-                        Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                            $"Unknown faction '{path}'. Dotted property access is no longer supported; use 'faction:{oldId}:{oldMember}' for its {oldMember} property.",
-                            reference.Name.Start + dot);
-                    }
-
                     Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown faction '{path}'.", reference.Name.Start);
-                }
 
                 if (member is null) return new FactionNameRef(faction);
                 return member switch

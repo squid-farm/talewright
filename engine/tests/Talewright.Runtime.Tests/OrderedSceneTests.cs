@@ -208,7 +208,7 @@ public sealed class OrderedSceneTests
         var compiled = Compile("""
             === start
             ~ var:gold += 1
-            * [Gold {var:gold}] (requires: var:gold == 10) -> END
+            * [Gold {var:gold}] (requires var:gold == 10) -> END
             """);
         var scene = compiled.Scenes[0];
         var unordered = Copy(compiled, [scene.Steps[1], scene.Steps[0]]);
@@ -300,7 +300,7 @@ public sealed class OrderedSceneTests
             You take the relic.
             {/if}
             Gold {var:gold}.
-            * [Spend] (requires: var:gold > 10) -> start
+            * [Spend] (requires var:gold > 10) -> start
             * [Wait] -> start
             """);
         var session = AuthorSession.Create(story, story.Start, captureDecisions: true);

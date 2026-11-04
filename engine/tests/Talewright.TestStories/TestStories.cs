@@ -68,10 +68,10 @@ public static class TestStories
         @title Gate room
         @hub room
         Inventory: {if player has rope}ready{else}empty{/if}.
-        * [Use the rope] (requires: player has rope) -> finish
-        * [Read the flag] (requires: flag:ready) -> flag
-        * [Trusted passage] (requires: faction:guild:tier >= friendly) -> finish
-        * [Strong passage] (requires: player:str >= 12) -> finish
+        * [Use the rope] (requires player has rope) -> finish
+        * [Read the flag] (requires flag:ready) -> flag
+        * [Trusted passage] (requires faction:guild:tier >= friendly) -> finish
+        * [Strong passage] (requires player:str >= 12) -> finish
         * [Leave empty] -> finish
         === supply
         @title Collect supplies
@@ -221,7 +221,7 @@ public static class TestStories
     public static readonly StoryFixture NoRoute = new("no-route", DefaultYaml, """
         === start
         No route is available.
-        * [Use a missing rope] (requires: player has rope) -> END
+        * [Use a missing rope] (requires player has rope) -> END
         """) { ExpectedWarningCodes = ["TW3013"] };
 
     public static StoryFixture Check(string id, string actor, bool entry, bool success)

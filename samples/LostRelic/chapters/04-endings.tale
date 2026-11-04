@@ -10,7 +10,7 @@ The walk back to camp is quiet. {guide:first-name} keeps glancing at your pack.
 -> ending.empty-handed
 {/if}
 
-* [Hand the relic to the guild] (requires: faction:explorers-guild:tier >= neutral) { take player relic; faction:explorers-guild:standing += 20 } -> ending.guild
+* [Hand the relic to the guild] (requires faction:explorers-guild:tier >= neutral) { take player relic; faction:explorers-guild:standing += 20 } -> ending.guild
 * [Keep it for yourself] { faction:explorers-guild:standing -= 30 } -> ending.keep
 
 === ending.guild

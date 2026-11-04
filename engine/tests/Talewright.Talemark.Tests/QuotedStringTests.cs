@@ -38,7 +38,7 @@ public class QuotedStringTests
             {/if}
             {if var:word != ""}{({{Encoded}})#capitalize}{/if}
             {player:pronoun#one-many({{Encoded}}, "other")#capitalize}
-            * [{({{Encoded}})}] (requires: (var:word == {{Encoded}})) { var:word = {{Encoded}}; set flag:ready } -> END
+            * [{({{Encoded}})}] (requires (var:word == {{Encoded}})) { var:word = {{Encoded}}; set flag:ready } -> END
             """);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
@@ -68,7 +68,7 @@ public class QuotedStringTests
     [InlineData("""{player:pronoun#one-many("bad\q", "ok")}""", "TW2006")]
     [InlineData("""{player:pronoun#one-many("ok", "bad\q")}""", "TW2006")]
     [InlineData("""* [{"bad\q"}] -> END""", "TW1001")]
-    [InlineData("""* [Go] (requires: "bad\q" == "") -> END""", "TW1001")]
+    [InlineData("""* [Go] (requires "bad\q" == "") -> END""", "TW1001")]
     [InlineData("""* [Go] { var:word = "bad\q" } -> END""", "TW1001")]
     public void Invalid_escapes_report_the_authored_backslash(string line, string code)
     {
@@ -92,7 +92,7 @@ public class QuotedStringTests
     [InlineData("~ var:word = \"unfinished")]
     [InlineData("{\"unfinished}")]
     [InlineData("* [{\"unfinished}] -> END")]
-    [InlineData("* [Go] (requires: \"unfinished) -> END")]
+    [InlineData("* [Go] (requires \"unfinished) -> END")]
     [InlineData("* [Go] { var:word = \"unfinished } -> END")]
     public void Unclosed_strings_report_the_opening_quote(string line)
     {

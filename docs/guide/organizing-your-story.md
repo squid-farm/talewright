@@ -41,7 +41,7 @@ items:
 
 > ferryman: Crossing tonight, {player:first-name}?
 
-* [Pay with your silver coin] (requires: player has coin) { take player coin } -> crossing
+* [Pay with your silver coin] (requires player has coin) { take player coin } -> crossing
 * [Walk away] -> END
 
 === crossing
