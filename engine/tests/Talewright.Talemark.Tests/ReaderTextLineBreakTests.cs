@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 
@@ -10,6 +11,7 @@ public sealed class ReaderTextLineBreakTests
 {
     [Theory]
     [InlineData("Before {if true and\n  true}shown{/if} after", "Before shown after")]
+    [InlineData("Before {player:pronoun#one-many(\"has\",\n  \"have\")} after", "Before has after")]
     [InlineData("Before\n{if true and\n  true}shown{/if}\nAfter", "Before\nshown\nAfter")]
     [InlineData("Before\n{if false and\n  true}hidden{/if}\nAfter", "Before\nAfter")]
     [InlineData("Before\n{if false}hidden{/if}\n{if false}hidden{/if}\nAfter", "Before\nAfter")]
@@ -35,5 +37,30 @@ public sealed class ReaderTextLineBreakTests
             CompilerTests.Templates(scene), GameState.CreateInitial(story.World, 1));
 
         Assert.Equal(expected, Assert.IsType<RenderedParagraph>(Assert.Single(document.Blocks)).ToPlainText());
+    }
+
+    [Fact]
+    public void Multiline_image_arguments_do_not_create_a_reader_text_line_break()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = "=== start\nBefore {image(\"camp\",\n  \"A camp\")} after\n-> END",
+        }, ["images/camp.png"]);
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var story = result.Story!;
+        var scene = story.GetScene(new SceneId("start"));
+        var document = new TemplateRenderer().Render(
+            CompilerTests.Templates(scene), GameState.CreateInitial(story.World, 1));
+        var paragraph = Assert.IsType<RenderedParagraph>(Assert.Single(document.Blocks));
+
+        Assert.Equal<RenderedInline>(
+        [
+            new RenderedText("Before ", TextStyle.None),
+            new RenderedMedia("images/camp.png", "A camp"),
+            new RenderedText(" after", TextStyle.None),
+        ], paragraph.Inlines);
     }
 }
