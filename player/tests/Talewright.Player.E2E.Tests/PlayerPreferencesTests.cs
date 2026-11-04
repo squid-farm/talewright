@@ -27,6 +27,8 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         Assert.True(await dialog.EvaluateAsync<bool>("element => element.matches(':modal')"));
 
         await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Text size", new() { Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(theme).ToBeFocusedAsync();
@@ -61,6 +63,24 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
 
         await Page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Light });
         Assert.Equal("rgb(250, 248, 243)", await Page.Locator("body").EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor"));
+    }
+
+    [Theory]
+    [InlineData("{\"version\":1,\"theme\":\"dark\"}")]
+    [InlineData("{\"version\":1,\"theme\":\"dark\",\"textSizePercent\":250}")]
+    [Trait("Host", "Browser")]
+    public async Task Missing_or_invalid_text_size_uses_the_default_without_losing_theme(string stored)
+    {
+        await Page.EvaluateAsync(
+            "stored => localStorage.setItem('talewright.player.preferences', stored)",
+            stored);
+        await ReloadAsync();
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
+        Assert.Equal("18px", await Page.Locator("html").EvaluateAsync<string>(
+            "element => getComputedStyle(element).fontSize"));
+        Assert.Equal("rgb(28, 26, 23)", await Page.Locator("body").EvaluateAsync<string>(
+            "element => getComputedStyle(element).backgroundColor"));
     }
 
     [Fact]
@@ -108,5 +128,89 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
             """);
 
         Assert.True(contrast >= 4.5, $"Default-name button text contrast was {contrast:F2}:1 in forced Dark mode.");
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Maximum_text_size_persists_and_reflows_player_content_in_a_narrow_window()
+    {
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var textSize = Page.GetByLabel("Text size", new() { Exact = true });
+        await Expect(textSize.Locator("option")).ToHaveTextAsync(["100%", "125%", "150%", "175%", "200%"]);
+        await textSize.SelectOptionAsync("200");
+        Assert.Equal("36px", await Page.Locator("html").EvaluateAsync<string>(
+            "element => getComputedStyle(element).fontSize"));
+        Assert.Equal("36px", await Page.Locator(".tw-choices button").First.EvaluateAsync<string>(
+            "element => getComputedStyle(element).fontSize"));
+        Assert.InRange(await Sheet.EvaluateAsync<double>(
+            "element => parseFloat(getComputedStyle(element).fontSize)"), 30.5, 30.7);
+        Assert.Equal(200, await Page.EvaluateAsync<int>(
+            "() => JSON.parse(localStorage.getItem('talewright.player.preferences')).textSizePercent"));
+
+        await Page.Keyboard.PressAsync("Escape");
+        await ReloadAsync();
+        Assert.Equal("36px", await Page.Locator("html").EvaluateAsync<string>(
+            "element => getComputedStyle(element).fontSize"));
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Page.SetViewportSizeAsync(320, 720);
+
+        var layout = await Page.EvaluateAsync<string>("""
+            () => {
+                const bounds = element => {
+                    const rect = element.getBoundingClientRect();
+                    return {
+                        name: element.className || element.tagName,
+                        left: rect.left,
+                        right: rect.right,
+                        width: rect.width,
+                        scrollWidth: element.scrollWidth,
+                        clientWidth: element.clientWidth,
+                        columns: getComputedStyle(element).gridTemplateColumns
+                    };
+                };
+                const visibleToolbar = [...document.querySelectorAll(".tw-bar-actions button")]
+                    .filter(element => element.checkVisibility());
+                return JSON.stringify({
+                    innerWidth,
+                    rootWidth: document.documentElement.scrollWidth,
+                    elements: [".tw-app", ".tw-player", ".tw-columns", ".tw-transcript", ".tw-sheet", ".tw-choices"]
+                        .map(selector => bounds(document.querySelector(selector))),
+                    toolbar: visibleToolbar.map(bounds),
+                    choices: [...document.querySelectorAll(".tw-choices button")].map(bounds)
+                });
+            }
+            """);
+        using var layoutDetails = System.Text.Json.JsonDocument.Parse(layout);
+        var rootWidth = layoutDetails.RootElement.GetProperty("rootWidth").GetDouble();
+        var viewportWidth = layoutDetails.RootElement.GetProperty("innerWidth").GetDouble();
+        Assert.True(rootWidth <= viewportWidth + 1,
+            $"Text at 200% should reflow without horizontal clipping in a narrow window: {layout}");
+        foreach (var group in new[] { "toolbar", "choices" })
+        {
+            foreach (var element in layoutDetails.RootElement.GetProperty(group).EnumerateArray())
+            {
+                Assert.True(element.GetProperty("left").GetDouble() >= -1
+                    && element.GetProperty("right").GetDouble() <= viewportWidth + 1,
+                    $"Text at 200% should keep {element.GetProperty("name").GetString()} in the viewport: {layout}");
+            }
+        }
+        Assert.True((await Driver.ObserveAsync()).SheetStacked);
+
+        Assert.True(await Page.Locator(".tw-sheet").EvaluateAsync<bool>(
+            "element => element.scrollWidth <= element.clientWidth + 1"),
+            "Character sheet should reflow at the largest text size.");
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        var settings = Page.GetByRole(AriaRole.Dialog, new() { Name = "Settings", Exact = true });
+        await Expect(settings).ToBeVisibleAsync();
+        Assert.True(await settings.EvaluateAsync<bool>("element => element.scrollWidth <= element.clientWidth + 1"),
+            "Settings dialog should fit in a narrow window.");
+        Assert.True(await textSize.EvaluateAsync<bool>("element => element.getBoundingClientRect().right <= innerWidth"));
+        await Page.Keyboard.PressAsync("Escape");
     }
 }

@@ -60,6 +60,48 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Maximum_text_size_reflows_the_desktop_player_and_keeps_toolbar_controls_visible()
+    {
+        await Driver.StartAsync();
+        await Driver.OpenBundledAsync();
+        await Driver.ClickAsync("Start story");
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var before = await native.SnapshotAsync();
+        var passageBefore = Assert.Single(before.Descendants(), node => node.Name == "Current passage");
+
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        var dialog = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "dialog" && node.Name == "Settings");
+        var textSize = Assert.Single(dialog.Descendants(),
+            node => node.Role == "combo box" && node.Name == "Text size");
+        Assert.False(textSize.Focused);
+        await Driver.PressAsync("Tab");
+        Assert.True(Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "combo box" && node.Name == "Text size").Focused);
+        await Driver.PressAsync("End");
+        await Driver.ClickAsync("Close settings");
+
+        var after = await native.SnapshotAsync();
+        var passageAfter = Assert.Single(after.Descendants(), node => node.Name == "Current passage");
+        Assert.True(passageAfter.Bounds.Height > passageBefore.Bounds.Height,
+            "The rendered passage should grow when text size increases.");
+
+        await Driver.ResizeAsync(640, 760);
+        Assert.True((await Driver.ObserveAsync()).SheetStacked);
+        var resized = await native.SnapshotAsync();
+        var window = Assert.Single(resized.Descendants(), node => node.Role == "frame");
+        foreach (var name in new[] { "Back", "Forward", "Quick Save", "Saves", "More actions" })
+        {
+            var control = Assert.Single(resized.Descendants(),
+                node => node.Role == "push button" && node.Name == name);
+            Assert.True(control.Bounds.X >= window.Bounds.X
+                && control.Bounds.X + control.Bounds.Width <= window.Bounds.X + window.Bounds.Width,
+                $"{name} remains within the desktop window at maximum text size.");
+        }
+    }
+
+    [Fact]
     public async Task Folder_and_multiple_cli_paths_are_available_in_library()
     {
         var directory = Path.Combine(_fixtures, "linear");

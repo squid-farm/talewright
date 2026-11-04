@@ -48,6 +48,13 @@
         <option value="@PlayerTheme.Light">Light</option>
         <option value="@PlayerTheme.Dark">Dark</option>
     </select>
+    <label for="tw-text-size">Text size</label>
+    <select id="tw-text-size" value="@_textSizePercent" @onchange="ChangeTextSize">
+        @foreach (var textSize in PlayerPreferences.SupportedTextSizes)
+        {
+            <option value="@textSize">@textSize%</option>
+        }
+    </select>
     @if (Preferences.Warning is not null)
     {
         <p class="tw-error" role="status">@Preferences.Warning</p>
@@ -90,8 +97,13 @@
     private bool _initialized;
     private bool _focusMenu;
     private PlayerTheme _theme = PlayerTheme.System;
+    private int _textSizePercent = PlayerPreferences.DefaultTextSizePercent;
 
-    protected override void OnInitialized() => _theme = Preferences.Current.Theme;
+    protected override void OnInitialized()
+    {
+        _theme = Preferences.Current.Theme;
+        _textSizePercent = Preferences.Current.TextSizePercent;
+    }
 
     protected override void OnParametersSet()
     {
@@ -148,6 +160,18 @@
 
         await Preferences.SetThemeAsync(theme);
         _theme = theme;
+    }
+
+    private async Task ChangeTextSize(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var textSizePercent)
+            || !PlayerPreferences.IsSupportedTextSize(textSizePercent))
+        {
+            throw new InvalidOperationException($"Unknown text size selection '{args.Value}'.");
+        }
+
+        await Preferences.SetTextSizeAsync(textSizePercent);
+        _textSizePercent = textSizePercent;
     }
 
     private async Task CancelRestart() =>
