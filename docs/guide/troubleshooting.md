@@ -21,7 +21,7 @@ top level or inside a single folder.
 
 ## A choice I wrote doesn't appear
 
-Choices with `(requires: ...)` are hidden while the condition is false. So are choices inside an
+Choices with `(requires ...)` are hidden while the condition is false. So are choices inside an
 `{if}` block whose condition is false. Use the [Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger)
 to open the scene with the state you expect, then read its **Branch explanations**.
 

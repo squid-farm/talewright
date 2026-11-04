@@ -175,13 +175,13 @@ Right now Ada can pay with a coin she might not have, and nothing changes when s
 two choices in `dock` with these:
 
 ```tale
-* [Pay with your silver coin] (requires: player has coin) { take player coin } -> crossing
+* [Pay with your silver coin] (requires player has coin) { take player coin } -> crossing
 * [Talk your way aboard] skill-check persuasion dc 12
   success: -> crossing
   failure: -> stranded
 ```
 
-- `(requires: ...)` hides a choice unless its condition is true.
+- `(requires ...)` hides a choice unless its condition is true.
 - `{ take player coin }` is an **effect** that changes the game when the choice is picked.
 - `skill-check persuasion dc 12` rolls a d20, adds Ada's persuasion bonus, and succeeds on 12 or more.
   The indented `success:` and `failure:` lines say where each result leads.
@@ -226,7 +226,7 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 
 > ferryman: Crossing tonight, {player:first-name}? It'll cost you.
 
-* [Pay with your silver coin] (requires: player has coin) { take player coin } -> crossing
+* [Pay with your silver coin] (requires player has coin) { take player coin } -> crossing
 * [Talk your way aboard] skill-check persuasion dc 12
   success: -> crossing
   failure: -> stranded

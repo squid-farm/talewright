@@ -17,28 +17,31 @@ internal sealed class ExpressionSyntaxParser
     private readonly int _endOffset;
     private readonly Func<int, SourceLocation> _locate;
     private readonly DiagnosticBag _diagnostics;
+    private readonly bool _highlightUnexpectedTokens;
     private int _position;
     private int _nestingDepth;
     private int _failureOffset;
     private bool _hasErrors;
 
     private ExpressionSyntaxParser(TokenBuffer tokens, int endOffset, Func<int, SourceLocation> locate,
-        DiagnosticBag diagnostics, int? endIndex = null)
+        DiagnosticBag diagnostics, int? endIndex = null, bool highlightUnexpectedTokens = false)
     {
         _tokens = tokens;
         _endIndex = endIndex ?? tokens.Count - 1;
         _endOffset = endOffset;
         _locate = locate;
         _diagnostics = diagnostics;
+        _highlightUnexpectedTokens = highlightUnexpectedTokens;
     }
 
     private sealed class ParseException : Exception;
 
     internal static ExpressionSyntaxTree ParseExpression(TokenBuffer tokens, int endOffset,
-        Func<int, SourceLocation> locate, DiagnosticBag diagnostics, bool sumOnly = false)
+        Func<int, SourceLocation> locate, DiagnosticBag diagnostics, bool sumOnly = false,
+        bool highlightUnexpectedTokens = false)
     {
         var parser = new ExpressionSyntaxParser(tokens, endOffset, locate, diagnostics,
-            FindEndIndex(tokens, endOffset));
+            FindEndIndex(tokens, endOffset), highlightUnexpectedTokens);
         try
         {
             var root = sumOnly ? parser.ParseSum() : parser.ParseOr();
@@ -157,9 +160,12 @@ internal sealed class ExpressionSyntaxParser
 
     private void ExpectEnd()
     {
-        if (Peek.Kind != TokenKind.End)
+        var token = Peek;
+        if (token.Kind != TokenKind.End)
         {
-            Fail(CompilerDiagnosticCodes.InvalidExpression, $"Unexpected '{Peek.Text}'.", Peek.Offset);
+            // Error tokens can be a single UTF-16 surrogate rather than a whole character.
+            Fail(CompilerDiagnosticCodes.InvalidExpression, $"Unexpected '{token.Text}'.", token.Offset,
+                token.Kind == TokenKind.Error ? 0 : token.Length);
         }
     }
 
@@ -175,17 +181,20 @@ internal sealed class ExpressionSyntaxParser
     }
 
     [DoesNotReturn]
-    private void Fail(string code, string message, int offset)
+    private void Fail(string code, string message, int offset, int length = 0)
     {
         _hasErrors = true;
         _failureOffset = offset;
-        _diagnostics.Error(code, message, _locate(offset));
+        if (_highlightUnexpectedTokens && length > 0)
+            _diagnostics.Error(code, message, _locate(offset), _locate(offset + length));
+        else
+            _diagnostics.Error(code, message, _locate(offset));
         throw new ParseException();
     }
 
-    private T Fail<T>(string code, string message, int offset)
+    private T Fail<T>(string code, string message, int offset, int length = 0)
     {
-        Fail(code, message, offset);
+        Fail(code, message, offset, length);
         return default!;
     }
 
@@ -374,7 +383,7 @@ internal sealed class ExpressionSyntaxParser
             default:
                 return Fail<ExpressionNode>(CompilerDiagnosticCodes.InvalidExpression,
                     token.Kind == TokenKind.End ? "Expression is incomplete." : $"Unexpected '{token.Text}'.",
-                    token.Offset);
+                    token.Offset, token.Length);
         }
     }
 

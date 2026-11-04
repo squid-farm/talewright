@@ -18,10 +18,10 @@ public sealed class SlowInputStoriesTests
     [InlineData(SlowInputShape.UnmatchedEmphasis, 3_167, "E81CA2347132C809944BC1432F3D28036FD137F6D8EF099814BDFC186AAF5E92")]
     [InlineData(SlowInputShape.UnclosedLinks, 4_167, "2D9B68D53911BD882088BA164EC3213076ABD25E7CA24689B7D5BD0145B6B644")]
     [InlineData(SlowInputShape.Choices, 22_049, "053FD46B604D0ACAA1B25F5F15B4F22B5F87323046FDE820FA2FFEFC7FEBA37E")]
-    [InlineData(SlowInputShape.ChoicesWithExpressions, 67_049, "E40444CDCF6441CDF91F84224A153CD3F8378EB6D1E254B7160F94A78114DECA")]
+    [InlineData(SlowInputShape.ChoicesWithExpressions, 66_049, "87B22BC189A14403B900C328B005E77CBE157A7283E105D67B9E1B8190CA4B75")]
     [InlineData(SlowInputShape.NestedParentheses, 2_182, "BC9E630280B9216D3D844B5B8758885957F34B878B851F9D81411299ACCEA390")]
     [InlineData(SlowInputShape.UnaryPrefixes, 1_182, "7C72C05219A6D9588E23CCBFA04EEA4BA81257F40742FEC355B23930E4FF0C97")]
-    [InlineData(SlowInputShape.BrokenChoiceLines, 61_159, "5593EFF3A1E7884D9488BCB98A02BAC17F5D737430B9191BAE397D803464A13A")]
+    [InlineData(SlowInputShape.BrokenChoiceLines, 60_159, "28DA220F80906EC5A095AA1096CFA5FC071A289508947E33ED216DC052A3C1EC")]
     [InlineData(SlowInputShape.UnclosedChoiceLabel, 1_172, "0BF25CEA1DA3CCF1129FE76E7650B57B39088BC0A2DF1A9B30DA0633515731A6")]
     public void Reference_ladder_preserves_source_bytes(SlowInputShape shape, int expectedBytes, string expectedHash)
     {
@@ -137,7 +137,7 @@ public sealed class SlowInputStoriesTests
     public void Broken_choice_stress_shapes_reach_ten_thousand_lines_and_label_characters()
     {
         const int size = 10_000;
-        const string brokenLine = "* [Go {var:count} (requires: flag:a) { set flag:b } -> start";
+        const string brokenLine = "* [Go {var:count} (requires flag:a) { set flag:b } -> start";
         var lines = SlowInputStories.Create(SlowInputShape.BrokenChoiceLines, size).Files["main.tale"];
         var label = SlowInputStories.Create(SlowInputShape.UnclosedChoiceLabel, size).Files["main.tale"];
 

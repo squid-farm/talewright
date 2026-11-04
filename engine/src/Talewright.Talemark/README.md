@@ -66,7 +66,7 @@ keyword, speaker or block keyword) and value spans. Parts live in a per-scene si
 comment lines stay small. Lines with a structural error are marked `IsInvalid`; lines inside a condition nested past
 the limit are marked `IsSuppressed`. The binder gives either kind no further meaning.
 
-Choice, `::: skill-check` and outcome lines record clauses (`TaleClause`) instead: label, `(requires: …)`,
+Choice, `::: skill-check` and outcome lines record clauses (`TaleClause`) instead: label, `(requires …)`,
 effects, divert, the skill-check spec with its actor/stat words and `dc` expression. An invalid choice line is a
 dropped choice; duplicate clauses, trailing text and bad divert targets are reported but keep it. Comment lines and
 `success:`/`failure:` lines after an accepted check, plus blank lines and the closing `:::` inside a block, are

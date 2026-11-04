@@ -289,7 +289,7 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 
 ~ var:torches-lit += 1
 
-* [Read the glyphs] (requires: player:int >= 12) -> temple.glyphs
+* [Read the glyphs] (requires player:int >= 12) -> temple.glyphs
 * [Shove the door] { faction:explorers-guild:standing -= 5 } -> temple.hall
 ```
 
@@ -309,8 +309,8 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
-| `* [label] (requires: expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
-| `* (requires: expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
+| `* [label] (requires expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
+| `* (requires expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
@@ -339,16 +339,16 @@ more choices, conditions containing only choices, comments and blank lines are a
 requirements and enclosing conditions are evaluated when reached; choice effects run when chosen.
 
 Each choice can have at most one requirement and one effect block, in either order. Both must
-come before its divert or `skill-check`. Spell the condition's opening marker exactly
-`(requires:`; whitespace may follow the colon, but not separate `(`, `requires` and `:`.
-An unclosed label reports TW1011 at its opening `[`. When there is one clear clause boundary,
-the diagnostic may suggest where to insert `]`.
+come before its divert or `skill-check`. Write a choice requirement as `(requires expression)`,
+with whitespace between `requires` and the expression. The older `(requires: expression)` form
+reports TW1011 with a replacement suggestion. An unclosed label reports TW1011 at its opening
+`[`. When there is one clear clause boundary, the diagnostic may suggest where to insert `]`.
 
 Omit a choice's label to show **Continue**, including alongside other choices:
 
 ```tale
-* [Open the door] (requires: flag:ready) -> hall
-* (requires: flag:ready) { set flag:left } -> garden
+* [Open the door] (requires flag:ready) -> hall
+* (requires flag:ready) { set flag:left } -> garden
 * -> END
 ```
 

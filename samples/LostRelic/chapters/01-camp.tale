@@ -131,8 +131,8 @@ The watch ledger has no phrase recorded yet.
 You write **{var:watch-note}** in the watch ledger. {guide:first-name} asks what should happen
 if a stranger overhears it.
 
-* [Change the watchword to lantern light] (requires: var:watchword == var:watch-note) { var:watchword = "lantern light" } -> camp.watchword-readback
-* [Retire the watchword without a replacement] (requires: var:watchword == var:watch-note) { var:watchword = "" } -> camp.watchword-readback
+* [Change the watchword to lantern light] (requires var:watchword == var:watch-note) { var:watchword = "lantern light" } -> camp.watchword-readback
+* [Retire the watchword without a replacement] (requires var:watchword == var:watch-note) { var:watchword = "" } -> camp.watchword-readback
 * [Keep the recorded watchword] -> camp.watchword-readback
 
 === camp.watchword-readback

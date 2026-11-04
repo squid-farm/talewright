@@ -197,7 +197,7 @@ public sealed class AuthorTimelineTests
     [Fact]
     public void Refresh_retains_incoming_choice_consequences_and_entry_check_notes_once()
     {
-        var session = Start(Compile(Tale.Replace("* [Prepared {var:count}] (requires: flag:ready) -> target", """
+        var session = Start(Compile(Tale.Replace("* [Prepared {var:count}] (requires flag:ready) -> target", """
             * [Try] { give guide rope } skill-check athletics dc 1
               success: -> target
               failure: -> target
@@ -300,7 +300,7 @@ public sealed class AuthorTimelineTests
             .Replace("flags: [ready, fired]", "flags: [ready, fired, chain-0]") + "triggers:\n" + triggers;
         var session = Start(Compile("""
             === start
-            * [Stay] (requires: not flag:ready) -> start
+            * [Stay] (requires not flag:ready) -> start
             === bad
             ~ set flag:chain-0
             -> END

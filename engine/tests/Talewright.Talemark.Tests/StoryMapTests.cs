@@ -51,7 +51,7 @@ public sealed class StoryMapTests
             ["story.talewright.yaml"] = TestStories.DefaultYaml,
             ["main.tale"] = """
                 === start
-                * [Unavailable] (requires: false) -> gated
+                * [Unavailable] (requires false) -> gated
                 === gated
                 -> END
                 === orphan

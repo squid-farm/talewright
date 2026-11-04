@@ -102,7 +102,8 @@ payload instead. See [artwork and hosting size](../guide/sharing-your-story.md#a
 
 - Each diagnostic has `code`, `severity` (`error` or `warning`), `message`, `file` (relative to the story),
   `line` and `column`. Positions are one-based; `0` means unspecified. `--warnings-as-errors` doesn't
-  change reported severities.
+  change reported severities. Diagnostics with source ranges also include exclusive `endLine` and
+  `endColumn` positions.
 - Operational failures (exit 2) return `success: false`, empty `diagnostics` and
   `error: {"code": "TWCLI001" | "TWCLI002" | "TWCLI003", "message": "..."}`: `TWCLI001` for invocation errors,
   `TWCLI002` for input errors, and `TWCLI003` for invalid lint configuration.

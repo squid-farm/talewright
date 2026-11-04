@@ -8,7 +8,7 @@
 The trail ends at a brown river, swollen with last night's rain. On the far bank, through the trees, you
 can make out a stair of green stone.
 
-* [Tie off the rope and cross carefully] (requires: player has rope) { player:xp += 25 } -> trail.far-bank
+* [Tie off the rope and cross carefully] (requires player has rope) { player:xp += 25 } -> trail.far-bank
 * [Swim for it] skill-check athletics dc 12
   success: -> trail.far-bank
   failure: { player:hp -= 3 } -> trail.swept
@@ -131,6 +131,6 @@ returns, and agree not to follow a voice you cannot place.
 The watch bell has sounded **{var:bell-count}** times. A low branch is caught
 in the tripwire. You can lift it clear, then check whether the line still holds.
 
-* [Ring the bell] (requires: not flag:bell-ringing) { set flag:bell-ringing } -> trail.bell
-* [Silence the bell] (requires: flag:bell-ringing) { clear flag:bell-ringing } -> trail.bell
+* [Ring the bell] (requires not flag:bell-ringing) { set flag:bell-ringing } -> trail.bell
+* [Silence the bell] (requires flag:bell-ringing) { clear flag:bell-ringing } -> trail.bell
 * [Return to the fire] { clear flag:bell-ringing } -> trail.night

@@ -89,6 +89,28 @@ public sealed class ValidationTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("validate")]
+    [InlineData("lint")]
+    public void Json_includes_compiler_unexpected_token_range(string command)
+    {
+        const string line = "  * [😀] (requires: true) -> END";
+        File.WriteAllText(Path.Combine(_root, "main.tale"), $"=== a\n{line}\n");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = CommandLine.Run([command, _root, "--format", "json"], output, error);
+        using var json = JsonDocument.Parse(output.ToString());
+        var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
+            item => item.GetProperty("code").GetString() == "TW1001");
+
+        Assert.Equal(1, code);
+        Assert.Equal("Unexpected ':'.", diagnostic.GetProperty("message").GetString());
+        Assert.Equal(2, diagnostic.GetProperty("line").GetInt32());
+        Assert.Equal(line.IndexOf(':') + 1, diagnostic.GetProperty("column").GetInt32());
+        Assert.Equal(2, diagnostic.GetProperty("endLine").GetInt32());
+        Assert.Equal(line.IndexOf(':') + 2, diagnostic.GetProperty("endColumn").GetInt32());
+    }
+
     [Fact]
     public void Warnings_succeed_unless_explicitly_rejected()
     {
