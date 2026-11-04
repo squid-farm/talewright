@@ -113,7 +113,7 @@ public sealed class TalemarkFakerTests
         manifest.Character("player", "Tester", pronouns: "they");
         manifest.Faction("guild", "Test Guild", 3);
         manifest.Item("charm", "Test charm", new Dictionary<string, int> { ["wis"] = 2 });
-        manifest.Trigger("welcome", "faction:guild >= friendly", EffectFaker.Set(ready), once: true);
+        manifest.Trigger("welcome", "faction:guild:tier >= friendly", EffectFaker.Set(ready), once: true);
 
         var yaml = manifest.Build();
         var source = new StorySource(new Dictionary<string, string>

@@ -6,7 +6,7 @@
 {image("camp-art", "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.")}
 
 The boat leaves {player:first-name} at the edge of the jungle with a pack, {item:torch#a#lower} and
-three weeks of unanswered letters. The {faction:explorers-guild:name} has given {player:pronoun:object}
+three weeks of unanswered letters. The {faction:explorers-guild} has given {player:pronoun:object}
 one season to find **{item:relic#the}** before they hand the expedition to someone more *reliable*.
 
 > guide: {player:name}. You're later than your letter promised. I'm {guide:first-name} — the guild sent me.
@@ -74,13 +74,13 @@ The clerk says {item:idol#this} {item:idol#one-many("belongs", "belong")} to the
 {guide:first-name} tells you about the river crossing, and about {ines:name},
 the explorer who went in last spring and came out talking only in numbers.
 
-{if faction:explorers-guild >= friendly}
+{if faction:explorers-guild:tier >= friendly}
 > guide: The guild speaks well of you. I'll do what I can.
 {else}
 > guide: Between us, the guild expects you to fail.
 {/if}
 
-~ faction:explorers-guild += 5
+~ faction:explorers-guild:standing += 5
 -> camp.hub
 
 === camp.journal

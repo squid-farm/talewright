@@ -92,6 +92,8 @@ internal static class ExpressionCompletion
             {
                 if (owner.Is(Faction))
                     keywords = [.. FactionProperties];
+                else if (owner.Is(Item))
+                    keywords = [.. ItemProperties];
                 else if (kind != ExpressionContextKind.Number && member.Is(Pronoun) &&
                          symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)))
                 {

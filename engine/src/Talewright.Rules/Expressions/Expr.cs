@@ -48,13 +48,13 @@ public sealed record StatRef(EntityId Character, StatId Stat) : Expr
     public override ExprType Type => ExprType.Number;
 }
 
-/// <summary><c>faction:guild</c>: player standing with a faction.</summary>
+/// <summary><c>faction:guild:standing</c>: player's numeric standing with a faction.</summary>
 public sealed record StandingRef(FactionId Faction) : Expr
 {
     public override ExprType Type => ExprType.Number;
 }
 
-/// <summary><c>faction:guild:tier</c>: standing tier (also produced implicitly when comparing a faction to a tier name).</summary>
+/// <summary><c>faction:guild:tier</c>: standing tier.</summary>
 public sealed record StandingTierRef(FactionId Faction) : Expr
 {
     public override ExprType Type => ExprType.Tier;
@@ -106,13 +106,13 @@ public sealed record PronounRef(EntityId Character, PronounForm Form) : Expr
     public override ExprType Type => ExprType.Text;
 }
 
-/// <summary><c>faction:guild:name</c>.</summary>
+/// <summary><c>faction:guild</c> or <c>faction:guild:name</c>: faction display name.</summary>
 public sealed record FactionNameRef(FactionId Faction) : Expr
 {
     public override ExprType Type => ExprType.Text;
 }
 
-/// <summary><c>item:rope</c>: item display name.</summary>
+/// <summary><c>item:rope</c> or <c>item:rope:name</c>: item display name.</summary>
 public sealed record ItemNameRef(ItemId Item) : Expr
 {
     public override ExprType Type => ExprType.Text;

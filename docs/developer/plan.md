@@ -147,7 +147,7 @@ for actual project references, public contracts, and implemented types.
 - **Evaluator:** pure functions over a read-only `IGameStateView`. No reflection, no runtime expression compilation (WASM-friendly).
 - **Storylet selection:** content units carry `requires`, `priority` and `tags`. The selector returns eligible units. "Rails" means explicit diverts (`-> scene`); "hubs" means offering every eligible storylet. Both come in M1 at basic level.
 - **Modifiers:** derived and temporary stat adjustments (an equipped item gives +2).
-- **Triggers:** reactive rules (`when faction:guild < hostile → emit FactionTurnedHostile`), bounded to prevent infinite cascades.
+- **Triggers:** reactive rules (`when faction:guild:tier < hostile → emit FactionTurnedHostile`), bounded to prevent infinite cascades.
 - **Skill checks:** `d20 + modifier vs DC` by default, defined by the ruleset and replaceable. Outcomes (success, failure, later crit or partial) map to branches.
 
 ### 4.4 Narrative / Template renderer (`Talewright.Narrative`)

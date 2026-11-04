@@ -14,6 +14,8 @@ public sealed partial class ServerTests
     [InlineData("{var:co|ins}", "Variable", "coins")]
     [InlineData("{item:ro|pe}", "Item", "rope")]
     [InlineData("{faction:gu|ild:name}", "Faction", "guild")]
+    [InlineData("{item:rope:na|me}", "Character, faction or item display name", "name")]
+    [InlineData("{faction:guild:sta|nding}", "Numeric player standing", "standing")]
     [InlineData("@requires @IsH|ero", "Predicate", "IsHero")]
     [InlineData("{player:first-name#cus|tom}", "Modifier", "custom")]
     [InlineData("@req|uires player:hp > 0", "Boolean condition", "requires")]

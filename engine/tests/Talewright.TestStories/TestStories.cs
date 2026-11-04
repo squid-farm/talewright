@@ -23,7 +23,7 @@ public static class TestStories
         manifest.Item("charm", "Test charm", new Dictionary<string, int> { ["wis"] = 2 });
         manifest.Item("relic", "Test relic", new Dictionary<string, int> { ["cha"] = 2 });
         manifest.Number("visits", 0);
-        manifest.Trigger("wary", "faction:guild <= unfriendly", EffectFaker.Set(new TaleFlagRef("wary")), once: true);
+        manifest.Trigger("wary", "faction:guild:tier <= unfriendly", EffectFaker.Set(new TaleFlagRef("wary")), once: true);
         return manifest;
     }
 
@@ -70,7 +70,7 @@ public static class TestStories
         Inventory: {if player has rope}ready{else}empty{/if}.
         * [Use the rope] (requires: player has rope) -> finish
         * [Read the flag] (requires: flag:ready) -> flag
-        * [Trusted passage] (requires: faction:guild >= friendly) -> finish
+        * [Trusted passage] (requires: faction:guild:tier >= friendly) -> finish
         * [Strong passage] (requires: player:str >= 12) -> finish
         * [Leave empty] -> finish
         === supply
@@ -81,7 +81,7 @@ public static class TestStories
         ~ give player rope 2
         ~ give player charm
         ~ player:str += 2
-        ~ faction:guild += 20
+        ~ faction:guild:standing += 20
         ~ set flag:ready
         Supplies collected.
         -> start
@@ -106,8 +106,8 @@ public static class TestStories
         * [Leave empty] -> empty
         === return
         Level {player:level}.
-        * [Donate relic] { take player relic; faction:guild += 20 } -> donated
-        * [Keep relic] { faction:guild -= 30 } -> kept
+        * [Donate relic] { take player relic; faction:guild:standing += 20 } -> donated
+        * [Keep relic] { faction:guild:standing -= 30 } -> kept
         === donated
         The donation is complete. Standing: {faction:guild:tier}.
         -> END
@@ -132,9 +132,9 @@ public static class TestStories
         === start
         Choose a condition.
         * [Outer false] -> result
-        * [Inner false] { faction:guild -= 30 } -> result
-        * [Inner true] { faction:guild -= 30; give player relic; player:xp += 150 } -> result
-        * [Inner true without relic] { faction:guild -= 30; player:xp += 150 } -> result
+        * [Inner false] { faction:guild:standing -= 30 } -> result
+        * [Inner true] { faction:guild:standing -= 30; give player relic; player:xp += 150 } -> result
+        * [Inner true without relic] { faction:guild:standing -= 30; player:xp += 150 } -> result
         === result
         {if flag:wary}
         Outer true.

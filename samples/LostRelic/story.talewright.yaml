@@ -93,7 +93,7 @@ vars:
 
 triggers:
   - id: guild-wary
-    when: faction:explorers-guild <= unfriendly
+    when: faction:explorers-guild:tier <= unfriendly
     do: set flag:guild-wary
     once: true
   - id: courage-earned
