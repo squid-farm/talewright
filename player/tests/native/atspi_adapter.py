@@ -211,7 +211,7 @@ class Desktop:
                     data = serialize(child, depth + 1)
                     if data is not None:
                         children.append(data)
-            return {"name": normalized(node.name), "role": node.getRoleName(), "text": normalized(content),
+            return {"name": normalized(node.name), "role": node.getRoleName(), "text": content,
                     "focused": node.getState().contains(pyatspi.STATE_FOCUSED),
                     "bounds": bounds, "children": children}
         return serialize(root)

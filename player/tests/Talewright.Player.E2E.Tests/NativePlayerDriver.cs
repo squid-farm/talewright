@@ -21,7 +21,7 @@ public sealed record AccessibleNode(
             var content = !string.IsNullOrEmpty(Text)
                 ? Text.Replace("\uFFFC", "", StringComparison.Ordinal)
                 : Children.Length > 0 ? string.Join(" ", Children.Select(node => node.NarrativeContent)) : Name;
-            return Regex.Replace(content, @"\s+", " ").Trim();
+            return Regex.Replace(content.ReplaceLineEndings("\n"), @"[^\S\n]+", " ").Trim();
         }
     }
 }
