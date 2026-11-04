@@ -397,9 +397,9 @@ Several conditional diverts may precede the choices; the first reached divert en
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed
 by a space or `[` is a choice; `*emphasis*` at the start of a line is prose.
 
-**Reader-text escapes.** A backslash before ASCII punctuation shows that character literally. For
-example, `\* [Go] -> hall` is prose, not a choice. A backslash before a letter, digit, space or
-non-ASCII character stays visible, as in `C:\stories` and `\—`.
+**Reader-text escapes.** A backslash before an ASCII punctuation or symbol character shows that
+character literally. For example, `\* [Go] -> hall` is prose, not a choice. A backslash before a
+letter, digit, space or non-ASCII character stays visible, as in `C:\stories` and `\—`.
 
 **Reader text is not Markdown.** Talemark implements its own small
 [reader-text grammar](talemark-operators.md#reader-text-grammar): word-boundary bold and italic,
