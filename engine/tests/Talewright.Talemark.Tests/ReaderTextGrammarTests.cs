@@ -17,8 +17,8 @@ namespace Talewright.Talemark.Tests;
 public sealed class ReaderTextGrammarTests
 {
     [Theory]
-    [InlineData("Lost line\n---", "Lost line ---")]
-    [InlineData("Lost line\n-", "Lost line -")]
+    [InlineData("Lost line\n---", "Lost line\n---")]
+    [InlineData("Lost line\n-", "Lost line\n-")]
     [InlineData("[Inventory]: empty", "[Inventory]: empty")]
     [InlineData("[the inn][1] is here", "[the inn][1] is here")]
     [InlineData("[Go](https://example.org) now", "[Go](https://example.org) now")]
@@ -45,9 +45,9 @@ public sealed class ReaderTextGrammarTests
     [InlineData("**bold *italic* bold**", "[B: bold ][B+I: italic][B:  bold]")]
     [InlineData("*a **b* c**", "*a [B: b* c]")]
     [InlineData("_under_ and __strong__", "[I: under] and [B: strong]")]
-    [InlineData("`code {player:first-name} **x**`", "[C: code Mara **x**]")]
-    [InlineData(@"`a \{b\} c`", "[C: a {b} c]")]
-    [InlineData("`` a`b ``", "[C: a`b]")]
+    [InlineData("`code {player:first-name} **x**`", "`code Mara [B: x]`")]
+    [InlineData(@"`a \{b\} c`", "`a {b} c`")]
+    [InlineData("`` a`b ``", "`` a`b ``")]
     [InlineData(@"\* \_ \[ \] \{ \} \\", "* _ [ ] { } \\")]
     [InlineData(@"\. \# \> \& \= \a \1 \—", @". # > & = \a \1 \—")]
     [InlineData(@"\{player}", "{player}")]
@@ -55,7 +55,6 @@ public sealed class ReaderTextGrammarTests
     [InlineData(@"\* [Go] -> hall", "* [Go] -> hall")]
     [InlineData(@"\> guide: Hello", "> guide: Hello")]
     [InlineData(@"\= ordinary text", "= ordinary text")]
-    [InlineData("line one\\\nline two", "line one\nline two")]
     [InlineData("She said \"hi\" (quietly) [aside]", "She said \"hi\" (quietly) [aside]")]
     public void Approved_reader_text_corpus_is_preserved(
         string inline, string expected)
@@ -129,7 +128,7 @@ public sealed class ReaderTextGrammarTests
     }
 
     [Fact]
-    public void Formatting_and_code_scans_do_linear_work_on_a_mixed_paragraph()
+    public void Formatting_and_reader_text_scans_do_linear_work_on_a_mixed_paragraph()
     {
         var input = string.Concat(Enumerable.Repeat(
             "ordinary *prose* with `code` and **strong**.\n", 1_000));
@@ -157,6 +156,51 @@ public sealed class ReaderTextGrammarTests
             Assert.Equal(character.ToString(),
                 string.Concat(inlines.Select(inline => Assert.IsType<TextTemplate>(inline).Text)));
         }
+    }
+
+    [Theory]
+    [InlineData("line one\nline two", "line one\nline two")]
+    [InlineData("first\n{if false}hidden{/if}\nlast", "first\nlast")]
+    [InlineData("{if false}hidden{/if}\nfirst", "first")]
+    [InlineData("first\n{if false}hidden{/if}", "first")]
+    [InlineData("first\n{if true}shown{/if}\nlast", "first\nshown\nlast")]
+    public void Reader_text_line_breaks_render_as_written_except_for_empty_lines(
+        string inline, string expected)
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = $"=== start\n{inline}\n-> END",
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var scene = result.Story!.GetScene(new SceneId("start"));
+        var document = new TemplateRenderer().Render(
+            CompilerTests.Templates(scene),
+            GameState.CreateInitial(result.Story.World, 1));
+        var paragraph = Assert.IsType<RenderedParagraph>(Assert.Single(document.Blocks));
+        Assert.Equal(expected, string.Concat(paragraph.Inlines.Select(Describe)));
+    }
+
+    [Theory]
+    [InlineData("line one\\\nline two", 2, 9)]
+    [InlineData("line one\\", 2, 9)]
+    [InlineData("> player: line\\", 2, 15)]
+    public void Unpaired_trailing_backslashes_report_the_replacement(
+        string inline, int line, int column)
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = $"=== start\n{inline}\n-> END",
+        });
+        var result = StoryCompiler.Compile(source);
+        var error = Assert.Single(result.Errors,
+            diagnostic => diagnostic.Code == CompilerDiagnosticCodes.TrailingReaderTextBackslash);
+
+        Assert.Equal("Line breaks now render as written; remove the trailing '\\'.", error.Message);
+        Assert.Equal(new SourceLocation("main.tale", line, column), error.Location);
     }
 
     [Fact]

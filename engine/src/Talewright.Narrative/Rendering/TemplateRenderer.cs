@@ -138,6 +138,8 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
         var merged = new List<RenderedInline>();
         var buffer = new StringBuilder();
         TextStyle? bufferStyle = null;
+        var lineStart = 0;
+        var lineHasContent = false;
 
         void Flush()
         {
@@ -154,6 +156,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
         {
             if (inline is RenderedText text)
             {
+                lineHasContent |= !string.IsNullOrWhiteSpace(text.Text);
                 if (bufferStyle != text.Style)
                 {
                     Flush();
@@ -162,14 +165,39 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
 
                 buffer.Append(text.Text);
             }
+            else if (inline is RenderedLineBreak)
+            {
+                Flush();
+                if (lineHasContent)
+                {
+                    merged.Add(inline);
+                }
+                else
+                {
+                    merged.RemoveRange(lineStart, merged.Count - lineStart);
+                }
+
+                lineStart = merged.Count;
+                lineHasContent = false;
+            }
             else
             {
                 Flush();
                 merged.Add(inline);
+                lineHasContent = true;
             }
         }
 
         Flush();
+        if (!lineHasContent)
+        {
+            merged.RemoveRange(lineStart, merged.Count - lineStart);
+        }
+
+        if (merged.Count > 0 && merged[^1] is RenderedLineBreak)
+        {
+            merged.RemoveAt(merged.Count - 1);
+        }
 
         for (var i = 0; i < merged.Count; i++)
         {

@@ -122,7 +122,8 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
             await Expect(Page.GetByRole(AriaRole.Img, new() { Name = alt, Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator(".tw-media-strong")).ToHaveCSSAsync("font-weight", "700");
         await Expect(Page.Locator(".tw-media-emphasis")).ToHaveCSSAsync("font-style", "italic");
-        await Expect(Page.Locator(".tw-media-code")).ToHaveCSSAsync("font-family", "monospace");
+        await Expect(Page.Locator(".tw-media-code")).ToHaveCountAsync(0);
+        Assert.Equal(2, (await Choices.First.InnerTextAsync()).Count(character => character == '`'));
         await Expect(Latest.GetByRole(AriaRole.Status)).ToContainTextAsync(
             ["This image could not be displayed.", "This image could not be displayed."]);
         await Choices.First.FocusAsync();

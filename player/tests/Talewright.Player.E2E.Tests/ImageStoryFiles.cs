@@ -24,7 +24,7 @@ internal sealed class ImageStoryFiles : IDisposable
             "",
             $"{MarkupFaker.Strong(ImageFaker.Call("photo.jpeg", "Strong camp"))} {MarkupFaker.Emphasis(ImageFaker.Call("photo.jpeg", "Emphasized camp"))}",
             "",
-            MarkupFaker.Code(ImageFaker.Call("pixel.webp", "Code pixel")),
+            ImageFaker.Call("pixel.webp", "Code pixel"),
             "",
             IfFaker.Inline("true", ImageFaker.Call("photo.jpeg", "Conditional camp")),
             "",

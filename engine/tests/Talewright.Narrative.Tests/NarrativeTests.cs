@@ -140,6 +140,32 @@ public class NarrativeTests
     }
 
     [Fact]
+    public void A_line_with_only_media_remains_visible()
+    {
+        var rendered = new TemplateRenderer().RenderInlines(
+        [
+            new TextTemplate("Before"),
+            new LineBreakTemplate(),
+            new TextTemplate(" "),
+            new MediaTemplate("images/map.png", ""),
+            new TextTemplate(" "),
+            new LineBreakTemplate(),
+            new TextTemplate("After"),
+        ], State());
+
+        Assert.Equal<RenderedInline>(
+        [
+            new RenderedText("Before", TextStyle.None),
+            new RenderedLineBreak(),
+            new RenderedText(" ", TextStyle.None),
+            new RenderedMedia("images/map.png", ""),
+            new RenderedText(" ", TextStyle.None),
+            new RenderedLineBreak(),
+            new RenderedText("After", TextStyle.None),
+        ], rendered);
+    }
+
+    [Fact]
     public void Media_alt_template_renders_with_state_and_literal_alt_is_unchanged()
     {
         var rendered = new TemplateRenderer().RenderInlines(

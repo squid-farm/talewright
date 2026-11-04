@@ -107,7 +107,7 @@ public partial class LostRelicTests
                 _ => new[] { "They", "their", "theirs", "themselves" },
             };
             var text = history.Current.Document.ToPlainText();
-            Assert.Contains($"{forms[0]} signed {forms[1]} own name; this copy is {forms[2]}.", text);
+            Assert.Contains($"{forms[0]} signed\n{forms[1]} own name; this copy is {forms[2]}.", text);
             Assert.Contains($"check it {forms[3]}", text);
             Assert.Contains("MARA BURNS", text);
             Assert.Contains("An obsidian idol", text);
