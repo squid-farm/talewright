@@ -345,8 +345,8 @@ lines only inside a paragraph. Block directives, including block `{if}` lines, a
 1. Line directives decide the text units.
 2. Within a unit, a single left-to-right scan recognizes escapes, inline constructs, then emphasis
    and strong delimiters. Inline constructs are atoms: a `*` or `_` inside `{ }` is never formatting.
-3. Inline `{if}`, `{else}` and `{/if}` pair within their text unit. Otherwise they report TW1005.
-   Inline conditions nest at most 64 deep (TW1016).
+3. Inline `{if}`, `{else}` and `{/if}` pair only with markers in the same formatting span.
+   Otherwise they report TW1005. Inline conditions nest at most 64 deep (TW1016).
 
 ### Escapes
 
@@ -453,8 +453,8 @@ strong and `[C: ...]` is code.
 
 | # | Input | Current | Approved |
 |---|---|---|---|
-| 1 | `Lost line` ⏎ `---` | The paragraph disappears (setext heading). | `Lost line ---` |
-| 2 | `Lost line` ⏎ `-` | The paragraph disappears. | `Lost line -` |
+| 1 | `Lost line` ⏎ `---` | The paragraph disappears (setext heading). | `Lost line` ⏎ `---` |
+| 2 | `Lost line` ⏎ `-` | The paragraph disappears. | `Lost line` ⏎ `-` |
 | 3 | `[Inventory]: empty` | Disappears (reference definition). | Literal. |
 | 4 | `[the inn][1] is here` | `the inn][1] is here` | Literal. |
 | 5 | `[Go](https://example.org) now` | `Go now` | Literal. |

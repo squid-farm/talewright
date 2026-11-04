@@ -409,7 +409,8 @@ syntax, including links, entities, headings and lists, remains literal text.
 
 Each line break inside a paragraph renders as a line break. A line whose content renders empty,
 such as an inline conditional whose condition is false, does not leave an empty line. A trailing
-unpaired backslash reports TW1017; remove it.
+unpaired backslash reports TW1017; remove it. Disable hard-wrapping for prose and use your
+editor's soft wrapping for display instead.
 
 ## 3. Substitutions
 
