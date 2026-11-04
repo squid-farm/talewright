@@ -58,6 +58,28 @@ test('TextMate scopes agree with the owned vocabulary contract', async () => {
   }
 });
 
+test('emphasis scopes match the shared compiler corpus and record its known difference', async () => {
+  const cases = JSON.parse(await readFile(
+    new URL('../../../engine/tests/Talewright.Talemark.Tests/Fixtures/reader-text-emphasis-parity.json', import.meta.url),
+    'utf8',
+  ));
+  assert.equal(cases.filter(testCase => testCase.knownDifference).length, 1);
+  for (const { input, segments } of cases) {
+    const lineTokens = tokens(input).tokens;
+    for (const { start, length, text, styles } of segments) {
+      assert.equal(input.slice(start, start + length), text, `${input}: invalid fixture range`);
+      for (let offset = start; offset < start + length; offset++) {
+        const token = lineTokens.find(candidate => candidate.startIndex <= offset && candidate.endIndex > offset);
+        const actualStyles = token.scopes
+          .filter(scope => /^markup\.(bold|italic)\.markdown$/.test(scope))
+          .map(scope => scope.includes('.bold.') ? 'bold' : 'italic')
+          .sort();
+        assert.deepEqual(actualStyles, [...styles].sort(), `${input}: unexpected formatting at ${offset}`);
+      }
+    }
+  }
+});
+
 test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
   for (const [line, text, scope] of [
     ['=== temple.hall', 'temple.hall', 'entity.name.section.tale'],
