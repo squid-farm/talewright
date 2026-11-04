@@ -161,6 +161,23 @@ public sealed class ReaderTextGrammarTests
     }
 
     [Fact]
+    public void Rejected_image_does_not_hide_other_reader_text_errors()
+    {
+        var diagnostics = new DiagnosticBag();
+        InlineParser.Parse(
+            SourceText.Single("![a](p) tail\\", new SourceLocation("main.tale", 1, 1)),
+            Symbols(), diagnostics);
+
+        Assert.Equal(2, diagnostics.Items.Count);
+        var image = Assert.Single(diagnostics.Items, item => item.Code == CompilerDiagnosticCodes.LegacyImageSyntax);
+        var backslash = Assert.Single(diagnostics.Items, item => item.Code == CompilerDiagnosticCodes.TrailingReaderTextBackslash);
+        Assert.Equal(DiagnosticSeverity.Error, image.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, backslash.Severity);
+        Assert.Equal(new SourceLocation("main.tale", 1, 1), image.Location);
+        Assert.Equal(new SourceLocation("main.tale", 1, 13), backslash.Location);
+    }
+
+    [Fact]
     public void Every_ascii_punctuation_character_can_be_escaped_as_reader_text()
     {
         const string punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
