@@ -23,6 +23,17 @@ public sealed class AccessibleNodeTests
         Assert.Equal("Before Useful alt After", node.NarrativeContent);
     }
 
+    [Fact]
+    public void Section_narrative_uses_child_blocks_instead_of_accessibility_separators()
+    {
+        var node = Node("Current passage", "section", "Base Camp\n\ufffc\n\nThe boat leaves\nthree weeks later.",
+            Node("Base Camp", "heading", "Base Camp"),
+            Node("", "paragraph", "\ufffc", Node("Camp alt", "image", "")),
+            Node("", "paragraph", "The boat leaves\nthree weeks later."));
+
+        Assert.Equal("Base Camp The boat leaves\nthree weeks later.", node.NarrativeContent);
+    }
+
     [Theory]
     [InlineData("Xe\nhas a question")]
     [InlineData("The Hands have no owner.\nThey offer the final mark.")]

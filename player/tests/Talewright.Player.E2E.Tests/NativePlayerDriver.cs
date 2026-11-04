@@ -17,8 +17,11 @@ public sealed record AccessibleNode(
     {
         get
         {
-            // AX text already includes descendant text; object markers and repeated names are not narrative.
-            var content = !string.IsNullOrEmpty(Text)
+            // Section text includes accessibility separators; child paragraphs retain authored line breaks.
+            var content = Role == "section" && Children.Length > 0
+                ? string.Join(" ", Children.Select(node => node.NarrativeContent)
+                    .Where(node => !string.IsNullOrWhiteSpace(node)))
+                : !string.IsNullOrEmpty(Text)
                 ? Text.Replace("\uFFFC", "", StringComparison.Ordinal)
                 : Children.Length > 0 ? string.Join(" ", Children.Select(node => node.NarrativeContent)) : Name;
             return Regex.Replace(content.ReplaceLineEndings("\n"), @"[^\S\n]+", " ").Trim();
