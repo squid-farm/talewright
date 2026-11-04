@@ -23,6 +23,10 @@ def normalized(value):
     return " ".join(value.split())
 
 
+def normalized_lines(value):
+    return "\n".join(normalized(line) for line in value.splitlines()).strip()
+
+
 def nodes(root):
     stack = [(root, 0)]
     while stack:
@@ -211,7 +215,7 @@ class Desktop:
                     data = serialize(child, depth + 1)
                     if data is not None:
                         children.append(data)
-            return {"name": normalized(node.name), "role": node.getRoleName(), "text": content,
+            return {"name": normalized(node.name), "role": node.getRoleName(), "text": normalized_lines(content),
                     "focused": node.getState().contains(pyatspi.STATE_FOCUSED),
                     "bounds": bounds, "children": children}
         return serialize(root)
