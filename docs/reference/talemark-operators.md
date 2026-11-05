@@ -77,7 +77,7 @@ is needed.
 | Line directive | The first characters of a trimmed line. One directive per line. | Scene bodies; metadata directly after `===`. | Story structure: a scene, metadata, choice, speech, effect batch, check block, divert or comment. | `=== camp`, `@title`, `* [Go] -> hall`, `> guide: Hi.`, `~ set flag:x`, `::: skill-check`, `-> hall`, `// note` |
 | Reader text | The default content of a text unit. | Paragraphs, speech text, choice labels, image alt text. | Formatted text shown to the reader. | `**Danger** ahead` |
 | Inline construct | `{` and its matching `}` inside reader text. | Any reader text. | Substituted text, a conditional branch, or media. | `{player:first-name}`, `{if flag:x}`, `{image("map")}` |
-| Expression | An expression slot. | Substitutions, `{if}`, `@requires`, `(requires ...)`, assignment values, quantities and check DCs. | A typed value: number, boolean, text or tier. Never changes state. | `player:hp > 0`, `visited(camp)` |
+| Expression | An expression slot. | Substitutions, `{if}`, `@requires`, `(requires ...)`, assignment values, quantities and check DCs. | A typed value: number, boolean, text or tier. Never changes state. | `player:hp > 0`, `player visited camp`, `camp:player:visits` |
 | Text manipulator | `#name` after a substitution's value. | The end of a substitution only. | Text or formatted text. Applied left to right. Never changes state. | `#capitalize`, `#bold`, `#one-many("is", "are")` |
 | Effect | A statement in a `~` line or a choice `{ ... }` block, separated by `;`. | Effect lines and choice effects. | A state change, with no value. | `set flag:x`, `give player rope 2`, `var:coins += 1` |
 | Clause | A fixed word, or a word followed by `:`, attached to a directive. | Choices and checks. | Modifies its directive. | `(requires ...)`, `success:`, `skill-check perception dc 12` |
@@ -90,7 +90,7 @@ decides how that input is read. Quotes only delimit an argument; they do not dec
 
 | Slot kind | How it is read | Delimited by | Escapes | Current slots |
 |---|---|---|---|---|
-| Name | One bare identifier using the [shared name rules](#names-and-values). | The construct's punctuation or whitespace. | None. | Scene IDs, `visited(...)`, effect targets, item and character IDs. |
+| Name | One bare identifier using the [shared name rules](#names-and-values). | The construct's punctuation or whitespace. | None. | Scene IDs, `player visited <scene>`, effect targets, item and character IDs. |
 | Tag | Nonempty text without commas, trimmed. Not a story name. | Commas, or the end of the line. | None. | `@tags` values and `@hub` tags. |
 | Integer literal | A whole number; each slot sets its own range. | End of line. | None. | `@priority` (any integer) and `@hub-limit` (positive). |
 | Expression | The [expression grammar](#value-and-expression-operators) and binding order. | The construct: braces, parentheses or end of line. | Only inside its string literals. | `{if ...}`, substitutions, `@requires`, `(requires ...)`, assignment values. |
@@ -132,7 +132,8 @@ New callables follow this guideline. Existing exceptions are listed below rather
 
 | Callable | Family and result | Arguments (slot kind) | Contexts | Notes |
 |---|---|---|---|---|
-| `visited(scene)` | Expression predicate; boolean. | One scene name. | Expressions. | Whitespace before `(` is accepted. |
+| `player visited scene` | Expression predicate; boolean. | One scene name. | Expressions. | True when the player has entered the scene at least once. |
+| `scene:player:visits`, `<scene>:player:visits` | Expression reference; number. | Current-scene alias or one scene name. | Expressions. | Counts player entries, including repeated entries; other-character visit counts are unsupported. |
 | `character has item` | Expression predicate; boolean. | Character name, item name. | Expressions. | Infix word, not a call. |
 | `@Name` | Expression predicate; boolean. | None. | Expressions. | Registered by a C# story project. |
 | `#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, `#possessive` | Text manipulator; text. | None. | End of a substitution. | Chain left to right before any formatting modifier. |
@@ -146,9 +147,9 @@ New callables follow this guideline. Existing exceptions are listed below rather
 
 Known inconsistencies, recorded for follow-up rather than changed here:
 
-- Boolean queries have three spellings: a call (`visited(camp)`), an infix word (`player has rope`)
+- Boolean queries have three spellings: a sentence (`player visited camp`), an infix word (`player has rope`)
   and a sigil (`@CanPickLock`). Any unification belongs to [#184](https://github.com/squid-farm/talewright/issues/184).
-- `visited`, modifiers and `image` accept whitespace before `(`; `@hub all(`/`any(` do not.
+- Modifiers and `image` accept whitespace before `(`; `@hub all(`/`any(` do not.
   Aligning them belongs to #184.
 - Tags are not story names. `@tags` accepts spaces inside a tag, such as `@tags north gate`
   giving one tag. `@hub` rejects tags containing whitespace, parentheses or commas. Aligning tag
@@ -203,7 +204,7 @@ using the quoted-text rules when it is inside syntax.
 | `.` | Group words within one identifier, never access a property. | Name | `{item:weapon.knife}` | Invalid identifiers produce TW1001 in expressions, TW1008 for scenes, TW4003 in YAML. |
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
 | `#` | Text manipulator in a substitution. Takes the value to its left and returns text or formatted text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value, or incompatible chain. |
-| `(` `)` | Group an expression; also bound `visited`'s scene argument, modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
+| `(` `)` | Group an expression; also bound modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
 | `"` | Bound text literals, modifier string arguments and image arguments. All decode `\"` and `\\`; no single-quoted Talemark string form. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
 | `\` | Escape a quote or backslash inside literal strings, or ASCII punctuation and symbols in reader text. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |
 | `,` | Separate metadata tags, hub arguments and image arguments today; decided separator for multiple double-quoted modifier arguments. Each modifier defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; multi-argument modifiers are not implemented (TW2006). |
@@ -212,11 +213,12 @@ using the quoted-text rules when it is inside syntax.
 | `+` `-` | Integer addition and subtraction; two numbers. Space subtraction away from names. | 4 | `{var:coins - 1}` | TW2003 non-numbers; TW1001 missing operand; TW2004 if an unintended hyphenated variable is undeclared. |
 | `==` `!=` | Equality/inequality of matching types (number, boolean, text or tier). | 5 | `{if item:rope == "Rope"}Found it.{/if}` | TW2003 mismatched types; TW1001 malformed expression. |
 | `<` `<=` `>` `>=` | Ordered comparison of numbers or reputation tiers. | 5 | `{if faction:guild:tier >= friendly}Welcome.{/if}` | TW2003 mismatched/unordered types; faction values suggest `:standing` or `:tier`; TW1001 malformed expression. |
-| `not` | Negate a boolean condition. | 6 | `{if not visited(camp)}New here.{/if}` | TW2003 non-boolean; TW2002 unknown scene. |
+| `not` | Negate a boolean condition. | 6 | `{if not player visited camp}New here.{/if}` | TW2003 non-boolean; TW2002 unknown scene. |
 | `and` | Both boolean conditions must hold. | 7 | `{if player:hp > 0 and player has rope}Climb.{/if}` | TW2003 non-booleans. |
 | `or` | At least one boolean condition must hold. | 8 | `{if flag:ready or player:hp > 0}Go.{/if}` | TW2003 non-booleans; TW2004 undeclared flag. |
 | `has` | Inventory predicate: character ID on the left, item ID on the right. Item counts live only in inventory, not variables. | 1 | `{if player has rope}Equipped.{/if}` | TW2001 unknown character/item. |
-| `visited(...)` | Boolean predicate with one bare scene ID. | 1 | `{if visited(camp)}Back again.{/if}` | TW1001 malformed call; TW2002 unknown scene. |
+| `player visited <scene>` | Boolean predicate with one bare scene ID. | 1 | `{if player visited camp}Back again.{/if}` | TW2002 unknown scene; other-character subjects are unsupported. |
+| `scene:player:visits`, `<scene>:player:visits` | Numeric visit count for the current or named scene. | 1 | `{if camp:player:visits > 1}Back again.{/if}` | TW2002 unknown scene; TW2003 non-number in numeric operations. |
 | `@` in expressions | Named boolean predicate registered by a C# story project; no arguments. Distinct from line metadata. | 1 | `{if @CanPickLock}Try the lock.{/if}` | TW2005 unregistered predicate. |
 | `=` `+=` `-=` | Assign, add or subtract a number in an effect targeting a stat, variable or faction standing. Text variables support `=` only and require a text expression. Not comparison. | Structural | `~ player:hp -= 3`; `~ faction:guild:standing += 2`; `~ var:weather = "stormy"` | TW1003 malformed effect; TW2003 incompatible types or numeric operations on text; a faction target needs `:standing`; name errors. |
 | `;` | Separate effects inside an effect list, not prose sentences or arguments. | Structural | `* [Pay] { var:coins -= 1; set flag:paid } -> hall` | TW1003 malformed effect; TW1001 unexpected trailing text. |
@@ -234,7 +236,7 @@ See [declaration ordering and inference](talemark-syntax.md#declaring-variables-
 
 From tightest to loosest:
 
-1. Parenthesized expressions, literals, references, `has`, `visited(...)`, named predicates.
+1. Parenthesized expressions, literals, references, `has`, `player visited <scene>`, named predicates.
 2. Unary numeric `-`.
 3. `*`, `/`.
 4. `+`, binary `-`.

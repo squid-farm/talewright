@@ -102,25 +102,51 @@ internal static class ExpressionCompletion
                     keywords = [.. PronounProperties];
                     details = PronounFormDetails;
                 }
+                if (member.Is(Player) && symbols.Any(symbol =>
+                        symbol.Kind == AuthoringSymbolKind.Scene && owner.Is(symbol.Name)))
+                    keywords = [.. keywords, Visits];
+            }
+            else if (before is [.., { Kind: TokenKind.Identifier, Text: Player }, { Kind: TokenKind.Colon }] &&
+                     tokenIndex >= 4 &&
+                     tokens[tokenIndex - 4] is { Kind: TokenKind.Identifier } sceneOwner &&
+                     tokens[tokenIndex - 3].Kind == TokenKind.Colon &&
+                     (sceneOwner.Is(Scene) || symbols.Any(symbol =>
+                         symbol.Kind == AuthoringSymbolKind.Scene && sceneOwner.Is(symbol.Name))))
+            {
+                keywords = [Visits];
             }
             else if (before is [.., { Kind: TokenKind.Identifier } ns, { Kind: TokenKind.Colon }])
             {
-                kinds = ns.Text switch
+                if (ns.Is(Scene))
                 {
-                    Flag when kind != ExpressionContextKind.Number => [AuthoringSymbolKind.Flag],
-                    Var => [AuthoringSymbolKind.Variable],
-                    Faction => [AuthoringSymbolKind.Faction],
-                    Item when kind is ExpressionContextKind.Substitution or ExpressionContextKind.Condition
-                        => [AuthoringSymbolKind.Item],
-                    _ when symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && ns.Is(symbol.Name))
-                        => [AuthoringSymbolKind.Stat],
-                    _ => []
-                };
-                if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
-                    keywords = [.. CharacterProperties];
+                    keywords = [PlayerPrefix];
+                }
+                else
+                {
+                    kinds = ns.Text switch
+                    {
+                        Flag when kind != ExpressionContextKind.Number => [AuthoringSymbolKind.Flag],
+                        Var => [AuthoringSymbolKind.Variable],
+                        Faction => [AuthoringSymbolKind.Faction],
+                        Item when kind is ExpressionContextKind.Substitution or ExpressionContextKind.Condition
+                            => [AuthoringSymbolKind.Item],
+                        _ when symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && ns.Is(symbol.Name))
+                            => [AuthoringSymbolKind.Stat],
+                        _ => []
+                    };
+                    if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
+                        keywords = [.. CharacterProperties];
+                    if (symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Scene && ns.Is(symbol.Name)))
+                        keywords = [.. keywords, PlayerPrefix];
+                }
             }
-            else if (before is [.., { Text: Visited }, { Kind: TokenKind.LeftParen }])
-                kinds = kind == ExpressionContextKind.Condition ? [AuthoringSymbolKind.Scene] : [];
+            else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Substitution &&
+                     before is [.., { Kind: TokenKind.Identifier } visitedSubject, { Text: Visited }] &&
+                     visitedSubject.Is(Player))
+                kinds = [AuthoringSymbolKind.Scene];
+            else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Substitution &&
+                     before is [.., { Kind: TokenKind.Identifier } playerSubject] && playerSubject.Is(Player))
+                keywords = [Visited];
             else if (before is [.., { Text: Has }])
                 kinds = kind is ExpressionContextKind.Condition or ExpressionContextKind.Effects ? [AuthoringSymbolKind.Item] : [];
             else if (before is [.., { Text: Give or Take }, { Kind: TokenKind.Identifier }])
@@ -132,7 +158,7 @@ internal static class ExpressionCompletion
                      before is [{ Kind: TokenKind.Identifier }, { Kind: TokenKind.Identifier }])
             {
                 kinds = [AuthoringSymbolKind.Character];
-                keywords = [VarPrefix, FactionPrefix];
+                keywords = [VarPrefix, FactionPrefix, ScenePrefix];
             }
             else if (before is [.., { Text: Set or Clear }])
                 keywords = kind == ExpressionContextKind.Effects ? [FlagPrefix] : [];
@@ -147,11 +173,11 @@ internal static class ExpressionCompletion
                 {
                     ExpressionContextKind.Effects when before.Length == 0 || before[^1].Kind == TokenKind.Semicolon
                         => [.. EffectVerbs, VarPrefix, FactionPrefix],
-                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix],
-                    ExpressionContextKind.Number => [VarPrefix],
-                    ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ImageCall],
-                    ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix],
-                    _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, VisitedCall, True, False, Not]
+                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix, ScenePrefix],
+                    ExpressionContextKind.Number => [VarPrefix, ScenePrefix],
+                    ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix, ImageCall],
+                    ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix],
+                    _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, ScenePrefix, True, False, Not]
                 };
             }
             if (kinds.Length == 0 && keywords.Length == 0) continue;

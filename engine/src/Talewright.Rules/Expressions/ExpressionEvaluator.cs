@@ -155,6 +155,9 @@ public static class ExpressionEvaluator
             ItemNameRef e => Value.Of(state.World.Items[e.Item].Name),
             HasItem e => Value.Of(state.GetItemCount(e.Character, e.Item) > 0),
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
+            SceneVisitCountRef e => Value.Of(e.Scene is { } scene
+                ? state.VisitCount(scene)
+                : state.CurrentScene is { } current ? state.VisitCount(current) : 0),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };

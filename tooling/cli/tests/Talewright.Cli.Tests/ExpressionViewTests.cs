@@ -15,7 +15,7 @@ namespace Talewright.Cli.Tests;
 public sealed partial class ExpressionViewTests
 {
     private const string Compound =
-        "player has lantern and (faction:river:standing >= 3 or not visited(cave)) and @Brave and var:weather == \"sunny\"";
+        "player has lantern and (faction:river:standing >= 3 or not player visited cave) and @Brave and var:weather == \"sunny\"";
 
     [Fact]
     public async Task Branch_explanations_show_each_condition_node_as_Talemark_with_its_recorded_result()
@@ -25,15 +25,15 @@ public sealed partial class ExpressionViewTests
         Assert.Equal(
         [
             (1, Compound, "true"),
-            (2, "player has lantern and (faction:river:standing >= 3 or not visited(cave)) and @Brave", "true"),
-            (3, "player has lantern and (faction:river:standing >= 3 or not visited(cave))", "true"),
+            (2, "player has lantern and (faction:river:standing >= 3 or not player visited cave) and @Brave", "true"),
+            (3, "player has lantern and (faction:river:standing >= 3 or not player visited cave)", "true"),
             (4, "player has lantern", "true"),
-            (4, "faction:river:standing >= 3 or not visited(cave)", "true"),
+            (4, "faction:river:standing >= 3 or not player visited cave", "true"),
             (5, "faction:river:standing >= 3", "false"),
             (6, "faction:river:standing", "1"),
             (6, "3", "3"),
-            (5, "not visited(cave)", "true"),
-            (6, "visited(cave)", "false"),
+            (5, "not player visited cave", "true"),
+            (6, "player visited cave", "false"),
             (3, "@Brave", "true"),
             (2, "var:weather == \"sunny\"", "true"),
             (3, "var:weather", "\"sunny\""),

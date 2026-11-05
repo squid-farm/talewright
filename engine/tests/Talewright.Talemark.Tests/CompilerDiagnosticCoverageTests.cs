@@ -87,6 +87,12 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW3011", Scene("* [Leave] -> END\nProse.")),
         Warning("TW3012", Scene("-> END\nAfter.")),
         Warning("TW3013", Scene("* [Maybe] (requires player:hp > 0) -> END")),
+        Error("TW3014", Story("=== start\n-> END\n=== camp\n-> END", """
+            game: {id: coverage, title: Coverage, start: start}
+            characters:
+              player: {first-name: Ada}
+              camp: {first-name: Camp}
+            """), new(MainFile, 3, 1), Story("=== start\n-> END")),
 
         Error("TW4001", Story("=== start\n-> END", "game: [")),
         Error("TW4002", new StorySource(new Dictionary<string, string> { [MainFile] = "=== start\n-> END" })),
@@ -129,6 +135,7 @@ public sealed class CompilerDiagnosticCoverageTests
     [InlineData("TW1009")]
     [InlineData("TW1012")]
     [InlineData("TW3001")]
+    [InlineData("TW3014")]
     public void Previously_uncovered_codes_have_a_location_and_a_valid_counterpart(string code)
     {
         var fixture = Assert.Single(Cases, item => item.Code == code);

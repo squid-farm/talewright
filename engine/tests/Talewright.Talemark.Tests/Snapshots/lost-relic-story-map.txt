@@ -80,7 +80,7 @@ divert|trail.bell/step:134:1|trail.bell|trail.bell|Choice|-|0|not flag:bell-ring
 divert|trail.bell/step:135:1|trail.bell|trail.bell|Choice|-|1|flag:bell-ringing|reads=flag:bell-ringing
 divert|trail.bell/step:136:1|trail.bell|trail.night|Choice|-|2||reads=
 divert|temple.door/step:11:1|temple.door|temple.hall|Choice|-|0|flag:knows-glyphs|reads=flag:knows-glyphs
-divert|temple.door/step:12:1|temple.door|dream.arrival|Choice|-|1|not visited(dream.arrival)|reads=visited(dream.arrival)
+divert|temple.door/step:12:1|temple.door|dream.arrival|Choice|-|1|not player visited dream.arrival|reads=player visited dream.arrival
 divert|temple.door/step:13:1/success|temple.door|temple.hall|ChoiceSkillCheck|Success|2||reads=
 divert|temple.door/step:13:1/failure|temple.door|temple.side|ChoiceSkillCheck|Failure|3||reads=
 divert|temple.door/step:16:1|temple.door|temple.side|Choice|-|4||reads=
@@ -128,12 +128,12 @@ hub-offer|camp.hub/hub:camp.journal|camp.hub|camp.journal|any(camp)||once=true|r
 hub-offer|camp.hub/hub:camp.watchword|camp.hub|camp.watchword|any(camp)||once=true|reads=
 hub-offer|camp.supplies/hub:camp.register|camp.supplies|camp.register|all(camp,records)||once=true|reads=
 hub-offer|trail.night/hub:trail.supper|trail.night|trail.supper|any(night,watch)|player has ration|once=true|reads=player has ration
-hub-offer|trail.night/hub:trail.jaguar|trail.night|trail.jaguar|any(night,watch)|not visited(trail.jaguar)|once=true|reads=visited(trail.jaguar)
-hub-offer|trail.night/hub:trail.signal|trail.night|trail.signal|any(night,watch)|visited(trail.jaguar) and player:courage >= 6|once=true|reads=visited(trail.jaguar),player:courage
-hub-offer|trail.night/hub:trail.bell|trail.night|trail.bell|any(night,watch)|visited(trail.signal)|once=true|reads=visited(trail.signal)
+hub-offer|trail.night/hub:trail.jaguar|trail.night|trail.jaguar|any(night,watch)|not player visited trail.jaguar|once=true|reads=player visited trail.jaguar
+hub-offer|trail.night/hub:trail.signal|trail.night|trail.signal|any(night,watch)|player visited trail.jaguar and player:courage >= 6|once=true|reads=player visited trail.jaguar,player:courage
+hub-offer|trail.night/hub:trail.bell|trail.night|trail.bell|any(night,watch)|player visited trail.signal|once=true|reads=player visited trail.signal
 hub-offer|dream.hub/hub:dream.ines|dream.hub|dream.ines|all(dream,keeper)||once=true|reads=
 hub-offer|dream.hub/hub:dream.spiral|dream.hub|dream.spiral|all(dream,keeper)||once=true|reads=
 hub-offer|dream.hub/hub:dream.watcher|dream.hub|dream.watcher|all(dream,keeper)|player has glyph-mark|once=true|reads=player has glyph-mark
 hub-offer|dream.hub/hub:dream.archivist|dream.hub|dream.archivist|all(dream,keeper)||once=true|reads=
-hub-offer|dream.hub/hub:dream.hands|dream.hub|dream.hands|all(dream,keeper)|visited(dream.eye-mark) and var:marks == 2|once=true|reads=visited(dream.eye-mark),var:marks
+hub-offer|dream.hub/hub:dream.hands|dream.hub|dream.hands|all(dream,keeper)|player visited dream.eye-mark and var:marks == 2|once=true|reads=player visited dream.eye-mark,var:marks
 hub-offer|dream.hub/hub:dream.sleeper|dream.hub|dream.sleeper|all(dream,keeper)|var:marks == 3 and flag:all-marks and player has glyph-mark|once=true|reads=var:marks,flag:all-marks,player has glyph-mark

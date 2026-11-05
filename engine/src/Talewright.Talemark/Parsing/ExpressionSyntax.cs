@@ -24,7 +24,8 @@ internal sealed record NameExpressionNode(ExpressionSpan Name, ExpressionSpan Sp
 
 internal sealed record NamedPredicateExpressionNode(ExpressionSpan Name, ExpressionSpan Span) : ExpressionNode(Span);
 
-internal sealed record VisitedExpressionNode(ExpressionSpan Scene, ExpressionSpan Span) : ExpressionNode(Span);
+internal sealed record PlayerVisitedExpressionNode(ExpressionSpan Character, ExpressionSpan Scene,
+    ExpressionSpan Span) : ExpressionNode(Span);
 
 internal sealed record ParenthesizedExpressionNode(ExpressionNode Inner, ExpressionSpan Span) : ExpressionNode(Span);
 

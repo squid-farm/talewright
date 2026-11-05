@@ -75,7 +75,7 @@ Reusable pieces:
 | D6 | The template renderer outputs a **presentation-agnostic document model (AST)**, not HTML. It includes media placeholders for future images. |
 | D7 | Conditions: **both** inline expressions and named C# predicates. Both compile to the same predicate tree and run in one evaluator, the rules engine. |
 | D8 | Randomness is **optional**: configured per story (`randomness: off | checks-only | on`) and/or invoked only through a `skill-check` directive. **Seeded RNG**; folding an existing event log uses its recorded dice results, while player-save restore replays choices with the saved seed. |
-| D9 | State model: **event-sourced**. State is a fold over events, enabling event-log reconstruction, rewind, debugging, and history-based conditions. Player saves store replay inputs (seed, choice history, cursor, and character selection), not the event log. |
+| D9 | State model: **event-sourced**. State is a fold over events, enabling event-log reconstruction, rewind, debugging, and scene-visit conditions. Player saves store replay inputs (seed, choice history, cursor, and character selection), not the event log. |
 | D10 | Combat is **out of scope** for early milestones (to be a future module). |
 | D11 | **Predefined protagonist** in M1. The MVP story's player is female. **Pronoun/grammar system** is in scope. |
 | D12 | The core ruleset is **generic, d20-style** (STR/DEX/CON/INT/WIS/CHA plus skills). It ships as a module that can be **disabled or replaced**. |
@@ -138,12 +138,17 @@ for actual project references, public contracts, and implemented types.
 - **Inventory:** items are entities. Containment is a relation (owner → item, with quantity), which leaves room later for containers, equipment slots and shops.
 - **Factions and relationships:** `Relationship(from, to, kind, value)`, with reputation tiers defined by the ruleset (hostile … allied). This covers both faction allegiance and NPC affection.
 - **Event store:** an append-only `IReadOnlyList<GameEvent>`, with events as records (`StatChanged`, `ItemGranted`, `SceneEntered`, `ChoiceMade`, `DiceRolled`, `FlagSet`, …). State is a pure fold over them, with snapshots later for performance.
-- **History queries:** `visited(scene)`, `chose(choice)` and `count(event…)` power conditions such as "has ever betrayed X".
+- **History-related conditions:** `player visited camp` tests whether the player has entered a scene;
+  `camp:player:visits` and `scene:player:visits` give visit counts. Authors can explicitly record a
+  betrayal with `~ set flag:betrayed-x` and later test `flag:betrayed-x`, or use variables to count
+  other authored events with `~ var:betrayals += 1` and `var:betrayals > 0`. Direct choice and
+  event-history queries have no defined Talemark syntax; see the
+  [expression reference](../reference/talemark-syntax.md#4-expressions).
 - **RNG:** an `IRandomSource` with a seed held in state. Every roll emits a `DiceRolled` event, so replays read the recorded value and never re-roll.
 - **Not a one-way state machine:** there is no hardcoded "next" pointer. Position is state (`current scene`, plus later `current location`); movement is an event. This leaves open-world hubs, locations, time and clocks as additions rather than rewrites.
 
 ### 4.3 Rules (`Talewright.Rules`)
-- **Predicate/expression AST:** literals, `entity:path` references, arithmetic, comparisons, `and/or/not`, `has <item>`, `visited`/`chose`, reputation tiers, and **named predicates** (`@CanClimbWall`) registered from C#.
+- **Predicate/expression AST:** literals, `entity:path` references, arithmetic, comparisons, `and/or/not`, `player has rope`, `player visited camp`, scene visit counts, reputation tiers, and **named predicates** (`@CanClimbWall`) registered from C#.
 - **Evaluator:** pure functions over a read-only `IGameStateView`. No reflection, no runtime expression compilation (WASM-friendly).
 - **Storylet selection:** content units carry `requires`, `priority` and `tags`. The selector returns eligible units. "Rails" means explicit diverts (`-> scene`); "hubs" means offering every eligible storylet. Both come in M1 at basic level.
 - **Modifiers:** derived and temporary stat adjustments (an equipped item gives +2).
@@ -375,7 +380,7 @@ GitHub instead of recreating a local board.
 | repo-init | git init, .gitignore, LICENSE (MPL-2.0), README, docs/PLAN.md, ARCHITECTURE.md, TALE-SYNTAX.md, initial ADRs; first commit | — | done |
 | solution-skeleton | Talewright.sln, Directory.Build.props (net10.0, nullable, warnings-as-errors), global.json, all src/tests projects, build+test green | repo-init | done |
 | core-entities | Typed IDs, Entity + components, stat definitions, ruleset builder (add/remove/replace) | solution-skeleton | done |
-| core-events | GameEvent records, event store, state projection (fold), read-only IGameStateView, history queries | core-entities | done |
+| core-events | GameEvent records, event store, state projection (fold), read-only IGameStateView, scene-visit queries | core-entities | done |
 | core-inventory-factions | Inventory relations, factions/relationships with ruleset-defined tiers, levels/XP hooks | core-events | done |
 | core-rng | Seeded IRandomSource, DiceRolled events, deterministic replay | core-events | done |
 | ruleset-generic | Generic d20-ish attributes/skills/tiers/skill-check rule as an opt-out module | core-inventory-factions | done |

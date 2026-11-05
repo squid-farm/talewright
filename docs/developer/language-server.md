@@ -120,7 +120,8 @@ document versions, without waiting for the diagnostic debounce.
 
 Supported slots include scene diverts (including `END`), speech characters,
 scene metadata directives, skill-check actors/stats, and expression namespaces
-for stats, items, factions, flags, and variables. `visited(` offers scene IDs.
+for stats, items, factions, flags, and variables. `player visited ` offers scene IDs;
+`scene:player:visits` and `<scene>:player:visits` complete the visit-count references.
 `item:` references offer item names, and `give`/`take` quantities offer numeric
 expression operands after the actor and item.
 `@` in conditions offers explicitly registered predicates, and `#` in

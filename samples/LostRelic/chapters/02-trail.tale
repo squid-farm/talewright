@@ -69,7 +69,7 @@ You close the pack with one ration left, safely stowed for tomorrow.
 === trail.jaguar
 @title Stand your ground
 @tags night
-@requires not visited(trail.jaguar)
+@requires not player visited trail.jaguar
 @priority 10
 @once
 
@@ -92,7 +92,7 @@ leaving you trembling but upright. Your Courage is **{player:courage}**.
 === trail.signal
 @title Follow the signal
 @tags night
-@requires visited(trail.jaguar) and player:courage >= 6
+@requires player visited trail.jaguar and player:courage >= 6
 @priority 10
 @once
 
@@ -124,7 +124,7 @@ returns, and agree not to follow a voice you cannot place.
 === trail.bell
 @title Check the tripwire bell
 @tags trail,watch
-@requires visited(trail.signal)
+@requires player visited trail.signal
 @priority -1
 @once
 

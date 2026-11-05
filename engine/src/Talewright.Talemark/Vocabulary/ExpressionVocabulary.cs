@@ -9,6 +9,7 @@ namespace Talewright.Talemark.Vocabulary;
 internal enum ReferenceNamespace
 {
     Character,
+    Scene,
     Faction,
     Item,
     Flag,
@@ -27,6 +28,9 @@ internal static class ExpressionVocabulary
     internal const string True = "true";
     internal const string False = "false";
     internal const string Visited = "visited";
+    internal const string Scene = "scene";
+    internal const string Player = "player";
+    internal const string Visits = "visits";
     internal const string Has = "has";
     internal const string Image = "image";
 
@@ -100,10 +104,11 @@ internal static class ExpressionVocabulary
     ];
 
     internal static readonly string FactionPrefix = Faction + Separator;
+    internal static readonly string PlayerPrefix = Player + Separator;
+    internal static readonly string ScenePrefix = Scene + Separator;
     internal static readonly string ItemPrefix = Item + Separator;
     internal static readonly string FlagPrefix = Flag + Separator;
     internal static readonly string VarPrefix = Var + Separator;
-    internal static readonly string VisitedCall = Visited + OpenParen;
     internal static readonly string ImageCall = Image + OpenParen;
 
     internal static readonly ImmutableArray<string> CharacterProperties = [FirstName, LastName, Name, Pronoun];
@@ -164,6 +169,7 @@ internal static class ExpressionVocabulary
 
     internal static ReferenceNamespace Namespace(ReadOnlySpan<char> text) => text switch
     {
+        Scene => ReferenceNamespace.Scene,
         Faction => ReferenceNamespace.Faction,
         Item => ReferenceNamespace.Item,
         Flag => ReferenceNamespace.Flag,

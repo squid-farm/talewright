@@ -251,7 +251,7 @@ Use conditions in choice requirements such as `(requires expression)`, `{if}` an
 ```text
 player:dex >= 12 and not flag:alarm-raised
 player has rope or player:athletics > 3
-visited(temple.hall)
+player visited temple.hall
 faction:explorers-guild:tier <= unfriendly
 ```
 

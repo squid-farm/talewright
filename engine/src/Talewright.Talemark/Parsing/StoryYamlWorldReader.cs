@@ -3,6 +3,7 @@ using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Talemark.Model;
+using Talewright.Talemark.Vocabulary;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 using static Talewright.Talemark.Parsing.StoryYamlContext;
@@ -14,6 +15,7 @@ namespace Talewright.Talemark.Parsing;
 internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
 {
     private readonly StoryYamlContext _yaml = yaml;
+    internal Dictionary<EntityId, SourceLocation> CharacterLocations { get; } = [];
 
     internal CharacterCreation? ReadCreation(YamlNode? node, Ruleset ruleset)
     {
@@ -212,6 +214,15 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
         {
             var id = _yaml.Identifier(key, "character id");
             if (id is null) continue;
+            if (id == ExpressionVocabulary.Scene)
+            {
+                _yaml.Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"Character id '{id}' is reserved.", _yaml.At(key));
+                continue;
+            }
+
+            var characterId = new EntityId(id);
+            CharacterLocations[characterId] = _yaml.At(key);
             if (_yaml.Mapping(value, $"characters.{id}") is not { } body)
             {
                 continue;
@@ -226,7 +237,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
             var nameAgreement = Get(body, "name-agreement") is { } number
                 ? ReadGrammaticalNumber(number, "name-agreement")
                 : GrammaticalNumber.Singular;
-            characters.Add(new CharacterDefinition(new EntityId(id), firstName, lastName, pronouns, stats, inventory, nameAgreement));
+            characters.Add(new CharacterDefinition(characterId, firstName, lastName, pronouns, stats, inventory, nameAgreement));
         }
 
         if (map is not null && !characters.Any(c => c.Id == EntityId.Player))

@@ -45,6 +45,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var manifest = new StoryManifest
         {
             World = new WorldDefinition(ruleset, characters, items.Values, factions, flags, numericVars, textVars),
+            CharacterLocations = world.CharacterLocations,
             Id = _yaml.RequiredIdentifier(game, "id") ?? string.Empty,
             Title = _yaml.RequiredScalar(game, "title") ?? string.Empty,
             Version = Scalar(Get(game, "version")) ?? "0.0.0",
