@@ -18,6 +18,7 @@ public sealed record SavedGame
     public required int Cursor { get; init; }
     public CharacterSelection? Character { get; init; }
     public SaveSummary? Summary { get; init; }
+    public byte[]? ReplayEvidence { get; init; }
 }
 
 /// <summary>Reads and writes save files: a short header followed by a zlib-compressed MessagePack array.</summary>
@@ -104,6 +105,11 @@ public static class SaveFormat
             throw new InvalidDataException(HistoryMessage);
         }
 
+        if (payload.ReplayEvidence is { } evidence && !ReplayEvidence.IsValid(evidence))
+        {
+            throw new InvalidDataException(HistoryMessage);
+        }
+
         var character = payload.Character is null ? null : FromPayload(payload.Character);
         SaveSummary? summary = null;
         summaryDamaged = false;
@@ -130,6 +136,7 @@ public static class SaveFormat
             Choices = payload.Choices,
             Character = character,
             Summary = summary,
+            ReplayEvidence = payload.ReplayEvidence,
         };
     }
 
@@ -143,6 +150,7 @@ public static class SaveFormat
             Seed = save.Seed,
             Cursor = save.Cursor,
             Choices = save.Choices.ToList(),
+            ReplayEvidence = save.ReplayEvidence,
         };
         if (save.Character is { } character)
         {
@@ -280,6 +288,13 @@ public static class SaveFormat
                     if (!reader.TryReadNil())
                     {
                         reader.ReadBytes();
+                    }
+
+                    break;
+                case 8:
+                    if (!reader.TryReadNil() && reader.ReadBytes() is not { Length: ReplayEvidence.Length })
+                    {
+                        throw new InvalidDataException(HistoryMessage);
                     }
 
                     break;

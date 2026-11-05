@@ -415,7 +415,8 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
 - `Components/StoryPlayer.razor`: one playthrough. Keeps a transcript of past frames (echoing the chosen label),
   shows current choices, Back/Forward, named manual saves and Restart/Library buttons. Its collocated `StoryPlayer.razor.js` module scrolls the
   newest frame to the top of the viewport and focuses it (moving screen readers to it); plain `focus()` would
-  not scroll a frame that is already partly visible.
+  not scroll a frame that is already partly visible. A delayed initial reveal does not steal focus from
+  a control the player has already selected.
 - `Components/DocumentView.razor`, `InlineView.razor`: `RenderedDocument` → HTML (`<p>`, `<em>`, `<strong>`,
   `<code>`). `RenderedMedia` preserves inherited style and renders through `MediaView` on all narrative
   surfaces, including choices and chosen-label history.
@@ -568,6 +569,10 @@ Invalid keys throw `InvalidOperationException` listing the valid ones. The UI on
 
 **Saves, restore and Back/Forward.** Saves store replay inputs, never the event log or state:
 
+The diagram includes prototype replay evidence for
+[#478](https://github.com/squid-farm/talewright/issues/478). Cross-revision loading is not an approved
+release contract; representative tester cases and explicit lead approval remain outstanding.
+
 ```mermaid
 flowchart LR
   subgraph save["Save bytes (.twsave)"]
@@ -576,6 +581,7 @@ flowchart LR
     f2["content fingerprint"]
     f3["seed + character selection"]
     f4["choice keys + cursor"]
+    f5["replay evidence"]
   end
   hist["StoryHistory"] -- "Save()" --> save --> store["ISaveStore<br/>FileSaveStore · IndexedDbSaveStore"]
   store -- "bytes" --> restore["StoryHistory.Restore"]
@@ -587,8 +593,10 @@ _cursor_ choice keys.
 
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
-format/story versions and source/extension fingerprint. Unknown/corrupt/incompatible saves are rejected,
-not silently migrated. Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
+format/story versions, source/extension fingerprint and prototype replay evidence. The candidate
+implementation checks the full recorded path against an updated story, but released support remains
+exact-revision only. Unknown/corrupt/incompatible saves are rejected without rewriting the original.
+Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
 see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
 stories omit the character. Pre-v1 replay contracts may change without support for previous versions.
 
@@ -673,8 +681,8 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 
 ## 9. Known limitations and seams left for later
 
-- **No save migration.** Manual slots and autosaves reject mismatched content/extensions/version;
-  migration is M8.
+- **No approved cross-revision save path.** Same-path verification is a prototype pending tester
+  evidence and explicit contract approval; broader format and story migration remains M8.
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
 - **Media adapters.** Native folder player/debugger and built-in embedded samples display images.

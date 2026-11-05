@@ -2,6 +2,7 @@ using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
+using Talewright.Runtime.Saves;
 
 namespace Talewright.Runtime.Tests;
 
@@ -362,17 +363,20 @@ public partial class LostRelicTests
     }
 
     [Fact]
-    public void Earlier_sample_version_save_is_rejected_without_changing_current_history()
+    public void Earlier_sample_version_requires_evidence_and_never_changes_current_history()
     {
         var source = Source();
         var files = source.Files.ToDictionary();
         files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.4.0", "version: 0.3.0");
         var older = StoryCompiler.Compile(new StorySource(files, source.ImagePaths)).Story!;
-        var bytes = new StoryHistory(older, 42, older.Creation!.Default(older.World.Characters[EntityId.Player])).Save();
+        var oldHistory = new StoryHistory(older, 42, older.Creation!.Default(older.World.Characters[EntityId.Player]));
+        var bytes = oldHistory.Save();
+        var legacy = SaveFormat.Write(SaveFormat.Read(bytes) with { ReplayEvidence = null });
         var history = History();
         Choose(history, "Continue");
         var events = history.Events.ToArray();
-        Assert.StartsWith("Version 0.3.0 of ", Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes)).Message);
+        Assert.StartsWith("Version 0.3.0 of ", Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, legacy)).Message);
+        Assert.Equal(oldHistory.Events, StoryHistory.Restore(history.Story, bytes).Events);
         Assert.Equal(events, history.Events);
     }
 

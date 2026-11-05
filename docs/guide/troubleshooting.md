@@ -32,9 +32,10 @@ scenes haven't already been visited. `validate` warns (`TW3008`) when no scene h
 
 ## My old save won't load
 
-Saves only load into the exact story version they were made with, so any edit to the story stops older
-saves from loading. See [saves](playing-and-saving.md#updating-a-story-with-existing-saves). Carrying
-saves over to a new version is planned ([#39](https://github.com/squid-farm/talewright/issues/39)).
+Released save support requires the original story revision and a compatible player. Reopen the build
+that created the save; there is no approved cross-revision migration procedure yet. A proposed
+same-path check remains under review. Incompatible saves and the current game are left untouched.
+See [saves](playing-and-saving.md#updating-a-story-with-existing-saves).
 
 ## My saves disappeared (web)
 
