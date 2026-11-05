@@ -150,8 +150,8 @@ public sealed class AuthorInspectionTests
     }
 
     [Theory]
-    [InlineData("all(a,b)", "fourth")]
-    [InlineData("any(a,b)", "third")]
+    [InlineData("a and b", "fourth")]
+    [InlineData("a or b", "third")]
     public void Hub_trace_explains_tags_self_once_requirements_priority_and_limit(string query, string next)
     {
         var neverCalls = 0;

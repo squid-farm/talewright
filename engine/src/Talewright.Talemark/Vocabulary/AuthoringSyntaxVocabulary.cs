@@ -61,10 +61,9 @@ public static class AuthoringSyntaxVocabulary
     /// <summary>Escapes text for insertion inside an existing Talemark quoted string.</summary>
     public static string EscapeQuotedText(string text) => QuotedStringSyntax.EscapeContent(text);
 
-    /// <summary>Formats a hub's all/any tag selector.</summary>
+    /// <summary>Formats a hub's tag selector.</summary>
     public static string FormatHubSelector(IEnumerable<string> tags, bool matchAll) =>
-        $"{(matchAll ? SceneVocabulary.HubAllPrefix : SceneVocabulary.HubAnyPrefix)}" +
-        $"{string.Join($"{ExpressionVocabulary.ArgumentSeparator} ", tags)}{ExpressionVocabulary.CloseParen}";
+        string.Join($" {(matchAll ? ExpressionVocabulary.And : ExpressionVocabulary.Or)} ", tags);
 
     /// <summary>Gets help for a parser-recognized syntax kind.</summary>
     public static bool TryGetHelp(AuthoringTokenKind kind, out AuthoringSyntaxHelp help) =>
@@ -145,7 +144,9 @@ public static class AuthoringSyntaxVocabulary
             new(AuthoringTokenKind.Tags, SceneVocabulary.Tags, "Comma-separated scene tags."),
             new(AuthoringTokenKind.Priority, SceneVocabulary.Priority, "Integer priority used when selecting an available scene."),
             new(AuthoringTokenKind.Once, SceneVocabulary.Once, "Marks a scene as available only once."),
-            new(AuthoringTokenKind.Hub, SceneVocabulary.Hub, $"Offers available storylets matching a tag, {SceneVocabulary.HubAllPrefix}tag{argumentSeparator} tag{closeParen}, or {SceneVocabulary.HubAnyPrefix}tag{argumentSeparator} tag{closeParen}."),
+            new(AuthoringTokenKind.Hub, SceneVocabulary.Hub,
+                $"Offers available storylets matching one tag, every tag in a conjunction such as 'camp {ExpressionVocabulary.And} night', " +
+                $"or at least one tag in a disjunction such as 'night {ExpressionVocabulary.Or} watch'."),
             new(AuthoringTokenKind.HubLimit, SceneVocabulary.HubLimit, "Positive maximum number of choices offered by this hub."),
             new(AuthoringTokenKind.End, SceneVocabulary.End, "Ends the story instead of diverting to another scene."),
             new(AuthoringTokenKind.SceneHeader, SceneVocabulary.SceneHeader, $"Declares a scene: {SceneVocabulary.SceneHeader} scene.id. Put scene metadata immediately after this header."),
@@ -170,8 +171,10 @@ public static class AuthoringSyntaxVocabulary
             new(AuthoringTokenKind.Give, ExpressionVocabulary.Give, $"{ExpressionVocabulary.Give} character item {SceneVocabulary.OpenBracket}quantity{SceneVocabulary.CloseBracket}: adds inventory; quantity is a numeric expression and defaults to one.", ExpressionToken: true),
             new(AuthoringTokenKind.Take, ExpressionVocabulary.Take, $"{ExpressionVocabulary.Take} character item {SceneVocabulary.OpenBracket}quantity{SceneVocabulary.CloseBracket}: removes inventory; quantity is a numeric expression and defaults to one.", ExpressionToken: true),
             new(AuthoringTokenKind.Has, ExpressionVocabulary.Has, $"character {ExpressionVocabulary.Has} item: tests whether a character holds an item.", ExpressionToken: true),
-            new(AuthoringTokenKind.And, ExpressionVocabulary.And, "Boolean conjunction: both conditions must be true.", ExpressionToken: true),
-            new(AuthoringTokenKind.Or, ExpressionVocabulary.Or, "Boolean disjunction: either condition may be true.", ExpressionToken: true),
+            new(AuthoringTokenKind.And, ExpressionVocabulary.And,
+                $"Boolean conjunction; in an @hub selector, requires every listed tag.", ExpressionToken: true),
+            new(AuthoringTokenKind.Or, ExpressionVocabulary.Or,
+                "Boolean disjunction; in an @hub selector, requires at least one listed tag.", ExpressionToken: true),
             new(AuthoringTokenKind.Not, ExpressionVocabulary.Not, "Negates a boolean condition.", ExpressionToken: true),
             new(AuthoringTokenKind.True, ExpressionVocabulary.True, "Boolean true literal.", ExpressionToken: true),
             new(AuthoringTokenKind.False, ExpressionVocabulary.False, "Boolean false literal.", ExpressionToken: true),

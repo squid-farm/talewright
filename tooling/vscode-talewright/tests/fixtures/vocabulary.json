@@ -1,6 +1,6 @@
 [
-  {"owner":"expression","member":"And","spelling":"and","line":"@requires true and false","scope":"keyword.operator.word.tale","reference":"or / and / not"},
-  {"owner":"expression","member":"Or","spelling":"or","line":"@requires true or false","scope":"keyword.operator.word.tale","reference":"or / and / not"},
+  {"owner":"expression","member":"And","spelling":"and","line":"@hub camp and temple","scope":"keyword.operator.word.tale","reference":"@hub a and b"},
+  {"owner":"expression","member":"Or","spelling":"or","line":"@hub camp or temple","scope":"keyword.operator.word.tale","reference":"@hub a or b"},
   {"owner":"expression","member":"Not","spelling":"not","line":"@requires not true","scope":"keyword.operator.word.tale","reference":"or / and / not"},
   {"owner":"expression","member":"True","spelling":"true","line":"@requires true","scope":"constant.language.tale","reference":"true false 12 \"text\""},
   {"owner":"expression","member":"False","spelling":"false","line":"@requires false","scope":"constant.language.tale","reference":"true false 12 \"text\""},
@@ -71,8 +71,6 @@
   {"owner":"scene","member":"Once","spelling":"once","line":"@once","scope":"keyword.control.metadata.tale","reference":"@once"},
   {"owner":"scene","member":"Hub","spelling":"hub","line":"@hub camp","scope":"keyword.control.metadata.tale","reference":"@hub tag"},
   {"owner":"scene","member":"HubLimit","spelling":"hub-limit","line":"@hub-limit 2","scope":"keyword.control.metadata.tale","reference":"@hub-limit N"},
-  {"owner":"scene","member":"HubAllPrefix","spelling":"all(","line":"@hub all(camp, temple)","scope":"text.tale","exactScope":true,"reference":"@hub all(tag, tag)"},
-  {"owner":"scene","member":"HubAnyPrefix","spelling":"any(","line":"@hub any(camp, temple)","scope":"text.tale","exactScope":true,"reference":"@hub any(tag, tag)"},
   {"owner":"scene","member":"ChoiceRequires","spelling":"(requires","line":"* [Go] (requires true) -> END","scopes":[{"offset":0,"length":1,"scope":"punctuation.section.condition.begin.tale"},{"offset":1,"length":8,"scope":"keyword.control.tale"}],"reference":"(requires "},
   {"owner":"scene","member":"MetadataMarker","spelling":"@","line":"@requires true","scope":"keyword.control.metadata.tale","reference":"@requires expr"},
   {"owner":"scene","member":"SpeechMarker","spelling":">","line":"> player: Hello","scope":"punctuation.definition.speech.tale","reference":"> who: text"},

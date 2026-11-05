@@ -89,6 +89,20 @@ public sealed class StoryCompletionTests
         Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
     }
 
+    [Fact]
+    public void Hub_selector_completes_and_hovers_sentence_operators()
+    {
+        var (analysis, position) = Analyze("=== first\n@hub camp a|nd night");
+
+        var completion = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "and");
+        Assert.Contains("every listed tag", completion.Detail);
+        Assert.Contains("every listed tag", StoryHover.Get(analysis, position)!.PlainText);
+
+        (analysis, position) = Analyze("=== first\n@hub camp |");
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == "and");
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == "or");
+    }
+
     [Theory]
     [InlineData("bold", "bold formatting")]
     [InlineData("italic", "italic formatting")]

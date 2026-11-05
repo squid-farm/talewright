@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 using Xunit.Abstractions;
 
 namespace Talewright.Talemark.Tests;
@@ -14,11 +15,10 @@ public sealed class RicherHubTests(ITestOutputHelper output)
         }));
 
     [Theory]
-    [InlineData("@hub all()")]
-    [InlineData("@hub any(a,)")]
-    [InlineData("@hub all(a,a)")]
-    [InlineData("@hub all(a,b")]
     [InlineData("@hub unknown(a,b)")]
+    [InlineData("@hub a and")]
+    [InlineData("@hub a and b or c")]
+    [InlineData("@hub a and a")]
     [InlineData("@hub a\n@hub b")]
     [InlineData("@hub a\n@hub-limit 0")]
     [InlineData("@hub a\n@hub-limit -1")]
@@ -28,8 +28,8 @@ public sealed class RicherHubTests(ITestOutputHelper output)
         Assert.Contains(Compile(metadata).Errors, d => d.Code == "TW1006");
 
     [Theory]
-    [InlineData("@hub all(a,b)")]
-    [InlineData("@hub any(a,b)\n@hub-limit 1")]
+    [InlineData("@hub a and b")]
+    [InlineData("@hub a or b\n@hub-limit 1")]
     [InlineData("@hub a")]
     public void Matching_scenes_are_conservatively_reachable(string metadata)
     {
@@ -40,8 +40,10 @@ public sealed class RicherHubTests(ITestOutputHelper output)
 
     [Theory]
     [InlineData("a", false, new[] { "a" })]
-    [InlineData("all(a,b)", true, new[] { "a", "b" })]
-    [InlineData("any(a,b)", false, new[] { "a", "b" })]
+    [InlineData("a and b", true, new[] { "a", "b" })]
+    [InlineData("a and b and c", true, new[] { "a", "b", "c" })]
+    [InlineData("a or b", false, new[] { "a", "b" })]
+    [InlineData("a or b or c", false, new[] { "a", "b", "c" })]
     public void Hub_forms_compile_to_one_tag_query(string query, bool matchAll, string[] tags)
     {
         var result = Compile($"@hub {query}");
@@ -52,10 +54,10 @@ public sealed class RicherHubTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("all(a,b)", false, true)]
-    [InlineData("any(a,b)", false, false)]
-    [InlineData("all(a,missing)", true, true)]
-    [InlineData("any(a,missing)", false, true)]
+    [InlineData("a and b", false, true)]
+    [InlineData("a or b", false, false)]
+    [InlineData("a and missing", true, true)]
+    [InlineData("a or missing", false, true)]
     [InlineData("missing", true, true)]
     [InlineData("self", true, true)]
     [InlineData("A", true, true)]
@@ -81,6 +83,41 @@ public sealed class RicherHubTests(ITestOutputHelper output)
         Assert.Equal(empty, result.Warnings.Any(d => d.Code == "TW3008"));
         Assert.Equal(bUnreachable, result.Warnings.Any(d => d.Code == "TW3009" && d.Message.Contains("'b'")));
         Assert.Equal(empty, result.Warnings.Any(d => d.Code == "TW3009" && d.Message.Contains("'a'")));
+    }
+
+    [Theory]
+    [InlineData("all(a, b)", "@hub a and b")]
+    [InlineData("any(a, b)", "@hub a or b")]
+    public void Legacy_forms_include_a_replacement_diagnostic(string query, string replacement)
+    {
+        var error = Assert.Single(Compile($"@hub {query}").Errors);
+
+        Assert.Equal("TW1006", error.Code);
+        Assert.Contains($"use '{replacement}'", error.Message);
+    }
+
+    [Theory]
+    [InlineData("and")]
+    [InlineData("or")]
+    public void Hub_operators_cannot_be_declared_as_tags(string tag)
+    {
+        var error = Assert.Single(Compile($"@tags {tag}").Errors);
+
+        Assert.Equal("TW1006", error.Code);
+        Assert.Contains($"'{tag}' is reserved as an @hub selector operator", error.Message);
+    }
+
+    [Fact]
+    public void Sentence_selector_and_limit_are_preserved_in_the_story_map()
+    {
+        var result = Compile("@hub a and b\n@hub-limit 1");
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var offer = Assert.Single(StoryMap.Build(result.Story!).HubOffers);
+
+        Assert.Equal(["a", "b"], offer.Tags.Tags);
+        Assert.True(offer.Tags.MatchAll);
+        Assert.Equal(1, result.Story!.GetScene(new("hub")).HubLimit);
     }
 
     [Theory]

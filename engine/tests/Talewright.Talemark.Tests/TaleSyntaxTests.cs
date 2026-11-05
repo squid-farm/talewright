@@ -194,7 +194,11 @@ public sealed class TaleSyntaxTests
     [InlineData("@hub-limit 2\n@hub-limit 3", CompilerDiagnosticCodes.InvalidSceneMetadata, 2, 0)]
     [InlineData("@priority  high", CompilerDiagnosticCodes.NumberTooLarge, 1, 10)]
     [InlineData("@priority", CompilerDiagnosticCodes.NumberTooLarge, 1, 0)]
-    [InlineData("@hub all(a, a)", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 0)]
+    [InlineData("@hub a and a", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 0)]
+    [InlineData("@hub a and b or c", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 0)]
+    [InlineData("@tags and", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 6)]
+    [InlineData("@tags or", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 6)]
+    [InlineData("@tags handle, and", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 14)]
     [InlineData("@hub-limit 0", CompilerDiagnosticCodes.InvalidSceneMetadata, 1, 0)]
     public void Invalid_metadata_values_are_reported_by_syntax(string header, string code, int line, int column)
     {
@@ -203,6 +207,20 @@ public sealed class TaleSyntaxTests
         var diagnostic = Assert.Single(scene.Diagnostics);
         Assert.Equal((code, line, column), (diagnostic.Code, diagnostic.Line, diagnostic.Column));
         Assert.True(scene.Lines[line - 1].IsInvalid);
+    }
+
+    [Theory]
+    [InlineData("all(a, b)", "@hub a and b")]
+    [InlineData("any(a, b)", "@hub a or b")]
+    [InlineData("all(a)", "@hub a")]
+    public void Legacy_hub_forms_report_their_replacement(string query, string replacement)
+    {
+        var scene = TaleSyntaxParser.Parse($"=== a\n@hub {query}").Scenes[0];
+
+        var diagnostic = Assert.Single(scene.Diagnostics);
+        Assert.Contains($"'@hub {query}' is no longer supported", diagnostic.Message);
+        Assert.Contains($"use '{replacement}'", diagnostic.Message);
+        Assert.True(scene.Lines[0].IsInvalid);
     }
 
     [Fact]

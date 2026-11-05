@@ -46,8 +46,8 @@ public static class SceneVocabulary
     internal const string Once = "once";
     internal const string Hub = "hub";
     internal const string HubLimit = "hub-limit";
-    internal const string HubAllPrefix = "all(";
-    internal const string HubAnyPrefix = "any(";
+    internal const string LegacyHubAllPrefix = "all(";
+    internal const string LegacyHubAnyPrefix = "any(";
     internal const string ChoiceRequires = "(" + Requires;
     internal static readonly string ChoiceRequiresExample = "(" + Requires + " expression)";
 
@@ -99,15 +99,15 @@ public static class SceneVocabulary
         }
     }
 
-    internal static bool TryGetHubMode(ReadOnlySpan<char> text, out SceneHubMode mode)
+    internal static bool TryGetLegacyHubMode(ReadOnlySpan<char> text, out SceneHubMode mode)
     {
-        if (text.StartsWith(HubAllPrefix, StringComparison.Ordinal))
+        if (text.StartsWith(LegacyHubAllPrefix, StringComparison.Ordinal))
         {
             mode = SceneHubMode.All;
             return true;
         }
 
-        if (text.StartsWith(HubAnyPrefix, StringComparison.Ordinal))
+        if (text.StartsWith(LegacyHubAnyPrefix, StringComparison.Ordinal))
         {
             mode = SceneHubMode.Any;
             return true;
@@ -117,10 +117,10 @@ public static class SceneVocabulary
         return false;
     }
 
-    internal static string HubModePrefix(SceneHubMode mode) => mode switch
+    internal static string LegacyHubModePrefix(SceneHubMode mode) => mode switch
     {
-        SceneHubMode.All => HubAllPrefix,
-        SceneHubMode.Any => HubAnyPrefix,
+        SceneHubMode.All => LegacyHubAllPrefix,
+        SceneHubMode.Any => LegacyHubAnyPrefix,
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null),
     };
 

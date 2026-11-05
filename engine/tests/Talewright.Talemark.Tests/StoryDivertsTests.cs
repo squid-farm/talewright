@@ -140,7 +140,7 @@ public sealed class StoryDivertsTests
             @tags camp, night
             -> start
             === night
-            @hub all(camp, night)
+            @hub camp and night
             * -> END
             === empty
             @hub nowhere

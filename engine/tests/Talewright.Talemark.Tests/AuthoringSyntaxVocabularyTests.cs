@@ -53,7 +53,7 @@ public sealed class AuthoringSyntaxVocabularyTests
         {
             (AuthoringTokenKind.SceneHeader, $"{SceneVocabulary.SceneHeader} scene.id"),
             (AuthoringTokenKind.Divert, SceneVocabulary.End),
-            (AuthoringTokenKind.Hub, $"{SceneVocabulary.HubAllPrefix}tag{argumentSeparator} tag{ExpressionVocabulary.CloseParen}"),
+            (AuthoringTokenKind.Hub, $"camp {ExpressionVocabulary.And} night"),
             (AuthoringTokenKind.Choice, $"{SceneVocabulary.ChoiceMarker} {SceneVocabulary.Divert} target"),
             (AuthoringTokenKind.SkillCheckBlock, $"{SceneVocabulary.SkillCheckBlock} {SceneVocabulary.OpenBracket}actor{SceneVocabulary.CloseBracket} stat {SceneVocabulary.Difficulty} number"),
             (AuthoringTokenKind.If, $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}"),
@@ -100,8 +100,9 @@ public sealed class AuthoringSyntaxVocabularyTests
     public void Formatted_authoring_syntax_keeps_existing_output()
     {
         Assert.Equal("#upper", AuthoringSyntaxVocabulary.FormatModifier("upper"));
-        Assert.Equal("all(camp, records)", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], true));
-        Assert.Equal("any(camp, records)", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], false));
+        Assert.Equal("camp and records", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], true));
+        Assert.Equal("camp or records", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], false));
+        Assert.Equal("camp", AuthoringSyntaxVocabulary.FormatHubSelector(["camp"], true));
         Assert.Equal([":", "@", "#", ">", "(", "\"", "/"], AuthoringSyntaxVocabulary.CompletionTriggerCharacters);
     }
 

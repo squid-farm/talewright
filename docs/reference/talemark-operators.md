@@ -140,7 +140,8 @@ New callables follow this guideline. Existing exceptions are listed below rather
 | `#bold`, `#italic` | Text manipulator; formatted text with a `TextStyle`. | None. | End of a substitution. | Lowered to the same `StyledTemplate` model as prose formatting; can follow text modifiers and each other, but not be followed by text modifiers. |
 | `#one-many("singular", "plural")` | Text manipulator; text. | Two literal-text arguments, both required. | Pronoun and item-name references. | Only multi-argument modifier. |
 | `image("path", "alt")` | Inline construct; media. | Literal-text path, required; reader-text alt, optional. | The whole content of a `{ }` in reader text. | Not an expression; no `#` chaining. |
-| `all(tag, ...)`, `any(tag, ...)` | `@hub` argument; tag group. | One or more distinct tags. | `@hub` only. | `(` must follow immediately today. |
+| `tag and tag [and tag…]` | Hub intersection; all listed tags. | Two or more distinct tags. | `@hub` only. | Do not mix with `or`. |
+| `tag or tag [or tag…]` | Hub union; at least one listed tag. | Two or more distinct tags. | `@hub` only. | Do not mix with `and`. |
 | `set flag:id`, `clear flag:id` | Effect. | One flag reference. | Effects. | Word command. |
 | `give`/`take character item [n]` | Effect. | Character name, item name, optional number expression (default 1). | Effects. | Space-separated arguments. |
 | `skill-check [actor] skill dc n` | Clause. | Optional character name, skill name, number expression. | Choices and `:::` blocks. | Keyword sequence. |
@@ -149,11 +150,10 @@ Known inconsistencies, recorded for follow-up rather than changed here:
 
 - Boolean queries have three spellings: a sentence (`player visited camp`), an infix word (`player has rope`)
   and a sigil (`@CanPickLock`). Any unification belongs to [#184](https://github.com/squid-farm/talewright/issues/184).
-- Modifiers and `image` accept whitespace before `(`; `@hub all(`/`any(` do not.
-  Aligning them belongs to #184.
+- Hub selectors use sentence forms without grouping; `and` and `or` are reserved tag names.
 - Tags are not story names. `@tags` accepts spaces inside a tag, such as `@tags north gate`
-  giving one tag. `@hub` rejects tags containing whitespace, parentheses or commas. Aligning tag
-  rules belongs to #184.
+  giving one tag. A tag operand in `@hub` cannot contain whitespace, parentheses or commas; spaces
+  separate tags and the `and`/`or` selector words. Aligning tag rules belongs to #184.
 - Modifier names are scanned up to `#` or `(` instead of with the shared name rules. Registration
   and extensibility belong to [#193](https://github.com/squid-farm/talewright/issues/193).
 - General multi-argument modifiers are not implemented; only `#one-many` takes arguments
@@ -170,7 +170,7 @@ handled as reader text, so `\* [Go] -> hall` is prose rather than a choice.
 | Marker | Meaning, context and arguments | Canonical example | Diagnostics |
 |---|---|---|---|
 | `===` | Start a scene on its own line; followed by one scene ID. | `=== camp.arrival` | TW1008 invalid ID; TW3010 duplicate; TW3001 text before a scene. |
-| `@` | Scene metadata directly after its header. `title` takes text; `requires` a condition; `tags` comma-separated tags; `priority` an integer; `once` no argument; `hub` a tag or `all(...)`/`any(...)`; `hub-limit` a positive integer with `hub`. | `@requires player:hp > 0` | TW1006 misplaced, duplicate or invalid metadata; TW1002 invalid priority; expression errors for conditions. |
+| `@` | Scene metadata directly after its header. `title` takes text; `requires` a condition; `tags` comma-separated tags; `priority` an integer; `once` no argument; `hub` a tag or a tag list joined with `and` or `or`; `hub-limit` a positive integer with `hub`. | `@requires player:hp > 0` | TW1006 misplaced, duplicate or invalid metadata; TW1002 invalid priority; expression errors for conditions. |
 | `->` | Immediate divert in a scene, choice or check outcome; takes one scene ID or `END`. Later scene steps do not run. Conditional early exits precede choices; there is no fallback/gather. | `-> camp.arrival` | TW1010 missing target; TW1008 invalid ID; TW2002 unknown target; TW3011 after choices. |
 | `*` | Choice at the start of a line (`* ` or `*[`). A prose `[label]` is optional with an explicit `->` target; omitted labels display **Continue**. At most one `(requires condition)` and one `{ effects }` work on either form, in either order before the terminal divert or skill check. The opening `(requires ` is exact. A choice skill check needs a label. This is not multiplication in this context. | `* -> hall` | TW1011 malformed, duplicate or misplaced choice clause; TW3003 no usable target. |
 | `[` `]` | Bound a choice label; its contents are reader text with substitutions and formatting. Balanced inner brackets are literal text; the scanner skips backslash-escaped brackets and inline constructs. | `* [Open [the] door] -> hall` | TW1011 missing closing bracket. |

@@ -304,8 +304,8 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
 | `@once`                                            | A scene offered by a hub disappears after the player visits it once.                          |
 | `@hub tag`                                         | At this scene, offer each available scene with the tag as a choice.                            |
-| `@hub all(tag, tag)`                               | Offer scenes that have every listed tag.                                                      |
-| `@hub any(tag, tag)`                               | Offer scenes that have at least one listed tag.                                               |
+| `@hub a and b [and c…]`                            | Offer scenes that have every listed tag.                                                      |
+| `@hub a or b [or c…]`                              | Offer scenes that have at least one listed tag.                                               |
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (bold and italic formatting).                                                       |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
@@ -315,6 +315,9 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `* (requires expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
+
+Hub selectors use one operator throughout: `and` requires every tag, and `or` requires at least one. Do not mix
+them or use either word as a tag name.
 
 Metadata lines are only recognized directly after the `===` header. Lines starting with `//` are comments.
 

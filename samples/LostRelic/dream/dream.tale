@@ -12,7 +12,7 @@ A woman sits at a table laid for eight, counting cups.
 
 === dream.hub
 @title The Hall Without Walls
-@hub all(dream,keeper)
+@hub dream and keeper
 @hub-limit 2
 
 The keepers wait around the table. Glyph marks held: **{var:marks}**.

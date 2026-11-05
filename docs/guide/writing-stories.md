@@ -296,8 +296,9 @@ available. Scenes offered this way are sometimes called **storylets**:
 ```
 
 Every scene tagged `camp` whose `@requires` is true appears as a choice, using its `@title`. `@once`
-removes it after the first visit, and `@priority` controls the order. You can also match several tags
-with `@hub all(...)` / `@hub any(...)`, or cap how many show with `@hub-limit 3`.
+removes it after the first visit, and `@priority` controls the order. You can also match every listed
+tag with `@hub camp and records`, or any listed tag with `@hub night or watch`; use one operator per
+selector. `@hub-limit 3` caps how many choices show.
 See [scenes](../reference/talemark-syntax.md#2-scenes).
 
 ## Triggers
