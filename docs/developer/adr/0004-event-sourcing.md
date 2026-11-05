@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Decision:** every change is a `GameEvent`, and state is a fold over the event log. This supports state reconstruction from an existing log, rewind, debugging, and history-based conditions such as `player visited scene`. Dice results are stored in events, so folding an existing log does not reroll. Player saves instead store a seed, choice history, cursor, and character selection; restore reruns the story choices with that seed to create a new event log.
+**Decision:** every change is a `GameEvent`, and state is a fold over the event log. This supports state reconstruction from an existing log, rewind, debugging, and scene-visit conditions such as `player visited camp`. Talemark also exposes named and current-scene visit counts as described in the [expression reference](../../reference/talemark-syntax.md#4-expressions). Choice history is replay input, not directly queryable in Talemark; no general choice or event-history query syntax is defined. Dice results are stored in events, so folding an existing log does not reroll. Player saves instead store a seed, choice history, cursor, and character selection; restore reruns the story choices with that seed to create a new event log.
 
 ## Delivered save compatibility boundary
 
