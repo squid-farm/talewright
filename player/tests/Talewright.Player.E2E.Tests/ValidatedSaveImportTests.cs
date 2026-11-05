@@ -65,6 +65,11 @@ public sealed class ValidatedSaveImportTests : IDisposable
         await store.WriteAsync(story.Id, "Slot", original);
 
         var save = SaveFormat.Read(original);
+        var changedOutcome = new StoryHistory(story, 4);
+        changedOutcome.Choose("c0");
+        var changedOutcomeSave = SaveFormat.Read(changedOutcome.Save());
+        var replayIdentities = changedOutcomeSave.ReplayChoiceIdentities!.Select(identity => identity.ToArray()).ToArray();
+        replayIdentities[0][0] ^= 1;
         var invalid = new[]
         {
             Array.Empty<byte>(),
@@ -75,7 +80,7 @@ public sealed class ValidatedSaveImportTests : IDisposable
             SaveFormat.Write(save with { StoryId = "other" }),
             SaveFormat.Write(save with { StoryVersion = "other" }),
             SaveFormat.Write(save with { ContentFingerprint = "other" }),
-            SaveFormat.Write(save with { Choices = ["not-a-choice"], Cursor = 1 }),
+            SaveFormat.Write(changedOutcomeSave with { ReplayChoiceIdentities = replayIdentities }),
             new byte[StoryHistory.MaxSaveBytes + 1],
         };
         foreach (var bytes in invalid)
@@ -174,7 +179,8 @@ public sealed class ValidatedSaveImportTests : IDisposable
         var divergent = fixture with
         {
             Tale = fixture.Tale.Replace("* [Walk onward] -> second",
-                "* [Inserted] -> finish\n* [Walk onward] -> second", StringComparison.Ordinal),
+                "* [Walk onward] { var:visits += 1 } -> second",
+                StringComparison.Ordinal),
         };
         return (fixture.Compile(), updated.Compile(), divergent.Compile());
     }

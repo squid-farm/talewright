@@ -9,6 +9,7 @@ namespace Talewright.Runtime.Tests;
 
 public class StoryHistoryTests
 {
+    private const int ReplayChoiceIdLength = 8;
     private static readonly string Yaml = BuildManifest().Build();
     private static readonly string Tale = BuildTale();
 
@@ -96,7 +97,12 @@ public class StoryHistoryTests
     {
         var history = new StoryHistory(Compile(), 7);
         var bytes = Mutate(history.Save(history.CaptureSummary(DateTimeOffset.UtcNow)),
-            save => save with { Choices = ["no-such-choice"], Cursor = 1 });
+            save => save with
+            {
+                Choices = ["no-such-choice"],
+                ReplayChoiceIdentities = [new byte[ReplayChoiceIdLength]],
+                Cursor = 1,
+            });
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes));
         Assert.NotNull(StoryHistory.DescribeSave("Invalid replay", bytes).Summary);
         foreach (var broken in new[] { "{broken"u8.ToArray(), bytes[..^4], [.. "TWSV"u8, 3, 0xFF] })
@@ -190,11 +196,28 @@ public class StoryHistoryTests
         var history = new StoryHistory(Compile(), 7);
         history.Choose("c0");
         history.Choose("c0");
-        var save = Mutate(history.Save(), save => save with { Choices = [save.Choices[0], "missing"] });
+        var save = Mutate(history.Save(), save => save with
+        {
+            ReplayChoiceIdentities = CorruptIdentity(save.ReplayChoiceIdentities!, 1),
+        });
 
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
 
         Assert.Contains("cannot continue", error.Message);
+    }
+
+    [Fact]
+    public void Replay_uses_the_saved_outcome_identity_instead_of_the_ui_choice_key()
+    {
+        var history = new StoryHistory(Compile(), 7);
+        history.Choose("c0");
+        var save = Mutate(history.Save(), data => data with { Choices = ["renamed-key"] });
+
+        var restored = StoryHistory.Restore(history.Story, save);
+
+        Assert.Equal(history.Events, restored.Events);
+        Assert.Equal(history.State.GetBaseStat(EntityId.Player, new StatId("hp")),
+            restored.State.GetBaseStat(EntityId.Player, new StatId("hp")));
     }
 
     [Fact]
@@ -252,7 +275,10 @@ public class StoryHistoryTests
             "story-version" => Mutate(before, save => save with { StoryVersion = "other" }),
             "fingerprint" => Mutate(before, save => save with { ContentFingerprint = "changed" }),
             "cursor" => Mutate(before, save => save with { Cursor = 3 }),
-            "choice" => Mutate(before, save => save with { Choices = ["missing"] }),
+            "choice" => Mutate(before, save => save with
+            {
+                ReplayChoiceIdentities = CorruptIdentity(save.ReplayChoiceIdentities!, 0),
+            }),
             _ => throw new ArgumentOutOfRangeException(nameof(damage)),
         };
 
@@ -266,7 +292,11 @@ public class StoryHistoryTests
     public void Invalid_redo_is_checked_even_when_cursor_is_at_the_start()
     {
         var history = new StoryHistory(Compile(), 7);
-        var save = Mutate(history.Save(), save => save with { Choices = ["missing"] });
+        var save = Mutate(history.Save(), save => save with
+        {
+            Choices = ["missing"],
+            ReplayChoiceIdentities = [new byte[ReplayChoiceIdLength]],
+        });
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
     }
 
@@ -274,7 +304,11 @@ public class StoryHistoryTests
     public void Invalid_replay_reports_no_scene_or_choice_position()
     {
         var history = new StoryHistory(Compile(), 7);
-        var save = Mutate(history.Save(), save => save with { Choices = ["missing"] });
+        var save = Mutate(history.Save(), save => save with
+        {
+            Choices = ["missing"],
+            ReplayChoiceIdentities = [new byte[ReplayChoiceIdLength]],
+        });
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
 
         Assert.Contains("cannot continue", error.Message);
@@ -412,7 +446,11 @@ public class StoryHistoryTests
         var history = new StoryHistory(Compile(), 7);
         var updated = Compile(tale: Tale + "\n// change");
         var save = history.Save();
-        var legacy = Mutate(save, data => data with { ReplayEvidence = null });
+        var legacy = Mutate(save, data => data with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
         var error = Assert.Throws<InvalidDataException>(() =>
             StoryHistory.Restore(updated, legacy));
         Assert.Equal("Version 1 of History has changed, and this save is no longer compatible. Open it with the story and player version that created it.", error.Message);
@@ -453,6 +491,13 @@ public class StoryHistoryTests
 
     private static byte[] Mutate(byte[] save, Func<SavedGame, SavedGame> change) =>
         SaveFormat.Write(change(SaveFormat.Read(save)));
+
+    private static byte[][] CorruptIdentity(IReadOnlyList<byte[]> identities, int index)
+    {
+        var copy = identities.Select(identity => identity.ToArray()).ToArray();
+        copy[index][0] ^= 1;
+        return copy;
+    }
 
     private static void AssertEquivalent(StoryHistory expected, StoryHistory actual)
     {

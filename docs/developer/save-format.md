@@ -31,6 +31,10 @@ The body is an array-keyed MessagePack object. Its positions are the schema:
 | 6 | Choice history | array of choice-key strings |
 | 7 | Display summary | nil or a binary value containing a MessagePack summary array |
 | 8 | Replay evidence | nil or a 33-byte binary value: evidence version followed by a SHA-256 digest |
+| 9 | Replay choice identities | nil or an array of binary choice-outcome identities, one per choice |
+
+Replay evidence and replay choice identities are either both present or both `nil`. Missing trailing
+fields are still accepted by the reader, but saves without evidence have no v1 cross-revision guarantee.
 
 The character array is `[first name, last name, pronouns, preset, stats]`. Optional strings are
 `nil`; `stats` is an array of `[id, value]` arrays, sorted by id before writing. The summary array
@@ -79,7 +83,8 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 | Choice key | 1–512 characters | Saving and reading |
 | Character stats | 1,000 | Reading; array size checked before deserialization |
 | Summary UTC offset | ±14 hours | Reading (invalid details are dropped, not fatal) |
-| Replay evidence | 33 bytes, version 2 | Reading; malformed or unsupported evidence rejects the save |
+| Replay evidence | 33 bytes, version 3 | Reading; malformed or unsupported evidence rejects the save |
+| Replay choice identity | 8 bytes, or 32 bytes for a colliding scene | Reading; count and encoding are checked before replay |
 
 Collection counts are checked with `MessagePackReader` before the generated deserializer allocates
 their lists. Other decoded structures are bounded by the 8 MiB body limit. A repeated-choice
@@ -87,48 +92,36 @@ playthrough of about 200 choices compresses below 4 KiB.
 
 ## Compatibility
 
-Released save support remains exact-revision only. Cross-revision loading is a prototype for
-[#478](https://github.com/squid-farm/talewright/issues/478), not an approved supported update path.
+A save must have the same story id. When the story version or content fingerprint changes, loading
+also requires replay evidence, per-choice outcome identities, and the same replay/extension identity.
+The runtime replays the complete timeline, including redo, and accepts the update only when the
+starting state and full gameplay evidence match. It then rebuilds the visible cursor from the validated
+timeline. Loading never rewrites the original bytes; a later save uses the current story identity.
 
-### Proposed story-update contract
+Each choice identity is a SHA-256 prefix describing its scene and gameplay outcome: destination,
+ordered effects, and skill-check definition and outcomes. The usual encoding is the first 8 bytes.
+If different outcome descriptions in one scene collide on those 8 bytes, every choice in that scene
+uses the full 32-byte hash. Choice labels, prose, source positions, availability requirements, and
+other offered choices are excluded. When replaying, the runtime chooses the first current authored
+choice with the same outcome identity, even if its availability requirement is now false. Live choice
+keys and availability behavior are unchanged.
 
-The behavior below describes the candidate implementation. Its fixtures are synthetic, not
-preview-tester evidence. Before merging or advertising this path, representative tester cases must
-be evaluated and the project lead must explicitly approve the exact path and legacy-save treatment
-under [#171](https://github.com/squid-farm/talewright/issues/171). Neither requirement is established
-by successful synthetic replay tests.
+Replay evidence is a versioned SHA-256 chain. Its start binds the story and replay/extension identity,
+seed, character selection, initial ruleset and world state, and start events. Each decision binds its
+scene, outcome identity, and every resulting gameplay event. The final evidence binds the complete
+timeline digest and cursor. Full evidence is recomputed during restore; short choice identities are
+never trusted alone. Evidence is a compatibility check, not an authentication mechanism.
+The canonical encoding and frozen test vectors are maintained by `StoryCompatibilityTests`; update
+the evidence version when its encoding or meaning changes.
 
-A save must have the same story id. With matching version and content fingerprint it can replay as
-before, and any evidence present is verified. Across changed source or story versions, it additionally
-needs version-2 replay evidence and the same engine replay/extension identity. The runtime validates
-the character, replays the entire choice history including redo, and accepts only when the evidence
-matches. It also checks that reconstructing the visible cursor reproduces the validated prefix and
-offered choices. The old bytes are never rewritten by loading. A later save uses the current story
-identity and fresh evidence.
+Prose, label, unrelated-choice, ordering, and availability-requirement changes can be compatible.
+Changed starting values or recorded gameplay outcomes are not. This checks a replay path, not a saved
+state snapshot, and does not provide general state mappings or save-format migration.
 
-The evidence is a SHA-256 chain over the start and each recorded choice. The start binds the story id,
-replay/extension identity, seed, character selection and start events. Each choice binds its scene,
-the keys and rendered labels of all offered choices, the selected key, and every resulting gameplay
-event and field. A final digest also binds the cursor and the choices currently offered at that cursor.
-Canonical, source-generated JSON feeds the hash;
-the encoding and test vectors are pinned by `StoryCompatibilityTests`. Change the evidence version
-when its canonical encoding or meaning changes. The evidence is a compatibility check, not an
-authentication mechanism.
-
-This candidate path is intentionally conservative about selected choices and their offered labels.
-Prose edits can work, but changed choices, effects or rolls on the recorded timeline are rejected when their
-evidence differs. It compares the played path, not a saved state snapshot: an updated world's unused
-defaults can change the resumed state or future play even when the recorded events still match.
-General mappings and format migration are not implemented.
-
-The proposed legacy-save treatment keeps format-4 saves without evidence—including any
-`1.0.0-preview.1` saves made without it—tied to their exact original story and compatible player.
-Reopening them there with an evidence-aware
-player and saving again adds evidence; that new save can then be checked against an update. Older
-unsupported formats cannot use this path. Manually constructed stories without a replay/extension
-identity remain exact-revision only.
-
-The author-facing rules are in [Sharing your story](../guide/sharing-your-story.md) and
+Saves without evidence have no v1 cross-revision compatibility guarantee. Reopening and re-saving
+such a save is not an approved migration path. Stories without a replay/extension identity remain
+exact-revision only. The author-facing guidance is in
+[Sharing your story](../guide/sharing-your-story.md) and
 [Updating a story with existing saves](../guide/playing-and-saving.md#updating-a-story-with-existing-saves).
 
 Player messages:

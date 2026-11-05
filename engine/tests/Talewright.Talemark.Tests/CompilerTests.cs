@@ -131,7 +131,7 @@ public class CompilerTests
             hash.AppendData(bytes);
         }
 
-        Append("talewright-replay-v2");
+        Append("talewright-replay-v3");
         Append(compatibilityId);
         foreach (var (path, text) in files.OrderBy(file => file.Key, StringComparer.Ordinal))
         {

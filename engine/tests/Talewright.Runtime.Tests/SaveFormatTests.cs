@@ -9,6 +9,7 @@ namespace Talewright.Runtime.Tests;
 
 public class SaveFormatTests
 {
+    private const int ReplayChoiceIdLength = 8;
     private static readonly SavedGame Sample = new()
     {
         StoryId = "lost-relic",
@@ -34,6 +35,13 @@ public class SaveFormatTests
         Summary = new SaveSummary("The Old Gate",
             new DateTimeOffset(2026, 10, 23, 18, 30, 15, TimeSpan.FromMinutes(-330)), "Mara"),
     };
+    private static SavedGame ReplaySample => Sample with
+    {
+        ReplayEvidence = CreateEvidence(),
+        ReplayChoiceIdentities = Enumerable.Range(1, Sample.Choices.Count)
+            .Select(value => Enumerable.Repeat((byte)value, ReplayChoiceIdLength).ToArray())
+            .ToArray(),
+    };
 
     [Fact]
     public void Write_then_read_round_trips_the_sample_and_container_header()
@@ -50,31 +58,32 @@ public class SaveFormatTests
     [Fact]
     public void MessagePack_body_uses_the_frozen_positional_array_layout()
     {
-        var body = SaveFormat.EncodeBody(Sample);
+        var sample = ReplaySample;
+        var body = SaveFormat.EncodeBody(sample);
         var reader = new MessagePackReader(new ReadOnlySequence<byte>(body));
 
-        Assert.Equal(9, reader.ReadArrayHeader());
-        Assert.Equal(Sample.StoryId, reader.ReadString());
-        Assert.Equal(Sample.StoryVersion, reader.ReadString());
-        Assert.Equal(Sample.ContentFingerprint, reader.ReadString());
-        Assert.Equal(Sample.Seed, reader.ReadUInt64());
-        Assert.Equal(Sample.Cursor, reader.ReadInt32());
+        Assert.Equal(10, reader.ReadArrayHeader());
+        Assert.Equal(sample.StoryId, reader.ReadString());
+        Assert.Equal(sample.StoryVersion, reader.ReadString());
+        Assert.Equal(sample.ContentFingerprint, reader.ReadString());
+        Assert.Equal(sample.Seed, reader.ReadUInt64());
+        Assert.Equal(sample.Cursor, reader.ReadInt32());
 
         Assert.Equal(5, reader.ReadArrayHeader());
-        Assert.Equal(Sample.Character!.FirstName, reader.ReadString());
-        Assert.Equal(Sample.Character.LastName, reader.ReadString());
-        Assert.Equal(Sample.Character.Pronouns, reader.ReadString());
+        Assert.Equal(sample.Character!.FirstName, reader.ReadString());
+        Assert.Equal(sample.Character.LastName, reader.ReadString());
+        Assert.Equal(sample.Character.Pronouns, reader.ReadString());
         Assert.True(reader.TryReadNil());
-        Assert.Equal(Sample.Character.Stats.Count, reader.ReadArrayHeader());
-        foreach (var (id, value) in Sample.Character.Stats.OrderBy(stat => stat.Key, StringComparer.Ordinal))
+        Assert.Equal(sample.Character.Stats.Count, reader.ReadArrayHeader());
+        foreach (var (id, value) in sample.Character.Stats.OrderBy(stat => stat.Key, StringComparer.Ordinal))
         {
             Assert.Equal(2, reader.ReadArrayHeader());
             Assert.Equal(id, reader.ReadString());
             Assert.Equal(value, reader.ReadInt32());
         }
 
-        Assert.Equal(Sample.Choices.Count, reader.ReadArrayHeader());
-        foreach (var choice in Sample.Choices)
+        Assert.Equal(sample.Choices.Count, reader.ReadArrayHeader());
+        foreach (var choice in sample.Choices)
         {
             Assert.Equal(choice, reader.ReadString());
         }
@@ -83,12 +92,17 @@ public class SaveFormatTests
         Assert.NotNull(summaryBytes);
         var summaryReader = new MessagePackReader(summaryBytes.Value);
         Assert.Equal(4, summaryReader.ReadArrayHeader());
-        Assert.Equal(Sample.Summary!.SceneTitle, summaryReader.ReadString());
-        Assert.Equal(Sample.Summary.SavedAt.UtcTicks, summaryReader.ReadInt64());
-        Assert.Equal((int)Sample.Summary.SavedAt.Offset.TotalMinutes, summaryReader.ReadInt32());
-        Assert.Equal(Sample.Summary.CharacterName, summaryReader.ReadString());
+        Assert.Equal(sample.Summary!.SceneTitle, summaryReader.ReadString());
+        Assert.Equal(sample.Summary.SavedAt.UtcTicks, summaryReader.ReadInt64());
+        Assert.Equal((int)sample.Summary.SavedAt.Offset.TotalMinutes, summaryReader.ReadInt32());
+        Assert.Equal(sample.Summary.CharacterName, summaryReader.ReadString());
         Assert.True(summaryReader.End);
-        Assert.True(reader.TryReadNil());
+        Assert.Equal(sample.ReplayEvidence, reader.ReadBytes()!.Value.ToArray());
+        Assert.Equal(sample.ReplayChoiceIdentities!.Count, reader.ReadArrayHeader());
+        foreach (var identity in sample.ReplayChoiceIdentities)
+        {
+            Assert.Equal(identity, reader.ReadBytes()!.Value.ToArray());
+        }
         Assert.True(reader.End);
     }
 
@@ -103,9 +117,9 @@ public class SaveFormatTests
         var oldBody = Decompress(frozen);
         var currentBody = SaveFormat.EncodeBody(Sample);
         Assert.Equal(0x98, oldBody[0]);
-        Assert.Equal(0x99, currentBody[0]);
-        Assert.Equal(oldBody[1..], currentBody[1..^1]);
-        Assert.Equal(0xc0, currentBody[^1]);
+        Assert.Equal(0x9a, currentBody[0]);
+        Assert.Equal(oldBody[1..], currentBody[1..^2]);
+        Assert.Equal([0xc0, 0xc0], currentBody[^2..]);
     }
 
     [Fact]
@@ -130,7 +144,7 @@ public class SaveFormatTests
 
         var futureField = MessagePackBody((ref MessagePackWriter writer) =>
         {
-            writer.WriteArrayHeader(10);
+            writer.WriteArrayHeader(11);
             writer.Write("story");
             writer.Write("1");
             writer.Write("fingerprint");
@@ -138,6 +152,7 @@ public class SaveFormatTests
             writer.Write(0);
             writer.WriteNil();
             writer.WriteArrayHeader(0);
+            writer.WriteNil();
             writer.WriteNil();
             writer.WriteNil();
             writer.Write("future");
@@ -149,9 +164,9 @@ public class SaveFormatTests
     public void Replay_evidence_round_trips_and_invalid_evidence_is_rejected()
     {
         var evidence = new byte[ReplayEvidence.Length];
-        evidence[0] = 2;
+        evidence[0] = 3;
         evidence[^1] = 42;
-        var save = Sample with { ReplayEvidence = evidence };
+        var save = ReplaySample with { ReplayEvidence = evidence };
         Assert.Equal(evidence, SaveFormat.Read(SaveFormat.Write(save)).ReplayEvidence);
 
         foreach (var invalid in new[]
@@ -214,7 +229,12 @@ public class SaveFormatTests
     public void Typical_choice_history_compresses_to_a_small_save()
     {
         var choices = Enumerable.Range(0, 204).Select(i => $"choice-{i:D3}").ToArray();
-        var save = Sample with { Choices = choices, Cursor = choices.Length };
+        var save = ReplaySample with
+        {
+            Choices = choices,
+            Cursor = choices.Length,
+            ReplayChoiceIdentities = choices.Select(_ => new byte[ReplayChoiceIdLength]).ToArray(),
+        };
         Assert.True(SaveFormat.Write(save).Length < 4 * 1024);
     }
 
@@ -376,7 +396,7 @@ public class SaveFormatTests
         if (evidence is not null)
         {
             random.NextBytes(evidence);
-            evidence[0] = 2;
+            evidence[0] = 3;
         }
         return Sample with
         {
@@ -386,7 +406,16 @@ public class SaveFormatTests
             Character = character,
             Summary = summary,
             ReplayEvidence = evidence,
+            ReplayChoiceIdentities = evidence is null ? null
+                : choices.Select(_ => new byte[ReplayChoiceIdLength]).ToArray(),
         };
+    }
+
+    private static byte[] CreateEvidence()
+    {
+        var evidence = new byte[ReplayEvidence.Length];
+        evidence[0] = 3;
+        return evidence;
     }
 
     private delegate void MessagePackWriteAction(ref MessagePackWriter writer);
@@ -434,5 +463,7 @@ public class SaveFormatTests
         Assert.Equal(expected.Character?.Stats, actual.Character?.Stats);
         Assert.Equal(expected.Summary, actual.Summary);
         Assert.Equal(expected.ReplayEvidence, actual.ReplayEvidence);
+        Assert.Equal(expected.ReplayChoiceIdentities?.Select(identity => Convert.ToHexString(identity)),
+            actual.ReplayChoiceIdentities?.Select(identity => Convert.ToHexString(identity)));
     }
 }

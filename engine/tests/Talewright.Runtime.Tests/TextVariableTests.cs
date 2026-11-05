@@ -58,7 +58,9 @@ public class TextVariableTests
         Assert.Contains(restored.Events, e => e is TextVariableChanged { OldValue: "雪", NewValue: "" });
         var before = history.Save();
         var saved = SaveFormat.Read(before);
-        var damaged = SaveFormat.Write(saved with { Choices = [saved.Choices[0], "missing", .. saved.Choices.Skip(2)] });
+        var damagedIdentities = saved.ReplayChoiceIdentities!.Select(identity => identity.ToArray()).ToArray();
+        damagedIdentities[1][0] ^= 1;
+        var damaged = SaveFormat.Write(saved with { ReplayChoiceIdentities = damagedIdentities });
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(result.Story!, damaged));
         Assert.Equal(before, history.Save());
         Assert.Equal("", history.State.GetTextVariable(new("weather")));

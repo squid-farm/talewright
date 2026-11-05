@@ -44,8 +44,9 @@ Full description in [architecture §5](../../../docs/developer/architecture.md#5
 | `storylet:<scene-id>` | a hub storylet |
 | `continue` (`StorySession.ContinueKey`) | the synthetic Continue after an entry check or before a divert |
 
-Keys are stable for a given story version, so **seed + list of keys** reproduces a playthrough. That's the
-save/replay contract.
+Keys distinguish choices in the live session. Explicit `cN` keys are position-derived and may change
+when choices are inserted or reordered. Saves use separate gameplay-outcome identities and replay
+evidence; the UI keys alone are not the cross-revision save/replay contract.
 
 ## Headless author scene playtesting
 

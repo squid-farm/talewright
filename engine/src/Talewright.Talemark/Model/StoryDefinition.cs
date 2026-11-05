@@ -93,6 +93,7 @@ public sealed class SceneDefinition : IStorylet
     public int? HubLimit { get; init; }
 
     public IReadOnlyList<SceneStep> Steps { get; init; } = [];
+    internal bool UsesFullReplayIdentities { get; set; }
     public IReadOnlyList<ChoiceDefinition> Choices =>
         SceneSteps.Walk(Steps).OfType<ChoiceStep>().Select(step => step.Choice).ToArray();
 }
@@ -107,6 +108,9 @@ public sealed class ChoiceDefinition
 
     /// <summary>Stable key within the scene (declaration index), recorded in <c>ChoiceMade</c> events.</summary>
     public required string Key { get; init; }
+
+    /// <summary>Compiled identity of this choice's gameplay outcome, independent of presentation and position.</summary>
+    internal byte[]? ReplayIdentity { get; set; }
 
     /// <summary>Authored label, or null for a textless choice. An explicitly empty label remains empty.</summary>
     public required IReadOnlyList<TemplateInline>? Label { get; init; }

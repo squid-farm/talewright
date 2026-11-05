@@ -56,8 +56,6 @@ public sealed class StoryCompatibilityTests
     }
 
     [Theory]
-    [InlineData("inserted-choice")]
-    [InlineData("changed-choice")]
     [InlineData("changed-effect")]
     [InlineData("changed-check")]
     [InlineData("changed-character")]
@@ -76,8 +74,6 @@ public sealed class StoryCompatibilityTests
         var activeBefore = active.Save();
         var updated = change switch
         {
-            "inserted-choice" => Compile(version: "2", insertChoice: true),
-            "changed-choice" => Compile(version: "2", choiceLabel: "A different decision"),
             "changed-effect" => Compile(version: "2", reward: 2),
             "changed-check" => Compile(version: "2", difficulty: 13),
             "changed-character" => Compile(version: "2", presetHp: 9),
@@ -86,12 +82,6 @@ public sealed class StoryCompatibilityTests
             "changed-start" => Compile(version: "2", startEffect: 1),
             _ => throw new ArgumentOutOfRangeException(nameof(change)),
         };
-        if (change == "inserted-choice")
-        {
-            var candidate = Create(updated);
-            Assert.Equal("Inserted", candidate.Current.Choices.Single(choice => choice.Key == "c0").Text);
-        }
-
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
 
         Assert.Contains("Version 1 of Compatibility has changed", error.Message);
@@ -99,6 +89,56 @@ public sealed class StoryCompatibilityTests
         Assert.DoesNotContain("scene", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(unchanged, bytes);
         Assert.Equal(activeBefore, active.Save());
+    }
+
+    [Theory]
+    [InlineData("inserted-choice")]
+    [InlineData("reordered-choice")]
+    [InlineData("changed-selected-label")]
+    [InlineData("changed-redo-label")]
+    public void Choice_insertions_reordering_and_label_changes_preserve_replay(string change)
+    {
+        var original = Create(Compile());
+        original.Choose("c0");
+        original.Choose("c0");
+        original.Back();
+        var bytes = original.Save();
+        var updated = change switch
+        {
+            "inserted-choice" => Compile(version: "2", insertChoice: true),
+            "reordered-choice" => Compile(version: "2", reverseInitialChoices: true),
+            "changed-selected-label" => Compile(version: "2", choiceLabel: "A different decision"),
+            "changed-redo-label" => Compile(version: "2", middleChoiceLabel: "A different continuation"),
+            _ => throw new ArgumentOutOfRangeException(nameof(change)),
+        };
+
+        var restored = StoryHistory.Restore(updated, bytes);
+
+        Assert.Equal(original.Events.Where(gameEvent => gameEvent is not ChoiceMade),
+            restored.Events.Where(gameEvent => gameEvent is not ChoiceMade));
+        if (change is not ("inserted-choice" or "reordered-choice"))
+        {
+            Assert.Equal(original.Events, restored.Events);
+        }
+        Assert.Equal(original.Cursor, restored.Cursor);
+        Assert.True(restored.CanForward);
+        if (change == "changed-selected-label")
+        {
+            Assert.Contains("A different decision", restored.Transcript[0].Chosen!.OfType<RenderedText>().Single().Text);
+        }
+        if (change == "changed-redo-label")
+        {
+            restored.Forward();
+            Assert.Contains("A different continuation",
+                restored.Transcript[1].Chosen!.OfType<RenderedText>().Single().Text);
+        }
+        if (change is "inserted-choice" or "reordered-choice")
+        {
+            restored.Forward();
+            restored.Back();
+            Assert.Equal(original.Events.Where(gameEvent => gameEvent is not ChoiceMade),
+                restored.Events.Where(gameEvent => gameEvent is not ChoiceMade));
+        }
     }
 
     [Fact]
@@ -160,9 +200,18 @@ public sealed class StoryCompatibilityTests
         }
 
         vary = true;
-        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(target, bytes));
-        Assert.Equal(2, calls);
-        if (updated) Assert.StartsWith("Version 0.0.0 of Cursor replay has changed", error.Message);
+        if (differentEvents)
+        {
+            var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(target, bytes));
+            Assert.Equal(2, calls);
+            if (updated) Assert.StartsWith("Version 0.0.0 of Cursor replay has changed", error.Message);
+        }
+        else
+        {
+            var restored = StoryHistory.Restore(target, bytes);
+            Assert.Equal(2, calls);
+            Assert.Equal(history.Events, restored.Events);
+        }
     }
 
     [Fact]
@@ -183,34 +232,29 @@ public sealed class StoryCompatibilityTests
     }
 
     [Fact]
-    public void Saves_without_evidence_need_the_original_revision_before_they_can_be_upgraded()
+    public void Saves_without_evidence_cannot_be_restored_after_the_story_changes()
     {
         var oldStory = Compile();
         var original = Create(oldStory);
         original.Choose("c0");
-        var legacy = SaveFormat.Write(SaveFormat.Read(original.Save()) with { ReplayEvidence = null });
+        var legacy = SaveFormat.Write(SaveFormat.Read(original.Save()) with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
         var updated = Compile(version: "2", prose: "Updated narrative.");
 
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, legacy));
-        var restored = StoryHistory.Restore(oldStory, legacy);
-        var upgraded = restored.Save();
-        Assert.NotNull(SaveFormat.Read(upgraded).ReplayEvidence);
-        Assert.Equal(original.Events, StoryHistory.Restore(updated, upgraded).Events);
         Assert.Null(SaveFormat.Read(legacy).ReplayEvidence);
     }
 
     [Fact]
-    public void Unchanged_path_uses_the_updated_world_defaults_rather_than_a_saved_state_snapshot()
+    public void Changed_initial_world_defaults_are_rejected()
     {
         var original = Create(Compile());
-        original.Choose("c0");
         var updated = Compile(version: "2", initialScore: 5);
 
-        var restored = StoryHistory.Restore(updated, original.Save());
-
-        Assert.Equal(original.Events, restored.Events);
-        Assert.Equal(0, original.State.GetVariable(new VarId("score")));
-        Assert.Equal(5, restored.State.GetVariable(new VarId("score")));
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, original.Save()));
     }
 
     [Fact]
@@ -235,7 +279,7 @@ public sealed class StoryCompatibilityTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Changed_offered_choices_at_the_saved_cursor_are_rejected(bool afterAChoice)
+    public void Choice_labels_at_the_saved_cursor_do_not_invalidate_replay(bool afterAChoice)
     {
         var original = Create(Compile());
         if (afterAChoice)
@@ -248,21 +292,19 @@ public sealed class StoryCompatibilityTests
             choiceLabel: afterAChoice ? "Investigate" : "A different decision",
             middleChoiceLabel: afterAChoice ? "A different decision" : "Continue");
 
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
+        var restored = StoryHistory.Restore(updated, bytes);
+        Assert.Equal(original.Events, restored.Events);
+        Assert.Contains("A different decision",
+            restored.Current.Choices.Single(choice => choice.Key == "c0").Text);
     }
 
     [Fact]
-    public void Restored_legacy_progress_retains_its_source_key_without_trusting_damaged_evidence()
+    public void Changed_replay_evidence_changes_progress_identity()
     {
         var history = Create(Compile());
         history.Choose("c0");
         var save = history.Save();
         var saved = SaveFormat.Read(save);
-        var legacy = SaveFormat.Write(saved with { ReplayEvidence = null });
-        var restored = StoryHistory.Restore(history.Story, legacy);
-        Assert.Equal(StoryHistory.DescribeSave("Legacy", legacy).ProgressKey, restored.RestoredProgressKey);
-        Assert.NotEqual(restored.ProgressKey, restored.RestoredProgressKey);
-
         var damaged = saved.ReplayEvidence!.ToArray();
         damaged[^1] ^= 1;
         var damagedSave = SaveFormat.Write(saved with { ReplayEvidence = damaged });
@@ -270,10 +312,86 @@ public sealed class StoryCompatibilityTests
     }
 
     [Fact]
+    public void Duplicate_outcomes_keep_live_choice_keys_but_replay_the_first_equivalent_choice()
+    {
+        var firstAvailable = false;
+        var predicates = new NamedPredicateRegistry().Register("FirstAvailable", _ => firstAvailable);
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: duplicate-outcomes, title: Duplicate outcomes, start: start }
+                characters:
+                  player: { first-name: Tester }
+                """,
+            ["main.tale"] = """
+                === start
+                * [First] (requires @FirstAvailable) -> finish
+                * [Second] -> finish
+                === finish
+                Finished.
+                -> END
+                """,
+        });
+        var result = StoryCompiler.Compile(source, new CompilerOptions
+        {
+            CompatibilityId = "duplicate-outcomes-v1",
+            Predicates = predicates,
+        });
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var history = new StoryHistory(result.Story!, 7);
+        Assert.Equal(["c1"], history.Current.Choices.Select(choice => choice.Key));
+        history.Choose("c1");
+        var bytes = history.Save();
+
+        firstAvailable = true;
+        var restored = StoryHistory.Restore(result.Story!, bytes);
+
+        Assert.Equal("c0", Assert.Single(restored.Events.OfType<ChoiceMade>()).ChoiceKey);
+        Assert.Equal(history.State.GetBaseStat(EntityId.Player, new StatId("hp")),
+            restored.State.GetBaseStat(EntityId.Player, new StatId("hp")));
+    }
+
+    [Fact]
+    public void Replay_does_not_select_a_choice_from_an_inactive_conditional_branch()
+    {
+        var enabled = true;
+        var predicates = new NamedPredicateRegistry().Register("Enabled", _ => enabled);
+        var manifest = new ManifestFaker("conditional-replay", "Conditional replay", "start");
+        manifest.Character("player", "Tester");
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = """
+                === start
+                {if @Enabled}
+                * [Inside] -> finish
+                {/if}
+                * [Outside] -> other
+                === finish
+                -> END
+                === other
+                -> END
+                """,
+        }), new CompilerOptions
+            {
+                CompatibilityId = "conditional-replay-v1",
+                Predicates = predicates,
+            });
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var history = new StoryHistory(result.Story!, 7);
+        history.Choose("c0");
+        var bytes = history.Save();
+
+        enabled = false;
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(result.Story!, bytes));
+    }
+
+    [Fact]
     public void Initial_evidence_has_a_frozen_encoding()
     {
         var history = new StoryHistory(TestStories.Linear.Compile(), 42);
-        Assert.Equal("02A798A6261EA551898FCBAF38D69A048FA96FD9B23B9C098EBC626B460DE874EB",
+        Assert.Equal("03DAEE9310D6DF8136C34ACADD09932D87346013FCEE9CAE22919A047361FD056F",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -285,7 +403,7 @@ public sealed class StoryCompatibilityTests
         history.Choose("c0");
         history.Back();
 
-        Assert.Equal("02F26EB70E51571DC6A7AE8A17AC17E484E51EFE6F24BF39B5420E468C6D03AC39",
+        Assert.Equal("03D374F459D587E8BB490F7B6EC4AB3AC1E218C278520B53E06D41104D080889CA",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -319,7 +437,7 @@ public sealed class StoryCompatibilityTests
     private static StoryDefinition Compile(string version = "1", string prose = "Original narrative.",
         bool insertChoice = false, string choiceLabel = "Investigate", int reward = 1, int difficulty = 12,
         int presetHp = 15, bool allowShe = true, string? compatibilityId = null, int startEffect = 0,
-        int initialScore = 0, string middleChoiceLabel = "Continue")
+        int initialScore = 0, string middleChoiceLabel = "Continue", bool reverseInitialChoices = false)
     {
         var manifest = new ManifestFaker("compatibility", "Compatibility", "start")
         {
@@ -334,10 +452,11 @@ public sealed class StoryCompatibilityTests
         var lines = new List<string> { SceneFaker.Header("start"), prose };
         if (startEffect != 0) lines.Add(EffectFaker.Line(EffectFaker.Increase(score, startEffect)));
         if (insertChoice) lines.Add(ChoiceFaker.Create("middle", "Inserted"));
-        lines.Add(SkillCheckFaker.Choice(choiceLabel, "athletics", difficulty, "middle", "middle",
+        var checkedChoice = SkillCheckFaker.Choice(choiceLabel, "athletics", difficulty, "middle", "middle",
             EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 1),
-            EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 2)));
-        lines.Add(ChoiceFaker.Create("END", "Leave"));
+            EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 2));
+        var leaveChoice = ChoiceFaker.Create("END", "Leave");
+        lines.AddRange(reverseInitialChoices ? [leaveChoice, checkedChoice] : [checkedChoice, leaveChoice]);
         lines.Add(SceneFaker.Header("middle"));
         lines.Add("The middle.");
         lines.Add(ChoiceFaker.Create("finish", middleChoiceLabel, effect: EffectFaker.Increase(score, reward)));

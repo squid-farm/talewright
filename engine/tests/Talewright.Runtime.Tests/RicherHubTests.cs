@@ -1,4 +1,5 @@
 using Talewright.Talemark.Compilation;
+using Talewright.Rules.Expressions;
 using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
@@ -74,5 +75,44 @@ public sealed class RicherHubTests
         Assert.Equal("c0", history.Current.Choices[0].Key);
         history.Choose("c0");
         Assert.True(history.Current.IsEnded);
+    }
+
+    [Fact]
+    public void Replay_finds_a_hub_choice_even_when_its_requirement_now_hides_it()
+    {
+        var available = true;
+        var predicates = new NamedPredicateRegistry().Register("Available", _ => available);
+        var manifest = new ManifestFaker("hub-replay", "Hub replay", "hub");
+        manifest.Character("player", "Tester");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = string.Join('\n',
+                SceneFaker.Header("hub"),
+                SceneFaker.Hub("room"),
+                SceneFaker.Header("first"),
+                SceneFaker.Tags("room"),
+                SceneFaker.Requires("@Available"),
+                DivertFaker.To("END"),
+                SceneFaker.Header("second"),
+                SceneFaker.Tags("room"),
+                DivertFaker.To("END")),
+        });
+        var result = StoryCompiler.Compile(source, new CompilerOptions
+        {
+            CompatibilityId = "hub-replay-v1",
+            Predicates = predicates,
+        });
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var history = new StoryHistory(result.Story!, 42);
+        Assert.Contains(history.Current.Choices, choice => choice.Key == "storylet:first");
+        history.Choose("storylet:first");
+        var bytes = history.Save();
+
+        available = false;
+        var restored = StoryHistory.Restore(result.Story!, bytes);
+
+        Assert.True(restored.Current.IsEnded);
+        Assert.Equal(history.Events, restored.Events);
     }
 }
