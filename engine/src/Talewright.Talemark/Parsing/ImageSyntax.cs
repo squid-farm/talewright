@@ -259,6 +259,4 @@ internal static class ImageSyntax
 
     private static bool IsPlain(IReadOnlyList<TemplateInline> inlines, string decoded) =>
         inlines.Count == 1 && inlines[0] is TextTemplate text && text.Text == decoded;
-
-    internal static string Quote(string text) => QuotedStringSyntax.Quote(text);
 }

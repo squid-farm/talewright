@@ -22,6 +22,10 @@ public sealed class ReaderTextGrammarTests
     [InlineData("[Inventory]: empty", "[Inventory]: empty")]
     [InlineData("[the inn][1] is here", "[the inn][1] is here")]
     [InlineData("[Go](https://example.org) now", "[Go](https://example.org) now")]
+    [InlineData("![a [b]](p)", "![a [b]](p)")]
+    [InlineData("![a](p(q))", "![a](p(q))")]
+    [InlineData("An unfinished ![image] remains prose.", "An unfinished ![image] remains prose.")]
+    [InlineData(@"\![alt](path)", "![alt](path)")]
     [InlineData("&amp; &copy; &#65;", "&amp; &copy; &#65;")]
     [InlineData("<b>tag</b>, https://example.org", "<b>tag</b>, https://example.org")]
     [InlineData("# Not heading; - not list; 1. not list", "# Not heading; - not list; 1. not list")]
@@ -138,6 +142,39 @@ public sealed class ReaderTextGrammarTests
             new DiagnosticBag());
 
         Assert.InRange(result.WorkUnits, input.Length, 10 * input.Length);
+    }
+
+    [Fact]
+    public void Rejected_image_text_keeps_its_formatting_boundaries()
+    {
+        var diagnostics = new DiagnosticBag();
+        var inlines = InlineParser.Parse(
+            SourceText.Single("**![a](p)** and ![a](p)*after*", SourceLocation.None),
+            Symbols(), diagnostics);
+
+        Assert.Equal(2, diagnostics.Items.Count(item => item.Code == CompilerDiagnosticCodes.LegacyImageSyntax));
+        var styled = Assert.IsType<StyledTemplate>(inlines[0]);
+        Assert.Equal(TextStyle.Strong, styled.Style);
+        Assert.Equal("![a](p)", Assert.IsType<TextTemplate>(Assert.Single(styled.Children)).Text);
+        Assert.Equal(" and ![a](p)*after*",
+            string.Concat(inlines.Skip(1).Select(inline => Assert.IsType<TextTemplate>(inline).Text)));
+    }
+
+    [Fact]
+    public void Rejected_image_does_not_hide_other_reader_text_errors()
+    {
+        var diagnostics = new DiagnosticBag();
+        InlineParser.Parse(
+            SourceText.Single("![a](p) tail\\", new SourceLocation("main.tale", 1, 1)),
+            Symbols(), diagnostics);
+
+        Assert.Equal(2, diagnostics.Items.Count);
+        var image = Assert.Single(diagnostics.Items, item => item.Code == CompilerDiagnosticCodes.LegacyImageSyntax);
+        var backslash = Assert.Single(diagnostics.Items, item => item.Code == CompilerDiagnosticCodes.TrailingReaderTextBackslash);
+        Assert.Equal(DiagnosticSeverity.Error, image.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, backslash.Severity);
+        Assert.Equal(new SourceLocation("main.tale", 1, 1), image.Location);
+        Assert.Equal(new SourceLocation("main.tale", 1, 13), backslash.Location);
     }
 
     [Fact]

@@ -203,15 +203,16 @@ public sealed class ImageSyntaxTests
     }
 
     [Theory]
-    [InlineData("![The camp](camp)", """{image("camp", "The camp")}""")]
-    [InlineData("![Joel's camp](maps/camp)", """{image("maps/camp", "Joel's camp")}""")]
-    [InlineData("""![A "quote"](camp)""", """{image("camp", "A \"quote\"")}""")]
-    public void Markdown_images_name_the_escaped_replacement(string old, string replacement)
+    [InlineData("![The camp](camp)")]
+    [InlineData("![Joel's camp](maps/camp)")]
+    [InlineData("""![A "quote"](camp)""")]
+    [InlineData("![](camp)")]
+    public void Markdown_images_report_unexpected_reader_text_syntax(string old)
     {
         var result = Compile("=== start\n" + old + "\n-> END");
         var error = Assert.Single(result.Errors, error => error.Code == "TW1015");
         Assert.Equal(new SourceLocation("main.tale", 2, 1), error.Location);
-        Assert.Contains(replacement, error.Message);
+        Assert.Equal("Unexpected syntax in reader text.", error.Message);
     }
 
     [Fact]
