@@ -33,6 +33,8 @@ public sealed class StoryHoverTests
     [InlineData("{faction:guild:ti|er}", "Faction standing tier", "tier")]
     [InlineData("{faction:guild:sta|nding}", "Numeric player standing", "standing")]
     [InlineData("{player:first-name#cap|italize}", "Modifier", "capitalize")]
+    [InlineData("{player:first-name#bo|ld}", "bold formatting", "bold")]
+    [InlineData("{player:first-name#ita|lic}", "italic formatting", "italic")]
     [InlineData("@req|uires player:hp > 0", "Boolean condition", "requires")]
     [InlineData("@requires vis|ited(second)", "visited(scene)", "visited")]
     [InlineData("@requires player h|as rope", "tests whether", "has")]

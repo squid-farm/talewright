@@ -30,6 +30,11 @@ public static class AuthoringSyntaxVocabulary
         [ExpressionVocabulary.VisitedCall] = AuthoringTokenKind.Visited,
         [ExpressionVocabulary.ImageCall] = AuthoringTokenKind.Image,
     };
+    private static readonly IReadOnlyDictionary<string, string> ModifierDescriptions = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [TextModifierRegistry.BoldName] = "Applies bold formatting to the value without changing its text.",
+        [TextModifierRegistry.ItalicName] = "Applies italic formatting to the value without changing its text.",
+    };
 
     /// <summary>Characters that can start a Talemark completion request.</summary>
     public static IReadOnlyList<string> CompletionTriggerCharacters { get; } = Array.AsReadOnly(new[]
@@ -70,6 +75,11 @@ public static class AuthoringSyntaxVocabulary
         if (HelpBySpelling.TryGetValue(spelling, out var entry))
         {
             help = new(entry.Spelling, entry.Description);
+            return true;
+        }
+        if (ModifierDescriptions.TryGetValue(spelling, out var description))
+        {
+            help = new(FormatModifier(spelling), description);
             return true;
         }
         if (CompletionAliases.TryGetValue(spelling, out var kind))

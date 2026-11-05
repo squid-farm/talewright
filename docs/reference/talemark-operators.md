@@ -78,7 +78,7 @@ is needed.
 | Reader text | The default content of a text unit. | Paragraphs, speech text, choice labels, image alt text. | Formatted text shown to the reader. | `**Danger** ahead` |
 | Inline construct | `{` and its matching `}` inside reader text. | Any reader text. | Substituted text, a conditional branch, or media. | `{player:first-name}`, `{if flag:x}`, `{image("map")}` |
 | Expression | An expression slot. | Substitutions, `{if}`, `@requires`, `(requires ...)`, assignment values, quantities and check DCs. | A typed value: number, boolean, text or tier. Never changes state. | `player:hp > 0`, `visited(camp)` |
-| Text manipulator | `#name` after a substitution's value. | The end of a substitution only. | Text. Applied left to right. Never changes state. | `#capitalize`, `#one-many("is", "are")` |
+| Text manipulator | `#name` after a substitution's value. | The end of a substitution only. | Text or formatted text. Applied left to right. Never changes state. | `#capitalize`, `#bold`, `#one-many("is", "are")` |
 | Effect | A statement in a `~` line or a choice `{ ... }` block, separated by `;`. | Effect lines and choice effects. | A state change, with no value. | `set flag:x`, `give player rope 2`, `var:coins += 1` |
 | Clause | A fixed word, or a word followed by `:`, attached to a directive. | Choices and checks. | Modifies its directive. | `(requires ...)`, `success:`, `skill-check perception dc 12` |
 
@@ -135,7 +135,8 @@ New callables follow this guideline. Existing exceptions are listed below rather
 | `visited(scene)` | Expression predicate; boolean. | One scene name. | Expressions. | Whitespace before `(` is accepted. |
 | `character has item` | Expression predicate; boolean. | Character name, item name. | Expressions. | Infix word, not a call. |
 | `@Name` | Expression predicate; boolean. | None. | Expressions. | Registered by a C# story project. |
-| `#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, `#possessive` | Text manipulator; text. | None. | End of a substitution. | Chain left to right. |
+| `#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, `#possessive` | Text manipulator; text. | None. | End of a substitution. | Chain left to right before any formatting modifier. |
+| `#bold`, `#italic` | Text manipulator; formatted text with a `TextStyle`. | None. | End of a substitution. | Lowered to the same `StyledTemplate` model as prose formatting; can follow text modifiers and each other, but not be followed by text modifiers. |
 | `#one-many("singular", "plural")` | Text manipulator; text. | Two literal-text arguments, both required. | Pronoun and item-name references. | Only multi-argument modifier. |
 | `image("path", "alt")` | Inline construct; media. | Literal-text path, required; reader-text alt, optional. | The whole content of a `{ }` in reader text. | Not an expression; no `#` chaining. |
 | `all(tag, ...)`, `any(tag, ...)` | `@hub` argument; tag group. | One or more distinct tags. | `@hub` only. | `(` must follow immediately today. |
@@ -201,7 +202,7 @@ using the quoted-text rules when it is inside syntax.
 | `:` | Access a named value/property in expressions and substitutions; also select an effect target. Repeats for nested access. Never use `.` instead. | 1 | `{faction:explorers-guild:standing}` | TW2001 unknown name/property or old spelling; TW2004 undeclared flag/variable. |
 | `.` | Group words within one identifier, never access a property. | Name | `{item:weapon.knife}` | Invalid identifiers produce TW1001 in expressions, TW1008 for scenes, TW4003 in YAML. |
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
-| `#` | Text manipulator in a substitution. Takes the value to its left and returns text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value. |
+| `#` | Text manipulator in a substitution. Takes the value to its left and returns text or formatted text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown modifier, bad argument syntax or value, or incompatible chain. |
 | `(` `)` | Group an expression; also bound `visited`'s scene argument, modifier arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 modifier; TW1011 choice; TW1006 hub. |
 | `"` | Bound text literals, modifier string arguments and image arguments. All decode `\"` and `\\`; no single-quoted Talemark string form. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed modifier; TW1014 malformed image; TW1004 enclosing brace not found. |
 | `\` | Escape a quote or backslash inside literal strings, or ASCII punctuation and symbols in reader text. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |

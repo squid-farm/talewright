@@ -139,6 +139,7 @@ internal static class InlineParser
         StorySymbols symbols,
         DiagnosticBag diagnostics,
         bool allowImages,
+        bool allowFormattedOutput,
         CancellationToken cancellationToken)
     {
         private int _remaining = CancellationInterval;
@@ -147,6 +148,7 @@ internal static class InlineParser
         public StorySymbols Symbols { get; } = symbols;
         public DiagnosticBag Diagnostics { get; } = diagnostics;
         public bool AllowImages { get; } = allowImages;
+        public bool AllowFormattedOutput { get; } = allowFormattedOutput;
         public CancellationToken CancellationToken { get; } = cancellationToken;
         public int WorkUnits { get; set; }
 
@@ -175,14 +177,14 @@ internal static class InlineParser
     }
 
     internal static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
-        bool allowImages = true, CancellationToken cancellationToken = default) =>
-        ParseWithWork(source, symbols, diagnostics, allowImages, cancellationToken).Inlines;
+        bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true) =>
+        ParseWithWork(source, symbols, diagnostics, allowImages, cancellationToken, allowFormattedOutput).Inlines;
 
     internal static InlineParseResult ParseWithWork(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
-        bool allowImages = true, CancellationToken cancellationToken = default)
+        bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var context = new Context(source, symbols, diagnostics, allowImages, cancellationToken);
+        var context = new Context(source, symbols, diagnostics, allowImages, allowFormattedOutput, cancellationToken);
         var text = source.Text;
         var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
         context.WorkUnits += scan.WorkUnits;
@@ -467,10 +469,11 @@ internal static class InlineParser
         }
 
         var fragment = ParseFragment(inner, location, context, sourceOffset);
-        if (fragment is InlinePiece { Inline: SubstitutionTemplate substitution })
+        if (fragment is InlinePiece { Inline: var inline })
         {
-            context.Symbols.Analysis?.Substitutions.Add(new(
-                new(context.Source.Locate(open), context.Source.Locate(close + 1)), substitution));
+            var range = new SourceRange(context.Source.Locate(open), context.Source.Locate(close + 1));
+            foreach (var substitution in FindSubstitutions(inline))
+                context.Symbols.Analysis?.Substitutions.Add(new(range, substitution));
         }
 
         return fragment;
@@ -497,8 +500,28 @@ internal static class InlineParser
         }
 
         var substitution = ExpressionParser.ParseSubstitution(inner, location, context.Symbols, context.Diagnostics,
-            offset => source.Locate(sourceOffset + offset));
+            offset => source.Locate(sourceOffset + offset), context.AllowFormattedOutput);
         return substitution is null ? null : new InlinePiece(substitution);
+    }
+
+    private static IEnumerable<SubstitutionTemplate> FindSubstitutions(TemplateInline inline)
+    {
+        switch (inline)
+        {
+            case SubstitutionTemplate substitution:
+                yield return substitution;
+                break;
+            case StyledTemplate styled:
+                foreach (var child in styled.Children)
+                    foreach (var substitution in FindSubstitutions(child))
+                        yield return substitution;
+                break;
+            case ConditionalInlineTemplate conditional:
+                foreach (var child in conditional.Then.Concat(conditional.Else))
+                    foreach (var substitution in FindSubstitutions(child))
+                        yield return substitution;
+                break;
+        }
     }
 
     private static bool TryReadLegacyImage(Context context, string text, int start, out int end)

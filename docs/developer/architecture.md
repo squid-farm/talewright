@@ -315,8 +315,11 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
     text modifiers), `ConditionalInlineTemplate`.
   - Note: this is what "strongly typed, not string parsing" means in practice. `{player:first-name#possessive}`
     compiles to `SubstitutionTemplate(NameRef(player, First), [possessive])`.
-- **`Templates/TextModifiers.cs`**: `ITextModifier` (`#possessive`, `#capitalize`, `#upper`, `#lower`, `#a` …) and
-  `TextModifierRegistry`. Register your own to add `#whatever`.
+- **`Templates/TextModifiers.cs`**: `ITextModifier` (`#possessive`, `#capitalize`, `#upper`, `#lower`,
+  `#a`, `#bold`, `#italic`) and `TextModifierRegistry`. Text modifiers declare accepted and output kinds;
+  `#bold` and `#italic`
+  lower to `StyledTemplate` with the same `TextStyle` as prose formatting. Register your own to add
+  `#whatever`.
 - **`Grammar/EnglishGrammar.cs`**: `IGrammar` with Chicago-style possessives (`Burns's`, `the guards'`),
   a/an, capitalisation. Swap the grammar to localise or change style.
 - **`Rendering/`**: `TemplateRenderer.Render(blocks, state)` → `RenderedDocument`. Output types:

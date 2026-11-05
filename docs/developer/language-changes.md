@@ -10,7 +10,7 @@ meanings and the difference between implemented and decided syntax.
   spelling consistent and resolve any conflicting issue wording before coding.
 - [ ] State the author task in plain English, with one small canonical example.
 - [ ] Check the registry. Reuse an existing sigil only for its existing meaning:
-  `:` accesses properties, `#` manipulates a value into text and chains left to right,
+  `:` accesses properties, `#` manipulates a value into text or formatted text and chains left to right,
   `.` groups words inside a name.
 - [ ] If proposing a new sigil, explain why the existing ones cannot express the task clearly.
   List its contexts, arguments, boundaries and any conflict with prose or existing syntax.
@@ -35,6 +35,22 @@ meanings and the difference between implemented and decided syntax.
 - [ ] Identify any decided-but-unimplemented prerequisite. Agree on a scoped issue with the
   project manager rather than expanding a syntax slice into resolver, runtime or presentation work.
 - [ ] Keep the change reviewable. Split oversized issues with the project manager before coding.
+
+### Sugar and defaults
+
+These are different contracts:
+
+- **Syntax sugar** is an alternate spelling for an existing meaning. Lower it during compilation
+  into the same canonical model, so later validation, rendering and authoring tools do not need to
+  know which spelling the author used. For example, `**{player:first-name}**` and
+  `{player:first-name#bold}` both compile to a `StyledTemplate` with `TextStyle.Strong`.
+- **A default** is omitted author input. Preserve that absence in the model and supply the default
+  only at the boundary that owns its behavior. A textless choice keeps `Label = null`; the player
+  presents it as **Continue**. It is not rewritten as an authored `[Continue]` label.
+
+When proposing shorthand, name the canonical model it lowers to. When proposing a default, name
+where absence is represented and where the value is chosen. Tests should verify equivalent models
+for sugar and preserve the distinction between absent and explicitly authored values for defaults.
 
 ## Ship together
 

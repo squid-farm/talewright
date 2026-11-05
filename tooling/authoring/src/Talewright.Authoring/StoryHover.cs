@@ -71,6 +71,10 @@ public static class StoryHover
 
     private static AuthoringHover Describe(StoryAnalysis analysis, AuthoringSymbol symbol, SourceRange range)
     {
+        if (symbol.Kind == AuthoringSymbolKind.Modifier &&
+            AuthoringSyntaxVocabulary.TryGetKeywordHelp(symbol.Name, out var modifierHelp))
+            return Help(modifierHelp.Spelling, modifierHelp.Description, range);
+
         var summary = $"{symbol.Kind}: {symbol.Name} ({symbol.Type})";
         var markdown = $"**{symbol.Kind}** {Code(symbol.Name)} ({Code(symbol.Type)})";
         var plain = summary;

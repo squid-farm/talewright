@@ -106,14 +106,14 @@ internal static class ExpressionParser
     }
 
     /// <summary>Parses and binds the inside of <c>{reference#modifier…}</c>.</summary>
-    public static SubstitutionTemplate? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<int, SourceLocation>? locate = null)
+    public static TemplateInline? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols,
+        DiagnosticBag diagnostics, Func<int, SourceLocation>? locate = null, bool allowFormattedOutput = true)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location, locate)
             ?? Lexer.Tokenize(text);
         var syntax = ExpressionSyntaxParser.ParseSubstitution(tokens, text.Length, locate ?? location.Offset,
             diagnostics);
-        return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset);
+        return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, allowFormattedOutput);
     }
 
     /// <summary>Parses and binds semicolon-separated effects.</summary>
