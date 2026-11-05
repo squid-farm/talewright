@@ -1,3 +1,4 @@
+using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Talemark.Diagnostics;
@@ -21,6 +22,8 @@ internal sealed class StoryManifest
     public bool UndoEnabled { get; set; } = true;
     public CharacterCreation? Creation { get; set; }
     public required WorldDefinition World { get; init; }
+    public IReadOnlyDictionary<EntityId, SourceLocation> CharacterLocations { get; init; } =
+        new Dictionary<EntityId, SourceLocation>();
     public List<RawTrigger> Triggers { get; } = [];
 
     /// <summary>Raw trigger text, for the flag/variable pre-scan.</summary>

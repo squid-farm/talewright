@@ -36,7 +36,7 @@ public sealed class StoryHoverTests
     [InlineData("{player:first-name#bo|ld}", "bold formatting", "bold")]
     [InlineData("{player:first-name#ita|lic}", "italic formatting", "italic")]
     [InlineData("@req|uires player:hp > 0", "Boolean condition", "requires")]
-    [InlineData("@requires vis|ited(second)", "visited(scene)", "visited")]
+    [InlineData("@requires player vis|ited second", "player visited scene", "visited")]
     [InlineData("@requires player h|as rope", "tests whether", "has")]
     [InlineData("~ gi|ve player rope", "numeric expression", "give")]
     [InlineData("~ player:hp +|= 1", "Adds a numeric", "+=")]

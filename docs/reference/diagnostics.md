@@ -83,6 +83,7 @@ Giving a character a value does not declare the skill. See the complete
 | TW3011 | A non-choice step follows the scene's first choice, including inside another condition branch. | Move prose, images, effects, diverts and checks before the final choice block. |
 | ⚠ TW3012 | A line cannot run because an earlier step always leaves its block. | Move the line before the exit, make the exit conditional, or remove the unreachable line. |
 | ⚠ TW3013 | A scene may reach its choices with none available. | Add an unconditional choice such as `* -> target` or `* [The end] -> END`, or give every continuing `{if}` / `{else}` branch an unconditional choice. |
+| TW3014 | A scene ID matches a character ID. | Rename either the scene or the character; these IDs must be distinct. |
 
 TW3013 counts authored choices without a choice requirement. Hub offers do not guarantee a choice:
 their storylets can all be ineligible or already visited. A conditional `->` may be skipped

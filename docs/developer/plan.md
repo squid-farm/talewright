@@ -138,7 +138,7 @@ for actual project references, public contracts, and implemented types.
 - **Inventory:** items are entities. Containment is a relation (owner → item, with quantity), which leaves room later for containers, equipment slots and shops.
 - **Factions and relationships:** `Relationship(from, to, kind, value)`, with reputation tiers defined by the ruleset (hostile … allied). This covers both faction allegiance and NPC affection.
 - **Event store:** an append-only `IReadOnlyList<GameEvent>`, with events as records (`StatChanged`, `ItemGranted`, `SceneEntered`, `ChoiceMade`, `DiceRolled`, `FlagSet`, …). State is a pure fold over them, with snapshots later for performance.
-- **History queries:** `visited(scene)`, `chose(choice)` and `count(event…)` power conditions such as "has ever betrayed X".
+- **History queries:** `player visited scene`, `chose(choice)` and `count(event…)` power conditions such as "has ever betrayed X".
 - **RNG:** an `IRandomSource` with a seed held in state. Every roll emits a `DiceRolled` event, so replays read the recorded value and never re-roll.
 - **Not a one-way state machine:** there is no hardcoded "next" pointer. Position is state (`current scene`, plus later `current location`); movement is an event. This leaves open-world hubs, locations, time and clocks as additions rather than rewrites.
 

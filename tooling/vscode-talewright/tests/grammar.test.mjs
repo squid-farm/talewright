@@ -137,8 +137,8 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['  success: { player:hp += 1 } -> END', 'success', 'keyword.control.outcome.tale'],
     ['failure: -> temple.hall', 'failure', 'keyword.control.outcome.tale'],
     ['-> END', 'END', 'entity.name.section.target.tale'],
-    ['{if visited(temple.hall) and true}Yes{else}No{/if}', 'if', 'keyword.control.conditional.tale'],
-    ['{if visited(temple.hall)}Yes{/if}', 'visited', 'support.function.tale'],
+    ['{if player visited temple.hall and true}Yes{else}No{/if}', 'if', 'keyword.control.conditional.tale'],
+    ['{if player visited temple.hall}Yes{/if}', 'visited', 'keyword.operator.word.tale'],
     ['{player:first-name#possessive}', '#possessive', 'support.function.modifier.tale'],
     ['{if var:count == 12}', '12', 'constant.numeric.tale'],
     ['*emphasis* and **strong**', 'emphasis', 'markup.italic.markdown'],
@@ -158,11 +158,11 @@ test('Talemark syntax categories tokenize with real Oniguruma/TextMate', () => {
     ['{image("{player:name}", "Camp")}', 'player', 'string.quoted.double.tale'],
     ['{image:name}', 'name', 'variable.other.member.tale'],
     ['Literal \\{player:first-name\\}', '\\{', 'constant.character.escape.tale'],
-    ['* [Continue] (requires visited(start) and player:hp > 0) -> END', 'and', 'keyword.operator.word.tale'],
-    ['* [Continue] (requires visited(start) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
-    ['* [Continue] (requires visited(start) and player:hp > 0) -> END', 'END', 'entity.name.section.target.tale'],
-    ['* [Go] (requires (visited(a) or visited(b)) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
-    ['{if visited(start) and player:hp > 0}Yes{/if}', 'hp', 'variable.other.member.tale'],
+    ['* [Continue] (requires player visited start and player:hp > 0) -> END', 'and', 'keyword.operator.word.tale'],
+    ['* [Continue] (requires player visited start and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
+    ['* [Continue] (requires player visited start and player:hp > 0) -> END', 'END', 'entity.name.section.target.tale'],
+    ['* [Go] (requires (player visited a or player visited b) and player:hp > 0) -> END', 'hp', 'variable.other.member.tale'],
+    ['{if player visited start and player:hp > 0}Yes{/if}', 'hp', 'variable.other.member.tale'],
     ['__snake__case__ after', 'case', 'markup.bold.markdown'],
     ['_snake_case_words_ after', 'case_words', 'markup.italic.markdown'],
     ['**bold** text', 'bold', 'markup.bold.markdown'],
@@ -238,7 +238,7 @@ test('ordinary prose, unsupported Markdown, comments and escaped braces follow T
   for (const line of ['![a [b]](p)', String.raw`![a\]](p)`, '![a](p(q))']) {
     assert.ok(!tokens(line).tokens.some(token => token.scopes.includes('invalid.deprecated.image.tale')), line);
   }
-  const requires = '* [Continue] (requires visited(start) and player:hp > 0) -> END';
+  const requires = '* [Continue] (requires player visited start and player:hp > 0) -> END';
   const close = requires.indexOf(') ->');
   const closeToken = tokens(requires).tokens.find(token => token.startIndex <= close && token.endIndex > close);
   assert.ok(closeToken.scopes.includes('punctuation.section.condition.end.tale'), closeToken.scopes.join(', '));
@@ -317,7 +317,7 @@ test('speaker names use the shared identifier fixture', async () => {
 test('unterminated edits recover before the next scene', () => {
   for (const line of [
     '{player:first-name', '{if var:count == "unfinished', '* [unfinished',
-    '* [choice] (requires player:dex >', '* [choice] (requires visited(start', '**unfinished', '_unfinished', '__unfinished',
+    '* [choice] (requires player:dex >', '* [choice] (requires player visited ', '**unfinished', '_unfinished', '__unfinished',
     '> guide: {player:first-name', '::: skill-check', '~ var:count = "unfinished',
     '`unfinished code', '![unfinished](image', '[unfinished](link',
   ]) {

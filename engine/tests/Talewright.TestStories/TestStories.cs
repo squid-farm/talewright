@@ -114,7 +114,7 @@ public static class TestStories
         === kept
         {if flag:wary}
         The guild is wary.
-        {if player:level >= 2 and (player has relic or visited(return))}
+        {if player:level >= 2 and (player has relic or player visited return)}
         Ready{if player has relic}, relic watching{/if}.
         {else}
         Not ready.
@@ -138,7 +138,7 @@ public static class TestStories
         === result
         {if flag:wary}
         Outer true.
-        {if player:level >= 2 and (player has relic or visited(start))}
+        {if player:level >= 2 and (player has relic or player visited start)}
         Inner true{if player has relic}, relic watching{/if}.
         {else}
         Inner false.

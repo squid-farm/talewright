@@ -98,6 +98,16 @@ public static class StoryCompiler
             }, DiscoverEffects, cancellationToken);
         }
 
+        foreach (var (scene, location) in scenes)
+        {
+            if (manifest.CharacterLocations.TryGetValue(new EntityId(scene.Value), out var characterLocation))
+            {
+                diagnostics.Error(CompilerDiagnosticCodes.SceneCharacterIdCollision,
+                    $"Scene '{scene}' and character '{scene}' use the same id; character declared at {characterLocation}.",
+                    location);
+            }
+        }
+
         foreach (var trigger in manifest.Triggers)
         {
             DiscoverEffects(trigger.Do, trigger.DoLocation);

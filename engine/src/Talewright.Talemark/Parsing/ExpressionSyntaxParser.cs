@@ -392,13 +392,12 @@ internal sealed class ExpressionSyntaxParser
         var token = Next();
         if (token.Is(ExpressionVocabulary.True)) return new BooleanExpressionNode(true, Span(token));
         if (token.Is(ExpressionVocabulary.False)) return new BooleanExpressionNode(false, Span(token));
-        if (token.Is(ExpressionVocabulary.Visited))
+        if (IsKeyword(ExpressionVocabulary.Visited))
         {
-            Expect(TokenKind.LeftParen, "'(' after visited");
-            var scene = Expect(TokenKind.Identifier, "a scene id");
-            var close = Expect(TokenKind.RightParen, "')'");
-            return new VisitedExpressionNode(Span(scene),
-                new(token.Offset, close.Offset + close.Length - token.Offset));
+            Next();
+            var scene = Expect(TokenKind.Identifier, "a scene id after 'visited'");
+            return new PlayerVisitedExpressionNode(Span(token), Span(scene),
+                new(token.Offset, scene.Offset + scene.Length - token.Offset));
         }
 
         if (Peek.Kind == TokenKind.Colon)
