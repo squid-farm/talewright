@@ -41,8 +41,8 @@ operator registry. In summary, decided by the lead in the #399 discussion:
    `***both***`. Properly nested spans work; crossing or unmatched delimiters stay literal.
    "It's easier to expand than it is to take away."
 2. **Everything else that looks like Markdown is literal text.** That covers headings (including
-   setext underlines), reference definitions, links, entities, HTML and lists. TW1015 is retained
-   for the rejected `![alt](path)` image form because it has a direct replacement.
+   setext underlines), reference definitions, links, entities, HTML and lists. TW1015 reports
+   unexpected reader-text syntax for the rejected `![alt](path)` image form.
 3. **Legacy links become literal.** `[Go](https://example.org)` displays exactly as written instead
    of keeping `Go` and discarding the target.
 4. **Backslash escapes only Talemark's own delimiters.** A trailing backslash still makes a hard

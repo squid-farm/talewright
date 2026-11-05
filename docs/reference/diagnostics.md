@@ -33,7 +33,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
 | TW1014 | Malformed image call, image path escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
-| TW1015 | The simple legacy `![alt](path)` image form. | Replace it with `{image("path", "alt")}`; the message gives the escaped replacement. |
+| TW1015 | Unexpected syntax in reader text, including the simple `![alt](path)` image form. | Use `{image("path", "alt")}` for an image. |
 | TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |
 | TW1017 | A reader-text line ends with an unpaired backslash. | Remove the trailing `\`; line breaks render as written. |
 
@@ -102,10 +102,10 @@ note is shown.
 |---|---|---|
 | TW4001 | Invalid YAML. | Check indentation (spaces, not tabs) and colons. |
 | TW4002 | Something required is missing: `story.talewright.yaml` itself, `game.id`, `game.title`, `game.start`, the `player` character, a character's `first-name`, custom pronoun `agreement`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. Custom pronoun sets require `agreement: singular` or `agreement: plural`. |
-| TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers, invalid grammatical number, invalid item `uncountable`, obsolete `plural` settings, and wrong-category governing-attribute links. | Read the message for the allowed values. Item `name-agreement` must be `singular` or `plural`, and `uncountable` must be `true` or `false`. `governing-attribute` belongs only to `category: skill` and must target `category: attribute`. Replace pronoun `plural` with `agreement: singular\|plural` and character-root `plural` with `name-agreement: singular\|plural`; both describe grammar, not population. |
+| TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers, invalid grammatical number, invalid item `uncountable`, and wrong-category governing-attribute links. | Read the message for the allowed values. Item `name-agreement` must be `singular` or `plural`, and `uncountable` must be `true` or `false`. `governing-attribute` belongs only to `category: skill` and must target `category: attribute`. |
 | TW4004 | Unknown ruleset. | Use `generic` or `none`. |
 | TW4005 | Unknown stat or item in `story.talewright.yaml`, or an unknown/disabled `governing-attribute` target. | Fix the spelling, or declare it under `game.ruleset.stats` / `items`. Governing attributes must resolve to enabled attributes after `disable` and all stat declarations. |
-| ⚠ TW4006 | Unknown key (ignored). | Usually a typo, e.g. `charaters:`. |
+| TW4006 | Unknown or non-scalar configuration key. | Correct or remove the key; the message lists the expected keys. |
 | TW4007 | A declaration identity is repeated, two triggers have the same id, or more than one configuration file declares `triggers:`. | Remove or rename the duplicate; keep one authored trigger list. Cross-file conflicts name both sources. |
 
 ## Lint rule codes

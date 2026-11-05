@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace Talewright.Talemark.Tests;
@@ -121,15 +122,16 @@ public sealed class GoverningAttributeTests
     }
 
     [Fact]
-    public void Camel_case_key_is_diagnosed_as_unknown_and_does_not_link_an_attribute()
+    public void Camel_case_key_is_an_unknown_configuration_error()
     {
         var result = Compile("      - {id: tracking, category: skill, governingAttribute: str}");
-        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.False(result.Success);
+        Assert.Null(result.Story);
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal("TW4006", diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("Unknown key 'governingAttribute'", diagnostic.Message);
         Assert.Contains("governing-attribute", diagnostic.Message);
-        Assert.Null(result.Story!.World.Ruleset.StatsById[new("tracking")].GoverningAttribute);
     }
 
     [Fact]

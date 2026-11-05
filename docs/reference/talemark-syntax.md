@@ -174,9 +174,8 @@ Faction entries must be objects, unlike the shorthand allowed for items:
 `guild: {}` is valid and defaults the name to `guild` and standing to `0`;
 `guild: Explorers Guild` is invalid.
 
-Unknown keys produce a TW4006 warning and are ignored by the compiler. The
-bundled editor schema intentionally rejects unknown keys, so editor validation
-is stricter than compilation.
+Unknown configuration keys are errors (TW4006) in both the root manifest and
+supporting files. The bundled editor schema also rejects unknown keys.
 
 For a complete custom skill declaration, character value and check, see
 [Add a skill for your setting](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
@@ -631,7 +630,7 @@ Desktop publications use the adjacent story folder. Keep the complete published 
 See [sharing and artwork guidance](../guide/sharing-your-story.md#artwork-and-hosting-size) for
 hosting-size warnings and platform verification limits.
 
-The old `![alt](path)` form is an error with a quoted `{image("path", "alt")}` replacement.
+The `![alt](path)` form is an unexpected reader-text syntax error.
 The proposed `@image(...)` form was not shipped and is not supported.
 
 ## 4. Expressions

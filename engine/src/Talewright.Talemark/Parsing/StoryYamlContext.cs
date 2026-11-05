@@ -131,17 +131,14 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
     {
         foreach (var key in map.Children.Keys)
         {
-            if (Scalar(key) is { } name && !allowed.Contains(name))
+            if (Scalar(key) is not { } name)
             {
-                if (name == "plural" && (allowed.Contains("agreement") || allowed.Contains("name-agreement")))
-                {
-                    var replacement = allowed.Contains("agreement") ? "agreement" : "name-agreement";
-                    Error(key, CompilerDiagnosticCodes.InvalidConfigurationValue, $"The obsolete 'plural' key is no longer supported. Use '{replacement}: singular' or '{replacement}: plural' for grammar, not population.", 0);
-                    continue;
-                }
-
-                Diagnostics.Warning(CompilerDiagnosticCodes.UnknownConfigurationKey, $"Unknown key '{name}' (ignored). Expected one of: {string.Join(", ", allowed)}.", At(key));
+                Diagnostics.Error(CompilerDiagnosticCodes.UnknownConfigurationKey,
+                    $"Configuration keys must be scalar values. Expected one of: {string.Join(", ", allowed)}.", At(key));
             }
+            else if (!allowed.Contains(name))
+                Diagnostics.Error(CompilerDiagnosticCodes.UnknownConfigurationKey,
+                    $"Unknown key '{name}'. Expected one of: {string.Join(", ", allowed)}.", At(key));
         }
     }
 

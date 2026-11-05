@@ -228,8 +228,8 @@ override these language-specific defaults in your VS Code settings.
 
 The grammar distinguishes scene headers, metadata, speech, effects, conditions,
 choices, substitutions, and checks. It also highlights bold and italic text,
-escapes and `{image("path", "alt text")}` calls. Old Markdown images are highlighted as
-deprecated and reported with replacement guidance. These colors describe syntax, not whether
+escapes and `{image("path", "alt text")}` calls. Markdown images are highlighted as invalid
+and reported as unexpected reader-text syntax. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
 images are currently placeholders, not image rendering support.
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
@@ -316,8 +316,8 @@ report structural errors differently from compiler diagnostics. The reader
 currently accepts some scalar spellings or YAML forms beyond the schema's
 documented canonical values; use the forms in the examples for portable feedback.
 For example, faction values must be mappings (`guild: {name: Guild}`): the
-compiler silently ignores a scalar faction display name. Unknown keys are schema
-errors but compiler warnings (`TW4006`). Creation preset IDs must contain a
+compiler silently ignores a scalar faction display name. Unknown keys are errors
+in both schema validation and the compiler (`TW4006`). Creation preset IDs must contain a
 non-whitespace character and be no longer than 80 characters.
 
 Under `vars`, integers and quoted text (including `""` and `"12"`) are supported.

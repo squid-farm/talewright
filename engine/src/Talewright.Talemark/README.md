@@ -190,7 +190,7 @@ deployment acceptance under #179 stay separate.
 | `Compilation/StoryImageResolver.cs` | Safe, path-only image lookup and alt-text defaults; see [Story images](#story-images). |
 | `Compilation/CompilerOptions.cs` | `Predicates` (`@Name`), `Modifiers` (`#mod`), `Rulesets` (name → factory; defaults `generic` and `none`). Also `CompilationResult` (`Story`, `Diagnostics`, `Success`, `Errors`, `Warnings`). |
 | `Compilation/StoryValidator.cs` | Whole-story structural checks (TW3xxx). Reachability is skipped when there are errors so one bad divert doesn't produce a wall of warnings. |
-| `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are warnings (TW4006) so typos are noticed. |
+| `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are errors (TW4006). |
 | `Parsing/TaleSyntaxParser.cs`, `Parsing/TaleSyntax.cs` | Symbol-independent file/scene syntax: line splitting, scene ownership and line kinds with scene-relative spans. |
 | `Parsing/TaleParser.cs` | Binds file syntax to scenes and steps. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
 | `Parsing/InlineParser.cs` | Prose → `TemplateInline`s. Directly tokenizes reader-text escapes, inline constructs, line breaks and formatting, then folds inline conditions; `SourceText` maps offsets back to line/column. |
