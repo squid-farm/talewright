@@ -17,6 +17,7 @@ public sealed class StoryHistory
     public const int MaxChoices = SaveFormat.MaxChoices;
     public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
     private readonly List<string> _choices = [];
+    private readonly List<byte[]>? _evidence;
     private StorySession _session;
     private List<HistoryFrame> _frames;
     private ReplayCursor _timeline;
@@ -28,10 +29,12 @@ public sealed class StoryHistory
         _timeline = new ReplayCursor(0, 0);
         _session = new StorySession(story, seed, character: Character);
         _frames = [new HistoryFrame(_session.Start())];
+        _evidence = CanRecordEvidence(story) ? [ReplayEvidence.Start(story, _session, Character)] : null;
     }
 
     private StoryHistory(StoryDefinition story, CharacterSelection? character, StorySession session,
-        List<HistoryFrame> frames, IEnumerable<string> choices, ReplayCursor timeline)
+        List<HistoryFrame> frames, IEnumerable<string> choices, ReplayCursor timeline, List<byte[]>? evidence,
+        string? restoredProgressKey)
     {
         Story = story;
         Character = character;
@@ -39,6 +42,8 @@ public sealed class StoryHistory
         _frames = frames;
         _choices.AddRange(choices);
         _timeline = timeline;
+        _evidence = evidence;
+        RestoredProgressKey = restoredProgressKey;
     }
 
     public StoryDefinition Story { get; }
@@ -51,6 +56,8 @@ public sealed class StoryHistory
     public int Cursor => _timeline.Position;
     public bool CanBack => Story.UndoEnabled && _timeline.CanBack;
     public bool CanForward => Story.UndoEnabled && _timeline.CanForward;
+    /// <summary>The original slot's progress after a load, until the timeline changes.</summary>
+    public string? RestoredProgressKey { get; private set; }
 
     /// <summary>Forks validated player replay inputs into isolated synthetic author tooling, retaining redo.</summary>
     public AuthorSession ForkAuthor(bool captureDecisions = true) =>
@@ -66,12 +73,21 @@ public sealed class StoryHistory
 
         var choice = Current.Choices.FirstOrDefault(c => c.Key == key)
             ?? throw new InvalidOperationException($"'{key}' is not an available choice.");
+        var previousFrame = Current;
+        var eventStart = _session.Events.Count;
         var frame = _session.Choose(key);
+        if (_evidence is not null)
+        {
+            var next = ReplayEvidence.Next(_evidence[_timeline.Position], previousFrame, key, _session.Events, eventStart);
+            _evidence.RemoveRange(_timeline.Position + 1, _evidence.Count - _timeline.Position - 1);
+            _evidence.Add(next);
+        }
         _frames[^1] = _frames[^1] with { Chosen = choice.Label };
         _frames.Add(new HistoryFrame(frame));
         _choices.RemoveRange(_timeline.Position, _timeline.Length - _timeline.Position);
         _choices.Add(key);
         _timeline = _timeline.AfterAppend();
+        RestoredProgressKey = null;
     }
 
     public void Back()
@@ -96,10 +112,11 @@ public sealed class StoryHistory
 
     private void MoveTo(ReplayCursor timeline)
     {
-        var (session, frames) = Replay(Story, Seed, _choices.Take(timeline.Position), Character);
+        var (session, frames, _) = Replay(Story, Seed, _choices.Take(timeline.Position), Character);
         _session = session;
         _frames = frames;
         _timeline = timeline;
+        RestoredProgressKey = null;
     }
 
     public byte[] Save(SaveSummary? summary = null)
@@ -138,6 +155,7 @@ public sealed class StoryHistory
             Cursor = Cursor,
             Character = Character,
             Summary = summary,
+            ReplayEvidence = _evidence is null ? null : ReplayEvidence.Encode(_evidence[^1], Cursor, Current),
         };
     }
 
@@ -200,13 +218,12 @@ public sealed class StoryHistory
             throw new InvalidDataException("This save is incompatible with the current story or player. Contact the story author.");
         }
 
-        if (save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint)
+        var changed = save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint;
+        if (changed && (save.ReplayEvidence is null || !CanRecordEvidence(story)
+            || !IsFingerprint(save.ContentFingerprint) || !IsFingerprint(story.ContentFingerprint)
+            || save.ContentFingerprint == story.ContentFingerprint))
         {
-            var version = save.StoryVersion;
-            var subject = !string.IsNullOrWhiteSpace(version) && version.Length <= 64 && !version.Any(char.IsControl)
-                ? $"Version {version} of {story.Title}"
-                : story.Title;
-            throw new InvalidDataException($"{subject} has changed, and this save is no longer compatible. Open it with the story and player version that created it.");
+            throw Incompatible(story, save);
         }
 
         // Validate redo choices too, not just the visible prefix.
@@ -217,35 +234,99 @@ public sealed class StoryHistory
         }
         catch (ArgumentException ex)
         {
+            if (changed) throw Incompatible(story, save, ex);
             throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
         }
         var timeline = new ReplayCursor(save.Cursor, save.Choices.Count);
-        var (session, frames) = Replay(story, save.Seed, save.Choices, character);
-        if (timeline.CanForward)
+        StorySession session;
+        List<HistoryFrame> frames;
+        List<byte[]>? evidence;
+        try
         {
-            (session, frames) = Replay(story, save.Seed, save.Choices.Take(timeline.Position), character);
+            (session, frames, evidence) = Replay(story, save.Seed, save.Choices, character, recordEvidence: true);
+        }
+        catch (InvalidDataException ex) when (changed)
+        {
+            throw Incompatible(story, save, ex);
         }
 
-        return new StoryHistory(story, character, session, frames, save.Choices, timeline);
+        if (timeline.CanForward)
+        {
+            var expectedFrame = frames[timeline.Position].Frame;
+            List<byte[]>? prefixEvidence;
+            try
+            {
+                (session, frames, prefixEvidence) = Replay(story, save.Seed,
+                    save.Choices.Take(timeline.Position), character, recordEvidence: evidence is not null);
+            }
+            catch (InvalidDataException ex) when (changed)
+            {
+                throw Incompatible(story, save, ex);
+            }
+
+            if (evidence is not null && (prefixEvidence is null
+                || !CryptographicOperations.FixedTimeEquals(evidence[timeline.Position], prefixEvidence[^1])
+                || !ReplayEvidence.FramesMatch(expectedFrame, session.Current!)))
+            {
+                throw ReplayMismatch(story, save, changed);
+            }
+        }
+
+        if (save.ReplayEvidence is { } savedEvidence
+            && (evidence is null || !ReplayEvidence.Matches(savedEvidence, evidence[^1], save.Cursor, session.Current!)))
+        {
+            throw ReplayMismatch(story, save, changed);
+        }
+
+        return new StoryHistory(story, character, session, frames, save.Choices, timeline, evidence, KeyOf(save));
     }
 
-    private static (StorySession Session, List<HistoryFrame> Frames) Replay(
-        StoryDefinition story, ulong seed, IEnumerable<string> choices, CharacterSelection? character)
+    private static bool CanRecordEvidence(StoryDefinition story) =>
+        !string.IsNullOrEmpty(story.ContentFingerprint) && !string.IsNullOrEmpty(story.ReplayCompatibilityId);
+
+    private static bool IsFingerprint(string fingerprint) =>
+        fingerprint.Length == 64 && fingerprint.All(Uri.IsHexDigit);
+
+    private static InvalidDataException Incompatible(StoryDefinition story, SavedGame save, Exception? inner = null)
+    {
+        var version = save.StoryVersion;
+        var subject = !string.IsNullOrWhiteSpace(version) && version.Length <= 64 && !version.Any(char.IsControl)
+            ? $"Version {version} of {story.Title}" : story.Title;
+        return new InvalidDataException($"{subject} has changed, and this save is no longer compatible. Open it with the story and player version that created it.", inner);
+    }
+
+    private static InvalidDataException ReplayMismatch(StoryDefinition story, SavedGame save, bool changed) =>
+        changed ? Incompatible(story, save) : ReplayFailure();
+
+    private static InvalidDataException ReplayFailure() =>
+        new("This saved game cannot continue because the story has changed or the save is damaged. It is no longer compatible.");
+
+    private static (StorySession Session, List<HistoryFrame> Frames, List<byte[]>? Evidence) Replay(
+        StoryDefinition story, ulong seed, IEnumerable<string> choices, CharacterSelection? character,
+        bool recordEvidence = false)
     {
         var session = new StorySession(story, seed, character: character);
         var frames = new List<HistoryFrame> { new(session.Start()) };
+        var evidence = recordEvidence && CanRecordEvidence(story)
+            ? new List<byte[]> { ReplayEvidence.Start(story, session, character) } : null;
         foreach (var key in choices)
         {
             var choice = session.Current!.Choices.FirstOrDefault(c => c.Key == key);
             if (choice is null)
             {
-                throw new InvalidDataException("This saved game cannot continue because the story has changed or the save is damaged. It is no longer compatible.");
+                throw ReplayFailure();
             }
 
+            var previousFrame = session.Current;
+            var eventStart = session.Events.Count;
             frames[^1] = frames[^1] with { Chosen = choice.Label };
             frames.Add(new HistoryFrame(session.Choose(key)));
+            if (evidence is not null)
+            {
+                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, key, session.Events, eventStart));
+            }
         }
 
-        return (session, frames);
+        return (session, frames, evidence);
     }
 }

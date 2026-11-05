@@ -407,12 +407,16 @@ public class StoryHistoryTests
     }
 
     [Fact]
-    public void Changed_source_with_unchanged_story_version_is_incompatible()
+    public void Changed_source_requires_evidence_even_when_story_version_is_unchanged()
     {
         var history = new StoryHistory(Compile(), 7);
+        var updated = Compile(tale: Tale + "\n// change");
+        var save = history.Save();
+        var legacy = Mutate(save, data => data with { ReplayEvidence = null });
         var error = Assert.Throws<InvalidDataException>(() =>
-            StoryHistory.Restore(Compile(tale: Tale + "\n// change"), history.Save()));
+            StoryHistory.Restore(updated, legacy));
         Assert.Equal("Version 1 of History has changed, and this save is no longer compatible. Open it with the story and player version that created it.", error.Message);
+        AssertEquivalent(history, StoryHistory.Restore(updated, save));
     }
 
     [Fact]

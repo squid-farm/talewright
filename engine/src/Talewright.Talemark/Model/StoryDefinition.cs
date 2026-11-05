@@ -20,6 +20,8 @@ public sealed class StoryDefinition
     public required string Title { get; init; }
     public required string Version { get; init; }
     public string? ContentFingerprint { get; init; }
+    /// <summary>Identity of the replay semantics and registered extensions, independent of story content.</summary>
+    public string? ReplayCompatibilityId { get; init; }
     public bool UndoEnabled { get; init; } = true;
     public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }

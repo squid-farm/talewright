@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using MessagePack;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Model;
@@ -52,7 +53,7 @@ public class SaveFormatTests
         var body = SaveFormat.EncodeBody(Sample);
         var reader = new MessagePackReader(new ReadOnlySequence<byte>(body));
 
-        Assert.Equal(8, reader.ReadArrayHeader());
+        Assert.Equal(9, reader.ReadArrayHeader());
         Assert.Equal(Sample.StoryId, reader.ReadString());
         Assert.Equal(Sample.StoryVersion, reader.ReadString());
         Assert.Equal(Sample.ContentFingerprint, reader.ReadString());
@@ -87,6 +88,7 @@ public class SaveFormatTests
         Assert.Equal((int)Sample.Summary.SavedAt.Offset.TotalMinutes, summaryReader.ReadInt32());
         Assert.Equal(Sample.Summary.CharacterName, summaryReader.ReadString());
         Assert.True(summaryReader.End);
+        Assert.True(reader.TryReadNil());
         Assert.True(reader.End);
     }
 
@@ -94,14 +96,16 @@ public class SaveFormatTests
     public void Frozen_sample_file_still_decodes_to_the_same_save()
     {
         var path = SourcePath("engine", "tests", "Talewright.Runtime.Tests", "SaveSamples", "v4-sample.twsave");
-        if (Environment.GetEnvironmentVariable("TALEWRIGHT_REGENERATE_SAVE_SAMPLES") == "1")
-        {
-            File.WriteAllBytes(path, SaveFormat.Write(Sample));
-        }
-
         var frozen = File.ReadAllBytes(path);
+        Assert.Equal("80E5E696135AF0F9F5FB254B63E8DB06F37B21C126435E3F7418A446FF94717C",
+            Convert.ToHexString(SHA256.HashData(frozen)));
         AssertSame(Sample, SaveFormat.Read(frozen));
-        Assert.Equal(SaveFormat.EncodeBody(Sample), Decompress(frozen));
+        var oldBody = Decompress(frozen);
+        var currentBody = SaveFormat.EncodeBody(Sample);
+        Assert.Equal(0x98, oldBody[0]);
+        Assert.Equal(0x99, currentBody[0]);
+        Assert.Equal(oldBody[1..], currentBody[1..^1]);
+        Assert.Equal(0xc0, currentBody[^1]);
     }
 
     [Fact]
@@ -126,7 +130,7 @@ public class SaveFormatTests
 
         var futureField = MessagePackBody((ref MessagePackWriter writer) =>
         {
-            writer.WriteArrayHeader(9);
+            writer.WriteArrayHeader(10);
             writer.Write("story");
             writer.Write("1");
             writer.Write("fingerprint");
@@ -135,9 +139,31 @@ public class SaveFormatTests
             writer.WriteNil();
             writer.WriteArrayHeader(0);
             writer.WriteNil();
+            writer.WriteNil();
             writer.Write("future");
         });
         Assert.Equal("story", SaveFormat.DecodeBody(futureField, out _).StoryId);
+    }
+
+    [Fact]
+    public void Replay_evidence_round_trips_and_invalid_evidence_is_rejected()
+    {
+        var evidence = new byte[ReplayEvidence.Length];
+        evidence[0] = 2;
+        evidence[^1] = 42;
+        var save = Sample with { ReplayEvidence = evidence };
+        Assert.Equal(evidence, SaveFormat.Read(SaveFormat.Write(save)).ReplayEvidence);
+
+        foreach (var invalid in new[]
+        {
+            Array.Empty<byte>(), new byte[ReplayEvidence.Length - 1],
+            new byte[ReplayEvidence.Length], new byte[ReplayEvidence.Length + 1],
+        })
+        {
+            var error = Assert.Throws<InvalidDataException>(() =>
+                SaveFormat.Read(SaveFormat.Write(Sample with { ReplayEvidence = invalid })));
+            Assert.Equal(SaveFormat.HistoryMessage, error.Message);
+        }
     }
 
     [Fact]
@@ -346,6 +372,12 @@ public class SaveFormatTests
         };
         SaveSummary? summary = random.Next(2) == 0 ? null : new SaveSummary("Scene",
             new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.FromMinutes(random.Next(-840, 841))), null);
+        var evidence = random.Next(2) == 0 ? null : new byte[ReplayEvidence.Length];
+        if (evidence is not null)
+        {
+            random.NextBytes(evidence);
+            evidence[0] = 2;
+        }
         return Sample with
         {
             Seed = (ulong)random.NextInt64(),
@@ -353,6 +385,7 @@ public class SaveFormatTests
             Choices = choices,
             Character = character,
             Summary = summary,
+            ReplayEvidence = evidence,
         };
     }
 
@@ -400,5 +433,6 @@ public class SaveFormatTests
         Assert.Equal(expected.Character?.Preset, actual.Character?.Preset);
         Assert.Equal(expected.Character?.Stats, actual.Character?.Stats);
         Assert.Equal(expected.Summary, actual.Summary);
+        Assert.Equal(expected.ReplayEvidence, actual.ReplayEvidence);
     }
 }

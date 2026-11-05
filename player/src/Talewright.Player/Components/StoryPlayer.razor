@@ -138,6 +138,7 @@
     private StoryHistory _session = default!;
     private StoryDefinition? _startedStory;
     private bool _focusLatest;
+    private bool _preserveFocusOnReveal;
     private bool _wasVisible = true;
     private IJSObjectReference? _module;
     private bool _busy;
@@ -174,7 +175,8 @@
         if (!ReferenceEquals(_startedStory, Story))
         {
             _startedStory = Story;
-            ResetSession(ResumeHistory ?? new StoryHistory(Story, Seed, Character), initialAutosave: ResumeHistory is null);
+            ResetSession(ResumeHistory ?? new StoryHistory(Story, Seed, Character),
+                initialAutosave: ResumeHistory is null, preserveExistingFocus: true);
             _autosaveCheckComplete = AutosaveResumeChecked || SaveStore is null || ResumeHistory is not null;
             _resumePrompt = false;
             _startupResumeHistory = null;
@@ -188,14 +190,15 @@
 
         if (Visible && !_wasVisible)
         {
-            _focusLatest = true;
+            RequestReveal();
         }
 
         _wasVisible = Visible;
         if (!Visible) CloseHistory();
     }
 
-    private void ResetSession(StoryHistory session, bool initialAutosave, bool clearAutosaveError = true)
+    private void ResetSession(StoryHistory session, bool initialAutosave, bool clearAutosaveError = true,
+        bool preserveExistingFocus = false)
     {
         _session = session;
         _generation++;
@@ -213,7 +216,13 @@
         _initialAutosavePending = initialAutosave;
         _autosaveSequence++;
         _slots = [];
+        RequestReveal(preserveExistingFocus);
+    }
+
+    private void RequestReveal(bool preserveExistingFocus = false)
+    {
         _focusLatest = true;
+        _preserveFocusOnReveal = preserveExistingFocus;
     }
 
     private Task Restart()
@@ -303,7 +312,7 @@
         _autosaveStartupError = null;
         _autosaveCheckComplete = true;
         _initialAutosavePending = false;
-        _focusLatest = true;
+        RequestReveal();
         return QueueAutosaveAsync();
     }
 
@@ -404,7 +413,7 @@
             return;
         }
         _session.Choose(choice.Key);
-        _focusLatest = true;
+        RequestReveal();
         await QueueAutosaveAsync();
     }
 
@@ -412,14 +421,14 @@
     {
         CloseHistory();
         _session.Back();
-        _focusLatest = true;
+        RequestReveal();
     }
 
     private void Forward()
     {
         CloseHistory();
         _session.Forward();
-        _focusLatest = true;
+        RequestReveal();
     }
 
     private async Task ShowSavesAsync()
@@ -508,13 +517,17 @@
         _slots = slots;
         var currentProgress = _session.TryProgressKey(out var progressKey) ? progressKey : null;
         // The autosave is replaced by the next choice, so it does not protect progress from a load.
-        if (currentProgress is null || !_slots.Any(entry => !entry.IsAutosave && entry.ProgressKey == currentProgress))
+        if (!HasProtectedProgress(_slots, currentProgress, _session.RestoredProgressKey))
         {
             _pendingLoad = slot;
             return;
         }
         await LoadAsync(slot, generation);
     });
+
+    internal static bool HasProtectedProgress(IEnumerable<SaveEntry> slots, string? currentProgress, string? restoredProgress) =>
+        currentProgress is not null && slots.Any(entry => !entry.IsAutosave &&
+            (entry.ProgressKey == currentProgress || (restoredProgress is not null && entry.ProgressKey == restoredProgress)));
 
     private Task ConfirmLoadAsync()
     {
@@ -541,7 +554,7 @@
             _pendingLoad = null;
             _showSaves = false;
             _saveMessage = $"Loaded '{SaveEntry.DisplayNameFor(slot)}'.";
-            _focusLatest = true;
+            RequestReveal();
         }
     }
 
@@ -710,12 +723,13 @@
         if (_focusLatest && Visible && !_showHistory && _autosaveCheckComplete && !_resumePrompt && _autosaveStartupError is null)
         {
             _focusLatest = false;
+            var preserveExistingFocus = _preserveFocusOnReveal;
 
             // Scroll the newest frame to the top and focus it, so the new text is visible and screen readers move to it.
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-                await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1);
+                await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1, preserveExistingFocus);
             }
 
             catch (JSException)

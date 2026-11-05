@@ -273,22 +273,29 @@ maintain a linear undo/redo cursor; choosing after Back discards redo. Rebuildin
 trigger edge state and deterministic dice, not just event-backed state. Manifest `undo: false` disables
 navigation, not persistence.
 
-`Save()` returns bounded UTF-8 JSON bytes. `StoryHistory.Restore(story, bytes)` creates and validates a
-separate candidate, including redo choices. Only replace an active history after this succeeds.
-The version-2 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices and cursor.
-The `character` field is required: null for fixed-protagonist stories, a valid selection for
-opt-in creation stories. Previous save formats are unsupported. Schema/source changes still
-invalidate mismatched fingerprints.
+`Save()` returns bounded compressed MessagePack bytes. `StoryHistory.Restore(story, bytes)` creates and
+validates a separate candidate, including redo choices. Only replace an active history after this succeeds.
+The version-4 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices,
+cursor, character selection and compact replay evidence. Fixed-protagonist stories use a null
+character; creation stories require a valid selection. Previous save formats are unsupported.
+Cross-revision verification is an experimental candidate, not an approved supported update path.
+Representative preview-tester evidence and explicit lead approval of the exact contract and
+legacy-save treatment remain outstanding. The candidate requires older format-4 saves without
+evidence to use their original revision before re-saving with evidence; that is a proposal, not an
+approved migration procedure. See
+[Save format](../../../docs/developer/save-format.md#compatibility) for the proposed contract and limits.
 `Save(CaptureSummary(DateTimeOffset.UtcNow))` embeds optional scene/title, capture time and
 effective character-name metadata in the same atomic payload. `Save()` without metadata omits the
 summary; this is a current optional display feature, not an older-save compatibility contract.
 Malformed summary values do not prevent otherwise-valid replay restoration.
 `SaveCatalog.ListEntriesAsync` parses bounded payloads without replay, returning missing/unreadable
 details explicitly. `StoryHistory.ProgressKey` and each entry's matching key hash the canonical
-full replay payload excluding summary metadata. The player checks those keys against actual
-persisted slots before replacing a session; timestamps do not influence load protection.
+full replay payload excluding summary metadata. `RestoredProgressKey` also identifies a successfully
+loaded original slot until the timeline changes, including in the candidate update path. The player
+checks those keys against actual persisted slots before replacing a session; timestamps do not
+influence load protection.
 The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
-unsupported formats and incompatible stories fail explicitly. No migration is attempted.
+unsupported formats and incompatible stories fail explicitly. General migration is not attempted.
 
 Built-in compiler options provide a compatibility identity. Custom C# hosts must set
 `CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;
@@ -307,7 +314,7 @@ with atomic unconditional replacement. Missing reads throw `FileNotFoundExceptio
 storage failures remain explicit. Custom save-store implementations must supply these methods.
 Named `ListAsync` omits the checkpoint. `SaveCatalog.ListEntriesAsync` combines both kinds into one
 list using `SaveEntry.IsQuick` and `DisplayName`, and reads metadata without replay.
-Desktop storage uses `quick.json` beside hexadecimal named-slot filenames (so names such as
+Desktop storage uses `quick.twsave` beside hexadecimal named-slot filenames (so names such as
 `quick` or `Quick Save checkpoint` cannot collide). IndexedDB uses the reserved `\0quick` key,
 which contains a control character and cannot pass named-save validation.
 The replay format is identical for both kinds; neither storage key nor display name establishes
@@ -318,7 +325,7 @@ additional, separate recovery slot. Replacements are atomic, and failed writes p
 committed autosave. Named `ListAsync` omits it; `SaveCatalog.ListEntriesAsync` lists it after the
 Quick Save checkpoint as `SaveEntry.AutosaveSlot` (`IsAutosave`). The player uses it for an explicit
 Resume prompt and as a read-only Saves list entry. Desktop storage
-uses `autosave.json`; IndexedDB uses the reserved `\0autosave` key. Custom `ISaveStore`
+uses `autosave.twsave`; IndexedDB uses the reserved `\0autosave` key. Custom `ISaveStore`
 implementations must provide these methods as well.
 
 ## Character initialization

@@ -35,11 +35,11 @@ browser zoom.
 When mechanical notes are hidden, they are removed from both the display and accessibility tree.
 This changes presentation only; story events, game state, history and saves are unchanged.
 
-Player saves store the story identity/version, seed, choice history and current position, and character
-selection—not a recorded event log or dice results. Loading checks the saved choices against the story and
-replays them with the saved seed, rebuilding the playthrough. **Back** and **Forward** use the same
-choice-replay approach. This differs from folding an existing event log to reconstruct state; that is an
-engine operation, not how player saves are restored.
+Player saves store the story identity/version, seed, choice history and current position, character
+selection and compact replay evidence—not a recorded event log or dice results. Loading checks the saved
+choices against the story and replays them with the saved seed, rebuilding the playthrough. **Back** and
+**Forward** use the same choice-replay approach. This differs from folding an existing event log to
+reconstruct state; that is an engine operation, not how player saves are restored.
 
 The toolbar stays visible while you scroll. Quick Save confirmations and storage errors appear
 in the toolbar without returning you to the start of the passage.
@@ -93,8 +93,8 @@ game**; progress is never restored silently. While playing, the **Saves** list a
 **Autosave** entry so you can load your latest autosave at any time. You can't overwrite it, and
 your next choice replaces it, so loading another save still asks before discarding progress that
 exists only in the autosave. A failed autosave leaves the previous recovery save
-intact, lets you continue playing and offers **Retry autosave**. Autosave is not a backup or save
-migration: saves still depend on the exact story and player compatibility.
+intact, lets you continue playing and offers **Retry autosave**. Autosave is not a backup: loading it
+still checks story and player compatibility.
 
 If the autosave cannot be loaded and you start a new game, Talewright keeps its original bytes as a
 separate **Recovered autosave** named save before writing the new autosave. Find it in **Saves**;
@@ -115,18 +115,26 @@ under **Import save file**. If that name already exists, confirm before replacin
 the file against the same story and player compatibility rules as loading; a damaged or incompatible
 file leaves your existing saves and current playthrough unchanged. Import adds a named save; it does
 not load it or replace the separate Quick Save checkpoint. Select **Load** to play it.
-Save files are compressed binary files, not text, and editing one makes it fail to load.
+Save files are compressed binary files, not text. Editing them can damage the save; they are not
+tamper-proof.
 Backups can move between web and desktop when the story files and player save format are compatible.
 
 ## Updating a story with existing saves
 
-Saves are tied to the exact story files they were made with. **Any change to the story, even fixing a
-typo, means older saves won't load.** Talewright checks before loading, shows a message and leaves the
-current game untouched. Bear this in mind before releasing an update to players. Migrating old saves to
-new story versions is planned ([#39](https://github.com/squid-farm/talewright/issues/39)).
+Released save support requires the exact story revision. Keep a copy of every released story so
+players can reopen saves with the version that created them. Before v1, player or extension updates
+may also make saves unsupported. Failed loads leave the original save and current game untouched.
 
-Before v1, player updates may also make existing saves unsupported. There is no save migration.
-Unsupported loads report an error without replacing your current game or saved data.
+A same-path story-update check is being prototyped in
+[#478](https://github.com/squid-farm/talewright/issues/478). It is not an approved supported update
+path: representative preview-tester cases and explicit lead approval of the contract, including
+pre-compatibility preview saves, are still required. Do not promise players that an update will
+preserve their saves or use reopening and re-saving as an approved migration procedure.
+
+The [proposed contract](../developer/save-format.md#proposed-story-update-contract) describes the
+candidate behavior and its limits, including why matching recorded events does not preserve every
+world default. General save migration remains planned
+([#39](https://github.com/squid-farm/talewright/issues/39)).
 
 ## Character creation
 
