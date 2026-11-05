@@ -105,7 +105,6 @@ internal static class InlineParser
         Text,
         LineBreak,
         Construct,
-        LegacyImage,
         FormatDelimiter,
         FormatOpen,
         FormatClose,
@@ -118,8 +117,6 @@ internal static class InlineParser
         public int Length { get; } = length;
         public int End => Start + Length;
         public string? Text { get; set; } = text;
-        public string? LegacyAlt { get; set; }
-        public string? LegacyPath { get; set; }
         public Piece? Piece { get; set; }
         public int RunLength { get; set; }
         public TextStyle Style { get; set; }
@@ -307,13 +304,14 @@ internal static class InlineParser
                 return tokens;
             }
 
-            if (current == SceneVocabulary.LegacyImageMarker && TryReadLegacyImage(context, text, index,
-                    out var imageEnd, out var alt, out var path))
+            if (current == SceneVocabulary.LegacyImageMarker &&
+                TryReadLegacyImage(context, text, index, out var imageEnd))
             {
-                AddToken(new(TokenKind.LegacyImage, index, imageEnd - index, text[index..imageEnd])
+                context.Diagnostics.Error(CompilerDiagnosticCodes.LegacyImageSyntax, "Unexpected syntax in reader text.",
+                    context.Source.Locate(index));
+                AddToken(new(TokenKind.Construct, index, imageEnd - index)
                 {
-                    LegacyAlt = alt,
-                    LegacyPath = path,
+                    Piece = new InlinePiece(new TextTemplate(text[index..imageEnd])),
                 });
                 context.CheckCharacters(imageEnd - index);
                 index = imageEnd;
@@ -503,17 +501,13 @@ internal static class InlineParser
         return substitution is null ? null : new InlinePiece(substitution);
     }
 
-    private static bool TryReadLegacyImage(Context context, string text, int start,
-        out int end, out string alt, out string path)
+    private static bool TryReadLegacyImage(Context context, string text, int start, out int end)
     {
         end = start;
-        alt = "";
-        path = "";
         if (start + 1 >= text.Length || text[start] != SceneVocabulary.LegacyImageMarker ||
             text[start + 1] != SceneVocabulary.OpenBracket) return false;
 
-        var altStart = start + 2;
-        var cursor = altStart;
+        var cursor = start + 2;
         while (cursor < text.Length && text[cursor] != SceneVocabulary.CloseBracket)
         {
             context.Check();
@@ -526,7 +520,6 @@ internal static class InlineParser
 
         if (cursor >= text.Length || cursor + 1 >= text.Length ||
             text[cursor + 1] != ExpressionVocabulary.OpenParen) return false;
-        var altEnd = cursor;
         var pathStart = cursor + 2;
         cursor = pathStart;
         while (cursor < text.Length && text[cursor] != ExpressionVocabulary.CloseParen)
@@ -542,8 +535,6 @@ internal static class InlineParser
         }
 
         if (cursor >= text.Length || cursor == pathStart) return false;
-        alt = text[altStart..altEnd];
-        path = text[pathStart..cursor];
         end = cursor + 1;
         return true;
     }
@@ -613,7 +604,6 @@ internal static class InlineParser
         {
             TokenKind.Text => EndsWithWordCharacter(previous.Text!),
             TokenKind.Construct => previous.Piece is InlinePiece,
-            TokenKind.LegacyImage => true,
             _ => false,
         };
     }
@@ -626,7 +616,6 @@ internal static class InlineParser
         {
             TokenKind.Text => StartsWithWordCharacter(next.Text!),
             TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
-            TokenKind.LegacyImage => true,
             _ => false,
         };
     }
@@ -639,7 +628,7 @@ internal static class InlineParser
         {
             TokenKind.Text => EndsWithNonWhitespaceCharacter(previous.Text!),
             TokenKind.Construct => previous.Piece is InlinePiece,
-            TokenKind.LegacyImage or TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
+            TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
     }
@@ -652,7 +641,7 @@ internal static class InlineParser
         {
             TokenKind.Text => StartsWithNonWhitespaceCharacter(next.Text!),
             TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
-            TokenKind.LegacyImage or TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
+            TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
     }
@@ -722,17 +711,6 @@ internal static class InlineParser
                     break;
                 case TokenKind.Construct:
                     if (token.Piece is { } construct) Current().Add(construct);
-                    break;
-                case TokenKind.LegacyImage:
-                    var replacement =
-                        $"{SceneVocabulary.InlineOpen}{ExpressionVocabulary.ImageCall}" +
-                        $"{ImageSyntax.Quote(token.LegacyPath!)}{ExpressionVocabulary.ArgumentSeparator} " +
-                        $"{ImageSyntax.Quote(token.LegacyAlt!)}{ExpressionVocabulary.CloseParen}" +
-                        SceneVocabulary.InlineClose;
-                    context.Diagnostics.Error(CompilerDiagnosticCodes.LegacyImageSyntax,
-                        $"Markdown images are no longer supported. Use {replacement} instead.",
-                        context.Source.Locate(token.Start));
-                    Current().Add(new InlinePiece(new TextTemplate(token.Text!)));
                     break;
                 case TokenKind.FormatOpen:
                     frames.Push(new FormattingFrame(token.Style));

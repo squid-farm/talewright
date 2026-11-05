@@ -217,7 +217,8 @@ public sealed partial class ServerTests
         await client.Open("start.tale", "=== start\n![Camp](camp)\n-> END", 1);
         var diagnostics = await client.Diagnostics("start.tale", 1);
         var legacy = Assert.Single(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString() == "TW1015");
-        Assert.Contains("{image(\"camp\", \"Camp\")}", legacy.GetProperty("message").GetString());
+        Assert.Equal("Unexpected syntax in reader text.", legacy.GetProperty("message").GetString());
+        Assert.Equal(0, legacy.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
         await client.Change("start.tale", "=== start\n{image(\"camp\", \"Camp\")}\n-> END", 2);
         var corrected = Assert.Single(await client.Diagnostics("start.tale", 2));
         Assert.Equal("TW2012", corrected.GetProperty("code").GetString());
