@@ -27,7 +27,8 @@ public static class AuthoringSyntaxVocabulary
         [ExpressionVocabulary.VarPrefix] = AuthoringTokenKind.Variable,
         [ExpressionVocabulary.FactionPrefix] = AuthoringTokenKind.Faction,
         [ExpressionVocabulary.ItemPrefix] = AuthoringTokenKind.Item,
-        [ExpressionVocabulary.VisitedCall] = AuthoringTokenKind.Visited,
+        [ExpressionVocabulary.ScenePrefix] = AuthoringTokenKind.SceneContext,
+        [ExpressionVocabulary.PlayerPrefix] = AuthoringTokenKind.Visits,
         [ExpressionVocabulary.ImageCall] = AuthoringTokenKind.Image,
     };
     private static readonly IReadOnlyDictionary<string, string> ModifierDescriptions = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -156,7 +157,9 @@ public static class AuthoringSyntaxVocabulary
             new(AuthoringTokenKind.If, SceneVocabulary.If, $"Begins conditional text with {inlineOpen}{SceneVocabulary.If} condition{inlineClose}. Close it with {inlineOpen}{SceneVocabulary.EndIf}{inlineClose}; {inlineOpen}{SceneVocabulary.Else}{inlineClose} is optional.", ExpressionToken: true),
             new(AuthoringTokenKind.Else, SceneVocabulary.Else, $"Alternative text for the preceding {inlineOpen}{SceneVocabulary.If} condition{inlineClose}.", ExpressionToken: true),
             new(AuthoringTokenKind.EndIf, SceneVocabulary.EndIf, "Closes the current conditional text block."),
-            new(AuthoringTokenKind.Visited, ExpressionVocabulary.Visited, $"{ExpressionVocabulary.VisitedCall}scene{closeParen}: {ExpressionVocabulary.True} when the scene has been visited.", ExpressionToken: true),
+            new(AuthoringTokenKind.Visited, ExpressionVocabulary.Visited, $"{ExpressionVocabulary.Player} {ExpressionVocabulary.Visited} scene: true when the player has visited the scene.", ExpressionToken: true),
+            new(AuthoringTokenKind.SceneContext, ExpressionVocabulary.Scene, $"{ExpressionVocabulary.ScenePrefix}{ExpressionVocabulary.Player}:{ExpressionVocabulary.Visits}: the current scene's visit count.", ExpressionToken: true),
+            new(AuthoringTokenKind.Visits, ExpressionVocabulary.Visits, $"{ExpressionVocabulary.Visits}: number of times the player has entered a scene.", ExpressionToken: true),
             new(AuthoringTokenKind.Flag, ExpressionVocabulary.Flag, $"{flag}: a declared boolean story flag.", ExpressionToken: true),
             new(AuthoringTokenKind.Variable, ExpressionVocabulary.Var, $"{ExpressionVocabulary.VarPrefix}id: a story variable with a fixed integer or text type.", ExpressionToken: true),
             new(AuthoringTokenKind.Faction, ExpressionVocabulary.Faction, $"{ExpressionVocabulary.FactionPrefix}id: the faction's display name. {ExpressionVocabulary.FactionPrefix}id{separator}{ExpressionVocabulary.Standing} selects its numeric standing, {ExpressionVocabulary.FactionPrefix}id{separator}{ExpressionVocabulary.Tier} its reputation tier, and {ExpressionVocabulary.FactionPrefix}id{separator}{ExpressionVocabulary.Name} its display name explicitly.", ExpressionToken: true),

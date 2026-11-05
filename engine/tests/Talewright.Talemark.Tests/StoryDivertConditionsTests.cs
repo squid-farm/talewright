@@ -152,7 +152,7 @@ public sealed class StoryDivertConditionsTests
             * -> END
             === destination
             @tags offer
-            @requires player:dex >= 10 and faction:river:standing >= 1 and faction:river:tier == faction:river:tier and flag:ready and var:coins > 0 and var:weather == "rain" and player:first-name == "Mara" and player:pronoun:object == "her" and faction:river == "River Guild" and faction:river:name == "River Guild" and item:lantern == "Lantern" and item:lantern:name == "Lantern" and player has lantern and visited(destination) and @CanGo and flag:ready
+            @requires player:dex >= 10 and faction:river:standing >= 1 and faction:river:tier == faction:river:tier and flag:ready and var:coins > 0 and var:weather == "rain" and player:first-name == "Mara" and player:pronoun:object == "her" and faction:river == "River Guild" and faction:river:name == "River Guild" and item:lantern == "Lantern" and item:lantern:name == "Lantern" and player has lantern and player visited destination and @CanGo and flag:ready
             @once
             -> END
             """);
@@ -172,7 +172,7 @@ public sealed class StoryDivertConditionsTests
                 (StoryStateReadKind.FactionName, "faction:river"),
                 (StoryStateReadKind.ItemName, "item:lantern"),
                 (StoryStateReadKind.ItemsHeld, "player has lantern"),
-                (StoryStateReadKind.VisitedScene, "visited(destination)"),
+                (StoryStateReadKind.VisitedScene, "player visited destination"),
                 (StoryStateReadKind.NamedPredicate, "@CanGo"),
             ],
             offer.Condition.Reads.Select(read => (read.Kind, read.Reference)));

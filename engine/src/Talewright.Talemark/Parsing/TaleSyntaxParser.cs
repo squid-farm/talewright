@@ -885,11 +885,11 @@ internal static class TaleSyntaxParser
                 FinishCheck(closed: false);
             const string unclosed = "block is never closed with ";
             var diagnostics = new List<TaleSyntaxDiagnostic>(_diagnostics.Count + 1);
-            if (!IdentifierRules.IsValid(_id) || _id == SceneVocabulary.End)
+            if (!IdentifierRules.IsValid(_id) || _id is SceneVocabulary.End or ExpressionVocabulary.Scene)
             {
                 diagnostics.Add(new(CompilerDiagnosticCodes.InvalidSceneId,
                     $"'{_id}' is not a valid scene id. Use an ASCII letter or '_' followed by letters, digits, '_' " +
-                    "and single '-' or '.' separators (e.g. temple.entrance).", 0, _headerIndent));
+                    $"and single '-' or '.' separators (e.g. temple.entrance); '{ExpressionVocabulary.Scene}' is reserved.", 0, _headerIndent));
             }
 
             diagnostics.AddRange(_diagnostics);

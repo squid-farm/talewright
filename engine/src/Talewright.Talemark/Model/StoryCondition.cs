@@ -24,6 +24,9 @@ public enum StoryStateReadKind
     /// <summary>A text variable, such as <c>var:weather</c>.</summary>
     TextVariable,
 
+    /// <summary>A scene visit count, such as <c>scene:player:visits</c> or <c>camp:player:visits</c>.</summary>
+    SceneVisitCount,
+
     /// <summary>A character name property, such as <c>player:first-name</c>.</summary>
     CharacterName,
 
@@ -39,7 +42,7 @@ public enum StoryStateReadKind
     /// <summary>Whether a character holds an item, such as <c>player has lantern</c>.</summary>
     ItemsHeld,
 
-    /// <summary>Whether a scene has been visited, such as <c>visited(camp)</c>.</summary>
+    /// <summary>Whether the player has visited a scene, such as <c>player visited camp</c>.</summary>
     VisitedScene,
 
     /// <summary>A named C# predicate, such as <c>@CanGo</c>.</summary>
@@ -121,6 +124,7 @@ public sealed class StoryCondition
                 StandingTierRef value => Create(StoryStateReadKind.StandingTier, value),
                 FlagRef value => Create(StoryStateReadKind.Flag, value),
                 VarRef value => Create(StoryStateReadKind.NumberVariable, value),
+                SceneVisitCountRef value => Create(StoryStateReadKind.SceneVisitCount, value),
                 TextVarRef value => Create(StoryStateReadKind.TextVariable, value),
                 NameRef value => Create(StoryStateReadKind.CharacterName, value),
                 PronounRef value => Create(StoryStateReadKind.CharacterPronoun, value),

@@ -175,7 +175,7 @@ internal sealed class ExpressionBinder
         BooleanExpressionNode boolean => new BoolLiteral(boolean.Value),
         NameExpressionNode name => BindName(name),
         NamedPredicateExpressionNode predicate => BindPredicate(predicate),
-        VisitedExpressionNode visited => BindVisited(visited),
+        PlayerVisitedExpressionNode visited => BindPlayerVisited(visited),
         ParenthesizedExpressionNode parenthesized => Bind(parenthesized.Inner),
         ReferenceExpressionNode reference => BindReference(reference),
         HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
@@ -210,8 +210,16 @@ internal sealed class ExpressionBinder
         return new NamedPredicate(name);
     }
 
-    private Expr BindVisited(VisitedExpressionNode visited)
+    private Expr BindPlayerVisited(PlayerVisitedExpressionNode visited)
     {
+        var character = Character(visited.Character);
+        if (character != EntityId.Player)
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                "Only player visits are tracked; use 'player visited <scene>'.",
+                visited.Character.Start);
+        }
+
         var name = Text(visited.Scene);
         var scene = new SceneId(name);
         if (!_symbols.Scenes.Contains(scene))
@@ -228,6 +236,42 @@ internal sealed class ExpressionBinder
         var path = Text(reference.Name);
         var member = reference.Member is { } memberSpan ? Text(memberSpan) : null;
         var subMember = reference.SubMember is { } subMemberSpan ? Text(subMemberSpan) : null;
+
+        if (path == ExpressionVocabulary.Player && member == ExpressionVocabulary.Visits)
+        {
+            if (ns == ExpressionVocabulary.Scene)
+                return new SceneVisitCountRef(null);
+
+            var scene = new SceneId(ns);
+            if (_symbols.Scenes.Contains(scene))
+                return new SceneVisitCountRef(scene);
+
+            if (_symbols.World.Characters.ContainsKey(new EntityId(ns)))
+            {
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                    "Only player visits are tracked; use '<scene>:player:visits'.",
+                    reference.Namespace.Start);
+            }
+
+            Fail(CompilerDiagnosticCodes.UnknownScene, $"Unknown scene '{ns}'.", reference.Namespace.Start);
+        }
+
+        if (_symbols.World.Characters.ContainsKey(new EntityId(ns)) &&
+            (path == ExpressionVocabulary.Visits || member == ExpressionVocabulary.Visits))
+        {
+            var hint = ns == ExpressionVocabulary.Player
+                ? "Use 'scene:player:visits' or '<scene>:player:visits' to read player visits."
+                : "Only player visits are tracked; use '<scene>:player:visits'.";
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, hint, reference.Name.Start);
+        }
+
+        if (reference.Kind == ReferenceNamespace.Scene ||
+            reference.Kind == ReferenceNamespace.Character && _symbols.Scenes.Contains(new SceneId(ns)))
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown scene property '{path}:{member}'. Use '{ExpressionVocabulary.Player}:{ExpressionVocabulary.Visits}'.",
+                reference.Name.Start);
+        }
 
         switch (reference.Kind)
         {

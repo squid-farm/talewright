@@ -9,7 +9,7 @@ A door of a single slab blocks the top of the stair. Three glyphs are cut deep i
 eye, a hand.
 
 * [Trace the glyphs and press the hand] (requires flag:knows-glyphs) { faction:explorers-guild:standing += 5; player:xp += 50 } -> temple.hall
-* [Close your eyes] (requires not visited(dream.arrival)) -> dream.arrival
+* [Close your eyes] (requires not player visited dream.arrival) -> dream.arrival
 * [Force the door] skill-check athletics dc 14
   success: { set flag:door-damaged; faction:explorers-guild:standing -= 10 } -> temple.hall
   failure: { player:hp -= 2 } -> temple.side
@@ -46,7 +46,7 @@ One of the eyes is open. Behind it, in a niche no bigger than your fist, sits a 
 
 {image("relic-altar", "A pale gold disc rests on a worn stone altar beneath walls carved with closed eyes.")}
 
-{if visited(dream.sleeper)}
+{if player visited dream.sleeper}
 The voice beyond the door falls silent as you reach the altar.
 {/if}
 

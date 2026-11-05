@@ -45,6 +45,7 @@ public static class CompilerDiagnosticCodes
     public const string StepAfterChoice = "TW3011";
     public const string UnreachableStep = "TW3012";
     public const string MayHaveNoAvailableChoice = "TW3013";
+    public const string SceneCharacterIdCollision = "TW3014";
 
     public const string InvalidYaml = "TW4001";
     public const string MissingRequiredConfiguration = "TW4002";

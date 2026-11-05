@@ -129,7 +129,7 @@ internal static class ExpressionParser
     /// <summary>True for words that can't be used as ids.</summary>
     public static bool IsReserved(string id) =>
         id is ExpressionVocabulary.And or ExpressionVocabulary.Or or ExpressionVocabulary.Not or ExpressionVocabulary.Has or
-            ExpressionVocabulary.True or ExpressionVocabulary.False or ExpressionVocabulary.Visited or
+            ExpressionVocabulary.True or ExpressionVocabulary.False or ExpressionVocabulary.Visited or ExpressionVocabulary.Scene or
             ExpressionVocabulary.Faction or ExpressionVocabulary.Item or ExpressionVocabulary.Flag or ExpressionVocabulary.Var or
             SceneVocabulary.End;
 }
