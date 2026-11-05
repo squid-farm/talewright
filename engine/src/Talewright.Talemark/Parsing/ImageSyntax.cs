@@ -148,7 +148,7 @@ internal static class ImageSyntax
                     decoded = plain.ToString();
                     var authored = templateText.ToString();
                     var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics,
-                        allowImages: false, cancellationToken: cancellationToken);
+                        allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false);
                     if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
 
                     return true;
@@ -226,7 +226,7 @@ internal static class ImageSyntax
                 }
                 mapped.Add(source.Locate(endAt));
                 InlineParser.Parse(SourceText.Mapped(authored, mapped), symbols, new DiagnosticBag(),
-                    allowImages: false, cancellationToken: cancellationToken);
+                    allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false);
             }
         }
 

@@ -88,6 +88,8 @@
   {"owner":"modifier","member":"capitalize","spelling":"capitalize","line":"{item:rope#capitalize}","scope":"support.function.modifier.tale","reference":"#capitalize"},
   {"owner":"modifier","member":"upper","spelling":"upper","line":"{item:rope#upper}","scope":"support.function.modifier.tale","reference":"#upper"},
   {"owner":"modifier","member":"lower","spelling":"lower","line":"{item:rope#lower}","scope":"support.function.modifier.tale","reference":"#lower"},
+  {"owner":"modifier","member":"bold","spelling":"bold","line":"{item:rope#bold}","scope":"support.function.modifier.tale","reference":"#bold"},
+  {"owner":"modifier","member":"italic","spelling":"italic","line":"{item:rope#italic}","scope":"support.function.modifier.tale","reference":"#italic"},
   {"owner":"modifier","member":"a","spelling":"a","line":"{item:rope#a}","scope":"support.function.modifier.tale","reference":"#a"},
   {"owner":"modifier","member":"the","spelling":"the","line":"{item:rope#the}","scope":"support.function.modifier.tale","reference":"#the"},
   {"owner":"modifier","member":"this","spelling":"this","line":"{item:rope#this}","scope":"support.function.modifier.tale","reference":"#this"},

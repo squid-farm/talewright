@@ -20,7 +20,10 @@ public static class StoryCompletion
             var length = site.Positions.TakeWhile(point => Compare(point, position) <= 0).Count() - 1;
             var prefix = site.Text[..Math.Clamp(length, 0, site.Text.Length)];
             var symbols = (site.Candidates ?? analysis.Symbols).Where(symbol => site.Kinds.Contains(symbol.Kind))
-                .Select(symbol => (symbol.Name, Detail: $"{symbol.Kind}: {symbol.Type}"));
+                .Select(symbol => (symbol.Name, Detail: symbol.Kind == AuthoringSymbolKind.Modifier &&
+                    AuthoringSyntaxVocabulary.TryGetKeywordHelp(symbol.Name, out var help)
+                        ? help.Description
+                        : $"{symbol.Kind}: {symbol.Type}"));
             foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword =>
                          (keyword, KeywordDetail(site, keyword)))))
             {

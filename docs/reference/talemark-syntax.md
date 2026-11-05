@@ -446,6 +446,16 @@ Any character id can replace `player`.
 | `#a`                | Prefix with `a`/`an`; use `some` for plural or uncountable names                               |
 | `#the`              | Prefix with `the`                                                                            |
 | `#this` / `#that`   | Prefix with `this`/`that`, or `these`/`those` for plural agreement                               |
+| `#bold` / `#italic` | Apply bold or italic formatting to the value                                                  |
+
+`#bold` and `#italic` produce formatted text without changing its characters. They may follow
+text modifiers, and may be chained with each other; text modifiers cannot follow them. Use
+`#upper#bold`, not `#bold#upper`.
+
+Prose formatting is syntax sugar for the same style model: `**{player:first-name}**` and
+`{player:first-name#bold}` compile to the same styled substitution. Italic delimiters similarly
+correspond to `#italic`. This does not turn a default into an alias: a textless choice still has no
+authored label, and its **Continue** label is chosen by the player.
 
 **Pronoun properties.** `{player:pronoun}` is shorthand for `{player:pronoun:subject}`.
 Choose a stored form with property access, then chain text modifiers after the value:
