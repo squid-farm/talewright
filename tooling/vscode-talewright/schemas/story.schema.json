@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json",
   "title": "Talewright story configuration (*.talewright.yaml)",
-  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler. Optional mappings and lists must be omitted or supplied as containers; YAML null is not an empty container. The editor schema rejects unknown keys; the compiler reports TW4006 and ignores them.",
+  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler. Optional mappings and lists must be omitted or supplied as containers; YAML null is not an empty container. Unknown keys are errors in the editor schema and compiler (TW4006).",
   "type": "object",
   "properties": {
     "game": {
@@ -249,7 +249,7 @@
           "type": "string",
           "enum": ["singular", "plural"],
           "default": "singular",
-          "description": "Displayed-name grammar for possessives, not population: the pack is singular; the goblins is plural. Replaces the obsolete character plural key."
+          "description": "Displayed-name grammar for possessives, not population: the pack is singular; the goblins is plural."
         }
       },
       "additionalProperties": false
@@ -285,7 +285,7 @@
         "agreement": {
           "type": "string",
           "enum": ["singular", "plural"],
-          "description": "Required grammatical agreement, not population. Singular they uses plural agreement. Replaces the obsolete pronoun plural key."
+          "description": "Required grammatical agreement, not population. Singular they uses plural agreement."
         }
       },
       "additionalProperties": false

@@ -140,11 +140,12 @@ public class EditorManifestSchemaTests
                 ["main.tale"] = "=== beginning\nHello.\n-> END\n",
             }));
             Assert.Equal(expectedCodes, result.Diagnostics.Select(diagnostic => diagnostic.Code).Order().ToArray());
-            Assert.Equal(!expectedCodes.Contains("TW4003"), result.Success);
+            Assert.Equal(!expectedCodes.Any(code => code is "TW4003" or "TW4006"), result.Success);
             Assert.All(result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4006"), diagnostic =>
             {
-                Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-                Assert.Contains("(ignored)", diagnostic.Message);
+                Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+                Assert.StartsWith("Unknown key '", diagnostic.Message);
+                Assert.Contains("Expected one of:", diagnostic.Message);
             });
             if (fixture.TryGetProperty("diagnosticLocations", out var locations))
             {
@@ -161,9 +162,9 @@ public class EditorManifestSchemaTests
                     .ToArray();
                 Assert.Equal(expectedLocations, actualLocations);
             }
-            if (fixture.TryGetProperty("warningLocations", out var warningLocations))
+            if (fixture.TryGetProperty("unknownKeyLocations", out var unknownKeyLocations))
             {
-                var expectedLocations = warningLocations.EnumerateArray()
+                var expectedLocations = unknownKeyLocations.EnumerateArray()
                     .Select(location => (Line: location.GetProperty("line").GetInt32(),
                         Column: location.GetProperty("column").GetInt32()))
                     .OrderBy(location => location.Line)

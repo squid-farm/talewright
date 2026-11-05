@@ -8,6 +8,34 @@ public sealed partial class ServerTests
     private const string GuideDeclaration = "characters:\n  guide: {first-name: Bea}\n";
     private const string GuideTale = "=== start\n> guide: Hi.\n-> END\n";
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Unknown_configuration_keys_are_errors_and_clear_when_corrected(bool supporting)
+    {
+        await using var client = new Client();
+        if (supporting) Directory.CreateDirectory(client.PathOf("characters"));
+        await client.Initialize();
+        var name = supporting ? GuideFragment : "story.talewright.yaml";
+        var valid = supporting ? GuideDeclaration : Manifest;
+        var invalid = supporting
+            ? "characters:\n  guide: {first-name: Bea, surprise: true}\n"
+            : valid + "surprise: true\n";
+        await client.Open(name, invalid, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics(name, 1),
+            item => item.GetProperty("code").GetString() == "TW4006");
+        var offset = invalid.IndexOf("surprise:", StringComparison.Ordinal);
+        var preceding = invalid[..offset];
+        var start = diagnostic.GetProperty("range").GetProperty("start");
+
+        Assert.Equal(1, diagnostic.GetProperty("severity").GetInt32());
+        Assert.Equal(preceding.Count(character => character == '\n'), start.GetProperty("line").GetInt32());
+        Assert.Equal(offset - preceding.LastIndexOf('\n') - 1, start.GetProperty("character").GetInt32());
+        Assert.StartsWith("Unknown key 'surprise'.", diagnostic.GetProperty("message").GetString());
+        await client.Change(name, valid, 2);
+        Assert.Empty(await client.Diagnostics(name, 2));
+    }
+
     [Fact]
     public async Task Governing_attribute_completion_and_diagnostics_use_enabled_attributes()
     {
