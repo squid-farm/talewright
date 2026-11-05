@@ -72,6 +72,22 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("bold", "bold formatting")]
+    [InlineData("italic", "italic formatting")]
+    public void Formatting_modifier_completion_and_hover_explain_the_style(string modifier, string expected)
+    {
+        var partial = "{player:first-name#" + modifier[..2] + "|" + modifier[2..] + "}";
+        var (completionAnalysis, completionPosition) = Analyze("=== first\n" + partial);
+        var completion = Assert.Single(StoryCompletion.Complete(completionAnalysis, completionPosition),
+            item => item.Label == modifier);
+        Assert.Contains(expected, completion.Detail);
+
+        var (hoverAnalysis, hoverPosition) = Analyze("=== first\n" + partial);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(hoverAnalysis, hoverPosition));
+        Assert.Contains(expected, hover.PlainText);
+    }
+
+    [Theory]
     [InlineData("@req|", "requires", "@req|uires flag:ready", "@requires", 2, 5)]
     [InlineData("@requires fla|", "flag:", "@requires fla|g:ready", "@requires flag:", 11, 14)]
     [InlineData("@requires vis|", "visited(", "@requires vis|ited(second)", "@requires visited(", 11, 14)]

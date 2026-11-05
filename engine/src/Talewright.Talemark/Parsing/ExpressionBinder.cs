@@ -57,8 +57,8 @@ internal sealed class ExpressionBinder
         }
     }
 
-    internal static SubstitutionTemplate? Bind(SubstitutionSyntaxTree syntax, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<int, SourceLocation> locate)
+    internal static TemplateInline? Bind(SubstitutionSyntaxTree syntax, StorySymbols symbols,
+        DiagnosticBag diagnostics, Func<int, SourceLocation> locate, bool allowFormattedOutput = true)
     {
         if (syntax.HasErrors) return null;
         var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics);
@@ -66,8 +66,11 @@ internal sealed class ExpressionBinder
         {
             var value = binder.Bind(syntax.Value);
             var modifiers = new List<ITextModifier>();
+            var valueKind = TextModifierValueKind.Text;
+            var style = TextStyle.None;
             foreach (var call in syntax.Modifiers)
             {
+                ITextModifier modifier;
                 if (call.Name == OneManyTextModifier.ModifierName)
                 {
                     if (value is not (PronounRef or ItemNameRef) || call.Argument is null || call.PluralArgument is null)
@@ -77,23 +80,54 @@ internal sealed class ExpressionBinder
                             call.Offset);
                     }
 
-                    modifiers.Add(new OneManyTextModifier(call.Argument, call.PluralArgument));
-                    continue;
+                    modifier = new OneManyTextModifier(call.Argument, call.PluralArgument);
                 }
-
-                if (call.Argument is not null)
+                else
                 {
-                    binder.Fail(CompilerDiagnosticCodes.InvalidModifier, $"Modifier '#{call.Name}' does not take an argument.", call.Offset);
+                    if (call.Argument is not null)
+                    {
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                            $"Modifier '#{call.Name}' does not take an argument.", call.Offset);
+                    }
+
+                    if (!symbols.Modifiers.TryGet(call.Name, out modifier!))
+                    {
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                            $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
+                            call.Offset);
+                    }
                 }
 
-                if (!symbols.Modifiers.TryGet(call.Name, out var modifier))
+                if (!modifier.AcceptsInput(valueKind))
                 {
                     binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
-                        $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
+                        $"Modifier '#{call.Name}' cannot follow a modifier that produces formatted text.",
                         call.Offset);
                 }
 
-                modifiers.Add(modifier);
+                if (!allowFormattedOutput && modifier.OutputKind == TextModifierValueKind.FormattedText)
+                {
+                    binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                        $"Formatting modifier '#{call.Name}' is not allowed in plain-text fields such as image alt text.",
+                        call.Offset);
+                }
+
+                valueKind = modifier.OutputKind;
+                if (modifier.OutputKind == TextModifierValueKind.FormattedText)
+                {
+                    if (modifier.OutputStyle == TextStyle.None)
+                    {
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                            $"Modifier '#{call.Name}' produces formatted text without a supported style.",
+                            call.Offset);
+                    }
+
+                    style |= modifier.OutputStyle;
+                }
+                else
+                {
+                    modifiers.Add(modifier);
+                }
             }
 
             var isPlural = value switch
@@ -103,7 +137,8 @@ internal sealed class ExpressionBinder
                 ItemNameRef item => symbols.World.Items[item.Item].NameAgreement == GrammaticalNumber.Plural,
                 _ => false,
             };
-            return new SubstitutionTemplate(value, modifiers, isPlural);
+            var substitution = new SubstitutionTemplate(value, modifiers, isPlural);
+            return style == TextStyle.None ? substitution : new StyledTemplate(style, [substitution]);
         }
         catch (BindingException)
         {
