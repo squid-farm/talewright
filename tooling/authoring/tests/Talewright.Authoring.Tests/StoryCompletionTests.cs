@@ -44,11 +44,24 @@ public sealed class StoryCompletionTests
     [InlineData("@requires scene:|", "player:")]
     [InlineData("@requires scene:player:|", "visits")]
     [InlineData("@requires second:player:|", "visits")]
+    [InlineData("{|}", "scene:")]
+    [InlineData("{sce|}", "scene:")]
+    [InlineData("{1 + sce|}", "scene:")]
+    [InlineData("{scene:|}", "player:")]
+    [InlineData("{scene:player:|}", "visits")]
+    [InlineData("> guide: {sce|}", "scene:")]
+    [InlineData("* [Seen {sce|}] -> END", "scene:")]
+    [InlineData("""{image("map", "Visits: {sce|}")}""", "scene:")]
     [InlineData("~ give player ro|", "rope")]
     [InlineData("~ give gu|", "guide")]
     [InlineData("~ give |", "guide")]
     [InlineData("@requires   |", "flag:")]
     [InlineData("::: skill-check athletics dc   |", "var:")]
+    [InlineData("::: skill-check athletics dc sce|", "scene:")]
+    [InlineData("~ var:coins = sce|", "scene:")]
+    [InlineData("~ give player rope sce|", "scene:")]
+    [InlineData("~ give player rope 1 + sce|", "scene:")]
+    [InlineData("~ take player rope sce|", "scene:")]
     [InlineData("~ set flag:re|", "ready")]
     [InlineData("{player:first-name#cap|", "capitalize")]
     [InlineData("{gu|", "guide")]
@@ -96,6 +109,7 @@ public sealed class StoryCompletionTests
     [InlineData("@req|", "requires", "@req|uires flag:ready", "@requires", 2, 5)]
     [InlineData("@requires fla|", "flag:", "@requires fla|g:ready", "@requires flag:", 11, 14)]
     [InlineData("@requires player vis|", "visited", "@requires player vis|ited second", "@requires player visited", 18, 21)]
+    [InlineData("{sce|}", "scene:", "{sce|ne:player:visits}", "{scene:}", 2, 5)]
     [InlineData("-> |", "END", "-> E|ND", "-> END", 4, 4)]
     [InlineData("{player:pro|}", "pronoun", "{player:pro|noun}", "{player:pronoun}", 9, 12)]
     [InlineData("{player:pronoun:ob|}", "object", "{player:pronoun:ob|ject}", "{player:pronoun:object}", 17, 19)]
@@ -129,6 +143,43 @@ public sealed class StoryCompletionTests
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "second");
+    }
+
+    [Theory]
+    [InlineData("~ sce|")]
+    [InlineData("~ give sce|")]
+    [InlineData("~ set sce|")]
+    [InlineData("~ set flag:ready; sce|")]
+    public void Visit_counts_are_not_suggested_as_effect_targets(string line)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line);
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "scene:");
+    }
+
+    [Theory]
+    [InlineData("flag", "@requires flag:|", "ready")]
+    [InlineData("flag", "@requires flag:|", "player:")]
+    [InlineData("var", "{var:|}", "coins")]
+    [InlineData("var", "{var:|}", "player:")]
+    [InlineData("faction", "{faction:|}", "guild")]
+    [InlineData("faction", "{faction:|}", "player:")]
+    [InlineData("item", "{item:|}", "rope")]
+    [InlineData("item", "{item:|}", "player:")]
+    [InlineData("flag", "@requires flag:player:|", "visits")]
+    [InlineData("var", "{var:player:|}", "visits")]
+    [InlineData("faction", "{faction:player:|}", "visits")]
+    [InlineData("faction", "{faction:player:|}", "name")]
+    [InlineData("item", "{item:player:|}", "visits")]
+    [InlineData("item", "{item:player:|}", "name")]
+    [InlineData("true", "{true:|}", "player:")]
+    [InlineData("true", "{true:player:|}", "visits")]
+    [InlineData("false", "{false:|}", "player:")]
+    [InlineData("not", "@requires not:player:|", "visits")]
+    public void Scene_ids_matching_builtin_words_complete_correctly(
+        string scene, string line, string expected)
+    {
+        var (analysis, position) = Analyze($"=== first\n{line}\n=== {scene}\n-> END");
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
     }
 
     [Fact]
@@ -390,6 +441,13 @@ public sealed class StoryCompletionTests
     [InlineData("@requires player vis|ited first", "visited", "@requires player visited first")]
     [InlineData("@requires va|", "var:", "@requires var:")]
     [InlineData("@requires player vis|", "visited", "@requires player visited")]
+    [InlineData("{sce|ne:player:visits}", "scene:", "{scene:player:visits}")]
+    [InlineData("{1 + sce|}", "scene:", "{1 + scene:}")]
+    [InlineData("{scene:pla|yer:visits}", "player:", "{scene:player:visits}")]
+    [InlineData("{scene:player:vis|its}", "visits", "{scene:player:visits}")]
+    [InlineData("::: skill-check athletics dc sce|", "scene:", "::: skill-check athletics dc scene:")]
+    [InlineData("~ var:coins = sce|", "scene:", "~ var:coins = scene:")]
+    [InlineData("~ give player rope sce|", "scene:", "~ give player rope scene:")]
     [InlineData("{item:ro|pe}", "rope", "{item:rope}")]
     [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]
     [InlineData("~ take player rope gu|", "guide", "~ take player rope guide")]

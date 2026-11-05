@@ -160,6 +160,10 @@ public sealed partial class ServerTests
     [InlineData("{item:rope:|}", "name", "{item:rope:name}")]
     [InlineData("@requires va|r:coins > 0", "var:", "@requires var:coins > 0")]
     [InlineData("@requires player vis|ited start", "visited", "@requires player visited start")]
+    [InlineData("{sce|ne:player:visits}", "scene:", "{scene:player:visits}")]
+    [InlineData("{1 + sce|}", "scene:", "{1 + scene:}")]
+    [InlineData("{scene:pla|yer:visits}", "player:", "{scene:player:visits}")]
+    [InlineData("{scene:player:vis|its}", "visits", "{scene:player:visits}")]
     [InlineData("~ give player rope va|", "var:", "~ give player rope var:")]
     [InlineData("~ take player rope pla|", "player", "~ take player rope player")]
     public async Task Applying_protocol_text_edit_preserves_surrounding_syntax(string line, string label, string expected)

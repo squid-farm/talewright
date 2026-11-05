@@ -102,6 +102,9 @@ internal static class ExpressionCompletion
                     keywords = [.. PronounProperties];
                     details = PronounFormDetails;
                 }
+                if (member.Is(Player) && symbols.Any(symbol =>
+                        symbol.Kind == AuthoringSymbolKind.Scene && owner.Is(symbol.Name)))
+                    keywords = [.. keywords, Visits];
             }
             else if (before is [.., { Kind: TokenKind.Identifier, Text: Player }, { Kind: TokenKind.Colon }] &&
                      tokenIndex >= 4 &&
@@ -114,8 +117,7 @@ internal static class ExpressionCompletion
             }
             else if (before is [.., { Kind: TokenKind.Identifier } ns, { Kind: TokenKind.Colon }])
             {
-                if (ns.Is(Scene) || symbols.Any(symbol =>
-                        symbol.Kind == AuthoringSymbolKind.Scene && ns.Is(symbol.Name)))
+                if (ns.Is(Scene))
                 {
                     keywords = [PlayerPrefix];
                 }
@@ -134,6 +136,8 @@ internal static class ExpressionCompletion
                     };
                     if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
                         keywords = [.. CharacterProperties];
+                    if (symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Scene && ns.Is(symbol.Name)))
+                        keywords = [.. keywords, PlayerPrefix];
                 }
             }
             else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Substitution &&
@@ -154,7 +158,7 @@ internal static class ExpressionCompletion
                      before is [{ Kind: TokenKind.Identifier }, { Kind: TokenKind.Identifier }])
             {
                 kinds = [AuthoringSymbolKind.Character];
-                keywords = [VarPrefix, FactionPrefix];
+                keywords = [VarPrefix, FactionPrefix, ScenePrefix];
             }
             else if (before is [.., { Text: Set or Clear }])
                 keywords = kind == ExpressionContextKind.Effects ? [FlagPrefix] : [];
@@ -169,10 +173,10 @@ internal static class ExpressionCompletion
                 {
                     ExpressionContextKind.Effects when before.Length == 0 || before[^1].Kind == TokenKind.Semicolon
                         => [.. EffectVerbs, VarPrefix, FactionPrefix],
-                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix],
-                    ExpressionContextKind.Number => [VarPrefix],
-                    ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ImageCall],
-                    ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix],
+                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix, ScenePrefix],
+                    ExpressionContextKind.Number => [VarPrefix, ScenePrefix],
+                    ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix, ImageCall],
+                    ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix],
                     _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, ScenePrefix, True, False, Not]
                 };
             }

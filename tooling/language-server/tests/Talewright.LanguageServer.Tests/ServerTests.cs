@@ -603,6 +603,29 @@ public sealed partial class ServerTests
         Assert.Equal(line.IndexOf(':') + 1, end.GetProperty("character").GetInt32());
     }
 
+    [Theory]
+    [InlineData("@requires visited(camp)\n-> END", false)]
+    [InlineData("* [Go] (requires visited(camp)) -> END", true)]
+    public async Task Former_visit_call_diagnostic_reports_the_replacement(string body, bool highlightsToken)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("start.tale", $"=== start\n{body}\n=== camp\n-> END\n", 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW1001");
+
+        Assert.Equal("Unexpected 'visited'. Use 'player visited camp' instead.",
+            diagnostic.GetProperty("message").GetString());
+        var range = diagnostic.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        var column = body.IndexOf("visited", StringComparison.Ordinal);
+        Assert.Equal(1, start.GetProperty("line").GetInt32());
+        Assert.Equal(column, start.GetProperty("character").GetInt32());
+        Assert.Equal(1, end.GetProperty("line").GetInt32());
+        Assert.Equal(column + (highlightsToken ? "visited".Length : 0), end.GetProperty("character").GetInt32());
+    }
+
     [Fact]
     public async Task Compiler_point_diagnostics_still_use_zero_width_ranges()
     {

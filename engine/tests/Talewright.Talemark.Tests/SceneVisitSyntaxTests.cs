@@ -98,6 +98,36 @@ public sealed class SceneVisitSyntaxTests
     }
 
     [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    [InlineData("not")]
+    [InlineData("and")]
+    [InlineData("or")]
+    [InlineData("visited")]
+    [InlineData("has")]
+    [InlineData("flag")]
+    [InlineData("var")]
+    [InlineData("faction")]
+    [InlineData("item")]
+    public void Scene_ids_matching_expression_words_can_be_counted(string scene)
+    {
+        var result = Compile($"""
+            === start
+            @requires {scene}:player:visits == 0 and not player visited {scene}
+            -> END
+            === {scene}
+            -> END
+            """);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var state = GameState.CreateInitial(result.Story!.World, 1);
+        var requires = result.Story.GetScene(new SceneId("start")).Requires!;
+        Assert.True(ExpressionEvaluator.IsTrue(requires, EvaluationContext.For(state)));
+        state.Apply(new SceneEntered(new SceneId(scene)));
+        Assert.False(ExpressionEvaluator.IsTrue(requires, EvaluationContext.For(state)));
+    }
+
+    [Theory]
     [InlineData("guide:visits > 0")]
     [InlineData("guide:player:visits > 0")]
     [InlineData("guide visited camp")]
@@ -110,10 +140,46 @@ public sealed class SceneVisitSyntaxTests
         Assert.Contains("Only player visits are tracked", error.Message);
     }
 
-    [Fact]
-    public void Former_visited_call_gets_a_generic_invalid_syntax_error()
+    [Theory]
+    [InlineData("@requires visited(camp)\n-> END", "camp")]
+    [InlineData("@requires not visited( camp-site )\n-> END", "camp-site")]
+    [InlineData("@requires visited(temple.hall)\n-> END", "temple.hall")]
+    [InlineData("{visited(camp)}\n-> END", "camp")]
+    [InlineData("* (requires visited(camp)) -> END", "camp")]
+    [InlineData("~ player:hp = visited(camp)\n-> END", "camp")]
+    public void Former_visited_call_gets_a_replacement_hint(string body, string scene)
     {
-        var result = Compile("=== start\n@requires visited(camp)\n-> END\n=== camp\n-> END");
+        var result = Compile($"=== start\n{body}\n=== camp\n-> END\n=== camp-site\n-> END\n=== temple.hall\n-> END");
+
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.InvalidExpression, error.Code);
+        Assert.Contains($"player visited {scene}", error.Message);
+    }
+
+    [Theory]
+    [InlineData("visited(camp)")]
+    [InlineData("\"visited(camp)\"")]
+    public void Former_visited_call_in_a_trigger_gets_a_replacement_hint(string expression)
+    {
+        var manifest = Manifest +
+            $"\ntriggers:\n  - id: revisit\n    when: {expression}\n    do: set flag:ready\n";
+        var result = Compile("=== start\n-> END\n=== camp\n-> END", manifest);
+
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.InvalidExpression, error.Code);
+        Assert.Equal(StorySource.ManifestFileName, error.Location.File);
+        Assert.Contains("player visited camp", error.Message);
+    }
+
+    [Theory]
+    [InlineData("visited()")]
+    [InlineData("visited(1)")]
+    [InlineData("visited(camp, other)")]
+    [InlineData("visited(camp")]
+    [InlineData("visited(camp + 1)")]
+    public void Malformed_visited_calls_do_not_get_misleading_replacement_hints(string expression)
+    {
+        var result = Compile($"=== start\n@requires {expression}\n-> END\n=== camp\n-> END");
 
         var error = Assert.Single(result.Errors);
         Assert.Equal(CompilerDiagnosticCodes.InvalidExpression, error.Code);
