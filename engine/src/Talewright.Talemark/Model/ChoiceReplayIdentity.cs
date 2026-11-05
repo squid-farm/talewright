@@ -1,9 +1,12 @@
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Talewright.Core.Identity;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Model;
 
@@ -13,28 +16,79 @@ internal static class ChoiceReplayIdentity
     internal const int FullLength = 32;
 
     internal static void Assign(IEnumerable<SceneDefinition> scenes) =>
-        Assign(scenes, SHA256.HashData);
+        AssignCore(scenes, hash: null);
 
-    internal static void Assign(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]> hash)
+    internal static void Assign(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]> hash) =>
+        AssignCore(scenes, hash);
+
+    private static void AssignCore(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]>? hash)
     {
         var allScenes = scenes.ToArray();
+        var buffer = new ArrayBufferWriter<byte>();
+        using var writer = new Utf8JsonWriter(buffer);
+        var descriptions = new Dictionary<ulong, (int Start, int Length)>();
+        var choices = new List<ChoiceDefinition>();
+        var compactCollisions = false;
         foreach (var scene in allScenes)
         {
-            var choices = SceneSteps.Walk(scene.Steps).OfType<ChoiceStep>().ToArray();
-            var descriptions = choices.Select(step => Describe(scene.Id, step.Choice)).ToArray();
-            var collisionDescriptions = descriptions.Concat(SyntheticDescriptions(scene, allScenes)).ToArray();
-            var collisionHashes = collisionDescriptions.Select(hash).ToArray();
-            var compactCollisions = collisionHashes
-                .Select((value, index) => (Prefix: value[..CompactLength], Description: collisionDescriptions[index]))
-                .GroupBy(entry => Convert.ToHexString(entry.Prefix), StringComparer.Ordinal)
-                .Any(group => group.Select(entry => Convert.ToBase64String(entry.Description))
-                    .Distinct(StringComparer.Ordinal).Count() > 1);
-            scene.UsesFullReplayIdentities = compactCollisions;
-            for (var index = 0; index < choices.Length; index++)
+            buffer.Clear();
+            descriptions.Clear();
+            choices.Clear();
+            compactCollisions = false;
+            foreach (var step in SceneSteps.Walk(scene.Steps))
             {
-                choices[index].Choice.ReplayIdentity = compactCollisions
-                    ? collisionHashes[index]
-                    : collisionHashes[index][..CompactLength];
+                if (step is ChoiceStep choice)
+                {
+                    Add(scene.Id, choice.Choice.Divert, choice.Choice.Effects, choice.Choice.Check, choice.Choice);
+                }
+            }
+            foreach (var target in SyntheticTargets(scene, allScenes))
+            {
+                Add(scene.Id, target, effects: [], check: null, choice: null);
+            }
+            scene.UsesFullReplayIdentities = compactCollisions;
+            if (!compactCollisions)
+            {
+                foreach (var choice in choices)
+                {
+                    choice.ReplayIdentity = choice.ReplayIdentity![..CompactLength];
+                }
+            }
+        }
+
+        void Add(SceneId scene, DivertTarget? divert, IReadOnlyList<Effect> effects, CheckBranch? check,
+            ChoiceDefinition? choice)
+        {
+            var start = buffer.WrittenCount;
+            writer.Reset(buffer);
+            WriteDescription(writer, scene, divert, effects, check);
+            writer.Flush();
+            var description = buffer.WrittenSpan[start..];
+            Span<byte> digest = stackalloc byte[FullLength];
+            if (hash is null)
+            {
+                SHA256.HashData(description, digest);
+            }
+            else
+            {
+                hash(description.ToArray()).CopyTo(digest);
+            }
+            var prefix = BinaryPrimitives.ReadUInt64LittleEndian(digest);
+            if (descriptions.TryGetValue(prefix, out var previous))
+            {
+                if (!description.SequenceEqual(buffer.WrittenSpan.Slice(previous.Start, previous.Length)))
+                {
+                    compactCollisions = true;
+                }
+            }
+            else
+            {
+                descriptions.Add(prefix, (start, description.Length));
+            }
+            if (choice is not null)
+            {
+                choice.ReplayIdentity = digest.ToArray();
+                choices.Add(choice);
             }
         }
     }
@@ -45,15 +99,17 @@ internal static class ChoiceReplayIdentity
         return source.UsesFullReplayIdentities ? hash : hash[..CompactLength];
     }
 
-    private static IEnumerable<byte[]> SyntheticDescriptions(SceneDefinition scene,
+    private static IEnumerable<DivertTarget> SyntheticTargets(SceneDefinition scene,
         IReadOnlyList<SceneDefinition> allScenes)
     {
-        if (scene.Hub is { } hub)
+        if (scene.Hub is not null)
         {
-            foreach (var storylet in allScenes.Where(candidate =>
-                candidate.Id != scene.Id && hub.Matches(candidate.Tags)))
+            foreach (var storylet in allScenes)
             {
-                yield return Describe(scene.Id, new DivertTarget(storylet.Id), effects: [], check: null);
+                if (storylet.Id != scene.Id)
+                {
+                    yield return new DivertTarget(storylet.Id);
+                }
             }
         }
 
@@ -69,14 +125,11 @@ internal static class ChoiceReplayIdentity
             {
                 if (target is { IsEnd: false })
                 {
-                    yield return Describe(scene.Id, target, effects: [], check: null);
+                    yield return target;
                 }
             }
         }
     }
-
-    private static byte[] Describe(SceneId scene, ChoiceDefinition choice) =>
-        Describe(scene, choice.Divert, choice.Effects, choice.Check);
 
     private static byte[] Describe(SceneId scene, DivertTarget? divert,
         IReadOnlyList<Effect> effects, CheckBranch? check)
@@ -84,20 +137,26 @@ internal static class ChoiceReplayIdentity
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
-            writer.WriteStartArray();
-            writer.WriteStringValue("choice-replay-v1");
-            writer.WriteStringValue(scene.Value);
-            WriteDivert(writer, divert);
-            writer.WriteStartArray();
-            foreach (var effect in effects)
-            {
-                WriteEffect(writer, effect);
-            }
-            writer.WriteEndArray();
-            WriteCheck(writer, check);
-            writer.WriteEndArray();
+            WriteDescription(writer, scene, divert, effects, check);
         }
         return stream.ToArray();
+    }
+
+    private static void WriteDescription(Utf8JsonWriter writer, SceneId scene, DivertTarget? divert,
+        IReadOnlyList<Effect> effects, CheckBranch? check)
+    {
+        writer.WriteStartArray();
+        writer.WriteStringValue("choice-replay-v1");
+        writer.WriteStringValue(scene.Value);
+        WriteDivert(writer, divert);
+        writer.WriteStartArray();
+        foreach (var effect in effects)
+        {
+            WriteEffect(writer, effect);
+        }
+        writer.WriteEndArray();
+        WriteCheck(writer, check);
+        writer.WriteEndArray();
     }
 
     private static void WriteDivert(Utf8JsonWriter writer, DivertTarget? target)
@@ -155,7 +214,7 @@ internal static class ChoiceReplayIdentity
                 WriteExpr(writer, change.Amount);
                 break;
             case ChangeStanding change:
-                writer.WriteStringValue("standing");
+                writer.WriteStringValue(ExpressionVocabulary.Standing);
                 writer.WriteStringValue(change.Faction.Value);
                 writer.WriteStringValue(change.Op.ToString());
                 WriteExpr(writer, change.Amount);
@@ -172,7 +231,7 @@ internal static class ChoiceReplayIdentity
                 WriteExpr(writer, change.Value);
                 break;
             case SetFlag change:
-                writer.WriteStringValue("flag");
+                writer.WriteStringValue(ExpressionVocabulary.Flag);
                 writer.WriteStringValue(change.Flag.Value);
                 writer.WriteBooleanValue(change.Value);
                 break;
@@ -212,7 +271,7 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue(value.Value);
                 break;
             case TierLiteral value:
-                writer.WriteStringValue("tier");
+                writer.WriteStringValue(ExpressionVocabulary.Tier);
                 writer.WriteStringValue(value.Tier.Id);
                 break;
             case StatRef value:
@@ -264,7 +323,7 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue(value.Item.Value);
                 break;
             case Visited value:
-                writer.WriteStringValue("visited");
+                writer.WriteStringValue(ExpressionVocabulary.Visited);
                 writer.WriteStringValue(value.Scene.Value);
                 break;
             case NamedPredicate value:

@@ -1,4 +1,5 @@
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Model;
 using Talewright.Rules.Expressions;
 using Talewright.Testing;
 
@@ -114,5 +115,73 @@ public sealed class RicherHubTests
 
         Assert.True(restored.Current.IsEnded);
         Assert.Equal(history.Events, restored.Events);
+    }
+
+    [Theory]
+    [InlineData("storylet-tags", false)]
+    [InlineData("storylet-tags", true)]
+    [InlineData("hub-query", false)]
+    [InlineData("hub-query", true)]
+    [InlineData("removed", false)]
+    [InlineData("removed", true)]
+    public void Hub_replay_ignores_tag_availability_but_requires_the_recorded_destination(string change, bool redo)
+    {
+        var original = new StoryHistory(Compile(), 42);
+        original.Choose("storylet:first");
+        if (redo) original.Back();
+        var bytes = original.Save();
+        var unchanged = bytes.ToArray();
+        var updated = change switch
+        {
+            "storylet-tags" => Compile(firstTags: "elsewhere"),
+            "hub-query" => Compile(hubTags: "other"),
+            "removed" => Compile(includeFirst: false),
+            _ => throw new ArgumentOutOfRangeException(nameof(change)),
+        };
+        var live = new StoryHistory(updated, 42);
+        var activeBefore = live.Save();
+        Assert.DoesNotContain(live.Current.Choices, choice => choice.Key == "storylet:first");
+        Assert.Throws<InvalidOperationException>(() => live.Choose("storylet:first"));
+
+        if (change == "removed")
+        {
+            Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
+        }
+        else
+        {
+            var restored = StoryHistory.Restore(updated, bytes);
+            Assert.Equal(original.Cursor, restored.Cursor);
+            Assert.Equal(original.Events, restored.Events);
+            if (!redo) restored.Back();
+            Assert.DoesNotContain(restored.Current.Choices, choice => choice.Key == "storylet:first");
+            restored.Forward();
+            Assert.True(restored.Current.IsEnded);
+            Assert.Equal(restored.Events, StoryHistory.Restore(updated, restored.Save()).Events);
+        }
+        Assert.Equal(unchanged, bytes);
+        Assert.Equal(activeBefore, live.Save());
+
+        static StoryDefinition Compile(string hubTags = "room", string firstTags = "room", bool includeFirst = true)
+        {
+            var manifest = new ManifestFaker("hub-tags-replay", "Hub tag replay", "hub");
+            manifest.Character("player", "Tester");
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                ["story.talewright.yaml"] = manifest.Build(),
+                ["main.tale"] = string.Join('\n',
+                    SceneFaker.Header("hub"),
+                    SceneFaker.Hub(hubTags),
+                    ChoiceFaker.Create("END", "Exit"),
+                    includeFirst ? string.Join('\n',
+                        SceneFaker.Header("first"),
+                        SceneFaker.Tags(firstTags),
+                        DivertFaker.To("END")) : "",
+                    SceneFaker.Header("second"),
+                    SceneFaker.Tags("room", "other"),
+                    DivertFaker.To("END")),
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!;
+        }
     }
 }

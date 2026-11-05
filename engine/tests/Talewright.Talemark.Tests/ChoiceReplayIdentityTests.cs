@@ -46,4 +46,44 @@ public sealed class ChoiceReplayIdentityTests
         Assert.Equal(choices[0].ReplayIdentity, choices[1].ReplayIdentity);
         Assert.NotEqual(choices[0].ReplayIdentity, choices[2].ReplayIdentity);
     }
+
+    [Fact]
+    public void Hub_collision_detection_includes_destinations_outside_current_tag_eligibility()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: hub-replay, title: Hub replay, start: hub }
+                characters:
+                  player: { first-name: Ada }
+                """,
+            ["main.tale"] = """
+                === hub
+                @hub room
+                === first
+                @tags room
+                -> END
+                === second
+                @tags elsewhere
+                -> END
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var hub = story.GetScene(new SceneId("hub"));
+        var first = new DivertTarget(new SceneId("first"));
+        var second = new DivertTarget(new SceneId("second"));
+        Assert.Equal(ChoiceReplayIdentity.CompactLength, ChoiceReplayIdentity.ForDivert(hub, first).Length);
+
+        ChoiceReplayIdentity.Assign(story.Scenes, description =>
+        {
+            var value = SHA256.HashData(description);
+            "collisio"u8.CopyTo(value);
+            return value;
+        });
+
+        Assert.Equal(ChoiceReplayIdentity.FullLength, ChoiceReplayIdentity.ForDivert(hub, first).Length);
+        Assert.Equal(ChoiceReplayIdentity.FullLength, ChoiceReplayIdentity.ForDivert(hub, second).Length);
+        Assert.NotEqual(ChoiceReplayIdentity.ForDivert(hub, first), ChoiceReplayIdentity.ForDivert(hub, second));
+    }
 }

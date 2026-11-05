@@ -210,10 +210,10 @@ public sealed class StorySession : IStorySession
             return true;
         }
 
-        if (scene.Hub is { } hub)
+        if (scene.Hub is not null)
         {
             foreach (var (storylet, _) in Story.Scenes.Select((candidate, index) => (candidate, index))
-                .Where(entry => entry.candidate.Id != scene.Id && hub.Matches(entry.candidate.Tags))
+                .Where(entry => entry.candidate.Id != scene.Id)
                 .OrderByDescending(entry => entry.candidate.Priority)
                 .ThenBy(entry => entry.index))
             {

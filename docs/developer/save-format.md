@@ -104,7 +104,8 @@ If different outcome descriptions in one scene collide on those 8 bytes, every c
 uses the full 32-byte hash. Choice labels, prose, source positions, availability requirements, and
 other offered choices are excluded. When replaying, the runtime chooses the first current authored
 choice with the same outcome identity, even if its availability requirement is now false. Live choice
-keys and availability behavior are unchanged.
+keys and availability behavior are unchanged. Recorded hub selections match existing destinations
+regardless of their current tag eligibility; removed destinations still reject the save.
 
 Replay evidence is a versioned SHA-256 chain. Its start binds the story and replay/extension identity,
 seed, character selection, initial ruleset and world state, and start events. Each decision binds its
