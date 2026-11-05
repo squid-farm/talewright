@@ -39,7 +39,8 @@ public sealed class StorySession : IStorySession
     private readonly bool _captureEntry;
     private readonly Action<RuleDecision>? _observer;
     private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
-    private readonly Dictionary<string, (Action<List<RenderedBlock>> Execute, byte[]? ReplayIdentity)> _actions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string,
+        (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity)> _actions = new(StringComparer.Ordinal);
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
     private IReadOnlyList<RenderedBlock> _entryPrelude = [];
     private readonly List<RenderedBlock> _editNotes = [];
@@ -147,7 +148,7 @@ public sealed class StorySession : IStorySession
         blocks.AddRange(execution.Blocks);
         blocks.AddRange(_editNotes);
         if (execution.Target is not null) SkipHub(scene);
-        var choices = execution.Target is null ? OfferChoices(scene, execution.Choices) : ContinueTo(execution.Target);
+        var choices = execution.Target is null ? OfferChoices(scene, execution.Choices) : ContinueTo(scene, execution.Target);
         if (execution.Target?.IsEnd == true || choices.Count == 0)
         {
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
@@ -219,7 +220,7 @@ public sealed class StorySession : IStorySession
             {
                 var target = new DivertTarget(storylet.Id);
                 var identity = ChoiceReplayIdentity.ForDivert(scene, target);
-                if (!identity.AsSpan().SequenceEqual(replayIdentity))
+                if (!identity.Span.SequenceEqual(replayIdentity))
                 {
                     continue;
                 }
@@ -246,7 +247,7 @@ public sealed class StorySession : IStorySession
 
         foreach (var (key, action) in _actions)
         {
-            if (action.ReplayIdentity is not { } identity || !identity.AsSpan().SequenceEqual(replayIdentity))
+            if (action.ReplayIdentity is not { } identity || !identity.Span.SequenceEqual(replayIdentity))
             {
                 continue;
             }
@@ -295,7 +296,7 @@ public sealed class StorySession : IStorySession
         if (execution.Target is { } next)
         {
             SkipHub(scene);
-            return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks, ContinueTo(next));
+            return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks, ContinueTo(scene, next));
         }
         var choices = OfferChoices(scene, execution.Choices);
         if (choices.Count == 0)
@@ -353,15 +354,15 @@ public sealed class StorySession : IStorySession
         return offered;
     }
 
-    private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> ContinueTo(DivertTarget target)
+    private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> ContinueTo(
+        SceneDefinition source, DivertTarget target)
     {
-        var source = Story.GetScene(Current?.Scene ?? Story.Start);
         return [(new ChoiceView(ContinueKey, ChoiceView.ContinueLabel)
         {
             ReplayIdentity = ChoiceReplayIdentity.ForDivert(source, target),
         }, notes =>
         {
-            _log.Append(new ChoiceMade(Current!.Scene ?? Story.Start, ContinueKey));
+            _log.Append(new ChoiceMade(source.Id, ContinueKey));
             Enter(target, notes);
         })];
     }

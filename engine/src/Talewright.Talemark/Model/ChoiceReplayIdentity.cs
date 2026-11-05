@@ -24,7 +24,18 @@ internal static class ChoiceReplayIdentity
     private static void AssignCore(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]>? hash)
     {
         var allScenes = scenes.ToArray();
+        var identityCapacity = allScenes.Sum(scene =>
+            (scene.Hub is null ? 0 : allScenes.Length - 1)
+            + SceneSteps.Walk(scene.Steps).Sum(step => step switch
+            {
+                DivertStep { Target.IsEnd: false } => 1,
+                CheckStep check => (check.Check.Success.Divert is { IsEnd: false } ? 1 : 0)
+                    + (check.Check.Failure.Divert is { IsEnd: false } ? 1 : 0),
+                _ => 0,
+            }));
         var buffer = new ArrayBufferWriter<byte>();
+        var replayIdentityData = new ArrayBufferWriter<byte>(Math.Max(1, identityCapacity * CompactLength));
+        var replayIdentityCache = new DivertReplayIdentityCache(identityCapacity);
         using var writer = new Utf8JsonWriter(buffer);
         var descriptions = new Dictionary<ulong, (int Start, int Length)>();
         var choices = new List<ChoiceDefinition>();
@@ -34,20 +45,47 @@ internal static class ChoiceReplayIdentity
             buffer.Clear();
             descriptions.Clear();
             choices.Clear();
+            scene.ReplayIdentityCache = replayIdentityCache;
             compactCollisions = false;
             foreach (var step in SceneSteps.Walk(scene.Steps))
             {
                 if (step is ChoiceStep choice)
                 {
-                    Add(scene.Id, choice.Choice.Divert, choice.Choice.Effects, choice.Choice.Check, choice.Choice);
+                    Add(scene, choice.Choice.Divert, choice.Choice.Effects, choice.Choice.Check, choice.Choice);
                 }
             }
             foreach (var target in SyntheticTargets(scene, allScenes))
             {
-                Add(scene.Id, target, effects: [], check: null, choice: null);
+                Add(scene, target, effects: [], check: null, choice: null);
             }
             scene.UsesFullReplayIdentities = compactCollisions;
-            if (!compactCollisions)
+            if (compactCollisions)
+            {
+                var targets = replayIdentityCache.Offsets.Keys
+                    .Where(key => key.Source == scene.Id)
+                    .Select(key => key.Target)
+                    .ToArray();
+                if (targets.Length > 0)
+                {
+                    var digest = new byte[FullLength];
+                    foreach (var target in targets)
+                    {
+                        var description = Describe(scene.Id, new DivertTarget(target), effects: [], check: null);
+                        if (hash is null)
+                        {
+                            SHA256.HashData(description, digest);
+                        }
+                        else
+                        {
+                            hash(description).CopyTo(digest);
+                        }
+                        replayIdentityCache.Offsets[(scene.Id, target)] = replayIdentityData.WrittenCount;
+                        digest.CopyTo(replayIdentityData.GetSpan(FullLength));
+                        replayIdentityData.Advance(FullLength);
+                    }
+                }
+            }
+            else
             {
                 foreach (var choice in choices)
                 {
@@ -55,13 +93,14 @@ internal static class ChoiceReplayIdentity
                 }
             }
         }
+        replayIdentityCache.Data = replayIdentityData.WrittenMemory;
 
-        void Add(SceneId scene, DivertTarget? divert, IReadOnlyList<Effect> effects, CheckBranch? check,
+        void Add(SceneDefinition scene, DivertTarget? divert, IReadOnlyList<Effect> effects, CheckBranch? check,
             ChoiceDefinition? choice)
         {
             var start = buffer.WrittenCount;
             writer.Reset(buffer);
-            WriteDescription(writer, scene, divert, effects, check);
+            WriteDescription(writer, scene.Id, divert, effects, check);
             writer.Flush();
             var description = buffer.WrittenSpan[start..];
             Span<byte> digest = stackalloc byte[FullLength];
@@ -90,13 +129,30 @@ internal static class ChoiceReplayIdentity
                 choice.ReplayIdentity = digest.ToArray();
                 choices.Add(choice);
             }
+            else if (divert?.Scene is { } target)
+            {
+                var key = (scene.Id, target);
+                if (!replayIdentityCache.Offsets.ContainsKey(key))
+                {
+                    replayIdentityCache.Offsets.Add(key, replayIdentityData.WrittenCount);
+                    digest[..CompactLength].CopyTo(replayIdentityData.GetSpan(CompactLength));
+                    replayIdentityData.Advance(CompactLength);
+                }
+            }
         }
     }
 
-    internal static byte[] ForDivert(SceneDefinition source, DivertTarget target)
+    internal static ReadOnlyMemory<byte> ForDivert(SceneDefinition source, DivertTarget target)
     {
-        var hash = SHA256.HashData(Describe(source.Id, target, effects: [], check: null));
-        return source.UsesFullReplayIdentities ? hash : hash[..CompactLength];
+        if (target.Scene is { } targetScene
+            && source.ReplayIdentityCache is { } cache
+            && cache.TryGet(source.Id, targetScene, source.UsesFullReplayIdentities, out var identity))
+        {
+            return identity;
+        }
+
+        throw new InvalidOperationException(
+            $"Replay identity for divert from '{source.Id}' to '{target}' was not precomputed.");
     }
 
     private static IEnumerable<DivertTarget> SyntheticTargets(SceneDefinition scene,
@@ -345,5 +401,31 @@ internal static class ChoiceReplayIdentity
                 throw new NotSupportedException($"Unknown choice expression '{expression.GetType().Name}'.");
         }
         writer.WriteEndArray();
+    }
+}
+
+internal sealed class DivertReplayIdentityCache
+{
+    internal DivertReplayIdentityCache(int capacity)
+    {
+        Offsets = new Dictionary<(SceneId Source, SceneId Target), int>(capacity);
+    }
+
+    internal Dictionary<(SceneId Source, SceneId Target), int> Offsets { get; }
+    internal ReadOnlyMemory<byte> Data { get; set; }
+
+    internal bool TryGet(SceneId source, SceneId target, bool fullLength,
+        out ReadOnlyMemory<byte> identity)
+    {
+        if (Offsets.TryGetValue((source, target), out var offset))
+        {
+            identity = Data.Slice(offset, fullLength
+                ? ChoiceReplayIdentity.FullLength
+                : ChoiceReplayIdentity.CompactLength);
+            return true;
+        }
+
+        identity = default;
+        return false;
     }
 }

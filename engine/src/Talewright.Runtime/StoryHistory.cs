@@ -337,14 +337,14 @@ public sealed class StoryHistory
             var previousFrame = session.Current!;
             var eventStart = session.Events.Count;
             ChoiceView? choice;
-            byte[]? identity;
+            ReadOnlyMemory<byte>? identity;
             if (replayChoiceIdentities is not null)
             {
-                identity = replayChoiceIdentities[index];
-                if (!session.ChooseReplay(identity, out choice) || choice is null)
+                if (!session.ChooseReplay(replayChoiceIdentities[index], out choice) || choice is null)
                 {
                     throw ReplayFailure();
                 }
+                identity = replayChoiceIdentities[index];
             }
             else
             {
@@ -361,8 +361,8 @@ public sealed class StoryHistory
             frames.Add(new HistoryFrame(session.Current!));
             if (identity is not null && evidence is not null && replayedIdentities is not null)
             {
-                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, identity, session.Events, eventStart));
-                replayedIdentities.Add(identity.ToArray());
+                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, identity.Value, session.Events, eventStart));
+                replayedIdentities.Add(identity.Value.ToArray());
             }
             else
             {

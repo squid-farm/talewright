@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Talewright.Core.Identity;
 using Talewright.Talemark.Compilation;
@@ -73,7 +74,9 @@ public sealed class ChoiceReplayIdentityTests
         var hub = story.GetScene(new SceneId("hub"));
         var first = new DivertTarget(new SceneId("first"));
         var second = new DivertTarget(new SceneId("second"));
-        Assert.Equal(ChoiceReplayIdentity.CompactLength, ChoiceReplayIdentity.ForDivert(hub, first).Length);
+        var compactIdentity = ChoiceReplayIdentity.ForDivert(hub, first);
+        Assert.Equal(ChoiceReplayIdentity.CompactLength, compactIdentity.Length);
+        AssertSharedIdentityMemory(compactIdentity, ChoiceReplayIdentity.ForDivert(hub, first));
 
         ChoiceReplayIdentity.Assign(story.Scenes, description =>
         {
@@ -82,8 +85,19 @@ public sealed class ChoiceReplayIdentityTests
             return value;
         });
 
-        Assert.Equal(ChoiceReplayIdentity.FullLength, ChoiceReplayIdentity.ForDivert(hub, first).Length);
+        var fullIdentity = ChoiceReplayIdentity.ForDivert(hub, first);
+        Assert.Equal(ChoiceReplayIdentity.FullLength, fullIdentity.Length);
+        AssertSharedIdentityMemory(fullIdentity, ChoiceReplayIdentity.ForDivert(hub, first));
         Assert.Equal(ChoiceReplayIdentity.FullLength, ChoiceReplayIdentity.ForDivert(hub, second).Length);
-        Assert.NotEqual(ChoiceReplayIdentity.ForDivert(hub, first), ChoiceReplayIdentity.ForDivert(hub, second));
+        Assert.NotEqual(fullIdentity, ChoiceReplayIdentity.ForDivert(hub, second));
+    }
+
+    private static void AssertSharedIdentityMemory(ReadOnlyMemory<byte> first, ReadOnlyMemory<byte> second)
+    {
+        Assert.True(MemoryMarshal.TryGetArray(first, out var firstSegment));
+        Assert.True(MemoryMarshal.TryGetArray(second, out var secondSegment));
+        Assert.Same(firstSegment.Array, secondSegment.Array);
+        Assert.Equal(firstSegment.Offset, secondSegment.Offset);
+        Assert.Equal(firstSegment.Count, secondSegment.Count);
     }
 }

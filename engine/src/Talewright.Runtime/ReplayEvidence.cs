@@ -53,15 +53,15 @@ internal static class ReplayEvidence
             WriteEvents(writer, session.Events, 0);
         });
 
-    public static byte[] Next(byte[] previous, StoryFrame frame, byte[] choiceIdentity,
+    public static byte[] Next(byte[] previous, StoryFrame frame, ReadOnlyMemory<byte> choiceIdentity,
         IReadOnlyList<GameEvent> events, int eventStart) =>
         Hash(writer =>
         {
             writer.WriteStringValue("choice");
             writer.WriteBase64StringValue(previous);
             writer.WriteStringValue(frame.Scene?.Value);
-            writer.WriteBase64StringValue(choiceIdentity);
-            WriteEvents(writer, events, eventStart, choiceIdentity);
+            writer.WriteBase64StringValue(choiceIdentity.Span);
+            WriteEvents(writer, events, eventStart, choiceIdentity.Span);
         });
 
     private static byte[] Hash(Action<Utf8JsonWriter> write)
@@ -226,12 +226,12 @@ internal static class ReplayEvidence
     }
 
     private static void WriteEvents(Utf8JsonWriter writer, IReadOnlyList<GameEvent> events, int start,
-        byte[]? choiceIdentity = null)
+        ReadOnlySpan<byte> choiceIdentity = default)
     {
         writer.WriteStartArray();
         for (var i = start; i < events.Count; i++)
         {
-            if (events[i] is ChoiceMade choice && choiceIdentity is not null)
+            if (events[i] is ChoiceMade choice && !choiceIdentity.IsEmpty)
             {
                 writer.WriteStartArray();
                 writer.WriteStringValue(nameof(ChoiceMade));

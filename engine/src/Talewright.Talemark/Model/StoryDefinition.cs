@@ -94,6 +94,7 @@ public sealed class SceneDefinition : IStorylet
 
     public IReadOnlyList<SceneStep> Steps { get; init; } = [];
     internal bool UsesFullReplayIdentities { get; set; }
+    internal DivertReplayIdentityCache? ReplayIdentityCache { get; set; }
     public IReadOnlyList<ChoiceDefinition> Choices =>
         SceneSteps.Walk(Steps).OfType<ChoiceStep>().Select(step => step.Choice).ToArray();
 }
