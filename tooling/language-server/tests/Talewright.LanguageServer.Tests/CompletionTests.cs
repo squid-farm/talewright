@@ -52,6 +52,8 @@ public sealed partial class ServerTests
     [InlineData("~ take player rope |", "player")]
     [InlineData("@requires @IsH|", "IsHero")]
     [InlineData("@requires flag:door-|", "door-open")]
+    [InlineData("@hub camp a|nd cave", "and")]
+    [InlineData("@hub camp o|r cave", "or")]
     [InlineData("{player:pronoun:|}", "reflexive")]
     [InlineData("{player:pronoun#one-|}", "one-many")]
     [InlineData("{item:rope#one-|}", "one-many")]
