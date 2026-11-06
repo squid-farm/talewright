@@ -64,7 +64,7 @@ source and binary breaking change for C# consumers, with no compatibility shim o
   package IDs remain `Talewright` and `Talewright.Player`; there is no new compiler package to install.
 
 The compiler tests and their project directory are now `Talewright.Talemark.Tests`.
-Individual API names such as `TaleParser` and `TaleFiles` are unchanged. So are `.tale` stories,
+Individual API names such as `TaleBinder` and `TaleFiles` are unchanged. So are `.tale` stories,
 `story.talewright.yaml`, the editor language ID/code-fence name `tale`, and grammar scope `text.tale`.
 The rename does not change story syntax, runtime behavior, or the save format; existing saves
 retain the same story/source compatibility requirements.

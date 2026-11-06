@@ -488,7 +488,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             TaleDeclarations.Collect(file, fileSyntax, Scene, null, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
-            TaleParser.Parse(file, fileSyntax, symbols, diagnostics, cancellationToken);
+            TaleBinder.Parse(file, fileSyntax, symbols, diagnostics, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
                 diagnostic.Code is CompilerDiagnosticCodes.UnsafeImagePath or CompilerDiagnosticCodes.UnsupportedImageFormat or CompilerDiagnosticCodes.MissingImage or CompilerDiagnosticCodes.AmbiguousImagePath or CompilerDiagnosticCodes.MissingImageAlt));

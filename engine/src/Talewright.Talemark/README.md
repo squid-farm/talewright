@@ -40,7 +40,7 @@ images have a separate path catalogue. Unrelated files are not published as stor
    choice effect clauses and attached outcome effects); the expression lexer collects assignment targets from
    those blocks and manifest effects. Comments, prose and choice labels do not declare flags/vars. Forward
    references across files remain supported.
-4. **Bind.** `TaleParser` binds each file's syntax line by line (files in path order). Prose goes through `InlineParser`;
+4. **Bind.** `TaleBinder` binds each file's syntax line by line (files in path order). Prose goes through `InlineParser`;
    conditions, substitutions and effects through `ExpressionParser`. `SceneDefinition.Steps` preserves source
    order, effect batches and nested conditions. Every step has a deterministic source-position ID and half-open
    UTF-16 source span; choice keys remain `c0`, `c1`, ... in source order.
@@ -74,7 +74,7 @@ marked `IsAttached`: the check binds them, and the next unattached line ends the
 
 Ownership:
 
-| Syntax (`TaleSyntaxParser`) | Binding (`TaleParser`) |
+| Syntax (`TaleSyntaxParser`) | Binding (`TaleBinder`) |
 | --- | --- |
 | Line splitting, scene ownership, line kinds and spans | Steps and block-condition frames |
 | Head and value parts of metadata, speech, effects, divert and `{if}` lines | Expressions, prose and divert targets bound against symbols |
@@ -87,7 +87,7 @@ Ownership:
 
 Expressions stay as spans and are parsed and bound by `ExpressionParser` during binding. Prose and
 images stay as line spans parsed by `InlineParser` during binding until #491 separates inline syntax from symbol
-binding. `TaleParser` binds syntax to the existing model; `TaleDeclarations` collects story-wide symbols from the
+binding. `TaleBinder` binds syntax to the existing model; `TaleDeclarations` collects story-wide symbols from the
 same syntax before any file is bound.
 
 Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
@@ -192,7 +192,7 @@ deployment acceptance under #179 stay separate.
 | `Compilation/StoryValidator.cs` | Whole-story structural checks (TW3xxx). Reachability is skipped when there are errors so one bad divert doesn't produce a wall of warnings. |
 | `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are errors (TW4006). |
 | `Parsing/TaleSyntaxParser.cs`, `Parsing/TaleSyntax.cs` | Symbol-independent file/scene syntax: line splitting, scene ownership and line kinds with scene-relative spans. |
-| `Parsing/TaleParser.cs` | Binds file syntax to scenes and steps. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
+| `Parsing/TaleBinder.cs` | Binds file syntax to scenes and steps. Handles `===`, `@directives`, `~` effects, `*` choices (+ `requires`, effects, checks, divert), `->` diverts, `::: skill-check` blocks, `{if}/{else}/{/if}` blocks, speech lines, paragraphs, and `\{` escapes. |
 | `Parsing/InlineParser.cs` | Prose → `TemplateInline`s. Directly tokenizes reader-text escapes, inline constructs, line breaks and formatting, then folds inline conditions; `SourceText` maps offsets back to line/column. |
 | `Parsing/ExpressionParser.cs` | Recursive descent with type checking: conditions (`player:str >= 12 and player has rope`), numbers, substitutions (`player:first-name#possessive`), effects (`player:hp -= 2`). |
 | `Parsing/Lexer.cs` | Tokens for the expression parser. |

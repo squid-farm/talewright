@@ -136,7 +136,7 @@ public static class StoryCompiler
         foreach (var (path, syntax) in syntaxes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var scene in TaleParser.Parse(path, syntax, symbols, diagnostics, cancellationToken))
+            foreach (var scene in TaleBinder.Parse(path, syntax, symbols, diagnostics, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // Discovery reported duplicates; keep the first so the rest still validates.

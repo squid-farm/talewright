@@ -388,9 +388,9 @@ public sealed class TaleSyntaxTests
         var lines = syntax.Scenes[0].Lines;
 
         var missing = new DiagnosticBag();
-        TaleParser.Parse("main.tale", syntax, Symbols(), missing);
+        TaleBinder.Parse("main.tale", syntax, Symbols(), missing);
         var present = new DiagnosticBag();
-        var scenes = TaleParser.Parse("main.tale", syntax, Symbols(new SceneId("later")), present);
+        var scenes = TaleBinder.Parse("main.tale", syntax, Symbols(new SceneId("later")), present);
 
         Assert.Equal(CompilerDiagnosticCodes.UnknownScene, Assert.Single(missing.Items).Code);
         Assert.Empty(present.Items);

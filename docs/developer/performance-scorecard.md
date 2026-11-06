@@ -228,7 +228,7 @@ dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
 
 ## Parser comment-line materialization experiment
 
-`TaleParser` no longer normalizes the whole source into a second string and
+`TaleBinder` no longer normalizes the whole source into a second string and
 splits it into an array containing a string for every line. It scans line
 ranges in the immutable source and skips comment lines before creating a
 string. Non-comment lines still become strings for the existing parser APIs.

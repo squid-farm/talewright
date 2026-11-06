@@ -6,7 +6,7 @@ namespace Talewright.Talemark.Parsing;
 
 /// <summary>
 /// Splits a <c>.tale</c> file into scenes and classifies each line without consulting story symbols. The binder
-/// (<see cref="TaleParser"/>) turns this syntax into the story model.
+/// (<see cref="TaleBinder"/>) turns this syntax into the story model.
 /// </summary>
 internal static class TaleSyntaxParser
 {
