@@ -17,7 +17,7 @@ public sealed class StorySceneDetailsTests
         @requires player has rope
         @once
         @priority 7
-        @hub any(exhibit, details)
+        @hub exhibit or details
         @hub-limit 2
 
         > guide: First, {player:first-name}.

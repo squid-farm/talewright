@@ -25,12 +25,12 @@ public sealed class SceneVocabularyTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Hub_mode_prefix_roundtrips(bool all)
+    public void Legacy_hub_mode_prefixes_are_recognized_for_diagnostics(bool all)
     {
         var mode = all ? SceneHubMode.All : SceneHubMode.Any;
-        var prefix = SceneVocabulary.HubModePrefix(mode);
+        var prefix = SceneVocabulary.LegacyHubModePrefix(mode);
 
-        Assert.True(SceneVocabulary.TryGetHubMode(prefix, out var parsed));
+        Assert.True(SceneVocabulary.TryGetLegacyHubMode(prefix, out var parsed));
         Assert.Equal(mode, parsed);
     }
 }

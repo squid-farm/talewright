@@ -38,9 +38,9 @@ public sealed class RealisticStoryTests
 
         Assert.Equal(22, story.Files.Count);
         Assert.Equal(946, story.SceneCount);
-        Assert.Equal(709_916, story.Files.Values.Sum(text => Encoding.UTF8.GetByteCount(text)));
+        Assert.Equal(709_856, story.Files.Values.Sum(text => Encoding.UTF8.GetByteCount(text)));
         var actualHash = Convert.ToHexString(hash.GetHashAndReset());
-        Assert.Equal("35C499D1C8ED1811466AAC8C88E3BFC3C821CC12D7C6C91CFC232730046CF449", actualHash);
+        Assert.Equal("1102FBB404CACA1242ED52EDF458061D0BCE7FCFA59F4DC9F6BEC98A6E1F1D2B", actualHash);
     }
 
     [Fact]

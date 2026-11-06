@@ -179,7 +179,7 @@ public static class SceneFaker
     public static string Priority(int priority) => Metadata("priority", priority.ToString(System.Globalization.CultureInfo.InvariantCulture));
     public static string Requires(string condition) => Metadata("requires", condition);
     public static string Hub(string query) => Metadata("hub", query);
-    public static string HubAny(params string[] tags) => Hub($"any({string.Join(", ", tags)})");
+    public static string HubAny(params string[] tags) => Hub(string.Join(" or ", tags));
     public static string HubLimit(int limit) => Metadata("hub-limit", limit.ToString(System.Globalization.CultureInfo.InvariantCulture));
     public static string Speaker(TaleCharacterRef character, string text) =>
         $"> {FakerArgument.Required(character)}: {FakerArgument.Required(text)}";
