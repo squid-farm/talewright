@@ -43,6 +43,12 @@ public sealed class SharedAnalysis
     {
         if (_superseded.TrySetResult()) _cancellation.Cancel();
     }
+    internal void ThrowIfCancellationRequested()
+    {
+        // Supersession can wake a worker before token cancellation has run.
+        if (_superseded.Task.IsCompleted) throw new OperationCanceledException(_cancellation.Token);
+        _cancellation.Token.ThrowIfCancellationRequested();
+    }
     internal void SetCompletion(Task<AnalysisUpdate> completion) => _completion = completion;
 }
 
@@ -255,15 +261,15 @@ public sealed class StoryWorkspace
         }
         else await delay.ConfigureAwait(false);
         shared.ReadyAt = Stopwatch.GetTimestamp();
-        shared.CancellationToken.ThrowIfCancellationRequested();
+        shared.ThrowIfCancellationRequested();
         await _analysisGate.WaitAsync(shared.CancellationToken).ConfigureAwait(false);
         try
         {
-            shared.CancellationToken.ThrowIfCancellationRequested();
+            shared.ThrowIfCancellationRequested();
             shared.StartedAt = Stopwatch.GetTimestamp();
             var parsedBefore = SyntaxParseCount;
             var analysis = await _analyze(snapshot, _options, shared.CancellationToken).ConfigureAwait(false);
-            shared.CancellationToken.ThrowIfCancellationRequested();
+            shared.ThrowIfCancellationRequested();
             if (_missingMetadata)
             {
                 analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error, AuthoringDiagnosticCodes.CustomFeaturesUnavailable,

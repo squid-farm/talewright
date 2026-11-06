@@ -50,7 +50,7 @@ public sealed class TalemarkVocabularyGuardTests
 
     private static readonly string[] LineMarkerFiles =
     [
-        "engine/src/Talewright.Talemark/Parsing/TaleParser.cs",
+        "engine/src/Talewright.Talemark/Parsing/TaleBinder.cs",
         "engine/src/Talewright.Talemark/Parsing/ChoiceSyntax.cs",
         "engine/src/Talewright.Talemark/Parsing/DelimiterScanner.cs",
         "engine/src/Talewright.Talemark/Parsing/ImageSyntax.cs",

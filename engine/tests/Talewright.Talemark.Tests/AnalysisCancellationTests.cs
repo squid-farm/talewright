@@ -62,7 +62,7 @@ public sealed class AnalysisCancellationTests
         var text = "=== first\n" + string.Join('\n', Enumerable.Repeat("Value {var:n}.", 2048)) + "\n-> END\n";
 
         Assert.Throws<OperationCanceledException>(() =>
-            TaleParser.Parse("main.tale", TaleSyntaxParser.Parse(text), Symbols(variables), new DiagnosticBag(), cancellation.Token));
+            TaleBinder.Parse("main.tale", TaleSyntaxParser.Parse(text), Symbols(variables), new DiagnosticBag(), cancellation.Token));
         Assert.InRange(lookups, 1, 64);
     }
 
@@ -80,7 +80,7 @@ public sealed class AnalysisCancellationTests
         var imageSource = new StorySource(new Dictionary<string, string>(), ["images/test.png"]);
 
         Assert.Throws<OperationCanceledException>(() =>
-            TaleParser.Parse("main.tale", TaleSyntaxParser.Parse(text), Symbols(variables, imageSource), new DiagnosticBag(), cancellation.Token));
+            TaleBinder.Parse("main.tale", TaleSyntaxParser.Parse(text), Symbols(variables, imageSource), new DiagnosticBag(), cancellation.Token));
         Assert.InRange(lookups, 1, 64);
     }
 
