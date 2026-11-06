@@ -65,7 +65,7 @@ public sealed class StoryQuickFixesTests
     [InlineData("flags: [ready]\n", "true-ish", ", true-ish")]
     public void Yaml_keyword_spellings_are_quoted_in_every_list_shape(string manifest, string item, string newText)
     {
-        var result = ManifestListEditor.Append(manifest, StorySource.ManifestFileName, "flags", item);
+        var result = ManifestListEditor.Append(manifest, StorySource.ManifestFileName, ManifestVocabulary.Flags, item);
 
         Assert.Null(result.Reason);
         Assert.Equal(newText, result.Edit!.NewText);
@@ -89,7 +89,7 @@ public sealed class StoryQuickFixesTests
     [Fact]
     public void Malformed_yaml_is_not_edited_and_returns_a_reason()
     {
-        var result = ManifestListEditor.Append("flags: [unfinished", StorySource.ManifestFileName, "flags", "missing");
+        var result = ManifestListEditor.Append("flags: [unfinished", StorySource.ManifestFileName, ManifestVocabulary.Flags, "missing");
 
         Assert.Null(result.Edit);
         Assert.Contains("invalid YAML", result.Reason);
@@ -118,6 +118,149 @@ public sealed class StoryQuickFixesTests
             "=== start\n~ set flag:missing\n{if flag:missing}Seen.{/if}\n-> END\n");
 
         Assert.DoesNotContain(analysis.Diagnostics, item => item.Code == "TW2004");
+    }
+
+    [Theory]
+    [InlineData(
+        "=== start\n> old-man: Hello.\n-> END\n",
+        "  old-man:\n    first-name: Old Man",
+        "Declare character 'old-man'")]
+    [InlineData(
+        "=== start\n{if player has silver-sword}Seen.{/if}\n-> END\n",
+        "items:\n  silver-sword: Silver Sword",
+        "Declare item 'silver-sword'")]
+    [InlineData(
+        "=== start\n{faction:river-guild:name}\n-> END\n",
+        "factions:\n  river-guild: {}",
+        "Declare faction 'river-guild'")]
+    public void Missing_manifest_names_add_schema_valid_declarations(
+        string story, string declaration, string title)
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+
+        var fix = Assert.Single(result.Fixes);
+        Assert.Null(result.DisabledReason);
+        Assert.Equal(title, fix.Title);
+        Assert.Equal(StoryQuickFixKind.TextEdit, fix.Kind);
+        Assert.Equal(StorySource.ManifestFileName, fix.File);
+        Assert.Contains(declaration, ApplyInsertion(manifest, fix));
+        var updated = ApplyInsertion(manifest, fix);
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Missing_manifest_name_appends_to_a_flow_mapping()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters: {player: {first-name: Ada}}\nitems: {rope: Rope}\n";
+        const string story = "=== start\n{if player has silver-sword}Seen.{/if}\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+
+        Assert.Equal(", silver-sword: Silver Sword", fix.NewText);
+        Assert.Equal(fix.Range.Start, fix.Range.End);
+        var updated = ApplyInsertion(manifest, fix);
+        Assert.Contains("items: {rope: Rope, silver-sword: Silver Sword}", updated);
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Missing_manifest_name_appends_to_an_empty_flow_mapping()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters: {player: {first-name: Ada}}\nfactions: {}\n";
+        const string story = "=== start\n{faction:river-guild:name}\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+
+        Assert.Equal("river-guild: {}", fix.NewText);
+        var updated = ApplyInsertion(manifest, fix);
+        Assert.Contains("factions: {river-guild: {}}", updated);
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Missing_manifest_name_preserves_comments_and_crlf_in_block_mappings()
+    {
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\ncharacters:\r\n  player: {first-name: Ada} # keep player\r\n  # keep this comment\r\n  guide: {first-name: Bea}\r\n";
+        const string story = "=== start\r\n> old-man: Hello.\r\n-> END\r\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+
+        Assert.Equal("  old-man:\r\n    first-name: Old Man\r\n", fix.NewText);
+        var updated = ApplyInsertion(manifest, fix);
+        Assert.Contains("player: {first-name: Ada} # keep player\r\n  # keep this comment\r\n  guide: {first-name: Bea}\r\n  old-man:", updated);
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Existing_manifest_names_and_unknown_properties_do_not_get_declaration_fixes()
+    {
+        const string story = "=== start\n> old-man: Hello.\n{old-man:unknown-property}\n-> END\n";
+        var analysis = AnalyzeManifest(
+            "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n",
+            story,
+            ("support/extra.talewright.yaml", "characters:\n  old-man: {first-name: Old Man}\n"));
+        var location = new SourceLocation("main.tale", 2, 3);
+        var diagnostic = new Diagnostic(DiagnosticSeverity.Error, "TW2001", "Unknown character 'old-man'.", location);
+        var propertyDiagnostic = new Diagnostic(DiagnosticSeverity.Error, "TW2001", "Unknown property.", new("main.tale", 3, 10));
+
+        Assert.Empty(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+        Assert.Empty(StoryQuickFixes.ForMissingManifestName(analysis, propertyDiagnostic).Fixes);
+
+        var playerAnalysis = AnalyzeManifest(
+            "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n",
+            "=== start\n> player: Hello.\n-> END\n");
+        var playerDiagnostic = new Diagnostic(
+            DiagnosticSeverity.Error, "TW2001", "Unknown character 'player'.", new("main.tale", 2, 3));
+        Assert.Empty(StoryQuickFixes.ForMissingManifestName(playerAnalysis, playerDiagnostic).Fixes);
+    }
+
+    [Fact]
+    public void Unsupported_manifest_mapping_returns_a_disabled_reason()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters: []\n";
+        const string story = "=== start\n> old-man: Hello.\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+
+        Assert.Empty(result.Fixes);
+        Assert.Contains("not a YAML mapping", result.DisabledReason);
+    }
+
+    [Fact]
+    public void Malformed_yaml_and_commented_flow_mappings_are_not_edited()
+    {
+        var malformed = ManifestListEditor.AppendMappingEntry(
+            "characters: [unfinished", StorySource.ManifestFileName, "characters", "old-man",
+            "\nfirst-name: Old Man", "{first-name: Old Man}");
+        const string commentedText = "items: {rope: Rope # keep this comment\n}\n";
+        var commented = ManifestListEditor.AppendMappingEntry(
+            commentedText, StorySource.ManifestFileName, "items", "silver-sword", "Silver Sword", "Silver Sword");
+
+        Assert.Null(malformed.Edit);
+        Assert.Contains("invalid YAML", malformed.Reason);
+        Assert.Null(commented.Edit);
+        Assert.Contains("comment inside its flow mapping", commented.Reason);
+        Assert.Equal("items: {rope: Rope # keep this comment\n}\n", commentedText);
     }
 
     [Fact]
@@ -210,8 +353,14 @@ public sealed class StoryQuickFixesTests
     private static string ApplyInsertion(string text, StoryQuickFix fix)
     {
         Assert.Equal(fix.Range.Start, fix.Range.End);
-        var lines = text.Split('\n');
-        var offset = lines.Take(fix.Range.Start.Line - 1).Sum(line => line.Length + 1) + fix.Range.Start.Column - 1;
+        var offset = 0;
+        for (var line = 1; line < fix.Range.Start.Line; line++)
+        {
+            var newline = text.IndexOfAny(['\r', '\n'], offset);
+            Assert.NotEqual(-1, newline);
+            offset = newline + (text[newline] == '\r' && newline + 1 < text.Length && text[newline + 1] == '\n' ? 2 : 1);
+        }
+        offset += fix.Range.Start.Column - 1;
         return text.Insert(offset, fix.NewText);
     }
 
@@ -221,4 +370,16 @@ public sealed class StoryQuickFixesTests
             [StorySource.ManifestFileName] = manifest,
             ["main.tale"] = text
         }));
+
+    private static StoryAnalysis AnalyzeManifest(
+        string manifest, string story, params (string File, string Text)[] additionalFiles)
+    {
+        var files = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = story
+        };
+        foreach (var (file, text) in additionalFiles) files.Add(file, text);
+        return StoryAnalyzer.Analyze(new StorySource(files));
+    }
 }

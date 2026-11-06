@@ -45,6 +45,59 @@ public static class StoryQuickFixes
         ], Title: title);
     }
 
+    public static StoryQuickFixResult ForMissingManifestName(StoryAnalysis analysis, Diagnostic diagnostic)
+    {
+        if (diagnostic.Code != CompilerDiagnosticCodes.UnknownNameOrProperty ||
+            !diagnostic.Location.File.EndsWith(".tale", StringComparison.OrdinalIgnoreCase))
+            return new([]);
+
+        var site = analysis.CompletionSitesAt(diagnostic.Location)
+            .FirstOrDefault(candidate => candidate.Range.Start == diagnostic.Location &&
+                candidate.Kinds.Count == 1 &&
+                (candidate.Kinds[0] is AuthoringSymbolKind.Character or AuthoringSymbolKind.Item or AuthoringSymbolKind.Faction) &&
+                IdentifierRules.IsValid(candidate.Text));
+        if (site is null) return new([]);
+
+        var kind = site.Kinds[0];
+        if ((kind == AuthoringSymbolKind.Character && site.Text == EntityId.Player.Value) ||
+            analysis.Symbols.Any(symbol => symbol.Kind == kind && symbol.Name == site.Text))
+            return new([]);
+
+        var (section, blockValue, flowValue) = kind switch
+        {
+            AuthoringSymbolKind.Character =>
+                (ManifestVocabulary.Characters,
+                    $"\n{ManifestVocabulary.FirstName}: {ManifestListEditor.FormatScalar(Humanize(site.Text))}",
+                    $"{{{ManifestVocabulary.FirstName}: {ManifestListEditor.FormatScalar(Humanize(site.Text))}}}"),
+            AuthoringSymbolKind.Item =>
+                (ManifestVocabulary.Items, ManifestListEditor.FormatScalar(Humanize(site.Text)),
+                    ManifestListEditor.FormatScalar(Humanize(site.Text))),
+            AuthoringSymbolKind.Faction =>
+                (ManifestVocabulary.Factions, "{}", "{}"),
+            _ => throw new InvalidOperationException($"Unsupported manifest name kind '{kind}'.")
+        };
+        var name = kind switch
+        {
+            AuthoringSymbolKind.Character => "character",
+            AuthoringSymbolKind.Item => SyntaxSpelling(AuthoringTokenKind.Item),
+            AuthoringSymbolKind.Faction => SyntaxSpelling(AuthoringTokenKind.Faction),
+            _ => throw new InvalidOperationException($"Unsupported manifest name kind '{kind}'.")
+        };
+        var title = $"Declare {name} '{site.Text}'";
+        if (!analysis.Source.Files.TryGetValue(StorySource.ManifestFileName, out var manifest))
+            return new([], $"Cannot declare '{site.Text}' because the root story manifest is unavailable.", title);
+
+        var edit = ManifestListEditor.AppendMappingEntry(
+            manifest, StorySource.ManifestFileName, section, site.Text, blockValue, flowValue);
+        if (edit.Edit is not { } textEdit)
+            return new([], edit.Reason ?? $"Cannot safely declare '{site.Text}' in the root story manifest.", title);
+
+        return new([
+            new(title, StoryQuickFixKind.TextEdit, StorySource.ManifestFileName,
+                textEdit.Range, textEdit.NewText)
+        ], Title: title);
+    }
+
     public static IReadOnlyList<StoryQuickFix> ForMissingScene(StoryAnalysis analysis, Diagnostic diagnostic)
     {
         if (diagnostic.Code != CompilerDiagnosticCodes.UnknownScene ||
@@ -101,4 +154,14 @@ public static class StoryQuickFixes
 
         return "\n";
     }
+
+    private static string Humanize(string id) =>
+        string.Join(' ', id.Replace('_', ' ').Replace('.', ' ').Replace('-', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part[..1].ToUpperInvariant() + part[1..]));
+
+    private static string SyntaxSpelling(AuthoringTokenKind kind) =>
+        AuthoringSyntaxVocabulary.TryGetHelp(kind, out var help)
+            ? help.Spelling
+            : throw new InvalidOperationException($"No Talemark syntax label is registered for '{kind}'.");
 }
