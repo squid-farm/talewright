@@ -109,6 +109,42 @@ public sealed class TalemarkClassifierTests
     }
 
     [Fact]
+    public void Classifies_block_conditionals_on_separate_lines()
+    {
+        const string tale = """
+            === start
+            {if player visited entry}
+            First path.
+            {else}
+            Other path.
+            {/if}
+            """;
+
+        var classifications = TalemarkClassifier.Classify("main.tale", tale);
+
+        void Has(TalemarkClassificationKind kind, string text, int line, int column) =>
+            Assert.Contains(classifications, classification =>
+                classification.Kind == kind &&
+                TextOf(tale, classification) == text &&
+                classification.Range.Start.Line == line &&
+                classification.Range.Start.Column == column &&
+                classification.Range.End.Column == column + text.Length);
+
+        Has(TalemarkClassificationKind.Punctuation, "{", 2, 1);
+        Has(TalemarkClassificationKind.Keyword, "if", 2, 2);
+        Has(TalemarkClassificationKind.Identifier, "player", 2, 5);
+        Has(TalemarkClassificationKind.Keyword, "visited", 2, 12);
+        Has(TalemarkClassificationKind.Identifier, "entry", 2, 20);
+        Has(TalemarkClassificationKind.Punctuation, "}", 2, 25);
+        Has(TalemarkClassificationKind.Punctuation, "{", 4, 1);
+        Has(TalemarkClassificationKind.Keyword, "else", 4, 2);
+        Has(TalemarkClassificationKind.Punctuation, "}", 4, 6);
+        Has(TalemarkClassificationKind.Punctuation, "{", 6, 1);
+        Has(TalemarkClassificationKind.Keyword, "/if", 6, 2);
+        Has(TalemarkClassificationKind.Punctuation, "}", 6, 5);
+    }
+
+    [Fact]
     public void Formatting_ranges_match_the_inline_renderers_pairing_rules()
     {
         const string tale = """

@@ -67,9 +67,10 @@ internal static class ImageSyntax
             index++;
             var authored = new StringBuilder();
             var locations = new List<SourceLocation>();
+            var work = 0;
             while (index < end)
             {
-                if ((index & 1023) == 0)
+                if ((++work & 255) == 0)
                     cancellationToken.ThrowIfCancellationRequested();
                 var unit = QuotedStringSyntax.ReadUnit(text, index, end);
                 if (unit.ClosingQuote)
