@@ -36,6 +36,40 @@ meanings and the difference between implemented and decided syntax.
   project manager rather than expanding a syntax slice into resolver, runtime or presentation work.
 - [ ] Keep the change reviewable. Split oversized issues with the project manager before coding.
 
+### Syntax principles
+
+1. **Authors first.** Optimize for onboarding new authors and for stories that stay readable even
+   when they use advanced features. Uniform syntax is not a goal in itself.
+2. **Justified, not convenient.** Each form must make authoring easier, not just make parsing easier.
+3. **Sentence and call forms can both be right.** Use whichever is easier to type and read, such as
+   `player has rope` and `{image("camp.png", "…")}`.
+4. **Core syntax grows when stories need it.** Experiments, personal preferences and niche features
+   can start as extensions ([#193](https://github.com/squid-farm/talewright/issues/193)). Move them
+   into core Talemark once real stories show they're worth it.
+5. **Shorthand only for very common formatting.** Shorthand is syntax sugar: lower it to the same
+   canonical model as the corresponding `#` manipulator. Everything else is a `#` manipulator
+   ([#193](https://github.com/squid-farm/talewright/issues/193),
+   [#496](https://github.com/squid-farm/talewright/issues/496)).
+6. **Displaying something never changes the world.** Manipulators change how a value is written or
+   displayed; effects change the world. Displaying a value never performs or repeats an effect.
+7. **A bare reference names the thing; properties give values** (`thing:property`).
+8. **Conditions are true or false.** Numbers are never conditions.
+9. **One spelling per meaning.** A keyword used in several places is spelled the same everywhere,
+   such as `@requires` and `(requires …)` ([#494](https://github.com/squid-farm/talewright/issues/494)).
+10. **Talemark is not Markdown.** Markdown-derived forms survive only if authors use them
+    ([#497](https://github.com/squid-farm/talewright/issues/497)). Text renders as it sits in the file.
+11. **Use the glossary's terms** in diagnostics, docs and hover text
+    ([#500](https://github.com/squid-farm/talewright/issues/500)).
+12. **Breaking changes include migration help.** Old forms produce an error that shows the
+    replacement. Any change that silently alters rendering is called out in the release notes.
+13. **Sugar and defaults are different contracts.** Sugar is another spelling of the same meaning
+    and compiles to the canonical model. A default is omitted author input that stays absent in the
+    model until the boundary that owns its behavior supplies a value. For example, bold shorthand
+    lowers to the same style model as `#bold`; a textless choice keeps its label absent and displays
+    **Continue** at runtime ([#496](https://github.com/squid-farm/talewright/issues/496)).
+
+Proposals that conflict with a principle must name it and say why it should be broken.
+
 ### Sugar and defaults
 
 These are different contracts:
