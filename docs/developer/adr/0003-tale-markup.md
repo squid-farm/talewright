@@ -19,7 +19,7 @@ The original display-name decision did not rename APIs or formats. The separate
 [compiler identity migration (#231)](../csharp-extensions.md#compiler-identity-migration) now names
 the compiler namespace and assembly `Talewright.Talemark`. Retain `.tale`, code fences and editor
 language ID `tale`, grammar scope `text.tale`, aggregate package IDs, and individual types such as
-`TaleParser`. Editor display names, debugger labels, and author-facing help use Talemark too;
+`TaleBinder`. Editor display names, debugger labels, and author-facing help use Talemark too;
 neither naming change alters story syntax or runtime behavior.
 
 An unrelated [Talemark film/book diary app](https://talemark.app/en/) already uses the name.
