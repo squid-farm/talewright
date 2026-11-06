@@ -1,6 +1,6 @@
 # Glossary
 
-These terms describe references to factions, items and story values in Talemark.
+These terms describe references to factions, items, story values and scene visits in Talemark.
 
 | Term | Definition |
 |---|---|
@@ -12,3 +12,5 @@ These terms describe references to factions, items and story values in Talemark.
 | item | A thing a character can hold. `item:rope` displays its name. |
 | flag | An on/off story value, such as `flag:door-open`; a flag reference is the value itself. |
 | variable | A named number or text value, such as `var:coins`; a variable reference is the value itself. |
+| visit | The player's entry into a scene, including a hub. `player visited camp` is true once the player has entered `camp`. |
+| visit count | The number of times the player has entered a scene. `camp:player:visits` counts entries into `camp`; `scene:player:visits` counts entries into the current scene. The count increases on entry, before the scene's text runs. |

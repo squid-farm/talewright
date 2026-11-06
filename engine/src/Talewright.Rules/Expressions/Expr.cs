@@ -124,10 +124,16 @@ public sealed record HasItem(EntityId Character, ItemId Item) : Expr
     public override ExprType Type => ExprType.Bool;
 }
 
-/// <summary><c>visited(temple.hall)</c>.</summary>
+/// <summary><c>player visited temple.hall</c>.</summary>
 public sealed record Visited(SceneId Scene) : Expr
 {
     public override ExprType Type => ExprType.Bool;
+}
+
+/// <summary><c>scene:player:visits</c> or <c>camp:player:visits</c>: number of player visits.</summary>
+public sealed record SceneVisitCountRef(SceneId? Scene) : Expr
+{
+    public override ExprType Type => ExprType.Number;
 }
 
 /// <summary><c>@CanPickLock</c>: a predicate registered from C# in <see cref="NamedPredicateRegistry"/>.</summary>

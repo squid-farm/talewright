@@ -158,6 +158,12 @@ internal sealed class ExpressionSyntaxParser
 
     private bool IsKeyword(string keyword) => Peek.Kind == TokenKind.Identifier && Peek.Is(keyword);
 
+    private bool IsVisitCountReference(int position) =>
+        TokenAt(position + 1).Kind == TokenKind.Colon &&
+        TokenAt(position + 2) is { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Player } &&
+        TokenAt(position + 3).Kind == TokenKind.Colon &&
+        TokenAt(position + 4) is { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Visits };
+
     private void ExpectEnd()
     {
         var token = Peek;
@@ -242,7 +248,7 @@ internal sealed class ExpressionSyntaxParser
 
     private ExpressionNode ParseNot()
     {
-        if (IsKeyword(ExpressionVocabulary.Not))
+        if (IsKeyword(ExpressionVocabulary.Not) && !IsVisitCountReference(_position))
         {
             var op = Next();
             var operand = ParseNested(op, ParseNot);
@@ -390,15 +396,26 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseIdentifier()
     {
         var token = Next();
-        if (token.Is(ExpressionVocabulary.True)) return new BooleanExpressionNode(true, Span(token));
-        if (token.Is(ExpressionVocabulary.False)) return new BooleanExpressionNode(false, Span(token));
-        if (token.Is(ExpressionVocabulary.Visited))
+        if (token.Is(ExpressionVocabulary.Visited) &&
+            TokenAt(_position).Kind == TokenKind.LeftParen &&
+            TokenAt(_position + 1) is { Kind: TokenKind.Identifier } oldScene &&
+            TokenAt(_position + 2).Kind == TokenKind.RightParen)
         {
-            Expect(TokenKind.LeftParen, "'(' after visited");
-            var scene = Expect(TokenKind.Identifier, "a scene id");
-            var close = Expect(TokenKind.RightParen, "')'");
-            return new VisitedExpressionNode(Span(scene),
-                new(token.Offset, close.Offset + close.Length - token.Offset));
+            return Fail<ExpressionNode>(CompilerDiagnosticCodes.InvalidExpression,
+                $"Unexpected '{token.Text}'. Use '{ExpressionVocabulary.Player} {ExpressionVocabulary.Visited} {oldScene.Text}' instead.",
+                token.Offset, token.Length);
+        }
+
+        if (token.Is(ExpressionVocabulary.True) && !IsVisitCountReference(_position - 1))
+            return new BooleanExpressionNode(true, Span(token));
+        if (token.Is(ExpressionVocabulary.False) && !IsVisitCountReference(_position - 1))
+            return new BooleanExpressionNode(false, Span(token));
+        if (IsKeyword(ExpressionVocabulary.Visited))
+        {
+            Next();
+            var scene = Expect(TokenKind.Identifier, "a scene id after 'visited'");
+            return new PlayerVisitedExpressionNode(Span(token), Span(scene),
+                new(token.Offset, scene.Offset + scene.Length - token.Offset));
         }
 
         if (Peek.Kind == TokenKind.Colon)

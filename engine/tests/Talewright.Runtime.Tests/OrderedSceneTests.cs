@@ -25,7 +25,7 @@ public sealed class OrderedSceneTests
         manifest.Trigger("reward", "flag:ready", EffectFaker.Set(new TaleFlagRef("rewarded")), once: true);
         if (includeArrived)
         {
-            manifest.Trigger("arrived", "visited(start)", EffectFaker.Increase(new TaleVariableRef("gold"), 7), once: true);
+            manifest.Trigger("arrived", "player visited start", EffectFaker.Increase(new TaleVariableRef("gold"), 7), once: true);
         }
 
         return manifest;

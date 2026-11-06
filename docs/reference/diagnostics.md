@@ -46,7 +46,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW2003 | Wrong kind of value, e.g. assigning text to a number, comparing text with a number, or arithmetic on text. | Keep each variable's declared type. Text uses `=` and text-to-text `==` / `!=`; numbers retain arithmetic. Declare text with a quoted initial value under `vars:`. |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |
 | TW2005 | Unknown `@predicate`. | Named predicates come from C# extensions; check the name or register it. |
-| TW2006 | Unknown or invalid `#modifier`, unsupported target or malformed modifier arguments. | Follow the modifier's documented arguments. `#one-many("singular", "plural")` requires exactly two quoted strings on a pronoun or item-name reference, with singular first. Use `\"` for a quote and `\\` for a backslash inside either string. It does not work on character names, text variables or counts. `#a`, `#the`, `#this` and `#that` take no arguments. |
+| TW2006 | Unknown or invalid `#modifier`, unsupported target, malformed arguments or incompatible modifier chain. | Follow the modifier's documented arguments and output type. `#one-many("singular", "plural")` requires exactly two quoted strings on a pronoun or item-name reference, with singular first. Use `\"` for a quote and `\\` for a backslash inside either string. It does not work on character names, text variables or counts. `#a`, `#the`, `#this`, `#that`, `#bold` and `#italic` take no arguments. Apply text modifiers before `#bold` or `#italic`; formatting modifiers are not allowed in plain-text fields such as image alt text. |
 | TW2007 | A variable's integer or text type cannot be inferred, e.g. a circular assignment chain without a known type. | Declare an initial value under `vars:` in the manifest, or fix the unresolved expression. Types are fixed; discovery never executes assignments. |
 | TW2010 | Unsafe image path. | Use a relative path inside `images/`, with `/` separators and no parent traversal, absolute path, web address, query string or fragment. |
 | TW2011 | Unsupported image format. | Use PNG (`.png`), JPEG (`.jpg` or `.jpeg`), or WebP (`.webp`). |
@@ -83,6 +83,7 @@ Giving a character a value does not declare the skill. See the complete
 | TW3011 | A non-choice step follows the scene's first choice, including inside another condition branch. | Move prose, images, effects, diverts and checks before the final choice block. |
 | ⚠ TW3012 | A line cannot run because an earlier step always leaves its block. | Move the line before the exit, make the exit conditional, or remove the unreachable line. |
 | ⚠ TW3013 | A scene may reach its choices with none available. | Add an unconditional choice such as `* -> target` or `* [The end] -> END`, or give every continuing `{if}` / `{else}` branch an unconditional choice. |
+| TW3014 | A scene ID matches a character ID. | Rename either the scene or the character; these IDs must be distinct. |
 
 TW3013 counts authored choices without a choice requirement. Hub offers do not guarantee a choice:
 their storylets can all be ineligible or already visited. A conditional `->` may be skipped

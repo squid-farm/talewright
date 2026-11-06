@@ -78,6 +78,8 @@ Identifiers are names for scenes, characters, items and other story parts. Use l
 underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
 `temple.entrance` and `hidden-door` are valid names. A dot groups words in a name; it does not mean
 "look inside" another value.
+Scene IDs cannot match character IDs, and `scene` is reserved for the current-scene visit-count
+reference.
 Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser restriction.
 The naming lint rules TWL001/TWL002 warn about style; they do not make an otherwise valid name
 illegal.
@@ -446,6 +448,16 @@ Any character id can replace `player`.
 | `#a`                | Prefix with `a`/`an`; use `some` for plural or uncountable names                               |
 | `#the`              | Prefix with `the`                                                                            |
 | `#this` / `#that`   | Prefix with `this`/`that`, or `these`/`those` for plural agreement                               |
+| `#bold` / `#italic` | Apply bold or italic formatting to the value                                                  |
+
+`#bold` and `#italic` produce formatted text without changing its characters. They may follow
+text modifiers, and may be chained with each other; text modifiers cannot follow them. Use
+`#upper#bold`, not `#bold#upper`.
+
+Prose formatting is syntax sugar for the same style model: `**{player:first-name}**` and
+`{player:first-name#bold}` compile to the same styled substitution. Italic delimiters similarly
+correspond to `#italic`. This does not turn a default into an alias: a textless choice still has no
+authored label, and its **Continue** label is chosen by the player.
 
 **Pronoun properties.** `{player:pronoun}` is shorthand for `{player:pronoun:subject}`.
 Choose a stored form with property access, then chain text modifiers after the value:
@@ -640,13 +652,19 @@ or / and / not            boolean logic
 == != < <= > >=           comparison
 + - * /                   integer arithmetic
 player has rope           inventory check (any character id)
-visited(temple.hall)      has the scene ever been entered
+player visited temple.hall
+                          whether the player has entered the scene
+temple.hall:player:visits  number of times the player has entered the scene
+scene:player:visits       number of times the player has entered the current scene
 true false 12 "text"      literals
 hostile … allied          reputation tier names (compare with faction:<id>:tier)
 @CanPickLock              named predicate registered from C# (see C# extensions)
 ```
 
 Types are checked at compile time (number, bool, text, tier).
+Only player visits are tracked. Scene visit counts are numeric, including for hubs; `scene` refers
+to the current scene, while `<scene-id>:player:visits` refers to a named scene.
+Use parentheses to group expressions, for example `(true)`.
 Put spaces around subtraction: `player:hp - 3` subtracts three, whereas
 `player:hp-3` refers to a stat named `hp-3`. Hyphens and dots are allowed inside identifiers.
 See the [operator registry](talemark-operators.md#names-and-values) for exact naming rules.

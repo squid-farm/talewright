@@ -187,8 +187,8 @@ and click **Rescan / retry watcher**, or deliberately start a fresh scene.
 ### Good to know
 
 - The debugger never writes player saves. It reads one only when you explicitly fork it (below).
-- Starting at a scene skips everything before it, so earlier scenes count as **unvisited**, and there's
-  no arbitrary visit-count override. If a scene checks `visited(...)`, start at the earlier scene and
+- Starting at a scene skips everything before it, so earlier scenes have zero visits, and there's
+  no arbitrary visit-count override. If a scene checks `player visited ...` or a visit count, start at the earlier scene and
   play forward or use **Jump retaining state** to keep the visits you have accumulated.
 - It needs a desktop environment (on Linux, WebKitGTK 4.1).
 

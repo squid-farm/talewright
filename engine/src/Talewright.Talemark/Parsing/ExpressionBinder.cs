@@ -57,8 +57,8 @@ internal sealed class ExpressionBinder
         }
     }
 
-    internal static SubstitutionTemplate? Bind(SubstitutionSyntaxTree syntax, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<int, SourceLocation> locate)
+    internal static TemplateInline? Bind(SubstitutionSyntaxTree syntax, StorySymbols symbols,
+        DiagnosticBag diagnostics, Func<int, SourceLocation> locate, bool allowFormattedOutput = true)
     {
         if (syntax.HasErrors) return null;
         var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics);
@@ -66,8 +66,11 @@ internal sealed class ExpressionBinder
         {
             var value = binder.Bind(syntax.Value);
             var modifiers = new List<ITextModifier>();
+            var valueKind = TextModifierValueKind.Text;
+            var style = TextStyle.None;
             foreach (var call in syntax.Modifiers)
             {
+                ITextModifier modifier;
                 if (call.Name == OneManyTextModifier.ModifierName)
                 {
                     if (value is not (PronounRef or ItemNameRef) || call.Argument is null || call.PluralArgument is null)
@@ -77,23 +80,54 @@ internal sealed class ExpressionBinder
                             call.Offset);
                     }
 
-                    modifiers.Add(new OneManyTextModifier(call.Argument, call.PluralArgument));
-                    continue;
+                    modifier = new OneManyTextModifier(call.Argument, call.PluralArgument);
                 }
-
-                if (call.Argument is not null)
+                else
                 {
-                    binder.Fail(CompilerDiagnosticCodes.InvalidModifier, $"Modifier '#{call.Name}' does not take an argument.", call.Offset);
+                    if (call.Argument is not null)
+                    {
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                            $"Modifier '#{call.Name}' does not take an argument.", call.Offset);
+                    }
+
+                    if (!symbols.Modifiers.TryGet(call.Name, out modifier!))
+                    {
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                            $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
+                            call.Offset);
+                    }
                 }
 
-                if (!symbols.Modifiers.TryGet(call.Name, out var modifier))
+                if (!modifier.AcceptsInput(valueKind))
                 {
                     binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
-                        $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
+                        $"Modifier '#{call.Name}' cannot follow a modifier that produces formatted text.",
                         call.Offset);
                 }
 
-                modifiers.Add(modifier);
+                if (!allowFormattedOutput && modifier.OutputKind == TextModifierValueKind.FormattedText)
+                {
+                    binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                        $"Formatting modifier '#{call.Name}' is not allowed in plain-text fields such as image alt text.",
+                        call.Offset);
+                }
+
+                valueKind = modifier.OutputKind;
+                if (modifier.OutputKind == TextModifierValueKind.FormattedText)
+                {
+                    if (modifier.OutputStyle == TextStyle.None)
+                    {
+                        binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
+                            $"Modifier '#{call.Name}' produces formatted text without a supported style.",
+                            call.Offset);
+                    }
+
+                    style |= modifier.OutputStyle;
+                }
+                else
+                {
+                    modifiers.Add(modifier);
+                }
             }
 
             var isPlural = value switch
@@ -103,7 +137,8 @@ internal sealed class ExpressionBinder
                 ItemNameRef item => symbols.World.Items[item.Item].NameAgreement == GrammaticalNumber.Plural,
                 _ => false,
             };
-            return new SubstitutionTemplate(value, modifiers, isPlural);
+            var substitution = new SubstitutionTemplate(value, modifiers, isPlural);
+            return style == TextStyle.None ? substitution : new StyledTemplate(style, [substitution]);
         }
         catch (BindingException)
         {
@@ -140,7 +175,7 @@ internal sealed class ExpressionBinder
         BooleanExpressionNode boolean => new BoolLiteral(boolean.Value),
         NameExpressionNode name => BindName(name),
         NamedPredicateExpressionNode predicate => BindPredicate(predicate),
-        VisitedExpressionNode visited => BindVisited(visited),
+        PlayerVisitedExpressionNode visited => BindPlayerVisited(visited),
         ParenthesizedExpressionNode parenthesized => Bind(parenthesized.Inner),
         ReferenceExpressionNode reference => BindReference(reference),
         HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
@@ -175,8 +210,16 @@ internal sealed class ExpressionBinder
         return new NamedPredicate(name);
     }
 
-    private Expr BindVisited(VisitedExpressionNode visited)
+    private Expr BindPlayerVisited(PlayerVisitedExpressionNode visited)
     {
+        var character = Character(visited.Character);
+        if (character != EntityId.Player)
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                "Only player visits are tracked; use 'player visited <scene>'.",
+                visited.Character.Start);
+        }
+
         var name = Text(visited.Scene);
         var scene = new SceneId(name);
         if (!_symbols.Scenes.Contains(scene))
@@ -193,6 +236,42 @@ internal sealed class ExpressionBinder
         var path = Text(reference.Name);
         var member = reference.Member is { } memberSpan ? Text(memberSpan) : null;
         var subMember = reference.SubMember is { } subMemberSpan ? Text(subMemberSpan) : null;
+
+        if (path == ExpressionVocabulary.Player && member == ExpressionVocabulary.Visits)
+        {
+            if (ns == ExpressionVocabulary.Scene)
+                return new SceneVisitCountRef(null);
+
+            var scene = new SceneId(ns);
+            if (_symbols.Scenes.Contains(scene))
+                return new SceneVisitCountRef(scene);
+
+            if (_symbols.World.Characters.ContainsKey(new EntityId(ns)))
+            {
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                    "Only player visits are tracked; use '<scene>:player:visits'.",
+                    reference.Namespace.Start);
+            }
+
+            Fail(CompilerDiagnosticCodes.UnknownScene, $"Unknown scene '{ns}'.", reference.Namespace.Start);
+        }
+
+        if (_symbols.World.Characters.ContainsKey(new EntityId(ns)) &&
+            (path == ExpressionVocabulary.Visits || member == ExpressionVocabulary.Visits))
+        {
+            var hint = ns == ExpressionVocabulary.Player
+                ? "Use 'scene:player:visits' or '<scene>:player:visits' to read player visits."
+                : "Only player visits are tracked; use '<scene>:player:visits'.";
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, hint, reference.Name.Start);
+        }
+
+        if (reference.Kind == ReferenceNamespace.Scene ||
+            reference.Kind == ReferenceNamespace.Character && _symbols.Scenes.Contains(new SceneId(ns)))
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown scene property '{path}:{member}'. Use '{ExpressionVocabulary.Player}:{ExpressionVocabulary.Visits}'.",
+                reference.Name.Start);
+        }
 
         switch (reference.Kind)
         {

@@ -88,7 +88,9 @@ public static class ExpressionFormatter
         FactionNameRef faction => Reference(Faction, Name(faction.Faction.Value)),
         ItemNameRef item => Reference(Item, Name(item.Item.Value)),
         HasItem item => $"{Character(item.Character)} {Has} {Name(item.Item.Value)}",
-        Visited visited => $"{VisitedCall}{Name(visited.Scene.Value)}{CloseParen}",
+        Visited visited => $"{Player} {ExpressionVocabulary.Visited} {Name(visited.Scene.Value)}",
+        SceneVisitCountRef visits => Reference(
+            visits.Scene is { } scene ? Name(scene.Value) : ExpressionVocabulary.Scene, Player, Visits),
         NamedPredicate predicate => $"{PredicateMarker}{Name(predicate.Name)}",
         UnaryExpr or BinaryExpr => throw new InvalidOperationException("Composite expressions are formatted separately."),
         _ => throw new NotSupportedException($"Expression kind '{expression.GetType().Name}' has no Talemark spelling."),

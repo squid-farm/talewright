@@ -70,7 +70,7 @@ split settings, how global IDs work and why triggers stay together.
 | Item/flag/faction gates and converging routes | River rope, temple glyphs, force/side-gap alternatives and guild hand-over |
 | Entry skill check | `temple.hall`: Perception leads to the idol niche or directly to the altar |
 | Faction tiers and trigger, XP and level-up | Guild standing throughout; keeping the relic fires `guild-wary` |
-| Nested block/inline conditions, `and`/`or`, parentheses, `visited(...)` | `ending.keep` |
+| Nested block/inline conditions, `and`/`or`, parentheses, `player visited <scene>` | `ending.keep` |
 | Conditional early exit before choices | `ending.return`: leave immediately for `ending.empty-handed` without the relic; otherwise offer guild/keeper choices |
 | Dream intersection hub and cap | `dream.hub`: `all(dream,keeper)`, `@hub-limit 2` offers at most two eligible keepers **per visit**, not two total visits; a fixed waking choice remains |
 | Custom pronouns and watchword responses | The Spiral uses xe/xem with singular agreement; current, changed, retired and unrecorded watchwords produce distinct responses |
@@ -78,7 +78,7 @@ split settings, how global IDs work and why triggers stay together.
 | Plural agreement and NPC inventory transfers | The Hands use plural name agreement and they; each keeper gives one glyph, then the Hands take one as the exit price after the Sleeper |
 | Counted glyphs, mirrored variable and trigger gate | `glyph-mark` inventory and `marks` stay equal; root `dream-ready` fires at 3; all 3 must be held to approach the Sleeper, 2 remain after paying |
 | Faction gate, standing changes, tier prose | The Archivist's friendly/neutral/hostile prose; promise requires neutral or better (+5), refusal costs 10 standing |
-| Lucidity tiers and visited ending state | The Sleeper uses <2 / 2–4 / >=5 prose; `visited(dream.sleeper)`, promise, Lucidity and guild standing change the altar and all three endings |
+| Lucidity tiers and visited ending state | The Sleeper uses <2 / 2–4 / >=5 prose; `player visited dream.sleeper`, promise, Lucidity and guild standing change the altar and all three endings |
 | State-dependent artwork | `dream.sleeper` selects exactly one low/middle/high Lucidity illustration alongside its prose; descriptive alt text reflects what is visible |
 | Titles, speech, formatting, comments, image media | Camp/worktable art, river crossing, night watch, jaguar, temple door/altar and dream illustrations; the dream-hall image appears on arrival, not on every hub visit |
 | Save/load, deterministic Back/Forward, restart and title | Shared player; created identity, stats, text variables, counted items and trigger progress survive replay |

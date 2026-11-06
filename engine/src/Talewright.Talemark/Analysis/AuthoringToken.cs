@@ -26,6 +26,8 @@ public enum AuthoringTokenKind
     HubLimit,
     End,
     Visited,
+    SceneContext,
+    Visits,
     Flag,
     Variable,
     Faction,

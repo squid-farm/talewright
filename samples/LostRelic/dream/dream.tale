@@ -32,7 +32,7 @@ Three will let you approach the shape sleeping beneath it.
 > ines: Six plus two. Three times. Half. Less one, less one. {var:sum}.
 
 Her collar still bears the name **{ines:name}**.
-{if visited(camp.guide)}
+{if player visited camp.guide}
 You recognize the explorer from {guide:first-name#possessive} story.
 {/if}
 
@@ -160,7 +160,7 @@ The hall stretches away. You gather yourself before trying another way.
 === dream.hands
 @title Ask the Hands for passage
 @tags dream,keeper
-@requires visited(dream.eye-mark) and var:marks == 2
+@requires player visited dream.eye-mark and var:marks == 2
 @priority 0
 @once
 

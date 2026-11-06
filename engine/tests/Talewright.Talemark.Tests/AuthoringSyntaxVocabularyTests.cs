@@ -30,7 +30,8 @@ public sealed class AuthoringSyntaxVocabularyTests
     [InlineData("var:", AuthoringTokenKind.Variable)]
     [InlineData("faction:", AuthoringTokenKind.Faction)]
     [InlineData("item:", AuthoringTokenKind.Item)]
-    [InlineData("visited(", AuthoringTokenKind.Visited)]
+    [InlineData("scene:", AuthoringTokenKind.SceneContext)]
+    [InlineData("player:", AuthoringTokenKind.Visits)]
     [InlineData("image(", AuthoringTokenKind.Image)]
     public void Completion_prefixes_share_their_syntax_entry(string completion, AuthoringTokenKind kind)
     {
@@ -56,7 +57,9 @@ public sealed class AuthoringSyntaxVocabularyTests
             (AuthoringTokenKind.Choice, $"{SceneVocabulary.ChoiceMarker} {SceneVocabulary.Divert} target"),
             (AuthoringTokenKind.SkillCheckBlock, $"{SceneVocabulary.SkillCheckBlock} {SceneVocabulary.OpenBracket}actor{SceneVocabulary.CloseBracket} stat {SceneVocabulary.Difficulty} number"),
             (AuthoringTokenKind.If, $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}"),
-            (AuthoringTokenKind.Visited, $"{ExpressionVocabulary.VisitedCall}scene{ExpressionVocabulary.CloseParen}"),
+            (AuthoringTokenKind.Visited, $"{ExpressionVocabulary.Player} {ExpressionVocabulary.Visited} scene"),
+            (AuthoringTokenKind.SceneContext, $"{ExpressionVocabulary.ScenePrefix}{ExpressionVocabulary.Player}:{ExpressionVocabulary.Visits}"),
+            (AuthoringTokenKind.Visits, ExpressionVocabulary.Visits),
             (AuthoringTokenKind.Variable, $"{ExpressionVocabulary.VarPrefix}id"),
             (AuthoringTokenKind.Faction, $"{ExpressionVocabulary.FactionPrefix}id"),
             (AuthoringTokenKind.Faction, $"{ExpressionVocabulary.FactionPrefix}id{separator}{ExpressionVocabulary.Name}"),
@@ -87,7 +90,7 @@ public sealed class AuthoringSyntaxVocabularyTests
 
     [Theory]
     [InlineData("flag:", "flag", true)]
-    [InlineData("visited(", "visited", true)]
+    [InlineData("scene:", "scene", true)]
     [InlineData("pronoun", "pronoun", true)]
     [InlineData("flag:", "var", false)]
     public void Completion_spelling_matches_the_undelimited_source_token(string spelling, string token, bool expected) =>
