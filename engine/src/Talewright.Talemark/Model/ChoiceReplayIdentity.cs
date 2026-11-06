@@ -186,7 +186,7 @@ internal static class ChoiceReplayIdentity
         }
     }
 
-    private static byte[] Describe(SceneId scene, SceneId? divert,
+    internal static byte[] Describe(SceneId scene, SceneId? divert,
         IReadOnlyList<Effect> effects, CheckBranch? check)
     {
         using var stream = new MemoryStream();
@@ -265,19 +265,19 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue("stat");
                 writer.WriteStringValue(change.Character.Value);
                 writer.WriteStringValue(change.Stat.Value);
-                writer.WriteStringValue(change.Op.ToString());
+                writer.WriteStringValue(Token(change.Op));
                 WriteExpr(writer, change.Amount);
                 break;
             case ChangeStanding change:
                 writer.WriteStringValue(ExpressionVocabulary.Standing);
                 writer.WriteStringValue(change.Faction.Value);
-                writer.WriteStringValue(change.Op.ToString());
+                writer.WriteStringValue(Token(change.Op));
                 WriteExpr(writer, change.Amount);
                 break;
             case ChangeVariable change:
                 writer.WriteStringValue("variable");
                 writer.WriteStringValue(change.Variable.Value);
-                writer.WriteStringValue(change.Op.ToString());
+                writer.WriteStringValue(Token(change.Op));
                 WriteExpr(writer, change.Amount);
                 break;
             case SetTextVariable change:
@@ -357,12 +357,12 @@ internal static class ChoiceReplayIdentity
             case NameRef value:
                 writer.WriteStringValue("name-ref");
                 writer.WriteStringValue(value.Character.Value);
-                writer.WriteStringValue(value.Part.ToString());
+                writer.WriteStringValue(Token(value.Part));
                 break;
             case PronounRef value:
                 writer.WriteStringValue("pronoun-ref");
                 writer.WriteStringValue(value.Character.Value);
-                writer.WriteStringValue(value.Form.ToString());
+                writer.WriteStringValue(Token(value.Form));
                 break;
             case FactionNameRef value:
                 writer.WriteStringValue("faction-name-ref");
@@ -391,12 +391,12 @@ internal static class ChoiceReplayIdentity
                 break;
             case UnaryExpr value:
                 writer.WriteStringValue("unary");
-                writer.WriteStringValue(value.Op.ToString());
+                writer.WriteStringValue(Token(value.Op));
                 WriteExpr(writer, value.Operand);
                 break;
             case BinaryExpr value:
                 writer.WriteStringValue("binary");
-                writer.WriteStringValue(value.Op.ToString());
+                writer.WriteStringValue(Token(value.Op));
                 WriteExpr(writer, value.Left);
                 WriteExpr(writer, value.Right);
                 break;
@@ -405,6 +405,60 @@ internal static class ChoiceReplayIdentity
         }
         writer.WriteEndArray();
     }
+
+    // Saved identities hash these tokens, so they are frozen here rather than taken from enum member names.
+    internal static string Token(AssignOp op) => op switch
+    {
+        AssignOp.Set => "Set",
+        AssignOp.Add => "Add",
+        AssignOp.Subtract => "Subtract",
+        _ => throw Unsupported(op),
+    };
+
+    internal static string Token(NamePart part) => part switch
+    {
+        NamePart.First => "First",
+        NamePart.Last => "Last",
+        NamePart.Full => "Full",
+        _ => throw Unsupported(part),
+    };
+
+    internal static string Token(PronounForm form) => form switch
+    {
+        PronounForm.Subject => "Subject",
+        PronounForm.Object => "Object",
+        PronounForm.Possessive => "Possessive",
+        PronounForm.PossessivePronoun => "PossessivePronoun",
+        PronounForm.Reflexive => "Reflexive",
+        _ => throw Unsupported(form),
+    };
+
+    internal static string Token(UnaryOp op) => op switch
+    {
+        UnaryOp.Not => "Not",
+        UnaryOp.Negate => "Negate",
+        _ => throw Unsupported(op),
+    };
+
+    internal static string Token(BinaryOp op) => op switch
+    {
+        BinaryOp.Add => "Add",
+        BinaryOp.Subtract => "Subtract",
+        BinaryOp.Multiply => "Multiply",
+        BinaryOp.Divide => "Divide",
+        BinaryOp.Equal => "Equal",
+        BinaryOp.NotEqual => "NotEqual",
+        BinaryOp.Less => "Less",
+        BinaryOp.LessOrEqual => "LessOrEqual",
+        BinaryOp.Greater => "Greater",
+        BinaryOp.GreaterOrEqual => "GreaterOrEqual",
+        BinaryOp.And => "And",
+        BinaryOp.Or => "Or",
+        _ => throw Unsupported(op),
+    };
+
+    private static NotSupportedException Unsupported<T>(T value) where T : struct, Enum =>
+        new($"Unknown {typeof(T).Name} '{value}' has no replay identity token.");
 }
 
 /// <summary>The replay identities of one complete scene set, owned by the story built from it.</summary>
