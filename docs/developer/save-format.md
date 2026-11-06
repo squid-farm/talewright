@@ -112,8 +112,14 @@ seed, character selection, initial ruleset and world state, and start events. Ea
 scene, outcome identity, and every resulting gameplay event. The final evidence binds the complete
 timeline digest and cursor. Full evidence is recomputed during restore; short choice identities are
 never trusted alone. Evidence is a compatibility check, not an authentication mechanism.
-The canonical encoding and frozen test vectors are maintained by `StoryCompatibilityTests`; update
-the evidence version when its encoding or meaning changes.
+`ReplayEvidence` owns the hash inputs. Event kinds, randomness modes and built-in rule types are
+written as tokens frozen in that class, not taken from CLR names; event payloads use the
+author-scenario serializer. Extension rule and modifier types have no frozen token, so renaming one
+changes evidence. `ReplayEvidenceEncodingTests` pins the input bytes of every gameplay event kind and
+of a representative initial state and rule configuration, plus complete-timeline evidence with
+checks, triggers and redo; `StoryCompatibilityTests` pins two more evidence values. A failing vector
+means saved evidence would change: keep the old encoding, or deliberately bump the evidence version
+and record the compatibility decision. Preview saves are not migrated.
 
 Prose, label, unrelated-choice, ordering, and availability-requirement changes can be compatible.
 Changed starting values or recorded gameplay outcomes are not. This checks a replay path, not a saved
