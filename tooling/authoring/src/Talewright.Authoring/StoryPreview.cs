@@ -60,7 +60,7 @@ public static class StoryPreview
             _ => null,
         };
         var declaredDefault = variable is not null && analysis.Tokens.Any(token =>
-            token.ManifestPath is { Count: 2 } path && path[0] == "vars" && path[1] == variable);
+            token.ManifestPath is { Count: 2 } path && path[0] == ManifestVocabulary.Vars && path[1] == variable);
         if (!declaredDefault &&
             template.Value is not (NameRef or PronounRef or ItemNameRef or FactionNameRef or
                 TextLiteral or NumberLiteral or BoolLiteral or TierLiteral))

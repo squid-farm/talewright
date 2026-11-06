@@ -263,7 +263,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             ExpressionParser.CollectDeclarations(tokens, text.Length, new HashSet<FlagId>(), new Dictionary<VarId, int>(),
                 (name, flag, offset) => Symbols.Add(new(name,
                     flag ? AuthoringSymbolKind.Flag : AuthoringSymbolKind.Variable,
-                    flag ? "boolean" : _variableTypes.GetValueOrDefault(name, "unresolved"),
+                    flag ? ManifestVocabulary.SymbolBoolean :
+                        _variableTypes.GetValueOrDefault(name, ManifestVocabulary.SymbolUnresolved),
                     scalar?.Range(offset, name.Length) ?? Range(location.Offset(offset), name))));
         }
         return tokens;
@@ -298,18 +299,18 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         var start = line.IndexOf(SceneVocabulary.SceneHeader, StringComparison.Ordinal)
             + SceneVocabulary.SceneHeader.Length;
         while (start < line.Length && char.IsWhiteSpace(line[start])) start++;
-        Symbols.Add(new(id.Value, AuthoringSymbolKind.Scene, "scene",
+        Symbols.Add(new(id.Value, AuthoringSymbolKind.Scene, ManifestVocabulary.SymbolScene,
             Range(location with { Column = start + 1 }, id.Value)));
     }
 
     internal void DisabledStats(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset) =>
         ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats.Select(stat =>
-            new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null)).ToArray());
+            new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, ManifestVocabulary.SymbolInteger, null)).ToArray());
 
     internal void GoverningAttribute(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset) =>
         ReferenceNode(node, AuthoringSymbolKind.Stat, ruleset.Stats
             .Where(stat => stat.Category == Talewright.Core.Rulesets.StatCategory.Attribute)
-            .Select(stat => new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, "attribute",
+            .Select(stat => new AuthoringSymbol(stat.Id.Value, AuthoringSymbolKind.Stat, ManifestVocabulary.StatCategoryAttribute,
                 Symbols.FirstOrDefault(symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat.Id.Value)?.Declaration))
             .ToArray());
 
@@ -392,17 +393,17 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 {
                     if (key is not YamlScalarNode { Value: { } name }) continue;
                     var next = path.Append(name).ToArray();
-                    if (next is ["game", "start"]) ReferenceNode(value, AuthoringSymbolKind.Scene, file: file);
-                    else if (next is ["game", "ruleset", "base"]) ReferenceNode(value, AuthoringSymbolKind.Ruleset, file: file);
-                    else if (path is ["characters", _, "inventory"]) ReferenceNode(key, AuthoringSymbolKind.Item, file: file);
-                    else if (next is ["characters", _, "inventory"] && value is YamlSequenceNode)
+                    if (next is [ManifestVocabulary.Game, ManifestVocabulary.Start]) ReferenceNode(value, AuthoringSymbolKind.Scene, file: file);
+                    else if (next is [ManifestVocabulary.Game, ManifestVocabulary.Ruleset, ManifestVocabulary.Base]) ReferenceNode(value, AuthoringSymbolKind.Ruleset, file: file);
+                    else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]) ReferenceNode(key, AuthoringSymbolKind.Item, file: file);
+                    else if (next is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory] && value is YamlSequenceNode)
                         ReferenceNode(value, AuthoringSymbolKind.Item, file: file);
-                    else if (path is ["characters", _, "stats"] or ["items", _, "modifiers"] or ["game", "creation", "stats"]
-                        or ["game", "creation", "presets", _, "stats"]) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
-                    if (next is ["game"] or ["characters"] or ["characters", _] or ["characters", _, "inventory"]
-                        or ["characters", _, "stats"] or ["items"] or ["items", _] or ["items", _, "modifiers"]
-                        or ["game", "ruleset"] or ["game", "creation"] or ["game", "creation", "stats"] or ["game", "creation", "presets"]
-                        or ["game", "creation", "presets", _] or ["game", "creation", "presets", _, "stats"])
+                    else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Stats] or [ManifestVocabulary.Items, _, ManifestVocabulary.Modifiers] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Stats]
+                        or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _, ManifestVocabulary.Stats]) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
+                    if (next is [ManifestVocabulary.Game] or [ManifestVocabulary.Characters] or [ManifestVocabulary.Characters, _] or [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]
+                        or [ManifestVocabulary.Characters, _, ManifestVocabulary.Stats] or [ManifestVocabulary.Items] or [ManifestVocabulary.Items, _] or [ManifestVocabulary.Items, _, ManifestVocabulary.Modifiers]
+                        or [ManifestVocabulary.Game, ManifestVocabulary.Ruleset] or [ManifestVocabulary.Game, ManifestVocabulary.Creation] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Stats] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets]
+                        or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _, ManifestVocabulary.Stats])
                         Walk(value, next);
                 }
             }
@@ -423,40 +424,41 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 Symbols.Add(new(name, kind, type, _scalars[location].Range(0, name.Length)));
             }
         }
-        if (file == StorySource.ManifestFileName && Get(root, "game") is YamlMappingNode game &&
-            Get(game, "id") is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
+        if (file == StorySource.ManifestFileName && Get(root, ManifestVocabulary.Game) is YamlMappingNode game &&
+            Get(game, ManifestVocabulary.Id) is YamlScalarNode { Value: { Length: > 0 } storyId } idNode)
         {
             Scalar(idNode);
             var location = new SourceLocation(file, (int)idNode.Start.Line, (int)idNode.Start.Column);
-            Symbols.Add(new(storyId, AuthoringSymbolKind.Story, "story",
+            Symbols.Add(new(storyId,             AuthoringSymbolKind.Story, ManifestVocabulary.SymbolStory,
                 _scalars[location].Range(0, storyId.Length)));
         }
         foreach (var (name, kind, type) in new[]
         {
-            ("characters", AuthoringSymbolKind.Character, "character"),
-            ("items", AuthoringSymbolKind.Item, "item"),
-            ("factions", AuthoringSymbolKind.Faction, "faction"),
-            ("vars", AuthoringSymbolKind.Variable, "integer"),
+            (ManifestVocabulary.Characters, AuthoringSymbolKind.Character, ManifestVocabulary.SymbolCharacter),
+            (ManifestVocabulary.Items, AuthoringSymbolKind.Item, ManifestVocabulary.SymbolItem),
+            (ManifestVocabulary.Factions, AuthoringSymbolKind.Faction, ManifestVocabulary.SymbolFaction),
+            (ManifestVocabulary.Vars, AuthoringSymbolKind.Variable, ManifestVocabulary.SymbolInteger),
         })
         {
             if (Get(root, name) is YamlMappingNode map)
                 foreach (var key in map.Children.Keys) Add(key, kind, type);
         }
-        if (Get(root, "flags") is YamlSequenceNode flags)
-            foreach (var flag in flags.Children) Add(flag, AuthoringSymbolKind.Flag, "boolean");
-        if (file == StorySource.ManifestFileName && Get(root, "game") is YamlMappingNode gameConfig &&
-            Get(gameConfig, "ruleset") is YamlMappingNode ruleset &&
-            Get(ruleset, "stats") is YamlSequenceNode stats)
+        if (Get(root, ManifestVocabulary.Flags) is YamlSequenceNode flags)
+            foreach (var flag in flags.Children) Add(flag, AuthoringSymbolKind.Flag, ManifestVocabulary.SymbolBoolean);
+        if (file == StorySource.ManifestFileName && Get(root, ManifestVocabulary.Game) is YamlMappingNode gameConfig &&
+            Get(gameConfig, ManifestVocabulary.Ruleset) is YamlMappingNode ruleset &&
+            Get(ruleset, ManifestVocabulary.Stats) is YamlSequenceNode stats)
             foreach (var stat in stats.Children.OfType<YamlMappingNode>())
-                if (Get(stat, "id") is { } id) Add(id, AuthoringSymbolKind.Stat, "integer");
+                if (Get(stat, ManifestVocabulary.Id) is { } id) Add(id, AuthoringSymbolKind.Stat, ManifestVocabulary.SymbolInteger);
     }
 
     internal void World(WorldDefinition world, IReadOnlySet<VarId>? unresolved = null)
     {
         AuthoredWorld = world;
-        foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = "integer";
-        foreach (var id in world.TextVariables.Keys) _variableTypes[id.Value] = "text";
-        foreach (var id in unresolved ?? new HashSet<VarId>()) _variableTypes[id.Value] = "unresolved";
+        foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = ManifestVocabulary.SymbolInteger;
+        foreach (var id in world.TextVariables.Keys) _variableTypes[id.Value] = ManifestVocabulary.SymbolText;
+        foreach (var id in unresolved ?? new HashSet<VarId>())
+            _variableTypes[id.Value] = ManifestVocabulary.SymbolUnresolved;
         for (var index = 0; index < Symbols.Count; index++)
         {
             var symbol = Symbols[index];
@@ -465,17 +467,17 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
         foreach (var stat in world.Ruleset.Stats)
             if (!Symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat.Id.Value))
-                Symbols.Add(new(stat.Id.Value, AuthoringSymbolKind.Stat, "integer", null));
+                Symbols.Add(new(stat.Id.Value, AuthoringSymbolKind.Stat, ManifestVocabulary.SymbolInteger, null));
     }
 
     internal void Registrations()
     {
         foreach (var name in options.Predicates.Names)
-            Symbols.Add(new(name, AuthoringSymbolKind.Predicate, "boolean", null));
+            Symbols.Add(new(name, AuthoringSymbolKind.Predicate, ManifestVocabulary.SymbolBoolean, null));
         foreach (var name in options.Modifiers.Names)
-            Symbols.Add(new(name, AuthoringSymbolKind.Modifier, "text", null));
+            Symbols.Add(new(name, AuthoringSymbolKind.Modifier, ManifestVocabulary.SymbolText, null));
         foreach (var name in options.Rulesets.Keys)
-            Symbols.Add(new(name, AuthoringSymbolKind.Ruleset, "ruleset", null));
+            Symbols.Add(new(name, AuthoringSymbolKind.Ruleset, ManifestVocabulary.Ruleset, null));
     }
 
     internal void DiscoverWithoutManifest(CancellationToken cancellationToken,

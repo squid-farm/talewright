@@ -1,6 +1,7 @@
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 using YamlDotNet.RepresentationModel;
 using static Talewright.Talemark.Parsing.StoryYamlContext;
 
@@ -24,8 +25,8 @@ internal static class StoryYamlAssembler
             yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"{kind} '{id}' is declared more than once (first at {first}).", yaml.At(node));
         void Collect(YamlMappingNode document)
         {
-            yaml.CheckKeys(document, "game", "characters", "factions", "items", "flags", "vars", "triggers");
-            foreach (var name in new[] { "characters", "factions", "items", "vars" })
+            yaml.CheckKeys(document, ManifestVocabulary.Game, ManifestVocabulary.Characters, ManifestVocabulary.Factions, ManifestVocabulary.Items, ManifestVocabulary.Flags, ManifestVocabulary.Vars, ManifestVocabulary.Triggers);
+            foreach (var name in new[] { ManifestVocabulary.Characters, ManifestVocabulary.Factions, ManifestVocabulary.Items, ManifestVocabulary.Vars })
             {
                 if (Get(document, name) is not { } node || yaml.Mapping(node, name) is not { } map) continue;
                 if (!sections.TryGetValue(name, out var combined))
@@ -42,9 +43,9 @@ internal static class StoryYamlAssembler
                         combined.Add(key, value);
                 }
             }
-            if (Get(document, "flags") is { } flagNode)
+            if (Get(document, ManifestVocabulary.Flags) is { } flagNode)
             {
-                foreach (var flag in yaml.Sequence(flagNode, "flags"))
+                foreach (var flag in yaml.Sequence(flagNode, ManifestVocabulary.Flags))
                 {
                     var id = Scalar(flag);
                     if (id is not null && !flagLocations.TryAdd(id, yaml.At(flag)))
@@ -53,7 +54,7 @@ internal static class StoryYamlAssembler
                         flags.Add(flag);
                 }
             }
-            if (Get(document, "triggers") is { } triggerNode)
+            if (Get(document, ManifestVocabulary.Triggers) is { } triggerNode)
             {
                 if (triggerLocation is { } first)
                     yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"Only one 'triggers' section is allowed (first at {first}).", yaml.At(triggerNode));
@@ -85,15 +86,15 @@ internal static class StoryYamlAssembler
             }
             if (yaml.Parse(file, text) is not { } document) continue;
             analysis?.Manifest(document, file);
-            if (Get(document, "game") is { } game)
+            if (Get(document, ManifestVocabulary.Game) is { } game)
                 yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "'game:' is allowed only in the root story configuration.", yaml.At(game));
             Collect(document);
         }
         var assembled = new YamlMappingNode();
-        if (Get(root, "game") is { } rootGame) assembled.Add("game", rootGame);
+        if (Get(root, ManifestVocabulary.Game) is { } rootGame) assembled.Add(ManifestVocabulary.Game, rootGame);
         foreach (var (name, map) in sections) assembled.Add(name, map);
-        assembled.Add("flags", flags);
-        if (triggers is not null) assembled.Add("triggers", triggers);
+        assembled.Add(ManifestVocabulary.Flags, flags);
+        if (triggers is not null) assembled.Add(ManifestVocabulary.Triggers, triggers);
         return assembled;
     }
 }

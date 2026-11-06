@@ -238,9 +238,34 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
   const readerFiles = (await readdir(new URL(directory, root)))
     .filter(file => file.startsWith('StoryYaml') && file.endsWith('.cs'));
   const source = (await Promise.all(readerFiles.map(file => read(`${directory}${file}`)))).join('\n');
-  const readerSets = [...source.matchAll(/CheckKeys\(\w+,\s*((?:"[^"]+"\s*,?\s*)+)\);/g)]
-    .map(match => [...match[1].matchAll(/"([^"]+)"/g)].map(key => key[1]).sort());
+
+  // Readers name keys through Talemark vocabulary constants, which may alias other vocabulary constants.
+  const vocabularyDirectory = 'engine/src/Talewright.Talemark/Vocabulary/';
+  const constants = new Map();
+  for (const file of (await readdir(new URL(vocabularyDirectory, root))).filter(file => file.endsWith('.cs'))) {
+    const type = file.slice(0, -'.cs'.length);
+    const text = await read(`${vocabularyDirectory}${file}`);
+    for (const [, name, value] of text.matchAll(/const string (\w+) = ([^;]+);/g)) {
+      constants.set(`${type}.${name}`, { type, value: value.trim() });
+    }
+  }
+  const resolve = (reference, seen = new Set()) => {
+    const literal = /^"([^"]+)"$/.exec(reference);
+    if (literal) return literal[1];
+    assert.ok(!seen.has(reference), `vocabulary constant ${reference} is circular`);
+    seen.add(reference);
+    const constant = constants.get(reference);
+    assert.ok(constant, `vocabulary constant ${reference} should be discoverable`);
+    const target = constant.value.includes('.') ? constant.value : `${constant.type}.${constant.value}`;
+    return /^"/.test(constant.value) ? resolve(constant.value, seen) : resolve(target, seen);
+  };
+
+  const keyPattern = String.raw`(?:"[^"]+"|ManifestVocabulary\.\w+)`;
+  const readerSets = [...source.matchAll(new RegExp(String.raw`CheckKeys\(\w+,\s*((?:${keyPattern}\s*,?\s*)+)\);`, 'g'))]
+    .map(match => [...match[1].matchAll(new RegExp(keyPattern, 'g'))].map(key => resolve(key[0])).sort());
   assert.ok(readerSets.length > 0, 'reader CheckKeys lists should be discoverable');
+  assert.equal(readerSets.length, [...source.matchAll(/\.CheckKeys\(/g)].length,
+    'every reader CheckKeys call should be discoverable');
 
   const closed = [
     ['root', schema, { game: { id: 'test', title: 'Test', start: 'beginning' }, characters: { player: { 'first-name': 'Ada' } } }],

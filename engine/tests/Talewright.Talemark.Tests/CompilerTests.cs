@@ -1,5 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
@@ -12,6 +13,7 @@ using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using System.IO.Compression;
 using System.Buffers.Binary;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -63,6 +65,12 @@ public class CompilerTests
             ["story.talewright.yaml"] = yaml,
             ["main.tale"] = tale,
         }, ["images/door-art.png"]), options);
+
+    private static IEnumerable<KeyValuePair<string, StatCategory>> ManifestStatCategories() =>
+        (IReadOnlyDictionary<string, StatCategory>)typeof(StoryCompiler).Assembly
+            .GetType("Talewright.Talemark.Vocabulary.ManifestVocabulary", throwOnError: true)!
+            .GetField("StatCategoryValues", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null)!;
 
     private static StoryDefinition Ok(string tale, string yaml = Yaml)
     {
@@ -651,6 +659,119 @@ public class CompilerTests
         Error("=== a\n-> END", "TW4005", Yaml.Replace("inventory: [rope]", "inventory: [sword]"));
         Error("=== a\n-> END", "TW4004", Yaml.Replace("seed: 42", "seed: 42\n  ruleset: { base: gurps }"));
         Error("=== a\n-> END", "TW4003", Yaml.Replace("pronouns: she", "pronouns: ze"));
+    }
+
+    [Fact]
+    public void Manifest_stat_categories_resolve_to_their_typed_categories()
+    {
+        foreach (var (keyword, expected) in ManifestStatCategories())
+        {
+            foreach (var spelling in new[] { keyword, keyword.ToUpperInvariant() })
+            {
+                var yaml = $$"""
+                    game:
+                      id: test
+                      title: Test
+                      start: start
+                      ruleset:
+                        base: generic
+                        stats:
+                          - { id: custom-stat, category: {{spelling}} }
+                    characters:
+                      player: { first-name: Ada }
+                    """;
+
+                var story = Ok("=== start\n-> END", yaml);
+
+                Assert.Equal(expected, story.World.Ruleset.StatsById[new StatId("custom-stat")].Category);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("1", StatCategory.Skill)]
+    [InlineData("99", (StatCategory)99)]
+    public void Numeric_stat_category_enum_values_remain_accepted(string keyword, StatCategory expected)
+    {
+        var yaml = $$"""
+            game:
+              id: test
+              title: Test
+              start: start
+              ruleset:
+                base: generic
+                stats:
+                  - { id: custom-stat, category: {{keyword}} }
+            characters:
+              player: { first-name: Ada }
+            """;
+
+        var story = Ok("=== start\n-> END", yaml);
+
+        Assert.Equal(expected, story.World.Ruleset.StatsById[new StatId("custom-stat")].Category);
+    }
+
+    [Fact]
+    public void Unknown_stat_category_keeps_its_existing_diagnostic()
+    {
+        var yaml = $$"""
+            game:
+              id: test
+              title: Test
+              start: start
+              ruleset:
+                base: generic
+                stats:
+                  - { id: custom-stat, category: unknown }
+            characters:
+              player: { first-name: Ada }
+            """;
+
+        var error = Error("=== start\n-> END", "TW4003", yaml);
+
+        Assert.Equal("Unknown stat category 'unknown'. Use attribute, skill, resource, progression or custom.", error.Message);
+    }
+
+    [Fact]
+    public void Built_in_pronouns_share_keywords_between_character_and_creation_readers()
+    {
+        foreach (var (keyword, pronouns) in Pronouns.BuiltInByKeyword)
+        {
+            var yaml = $$"""
+                game:
+                  id: test
+                  title: Test
+                  start: start
+                  creation:
+                    pronouns: [{{keyword}}]
+                characters:
+                  player: { first-name: Ada, pronouns: {{keyword.ToUpperInvariant()}} }
+                """;
+
+            var story = Ok("=== start\n-> END", yaml);
+
+            Assert.Equal(pronouns, story.World.Characters[new EntityId("player")].Pronouns);
+            Assert.Equal(new[] { keyword }, story.Creation!.Pronouns);
+        }
+    }
+
+    [Fact]
+    public void Creation_pronoun_keywords_remain_case_sensitive()
+    {
+        const string yaml = """
+            game:
+              id: test
+              title: Test
+              start: start
+              creation:
+                pronouns: [SHE]
+            characters:
+              player: { first-name: Ada, pronouns: she }
+            """;
+
+        var error = Error("=== start\n-> END", "TW4003", yaml);
+
+        Assert.Equal("creation.pronouns must contain distinct built-in keywords: she, he, they, it.", error.Message);
     }
 
     [Fact]
