@@ -16,263 +16,59 @@
       }
     },
     {
-      "begin": "^\\s*(@requires)\\b",
-      "beginCaptures": {"1": {"name": "keyword.control.metadata.tale"}},
-      "end": "$",
-      "patterns": [{"include": "#expression"}]
-    },
-    {
-      "begin": "^\\s*(@hub)(?=[\\t ]|$)",
-      "beginCaptures": {"1": {"name": "keyword.control.metadata.tale"}},
-      "end": "$",
-      "patterns": [
-        {"match": "\\b(?:and|or)\\b", "name": "keyword.operator.word.tale"},
-        {"include": "#inline"}
-      ]
-    },
-    {
-      "begin": "^\\s*(@(?:title|tags|priority|once|hub-limit))\\b",
-      "beginCaptures": {"1": {"name": "keyword.control.metadata.tale"}},
-      "end": "$",
-      "patterns": [{"include": "#inline"}]
-    },
-    {
-      "begin": "^\\s*(>)\\s*([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)",
-      "beginCaptures": {
-        "1": {"name": "punctuation.definition.speech.tale"},
-        "2": {"name": "entity.name.tag.character.tale"},
-        "3": {"name": "punctuation.separator.tale"}
-      },
-      "end": "$",
-      "patterns": [{"include": "#inline"}]
-    },
-    {
-      "begin": "^\\s*(~)",
-      "beginCaptures": {"1": {"name": "keyword.operator.effect.tale"}},
-      "end": "$",
-      "patterns": [{"include": "#expression"}]
-    },
-    {
-      "begin": "^\\s*(\\*)(?=\\s*\\[|[\\t ]+(?:\\(requires[\\t ]+|\\{|->)|\\s*$)",
-      "beginCaptures": {"1": {"name": "punctuation.definition.choice.tale"}},
-      "end": "$",
-      "patterns": [
-        {
-          "begin": "\\[",
-          "beginCaptures": {"0": {"name": "punctuation.definition.label.begin.tale"}},
-          "end": "\\]|(?=$)",
-          "endCaptures": {"0": {"name": "punctuation.definition.label.end.tale"}},
-          "name": "meta.choice.label.tale",
-          "patterns": [{"include": "#inline"}]
-        },
-        {
-          "begin": "(\\()(requires)([\\t ]+)(?![\\t ]*:)",
-          "beginCaptures": {
-            "1": {"name": "punctuation.section.condition.begin.tale"},
-            "2": {"name": "keyword.control.tale"},
-            "3": {"name": "punctuation.separator.tale"}
-          },
-          "end": "\\)|(?=$)",
-          "endCaptures": {"0": {"name": "punctuation.section.condition.end.tale"}},
-          "patterns": [{"include": "#expression"}]
-        },
-        {"include": "#target"},
-        {"include": "#check"},
-        {"include": "#template"}
-      ]
-    },
-    {
-      "begin": "^\\s*(:::)(?:\\s*(skill-check)\\b)?",
-      "beginCaptures": {
-        "1": {"name": "punctuation.section.check.tale"},
-        "2": {"name": "keyword.control.check.tale"}
-      },
-      "end": "$",
-      "patterns": [{"include": "#expression"}]
-    },
-    {
-      "begin": "^\\s*(success|failure)(:)",
-      "beginCaptures": {
-        "1": {"name": "keyword.control.outcome.tale"},
-        "2": {"name": "punctuation.separator.tale"}
-      },
-      "end": "$",
-      "patterns": [{"include": "#target"}, {"include": "#template"}]
-    },
-    {
-      "begin": "^\\s*(?=->)",
-      "end": "$",
-      "patterns": [{"include": "#target"}]
-    },
-    {"include": "#inline"}
-  ],
-  "repository": {
-    "target": {
-      "match": "(->)\\s*([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)?",
+      "match": "^\\s*(?:\\*[^\\r\\n]*?)?(->)\\s*([A-Za-z_][A-Za-z0-9_.-]*)?",
       "captures": {
         "1": {"name": "keyword.control.divert.tale"},
         "2": {"name": "entity.name.section.target.tale"}
       }
     },
-    "check": {
-      "begin": "\\b(skill-check)\\b",
-      "beginCaptures": {"1": {"name": "keyword.control.check.tale"}},
-      "end": "$",
-      "patterns": [{"include": "#expression"}]
+    {"include": "#inline"}
+  ],
+  "repository": {
+    "string": {
+      "begin": "\"",
+      "end": "\"|(?=$)",
+      "name": "string.quoted.double.tale",
+      "patterns": [
+        {"match": "\\\\[\"\\\\]", "name": "constant.character.escape.tale"}
+      ]
     },
     "template": {
-      "patterns": [
-        {"match": "\\\\[{}]", "name": "constant.character.escape.tale"},
-        {
-          "begin": "(\\{)\\s*(image)\\s*(\\()",
-          "beginCaptures": {
-            "1": {"name": "punctuation.section.template.begin.tale"},
-            "2": {"name": "support.function.image.tale"},
-            "3": {"name": "punctuation.section.parens.begin.tale"}
-          },
-          "end": "\\}|(?=$)",
-          "endCaptures": {"0": {"name": "punctuation.section.template.end.tale"}},
-          "name": "meta.image.tale",
-          "patterns": [
-            {
-              "begin": "\"",
-              "end": "\"|(?=$)",
-              "name": "string.quoted.double.tale",
-              "patterns": [
-                {"match": "\\\\[\"\\\\]", "name": "constant.character.escape.tale"},
-                {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"}
-              ]
-            },
-            {
-              "applyEndPatternLast": true,
-              "begin": ",",
-              "end": "(?=\\))|(?=$)",
-              "patterns": [
-                {
-                  "applyEndPatternLast": true,
-                  "begin": "\"",
-                  "end": "\"|(?=$)",
-                  "name": "string.quoted.double.tale",
-                  "patterns": [
-                    {"include": "#inline"}
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "begin": "(\\{)(/?if|else)\\b",
-          "beginCaptures": {
-            "1": {"name": "punctuation.section.template.begin.tale"},
-            "2": {"name": "keyword.control.conditional.tale"}
-          },
-          "end": "\\}|(?=$)",
-          "endCaptures": {"0": {"name": "punctuation.section.template.end.tale"}},
-          "patterns": [{"include": "#expression"}]
-        },
-        {
-          "begin": "\\{",
-          "beginCaptures": {"0": {"name": "punctuation.section.template.begin.tale"}},
-          "end": "\\}|(?=$)",
-          "endCaptures": {"0": {"name": "punctuation.section.template.end.tale"}},
-          "name": "meta.template.tale",
-          "patterns": [{"include": "#expression"}]
-        }
-      ]
-    },
-    "paren": {
-      "begin": "\\(",
-      "beginCaptures": {"0": {"name": "punctuation.section.parens.begin.tale"}},
-      "end": "\\)|(?=$)",
-      "endCaptures": {"0": {"name": "punctuation.section.parens.end.tale"}},
-      "patterns": [{"include": "#expression"}]
-    },
-    "expression": {
-      "patterns": [
-        {
-          "begin": "\"",
-          "end": "\"|(?=$)",
-          "name": "string.quoted.double.tale",
-          "patterns": [
-            {"match": "\\\\[\"\\\\]", "name": "constant.character.escape.tale"},
-            {"match": "\\\\(?:.|$)", "name": "invalid.illegal.escape.tale"}
-          ]
-        },
-        {"match": "@[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*", "name": "support.function.predicate.tale"},
-        {"match": "#[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*", "name": "support.function.modifier.tale"},
-        {"match": "\\b(?:true|false|hostile|unfriendly|neutral|friendly|allied)\\b", "name": "constant.language.tale"},
-        {"match": "\\b(?:and|or|not|has|visited|set|clear|give|take|dc)\\b", "name": "keyword.operator.word.tale"},
-        {"include": "#paren"},
-        {
-          "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)(pronoun)(:)(possessive-pronoun)(:)(determiner|independent)\\b",
-          "captures": {
-            "1": {"name": "variable.other.owner.tale"},
-            "2": {"name": "punctuation.separator.tale"},
-            "3": {"name": "variable.other.member.tale"},
-            "4": {"name": "punctuation.separator.tale"},
-            "5": {"name": "variable.other.member.tale"},
-            "6": {"name": "punctuation.separator.tale"},
-            "7": {"name": "variable.other.member.tale"}
-          }
-        },
-        {
-          "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)",
-          "captures": {
-            "1": {"name": "variable.other.owner.tale"},
-            "2": {"name": "punctuation.separator.tale"},
-            "3": {"name": "variable.other.member.tale"},
-            "4": {"name": "punctuation.separator.tale"},
-            "5": {"name": "variable.other.member.tale"}
-          }
-        },
-        {
-          "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)(:)([A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*)",
-          "captures": {
-            "1": {"name": "variable.other.owner.tale"},
-            "2": {"name": "punctuation.separator.tale"},
-            "3": {"name": "variable.other.member.tale"}
-          }
-        },
-        {"match": "\\b[0-9]+\\b", "name": "constant.numeric.tale"},
-        {"match": "==|!=|<=|>=|\\+=|-=|[=<>+*/-]", "name": "keyword.operator.tale"}
-      ]
+      "begin": "(\\{)",
+      "beginCaptures": {"1": {"name": "punctuation.section.template.begin.tale"}},
+      "end": "(\\})|(?=$)",
+      "endCaptures": {"1": {"name": "punctuation.section.template.end.tale"}},
+      "name": "meta.template.tale",
+      "patterns": [{"include": "#inline"}]
     },
     "inline": {
       "patterns": [
-        {"match": "\\\\[!-~&&[^A-Za-z0-9]]", "name": "constant.character.escape.tale"},
+        {"match": "\\\\[{}*_]", "name": "constant.character.escape.tale"},
+        {"include": "#string"},
         {"include": "#template"},
         {
-          "comment": "Strong delimiters use the reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s*\\\\])\\*\\*(?![\\p{L}\\p{N}*]))",
-          "end": "(?:(?<=[^\\s*\\\\])|(?<=\\\\[^\\s]))\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=\\S)",
+          "end": "(?<!\\s)\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "comment": "Underscore strong uses the same reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}_])__(?!_)(?=[^\\s_])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s_\\\\])__(?![\\p{L}\\p{N}_]))",
-          "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[^\\s]))__(?![\\p{L}\\p{N}_])|(?=$)",
+          "begin": "(?<![\\p{L}\\p{N}_])__(?!_)(?=\\S)",
+          "end": "(?<!\\s)__(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.bold.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "comment": "A single star marks emphasis using the reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}*])\\*(?!\\*)(?=[^\\s*])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s*\\\\])\\*(?![\\p{L}\\p{N}*]))",
-          "end": "(?:(?<=[^\\s*\\\\])|(?<=\\\\[^\\s]))\\*(?![\\p{L}\\p{N}*])|(?=$)",
+          "begin": "(?<![\\p{L}\\p{N}*])\\*(?!\\*)(?=\\S)",
+          "end": "(?<!\\s)\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
         },
         {
-          "comment": "Underscore emphasis uses the same reader-text flanking rules.",
-          "begin": "(?<![\\p{L}\\p{N}_])_(?!_)(?=[^\\s_])(?=(?:(?:\\\\.|[^\\\\])*?)(?:\\\\[^\\s]|[^\\s_\\\\])_(?![\\p{L}\\p{N}_]))",
-          "end": "(?:(?<=[^\\s_\\\\])|(?<=\\\\[^\\s]))_(?![\\p{L}\\p{N}_])|(?=$)",
+          "begin": "(?<![\\p{L}\\p{N}_])_(?!_)(?=\\S)",
+          "end": "(?<!\\s)_(?![\\p{L}\\p{N}_])|(?=$)",
           "name": "markup.italic.markdown",
           "patterns": [{"include": "#inline"}]
-        },
-        {
-          "match": "!\\[[^\\[\\]{}\\\\\\r\\n]*\\]\\([^\\s()\"{}\\\\\\r\\n]+\\)",
-          "name": "invalid.deprecated.image.tale"
         }
       ]
     }

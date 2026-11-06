@@ -94,7 +94,7 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 |---|---|
 | Parser and diagnostics | Lexer, expression syntax grammar, enclosing delimiters, semantic binding, precise positions, obsolete-form replacement messages. `ExpressionSyntaxParser` owns expression grammar; `ExpressionBinder` owns symbol resolution and type validation. Identify which is affected and explicitly call out unaffected surfaces. Keep parser behavior and the registry in agreement. |
 | Manifest schema | Name rules and any new data shapes; schema/compiler agreement on valid and invalid fixtures. YAML quoting is a separate layer from Talemark quoting. |
-| VS Code semantic tokens and grammar fallback | Compiler-backed semantic tokens provide Talemark coloring; keep the readable TextMate grammar as the startup and untrusted-workspace fallback. Do not accept a wider name set than the compiler. |
+| VS Code semantic tokens and grammar fallback | Compiler-backed semantic tokens provide compiler-accurate coloring. Keep the TextMate grammar lightweight for startup and untrusted workspaces; add a classifier case for new syntax, while a TextMate rule is optional. |
 | Language server and shared authoring analysis | Semantic tokens, completion, replacement ranges, hover, live diagnostics, partial/incomplete input, finite argument suggestions and default details. Never execute project code merely to offer completion. |
 | Docs and examples | Registry, syntax reference, diagnostics, guides, snippets, shipped samples and test-story fixtures. Label any remaining decided-versus-current gap with its implementation issue. |
 | Runtime/player, when affected | Rendering, state changes, persistence, accessibility and host behavior; avoid claiming a parser-only change supplies them. |
@@ -125,8 +125,9 @@ To add a term:
 3. Use the constant from parsing through formatting, completion and authoring where applicable.
    Add or update the typed authoring-help entry when the term is exposed in hover or completion.
 4. Update the [editor vocabulary cases](../../tooling/vscode-talewright/tests/fixtures/vocabulary.json)
-   with a representative source example, expected TextMate scopes and an exact syntax-reference example.
-   Compound spellings can specify separate scopes; intentionally unhighlighted characters use the root scope.
+   with a representative source example and an exact syntax-reference example. Add or update a
+   [classifier test](../../engine/tests/Talewright.Talemark.Tests/TalemarkClassifierTests.cs) for the
+   compiler-backed token kinds. A TextMate rule is optional and should remain a simple fallback.
 
 Identifier characters belong to `IdentifierRules`, and text-modifier names belong to their modifier or registry
 (for example `OneManyTextModifier.ModifierName` and `TextModifierRegistry`).
@@ -142,8 +143,9 @@ Complementary tests enforce these boundaries:
 - [EditorVocabularyContractTests](../../engine/tests/Talewright.Talemark.Tests/EditorContracts/EditorVocabularyContractTests.cs)
   checks fixture coverage against the vocabulary and built-in modifier registry, and requires each documented example
   to occur in the syntax reference. The editor's `compiler-contract` target runs it alongside manifest contracts.
-- The [TextMate vocabulary contract](../../tooling/vscode-talewright/tests/grammar.test.mjs) tokenizes the same
-  examples with the real grammar and checks every non-whitespace character against its expected scope.
+- [TalemarkClassifierTests](../../engine/tests/Talewright.Talemark.Tests/TalemarkClassifierTests.cs) owns
+  compiler-backed classification behavior. The TextMate grammar tests cover only the retained fallback
+  constructs, not compiler-vocabulary parity.
 
 ## Verification and review
 
