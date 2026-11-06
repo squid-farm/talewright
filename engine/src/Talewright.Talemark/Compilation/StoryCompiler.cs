@@ -170,7 +170,8 @@ public static class StoryCompiler
 
         cancellationToken.ThrowIfCancellationRequested();
         var sceneDefinitions = parsed.Select(p => p.Definition).ToList();
-        ChoiceReplayIdentity.Assign(sceneDefinitions);
+        // Editor analysis never replays; a story it produces builds its identities on first playback instead.
+        var replayIdentities = analysis is null ? ChoiceReplayIdentity.Assign(sceneDefinitions) : null;
         var story = new StoryDefinition
         {
             Id = manifest.Id,
@@ -189,6 +190,7 @@ public static class StoryCompiler
             Triggers = triggers,
             Predicates = options.Predicates,
             Reachability = reachability,
+            ReplayIdentities = replayIdentities,
         };
         return new CompilationResult(story, diagnostics.Items)
         {

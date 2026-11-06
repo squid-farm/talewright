@@ -422,6 +422,65 @@ public sealed class StoryCompatibilityTests
         }
     }
 
+    [Theory]
+    [InlineData("inserted-choices")]
+    [InlineData("removed-sibling")]
+    public void Author_fork_follows_the_choice_restored_by_outcome(string change)
+    {
+        var original = new StoryHistory(CompileNight(follow: false, home: true), 42);
+        original.Choose(KeyOf(original.Current, "Stay out"));
+        original.Choose(KeyOf(original.Current, "Walk home late"));
+        original.Back();
+        var bytes = original.Save();
+        var updated = change == "inserted-choices"
+            ? CompileNight(follow: true, home: true)
+            : CompileNight(follow: false, home: false);
+
+        var restored = StoryHistory.Restore(updated, bytes);
+        var fork = restored.ForkAuthor();
+
+        Assert.Equal(new SceneId("out"), restored.Current.Scene);
+        Assert.Equal(restored.Current.Scene, fork.Current.Scene);
+        Assert.Equal(restored.Events, fork.Events);
+        Assert.Equal(restored.Cursor, fork.Cursor);
+        restored.Forward();
+        fork.Forward();
+        Assert.Equal(restored.Events, fork.Events);
+        Assert.True(fork.Current.IsEnded);
+
+        static StoryDefinition CompileNight(bool follow, bool home)
+        {
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                ["story.talewright.yaml"] = """
+                    game: { id: night, title: Night, start: night }
+                    characters:
+                      player: { first-name: Ada }
+                    vars: { late: 0 }
+                    """,
+                ["main.tale"] = string.Join('\n',
+                    "=== night",
+                    follow ? "* [Follow the mysterious man] -> follow" : "",
+                    home ? "* [Home] -> home" : "",
+                    "* [Stay out] { var:late += 1 } -> out",
+                    "=== home",
+                    "Home.",
+                    "-> END",
+                    "=== out",
+                    "Out.",
+                    "* [Walk home late] { var:late += 1 } -> END",
+                    "=== follow",
+                    "-> END"),
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!;
+        }
+    }
+
+    private static string KeyOf(StoryFrame frame, string label) =>
+        frame.Choices.Single(choice =>
+            string.Concat(choice.Label.OfType<RenderedText>().Select(text => text.Text)) == label).Key;
+
     private static StoryHistory Create(StoryDefinition story)
     {
         var character = story.Creation!.Default(story.World.Characters[EntityId.Player]) with

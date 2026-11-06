@@ -274,6 +274,47 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Stories_sharing_compiled_scenes_keep_independent_replay_identities()
+    {
+        var yaml = BuildManifest(declareVariables: true).Build();
+        var first = Compile(yaml: yaml, tale: """
+            === a
+            @hub room
+            === b
+            @tags room
+            -> c
+            === c
+            -> END
+            """);
+        var second = Compile(yaml: yaml, tale: """
+            === a
+            -> extra
+            === extra
+            @tags room
+            -> END
+            """);
+        var firstIdentities = HubIdentities(first);
+        var mixed = WithScenes(first, [.. first.Scenes, second.GetScene(new SceneId("extra"))]);
+
+        var history = new StoryHistory(mixed, 7);
+        history.Choose("storylet:extra");
+        AssertEquivalent(history, StoryHistory.Restore(mixed, history.Save()));
+
+        Assert.Equal(firstIdentities, HubIdentities(first));
+        var original = new StoryHistory(first, 7);
+        original.Choose("storylet:b");
+        original.Choose(StorySession.ContinueKey);
+        AssertEquivalent(original, StoryHistory.Restore(first, original.Save()));
+        var other = new StoryHistory(second, 7);
+        other.Choose(StorySession.ContinueKey);
+        AssertEquivalent(other, StoryHistory.Restore(second, other.Save()));
+
+        static string[] HubIdentities(StoryDefinition story) =>
+            new StoryHistory(story, 7).Current.Choices
+                .Select(choice => Convert.ToHexString(choice.ReplayIdentity!.Value.Span)).ToArray();
+    }
+
+    [Fact]
     public void Invalid_last_choice_is_rejected_when_cursor_is_at_the_end()
     {
         var history = new StoryHistory(Compile(), 7);
@@ -581,6 +622,24 @@ public class StoryHistoryTests
         copy[index][0] ^= 1;
         return copy;
     }
+
+    private static StoryDefinition WithScenes(StoryDefinition story, IReadOnlyList<SceneDefinition> scenes) => new()
+    {
+        Id = story.Id,
+        Title = story.Title,
+        Version = story.Version,
+        ContentFingerprint = story.ContentFingerprint,
+        ReplayCompatibilityId = story.ReplayCompatibilityId,
+        UndoEnabled = story.UndoEnabled,
+        Creation = story.Creation,
+        Start = story.Start,
+        Randomness = story.Randomness,
+        Seed = story.Seed,
+        World = story.World,
+        Triggers = story.Triggers,
+        Predicates = story.Predicates,
+        Scenes = scenes,
+    };
 
     private static void AssertEquivalent(StoryHistory expected, StoryHistory actual)
     {

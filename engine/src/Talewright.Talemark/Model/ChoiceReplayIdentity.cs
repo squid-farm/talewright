@@ -15,13 +15,19 @@ internal static class ChoiceReplayIdentity
     internal const int CompactLength = 8;
     internal const int FullLength = 32;
 
-    internal static void Assign(IEnumerable<SceneDefinition> scenes) =>
-        AssignCore(scenes, hash: null);
+    /// <summary>Computes identities for compiler-owned definitions and records them on those definitions.</summary>
+    internal static ReplayIdentityTable Assign(IEnumerable<SceneDefinition> scenes) =>
+        AssignCore(scenes, hash: null, attach: true);
 
-    internal static void Assign(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]> hash) =>
-        AssignCore(scenes, hash);
+    internal static ReplayIdentityTable Assign(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]> hash) =>
+        AssignCore(scenes, hash, attach: true);
 
-    private static void AssignCore(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]>? hash)
+    /// <summary>Computes identities for one story without changing definitions that other stories may share.</summary>
+    internal static ReplayIdentityTable Build(IEnumerable<SceneDefinition> scenes) =>
+        AssignCore(scenes, hash: null, attach: false);
+
+    private static ReplayIdentityTable AssignCore(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]>? hash,
+        bool attach)
     {
         var allScenes = scenes.ToArray();
         var identityCapacity = allScenes.Sum(scene =>
@@ -35,17 +41,20 @@ internal static class ChoiceReplayIdentity
             }));
         var buffer = new ArrayBufferWriter<byte>();
         var replayIdentityData = new ArrayBufferWriter<byte>(Math.Max(1, identityCapacity * CompactLength));
-        var replayIdentityCache = new DivertReplayIdentityCache(identityCapacity);
+        var table = new ReplayIdentityTable(identityCapacity, allScenes.Length, attach);
         using var writer = new Utf8JsonWriter(buffer);
         var descriptions = new Dictionary<ulong, (int Start, int Length)>();
-        var choices = new List<ChoiceDefinition>();
+        var choices = new List<(ChoiceDefinition Choice, byte[] Identity)>();
         var compactCollisions = false;
         foreach (var scene in allScenes)
         {
             buffer.Clear();
             descriptions.Clear();
             choices.Clear();
-            scene.ReplayIdentityCache = replayIdentityCache;
+            if (attach)
+            {
+                scene.ReplayIdentityCache = table;
+            }
             compactCollisions = false;
             foreach (var step in SceneSteps.Walk(scene.Steps))
             {
@@ -56,15 +65,15 @@ internal static class ChoiceReplayIdentity
             }
             foreach (var target in SyntheticTargets(scene, allScenes))
             {
-                if (!replayIdentityCache.Offsets.ContainsKey((scene.Id, target)))
+                if (!table.Offsets.ContainsKey((scene.Id, target)))
                 {
                     Add(scene, target, effects: [], check: null, choice: null);
                 }
             }
-            scene.UsesFullReplayIdentities = compactCollisions;
             if (compactCollisions)
             {
-                var targets = replayIdentityCache.Offsets.Keys
+                table.FullScenes.Add(scene.Id);
+                var targets = table.Offsets.Keys
                     .Where(key => key.Source == scene.Id)
                     .Select(key => key.Target)
                     .ToArray();
@@ -82,21 +91,19 @@ internal static class ChoiceReplayIdentity
                         {
                             hash(description).CopyTo(digest);
                         }
-                        replayIdentityCache.Offsets[(scene.Id, target)] = replayIdentityData.WrittenCount;
+                        table.Offsets[(scene.Id, target)] = replayIdentityData.WrittenCount;
                         digest.CopyTo(replayIdentityData.GetSpan(FullLength));
                         replayIdentityData.Advance(FullLength);
                     }
                 }
             }
-            else
+            foreach (var (choice, identity) in choices)
             {
-                foreach (var choice in choices)
-                {
-                    choice.ReplayIdentity = choice.ReplayIdentity![..CompactLength];
-                }
+                table.Set(choice, compactCollisions ? identity : identity[..CompactLength]);
             }
         }
-        replayIdentityCache.Data = replayIdentityData.WrittenMemory;
+        table.Data = replayIdentityData.WrittenMemory;
+        return table;
 
         void Add(SceneDefinition scene, SceneId? divert, IReadOnlyList<Effect> effects, CheckBranch? check,
             ChoiceDefinition? choice)
@@ -129,31 +136,26 @@ internal static class ChoiceReplayIdentity
             }
             if (choice is not null)
             {
-                choice.ReplayIdentity = digest.ToArray();
-                choices.Add(choice);
+                choices.Add((choice, digest.ToArray()));
             }
             else if (divert is { } target)
             {
                 var key = (scene.Id, target);
-                replayIdentityCache.Offsets.Add(key, replayIdentityData.WrittenCount);
+                table.Offsets.Add(key, replayIdentityData.WrittenCount);
                 digest[..CompactLength].CopyTo(replayIdentityData.GetSpan(CompactLength));
                 replayIdentityData.Advance(CompactLength);
             }
         }
     }
 
-    internal static ReadOnlyMemory<byte> ForDivert(SceneDefinition source, DivertTarget target)
-    {
-        if (target.Scene is { } targetScene
-            && source.ReplayIdentityCache is { } cache
-            && cache.TryGet(source.Id, targetScene, source.UsesFullReplayIdentities, out var identity))
-        {
-            return identity;
-        }
+    /// <summary>Reads the identity recorded on a compiler-owned scene; runtime lookups use the story's table.</summary>
+    internal static ReadOnlyMemory<byte> ForDivert(SceneDefinition source, DivertTarget target) =>
+        source.ReplayIdentityCache is { } table
+            ? table.ForDivert(source.Id, target)
+            : throw NotPrecomputed(source.Id, target);
 
-        throw new InvalidOperationException(
-            $"Replay identity for divert from '{source.Id}' to '{target}' was not precomputed.");
-    }
+    internal static InvalidOperationException NotPrecomputed(SceneId source, DivertTarget target) =>
+        new($"Replay identity for divert from '{source}' to '{target}' was not precomputed.");
 
     private static IEnumerable<SceneId> SyntheticTargets(SceneDefinition scene,
         IReadOnlyList<SceneDefinition> allScenes)
@@ -405,28 +407,63 @@ internal static class ChoiceReplayIdentity
     }
 }
 
-internal sealed class DivertReplayIdentityCache
+/// <summary>The replay identities of one complete scene set, owned by the story built from it.</summary>
+internal sealed class ReplayIdentityTable
 {
-    internal DivertReplayIdentityCache(int capacity)
+    private readonly Dictionary<ChoiceDefinition, byte[]>? _choices;
+
+    internal ReplayIdentityTable(int capacity, int sceneCount, bool attached)
     {
         Offsets = new Dictionary<(SceneId Source, SceneId Target), int>(capacity);
+        SceneCount = sceneCount;
+        _choices = attached ? null : [];
     }
 
+    /// <summary>Number of scenes in the set the table was built from.</summary>
+    internal int SceneCount { get; }
     internal Dictionary<(SceneId Source, SceneId Target), int> Offsets { get; }
+    internal HashSet<SceneId> FullScenes { get; } = [];
     internal ReadOnlyMemory<byte> Data { get; set; }
 
-    internal bool TryGet(SceneId source, SceneId target, bool fullLength,
-        out ReadOnlyMemory<byte> identity)
+    internal void Set(ChoiceDefinition choice, byte[] identity)
     {
-        if (Offsets.TryGetValue((source, target), out var offset))
+        if (_choices is null)
         {
-            identity = Data.Slice(offset, fullLength
-                ? ChoiceReplayIdentity.FullLength
-                : ChoiceReplayIdentity.CompactLength);
-            return true;
+            choice.ReplayIdentity = identity;
+            choice.ReplayIdentityOwner = this;
+        }
+        else
+        {
+            _choices[choice] = identity;
+        }
+    }
+
+    internal byte[] For(ChoiceDefinition choice)
+    {
+        if (_choices is null)
+        {
+            if (ReferenceEquals(choice.ReplayIdentityOwner, this) && choice.ReplayIdentity is { } identity)
+            {
+                return identity;
+            }
+        }
+        else if (_choices.TryGetValue(choice, out var identity))
+        {
+            return identity;
         }
 
-        identity = default;
-        return false;
+        throw new InvalidOperationException($"Replay identity for choice '{choice.Key}' was not precomputed.");
+    }
+
+    internal ReadOnlyMemory<byte> ForDivert(SceneId source, DivertTarget target)
+    {
+        if (target.Scene is { } targetScene && Offsets.TryGetValue((source, targetScene), out var offset))
+        {
+            return Data.Slice(offset, FullScenes.Contains(source)
+                ? ChoiceReplayIdentity.FullLength
+                : ChoiceReplayIdentity.CompactLength);
+        }
+
+        throw ChoiceReplayIdentity.NotPrecomputed(source, target);
     }
 }

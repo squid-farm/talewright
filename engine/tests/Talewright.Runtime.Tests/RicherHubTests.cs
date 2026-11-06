@@ -117,6 +117,42 @@ public sealed class RicherHubTests
         Assert.Equal(history.Events, restored.Events);
     }
 
+    [Fact]
+    public void Author_fork_rejects_a_restored_hub_choice_that_is_no_longer_offered()
+    {
+        var original = new StoryHistory(CompileRoom("room"), 42);
+        original.Choose("storylet:first");
+        var bytes = original.Save();
+        Assert.Equal(original.Events, original.ForkAuthor().Events);
+
+        var restored = StoryHistory.Restore(CompileRoom("elsewhere"), bytes);
+
+        Assert.Equal(original.Events, restored.Events);
+        var error = Assert.Throws<InvalidOperationException>(() => restored.ForkAuthor());
+        Assert.Contains("Choice 1", error.Message);
+
+        static StoryDefinition CompileRoom(string firstTags)
+        {
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                ["story.talewright.yaml"] = """
+                    game: { id: room-fork, title: Room fork, start: hub }
+                    characters:
+                      player: { first-name: Ada }
+                    """,
+                ["main.tale"] = string.Join('\n',
+                    "=== hub",
+                    "@hub room",
+                    "* [Exit] -> END",
+                    "=== first",
+                    "@tags " + firstTags,
+                    "-> END"),
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!;
+        }
+    }
+
     [Theory]
     [InlineData("storylet-tags", false)]
     [InlineData("storylet-tags", true)]

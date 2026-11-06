@@ -128,7 +128,10 @@ prove semantic equivalence of positional choices. This is an explicit new scenar
 
 `StoryHistory.Restore(story, playerBytes).ForkAuthor()` first enforces ordinary save compatibility
 and full redo validation, then retains the normal start, character, seed, choices and cursor in an
-independent synthetic session. Normal save bytes, rules and slots are untouched.
+independent synthetic session. Each forked choice is the current choice that restore matched by outcome
+identity, not the saved positional key, so inserted or removed siblings cannot fork a different branch.
+If restore matched an outcome the current story no longer offers at that point (for example a retagged
+hub storylet), the fork fails instead of diverging. Normal save bytes, rules and slots are untouched.
 
 Value batches require every collection, including `textVariables` when empty; replay evidence includes
 empty text-variable state. Previous scenario formats are unsupported, not migrated.

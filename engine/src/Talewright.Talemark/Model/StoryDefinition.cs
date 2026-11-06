@@ -43,7 +43,7 @@ public sealed class StoryDefinition
     private Dictionary<SceneId, SceneDefinition>? _byId;
     private StoryReachability? _reachability;
     private readonly object _replayIdentityGate = new();
-    private volatile bool _replayIdentitiesReady;
+    private ReplayIdentityTable? _replayIdentities;
 
     /// <summary>The compiler keeps the graph it built for TW3009; other stories build it on first use.</summary>
     [AllowNull]
@@ -53,16 +53,40 @@ public sealed class StoryDefinition
         init => _reachability = value;
     }
 
-    internal void EnsureReplayIdentities()
+    /// <summary>
+    /// Replay identities for exactly this scene set. The compiler supplies them; other stories reuse a compiled
+    /// table only when it was built for the same scenes, otherwise they build their own without changing shared
+    /// scene or choice definitions.
+    /// </summary>
+    [AllowNull]
+    internal ReplayIdentityTable ReplayIdentities
     {
-        if (_replayIdentitiesReady) return;
-        lock (_replayIdentityGate)
+        get
         {
-            if (_replayIdentitiesReady) return;
-            if (Scenes.Any(scene => scene.ReplayIdentityCache is null))
-                ChoiceReplayIdentity.Assign(Scenes);
-            _replayIdentitiesReady = true;
+            if (Volatile.Read(ref _replayIdentities) is { } identities) return identities;
+            lock (_replayIdentityGate)
+            {
+                return _replayIdentities ??= CompiledReplayIdentities() ?? ChoiceReplayIdentity.Build(Scenes);
+            }
         }
+        init => _replayIdentities = value;
+    }
+
+    private ReplayIdentityTable? CompiledReplayIdentities()
+    {
+        if (Scenes.Count == 0 || Scenes[0].ReplayIdentityCache is not { } table || table.SceneCount != Scenes.Count)
+        {
+            return null;
+        }
+
+        foreach (var scene in Scenes)
+        {
+            if (!ReferenceEquals(scene.ReplayIdentityCache, table))
+            {
+                return null;
+            }
+        }
+        return table;
     }
 
     public SceneDefinition GetScene(SceneId id) =>
@@ -107,8 +131,8 @@ public sealed class SceneDefinition : IStorylet
     public int? HubLimit { get; init; }
 
     public IReadOnlyList<SceneStep> Steps { get; init; } = [];
-    internal bool UsesFullReplayIdentities { get; set; }
-    internal DivertReplayIdentityCache? ReplayIdentityCache { get; set; }
+    /// <summary>Identities recorded by the compiler for the scene set that produced this scene.</summary>
+    internal ReplayIdentityTable? ReplayIdentityCache { get; set; }
     public IReadOnlyList<ChoiceDefinition> Choices =>
         SceneSteps.Walk(Steps).OfType<ChoiceStep>().Select(step => step.Choice).ToArray();
 }
@@ -126,6 +150,7 @@ public sealed class ChoiceDefinition
 
     /// <summary>Compiled identity of this choice's gameplay outcome, independent of presentation and position.</summary>
     internal byte[]? ReplayIdentity { get; set; }
+    internal ReplayIdentityTable? ReplayIdentityOwner { get; set; }
 
     /// <summary>Authored label, or null for a textless choice. An explicitly empty label remains empty.</summary>
     public required IReadOnlyList<TemplateInline>? Label { get; init; }

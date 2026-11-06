@@ -36,6 +36,7 @@ public sealed class StorySession : IStorySession
     private readonly EventLog _log;
     private readonly TriggerEngine _triggers;
     private readonly SceneExecutor _executor;
+    private readonly ReplayIdentityTable _replayIdentities;
     private readonly bool _captureEntry;
     private readonly Action<RuleDecision>? _observer;
     private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
@@ -68,7 +69,7 @@ public sealed class StorySession : IStorySession
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
     {
         character = CharacterSelection.Validate(story, character);
-        story.EnsureReplayIdentities();
+        _replayIdentities = story.ReplayIdentities;
         Story = story;
         Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);
@@ -206,7 +207,7 @@ public sealed class StorySession : IStorySession
         var scene = Story.GetScene(currentScene);
         foreach (var step in _executor.ReplayChoices)
         {
-            if (step.Choice.ReplayIdentity is not { } identity || !identity.AsSpan().SequenceEqual(replayIdentity))
+            if (!_replayIdentities.For(step.Choice).AsSpan().SequenceEqual(replayIdentity))
             {
                 continue;
             }
@@ -224,7 +225,7 @@ public sealed class StorySession : IStorySession
                 .ThenBy(entry => entry.index))
             {
                 var target = new DivertTarget(storylet.Id);
-                var identity = ChoiceReplayIdentity.ForDivert(scene, target);
+                var identity = _replayIdentities.ForDivert(scene.Id, target);
                 if (!identity.Span.SequenceEqual(replayIdentity))
                 {
                     continue;
@@ -347,7 +348,7 @@ public sealed class StorySession : IStorySession
                 var target = new DivertTarget(storylet.Id);
                 offered.Add((new ChoiceView(key, label)
                 {
-                    ReplayIdentity = ChoiceReplayIdentity.ForDivert(scene, target),
+                    ReplayIdentity = _replayIdentities.ForDivert(scene.Id, target),
                 }, notes =>
                 {
                     _log.Append(new ChoiceMade(scene.Id, key));
@@ -364,7 +365,7 @@ public sealed class StorySession : IStorySession
     {
         return [(new ChoiceView(ContinueKey, ChoiceView.ContinueLabel)
         {
-            ReplayIdentity = ChoiceReplayIdentity.ForDivert(source, target),
+            ReplayIdentity = _replayIdentities.ForDivert(source.Id, target),
         }, notes =>
         {
             _log.Append(new ChoiceMade(source.Id, ContinueKey));

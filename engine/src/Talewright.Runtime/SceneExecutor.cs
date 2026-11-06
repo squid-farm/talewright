@@ -16,6 +16,7 @@ internal sealed record SceneExecution(IReadOnlyList<RenderedBlock> Blocks,
 internal sealed class SceneExecutor(StoryDefinition story, EventLog log, TemplateRenderer renderer,
     Action afterBatch, Action<RuleDecision>? observer, bool rememberEntry)
 {
+    private readonly ReplayIdentityTable _replayIdentities = story.ReplayIdentities;
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _notes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DivertTarget?> _checks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _prose = new(StringComparer.Ordinal);
@@ -181,7 +182,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             ? renderer.RenderInlines(label, log.State)
             : ChoiceView.ContinueLabel)
         {
-            ReplayIdentity = choice.ReplayIdentity,
+            ReplayIdentity = _replayIdentities.For(choice),
         };
 
     private static void RequireSettled(bool settled)

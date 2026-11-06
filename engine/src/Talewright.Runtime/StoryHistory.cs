@@ -64,10 +64,24 @@ public sealed class StoryHistory
     /// <summary>The original slot's progress after a load, until the timeline changes.</summary>
     public string? RestoredProgressKey { get; private set; }
 
-    /// <summary>Forks validated player replay inputs into isolated synthetic author tooling, retaining redo.</summary>
-    public AuthorSession ForkAuthor(bool captureDecisions = true) =>
-        AuthorSession.RestoreTimeline(Story, Story.Start, new AuthorSetup(), Seed, Character,
-            _choices.Select(key => (AuthorCommand)new AuthorChoice(key)).ToArray(), Cursor, captureDecisions);
+    /// <summary>
+    /// Forks validated player replay inputs into isolated synthetic author tooling, retaining redo. Each decision
+    /// becomes the current choice that replay selected, not the key recorded by an older story revision.
+    /// </summary>
+    public AuthorSession ForkAuthor(bool captureDecisions = true)
+    {
+        var keys = new List<string?>(_choices.Count);
+        Replay(Story, Seed, _choices, _replayChoiceIdentities, Character, liveKeys: keys);
+        var unavailable = keys.IndexOf(null);
+        if (unavailable >= 0)
+        {
+            throw new InvalidOperationException(
+                $"Choice {unavailable + 1} of this playthrough replays a recorded outcome that the current story no longer offers there, so it cannot be forked into an author timeline.");
+        }
+
+        return AuthorSession.RestoreTimeline(Story, Story.Start, new AuthorSetup(), Seed, Character,
+            keys.Select(key => (AuthorCommand)new AuthorChoice(key!)).ToArray(), Cursor, captureDecisions);
+    }
 
     public void Choose(string key)
     {
@@ -323,7 +337,7 @@ public sealed class StoryHistory
     private static (StorySession Session, List<HistoryFrame> Frames, List<byte[]>? Evidence,
         List<byte[]>? ReplayChoiceIdentities) Replay(StoryDefinition story, ulong seed,
         IReadOnlyList<string> choices, IReadOnlyList<byte[]>? replayChoiceIdentities, CharacterSelection? character,
-        bool recordEvidence = false)
+        bool recordEvidence = false, List<string?>? liveKeys = null)
     {
         var session = new StorySession(story, seed, character: character);
         var initialState = ReplayEvidence.InitialState(story, session.State);
@@ -345,6 +359,9 @@ public sealed class StoryHistory
                     throw ReplayFailure();
                 }
                 identity = replayChoiceIdentities[index];
+                // Replay may select an equivalent choice that live play would not offer here.
+                var selectedKey = choice.Key;
+                liveKeys?.Add(previousFrame.Choices.Any(offered => offered.Key == selectedKey) ? selectedKey : null);
             }
             else
             {
@@ -355,6 +372,7 @@ public sealed class StoryHistory
                 }
                 identity = choice.ReplayIdentity;
                 session.Choose(key);
+                liveKeys?.Add(key);
             }
 
             frames[^1] = frames[^1] with { Chosen = choice.Label };
