@@ -148,8 +148,12 @@ public sealed class StorySession : IStorySession
         blocks.AddRange(execution.Blocks);
         blocks.AddRange(_editNotes);
         if (execution.Target is not null) SkipHub(scene);
+        if (execution.Target?.IsEnd == true)
+        {
+            throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
+        }
         var choices = execution.Target is null ? OfferChoices(scene, execution.Choices) : ContinueTo(scene, execution.Target);
-        if (execution.Target?.IsEnd == true || choices.Count == 0)
+        if (choices.Count == 0)
         {
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
         }

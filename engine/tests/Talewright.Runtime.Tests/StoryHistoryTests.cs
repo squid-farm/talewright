@@ -191,6 +191,41 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Continue_identity_uses_its_scene_regardless_of_how_it_was_entered()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            * [Direct] -> target
+            * [Via middle] -> middle
+            === middle
+            * [Continue] -> target
+            === target
+            -> finish
+            === finish
+            -> END
+            """);
+        var direct = new StoryHistory(story, 7);
+        direct.Choose("c0");
+        var indirect = new StoryHistory(story, 7);
+        indirect.Choose("c1");
+        indirect.Choose("c0");
+
+        Assert.Equal(direct.Current.Choices.Single().ReplayIdentity!.Value.ToArray(),
+            indirect.Current.Choices.Single().ReplayIdentity!.Value.ToArray());
+
+        direct.Choose(StorySession.ContinueKey);
+        indirect.Choose(StorySession.ContinueKey);
+        AssertEquivalent(direct, StoryHistory.Restore(story, direct.Save()));
+        AssertEquivalent(indirect, StoryHistory.Restore(story, indirect.Save()));
+        var legacy = Mutate(direct.Save(), save => save with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
+        AssertEquivalent(direct, StoryHistory.Restore(story, legacy));
+    }
+
+    [Fact]
     public void Invalid_last_choice_is_rejected_when_cursor_is_at_the_end()
     {
         var history = new StoryHistory(Compile(), 7);

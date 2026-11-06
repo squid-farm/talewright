@@ -9,6 +9,63 @@ namespace Talewright.Talemark.Tests;
 public sealed class ChoiceReplayIdentityTests
 {
     [Fact]
+    public void Compact_identities_keep_the_canonical_destination_encoding()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: replay, title: Replay, start: start }
+                characters:
+                  player: { first-name: Ada }
+                """,
+            ["main.tale"] = """
+                === start
+                * [Continue] -> finish
+                * [End] -> END
+                === finish
+                -> start
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var choices = result.Story!.GetScene(new SceneId("start")).Choices;
+
+        Assert.Equal(Convert.FromHexString("D809246E5EEB77EC"), choices[0].ReplayIdentity);
+        Assert.Equal(Convert.FromHexString("9A2C35F8A8ED54A7"), choices[1].ReplayIdentity);
+        Assert.Equal(Convert.FromHexString("D4CD735E8C83236E"),
+            ChoiceReplayIdentity.ForDivert(result.Story.GetScene(new SceneId("finish")),
+                new DivertTarget(new SceneId("start"))).ToArray());
+    }
+
+    [Fact]
+    public void Visit_count_effects_have_stable_distinct_replay_identities()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: replay, title: Replay, start: start }
+                characters:
+                  player: { first-name: Ada }
+                vars: { count: 0 }
+                """,
+            ["main.tale"] = """
+                === start
+                * [Current] { var:count += scene:player:visits } -> finish
+                * [Same outcome] { var:count += scene:player:visits } -> finish
+                * [Start] { var:count += start:player:visits } -> finish
+                * [Finish] { var:count += finish:player:visits } -> finish
+                === finish
+                -> END
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var choices = result.Story!.GetScene(new SceneId("start")).Choices;
+
+        Assert.Equal(choices[0].ReplayIdentity, choices[1].ReplayIdentity);
+        Assert.NotEqual(choices[0].ReplayIdentity, choices[2].ReplayIdentity);
+        Assert.NotEqual(choices[2].ReplayIdentity, choices[3].ReplayIdentity);
+    }
+
+    [Fact]
     public void Truncated_hash_collision_uses_full_identity_for_every_choice_in_the_scene()
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>

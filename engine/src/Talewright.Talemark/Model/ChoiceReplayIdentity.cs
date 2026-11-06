@@ -51,12 +51,15 @@ internal static class ChoiceReplayIdentity
             {
                 if (step is ChoiceStep choice)
                 {
-                    Add(scene, choice.Choice.Divert, choice.Choice.Effects, choice.Choice.Check, choice.Choice);
+                    Add(scene, choice.Choice.Divert?.Scene, choice.Choice.Effects, choice.Choice.Check, choice.Choice);
                 }
             }
             foreach (var target in SyntheticTargets(scene, allScenes))
             {
-                Add(scene, target, effects: [], check: null, choice: null);
+                if (!replayIdentityCache.Offsets.ContainsKey((scene.Id, target)))
+                {
+                    Add(scene, target, effects: [], check: null, choice: null);
+                }
             }
             scene.UsesFullReplayIdentities = compactCollisions;
             if (compactCollisions)
@@ -70,7 +73,7 @@ internal static class ChoiceReplayIdentity
                     var digest = new byte[FullLength];
                     foreach (var target in targets)
                     {
-                        var description = Describe(scene.Id, new DivertTarget(target), effects: [], check: null);
+                        var description = Describe(scene.Id, target, effects: [], check: null);
                         if (hash is null)
                         {
                             SHA256.HashData(description, digest);
@@ -95,7 +98,7 @@ internal static class ChoiceReplayIdentity
         }
         replayIdentityCache.Data = replayIdentityData.WrittenMemory;
 
-        void Add(SceneDefinition scene, DivertTarget? divert, IReadOnlyList<Effect> effects, CheckBranch? check,
+        void Add(SceneDefinition scene, SceneId? divert, IReadOnlyList<Effect> effects, CheckBranch? check,
             ChoiceDefinition? choice)
         {
             var start = buffer.WrittenCount;
@@ -129,15 +132,12 @@ internal static class ChoiceReplayIdentity
                 choice.ReplayIdentity = digest.ToArray();
                 choices.Add(choice);
             }
-            else if (divert?.Scene is { } target)
+            else if (divert is { } target)
             {
                 var key = (scene.Id, target);
-                if (!replayIdentityCache.Offsets.ContainsKey(key))
-                {
-                    replayIdentityCache.Offsets.Add(key, replayIdentityData.WrittenCount);
-                    digest[..CompactLength].CopyTo(replayIdentityData.GetSpan(CompactLength));
-                    replayIdentityData.Advance(CompactLength);
-                }
+                replayIdentityCache.Offsets.Add(key, replayIdentityData.WrittenCount);
+                digest[..CompactLength].CopyTo(replayIdentityData.GetSpan(CompactLength));
+                replayIdentityData.Advance(CompactLength);
             }
         }
     }
@@ -155,7 +155,7 @@ internal static class ChoiceReplayIdentity
             $"Replay identity for divert from '{source.Id}' to '{target}' was not precomputed.");
     }
 
-    private static IEnumerable<DivertTarget> SyntheticTargets(SceneDefinition scene,
+    private static IEnumerable<SceneId> SyntheticTargets(SceneDefinition scene,
         IReadOnlyList<SceneDefinition> allScenes)
     {
         if (scene.Hub is not null)
@@ -164,30 +164,27 @@ internal static class ChoiceReplayIdentity
             {
                 if (storylet.Id != scene.Id)
                 {
-                    yield return new DivertTarget(storylet.Id);
+                    yield return storylet.Id;
                 }
             }
         }
 
         foreach (var step in SceneSteps.Walk(scene.Steps))
         {
-            IEnumerable<DivertTarget?> targets = step switch
+            switch (step)
             {
-                DivertStep divert => [divert.Target],
-                CheckStep check => [check.Check.Success.Divert, check.Check.Failure.Divert],
-                _ => [],
-            };
-            foreach (var target in targets)
-            {
-                if (target is { IsEnd: false })
-                {
+                case DivertStep { Target.Scene: { } target }:
                     yield return target;
-                }
+                    break;
+                case CheckStep check:
+                    if (check.Check.Success.Divert?.Scene is { } success) yield return success;
+                    if (check.Check.Failure.Divert?.Scene is { } failure) yield return failure;
+                    break;
             }
         }
     }
 
-    private static byte[] Describe(SceneId scene, DivertTarget? divert,
+    private static byte[] Describe(SceneId scene, SceneId? divert,
         IReadOnlyList<Effect> effects, CheckBranch? check)
     {
         using var stream = new MemoryStream();
@@ -198,13 +195,13 @@ internal static class ChoiceReplayIdentity
         return stream.ToArray();
     }
 
-    private static void WriteDescription(Utf8JsonWriter writer, SceneId scene, DivertTarget? divert,
+    private static void WriteDescription(Utf8JsonWriter writer, SceneId scene, SceneId? divert,
         IReadOnlyList<Effect> effects, CheckBranch? check)
     {
         writer.WriteStartArray();
         writer.WriteStringValue("choice-replay-v1");
         writer.WriteStringValue(scene.Value);
-        WriteDivert(writer, divert);
+        writer.WriteStringValue(divert?.Value);
         writer.WriteStartArray();
         foreach (var effect in effects)
         {
@@ -381,6 +378,10 @@ internal static class ChoiceReplayIdentity
             case Visited value:
                 writer.WriteStringValue(ExpressionVocabulary.Visited);
                 writer.WriteStringValue(value.Scene.Value);
+                break;
+            case SceneVisitCountRef value:
+                writer.WriteStringValue("scene-visit-count-ref");
+                writer.WriteStringValue(value.Scene?.Value);
                 break;
             case NamedPredicate value:
                 writer.WriteStringValue("predicate");
