@@ -5,6 +5,7 @@ operators, after the property and pronoun changes in
 [#191](https://github.com/squid-farm/talewright/issues/191) and
 [#190](https://github.com/squid-farm/talewright/issues/190).
 See the [syntax reference](talemark-syntax.md) for complete stories and the
+[syntax principles](../developer/language-changes.md#syntax-principles) and
 [language-change checklist](../developer/language-changes.md) before proposing new syntax.
 
 **Status matters.** Unless marked **decided, not implemented**, examples below describe the current

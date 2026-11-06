@@ -74,6 +74,14 @@ The whole story is checked when it loads. Mistakes are reported with a file name
 plus an [error code](diagnostics.md), so you can fix them before playing. C# story projects are an
 optional developer feature; see [C# extensions](../developer/csharp-extensions.md).
 
+## Compatibility
+
+Talemark and the engine are versioned together. A major version may change or remove syntax, but
+only when unavoidable, with advance notice, and with errors that show the replacement plus a
+migration note. Adding new syntax needs no compatibility handling and can happen in any release.
+Adding syntax that reserves a character existing prose may already use counts as a change, not an
+addition.
+
 Identifiers are names for scenes, characters, items and other story parts. Use letters, numbers,
 underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
 `temple.entrance` and `hidden-door` are valid names. A dot groups words in a name; it does not mean

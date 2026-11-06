@@ -1,6 +1,8 @@
 # Glossary
 
 These terms describe references to factions, items, story values and scene visits in Talemark.
+For the design rules behind new syntax, see the
+[syntax principles](../developer/language-changes.md#syntax-principles).
 
 | Term | Definition |
 |---|---|
