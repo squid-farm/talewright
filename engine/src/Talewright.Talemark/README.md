@@ -72,6 +72,17 @@ dropped choice; duplicate clauses, trailing text and bad divert targets are repo
 `success:`/`failure:` lines after an accepted check, plus blank lines and the closing `:::` inside a block, are
 marked `IsAttached`: the check binds them, and the next unattached line ends the check.
 
+The parser follows these responsibilities in separate partial files:
+
+- [TaleSyntaxParser.cs](Parsing/TaleSyntaxParser.cs) handles file/scene splitting, line classification and shared
+  parsing helpers.
+- [TaleSyntaxParser.SceneState.cs](Parsing/TaleSyntaxParser.SceneState.cs) owns the per-scene state, line description
+  and shared span/diagnostic helpers.
+- [TaleSyntaxParser.Metadata.cs](Parsing/TaleSyntaxParser.Metadata.cs) handles metadata and hub selectors.
+- [TaleSyntaxParser.Blocks.cs](Parsing/TaleSyntaxParser.Blocks.cs) balances inline condition blocks.
+- [TaleSyntaxParser.Choices.cs](Parsing/TaleSyntaxParser.Choices.cs) parses choice clauses.
+- [TaleSyntaxParser.SkillChecks.cs](Parsing/TaleSyntaxParser.SkillChecks.cs) parses skill-check specs and outcomes.
+
 Ownership:
 
 | Syntax (`TaleSyntaxParser`) | Binding (`TaleParser`) |
