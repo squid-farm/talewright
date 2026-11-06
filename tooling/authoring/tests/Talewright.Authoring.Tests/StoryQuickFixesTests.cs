@@ -210,6 +210,30 @@ public sealed class StoryQuickFixesTests
         Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
     }
 
+    [Theory]
+    [InlineData("characters:\n  player:\n    first-name: Ada\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n\n# keep this comment\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    # trailing comment\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: |\n      Line one\n      Line two\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: >-\n      Folded\n\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: \"Quoted\n      across lines\"\nitems:\n  rope: Rope\n")]
+    public void Missing_manifest_name_appends_after_a_multiline_entry_followed_by_another_section(string sections)
+    {
+        var manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n" + sections;
+        const string story = "=== start\n> old-man: Hello.\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+
+        var updated = ApplyInsertion(manifest, fix);
+        Assert.Equal(manifest, updated.Replace("  old-man:\n    first-name: Old Man\n", ""));
+        Assert.True(updated.IndexOf("  old-man:", StringComparison.Ordinal) < updated.IndexOf("items:", StringComparison.Ordinal));
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
     [Fact]
     public void Existing_manifest_names_and_unknown_properties_do_not_get_declaration_fixes()
     {
