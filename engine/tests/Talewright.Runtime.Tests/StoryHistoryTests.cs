@@ -226,6 +226,54 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Manually_constructed_stories_support_hub_and_continue_replay()
+    {
+        var compiled = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            @hub room
+            === b
+            @tags room
+            -> c
+            === c
+            -> END
+            """);
+        var story = new StoryDefinition
+        {
+            Id = compiled.Id,
+            Title = compiled.Title,
+            Version = compiled.Version,
+            ContentFingerprint = compiled.ContentFingerprint,
+            ReplayCompatibilityId = compiled.ReplayCompatibilityId,
+            UndoEnabled = compiled.UndoEnabled,
+            Creation = compiled.Creation,
+            Start = compiled.Start,
+            Randomness = compiled.Randomness,
+            Seed = compiled.Seed,
+            World = compiled.World,
+            Triggers = compiled.Triggers,
+            Predicates = compiled.Predicates,
+            Scenes = compiled.Scenes.Select(scene => new SceneDefinition
+            {
+                Id = scene.Id,
+                Title = scene.Title,
+                Requires = scene.Requires,
+                Tags = scene.Tags,
+                Priority = scene.Priority,
+                Once = scene.Once,
+                Hub = scene.Hub,
+                HubLimit = scene.HubLimit,
+                Steps = scene.Steps,
+            }).ToArray(),
+        };
+
+        var history = new StoryHistory(story, 7);
+        history.Choose("storylet:b");
+        history.Choose(StorySession.ContinueKey);
+
+        AssertEquivalent(history, StoryHistory.Restore(story, history.Save()));
+    }
+
+    [Fact]
     public void Invalid_last_choice_is_rejected_when_cursor_is_at_the_end()
     {
         var history = new StoryHistory(Compile(), 7);

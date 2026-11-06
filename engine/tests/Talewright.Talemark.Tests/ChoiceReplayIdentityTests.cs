@@ -146,7 +146,7 @@ public sealed class ChoiceReplayIdentityTests
         Assert.Equal(ChoiceReplayIdentity.FullLength, fullIdentity.Length);
         AssertSharedIdentityMemory(fullIdentity, ChoiceReplayIdentity.ForDivert(hub, first));
         Assert.Equal(ChoiceReplayIdentity.FullLength, ChoiceReplayIdentity.ForDivert(hub, second).Length);
-        Assert.NotEqual(fullIdentity, ChoiceReplayIdentity.ForDivert(hub, second));
+        Assert.NotEqual(fullIdentity.ToArray(), ChoiceReplayIdentity.ForDivert(hub, second).ToArray());
     }
 
     private static void AssertSharedIdentityMemory(ReadOnlyMemory<byte> first, ReadOnlyMemory<byte> second)

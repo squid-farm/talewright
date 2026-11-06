@@ -68,6 +68,7 @@ public sealed class StorySession : IStorySession
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
     {
         character = CharacterSelection.Validate(story, character);
+        story.EnsureReplayIdentities();
         Story = story;
         Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);

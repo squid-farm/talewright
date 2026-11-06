@@ -42,6 +42,8 @@ public sealed class StoryDefinition
 
     private Dictionary<SceneId, SceneDefinition>? _byId;
     private StoryReachability? _reachability;
+    private readonly object _replayIdentityGate = new();
+    private volatile bool _replayIdentitiesReady;
 
     /// <summary>The compiler keeps the graph it built for TW3009; other stories build it on first use.</summary>
     [AllowNull]
@@ -49,6 +51,18 @@ public sealed class StoryDefinition
     {
         get => _reachability ??= StoryReachability.Find(Scenes, StoryDiverts.From(Scenes), Start);
         init => _reachability = value;
+    }
+
+    internal void EnsureReplayIdentities()
+    {
+        if (_replayIdentitiesReady) return;
+        lock (_replayIdentityGate)
+        {
+            if (_replayIdentitiesReady) return;
+            if (Scenes.Any(scene => scene.ReplayIdentityCache is null))
+                ChoiceReplayIdentity.Assign(Scenes);
+            _replayIdentitiesReady = true;
+        }
     }
 
     public SceneDefinition GetScene(SceneId id) =>
