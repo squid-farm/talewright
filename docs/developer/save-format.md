@@ -107,6 +107,14 @@ choice with the same outcome identity, even if its availability requirement is n
 keys and availability behavior are unchanged. Recorded hub selections match existing destinations
 regardless of their current tag eligibility; removed destinations still reject the save.
 
+`ChoiceReplayIdentity` owns the outcome description, a JSON array tagged `choice-replay-v1`. Its
+operator, name-part and pronoun-form tokens are frozen in that class, not taken from enum member
+names; effect and expression kinds use the encoder's own tokens or the current Talemark vocabulary
+spellings. `ChoiceReplayIdentityEncodingTests` pins descriptions and identities for every built-in effect,
+expression and operator, and fails when a new effect or expression type has no encoding. If one of
+those vectors fails, the change altered saved identities: either keep the old token or deliberately
+change the version tag and record the compatibility decision. Preview saves are not migrated.
+
 Replay evidence is a versioned SHA-256 chain. Its start binds the story and replay/extension identity,
 seed, character selection, initial ruleset and world state, and start events. Each decision binds its
 scene, outcome identity, and every resulting gameplay event. The final evidence binds the complete
