@@ -94,12 +94,14 @@ Ownership:
 | `{if}`/`{else}`/`{/if}` balance, unclosed blocks, nesting limit and suppression | |
 | Misplaced, duplicate and malformed metadata values; malformed speech; missing divert targets | |
 | Malformed choices, skill-check specs and blocks; missing and misplaced outcomes | Dropped-choice bookkeeping, which needs condition frames |
-| | Analysis tokens, emitted from line kinds and spans |
+| Symbol-independent source classifications (`TalemarkClassifier`) | |
+| | Analysis tokens for hover and preview, emitted from line kinds and spans |
 
 Expressions stay as spans and are parsed and bound by `ExpressionParser` during binding. Prose and
-images stay as line spans parsed by `InlineParser` during binding until #491 separates inline syntax from symbol
-binding. `TaleBinder` binds syntax to the existing model; `TaleDeclarations` collects story-wide symbols from the
-same syntax before any file is bound.
+images stay as spans parsed into runtime templates by `InlineParser` during binding. The syntax classifier reuses
+the inline parser's tokenization and formatting-pairing path to return source ranges, kinds and modifiers without
+binding story symbols. `TaleBinder` binds syntax to the existing model; `TaleDeclarations` collects story-wide
+symbols from the same syntax before any file is bound.
 
 Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
 choice keys, so step IDs are runtime and tooling identities (executor caches, author inspection, debugger map

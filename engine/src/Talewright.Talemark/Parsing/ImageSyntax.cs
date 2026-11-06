@@ -16,6 +16,122 @@ internal static class ImageSyntax
             && trimmed[ExpressionVocabulary.Image.Length..].TrimStart() is [ExpressionVocabulary.OpenParen, ..];
     }
 
+    internal static void Classify(SourceText source, int start, int end,
+        ICollection<TalemarkClassification> output, CancellationToken cancellationToken)
+    {
+        var text = source.Text;
+        var index = start;
+        SkipSpace();
+        var functionStart = index;
+        if (text.AsSpan(index, end - index).StartsWith(ExpressionVocabulary.Image, StringComparison.Ordinal))
+        {
+            index += ExpressionVocabulary.Image.Length;
+            Add(functionStart, index, TalemarkClassificationKind.Function);
+        }
+
+        SkipSpace();
+        if (index < end && text[index] == ExpressionVocabulary.OpenParen)
+        {
+            Add(index, index + 1, TalemarkClassificationKind.Punctuation);
+            index++;
+        }
+        SkipSpace();
+
+        if (index < end && text[index] == TextVocabulary.QuoteMark)
+        {
+            var pathStart = index;
+            var path = QuotedStringSyntax.Read(text, index, end, cancellationToken: cancellationToken);
+            index = path.End;
+            Add(pathStart, index, TalemarkClassificationKind.String);
+        }
+
+        SkipSpace();
+        if (index < end && text[index] == ExpressionVocabulary.ArgumentSeparator)
+        {
+            Add(index, index + 1, TalemarkClassificationKind.Punctuation);
+            index++;
+            SkipSpace();
+            ClassifyAlt();
+        }
+
+        SkipSpace();
+        if (index < end && text[index] == ExpressionVocabulary.CloseParen)
+            Add(index, index + 1, TalemarkClassificationKind.Punctuation);
+
+        void ClassifyAlt()
+        {
+            if (index >= end || text[index] != TextVocabulary.QuoteMark)
+                return;
+
+            Add(index, index + 1, TalemarkClassificationKind.Punctuation);
+            index++;
+            var authored = new StringBuilder();
+            var locations = new List<SourceLocation>();
+            while (index < end)
+            {
+                if ((index & 1023) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+                var unit = QuotedStringSyntax.ReadUnit(text, index, end);
+                if (unit.ClosingQuote)
+                {
+                    index = unit.End;
+                    Add(index - 1, index, TalemarkClassificationKind.Punctuation);
+                    locations.Add(source.Locate(index));
+                    AppendInlineClassifications(authored, locations);
+                    return;
+                }
+
+                if (unit.Escaped)
+                {
+                    var next = unit.Character;
+                    index = unit.End;
+                    if (next == TextVocabulary.QuoteMark)
+                    {
+                        authored.Append(next);
+                        locations.Add(source.Locate(index - 1));
+                    }
+                    else
+                    {
+                        authored.Append(TextVocabulary.EscapeMark).Append(next);
+                        locations.Add(source.Locate(index - 2));
+                        locations.Add(source.Locate(index - 1));
+                    }
+                    continue;
+                }
+
+                authored.Append(unit.Character);
+                locations.Add(source.Locate(index));
+                index = unit.End;
+            }
+
+            locations.Add(source.Locate(index));
+            AppendInlineClassifications(authored, locations);
+
+            void AppendInlineClassifications(StringBuilder value, List<SourceLocation> positions)
+            {
+                foreach (var classification in InlineParser.Classify(SourceText.Mapped(value.ToString(), positions),
+                             cancellationToken))
+                    output.Add(classification);
+            }
+        }
+
+        void SkipSpace()
+        {
+            while (index < end && char.IsWhiteSpace(text[index]))
+            {
+                if ((index & 1023) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+                index++;
+            }
+        }
+
+        void Add(int from, int to, TalemarkClassificationKind kind)
+        {
+            if (to > from)
+                output.Add(new(new SourceRange(source.Locate(from), source.Locate(to)), kind));
+        }
+    }
+
     internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
         StorySymbols symbols, CancellationToken cancellationToken = default)
     {

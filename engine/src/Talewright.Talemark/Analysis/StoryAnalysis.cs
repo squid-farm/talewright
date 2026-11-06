@@ -36,6 +36,7 @@ public sealed class StoryAnalysis
         Expressions = original.Expressions;
         _sites = original._sites;
         Tokens = original.Tokens;
+        Classifications = original.Classifications;
         World = original.World;
         Substitutions = original.Substitutions;
         Scenes = original.Scenes;
@@ -48,6 +49,7 @@ public sealed class StoryAnalysis
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
         _sites = new CompletionSiteIndex(collector.CompletionSites.ToArray());
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
+        Classifications = Array.AsReadOnly(collector.Classifications.ToArray());
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
         Scenes = Array.AsReadOnly(collector.Scenes.ToArray());
@@ -71,6 +73,7 @@ public sealed class StoryAnalysis
     internal IEnumerable<CompletionSite> AllCompletionSites() => _sites.All(Symbols);
 
     public IReadOnlyList<AuthoringToken> Tokens { get; }
+    public IReadOnlyList<TalemarkClassification> Classifications { get; }
     public WorldDefinition? World { get; }
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
@@ -115,6 +118,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSiteSource> CompletionSites { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
+    internal List<TalemarkClassification> Classifications { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
     internal List<AuthoredScene> Scenes { get; } = [];
@@ -485,6 +489,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         {
             cancellationToken.ThrowIfCancellationRequested();
             var fileSyntax = syntax(file, text, cancellationToken);
+            Classifications.AddRange(TalemarkClassifier.Classify(file, fileSyntax, cancellationToken));
             TaleDeclarations.Collect(file, fileSyntax, Scene, null, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
