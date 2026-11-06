@@ -36,6 +36,7 @@ public sealed class StoryAnalysis
         Expressions = original.Expressions;
         _sites = original._sites;
         Tokens = original.Tokens;
+        _classifications = original._classifications;
         World = original.World;
         Substitutions = original.Substitutions;
         Scenes = original.Scenes;
@@ -48,6 +49,10 @@ public sealed class StoryAnalysis
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
         _sites = new CompletionSiteIndex(collector.CompletionSites.ToArray());
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
+        var classificationSources = collector.ClassificationSources.ToArray();
+        _classifications = new(() => Array.AsReadOnly(classificationSources
+            .SelectMany(input => TalemarkClassifier.Classify(input.File, input.Syntax, CancellationToken.None))
+            .ToArray()));
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
         Scenes = Array.AsReadOnly(collector.Scenes.ToArray());
@@ -55,6 +60,7 @@ public sealed class StoryAnalysis
     }
 
     private readonly CompletionSiteIndex _sites;
+    private readonly Lazy<IReadOnlyList<TalemarkClassification>> _classifications;
 
     public StorySource Source { get; }
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
@@ -71,6 +77,9 @@ public sealed class StoryAnalysis
     internal IEnumerable<CompletionSite> AllCompletionSites() => _sites.All(Symbols);
 
     public IReadOnlyList<AuthoringToken> Tokens { get; }
+
+    /// <summary>Source classifications, computed once on first access from this snapshot's parsed syntax.</summary>
+    public IReadOnlyList<TalemarkClassification> Classifications => _classifications.Value;
     public WorldDefinition? World { get; }
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
@@ -115,6 +124,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSiteSource> CompletionSites { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
+    internal List<(string File, TaleFileSyntax Syntax)> ClassificationSources { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
     internal List<AuthoredScene> Scenes { get; } = [];
@@ -485,6 +495,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         {
             cancellationToken.ThrowIfCancellationRequested();
             var fileSyntax = syntax(file, text, cancellationToken);
+            ClassificationSources.Add((file, fileSyntax));
             TaleDeclarations.Collect(file, fileSyntax, Scene, null, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var diagnostics = new DiagnosticBag();
