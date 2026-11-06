@@ -177,8 +177,10 @@ Avoid publishing two builds to the same path at once. Without force, publish sto
 appears or an approved file observably changes during the build. This is a safety check, not a lock
 against every possible filesystem race; see the [replacement policy](../reference/cli.md#advanced-replacing-an-existing-archive).
 
-Current released saves require the exact story revision; player or extension changes can also
-prevent loading. Keep a copy of each released build so players can reopen their saves with it.
+Current released saves require the exact story revision; even a prose-only edit can make a save
+unavailable, and player or extension changes can also prevent loading. Exporting a backup preserves
+the save file but does not make it compatible with a changed story or player. Keep a copy of each
+released story and a compatible player version so players can reopen their saves.
 V1 story updates use replay evidence: prose and label changes or unrelated choices may be compatible,
 but changed starting values or recorded gameplay outcomes are not. Saves without replay evidence
 have no cross-revision compatibility guarantee. See

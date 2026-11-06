@@ -116,8 +116,10 @@ the file against the same story and player compatibility rules as loading; a dam
 file leaves your existing saves and current playthrough unchanged. Import adds a named save; it does
 not load it or replace the separate Quick Save checkpoint. Select **Load** to play it.
 Save files are compressed binary files, not text. Editing them can damage the save; they are not
-tamper-proof.
-Backups can move between web and desktop when the story files and player save format are compatible.
+tamper-proof. Exporting or backing up a save preserves the file; it does not make the save compatible
+with a different story revision or player version. Keep the exact story files and a compatible player
+version with each backup. Backups can move between web and desktop when the story files and player
+save format are compatible.
 
 ## Updating a story with existing saves
 

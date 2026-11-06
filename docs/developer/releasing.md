@@ -15,6 +15,20 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 | Valid version-tag push | After verification, **Publish Samples** builds that tagged web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). The root represents the most recently deployed eligible tag, including previews. **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. Package publishing jobs use environment `release`. |
 | PR / manual | Validation only. |
 
+## Preview save-compatibility notice
+
+Use this prepared copy in preview release notes and tester announcements while released saves require
+the exact story revision. Update it if the shipped save behavior changes. This copy does not authorize
+publishing a release or contacting testers; the project lead controls both.
+
+> **Save compatibility:** Saves in this preview are tied to the exact story revision and a compatible
+> player version. Even a prose-only story edit can make a save unavailable, and player or extension
+> changes may also prevent loading. This preview does not migrate incompatible saves. Keep the exact
+> story files and a compatible player version used for each save. Exporting or backing up a save
+> preserves the file; it does not make the save compatible with a changed story or player. Autosave
+> is on by default and keeps one rolling recovery save, not a backup. If you test an update, note what
+> changed and whether the save still loads. Please do not share private story content without permission.
+
 The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
 public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/update procedure is documented in
 [UI test container image](ui-test-image.md).
