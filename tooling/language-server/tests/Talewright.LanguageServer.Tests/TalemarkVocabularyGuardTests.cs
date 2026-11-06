@@ -2,6 +2,9 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Talewright.Core.Rulesets;
+using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 
@@ -20,6 +23,12 @@ public sealed class TalemarkVocabularyGuardTests
     {
         ["tooling/authoring/src/Talewright.Authoring/ManifestListEditor.cs"] =
             "YAML scalar keywords are not Talemark syntax.",
+    };
+
+    private static readonly Dictionary<string, string> ManifestLiteralExemptions = new(StringComparer.Ordinal)
+    {
+        ["tooling/authoring/src/Talewright.Authoring/StoryHover.cs|items"] =
+            "The JSON Schema 'items' keyword is not a manifest property.",
     };
 
     // Single punctuation characters are also paths, URIs and Markdown, so they are enforced only where the
@@ -55,20 +64,6 @@ public sealed class TalemarkVocabularyGuardTests
         "engine/src/Talewright.Talemark",
         "tooling/authoring/src/Talewright.Authoring",
         "tooling/language-server/src/Talewright.LanguageServer",
-    ];
-
-    private static readonly string[] ManifestConsumerFiles =
-    [
-        "engine/src/Talewright.Talemark/Parsing/StoryYamlAssembler.cs",
-        "engine/src/Talewright.Talemark/Parsing/StoryYamlContext.cs",
-        "engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs",
-        "engine/src/Talewright.Talemark/Parsing/StoryYamlRulesetReader.cs",
-        "engine/src/Talewright.Talemark/Parsing/StoryYamlWorldReader.cs",
-        "engine/src/Talewright.Talemark/Analysis/StoryAnalysis.cs",
-        "engine/src/Talewright.Talemark/Compilation/StorySource.cs",
-        "tooling/authoring/src/Talewright.Authoring/ManifestListEditor.cs",
-        "tooling/authoring/src/Talewright.Authoring/StoryPreview.cs",
-        "tooling/authoring/src/Talewright.Authoring/StoryQuickFixes.cs",
     ];
 
     [Fact]
@@ -137,6 +132,9 @@ public sealed class TalemarkVocabularyGuardTests
         var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         var propertyKeys = Strings("PropertyKeys");
         var fixedKeywords = Strings("FixedKeywordValues");
+        var statCategories = Strings("StatCategories");
+        var statCategoryValues = (IReadOnlyDictionary<string, StatCategory>)
+            vocabulary.GetField("StatCategoryValues", flags)!.GetValue(null)!;
         var constantFields = vocabulary.GetFields(flags)
             .Where(field => field.IsLiteral && field.FieldType == typeof(string))
             .ToArray();
@@ -148,16 +146,23 @@ public sealed class TalemarkVocabularyGuardTests
 
         Assert.Equal(propertyKeys.Order(StringComparer.Ordinal), schemaProperties.Order(StringComparer.Ordinal));
         Assert.Equal(fixedKeywords.Order(StringComparer.Ordinal), schemaKeywords.Order(StringComparer.Ordinal));
+        Assert.Equal(statCategories.Order(StringComparer.Ordinal),
+            statCategoryValues.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(Pronouns.BuiltInByKeyword.Keys.Order(StringComparer.Ordinal),
+            Strings("BuiltInPronounKeywords").Order(StringComparer.Ordinal));
 
-        var sourcePaths = ManifestConsumerFiles.Select(path => Path.Combine(root, path)).ToArray();
-        Assert.All(sourcePaths, path => Assert.True(File.Exists(path), $"{path} no longer exists."));
+        var sourcePaths = ManifestConsumerPaths(root);
+        Assert.Contains(sourcePaths, path =>
+            Path.GetFileName(path).StartsWith("StoryYaml", StringComparison.Ordinal));
         var source = string.Join('\n', sourcePaths.Select(File.ReadAllText));
+        var readProperties = sourcePaths
+            .SelectMany(path => ManifestReadProperties(File.ReadAllText(path)))
+            .ToHashSet(StringComparer.Ordinal);
         foreach (var key in propertyKeys)
         {
             var field = Assert.Single(constantFields, field =>
                 StringComparer.Ordinal.Equals(field.GetRawConstantValue() as string, key));
-            Assert.True(source.Contains($"ManifestVocabulary.{field.Name}", StringComparison.Ordinal),
-                $"Manifest property '{key}' is not consumed from ManifestVocabulary.");
+            Assert.Contains(field.Name, readProperties);
         }
         Assert.Contains("ManifestVocabulary.BuiltInPronounKeywords", source, StringComparison.Ordinal);
         foreach (var symbolType in Strings("AuthoringSymbolTypes"))
@@ -178,12 +183,22 @@ public sealed class TalemarkVocabularyGuardTests
 
         var manifestSpellings = propertyKeys.Concat(fixedKeywords).Concat(Strings("AuthoringSymbolTypes"))
             .ToHashSet(StringComparer.Ordinal);
+        var seenManifestExemptions = new HashSet<string>(StringComparer.Ordinal);
         var unownedLiterals = sourcePaths
             .SelectMany(path => Literals(File.ReadAllText(path))
                 .Where(literal => manifestSpellings.Contains(literal.Value))
+                .Where(literal =>
+                {
+                    var key = $"{Path.GetRelativePath(root, path)}|{literal.Value}";
+                    if (!ManifestLiteralExemptions.ContainsKey(key)) return true;
+                    seenManifestExemptions.Add(key);
+                    return false;
+                })
                 .Select(literal => $"{Path.GetRelativePath(root, path)}:{literal.Line}: \"{literal.Value}\""))
             .ToArray();
-        Assert.Empty(unownedLiterals);
+        Assert.Equal(ManifestLiteralExemptions.Keys.Order(StringComparer.Ordinal),
+            seenManifestExemptions.Order(StringComparer.Ordinal));
+        Assert.True(unownedLiterals.Length == 0, string.Join(Environment.NewLine, unownedLiterals));
 
         string[] Strings(string name) =>
             ((IEnumerable<string>)vocabulary.GetField(name, flags)!.GetValue(null)!).ToArray();
@@ -209,6 +224,19 @@ public sealed class TalemarkVocabularyGuardTests
                     VisitSchema(value);
             }
         }
+    }
+
+    [Theory]
+    [InlineData("engine/src/Talewright.Talemark/Parsing/StoryYamlFutureReader.cs", "var key = \"game\";")]
+    [InlineData("tooling/authoring/src/Talewright.Authoring/ManifestFutureHelper.cs", "var key = \"flags\";")]
+    [InlineData("tooling/authoring/src/Talewright.Authoring/StoryFutureHelper.cs", "var path = token.ManifestPath; var key = \"vars\";")]
+    public void Manifest_consumer_discovery_covers_new_readers_and_authoring_helpers(string relativePath, string source)
+    {
+        var root = RepositoryRoot();
+        var path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+        Assert.True(IsManifestConsumer(root, path, source));
+        Assert.Contains(Literals(source), literal => literal.Value is "game" or "flags" or "vars");
     }
 
     [Fact]
@@ -287,6 +315,59 @@ public sealed class TalemarkVocabularyGuardTests
                     "ExpressionVocabulary.cs" or "ManifestVocabulary.cs" or "SceneVocabulary.cs" or "TextVocabulary.cs";
                 return !definition && !parts.Any(part => part is "bin" or "obj");
             });
+
+    private static string[] ManifestConsumerPaths(string root)
+    {
+        return SourceRoots.SelectMany(sourceRoot => SourceFiles(Path.Combine(root, sourceRoot)))
+            .Where(path => IsManifestConsumer(root, path, File.ReadAllText(path)))
+            .ToArray();
+    }
+
+    private static bool IsManifestConsumer(string root, string path, string source)
+    {
+        var name = Path.GetFileName(path);
+        var relative = Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
+        var isTalemarkSource = relative.StartsWith("engine/src/Talewright.Talemark/", StringComparison.Ordinal);
+        var isAuthoringSource = relative.StartsWith("tooling/authoring/src/Talewright.Authoring/", StringComparison.Ordinal);
+        var isLanguageServerSource = relative.StartsWith("tooling/language-server/src/Talewright.LanguageServer/", StringComparison.Ordinal);
+        return name.StartsWith("StoryYaml", StringComparison.Ordinal) ||
+            name.Contains("Manifest", StringComparison.Ordinal) ||
+            source.Contains("ManifestVocabulary.", StringComparison.Ordinal) ||
+            source.Contains("ManifestPath", StringComparison.Ordinal) ||
+            !isLanguageServerSource && source.Contains("ManifestFileName", StringComparison.Ordinal) ||
+            source.Contains("ManifestListEditor", StringComparison.Ordinal) ||
+            (isTalemarkSource || isAuthoringSource) && source.Contains("YamlMappingNode", StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<string> ManifestReadProperties(string source)
+    {
+        var root = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
+        return root.DescendantNodes()
+            .OfType<MemberAccessExpressionSyntax>()
+            .Where(member => member.Expression is IdentifierNameSyntax
+                { Identifier.ValueText: "ManifestVocabulary" })
+            .Where(IsManifestRead)
+            .Select(member => member.Name.Identifier.ValueText);
+    }
+
+    private static bool IsManifestRead(MemberAccessExpressionSyntax member)
+    {
+        foreach (var invocation in member.Ancestors().OfType<InvocationExpressionSyntax>())
+        {
+            var method = invocation.Expression switch
+            {
+                IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+                MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
+                _ => string.Empty,
+            };
+            if (method is not ("Get" or "RequiredScalar" or "RequiredIdentifier" or "TryGetValue" or "Form"))
+                continue;
+            if (invocation.ArgumentList.Arguments.Any(argument => argument.Span.Contains(member.Span)))
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>Decoded values of every string and character literal token, as the C# compiler sees them.</summary>
     /// <remarks>Comments are trivia and interpolated-string text is not a literal token, so neither is reported.</remarks>

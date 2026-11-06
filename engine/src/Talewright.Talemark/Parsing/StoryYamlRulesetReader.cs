@@ -78,7 +78,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                 }
 
                 var category = Scalar(Get(stat, ManifestVocabulary.Category)) ?? ManifestVocabulary.StatCategoryCustom;
-                if (!Enum.TryParse<StatCategory>(category, ignoreCase: true, out var parsedCategory))
+                if (!ManifestVocabulary.TryParseStatCategory(category, out var parsedCategory))
                 {
                     _yaml.Error(Get(stat, ManifestVocabulary.Category)!, CompilerDiagnosticCodes.InvalidConfigurationValue,
                         $"Unknown stat category '{category}'. Use {ManifestVocabulary.StatCategoryAttribute}, " +

@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Talewright.Core.World;
 
 /// <summary>
@@ -22,13 +24,17 @@ public sealed record Pronouns(
     public static Pronouns They { get; } = new("they", "them", "their", "theirs", "themselves", GrammaticalNumber.Plural);
     public static Pronouns It { get; } = new("it", "it", "its", "its", "itself", GrammaticalNumber.Singular);
 
+    /// <summary>Canonical keywords mapped to their built-in pronoun sets.</summary>
+    public static IReadOnlyDictionary<string, Pronouns> BuiltInByKeyword { get; } =
+        new ReadOnlyDictionary<string, Pronouns>(new Dictionary<string, Pronouns>(StringComparer.Ordinal)
+        {
+            ["she"] = She,
+            ["he"] = He,
+            ["they"] = They,
+            ["it"] = It,
+        });
+
     /// <summary>Resolves a built-in set by its subject form, or null.</summary>
-    public static Pronouns? FromKeyword(string keyword) => keyword.ToLowerInvariant() switch
-    {
-        "she" => She,
-        "he" => He,
-        "they" => They,
-        "it" => It,
-        _ => null,
-    };
+    public static Pronouns? FromKeyword(string keyword) =>
+        BuiltInByKeyword.TryGetValue(keyword.ToLowerInvariant(), out var pronouns) ? pronouns : null;
 }

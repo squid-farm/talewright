@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using CorePronouns = Talewright.Core.World.Pronouns;
+using Talewright.Core.Rulesets;
 
 namespace Talewright.Talemark.Vocabulary;
 
@@ -67,6 +68,20 @@ internal static class ManifestVocabulary
     [
         StatCategoryAttribute, StatCategorySkill, StatCategoryResource, StatCategoryProgression, StatCategoryCustom,
     ];
+    private static readonly ImmutableDictionary<string, StatCategory> StatCategoryValues =
+        ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase,
+        [
+            KeyValuePair.Create(StatCategoryAttribute, StatCategory.Attribute),
+            KeyValuePair.Create(StatCategorySkill, StatCategory.Skill),
+            KeyValuePair.Create(StatCategoryResource, StatCategory.Resource),
+            KeyValuePair.Create(StatCategoryProgression, StatCategory.Progression),
+            KeyValuePair.Create(StatCategoryCustom, StatCategory.Custom),
+        ]);
+
+    internal static bool TryParseStatCategory(string keyword, out StatCategory category) =>
+        StatCategoryValues.TryGetValue(keyword, out category) ||
+        Enum.TryParse(keyword, ignoreCase: true, out category);
+
     internal const string GrammaticalSingular = "singular";
     internal const string GrammaticalPlural = "plural";
 
@@ -81,10 +96,7 @@ internal static class ManifestVocabulary
     internal const string SymbolUnresolved = "unresolved";
     internal static readonly ImmutableArray<string> BuiltInPronounKeywords =
     [
-        CorePronouns.She.Subject,
-        CorePronouns.He.Subject,
-        CorePronouns.They.Subject,
-        CorePronouns.It.Subject,
+        .. CorePronouns.BuiltInByKeyword.Keys,
     ];
 
     internal static readonly ImmutableArray<string> PropertyKeys =
