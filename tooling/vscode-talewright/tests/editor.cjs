@@ -31,6 +31,9 @@ exports.run = async () => {
     assert.equal((await bundledServerProcesses(extension)).length, 0, 'Untrusted workspaces must not launch the server');
     assert.equal(vscode.languages.getDiagnostics(document.uri).filter(item => item.source === 'talewright').length, 0);
     assert.equal(document.languageId, 'tale', 'Syntax support remains available in restricted mode');
+    assert.ok(extension.packageJSON.contributes.grammars.some(grammar =>
+      grammar.language === 'tale' && grammar.scopeName === 'text.tale'),
+    'Untrusted workspaces retain the TextMate fallback grammar');
     console.log('Installed VSIX restricted-mode smoke passed: no server process or compiler execution.');
     return;
   }
@@ -339,10 +342,11 @@ async function testLiveDiagnostics() {
 
     const edit = new vscode.WorkspaceEdit();
     edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
-      '=== start\nHello.\n-> END\n');
+      '=== start\n{if true}\n\u{1F600} {player:first-name#upper} Ready.\nword*inner*word\n**bold**text\n__snake__case__\n*a **b* c**\n{else}\nStill here.\n{/if}\n-> END\n');
     assert.equal(await vscode.workspace.applyEdit(edit), true);
     assert.equal(document.isDirty, true, 'Exercise an unsaved overlay');
     await waitForCompiler(document, items => items.length === 0);
+    await assertSemanticTokens(document);
     assert.ok((await fs.readFile(file, 'utf8')).includes('missing'), 'Disk must remain invalid');
     const completionEdit = new vscode.WorkspaceEdit();
     completionEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
@@ -493,4 +497,35 @@ async function waitForCompiler(document, predicate) {
     await new Promise(resolve => setTimeout(resolve, 100));
   } while (Date.now() < deadline);
   assert.fail(`Timed out waiting for compiler diagnostics: ${JSON.stringify(vscode.languages.getDiagnostics(document.uri))}`);
+}
+
+async function assertSemanticTokens(document) {
+  const legend = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend', document.uri);
+  assert.ok(legend?.tokenTypes?.includes('operator'), 'The language server must register a semantic-token legend');
+  const result = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens', document.uri);
+  assert.ok(result?.data, 'The installed extension must provide compiler-backed semantic tokens');
+  const data = Array.from(result.data);
+  assert.equal(data.length % 5, 0, 'Semantic token data must use five-integer LSP groups');
+
+  const lines = document.getText().replace(/\r\n/g, '\n').split('\n');
+  const tokens = [];
+  let line = 0;
+  let previousStart = 0;
+  for (let index = 0; index < data.length; index += 5) {
+    const lineDelta = data[index];
+    line += lineDelta;
+    const start = lineDelta === 0 ? previousStart + data[index + 1] : data[index + 1];
+    const length = data[index + 2];
+    const type = legend.tokenTypes[data[index + 3]];
+    tokens.push({ line, type, text: lines[line].slice(start, start + length) });
+    previousStart = start;
+  }
+
+  assert.ok(tokens.some(token => token.type === 'keyword' && token.text === 'if'));
+  assert.ok(tokens.some(token => token.type === 'property' && token.text === 'first-name'));
+  assert.ok(tokens.some(token => token.type === 'modifier' && token.text === 'upper'));
+  assert.deepEqual(tokens.filter(token => token.type === 'operator' &&
+    (token.text === '__' || token.text === '**')).map(token => token.text), ['__', '__', '**', '**']);
+  assert.equal(tokens.some(token => token.type === 'operator' && token.text === '*' && token.line === 3), false,
+    'Compiler classifications must preserve the emphasis boundary rules');
 }

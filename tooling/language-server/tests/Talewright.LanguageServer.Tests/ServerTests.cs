@@ -37,6 +37,15 @@ public sealed partial class ServerTests
         var initialized = await client.Initialize();
         Assert.Equal("utf-16", initialized.GetProperty("result").GetProperty("capabilities").GetProperty("positionEncoding").GetString());
         Assert.Equal(1, initialized.GetProperty("result").GetProperty("capabilities").GetProperty("textDocumentSync").GetProperty("change").GetInt32());
+        var semanticTokens = initialized.GetProperty("result").GetProperty("capabilities").GetProperty("semanticTokensProvider");
+        Assert.Equal(["comment", "keyword", "operator", "number", "string", "variable", "namespace", "property", "function", "modifier"],
+            semanticTokens.GetProperty("legend").GetProperty("tokenTypes").EnumerateArray()
+                .Select(value => value.GetString()!).ToArray());
+        Assert.Equal(["declaration"],
+            semanticTokens.GetProperty("legend").GetProperty("tokenModifiers").EnumerateArray()
+                .Select(value => value.GetString()!).ToArray());
+        Assert.False(semanticTokens.GetProperty("range").GetBoolean());
+        Assert.False(semanticTokens.GetProperty("full").GetProperty("delta").GetBoolean());
         var triggers = initialized.GetProperty("result").GetProperty("capabilities").GetProperty("completionProvider")
             .GetProperty("triggerCharacters").EnumerateArray().Select(value => value.GetString()!).ToArray();
         Assert.Equal(AuthoringSyntaxVocabulary.CompletionTriggerCharacters, triggers);
