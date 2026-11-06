@@ -337,7 +337,7 @@ flowchart TD
   world["Ruleset factory + WorldDefinition<br/>(CompilerOptions.Rulesets)"]
   syn["TaleSyntaxParser per .tale<br/>scenes + classified lines, no symbols"]
   disc["Declarations: TaleDeclarations per syntax<br/>scene ids, auto-declared flags/vars"]
-  parse["Binding: TaleParser per syntax<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
+  parse["Binding: TaleBinder per syntax<br/>InlineParser · ExpressionSyntaxParser → ExpressionBinder"]
   val["StoryValidator<br/>structure + StoryReachability (Graphs)"]
   ok(["StoryDefinition"])
   err(["Diagnostics only (Story = null)"])
@@ -378,7 +378,7 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
     their check. Choice and skill-check lines record clause spans.
   - `TaleDeclarations`: walks that syntax for scene ids and effect text before binding, so story-wide flags
     and vars are known up front. It does not run the binder.
-  - `TaleParser`: binds that syntax to scenes and steps. See the Talemark README for syntax/binding ownership.
+  - `TaleBinder`: binds that syntax to scenes and steps. See the Talemark README for syntax/binding ownership.
   - `InlineParser`: reader text → inline template AST. Uses the shared delimiter scan for braces, then tokenizes
     constructs, escapes, line breaks and bounded formatting directly; unsupported Markdown remains literal.
   - `DelimiterScanner`: pairs enclosing delimiters and quoted strings; it does not parse the meaning inside them.

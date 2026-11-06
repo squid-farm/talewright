@@ -26,7 +26,7 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 /// <remarks>
 /// Block-level conditions retain their nested steps so the runtime decides each branch once.
 /// </remarks>
-internal sealed partial class TaleParser
+internal sealed partial class TaleBinder
 {
     private readonly string _file;
     private readonly TaleFileSyntax _syntax;
@@ -43,7 +43,7 @@ internal sealed partial class TaleParser
     private int _lineStart;
     private int _lineLength;
 
-    private TaleParser(string file, TaleFileSyntax syntax, StorySymbols symbols, DiagnosticBag diagnostics,
+    private TaleBinder(string file, TaleFileSyntax syntax, StorySymbols symbols, DiagnosticBag diagnostics,
         CancellationToken cancellationToken)
     {
         _file = file;
@@ -57,7 +57,7 @@ internal sealed partial class TaleParser
     public static List<ParsedScene> Parse(string file, TaleFileSyntax syntax, StorySymbols symbols,
         DiagnosticBag diagnostics, CancellationToken cancellationToken = default)
     {
-        var parser = new TaleParser(file, syntax, symbols, diagnostics, cancellationToken);
+        var parser = new TaleBinder(file, syntax, symbols, diagnostics, cancellationToken);
         parser.Run();
         return parser._scenes;
     }
