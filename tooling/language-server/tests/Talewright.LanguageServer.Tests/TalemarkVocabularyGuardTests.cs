@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Talewright.Narrative.Templates;
@@ -14,19 +15,11 @@ public sealed class TalemarkVocabularyGuardTests
 {
     private const string VocabularyNamespace = "Talewright.Talemark.Vocabulary";
 
-    // Files that still own grammar text until the issue that moves it lands. Each must still contain a stray spelling,
-    // so finished migrations remove their exemption.
+    // Files that contain a spelling for a different syntax or API; each exemption must still have a hit.
     private static readonly Dictionary<string, string> PendingFiles = new(StringComparer.Ordinal)
     {
-        ["engine/src/Talewright.Talemark/Analysis/StoryAnalysis.cs"] =
-            "Manifest symbol types are a separate vocabulary owned in #474.",
-        ["engine/src/Talewright.Talemark/Compilation/StorySource.cs"] =
-            "Manifest keys are a separate vocabulary owned in #474.",
-        ["engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs"] =
-            "Manifest keys are a separate vocabulary owned in #474.",
-        ["engine/src/Talewright.Talemark/Parsing/StoryYamlWorldReader.cs"] = "Manifest keys; owned in #474.",
-        ["engine/src/Talewright.Talemark/Parsing/StoryYamlRulesetReader.cs"] = "Manifest keys; owned in #474.",
-        ["tooling/authoring/src/Talewright.Authoring/ManifestListEditor.cs"] = "YAML scalars; owned in #474.",
+        ["tooling/authoring/src/Talewright.Authoring/ManifestListEditor.cs"] =
+            "YAML scalar keywords are not Talemark syntax.",
     };
 
     // Single punctuation characters are also paths, URIs and Markdown, so they are enforced only where the
@@ -62,6 +55,20 @@ public sealed class TalemarkVocabularyGuardTests
         "engine/src/Talewright.Talemark",
         "tooling/authoring/src/Talewright.Authoring",
         "tooling/language-server/src/Talewright.LanguageServer",
+    ];
+
+    private static readonly string[] ManifestConsumerFiles =
+    [
+        "engine/src/Talewright.Talemark/Parsing/StoryYamlAssembler.cs",
+        "engine/src/Talewright.Talemark/Parsing/StoryYamlContext.cs",
+        "engine/src/Talewright.Talemark/Parsing/StoryYamlReader.cs",
+        "engine/src/Talewright.Talemark/Parsing/StoryYamlRulesetReader.cs",
+        "engine/src/Talewright.Talemark/Parsing/StoryYamlWorldReader.cs",
+        "engine/src/Talewright.Talemark/Analysis/StoryAnalysis.cs",
+        "engine/src/Talewright.Talemark/Compilation/StorySource.cs",
+        "tooling/authoring/src/Talewright.Authoring/ManifestListEditor.cs",
+        "tooling/authoring/src/Talewright.Authoring/StoryPreview.cs",
+        "tooling/authoring/src/Talewright.Authoring/StoryQuickFixes.cs",
     ];
 
     [Fact]
@@ -122,6 +129,89 @@ public sealed class TalemarkVocabularyGuardTests
     }
 
     [Fact]
+    public void Manifest_keys_and_keywords_are_owned_consumed_and_match_the_editor_schema()
+    {
+        var root = RepositoryRoot();
+        var assembly = typeof(StoryCompiler).Assembly;
+        var vocabulary = assembly.GetType($"{VocabularyNamespace}.ManifestVocabulary", throwOnError: true)!;
+        var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+        var propertyKeys = Strings("PropertyKeys");
+        var fixedKeywords = Strings("FixedKeywordValues");
+        var constantFields = vocabulary.GetFields(flags)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .ToArray();
+        var schemaPath = Path.Combine(root, "tooling", "vscode-talewright", "schemas", "story.schema.json");
+        using var schema = JsonDocument.Parse(File.ReadAllText(schemaPath));
+        var schemaProperties = new HashSet<string>(StringComparer.Ordinal);
+        var schemaKeywords = new HashSet<string>(StringComparer.Ordinal);
+        VisitSchema(schema.RootElement);
+
+        Assert.Equal(propertyKeys.Order(StringComparer.Ordinal), schemaProperties.Order(StringComparer.Ordinal));
+        Assert.Equal(fixedKeywords.Order(StringComparer.Ordinal), schemaKeywords.Order(StringComparer.Ordinal));
+
+        var sourcePaths = ManifestConsumerFiles.Select(path => Path.Combine(root, path)).ToArray();
+        Assert.All(sourcePaths, path => Assert.True(File.Exists(path), $"{path} no longer exists."));
+        var source = string.Join('\n', sourcePaths.Select(File.ReadAllText));
+        foreach (var key in propertyKeys)
+        {
+            var field = Assert.Single(constantFields, field =>
+                StringComparer.Ordinal.Equals(field.GetRawConstantValue() as string, key));
+            Assert.True(source.Contains($"ManifestVocabulary.{field.Name}", StringComparison.Ordinal),
+                $"Manifest property '{key}' is not consumed from ManifestVocabulary.");
+        }
+        Assert.Contains("ManifestVocabulary.BuiltInPronounKeywords", source, StringComparison.Ordinal);
+        foreach (var symbolType in Strings("AuthoringSymbolTypes"))
+        {
+            var field = Assert.Single(constantFields, field =>
+                StringComparer.Ordinal.Equals(field.GetRawConstantValue() as string, symbolType));
+            Assert.True(source.Contains($"ManifestVocabulary.{field.Name}", StringComparison.Ordinal),
+                $"Authoring symbol type '{symbolType}' is not consumed from ManifestVocabulary.");
+        }
+        foreach (var keyword in fixedKeywords.Where(value => !Strings("BuiltInPronounKeywords").Contains(value,
+                     StringComparer.Ordinal)))
+        {
+            var field = Assert.Single(constantFields, field =>
+                StringComparer.Ordinal.Equals(field.GetRawConstantValue() as string, keyword));
+            Assert.True(source.Contains($"ManifestVocabulary.{field.Name}", StringComparison.Ordinal),
+                $"Manifest keyword '{keyword}' is not consumed from ManifestVocabulary.");
+        }
+
+        var manifestSpellings = propertyKeys.Concat(fixedKeywords).Concat(Strings("AuthoringSymbolTypes"))
+            .ToHashSet(StringComparer.Ordinal);
+        var unownedLiterals = sourcePaths
+            .SelectMany(path => Literals(File.ReadAllText(path))
+                .Where(literal => manifestSpellings.Contains(literal.Value))
+                .Select(literal => $"{Path.GetRelativePath(root, path)}:{literal.Line}: \"{literal.Value}\""))
+            .ToArray();
+        Assert.Empty(unownedLiterals);
+
+        string[] Strings(string name) =>
+            ((IEnumerable<string>)vocabulary.GetField(name, flags)!.GetValue(null)!).ToArray();
+
+        void VisitSchema(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                if (element.TryGetProperty("properties", out var properties))
+                {
+                    foreach (var property in properties.EnumerateObject())
+                        schemaProperties.Add(property.Name);
+                }
+                if (element.TryGetProperty("enum", out var enumeration))
+                    foreach (var value in enumeration.EnumerateArray())
+                        schemaKeywords.Add(value.GetString()!);
+                foreach (var property in element.EnumerateObject())
+                    VisitSchema(property.Value);
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var value in element.EnumerateArray())
+                    VisitSchema(value);
+            }
+        }
+    }
+
+    [Fact]
     public void Literal_scanner_checks_decoded_values_but_ignores_comments_and_interpolated_text()
     {
         const string source = """"
@@ -167,7 +257,7 @@ public sealed class TalemarkVocabularyGuardTests
     private static (HashSet<string> Words, HashSet<string> Punctuation, HashSet<string> LineMarkers) Spellings()
     {
         var vocabularyTypes = typeof(StoryCompiler).Assembly.GetTypes()
-            .Where(type => type.Namespace == VocabularyNamespace)
+            .Where(type => type.Namespace == VocabularyNamespace && type.Name != "ManifestVocabulary")
             .ToArray();
         var values = vocabularyTypes
             .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
@@ -194,7 +284,7 @@ public sealed class TalemarkVocabularyGuardTests
                 var parts = Path.GetRelativePath(sourceRoot, path)
                     .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 var definition = parts.Contains("Vocabulary") && Path.GetFileName(path) is
-                    "ExpressionVocabulary.cs" or "SceneVocabulary.cs" or "TextVocabulary.cs";
+                    "ExpressionVocabulary.cs" or "ManifestVocabulary.cs" or "SceneVocabulary.cs" or "TextVocabulary.cs";
                 return !definition && !parts.Any(part => part is "bin" or "obj");
             });
 

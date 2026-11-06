@@ -19,25 +19,26 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
 
     internal CharacterCreation? ReadCreation(YamlNode? node, Ruleset ruleset)
     {
-        if (node is null || _yaml.Mapping(node, "creation") is not { } map)
+        if (node is null || _yaml.Mapping(node, ManifestVocabulary.Creation) is not { } map)
         {
             return null;
         }
 
-        _yaml.CheckKeys(map, "name", "pronouns", "presets", "stats");
+        _yaml.CheckKeys(map, ManifestVocabulary.Name, ManifestVocabulary.Pronouns, ManifestVocabulary.Presets, ManifestVocabulary.Stats);
         var editName = false;
-        if (Get(map, "name") is { } name && !bool.TryParse(Scalar(name), out editName))
+        if (Get(map, ManifestVocabulary.Name) is { } name && !bool.TryParse(Scalar(name), out editName))
         {
             _yaml.Error(name, CompilerDiagnosticCodes.InvalidConfigurationValue, "creation.name must be true or false.", 0);
         }
 
         var pronouns = new List<string>();
-        if (Get(map, "pronouns") is { } pronounNode)
+        if (Get(map, ManifestVocabulary.Pronouns) is { } pronounNode)
         {
             foreach (var value in _yaml.Sequence(pronounNode, "creation.pronouns"))
             {
                 var keyword = Scalar(value) ?? "";
-                if (keyword is not ("she" or "he" or "they" or "it") || pronouns.Contains(keyword))
+                if (!ManifestVocabulary.BuiltInPronounKeywords.Contains(keyword, StringComparer.Ordinal) ||
+                    pronouns.Contains(keyword))
                 {
                     _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue, "creation.pronouns must contain distinct built-in keywords: she, he, they, it.", 0);
                 }
@@ -49,7 +50,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
         }
 
         var stats = new Dictionary<StatId, IReadOnlyList<int>>();
-        if (Get(map, "stats") is { } statNode && _yaml.Mapping(statNode, "creation.stats") is { } statMap)
+        if (Get(map, ManifestVocabulary.Stats) is { } statNode && _yaml.Mapping(statNode, "creation.stats") is { } statMap)
         {
             foreach (var (key, value) in statMap.Children)
             {
@@ -90,7 +91,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
         }
 
         var presets = new List<CharacterPreset>();
-        if (Get(map, "presets") is { } presetNode && _yaml.Mapping(presetNode, "creation.presets") is { } presetMap)
+        if (Get(map, ManifestVocabulary.Presets) is { } presetNode && _yaml.Mapping(presetNode, "creation.presets") is { } presetMap)
         {
             foreach (var (key, value) in presetMap.Children)
             {
@@ -99,7 +100,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
                     continue;
                 }
 
-                _yaml.CheckKeys(preset, "label", "stats");
+                _yaml.CheckKeys(preset, ManifestVocabulary.Label, ManifestVocabulary.Stats);
                 var id = _yaml.Identifier(key, "preset id");
                 if (id is null)
                 {
@@ -111,7 +112,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
                     continue;
                 }
 
-                var presetStats = ReadStatMap(Get(preset, "stats"), ruleset);
+                var presetStats = ReadStatMap(Get(preset, ManifestVocabulary.Stats), ruleset);
                 foreach (var (stat, number) in presetStats)
                 {
                     if (ruleset.StatsById[stat].Clamp(number) != number ||
@@ -121,7 +122,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
                     }
                 }
 
-                presets.Add(new CharacterPreset(id, Scalar(Get(preset, "label")) ?? id, presetStats));
+                presets.Add(new CharacterPreset(id, Scalar(Get(preset, ManifestVocabulary.Label)) ?? id, presetStats));
             }
 
             if (presets.Count > 16)
@@ -136,7 +137,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
     internal Dictionary<ItemId, ItemDefinition> ReadItems(YamlNode? node, Ruleset ruleset)
     {
         var items = new Dictionary<ItemId, ItemDefinition>();
-        if (node is null || _yaml.Mapping(node, "items") is not { } map)
+        if (node is null || _yaml.Mapping(node, ManifestVocabulary.Items) is not { } map)
         {
             return items;
         }
@@ -152,12 +153,12 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
             var uncountable = false;
             if (value is YamlMappingNode body)
             {
-                _yaml.CheckKeys(body, "name", "modifiers", "name-agreement", "uncountable");
-                name = Scalar(Get(body, "name")) ?? name;
-                modifiers = ReadStatMap(Get(body, "modifiers"), ruleset);
-                if (Get(body, "name-agreement") is { } number)
-                    nameAgreement = ReadGrammaticalNumber(number, "name-agreement");
-                if (Get(body, "uncountable") is { } mass)
+                _yaml.CheckKeys(body, ManifestVocabulary.Name, ManifestVocabulary.Modifiers, ManifestVocabulary.NameAgreement, ManifestVocabulary.Uncountable);
+                name = Scalar(Get(body, ManifestVocabulary.Name)) ?? name;
+                modifiers = ReadStatMap(Get(body, ManifestVocabulary.Modifiers), ruleset);
+                if (Get(body, ManifestVocabulary.NameAgreement) is { } number)
+                    nameAgreement = ReadGrammaticalNumber(number, ManifestVocabulary.NameAgreement);
+                if (Get(body, ManifestVocabulary.Uncountable) is { } mass)
                     uncountable = bool.TryParse(Scalar(mass), out var parsed)
                         ? parsed
                         : _yaml.Error(mass, CompilerDiagnosticCodes.InvalidConfigurationValue, "'uncountable' must be true or false.", false);
@@ -176,7 +177,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
     internal List<FactionDefinition> ReadFactions(YamlNode? node)
     {
         var factions = new List<FactionDefinition>();
-        if (node is null || _yaml.Mapping(node, "factions") is not { } map)
+        if (node is null || _yaml.Mapping(node, ManifestVocabulary.Factions) is not { } map)
         {
             return factions;
         }
@@ -191,9 +192,9 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
                 continue;
             }
 
-            _yaml.CheckKeys(body, "name", "standing");
-            var name = Scalar(Get(body, "name")) ?? id;
-            var standing = _yaml.Int(Get(body, "standing")) ?? 0;
+            _yaml.CheckKeys(body, ManifestVocabulary.Name, ManifestVocabulary.Standing);
+            var name = Scalar(Get(body, ManifestVocabulary.Name)) ?? id;
+            var standing = _yaml.Int(Get(body, ManifestVocabulary.Standing)) ?? 0;
 
             factions.Add(new FactionDefinition(new FactionId(id), name, standing));
         }
@@ -204,7 +205,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
     internal List<CharacterDefinition> ReadCharacters(YamlNode? node, YamlMappingNode root, Ruleset ruleset, Dictionary<ItemId, ItemDefinition> items)
     {
         var characters = new List<CharacterDefinition>();
-        var map = node is null ? null : _yaml.Mapping(node, "characters");
+        var map = node is null ? null : _yaml.Mapping(node, ManifestVocabulary.Characters);
         if (map is null || !map.Children.Any(c => Scalar(c.Key) == EntityId.Player.Value))
         {
             _yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "The story configuration must declare the protagonist under 'characters: player:'.", node is null ? _yaml.At(root) : _yaml.At(node));
@@ -228,14 +229,14 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
                 continue;
             }
 
-            _yaml.CheckKeys(body, "first-name", "last-name", "pronouns", "stats", "inventory", "name-agreement");
-            var firstName = _yaml.RequiredScalar(body, "first-name") ?? id;
-            var lastName = Scalar(Get(body, "last-name")) ?? string.Empty;
-            var pronouns = ReadPronouns(Get(body, "pronouns"));
-            var stats = ReadStatMap(Get(body, "stats"), ruleset);
-            var inventory = ReadInventory(Get(body, "inventory"), items);
-            var nameAgreement = Get(body, "name-agreement") is { } number
-                ? ReadGrammaticalNumber(number, "name-agreement")
+            _yaml.CheckKeys(body, ManifestVocabulary.FirstName, ManifestVocabulary.LastName, ManifestVocabulary.Pronouns, ManifestVocabulary.Stats, ManifestVocabulary.Inventory, ManifestVocabulary.NameAgreement);
+            var firstName = _yaml.RequiredScalar(body, ManifestVocabulary.FirstName) ?? id;
+            var lastName = Scalar(Get(body, ManifestVocabulary.LastName)) ?? string.Empty;
+            var pronouns = ReadPronouns(Get(body, ManifestVocabulary.Pronouns));
+            var stats = ReadStatMap(Get(body, ManifestVocabulary.Stats), ruleset);
+            var inventory = ReadInventory(Get(body, ManifestVocabulary.Inventory), items);
+            var nameAgreement = Get(body, ManifestVocabulary.NameAgreement) is { } number
+                ? ReadGrammaticalNumber(number, ManifestVocabulary.NameAgreement)
                 : GrammaticalNumber.Singular;
             characters.Add(new CharacterDefinition(characterId, firstName, lastName, pronouns, stats, inventory, nameAgreement));
         }
@@ -262,15 +263,15 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
 
         if (node is YamlMappingNode map)
         {
-            _yaml.CheckKeys(map, "subject", "object", "possessive-pronoun", "reflexive", "agreement");
-            var possessive = Get(map, "possessive-pronoun");
-            var determiner = "determiner";
-            var independent = "independent";
+            _yaml.CheckKeys(map, ManifestVocabulary.Subject, ManifestVocabulary.Object, ManifestVocabulary.PossessivePronoun, ManifestVocabulary.Reflexive, ManifestVocabulary.Agreement);
+            var possessive = Get(map, ManifestVocabulary.PossessivePronoun);
+            var determiner = ManifestVocabulary.Determiner;
+            var independent = ManifestVocabulary.Independent;
             if (possessive is YamlMappingNode forms)
             {
-                _yaml.CheckKeys(forms, "determiner", "independent");
-                determiner = _yaml.RequiredScalar(forms, "determiner") ?? determiner;
-                independent = _yaml.RequiredScalar(forms, "independent") ?? independent;
+                _yaml.CheckKeys(forms, ManifestVocabulary.Determiner, ManifestVocabulary.Independent);
+                determiner = _yaml.RequiredScalar(forms, ManifestVocabulary.Determiner) ?? determiner;
+                independent = _yaml.RequiredScalar(forms, ManifestVocabulary.Independent) ?? independent;
             }
             else if (possessive is null)
             {
@@ -282,10 +283,10 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
             }
 
             string Form(string key) => _yaml.RequiredScalar(map, key) ?? key;
-            var agreement = Get(map, "agreement") is { } number
-                ? ReadGrammaticalNumber(number, "agreement")
+            var agreement = Get(map, ManifestVocabulary.Agreement) is { } number
+                ? ReadGrammaticalNumber(number, ManifestVocabulary.Agreement)
                 : _yaml.Error(map, CompilerDiagnosticCodes.MissingRequiredConfiguration, "Custom pronoun sets require 'agreement: singular' or 'agreement: plural'. Agreement describes grammar, not population.", GrammaticalNumber.Singular);
-            return new Pronouns(Form("subject"), Form("object"), determiner, independent, Form("reflexive"), agreement);
+            return new Pronouns(Form(ManifestVocabulary.Subject), Form(ManifestVocabulary.Object), determiner, independent, Form(ManifestVocabulary.Reflexive), agreement);
         }
 
         var keyword = Scalar(node) ?? string.Empty;
@@ -295,15 +296,15 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
 
     private GrammaticalNumber ReadGrammaticalNumber(YamlNode node, string field) => Scalar(node) switch
     {
-        "singular" => GrammaticalNumber.Singular,
-        "plural" => GrammaticalNumber.Plural,
+        ManifestVocabulary.GrammaticalSingular => GrammaticalNumber.Singular,
+        ManifestVocabulary.GrammaticalPlural => GrammaticalNumber.Plural,
         _ => _yaml.Error(node, CompilerDiagnosticCodes.InvalidConfigurationValue, $"'{field}' must be 'singular' or 'plural'; it describes grammar, not population.", GrammaticalNumber.Singular),
     };
 
     private Dictionary<StatId, int> ReadStatMap(YamlNode? node, Ruleset ruleset)
     {
         var stats = new Dictionary<StatId, int>();
-        if (node is null || _yaml.Mapping(node, "stats") is not { } map)
+        if (node is null || _yaml.Mapping(node, ManifestVocabulary.Stats) is not { } map)
         {
             return stats;
         }
@@ -361,7 +362,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
     {
         var flags = new List<FlagId>();
         if (node is null) return flags;
-        foreach (var item in _yaml.Sequence(node, "flags"))
+        foreach (var item in _yaml.Sequence(node, ManifestVocabulary.Flags))
         {
             if (_yaml.Identifier(item, "flag id") is { } id) flags.Add(new FlagId(id));
         }
@@ -373,7 +374,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
     {
         var numericVars = new Dictionary<VarId, int>();
         var textVars = new Dictionary<VarId, string>();
-        if (node is null || _yaml.Mapping(node, "vars") is not { } map)
+        if (node is null || _yaml.Mapping(node, ManifestVocabulary.Vars) is not { } map)
         {
             return (numericVars, textVars);
         }

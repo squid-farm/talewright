@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Collections.ObjectModel;
 using System.Collections.Frozen;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Compilation;
 
@@ -241,9 +242,9 @@ public sealed class StorySource
             var stream = new YamlDotNet.RepresentationModel.YamlStream();
             stream.Load(new StringReader(yaml));
             return stream.Documents.FirstOrDefault()?.RootNode is YamlDotNet.RepresentationModel.YamlMappingNode root
-                && root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("game"), out var gameNode)
+                && root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode(ManifestVocabulary.Game), out var gameNode)
                 && gameNode is YamlDotNet.RepresentationModel.YamlMappingNode game
-                && game.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("title"), out var title)
+                && game.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode(ManifestVocabulary.Title), out var title)
                 ? (title as YamlDotNet.RepresentationModel.YamlScalarNode)?.Value
                 : null;
         }
