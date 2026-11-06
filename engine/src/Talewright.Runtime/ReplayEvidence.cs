@@ -1,11 +1,19 @@
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Talewright.Core.Events;
 using Talewright.Core.State;
+using Talewright.Rules.Checks;
+using Talewright.Rulesets.Generic;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
+/// <summary>
+/// Owns the replay-evidence hash inputs stored in player saves. Type names and enum values are written as the frozen
+/// tokens below, not taken from CLR names; event payloads use the author-scenario serializer and are pinned by
+/// <c>ReplayEvidenceEncodingTests</c>. Change <see cref="Version"/> deliberately when the encoding must change.
+/// </summary>
 internal static class ReplayEvidence
 {
     private const byte Version = 3;
@@ -31,14 +39,23 @@ internal static class ReplayEvidence
         IsValid(evidence) && CryptographicOperations.FixedTimeEquals(evidence, Encode(digest, cursor));
 
     public static byte[] InitialState(StoryDefinition story, IGameStateView state) =>
-        Hash(writer =>
-        {
-            writer.WriteStringValue("initial-state-v1");
-            writer.WriteStringValue(story.Randomness.ToString());
-            writer.WriteStringValue(state.Ruleset.Id);
-            WriteRuleset(writer, state);
-            WriteWorldState(writer, state);
-        });
+        Hash(writer => WriteInitialState(writer, story, state));
+
+    private static void WriteInitialState(Utf8JsonWriter writer, StoryDefinition story, IGameStateView state)
+    {
+        writer.WriteStringValue("initial-state-v1");
+        writer.WriteStringValue(Token(story.Randomness));
+        writer.WriteStringValue(state.Ruleset.Id);
+        WriteRuleset(writer, state);
+        WriteWorldState(writer, state);
+    }
+
+    /// <summary>The bytes <see cref="InitialState"/> hashes; exposed so tests can pin them.</summary>
+    internal static byte[] InitialStateInput(StoryDefinition story, IGameStateView state) =>
+        Input(writer => WriteInitialState(writer, story, state));
+
+    /// <summary>The bytes a recorded event contributes to evidence; exposed so tests can pin them.</summary>
+    internal static byte[] EventInput(GameEvent gameEvent) => Input(writer => WriteTyped(writer, gameEvent));
 
     public static byte[] Start(StoryDefinition story, StorySession session, CharacterSelection? character,
         byte[] initialState) =>
@@ -76,6 +93,18 @@ internal static class ReplayEvidence
         }
         stream.FlushFinalBlock();
         return hash.Hash ?? throw new InvalidOperationException("Replay evidence could not be calculated.");
+    }
+
+    private static byte[] Input(Action<Utf8JsonWriter> write)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartArray();
+            write(writer);
+            writer.WriteEndArray();
+        }
+        return buffer.WrittenSpan.ToArray();
     }
 
     private static void WriteCharacter(Utf8JsonWriter writer, CharacterSelection? character)
@@ -128,14 +157,14 @@ internal static class ReplayEvidence
         }
         writer.WriteEndArray();
 
-        writer.WriteStringValue(state.Ruleset.SkillCheckRule?.GetType().FullName);
+        writer.WriteStringValue(RuleToken(state.Ruleset.SkillCheckRule));
         writer.WriteNumberValue(state.Ruleset.SkillCheckRule?.DieSides ?? 0);
-        writer.WriteStringValue(state.Ruleset.LevelingRule?.GetType().FullName);
+        writer.WriteStringValue(RuleToken(state.Ruleset.LevelingRule));
         writer.WriteStringValue(state.Ruleset.LevelingRule?.LevelStat.Value);
         writer.WriteStartArray();
         foreach (var modifier in state.Ruleset.Modifiers)
         {
-            writer.WriteStringValue(modifier.GetType().FullName);
+            writer.WriteStringValue(RuleToken(modifier));
         }
         writer.WriteEndArray();
     }
@@ -234,7 +263,7 @@ internal static class ReplayEvidence
             if (events[i] is ChoiceMade choice && !choiceIdentity.IsEmpty)
             {
                 writer.WriteStartArray();
-                writer.WriteStringValue(nameof(ChoiceMade));
+                writer.WriteStringValue(EventToken(choice));
                 writer.WriteStringValue(choice.Scene.Value);
                 writer.WriteBase64StringValue(choiceIdentity);
                 writer.WriteEndArray();
@@ -247,11 +276,48 @@ internal static class ReplayEvidence
         writer.WriteEndArray();
     }
 
-    private static void WriteTyped(Utf8JsonWriter writer, object value)
+    private static void WriteTyped(Utf8JsonWriter writer, GameEvent value)
     {
         writer.WriteStartArray();
-        writer.WriteStringValue(value.GetType().Name);
+        writer.WriteStringValue(EventToken(value));
         JsonSerializer.Serialize(writer, value, value.GetType(), ScenarioJsonContext.Default);
         writer.WriteEndArray();
     }
+
+    internal static string Token(RandomnessMode randomness) => randomness switch
+    {
+        RandomnessMode.Off => "Off",
+        RandomnessMode.ChecksOnly => "ChecksOnly",
+        _ => throw new NotSupportedException($"Randomness mode '{randomness}' has no replay evidence token."),
+    };
+
+    // Built-in rules keep the names they were first encoded with. Extension types have no frozen token, so their CLR
+    // full name is part of the evidence.
+    internal static string? RuleToken(object? rule) => rule switch
+    {
+        null => null,
+        D20SkillCheckRule => "Talewright.Rulesets.Generic.D20SkillCheckRule",
+        ExperienceLevelingRule => "Talewright.Rulesets.Generic.ExperienceLevelingRule",
+        _ => rule.GetType().FullName,
+    };
+
+    internal static string EventToken(GameEvent gameEvent) => gameEvent switch
+    {
+        CharacterIdentityChanged => "CharacterIdentityChanged",
+        StatChanged => "StatChanged",
+        ItemsGranted => "ItemsGranted",
+        ItemsRemoved => "ItemsRemoved",
+        StandingChanged => "StandingChanged",
+        FlagChanged => "FlagChanged",
+        VariableChanged => "VariableChanged",
+        TextVariableChanged => "TextVariableChanged",
+        SceneEntered => "SceneEntered",
+        ChoiceMade => "ChoiceMade",
+        DiceRolled => "DiceRolled",
+        SkillCheckResolved => "SkillCheckResolved",
+        LevelChanged => "LevelChanged",
+        TriggerFired => "TriggerFired",
+        StoryEnded => "StoryEnded",
+        _ => throw new NotSupportedException($"Game event '{gameEvent.GetType().Name}' has no replay evidence token."),
+    };
 }
