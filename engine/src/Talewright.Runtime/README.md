@@ -44,8 +44,9 @@ Full description in [architecture §5](../../../docs/developer/architecture.md#5
 | `storylet:<scene-id>` | a hub storylet |
 | `continue` (`StorySession.ContinueKey`) | the synthetic Continue after an entry check or before a divert |
 
-Keys are stable for a given story version, so **seed + list of keys** reproduces a playthrough. That's the
-save/replay contract.
+Keys distinguish choices in the live session. Explicit `cN` keys are position-derived and may change
+when choices are inserted or reordered. Saves use separate gameplay-outcome identities and replay
+evidence; the UI keys alone are not the cross-revision save/replay contract.
 
 ## Headless author scene playtesting
 
@@ -127,7 +128,10 @@ prove semantic equivalence of positional choices. This is an explicit new scenar
 
 `StoryHistory.Restore(story, playerBytes).ForkAuthor()` first enforces ordinary save compatibility
 and full redo validation, then retains the normal start, character, seed, choices and cursor in an
-independent synthetic session. Normal save bytes, rules and slots are untouched.
+independent synthetic session. Each forked choice is the current choice that restore matched by outcome
+identity, not the saved positional key, so inserted or removed siblings cannot fork a different branch.
+If restore matched an outcome the current story no longer offers at that point (for example a retagged
+hub storylet), the fork fails instead of diverging. Normal save bytes, rules and slots are untouched.
 
 Value batches require every collection, including `textVariables` when empty; replay evidence includes
 empty text-variable state. Previous scenario formats are unsupported, not migrated.

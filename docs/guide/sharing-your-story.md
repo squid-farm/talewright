@@ -177,10 +177,11 @@ Avoid publishing two builds to the same path at once. Without force, publish sto
 appears or an approved file observably changes during the build. This is a safety check, not a lock
 against every possible filesystem race; see the [replacement policy](../reference/cli.md#advanced-replacing-an-existing-archive).
 
-Released save support requires the exact story revision; even a prose correction can break that
-contract. Player or extension changes can also prevent loading. Keep a copy of each released build so
-players can reopen their saves with it. A same-path update check is being prototyped, but has no
-approved supported transition yet; do not advertise cross-revision compatibility based on it.
-See [updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves).
+Current released saves require the exact story revision; player or extension changes can also
+prevent loading. Keep a copy of each released build so players can reopen their saves with it.
+V1 story updates use replay evidence: prose and label changes or unrelated choices may be compatible,
+but changed starting values or recorded gameplay outcomes are not. Saves without replay evidence
+have no cross-revision compatibility guarantee. See
+[updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves).
 
 All options and limits: [CLI reference: publish](../reference/cli.md#publish).

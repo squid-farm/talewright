@@ -322,6 +322,26 @@ public sealed class AuthorTimelineTests
     }
 
     [Fact]
+    public void Edit_that_exposes_an_end_divert_rejects_without_changing_the_timeline()
+    {
+        var session = Start(Compile("""
+            === start
+            {if flag:ready}
+            -> END
+            {/if}
+            * [Stay] -> start
+            """));
+        var events = session.Events;
+        var frame = session.Current;
+
+        var error = Assert.Throws<InvalidOperationException>(() => session.Edit(Flag(true)));
+
+        Assert.Contains("no live continuation", error.Message);
+        Assert.Same(events, session.Events);
+        Assert.Same(frame, session.Current);
+    }
+
+    [Fact]
     public void Ended_runs_require_back_or_fresh_world_rather_than_mutating_ended_state()
     {
         var session = Start();

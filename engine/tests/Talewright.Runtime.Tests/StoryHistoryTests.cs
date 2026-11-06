@@ -9,6 +9,7 @@ namespace Talewright.Runtime.Tests;
 
 public class StoryHistoryTests
 {
+    private const int ReplayChoiceIdLength = 8;
     private static readonly string Yaml = BuildManifest().Build();
     private static readonly string Tale = BuildTale();
 
@@ -96,7 +97,12 @@ public class StoryHistoryTests
     {
         var history = new StoryHistory(Compile(), 7);
         var bytes = Mutate(history.Save(history.CaptureSummary(DateTimeOffset.UtcNow)),
-            save => save with { Choices = ["no-such-choice"], Cursor = 1 });
+            save => save with
+            {
+                Choices = ["no-such-choice"],
+                ReplayChoiceIdentities = [new byte[ReplayChoiceIdLength]],
+                Cursor = 1,
+            });
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, bytes));
         Assert.NotNull(StoryHistory.DescribeSave("Invalid replay", bytes).Summary);
         foreach (var broken in new[] { "{broken"u8.ToArray(), bytes[..^4], [.. "TWSV"u8, 3, 0xFF] })
@@ -185,16 +191,157 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Continue_identity_uses_its_scene_regardless_of_how_it_was_entered()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            * [Direct] -> target
+            * [Via middle] -> middle
+            === middle
+            * [Continue] -> target
+            === target
+            -> finish
+            === finish
+            -> END
+            """);
+        var direct = new StoryHistory(story, 7);
+        direct.Choose("c0");
+        var indirect = new StoryHistory(story, 7);
+        indirect.Choose("c1");
+        indirect.Choose("c0");
+
+        Assert.Equal(direct.Current.Choices.Single().ReplayIdentity!.Value.ToArray(),
+            indirect.Current.Choices.Single().ReplayIdentity!.Value.ToArray());
+
+        direct.Choose(StorySession.ContinueKey);
+        indirect.Choose(StorySession.ContinueKey);
+        AssertEquivalent(direct, StoryHistory.Restore(story, direct.Save()));
+        AssertEquivalent(indirect, StoryHistory.Restore(story, indirect.Save()));
+        var legacy = Mutate(direct.Save(), save => save with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
+        AssertEquivalent(direct, StoryHistory.Restore(story, legacy));
+    }
+
+    [Fact]
+    public void Manually_constructed_stories_support_hub_and_continue_replay()
+    {
+        var compiled = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            @hub room
+            === b
+            @tags room
+            -> c
+            === c
+            -> END
+            """);
+        var story = new StoryDefinition
+        {
+            Id = compiled.Id,
+            Title = compiled.Title,
+            Version = compiled.Version,
+            ContentFingerprint = compiled.ContentFingerprint,
+            ReplayCompatibilityId = compiled.ReplayCompatibilityId,
+            UndoEnabled = compiled.UndoEnabled,
+            Creation = compiled.Creation,
+            Start = compiled.Start,
+            Randomness = compiled.Randomness,
+            Seed = compiled.Seed,
+            World = compiled.World,
+            Triggers = compiled.Triggers,
+            Predicates = compiled.Predicates,
+            Scenes = compiled.Scenes.Select(scene => new SceneDefinition
+            {
+                Id = scene.Id,
+                Title = scene.Title,
+                Requires = scene.Requires,
+                Tags = scene.Tags,
+                Priority = scene.Priority,
+                Once = scene.Once,
+                Hub = scene.Hub,
+                HubLimit = scene.HubLimit,
+                Steps = scene.Steps,
+            }).ToArray(),
+        };
+
+        var history = new StoryHistory(story, 7);
+        history.Choose("storylet:b");
+        history.Choose(StorySession.ContinueKey);
+
+        AssertEquivalent(history, StoryHistory.Restore(story, history.Save()));
+    }
+
+    [Fact]
+    public void Stories_sharing_compiled_scenes_keep_independent_replay_identities()
+    {
+        var yaml = BuildManifest(declareVariables: true).Build();
+        var first = Compile(yaml: yaml, tale: """
+            === a
+            @hub room
+            === b
+            @tags room
+            -> c
+            === c
+            -> END
+            """);
+        var second = Compile(yaml: yaml, tale: """
+            === a
+            -> extra
+            === extra
+            @tags room
+            -> END
+            """);
+        var firstIdentities = HubIdentities(first);
+        var mixed = WithScenes(first, [.. first.Scenes, second.GetScene(new SceneId("extra"))]);
+
+        var history = new StoryHistory(mixed, 7);
+        history.Choose("storylet:extra");
+        AssertEquivalent(history, StoryHistory.Restore(mixed, history.Save()));
+
+        Assert.Equal(firstIdentities, HubIdentities(first));
+        var original = new StoryHistory(first, 7);
+        original.Choose("storylet:b");
+        original.Choose(StorySession.ContinueKey);
+        AssertEquivalent(original, StoryHistory.Restore(first, original.Save()));
+        var other = new StoryHistory(second, 7);
+        other.Choose(StorySession.ContinueKey);
+        AssertEquivalent(other, StoryHistory.Restore(second, other.Save()));
+
+        static string[] HubIdentities(StoryDefinition story) =>
+            new StoryHistory(story, 7).Current.Choices
+                .Select(choice => Convert.ToHexString(choice.ReplayIdentity!.Value.Span)).ToArray();
+    }
+
+    [Fact]
     public void Invalid_last_choice_is_rejected_when_cursor_is_at_the_end()
     {
         var history = new StoryHistory(Compile(), 7);
         history.Choose("c0");
         history.Choose("c0");
-        var save = Mutate(history.Save(), save => save with { Choices = [save.Choices[0], "missing"] });
+        var save = Mutate(history.Save(), save => save with
+        {
+            ReplayChoiceIdentities = CorruptIdentity(save.ReplayChoiceIdentities!, 1),
+        });
 
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
 
         Assert.Contains("cannot continue", error.Message);
+    }
+
+    [Fact]
+    public void Replay_uses_the_saved_outcome_identity_instead_of_the_ui_choice_key()
+    {
+        var history = new StoryHistory(Compile(), 7);
+        history.Choose("c0");
+        var save = Mutate(history.Save(), data => data with { Choices = ["renamed-key"] });
+
+        var restored = StoryHistory.Restore(history.Story, save);
+
+        Assert.Equal(history.Events, restored.Events);
+        Assert.Equal(history.State.GetBaseStat(EntityId.Player, new StatId("hp")),
+            restored.State.GetBaseStat(EntityId.Player, new StatId("hp")));
     }
 
     [Fact]
@@ -252,7 +399,10 @@ public class StoryHistoryTests
             "story-version" => Mutate(before, save => save with { StoryVersion = "other" }),
             "fingerprint" => Mutate(before, save => save with { ContentFingerprint = "changed" }),
             "cursor" => Mutate(before, save => save with { Cursor = 3 }),
-            "choice" => Mutate(before, save => save with { Choices = ["missing"] }),
+            "choice" => Mutate(before, save => save with
+            {
+                ReplayChoiceIdentities = CorruptIdentity(save.ReplayChoiceIdentities!, 0),
+            }),
             _ => throw new ArgumentOutOfRangeException(nameof(damage)),
         };
 
@@ -266,7 +416,11 @@ public class StoryHistoryTests
     public void Invalid_redo_is_checked_even_when_cursor_is_at_the_start()
     {
         var history = new StoryHistory(Compile(), 7);
-        var save = Mutate(history.Save(), save => save with { Choices = ["missing"] });
+        var save = Mutate(history.Save(), save => save with
+        {
+            Choices = ["missing"],
+            ReplayChoiceIdentities = [new byte[ReplayChoiceIdLength]],
+        });
         Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
     }
 
@@ -274,7 +428,11 @@ public class StoryHistoryTests
     public void Invalid_replay_reports_no_scene_or_choice_position()
     {
         var history = new StoryHistory(Compile(), 7);
-        var save = Mutate(history.Save(), save => save with { Choices = ["missing"] });
+        var save = Mutate(history.Save(), save => save with
+        {
+            Choices = ["missing"],
+            ReplayChoiceIdentities = [new byte[ReplayChoiceIdLength]],
+        });
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, save));
 
         Assert.Contains("cannot continue", error.Message);
@@ -412,7 +570,11 @@ public class StoryHistoryTests
         var history = new StoryHistory(Compile(), 7);
         var updated = Compile(tale: Tale + "\n// change");
         var save = history.Save();
-        var legacy = Mutate(save, data => data with { ReplayEvidence = null });
+        var legacy = Mutate(save, data => data with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
         var error = Assert.Throws<InvalidDataException>(() =>
             StoryHistory.Restore(updated, legacy));
         Assert.Equal("Version 1 of History has changed, and this save is no longer compatible. Open it with the story and player version that created it.", error.Message);
@@ -453,6 +615,31 @@ public class StoryHistoryTests
 
     private static byte[] Mutate(byte[] save, Func<SavedGame, SavedGame> change) =>
         SaveFormat.Write(change(SaveFormat.Read(save)));
+
+    private static byte[][] CorruptIdentity(IReadOnlyList<byte[]> identities, int index)
+    {
+        var copy = identities.Select(identity => identity.ToArray()).ToArray();
+        copy[index][0] ^= 1;
+        return copy;
+    }
+
+    private static StoryDefinition WithScenes(StoryDefinition story, IReadOnlyList<SceneDefinition> scenes) => new()
+    {
+        Id = story.Id,
+        Title = story.Title,
+        Version = story.Version,
+        ContentFingerprint = story.ContentFingerprint,
+        ReplayCompatibilityId = story.ReplayCompatibilityId,
+        UndoEnabled = story.UndoEnabled,
+        Creation = story.Creation,
+        Start = story.Start,
+        Randomness = story.Randomness,
+        Seed = story.Seed,
+        World = story.World,
+        Triggers = story.Triggers,
+        Predicates = story.Predicates,
+        Scenes = scenes,
+    };
 
     private static void AssertEquivalent(StoryHistory expected, StoryHistory actual)
     {

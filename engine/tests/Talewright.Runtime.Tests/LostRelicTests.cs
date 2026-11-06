@@ -371,7 +371,11 @@ public partial class LostRelicTests
         var older = StoryCompiler.Compile(new StorySource(files, source.ImagePaths)).Story!;
         var oldHistory = new StoryHistory(older, 42, older.Creation!.Default(older.World.Characters[EntityId.Player]));
         var bytes = oldHistory.Save();
-        var legacy = SaveFormat.Write(SaveFormat.Read(bytes) with { ReplayEvidence = null });
+        var legacy = SaveFormat.Write(SaveFormat.Read(bytes) with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
         var history = History();
         Choose(history, "Continue");
         var events = history.Events.ToArray();

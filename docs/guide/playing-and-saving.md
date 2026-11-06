@@ -36,10 +36,10 @@ When mechanical notes are hidden, they are removed from both the display and acc
 This changes presentation only; story events, game state, history and saves are unchanged.
 
 Player saves store the story identity/version, seed, choice history and current position, character
-selection and compact replay evidence—not a recorded event log or dice results. Loading checks the saved
-choices against the story and replays them with the saved seed, rebuilding the playthrough. **Back** and
-**Forward** use the same choice-replay approach. This differs from folding an existing event log to
-reconstruct state; that is an engine operation, not how player saves are restored.
+selection, compact outcome identities and replay evidence—not a recorded event log or dice results.
+Loading replays the saved outcomes with the saved seed, rebuilding the playthrough. **Back** and
+**Forward** use those same identities. This differs from folding an existing event log to reconstruct
+state; that is an engine operation, not how player saves are restored.
 
 The toolbar stays visible while you scroll. Quick Save confirmations and storage errors appear
 in the toolbar without returning you to the start of the passage.
@@ -121,19 +121,16 @@ Backups can move between web and desktop when the story files and player save fo
 
 ## Updating a story with existing saves
 
-Released save support requires the exact story revision. Keep a copy of every released story so
-players can reopen saves with the version that created them. Before v1, player or extension updates
-may also make saves unsupported. Failed loads leave the original save and current game untouched.
+Keep a copy of each released story so players can reopen saves with the version that created them.
+For v1, an update may load a save only when the story identity and replay/extension compatibility
+match, the starting state is unchanged, and the complete saved path—including redo—replays to the
+same gameplay outcomes. Prose and choice-label edits, reordered or unrelated choices, and changed
+availability requirements may be compatible; changed starting values or recorded outcomes are not.
+Saves without replay evidence have no cross-revision compatibility guarantee. A failed load leaves
+the original save and current game untouched.
 
-A same-path story-update check is being prototyped in
-[#478](https://github.com/squid-farm/talewright/issues/478). It is not an approved supported update
-path: representative preview-tester cases and explicit lead approval of the contract, including
-pre-compatibility preview saves, are still required. Do not promise players that an update will
-preserve their saves or use reopening and re-saving as an approved migration procedure.
-
-The [proposed contract](../developer/save-format.md#proposed-story-update-contract) describes the
-candidate behavior and its limits, including why matching recorded events does not preserve every
-world default. General save migration remains planned
+See the [v1 story-update contract](../developer/save-format.md#compatibility) for the exact rules.
+General state mappings and save-format migration remain planned
 ([#39](https://github.com/squid-farm/talewright/issues/39)).
 
 ## Character creation

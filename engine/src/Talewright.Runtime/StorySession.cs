@@ -36,10 +36,12 @@ public sealed class StorySession : IStorySession
     private readonly EventLog _log;
     private readonly TriggerEngine _triggers;
     private readonly SceneExecutor _executor;
+    private readonly ReplayIdentityTable _replayIdentities;
     private readonly bool _captureEntry;
     private readonly Action<RuleDecision>? _observer;
     private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
-    private readonly Dictionary<string, Action<List<RenderedBlock>>> _actions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string,
+        (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity)> _actions = new(StringComparer.Ordinal);
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
     private IReadOnlyList<RenderedBlock> _entryPrelude = [];
     private readonly List<RenderedBlock> _editNotes = [];
@@ -67,6 +69,7 @@ public sealed class StorySession : IStorySession
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
     {
         character = CharacterSelection.Validate(story, character);
+        _replayIdentities = story.ReplayIdentities;
         Story = story;
         Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);
@@ -147,8 +150,12 @@ public sealed class StorySession : IStorySession
         blocks.AddRange(execution.Blocks);
         blocks.AddRange(_editNotes);
         if (execution.Target is not null) SkipHub(scene);
-        var choices = execution.Target is null ? OfferChoices(scene, execution.Choices) : ContinueTo(execution.Target);
-        if (execution.Target?.IsEnd == true || choices.Count == 0)
+        if (execution.Target?.IsEnd == true)
+        {
+            throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
+        }
+        var choices = execution.Target is null ? OfferChoices(scene, execution.Choices) : ContinueTo(scene, execution.Target);
+        if (choices.Count == 0)
         {
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
         }
@@ -185,8 +192,78 @@ public sealed class StorySession : IStorySession
         }
 
         var notes = new List<RenderedBlock>();
-        action(notes);
+        action.Execute(notes);
         return Current;
+    }
+
+    internal bool ChooseReplay(byte[] replayIdentity, out ChoiceView? selected)
+    {
+        selected = null;
+        if (Current?.Scene is not { } currentScene)
+        {
+            return false;
+        }
+
+        var scene = Story.GetScene(currentScene);
+        foreach (var step in _executor.ReplayChoices)
+        {
+            if (!_replayIdentities.For(step.Choice).AsSpan().SequenceEqual(replayIdentity))
+            {
+                continue;
+            }
+
+            selected = _executor.View(step.Choice);
+            MakeChoice(scene, step, []);
+            return true;
+        }
+
+        if (scene.Hub is not null)
+        {
+            foreach (var (storylet, _) in Story.Scenes.Select((candidate, index) => (candidate, index))
+                .Where(entry => entry.candidate.Id != scene.Id)
+                .OrderByDescending(entry => entry.candidate.Priority)
+                .ThenBy(entry => entry.index))
+            {
+                var target = new DivertTarget(storylet.Id);
+                var identity = _replayIdentities.ForDivert(scene.Id, target);
+                if (!identity.Span.SequenceEqual(replayIdentity))
+                {
+                    continue;
+                }
+
+                var key = StoryletKeyPrefix + storylet.Id.Value;
+                if (_actions.TryGetValue(key, out var action))
+                {
+                    selected = Current.Choices.First(choice => choice.Key == key);
+                    action.Execute([]);
+                }
+                else
+                {
+                    selected = new ChoiceView(key,
+                        [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)])
+                    {
+                        ReplayIdentity = identity,
+                    };
+                    _log.Append(new ChoiceMade(scene.Id, key));
+                    Enter(target, []);
+                }
+                return true;
+            }
+        }
+
+        foreach (var (key, action) in _actions)
+        {
+            if (action.ReplayIdentity is not { } identity || !identity.Span.SequenceEqual(replayIdentity))
+            {
+                continue;
+            }
+
+            selected = Current.Choices.First(choice => choice.Key == key);
+            action.Execute([]);
+            return true;
+        }
+
+        return false;
     }
 
     // ---- scene entry -----------------------------------------------------------------------------------------------
@@ -225,7 +302,7 @@ public sealed class StorySession : IStorySession
         if (execution.Target is { } next)
         {
             SkipHub(scene);
-            return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks, ContinueTo(next));
+            return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks, ContinueTo(scene, next));
         }
         var choices = OfferChoices(scene, execution.Choices);
         if (choices.Count == 0)
@@ -268,10 +345,14 @@ public sealed class StorySession : IStorySession
             {
                 var label = new RenderedInline[] { new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None) };
                 var key = StoryletKeyPrefix + storylet.Id.Value;
-                offered.Add((new ChoiceView(key, label), notes =>
+                var target = new DivertTarget(storylet.Id);
+                offered.Add((new ChoiceView(key, label)
+                {
+                    ReplayIdentity = _replayIdentities.ForDivert(scene.Id, target),
+                }, notes =>
                 {
                     _log.Append(new ChoiceMade(scene.Id, key));
-                    Enter(new DivertTarget(storylet.Id), notes);
+                    Enter(target, notes);
                 }));
             }
         }
@@ -279,11 +360,15 @@ public sealed class StorySession : IStorySession
         return offered;
     }
 
-    private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> ContinueTo(DivertTarget target)
+    private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> ContinueTo(
+        SceneDefinition source, DivertTarget target)
     {
-        return [(new ChoiceView(ContinueKey, ChoiceView.ContinueLabel), notes =>
+        return [(new ChoiceView(ContinueKey, ChoiceView.ContinueLabel)
         {
-            _log.Append(new ChoiceMade(Current!.Scene ?? Story.Start, ContinueKey));
+            ReplayIdentity = _replayIdentities.ForDivert(source.Id, target),
+        }, notes =>
+        {
+            _log.Append(new ChoiceMade(source.Id, ContinueKey));
             Enter(target, notes);
         })];
     }
@@ -350,7 +435,7 @@ public sealed class StorySession : IStorySession
         _actions.Clear();
         foreach (var (view, action) in choices)
         {
-            _actions[view.Key] = action;
+            _actions[view.Key] = (action, view.ReplayIdentity);
         }
 
         Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks), choices.Select(c => c.View).ToList(), IsEnded: false);

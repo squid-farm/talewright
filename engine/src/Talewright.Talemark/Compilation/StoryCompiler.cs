@@ -28,7 +28,7 @@ namespace Talewright.Talemark.Compilation;
 /// </remarks>
 public static class StoryCompiler
 {
-    private const string ReplayVersion = "talewright-replay-v2";
+    private const string ReplayVersion = "talewright-replay-v3";
 
     /// <summary>Compiles <paramref name="source"/>.</summary>
     public static CompilationResult Compile(StorySource source, CompilerOptions? options = null)
@@ -169,6 +169,9 @@ public static class StoryCompiler
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        var sceneDefinitions = parsed.Select(p => p.Definition).ToList();
+        // Editor analysis never replays; a story it produces builds its identities on first playback instead.
+        var replayIdentities = analysis is null ? ChoiceReplayIdentity.Assign(sceneDefinitions) : null;
         var story = new StoryDefinition
         {
             Id = manifest.Id,
@@ -183,10 +186,11 @@ public static class StoryCompiler
             Randomness = manifest.Randomness,
             Seed = manifest.Seed,
             World = world,
-            Scenes = parsed.Select(p => p.Definition).ToList(),
+            Scenes = sceneDefinitions,
             Triggers = triggers,
             Predicates = options.Predicates,
             Reachability = reachability,
+            ReplayIdentities = replayIdentities,
         };
         return new CompilationResult(story, diagnostics.Items)
         {

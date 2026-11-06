@@ -163,7 +163,11 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var old = result.Story!;
         var history = new StoryHistory(old, 42, old.Creation!.Default(old.World.Characters[EntityId.Player]));
-        var bytes = SaveFormat.Write(SaveFormat.Read(history.Save()) with { ReplayEvidence = null });
+        var bytes = SaveFormat.Write(SaveFormat.Read(history.Save()) with
+        {
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+        });
         if (!olderVersion)
         {
             bytes = SaveFormat.Write(SaveFormat.Read(bytes) with { StoryVersion = "0.4.0", ContentFingerprint = "before-the-dream" });
