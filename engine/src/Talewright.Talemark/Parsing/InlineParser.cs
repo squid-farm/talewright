@@ -122,6 +122,8 @@ internal static class InlineParser
         public TextStyle Style { get; set; }
         public bool CanOpen { get; set; }
         public bool CanClose { get; set; }
+        public bool IsInlinePiece { get; set; }
+        public bool IsIfPiece { get; set; }
     }
 
     private abstract record Piece;
@@ -136,20 +138,22 @@ internal static class InlineParser
 
     private sealed class Context(
         SourceText source,
-        StorySymbols symbols,
+        StorySymbols? symbols,
         DiagnosticBag diagnostics,
         bool allowImages,
         bool allowFormattedOutput,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        List<TalemarkClassification>? classifications = null)
     {
         private int _remaining = CancellationInterval;
 
         public SourceText Source { get; } = source;
-        public StorySymbols Symbols { get; } = symbols;
+        public StorySymbols? Symbols { get; } = symbols;
         public DiagnosticBag Diagnostics { get; } = diagnostics;
         public bool AllowImages { get; } = allowImages;
         public bool AllowFormattedOutput { get; } = allowFormattedOutput;
         public CancellationToken CancellationToken { get; } = cancellationToken;
+        public List<TalemarkClassification>? Classifications { get; } = classifications;
         public int WorkUnits { get; set; }
 
         public void Check()
@@ -199,6 +203,35 @@ internal static class InlineParser
         var inlines = BuildTemplate(context, text, tokens);
         cancellationToken.ThrowIfCancellationRequested();
         return new(inlines, context.WorkUnits);
+    }
+
+    internal static IReadOnlyList<TalemarkClassification> Classify(SourceText source,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var context = new Context(source, null, new DiagnosticBag(), allowImages: true,
+            allowFormattedOutput: true, cancellationToken: cancellationToken, classifications: []);
+        var text = source.Text;
+        var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
+        context.WorkUnits += scan.WorkUnits;
+        var bracePairs = new List<DelimiterPair>();
+        foreach (var pair in scan.Pairs)
+        {
+            context.Check();
+            if (pair.Kind == DelimiterKind.Brace) bracePairs.Add(pair);
+        }
+
+        var tokens = Tokenize(context, text, bracePairs);
+        PairFormatting(context, text, tokens);
+        foreach (var token in tokens)
+        {
+            context.Check();
+            if (token.Kind is TokenKind.FormatOpen or TokenKind.FormatClose)
+                AddClassification(context, token.Start, token.Length, TalemarkClassificationKind.Formatting);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return Array.AsReadOnly(context.Classifications!.ToArray());
     }
 
     internal static void AnalyzePartial(SourceText source, StorySymbols symbols, CancellationToken cancellationToken)
@@ -253,6 +286,8 @@ internal static class InlineParser
                     var next = text[index + 1];
                     if (DelimiterScanner.IsReaderTextEscape(next))
                     {
+                        if (context.Classifications is not null)
+                            AddClassification(context, index, 2, TalemarkClassificationKind.Escape);
                         AppendText(next, index, 2);
                         index += 2;
                         context.CheckCharacters(2);
@@ -286,10 +321,19 @@ internal static class InlineParser
                 if (braceIndex < bracePairs.Count && bracePairs[braceIndex].OpenOffset == index)
                 {
                     var close = bracePairs[braceIndex++].CloseOffset;
-                    AddToken(new(TokenKind.Construct, index, close + 1 - index)
+                    var token = new Token(TokenKind.Construct, index, close + 1 - index);
+                    if (context.Classifications is not null)
                     {
-                        Piece = ParseConstruct(context, text, index, close),
-                    });
+                        ClassifyConstructSyntax(context, text, index, close);
+                        SetSyntaxPieceKinds(token, text, index, close);
+                    }
+                    else
+                    {
+                        token.Piece = ParseConstruct(context, text, index, close);
+                        token.IsInlinePiece = token.Piece is InlinePiece;
+                        token.IsIfPiece = token.Piece is IfPiece;
+                    }
+                    AddToken(token);
                     index = close + 1;
                     while (braceIndex < bracePairs.Count && bracePairs[braceIndex].OpenOffset < index)
                     {
@@ -301,7 +345,10 @@ internal static class InlineParser
                 }
 
                 FlushText();
-                ParseUnclosedConstruct(context, text, index);
+                if (context.Classifications is null)
+                    ParseUnclosedConstruct(context, text, index);
+                else
+                    ClassifyConstructSyntax(context, text, index, -1);
                 tokens.Add(new(TokenKind.Text, index, text.Length - index, text[index..]));
                 return tokens;
             }
@@ -314,6 +361,7 @@ internal static class InlineParser
                 AddToken(new(TokenKind.Construct, index, imageEnd - index)
                 {
                     Piece = new InlinePiece(new TextTemplate(text[index..imageEnd])),
+                    IsInlinePiece = true,
                 });
                 context.CheckCharacters(imageEnd - index);
                 index = imageEnd;
@@ -367,6 +415,75 @@ internal static class InlineParser
         return tokens;
     }
 
+    private static void ClassifyConstructSyntax(Context context, string text, int open, int close)
+    {
+        AddClassification(context, open, 1, TalemarkClassificationKind.Punctuation);
+        if (close >= 0)
+            AddClassification(context, close, 1, TalemarkClassificationKind.Punctuation);
+
+        var innerStart = open + 1;
+        var innerEnd = close < 0 ? text.Length : close;
+        var inner = text.AsSpan(innerStart, innerEnd - innerStart);
+        var leading = inner.Length - inner.TrimStart().Length;
+        var trimmed = inner.Trim();
+        if (ImageSyntax.IsCall(inner))
+        {
+            ImageSyntax.Classify(context.Source, innerStart, innerEnd, context.Classifications!,
+                context.CancellationToken);
+            return;
+        }
+
+        if (trimmed.SequenceEqual(SceneVocabulary.Else))
+        {
+            AddClassification(context, innerStart + leading, trimmed.Length, TalemarkClassificationKind.Keyword);
+            return;
+        }
+
+        if (trimmed.SequenceEqual(SceneVocabulary.EndIf))
+        {
+            AddClassification(context, innerStart + leading, trimmed.Length, TalemarkClassificationKind.Keyword);
+            return;
+        }
+
+        if (inner[leading..].StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
+        {
+            AddClassification(context, innerStart + leading, SceneVocabulary.If.Length,
+                TalemarkClassificationKind.Keyword);
+            var expressionStart = innerStart + leading + SceneVocabulary.IfPrefix.Length;
+            var expression = text[expressionStart..innerEnd];
+            TalemarkClassifier.ClassifyExpressionSyntax(expression,
+                offset => context.Source.Locate(expressionStart + offset), context.Classifications!,
+                context.CancellationToken);
+            return;
+        }
+
+        var source = text[innerStart..innerEnd];
+        TalemarkClassifier.ClassifyExpressionSyntax(source, offset => context.Source.Locate(innerStart + offset),
+            context.Classifications!, context.CancellationToken);
+    }
+
+    private static void SetSyntaxPieceKinds(Token token, string text, int open, int close)
+    {
+        var end = close < 0 ? text.Length : close;
+        var inner = text.AsSpan(open + 1, end - open - 1).Trim();
+        if (inner.SequenceEqual(SceneVocabulary.Else) || inner.SequenceEqual(SceneVocabulary.EndIf))
+            return;
+        if (inner.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal))
+        {
+            token.IsIfPiece = true;
+            return;
+        }
+        token.IsInlinePiece = true;
+    }
+
+    private static void AddClassification(Context context, int start, int length, TalemarkClassificationKind kind)
+    {
+        if (length <= 0)
+            return;
+        var source = context.Source;
+        context.Classifications!.Add(new(new SourceRange(source.Locate(start), source.Locate(start + length)), kind));
+    }
+
     private static void ParseUnclosedConstruct(Context context, string text, int open)
     {
         var start = open + 1;
@@ -383,7 +500,7 @@ internal static class InlineParser
             else
             {
                 ImageSyntax.Parse(context.Source, start, text.Length, false, context.Diagnostics,
-                    context.Symbols, context.CancellationToken);
+                        context.Symbols!, context.CancellationToken);
             }
 
             return;
@@ -391,7 +508,7 @@ internal static class InlineParser
 
         TokenBuffer? expressionTokens = null;
         var errorStart = start;
-        if (context.Symbols.Analysis is { } analysis)
+        if (context.Symbols?.Analysis is { } analysis)
         {
             var incomplete = text[start..];
             var lead = incomplete.Length - incomplete.TrimStart().Length;
@@ -447,12 +564,12 @@ internal static class InlineParser
             }
 
             var lead = inner.Length - inner.TrimStart().Length;
-            context.Symbols.Analysis?.Tokens.Add(new(ExpressionVocabulary.Image,
+            context.Symbols!.Analysis?.Tokens.Add(new(ExpressionVocabulary.Image,
                 new(context.Source.Locate(sourceOffset + lead),
                     context.Source.Locate(sourceOffset + lead + ExpressionVocabulary.Image.Length)))
                 { Kind = AuthoringTokenKind.Image });
             var media = ImageSyntax.Parse(context.Source, sourceOffset, close, true, context.Diagnostics,
-                context.Symbols, context.CancellationToken);
+                context.Symbols!, context.CancellationToken);
             return media is null ? null : new InlinePiece(media);
         }
 
@@ -462,7 +579,7 @@ internal static class InlineParser
             trimmed is SceneVocabulary.Else or SceneVocabulary.EndIf ? trimmed : null;
         if (keyword is not null)
         {
-            context.Symbols.Analysis?.Tokens.Add(new(keyword,
+            context.Symbols!.Analysis?.Tokens.Add(new(keyword,
                 new(context.Source.Locate(sourceOffset + leading),
                     context.Source.Locate(sourceOffset + leading + keyword.Length)))
                 { Kind = AuthoringSyntaxVocabulary.ConditionalKind(keyword) });
@@ -473,7 +590,7 @@ internal static class InlineParser
         {
             var range = new SourceRange(context.Source.Locate(open), context.Source.Locate(close + 1));
             foreach (var substitution in FindSubstitutions(inline))
-                context.Symbols.Analysis?.Substitutions.Add(new(range, substitution));
+                context.Symbols!.Analysis?.Substitutions.Add(new(range, substitution));
         }
 
         return fragment;
@@ -483,6 +600,7 @@ internal static class InlineParser
     {
         var trimmed = inner.Trim();
         var lead = inner.Length - inner.TrimStart().Length;
+        var symbols = context.Symbols ?? throw new InvalidOperationException("Binding requires story symbols.");
         // Analysis retains these mappings for on-request completion; capture only the source text.
         var source = context.Source;
         if (trimmed == SceneVocabulary.Else) return new ElsePiece(location);
@@ -492,14 +610,14 @@ internal static class InlineParser
         {
             var condition = ExpressionParser.ParseCondition(trimmed[SceneVocabulary.IfPrefix.Length..],
                 location.Offset(lead + SceneVocabulary.IfPrefix.Length),
-                context.Symbols, context.Diagnostics,
+                symbols, context.Diagnostics,
                 locate: offset => source.Locate(sourceOffset + lead + SceneVocabulary.IfPrefix.Length + offset));
             return condition is null
                 ? null
                 : new IfPiece(condition, location, context.Source.Locate(sourceOffset - 1));
         }
 
-        var substitution = ExpressionParser.ParseSubstitution(inner, location, context.Symbols, context.Diagnostics,
+        var substitution = ExpressionParser.ParseSubstitution(inner, location, symbols, context.Diagnostics,
             offset => source.Locate(sourceOffset + offset), context.AllowFormattedOutput);
         return substitution is null ? null : new InlinePiece(substitution);
     }
@@ -626,7 +744,7 @@ internal static class InlineParser
         return previous.Kind switch
         {
             TokenKind.Text => EndsWithWordCharacter(previous.Text!),
-            TokenKind.Construct => previous.Piece is InlinePiece,
+            TokenKind.Construct => previous.IsInlinePiece,
             _ => false,
         };
     }
@@ -638,7 +756,7 @@ internal static class InlineParser
         return next.Kind switch
         {
             TokenKind.Text => StartsWithWordCharacter(next.Text!),
-            TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
+            TokenKind.Construct => next.IsInlinePiece || next.IsIfPiece,
             _ => false,
         };
     }
@@ -650,7 +768,7 @@ internal static class InlineParser
         return previous.Kind switch
         {
             TokenKind.Text => EndsWithNonWhitespaceCharacter(previous.Text!),
-            TokenKind.Construct => previous.Piece is InlinePiece,
+            TokenKind.Construct => previous.IsInlinePiece,
             TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
@@ -663,7 +781,7 @@ internal static class InlineParser
         return next.Kind switch
         {
             TokenKind.Text => StartsWithNonWhitespaceCharacter(next.Text!),
-            TokenKind.Construct => next.Piece is InlinePiece or IfPiece,
+            TokenKind.Construct => next.IsInlinePiece || next.IsIfPiece,
             TokenKind.FormatDelimiter or TokenKind.FormatOpen or TokenKind.FormatClose => true,
             _ => false,
         };
