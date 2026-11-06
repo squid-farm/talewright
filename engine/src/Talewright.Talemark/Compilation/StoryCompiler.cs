@@ -88,8 +88,7 @@ public static class StoryCompiler
             cancellationToken.ThrowIfCancellationRequested();
             var syntax = parseSyntax(path, text, cancellationToken);
             syntaxes.Add((path, syntax));
-            if (analysis is not null)
-                analysis.Classifications.AddRange(TalemarkClassifier.Classify(path, syntax, cancellationToken));
+            analysis?.ClassificationSources.Add((path, syntax));
             TaleDeclarations.Collect(path, syntax, (id, location) =>
             {
                 analysis?.Scene(id, location);

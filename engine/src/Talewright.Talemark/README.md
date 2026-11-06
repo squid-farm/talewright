@@ -103,6 +103,11 @@ the inline parser's tokenization and formatting-pairing path to return source ra
 binding story symbols. `TaleBinder` binds syntax to the existing model; `TaleDeclarations` collects story-wide
 symbols from the same syntax before any file is bound.
 
+`StoryAnalysis.Classifications` computes and caches these classifications on first access from the snapshot's
+already-parsed syntax, including manifest-recovery snapshots. Ordinary analysis and cached edits do not run an
+unused classification pass. Diagnostic-only copies share the cached result. For directly cancellable file
+classification, use `TalemarkClassifier.Classify(file, text, cancellationToken)`.
+
 Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
 choice keys, so step IDs are runtime and tooling identities (executor caches, author inspection, debugger map
 matching). Edit-stable IDs are evaluated separately in #492.

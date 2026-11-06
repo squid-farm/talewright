@@ -1,5 +1,7 @@
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Parsing;
 
 namespace Talewright.Talemark.Tests;
 
@@ -225,6 +227,34 @@ public sealed class TalemarkClassifierTests
             classification.Kind == TalemarkClassificationKind.Identifier &&
             classification.Modifiers == TalemarkClassificationModifiers.Declaration &&
             classification.Range.Start.File == "main.tale");
+    }
+
+    [Theory]
+    [InlineData("game: {id: classifier, title: Classifier, start: start}")]
+    [InlineData(null)]
+    [InlineData("game: [")]
+    public void Analysis_classifications_are_cached_from_the_parsed_snapshot(string? manifest)
+    {
+        const string tale = "=== start\n* -> END\n";
+        var files = new Dictionary<string, string> { ["main.tale"] = tale };
+        if (manifest is not null)
+            files[StorySource.ManifestFileName] = manifest;
+        using var cancellation = new CancellationTokenSource();
+        var parses = 0;
+        var analysis = StoryAnalyzer.Analyze(new StorySource(files), null, cancellation.Token,
+            (_, text, token) =>
+            {
+                parses++;
+                return TaleSyntaxParser.Parse(text, token);
+            });
+        cancellation.Cancel();
+        var annotated = analysis.WithDiagnostic(new(DiagnosticSeverity.Warning, "HOST001", "Host warning.",
+            SourceLocation.None));
+
+        Assert.Equal(TalemarkClassifier.Classify("main.tale", tale), analysis.Classifications);
+        Assert.Same(analysis.Classifications, analysis.Classifications);
+        Assert.Same(analysis.Classifications, annotated.Classifications);
+        Assert.Equal(1, parses);
     }
 
     private static string TextOf(string source, TalemarkClassification classification)
