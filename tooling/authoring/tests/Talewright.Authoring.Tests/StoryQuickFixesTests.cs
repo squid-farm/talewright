@@ -2,6 +2,7 @@ using Talewright.Authoring;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring.Tests;
 

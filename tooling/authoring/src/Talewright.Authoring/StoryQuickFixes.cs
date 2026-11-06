@@ -78,7 +78,7 @@ public static class StoryQuickFixes
         };
         var name = kind switch
         {
-            AuthoringSymbolKind.Character => "character",
+            AuthoringSymbolKind.Character => ManifestVocabulary.SymbolCharacter,
             AuthoringSymbolKind.Item => SyntaxSpelling(AuthoringTokenKind.Item),
             AuthoringSymbolKind.Faction => SyntaxSpelling(AuthoringTokenKind.Faction),
             _ => throw new InvalidOperationException($"Unsupported manifest name kind '{kind}'.")
