@@ -340,13 +340,13 @@ public sealed class StoryHoverTests
     public void Scene_card_shows_authored_metadata_only_when_present()
     {
         var (analysis, position) = Analyze("=== first\n-> sec|ond", other:
-            "=== second\n@title The Market\n@tags town, day\n@priority 5\n@once\n@hub all(camp, records)\n@hub-limit 2\n-> END");
+            "=== second\n@title The Market\n@tags town, day\n@priority 5\n@once\n@hub camp and records\n@hub-limit 2\n-> END");
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position)).PlainText;
         Assert.Contains("Title: \"The Market\"", hover);
         Assert.Contains("Tags: day, town", hover);
         Assert.Contains("Priority: 5", hover);
         Assert.Contains("Once: true", hover);
-        Assert.Contains("Hub: all(camp, records)", hover);
+        Assert.Contains("Hub: camp and records", hover);
         Assert.Contains("Hub limit: 2", hover);
         Assert.Contains("Source: === second", hover);
 

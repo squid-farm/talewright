@@ -260,6 +260,8 @@ internal sealed partial class TaleParser
             SceneVocabulary.MetadataSpellings);
         if (syntax.MetadataKey is not { } key)
             return false;
+        if (key == SceneMetadataKey.Hub)
+            _symbols.Analysis?.HubSelector(Value(syntax), At(Part(syntax).MetadataValueColumn(syntax)));
         if (syntax.IsInvalid)
             return true;
         var value = Value(syntax);

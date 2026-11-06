@@ -34,7 +34,7 @@ You are bleeding from a gash along your arm.
 
 === trail.night
 @title The Night Watch
-@hub any(night,watch)
+@hub night or watch
 @hub-limit 1
 
 {image("night-watch.jpeg", "A low fire lights an expedition awning and a brass tripwire bell at the foot of a jungle stair.")}

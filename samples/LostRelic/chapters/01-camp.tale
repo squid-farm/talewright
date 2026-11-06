@@ -29,7 +29,7 @@ you bought{/if}.
 @tags camp
 @once
 @priority 10
-@hub all(camp,records)
+@hub camp and records
 
 {image("expedition-workshop", "A sheltered camp worktable holds a rucksack, rations, rope and expedition records beside a hanging watch bell.")}
 

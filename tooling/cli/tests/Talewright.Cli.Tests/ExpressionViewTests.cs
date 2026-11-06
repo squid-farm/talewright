@@ -68,7 +68,7 @@ public sealed partial class ExpressionViewTests
     {
         var model = Start("""
             === hall
-            @hub any(adventure)
+            @hub adventure
             @hub-limit 2
             * [Wait] -> END
             === cave

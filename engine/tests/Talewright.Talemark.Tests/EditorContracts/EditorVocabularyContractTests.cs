@@ -63,11 +63,12 @@ public sealed class EditorVocabularyContractTests
         Assert.Equal(Constants(typeof(ExpressionVocabulary)), seen["expression"].Order(StringComparer.Ordinal));
         Assert.Equal(Constants(typeof(TextVocabulary)), seen["text"].Order(StringComparer.Ordinal));
 
-        // These are derived fragments or characters used only by prose and legacy Markdown, not standalone syntax.
+        // These are derived fragments, legacy prose characters, or diagnostic-only legacy syntax.
         var sceneExemptions = new[]
         {
             nameof(SceneVocabulary.DifficultyPrefix), nameof(SceneVocabulary.DifficultySeparator),
             nameof(SceneVocabulary.IfPrefix), nameof(SceneVocabulary.ChoiceProseQuote),
+            nameof(SceneVocabulary.LegacyHubAllPrefix), nameof(SceneVocabulary.LegacyHubAnyPrefix),
             nameof(SceneVocabulary.LegacyImageEscape), nameof(SceneVocabulary.LegacyImageQuote),
         };
         Assert.Equal(Constants(typeof(SceneVocabulary)).Except(sceneExemptions).Order(StringComparer.Ordinal),

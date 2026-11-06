@@ -51,8 +51,8 @@ public sealed class RicherHubTests
     }
 
     [Theory]
-    [InlineData("all(a,b)", "fourth")]
-    [InlineData("any(a,b)", "third")]
+    [InlineData("a and b", "fourth")]
+    [InlineData("a or b", "third")]
     [InlineData("a", "third")]
     public void Filters_before_limiting_keeps_stable_ties_explicit_choices_and_replays_once(string query, string next)
     {
@@ -71,7 +71,7 @@ public sealed class RicherHubTests
     [Fact]
     public void Empty_hub_keeps_the_explicit_exit_choice()
     {
-        var history = History("all(absent,b)");
+        var history = History("absent and b");
         Assert.Single(history.Current.Choices);
         Assert.Equal("c0", history.Current.Choices[0].Key);
         history.Choose("c0");

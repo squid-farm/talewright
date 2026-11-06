@@ -131,6 +131,64 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
 
+    internal void HubSelector(string value, SourceLocation location)
+    {
+        var words = new List<(int Start, int Length)>();
+        for (var index = 0; index < value.Length;)
+        {
+            while (index < value.Length && char.IsWhiteSpace(value[index]))
+                index++;
+            if (index == value.Length)
+                break;
+            var start = index;
+            while (index < value.Length && !char.IsWhiteSpace(value[index]))
+                index++;
+            words.Add((start, index - start));
+        }
+
+        var keywords = new[] { ExpressionVocabulary.And, ExpressionVocabulary.Or };
+        var details = AuthoringSyntaxVocabulary.KeywordDetails(keywords);
+        for (var index = 0; index < words.Count; index++)
+        {
+            var word = words[index];
+            if (index % 2 == 1)
+            {
+                var text = value.Substring(word.Start, word.Length);
+                var start = location.Offset(word.Start);
+                AddSite(new(text, Range(start, text), [], keywords,
+                    Enumerable.Range(0, text.Length + 1).Select(start.Offset).ToArray(),
+                    KeywordDetails: details));
+                continue;
+            }
+
+            var afterWord = word.Start + word.Length;
+            while (afterWord < value.Length && char.IsWhiteSpace(value[afterWord]))
+                afterWord++;
+            if (afterWord > word.Start + word.Length)
+            {
+                AddKeywordPoint(location.Offset(afterWord), keywords, details);
+                continue;
+            }
+
+            if (index == words.Count - 1 && source.Files.TryGetValue(location.File, out var content))
+            {
+                if (!_lines.TryGetValue(location.File, out var lines))
+                    _lines.Add(location.File, lines = content.ReplaceLineEndings("\n").Split('\n'));
+                var line = lines[location.Line - 1];
+                var trailing = location.Column - 1 + value.Length;
+                var end = trailing;
+                while (end < line.Length && char.IsWhiteSpace(line[end]))
+                    end++;
+                if (end > trailing)
+                    AddKeywordPoint(location with { Column = end + 1 }, keywords, details);
+            }
+        }
+    }
+
+    private void AddKeywordPoint(SourceLocation location, IReadOnlyList<string> keywords,
+        IReadOnlyDictionary<string, string> details) =>
+        AddSite(new("", new(location, location), [], keywords, [location], KeywordDetails: details));
+
     private void ReferenceCore(string text, SourceLocation location, AuthoringSymbolKind kind,
         IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null)
     {

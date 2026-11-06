@@ -22,7 +22,16 @@
       "patterns": [{"include": "#expression"}]
     },
     {
-      "begin": "^\\s*(@(?:title|tags|priority|once|hub-limit|hub))\\b",
+      "begin": "^\\s*(@hub)(?=[\\t ]|$)",
+      "beginCaptures": {"1": {"name": "keyword.control.metadata.tale"}},
+      "end": "$",
+      "patterns": [
+        {"match": "\\b(?:and|or)\\b", "name": "keyword.operator.word.tale"},
+        {"include": "#inline"}
+      ]
+    },
+    {
+      "begin": "^\\s*(@(?:title|tags|priority|once|hub-limit))\\b",
       "beginCaptures": {"1": {"name": "keyword.control.metadata.tale"}},
       "end": "$",
       "patterns": [{"include": "#inline"}]
