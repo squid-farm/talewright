@@ -34,9 +34,10 @@ compiler checks with human-readable and JSON diagnostics plus an explicit exit p
 Validation is static checking, not proof that every playthrough succeeds.
 
 A C# Language Server Protocol (LSP) server (M3, shipped) exposes live diagnostics,
-context-aware completion, and hover/syntax help to any LSP-capable editor. The VS Code extension provides
-highlighting, language configuration, snippets, and a thin LSP client; it does not contain a second parser
-for semantic analysis. The extension also supports syntax highlighting and snippets independently of the server.
+context-aware completion, hover/syntax help, and compiler-backed semantic tokens to any LSP-capable editor.
+The VS Code extension provides a thin LSP client and a TextMate grammar fallback for startup and untrusted
+workspaces. Semantic highlighting comes from the shared compiler classifier when the language server is
+available; the extension does not contain a second parser for semantic analysis.
 
 The runtime compiler model remains source-free. Authoring tooling provides a separate partial-analysis
 surface with symbols and source ranges for incomplete input, unsaved-buffer overlays, and invalidation when

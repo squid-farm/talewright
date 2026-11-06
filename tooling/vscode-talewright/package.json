@@ -78,7 +78,8 @@
     "configurationDefaults": {
       "[tale]": {
         "editor.autoClosingBrackets": "never",
-        "editor.autoClosingQuotes": "never"
+        "editor.autoClosingQuotes": "never",
+        "editor.semanticHighlighting.enabled": true
       }
     },
     "languages": [

@@ -35,3 +35,11 @@ test('Play From This Scene has gated menus, a default-enabled code lens, and an 
   assert.equal(manifest.contributes.taskDefinitions[0].properties.scene.type, 'string');
   assert.ok(!manifest.contributes.taskDefinitions[0].required.includes('scene'));
 });
+
+test('Talemark semantic highlighting is enabled while its TextMate grammar remains available', async () => {
+  const manifest = await json('package.json');
+  assert.equal(manifest.contributes.configurationDefaults['[tale]']['editor.semanticHighlighting.enabled'], true);
+  assert.ok(manifest.contributes.grammars.some(grammar =>
+    grammar.language === 'tale' && grammar.scopeName === 'text.tale' &&
+    grammar.path === './syntaxes/tale.tmLanguage.json'));
+});

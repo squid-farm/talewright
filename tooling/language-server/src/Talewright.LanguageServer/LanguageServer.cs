@@ -77,7 +77,7 @@ public sealed class LanguageServer
     }
     private readonly record struct DiagnosticPosition(int Line, int Character);
     private sealed record ProtocolError(int Code, string Message);
-    private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions }
+    private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions, SemanticTokens }
     private const int DiagnosticLimit = 200;
     private static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(150);
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
@@ -257,6 +257,16 @@ public sealed class LanguageServer
                         inlayHintProvider = true,
                         codeActionProvider = new { codeActionKinds = new[] { "quickfix" }, resolveProvider = false },
                         completionProvider = new { resolveProvider = false, triggerCharacters = AuthoringSyntaxVocabulary.CompletionTriggerCharacters },
+                        semanticTokensProvider = new
+                        {
+                            legend = new
+                            {
+                                tokenTypes = SemanticTokenCodec.TokenTypes,
+                                tokenModifiers = SemanticTokenCodec.TokenModifiers
+                            },
+                            full = new { delta = false },
+                            range = false
+                        },
                         textDocumentSync = new { openClose = true, change = 1, save = new { includeText = false } },
                         workspace = new { workspaceFolders = new { supported = true, changeNotifications = false } }
                     },
@@ -306,6 +316,10 @@ public sealed class LanguageServer
                 case "textDocument/codeAction":
                     if (!hasId) throw new ArgumentException("codeAction requires a request id.");
                     await StartSemanticAsync(id, parameters, Feature.CodeActions, cancellationToken);
+                    break;
+                case "textDocument/semanticTokens/full":
+                    if (!hasId) throw new ArgumentException("semanticTokens/full requires a request id.");
+                    await StartSemanticAsync(id, parameters, Feature.SemanticTokens, cancellationToken);
                     break;
                 case "textDocument/didChange":
                     Change(parameters);
@@ -403,8 +417,11 @@ public sealed class LanguageServer
             return new(Relative(story.Root, path), line + 1, character + 1);
         }
         var isRangeRequest = kind is Feature.InlayHints or Feature.CodeActions;
-        var position = Position(isRangeRequest
-            ? parameters.GetProperty("range").GetProperty("start") : parameters.GetProperty("position"));
+        var relativeFile = Relative(story.Root, path);
+        var position = kind == Feature.SemanticTokens
+            ? new SourceLocation(relativeFile, 1, 1)
+            : Position(isRangeRequest
+                ? parameters.GetProperty("range").GetProperty("start") : parameters.GetProperty("position"));
         var end = isRangeRequest ? Position(parameters.GetProperty("range").GetProperty("end")) : position;
         if (Compare(position, end) > 0) throw new ArgumentException($"{feature} range is reversed.");
         if (story.MetadataError is { } error)
@@ -424,6 +441,7 @@ public sealed class LanguageServer
         {
             Feature.InlayHints => "textDocument/inlayHint",
             Feature.CodeActions => "textDocument/codeAction",
+            Feature.SemanticTokens => "textDocument/semanticTokens/full",
             _ => $"textDocument/{feature.ToLowerInvariant()}"
         };
         var documentVersions = _documents
@@ -433,7 +451,7 @@ public sealed class LanguageServer
             path, document, story, kind, position, end, _hoverMarkdown,
             _documentChangesSupported, _createFileOperationSupported, documentVersions);
         _requests.Add(key, request);
-        var previous = (kind is Feature.Hover or Feature.Definition) &&
+        var previous = (kind is Feature.Hover or Feature.Definition or Feature.SemanticTokens) &&
             story.PublishedAnalysis is { } published &&
             published.Source.Files.TryGetValue(position.File, out var publishedText) && publishedText == document.Text
                 ? published : null;
@@ -472,7 +490,7 @@ public sealed class LanguageServer
             SemanticResult result;
             try
             {
-                result = CalculateSemantic(request, analysis, previous);
+                result = CalculateSemantic(request, analysis, previous, request.Cancellation.Token);
             }
             catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
                 or InvalidOperationException or KeyNotFoundException or JsonException)
@@ -492,12 +510,16 @@ public sealed class LanguageServer
         }
     }
 
-    private static SemanticResult CalculateSemantic(PendingRequest request, StoryAnalysis analysis, StoryAnalysis? previous)
+    private static SemanticResult CalculateSemantic(PendingRequest request, StoryAnalysis analysis, StoryAnalysis? previous,
+        CancellationToken cancellationToken)
     {
+        var position = request.Position;
+        if (request.Feature == Feature.SemanticTokens)
+            return new(new { data = SemanticTokenCodec.Encode(analysis.Classifications, position.File, cancellationToken) }, previous);
+
         if (analysis.Diagnostics.FirstOrDefault(diagnostic => diagnostic.Code is AuthoringDiagnosticCodes.CustomFeaturesUnavailable or AuthoringDiagnosticCodes.StoryAnalysisUnavailable) is { } unavailable)
             return new(null, ErrorCode: -32001, ErrorMessage: $"{request.Feature} unavailable: {unavailable.Message}");
 
-        var position = request.Position;
         if (request.Feature == Feature.CodeActions)
         {
             var diagnostics = analysis.Diagnostics.Where(diagnostic =>
