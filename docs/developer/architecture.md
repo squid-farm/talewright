@@ -566,15 +566,12 @@ sequenceDiagram
 
 Steps carry stable source-position IDs and spans. Choice keys still count choice steps in source order.
 Shared structural walks exclude steps beyond guaranteed exits, keeping validator reachability consistent
-with the model consumed by the story map. The replay fingerprint salt is `talewright-replay-v2`.
+with the model consumed by the story map. The replay fingerprint salt is `talewright-replay-v3`;
+compiled choices also carry stable outcome identities independent of their live UI keys.
 
 Invalid keys throw `InvalidOperationException` listing the valid ones. The UI only ever sends keys it was given.
 
 **Saves, restore and Back/Forward.** Saves store replay inputs, never the event log or state:
-
-The diagram includes prototype replay evidence for
-[#478](https://github.com/squid-farm/talewright/issues/478). Cross-revision loading is not an approved
-release contract; representative tester cases and explicit lead approval remain outstanding.
 
 ```mermaid
 flowchart LR
@@ -583,22 +580,23 @@ flowchart LR
     f1["format + story id/version"]
     f2["content fingerprint"]
     f3["seed + character selection"]
-    f4["choice keys + cursor"]
+    f4["choice keys + outcome identities + cursor"]
     f5["replay evidence"]
   end
   hist["StoryHistory"] -- "Save()" --> save --> store["ISaveStore<br/>FileSaveStore · IndexedDbSaveStore"]
   store -- "bytes" --> restore["StoryHistory.Restore"]
-  restore -- "validate all, then replay<br/>keys into a fresh StorySession" --> hist2["new StoryHistory<br/>(swapped in only on success)"]
+  restore -- "validate all, then replay<br/>outcome identities into a fresh StorySession" --> hist2["new StoryHistory<br/>(swapped in only on success)"]
 ```
 
 Back and Forward use the same replay: `StoryHistory` rebuilds a session from the seed and the first
-_cursor_ choice keys.
+_cursor_ outcome identities. Live choice keys still identify player actions; evidence-backed saves
+use outcome identities for replay compatibility.
 
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
-format/story versions, source/extension fingerprint and prototype replay evidence. The candidate
-implementation checks the full recorded path against an updated story, but released support remains
-exact-revision only. Unknown/corrupt/incompatible saves are rejected without rewriting the original.
+format/story versions, source/extension fingerprint, outcome identities and replay evidence. V1
+compatibility checks the full recorded path, including redo, against an updated story. Unknown,
+corrupt or incompatible saves are rejected without rewriting the original.
 Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
 see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
 stories omit the character. Pre-v1 replay contracts may change without support for previous versions.

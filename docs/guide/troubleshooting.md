@@ -32,9 +32,10 @@ scenes haven't already been visited. `validate` warns (`TW3008`) when no scene h
 
 ## My old save won't load
 
-Released save support requires the original story revision and a compatible player. Reopen the build
-that created the save; there is no approved cross-revision migration procedure yet. A proposed
-same-path check remains under review. Incompatible saves and the current game are left untouched.
+Try opening it with the original story revision and a compatible player. V1 updates can load a save
+only when its starting state and complete recorded gameplay path still match; a prose or label change
+may work, but changed starting values or outcomes do not. Saves without replay evidence have no
+cross-revision compatibility guarantee. A failed load leaves the save and current game untouched.
 See [saves](playing-and-saving.md#updating-a-story-with-existing-saves).
 
 ## My saves disappeared (web)

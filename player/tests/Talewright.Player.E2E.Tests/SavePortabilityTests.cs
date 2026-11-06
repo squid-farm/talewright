@@ -71,6 +71,8 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         var original = await ReadStoredAsync(story.Id, "My save");
 
         var decoded = SaveFormat.Read(valid);
+        var changedOutcomeIdentities = decoded.ReplayChoiceIdentities!.Select(identity => identity.ToArray()).ToArray();
+        changedOutcomeIdentities[0][0] ^= 1;
         var invalid = new (byte[] Bytes, string Message)[]
         {
             ("broken"u8.ToArray(), "malformed"),
@@ -80,7 +82,7 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             (SaveFormat.Write(decoded with { ContentFingerprint = "different" }), $"Version {story.Version} of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { StoryId = "different" }), "different story"),
             (SaveFormat.Write(decoded with { StoryVersion = "different" }), $"Version different of {story.Title} has changed"),
-            (SaveFormat.Write(decoded with { Choices = ["not-a-choice"] }), "cannot continue"),
+            (SaveFormat.Write(decoded with { ReplayChoiceIdentities = changedOutcomeIdentities }), "cannot continue"),
             (new byte[StoryHistory.MaxSaveBytes + 1], "too large"),
         };
         foreach (var (bytes, message) in invalid)

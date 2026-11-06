@@ -19,6 +19,7 @@ public sealed record SavedGame
     public CharacterSelection? Character { get; init; }
     public SaveSummary? Summary { get; init; }
     public byte[]? ReplayEvidence { get; init; }
+    public IReadOnlyList<byte[]>? ReplayChoiceIdentities { get; init; }
 }
 
 /// <summary>Reads and writes save files: a short header followed by a zlib-compressed MessagePack array.</summary>
@@ -110,6 +111,19 @@ public static class SaveFormat
             throw new InvalidDataException(HistoryMessage);
         }
 
+        if (payload.ReplayChoiceIdentities is { } identities
+            && (identities.Count != payload.Choices.Count
+                || identities.Any(identity => identity is null
+                    || identity.Length is not (ChoiceReplayIdentity.CompactLength or ChoiceReplayIdentity.FullLength))))
+        {
+            throw new InvalidDataException(HistoryMessage);
+        }
+
+        if ((payload.ReplayEvidence is null) != (payload.ReplayChoiceIdentities is null))
+        {
+            throw new InvalidDataException(HistoryMessage);
+        }
+
         var character = payload.Character is null ? null : FromPayload(payload.Character);
         SaveSummary? summary = null;
         summaryDamaged = false;
@@ -137,6 +151,7 @@ public static class SaveFormat
             Character = character,
             Summary = summary,
             ReplayEvidence = payload.ReplayEvidence,
+            ReplayChoiceIdentities = payload.ReplayChoiceIdentities,
         };
     }
 
@@ -151,6 +166,7 @@ public static class SaveFormat
             Cursor = save.Cursor,
             Choices = save.Choices.ToList(),
             ReplayEvidence = save.ReplayEvidence,
+            ReplayChoiceIdentities = save.ReplayChoiceIdentities?.Select(identity => identity.ToArray()).ToList(),
         };
         if (save.Character is { } character)
         {
@@ -295,6 +311,26 @@ public static class SaveFormat
                     if (!reader.TryReadNil() && reader.ReadBytes() is not { Length: ReplayEvidence.Length })
                     {
                         throw new InvalidDataException(HistoryMessage);
+                    }
+
+                    break;
+                case 9:
+                    if (!reader.TryReadNil())
+                    {
+                        var identityCount = reader.ReadArrayHeader();
+                        if (identityCount > MaxChoices)
+                        {
+                            throw new InvalidDataException(HistoryMessage);
+                        }
+
+                        for (var i = 0; i < identityCount; i++)
+                        {
+                            var identity = reader.ReadBytes();
+                            if (identity is not { Length: ChoiceReplayIdentity.CompactLength or ChoiceReplayIdentity.FullLength })
+                            {
+                                throw new InvalidDataException(HistoryMessage);
+                            }
+                        }
                     }
 
                     break;

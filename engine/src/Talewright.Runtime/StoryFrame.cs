@@ -10,6 +10,8 @@ namespace Talewright.Runtime;
 /// <param name="Label">Rendered label text.</param>
 public sealed record ChoiceView(string Key, IReadOnlyList<RenderedInline> Label)
 {
+    internal ReadOnlyMemory<byte>? ReplayIdentity { get; init; }
+
     internal static IReadOnlyList<RenderedInline> ContinueLabel { get; } =
         Array.AsReadOnly<RenderedInline>([new RenderedText(ChoiceDefinition.ContinueLabelText, TextStyle.None)]);
 
