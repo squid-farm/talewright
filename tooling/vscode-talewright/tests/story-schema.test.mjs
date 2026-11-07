@@ -117,50 +117,50 @@ test('compiler and schema accept the same identifiers', async () => {
   assertInvalid(creationStats, { 'bad/id': [8] }, 'invalid creation stat ID', 'propertyNames');
 });
 
-test('schema validates complete and contextual documented manifest examples', async () => {
-  const fullManifests = [
-    ['docs/reference/talemark-syntax.md', 0],
-    ['docs/reference/talemark-syntax.md', 1],
-    ['docs/guide/first-story.md', 0],
-    ['docs/guide/debugger-test-plan.md', 0],
-    ['docs/guide/authoring-recipes.md', 2],
-  ];
-  for (const [path, index] of fullManifests) {
-    const name = `${path} YAML example ${index + 1}`;
-    assertValid(validateManifest, parsedYaml(markdownYaml(await read(path), index), name), name);
-  }
+// Docs whose yaml blocks are all manifest examples. Keep in sync with the documentedManifests Nx input.
+const documentedManifestDocs = [
+  'docs/reference/talemark-syntax.md',
+  'docs/guide/first-story.md',
+  'docs/guide/authoring-recipes.md',
+  'docs/guide/organizing-your-story.md',
+  'docs/guide/debugger-test-plan.md',
+  'docs/guide/writing-stories.md',
+  'docs/guide/cheat-sheet.md',
+];
 
-  const fragmentExamples = [
-    ['docs/reference/talemark-syntax.md', 2, 'pronouns'],
-    ['docs/reference/talemark-syntax.md', 3, 'creation'],
-    ['docs/reference/talemark-syntax.md', 4, 'items'],
-    ['docs/reference/talemark-syntax.md', 5, 'vars'],
-    ['docs/guide/writing-stories.md', 0, 'characters'],
-    ['docs/guide/writing-stories.md', 1, 'items'],
-    ['docs/guide/writing-stories.md', 2, 'vars'],
-    ['docs/guide/writing-stories.md', 3, 'factions'],
-    ['docs/guide/writing-stories.md', 4, 'triggers'],
-    ['docs/guide/writing-stories.md', 5, 'creation'],
-  ];
-  for (const [path, index, property] of fragmentExamples) {
-    const name = `${path} YAML example ${index + 1} (${property})`;
-    const fragment = parsedYaml(markdownYaml(await read(path), index), name);
-    const value = property === 'pronouns' ? fragment.pronouns
-      : property === 'creation' ? fragment.game.creation
-        : fragment[property];
-    assert.ok(value !== undefined, `${name} must include ${property}`);
+async function documentedYaml() {
+  const examples = [];
+  for (const path of documentedManifestDocs) {
+    const blocks = [...(await read(path)).matchAll(/```yaml\r?\n([\s\S]*?)\r?\n```/g)];
+    assert.ok(blocks.length > 0, `${path} has no documented YAML examples`);
+    blocks.forEach((block, index) => examples.push({ name: `${path} YAML example ${index + 1}`, source: block[1] }));
+  }
+  return examples;
+}
+
+// Every yaml block in those docs is a manifest example: complete when it declares game.id, otherwise a
+// fragment shown in context, which must still validate once placed in a minimal story.
+test('schema validates complete and contextual documented manifest examples', async () => {
+  const examples = await documentedYaml();
+  for (const { name, source } of examples) {
+    const example = parsedYaml(source, name);
+    assert.ok(example && typeof example === 'object' && !Array.isArray(example) && Object.keys(example).length > 0,
+      `${name} must be a non-empty manifest mapping`);
+    if (example.game?.id !== undefined) {
+      assertValid(validateManifest, example, name);
+      continue;
+    }
+    const { pronouns, ...fragment } = example;
     const story = {
+      characters: { player: { 'first-name': 'Ada', ...(pronouns === undefined ? {} : { pronouns }) } },
+      ...fragment,
       game: {
         id: 'documented-fragment',
         title: 'Documented fragment',
         start: 'beginning',
+        ...fragment.game,
       },
-      characters: { player: { 'first-name': 'Ada' } },
     };
-    if (property === 'pronouns') {
-      story.characters.player.pronouns = value;
-    } else if (property === 'creation') story.game.creation = value;
-    else story[property] = value;
     assertValid(validateManifest, story, name);
   }
 

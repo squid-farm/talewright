@@ -8,16 +8,20 @@ the [architecture tour](docs/developer/architecture.md).
 contributors and coding agents; author-facing YAML keys use lowercase kebab-case,
 not the casing of their C# implementation.
 
-## Pre-v1 compatibility
+## Compatibility freeze
 
-Target the current syntax, APIs and file formats. Do not retain superseded properties, overloads,
-serialized shapes or replay digests solely for backward compatibility. Update callers, fixtures and
-documentation together; historical compatibility expectations do not override this policy.
-Any exception requires an explicit project-lead decision.
+**Compatibility freeze (from 1.0.0-preview.1).** Do not make backward-incompatible changes to Talemark
+syntax or meaning, the manifest schema, the save format, replay evidence, choice identities or gameplay
+behaviour. Additive changes are allowed but must be shown not to change existing stories or saves: no
+character or word that existing prose may already use is reserved, existing stories compile the same
+way, and golden save tests ([#570](https://github.com/squid-farm/talewright/issues/570)) pass
+unchanged. A breaking change needs an explicit project-lead decision, a version bump and migration notes.
 
-When a persisted contract changes, version it and reject unsupported data explicitly rather than
-migrating it. Failed loads must preserve the active session and original stored bytes. Keep
-deterministic replay and valid current optional behavior; breaking old formats is not a goal by itself.
+A breaking change is allowed only for a severe defect, such as a security or data-loss bug. Announce it
+in advance, and make the old form produce an error that names its replacement. Author Debugger
+scenario files, tooling, and C# extension/NuGet APIs are not frozen before 1.0.
+
+Failed loads must preserve the active session and original stored bytes.
 
 ## Set up
 

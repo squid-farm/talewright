@@ -253,6 +253,17 @@ listed. Results include unsaved edits; while the story is still being analyzed
 after an edit, the request waits for that analysis rather than returning old
 locations.
 
+Use **Rename Symbol** (`F2`) on any of those names to rename every occurrence
+across the story's `.tale` files and `*.talewright.yaml` files, including unsaved
+buffers. Only the name changes: prose, YAML quoting and comments are untouched,
+and a scene file keeps its filename. The rename is refused with an explanation
+when the new name isn't valid, is already used by a name of the same kind, or
+would add a compiler error or lint finding. It's also refused for `END`, the
+`player` character, built-in ruleset stats, a story stat that overrides a
+ruleset stat, and names whose declaration is ambiguous or sits next to an error
+that could hide a reference. Saved games store these names and saves are not
+migrated, so VS Code asks you to confirm before applying the edit.
+
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
 inside the first quoted argument, completion suggests supported files from the
 story's `images/` folder, including nested folders. Paths are case-sensitive.
@@ -349,9 +360,8 @@ maintain a second copy of the schema, so the schema file must not move. Submissi
 automatic discovery is available: SchemaStore must accept and publish the entry,
 and an editor may need to refresh its catalog.
 
-The rolling schema follows the current manifest format. Before v1, breaking
-manifest and schema changes are permitted without compatibility shims or migration
-support. To pin validation, replace `main` in the modeline URL with the
+The rolling schema follows the current manifest format. From 1.0.0-preview.1, manifest changes
+are additive, so story files written for a preview keep validating. To pin validation, replace `main` in the modeline URL with the
 commit or release tag matching your Talewright version, or use a local copy.
 The VSIX always uses its bundled schema, independent of catalog/network access.
 
@@ -415,7 +425,7 @@ treated as custom manipulators, not executed.
 
 ## Not included
 
-- Signature help, rename, lint, formatting, or runtime debugging.
+- Signature help, lint, formatting, or runtime debugging.
 - Implicit project builds/assembly execution, gameplay, network service, or telemetry.
 
 The language server uses only shared compiler/authoring analysis. Custom C#
