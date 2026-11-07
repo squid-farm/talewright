@@ -70,7 +70,8 @@ class CiRoutingTests(unittest.TestCase):
                 plan = make_plan(graph)
                 self.assertEqual(groups, {group for group, tasks in plan.items() if tasks})
                 self.assertEqual(
-                    [{"project": "Talewright.Talemark.Tests", "target": "test"}] if "unit" in groups else [],
+                    [{"project": "Talewright.Runtime.Tests", "target": "test"},
+                     {"project": "Talewright.Talemark.Tests", "target": "test"}] if "unit" in groups else [],
                     plan["unit"],
                 )
                 if changed.startswith("samples/"):
@@ -92,6 +93,18 @@ class CiRoutingTests(unittest.TestCase):
                                       else "talewright-performance-tooling"), "target": "check"}],
                         plan["checks"],
                     )
+
+    def test_golden_save_sources_select_runtime_units(self):
+        for changed in (
+            "examples/CSharpStory/Story/Content/main.tale",
+            "examples/CSharpStory/Story/StoryExtensions.cs",
+            "engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/lost-relic-slot.twsave",
+        ):
+            with self.subTest(changed=changed):
+                self.assertIn(
+                    {"project": "Talewright.Runtime.Tests", "target": "test"},
+                    make_plan(affected_graph(changed))["unit"],
+                )
 
     def test_editor_and_documentation_plans_select_expected_groups(self):
         for changed, expected in [
