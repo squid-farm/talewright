@@ -1,6 +1,6 @@
 # Golden saves
 
-These saves were written by the engine from the sample sources as they were checked in. `GoldenSaveTests` loads each one against the current sources and checks the restored scene, cursor, state and replay evidence. Tests only read these files. They never regenerate them.
+The quick, named and autosaves were written by the engine from the sample sources as they were checked in. The trigger checkpoint uses the test-only source overlay described below. `GoldenSaveTests` loads each save against its corresponding source and checks the restored scene, cursor, state and replay evidence. Tests only read these files. They never regenerate them.
 
 Loading a save replays every saved choice, then compares the result with the replay evidence stored in the save. If an engine change alters gameplay (rule maths, trigger timing, evaluation order, compiler binding or emitted events), these saves stop loading, and saves that players already have would stop loading too.
 
@@ -15,11 +15,12 @@ All three Lost Relic saves come from one playthrough of [`samples/LostRelic`](..
 | File | Written as | Covers |
 | --- | --- | --- |
 | `lost-relic-quick.twsave` | Quick Save after step 2 | Character creation, hub selection, the trigger firing, visit counts |
+| `lost-relic-trigger.twtrigger` | Trigger checkpoint after step 2 | The `courage-earned` checkpoint envelope and restoration of the same playthrough |
 | `lost-relic-slot.twsave` | Named save after step 3, then Back | Redo: cursor 13 of 14 choices. Going forward replays the skill-check roll |
 | `lost-relic-autosave.twsave` | Autosave after going forward again | The skill-check roll and its failure route |
 | `csharp-story.twsave` | Save at the ending of [`examples/CSharpStory`](../../../../../examples/CSharpStory), seed `7` | Replay identity of the extensions registered in `StoryExtensions.Create()` |
 
-The Lost Relic declares no saving trigger (`save: true`), so these fixtures include no trigger checkpoint file. The trigger's firing is covered by the replayed state and evidence. Trigger checkpoints use the same save bytes, wrapped by `TriggerSaveCodec`.
+The checked-in Lost Relic does not mark `courage-earned` as a saving trigger. To exercise the trigger-checkpoint envelope without changing the sample story's behavior, the checkpoint test compiles a test-only source overlay that adds `save: true` to that existing trigger. It replays the quick-save choices, then pins and restores the resulting `TriggerSaveCodec` envelope. The other Lost Relic saves use the unchanged sample source.
 
 Each save has a fixed summary time, and its SHA-256 is pinned in `GoldenSaveTests`.
 

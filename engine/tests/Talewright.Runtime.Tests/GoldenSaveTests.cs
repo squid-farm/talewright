@@ -63,6 +63,32 @@ public class GoldenSaveTests
     }
 
     [Fact]
+    public void Lost_relic_trigger_checkpoint_restores_through_trigger_envelope()
+    {
+        var fixture = Path.Combine(Root, "engine", "tests", "Talewright.Runtime.Tests", "SaveSamples", "golden",
+            "lost-relic-trigger.twtrigger");
+        var bytes = File.ReadAllBytes(fixture);
+        Assert.Equal("EE21E6CCF1E30649DF9352406683367AAA6CDE9FF54CAA1B468FBAB8ABF311B4",
+            Convert.ToHexString(SHA256.HashData(bytes)));
+
+        var (story, expected) = CreateLostRelicTriggerCheckpoint();
+        Assert.Equal(bytes, TriggerSaveCodec.Encode(expected));
+
+        var checkpoint = TriggerSaveCodec.Decode(bytes);
+        Assert.Equal("courage-earned", checkpoint.TriggerId);
+        var save = SaveFormat.Read(checkpoint.Data);
+        var history = StoryHistory.Restore(story, checkpoint.Data);
+
+        Assert.Equal(11, history.Cursor);
+        Assert.False(history.CanForward);
+        Assert.Equal("trail.jaguar", history.Current.Scene!.Value.Value);
+        AssertCampAndTrigger(history);
+        Assert.Equal(2, history.State.VisitCount(new SceneId("trail.night")));
+        Assert.Empty(history.Events.OfType<DiceRolled>());
+        AssertSameEvidence(save, history);
+    }
+
+    [Fact]
     public void Csharp_story_save_restores_through_registered_extensions()
     {
         var (save, history) = Restore("csharp-story.twsave",
@@ -117,6 +143,37 @@ public class GoldenSaveTests
 
     private static StoryDefinition LostRelic() =>
         Compile(StorySource.FromDirectory(Path.Combine(Root, "samples", "LostRelic")), null);
+
+    private static (StoryDefinition Story, TriggerSave Checkpoint) CreateLostRelicTriggerCheckpoint()
+    {
+        var quickSavePath = Path.Combine(Root, "engine", "tests", "Talewright.Runtime.Tests", "SaveSamples", "golden",
+            "lost-relic-quick.twsave");
+        var quickSave = SaveFormat.Read(File.ReadAllBytes(quickSavePath));
+        var story = Compile(LostRelicWithSavingCheckpoint(), null);
+        var history = new StoryHistory(story, quickSave.Seed, quickSave.Character);
+        foreach (var choice in quickSave.Choices)
+        {
+            history.Choose(choice);
+        }
+
+        var triggerSaveId = history.TriggerSaveId;
+        Assert.Equal("courage-earned", triggerSaveId);
+        return (story, new TriggerSave(
+            triggerSaveId ?? throw new InvalidOperationException("The trigger checkpoint did not fire."),
+            history.Save(quickSave.Summary)));
+    }
+
+    private static StorySource LostRelicWithSavingCheckpoint()
+    {
+        var source = StorySource.FromDirectory(Path.Combine(Root, "samples", "LostRelic"));
+        var files = source.Files.ToDictionary(file => file.Key, file => file.Value, StringComparer.Ordinal);
+        const string trigger = "    when: player:courage >= 10\n    do: set flag:steady\n    once: true";
+        var manifest = files[StorySource.ManifestFileName];
+        var updatedManifest = manifest.Replace(trigger, trigger + "\n    save: true", StringComparison.Ordinal);
+        Assert.NotEqual(manifest, updatedManifest);
+        files[StorySource.ManifestFileName] = updatedManifest;
+        return new StorySource(files, source.ImagePaths);
+    }
 
     private static StoryDefinition CSharpStory() =>
         Compile(StorySource.FromDirectory(Path.Combine(Root, "examples", "CSharpStory", "Story", "Content")),
