@@ -73,7 +73,7 @@ public sealed class StoryAnalysis
         _classifications = original._classifications;
         World = original.World;
         Substitutions = original.Substitutions;
-        Scenes = original.Scenes;
+        _scenes = original._scenes;
         SymbolContext = original.SymbolContext;
         _currentFile = original._currentFile;
         _currentFileSymbols = original._currentFileSymbols;
@@ -107,13 +107,17 @@ public sealed class StoryAnalysis
             .ToArray()));
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
-        Scenes = Array.AsReadOnly(collector.Scenes.ToArray());
+        var scenes = Array.AsReadOnly(collector.Scenes.ToArray());
+        _scenes = currentFileAnalysis && snapshot is not null
+            ? new(() => OverlayScenes(snapshot, currentFile!, scenes))
+            : new(() => scenes);
         SymbolContext = collector.SymbolContext;
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
     private readonly CompletionSiteIndex _sites;
     private readonly Lazy<IReadOnlyList<TalemarkClassification>> _classifications;
+    private readonly Lazy<IReadOnlyList<AuthoredScene>> _scenes;
     private readonly string? _currentFile;
     private readonly IReadOnlyList<AuthoringSymbol> _currentFileSymbols;
     private readonly Lazy<Dictionary<(AuthoringSymbolKind Kind, string Name), AuthoringSymbol[]>> _symbolsByIdentity;
@@ -140,8 +144,24 @@ public sealed class StoryAnalysis
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
-    public IReadOnlyList<AuthoredScene> Scenes { get; }
+    public IReadOnlyList<AuthoredScene> Scenes => _scenes.Value;
     internal StorySymbols? SymbolContext { get; }
+
+    // Scene definitions carry no source file, so a snapshot scene belongs to the edited file only when the
+    // snapshot declares it there and nowhere else.
+    private static IReadOnlyList<AuthoredScene> OverlayScenes(StoryAnalysis snapshot, string file,
+        IReadOnlyList<AuthoredScene> currentScenes)
+    {
+        var replaced = snapshot.Symbols
+            .Where(symbol => symbol.Kind == AuthoringSymbolKind.Scene && symbol.Declaration?.Start.File == file &&
+                !snapshot.HasSymbolOutside(file, AuthoringSymbolKind.Scene, symbol.Name))
+            .Select(symbol => symbol.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        return Array.AsReadOnly(snapshot.Scenes
+            .Where(scene => !replaced.Contains(scene.Definition.Id.Value))
+            .Concat(currentScenes)
+            .ToArray());
+    }
 
     internal bool HasSymbolOutside(string file, AuthoringSymbolKind kind, string name) =>
         _symbolsByIdentity.Value.TryGetValue((kind, name), out var symbols) &&

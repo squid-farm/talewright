@@ -139,7 +139,9 @@ guarantee.
 
 All measured p95 values met the 20 ms request target. Managed bytes use the
 process-wide counter, including server-thread allocations; they are neither
-retained memory nor peak memory. The increase for completion with 10,000 scene
-symbols is visible and is retained as a future optimization signal. The
-deterministic concurrency tests separately verify that these requests do not
-start or await whole-story analysis while the current buffer is being edited.
+retained memory nor peak memory. Completion allocations still grow with the
+story-wide symbol count (about 76 KB per request at 1,000 scene symbols and
+about 518 KB at 10,000), while hover stays roughly flat. That growth is a
+known target for later optimization. The deterministic concurrency tests
+separately verify that these requests do not start or await whole-story
+analysis while the current buffer is being edited.

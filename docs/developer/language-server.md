@@ -100,10 +100,11 @@ starting or waiting for whole-story analysis. Before the first snapshot is
 published, they return current-file syntax and local declarations only; they
 do not invent cross-file semantic candidates. Cross-file suggestions may remain
 stale until the next whole-story analysis publishes, but completion edits and
-hover ranges always come from the current buffer. Definition retains its
-separate safety policy: it does not navigate using an old target range after
-that target changes or is removed. Inlay hints and other analysis-dependent
-requests continue to await the requested revision.
+hover ranges always come from the current buffer. Hover details for scenes
+declared in other files, such as titles and tags, come from the same snapshot.
+Definition retains its separate safety policy: it does not navigate using an
+old target range after that target changes or is removed. Inlay hints and other
+analysis-dependent requests continue to await the requested revision.
 
 Cancelling a request with `$/cancelRequest` returns RequestCancelled (`-32800`)
 without cancelling analysis shared by other requests or diagnostics. If a

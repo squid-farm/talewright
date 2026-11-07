@@ -205,6 +205,29 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
+    public async Task Current_text_hover_keeps_other_file_scene_facts()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", "=== next\n@title Quiet Forest\n@tags forest, calm\n-> END\n");
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+
+        const string current = "=== start\n// current text\n-> next";
+        await client.Change("start.tale", current, 2);
+        var debounce = await control.NextDelay();
+        await client.Request(2, "textDocument/hover", Position(client, 2, 5));
+        var value = (await client.Response(2)).GetProperty("result").GetProperty("contents").GetProperty("value").GetString();
+        Assert.Contains("Quiet Forest", value);
+        Assert.Contains("calm, forest", value);
+        Assert.Equal(1, control.AnalysisCount);
+
+        debounce.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 2);
+    }
+
+    [Fact]
     public async Task Cold_completion_returns_local_syntax_without_waiting_for_initialization()
     {
         var control = new AnalysisControl();
