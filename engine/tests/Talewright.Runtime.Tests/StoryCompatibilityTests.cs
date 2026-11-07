@@ -62,6 +62,8 @@ public sealed class StoryCompatibilityTests
     [InlineData("invalid-character")]
     [InlineData("changed-extension")]
     [InlineData("changed-start")]
+    [InlineData("removed-redo-choice")]
+    [InlineData("changed-redo-destination")]
     public void Divergent_updates_are_rejected_without_changing_the_save_or_active_history(string change)
     {
         var original = Create(Compile());
@@ -80,6 +82,8 @@ public sealed class StoryCompatibilityTests
             "invalid-character" => Compile(version: "2", allowShe: false),
             "changed-extension" => Compile(version: "2", compatibilityId: "custom-v2"),
             "changed-start" => Compile(version: "2", startEffect: 1),
+            "removed-redo-choice" => Compile(version: "2", includeMiddleChoice: false),
+            "changed-redo-destination" => Compile(version: "2", middleDestination: "END"),
             _ => throw new ArgumentOutOfRangeException(nameof(change)),
         };
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
@@ -496,7 +500,8 @@ public sealed class StoryCompatibilityTests
     private static StoryDefinition Compile(string version = "1", string prose = "Original narrative.",
         bool insertChoice = false, string choiceLabel = "Investigate", int reward = 1, int difficulty = 12,
         int presetHp = 15, bool allowShe = true, string? compatibilityId = null, int startEffect = 0,
-        int initialScore = 0, string middleChoiceLabel = "Continue", bool reverseInitialChoices = false)
+        int initialScore = 0, string middleChoiceLabel = "Continue", bool reverseInitialChoices = false,
+        bool includeMiddleChoice = true, string middleDestination = "finish")
     {
         var manifest = new ManifestFaker("compatibility", "Compatibility", "start")
         {
@@ -518,7 +523,10 @@ public sealed class StoryCompatibilityTests
         lines.AddRange(reverseInitialChoices ? [leaveChoice, checkedChoice] : [checkedChoice, leaveChoice]);
         lines.Add(SceneFaker.Header("middle"));
         lines.Add("The middle.");
-        lines.Add(ChoiceFaker.Create("finish", middleChoiceLabel, effect: EffectFaker.Increase(score, reward)));
+        if (includeMiddleChoice)
+        {
+            lines.Add(ChoiceFaker.Create(middleDestination, middleChoiceLabel, effect: EffectFaker.Increase(score, reward)));
+        }
         lines.Add(ChoiceFaker.Create("END", "Quit"));
         lines.Add(SceneFaker.Header("finish"));
         lines.Add("Finished.");
