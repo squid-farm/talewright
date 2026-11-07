@@ -296,6 +296,179 @@ public sealed class StoryQuickFixesTests
     }
 
     [Theory]
+    [InlineData("generic")]
+    [InlineData("none")]
+    public void Missing_stat_expands_a_ruleset_shorthand_without_changing_its_base(string baseId)
+    {
+        var manifest = $"game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {baseId}\ncharacters:\n  player: {{first-name: Ada}}\n";
+        const string story = "=== start\n~ player:charm += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
+
+        Assert.Equal("Declare stat 'charm'", fix.Title);
+        Assert.Equal(
+            $":\n    base: {baseId}\n    stats:\n      - id: charm\n        name: Charm\n        category: custom\n        min: 0\n        max: 2147483647\n        default: 0",
+            fix.NewText);
+        var updated = ApplyTextEdit(manifest, fix);
+        Assert.Contains($"ruleset:\n    base: {baseId}\n    stats:", updated);
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Missing_stat_adds_schema_defaults_when_the_ruleset_is_implicit()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:charm += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
+
+        Assert.Equal(
+            "  ruleset:\n    stats:\n      - id: charm\n        name: Charm\n        category: custom\n        min: 0\n        max: 2147483647\n        default: 0\n",
+            fix.NewText);
+        var edited = AnalyzeManifest(ApplyTextEdit(manifest, fix), story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Missing_stat_preserves_crlf_and_trailing_comment_when_expanding_ruleset_shorthand()
+    {
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\n  ruleset: none # keep selected base\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
+        const string story = "=== start\r\n~ player:charm += 1\r\n-> END\r\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var edited = ApplyTextEdit(manifest, result.Fixes[0]);
+
+        Assert.Contains("ruleset:\r\n    base: none # keep selected base\r\n    stats:\r\n", edited);
+        Assert.DoesNotContain("\r\r\n", edited);
+        Assert.DoesNotContain(AnalyzeManifest(edited, story).Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Missing_stat_adds_a_ruleset_with_crlf_without_rewriting_the_manifest()
+    {
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
+        const string story = "=== start\r\n~ player:charm += 1\r\n-> END\r\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var edited = ApplyTextEdit(manifest, result.Fixes[0]);
+
+        Assert.Contains("  ruleset:\r\n    stats:\r\n      - id: charm\r\n", edited);
+        Assert.DoesNotContain("\r\r\n", edited);
+        Assert.DoesNotContain(AnalyzeManifest(edited, story).Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Missing_stat_appends_to_existing_block_stats_and_preserves_overrides_comments_and_crlf()
+    {
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\n  ruleset:\r\n    base: generic\r\n    disable: [cha] # keep disabled stat\r\n    stats:\r\n      - id: grit\r\n        category: custom # keep category\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
+        const string story = "=== start\r\n~ player:charm += 1\r\n-> END\r\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
+
+        Assert.Equal(
+            "      - id: charm\r\n        name: Charm\r\n        category: custom\r\n        min: 0\r\n        max: 2147483647\r\n        default: 0\r\n",
+            fix.NewText);
+        var updated = ApplyTextEdit(manifest, fix);
+        Assert.Contains("    disable: [cha] # keep disabled stat\r\n", updated);
+        Assert.Contains("        category: custom # keep category\r\n      - id: charm\r\n", updated);
+        var edited = AnalyzeManifest(updated, story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("game: {id: quick-fix, title: Quick Fix, start: start, ruleset: {base: none}}", ", stats: [{id: charm, name: Charm, category: custom, min: 0, max: 2147483647, default: 0}]")]
+    [InlineData("game: {id: quick-fix, title: Quick Fix, start: start, ruleset: {base: none, stats: []}}", "{id: charm, name: Charm, category: custom, min: 0, max: 2147483647, default: 0}")]
+    public void Missing_stat_preserves_flow_ruleset_and_stats_shapes(string game, string insertion)
+    {
+        var manifest = $"{game}\ncharacters: {{player: {{first-name: Ada}}}}\n";
+        const string story = "=== start\n~ player:charm += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
+
+        Assert.Equal(insertion, fix.NewText);
+        var edited = AnalyzeManifest(ApplyTextEdit(manifest, fix), story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("game: {id: quick-fix, title: Quick Fix, start: start}", ", ruleset: {stats: [{id: charm, name: Charm, category: custom, min: 0, max: 2147483647, default: 0}]}")]
+    [InlineData("game: {id: quick-fix, title: Quick Fix, start: start, ruleset: none}", "{base: none, stats: [{id: charm, name: Charm, category: custom, min: 0, max: 2147483647, default: 0}]}")]
+    public void Missing_stat_adds_or_expands_rulesets_inside_a_flow_game(string game, string insertion)
+    {
+        var manifest = $"{game}\ncharacters: {{player: {{first-name: Ada}}}}\n";
+        const string story = "=== start\n~ player:charm += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
+
+        Assert.Equal(insertion, fix.NewText);
+        var edited = AnalyzeManifest(ApplyTextEdit(manifest, fix), story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Disabled_builtin_stats_do_not_get_redeclared_as_custom_stats()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {base: generic, disable: [str]}\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:str += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        Assert.Empty(StoryQuickFixes.ForMissingStat(analysis, diagnostic).Fixes);
+    }
+
+    [Fact]
+    public void Existing_story_stats_do_not_get_duplicate_declaration_actions()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {base: none, stats: [{id: charm, category: custom}]}\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:charm += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+
+        Assert.DoesNotContain(analysis.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Unsupported_or_malformed_stat_sections_are_not_edited()
+    {
+        var unsupported = ManifestListEditor.AppendStoryStat(
+            "game: {ruleset: {base: none, stats: {charm: custom}}}\n", StorySource.ManifestFileName, "charm", "Charm");
+        var malformed = ManifestListEditor.AppendStoryStat(
+            "game: {ruleset: [unfinished\n", StorySource.ManifestFileName, "charm", "Charm");
+
+        Assert.Null(unsupported.Edit);
+        Assert.Contains("not a list", unsupported.Reason);
+        Assert.Null(malformed.Edit);
+        Assert.Contains("invalid YAML", malformed.Reason);
+    }
+
+    [Theory]
     [InlineData(
         "=== start\n> old-man: Hello.\n-> END\n",
         "  old-man:\n    first-name: Old Man",
@@ -580,6 +753,27 @@ public sealed class StoryQuickFixesTests
         }
         offset += fix.Range.Start.Column - 1;
         return text.Insert(offset, fix.NewText);
+    }
+
+    private static string ApplyTextEdit(string text, StoryQuickFix fix)
+    {
+        var start = Offset(fix.Range.Start);
+        var end = Offset(fix.Range.End);
+        Assert.InRange(start, 0, text.Length);
+        Assert.InRange(end, start, text.Length);
+        return text.Remove(start, end - start).Insert(start, fix.NewText);
+
+        int Offset(SourceLocation location)
+        {
+            var offset = 0;
+            for (var line = 1; line < location.Line; line++)
+            {
+                var newline = text.IndexOfAny(['\r', '\n'], offset);
+                Assert.NotEqual(-1, newline);
+                offset = newline + (text[newline] == '\r' && newline + 1 < text.Length && text[newline + 1] == '\n' ? 2 : 1);
+            }
+            return offset + location.Column - 1;
+        }
     }
 
     private static StoryAnalysis AnalyzeFlag(string manifest, string text) =>
