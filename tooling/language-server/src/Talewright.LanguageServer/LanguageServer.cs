@@ -523,13 +523,16 @@ public sealed class LanguageServer
         if (request.Feature == Feature.CodeActions)
         {
             var diagnostics = analysis.Diagnostics.Where(diagnostic =>
-                (diagnostic.Code is CompilerDiagnosticCodes.UnknownScene or CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable or CompilerDiagnosticCodes.UnknownNameOrProperty) &&
+                (diagnostic.Code is CompilerDiagnosticCodes.UnknownScene or CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable or
+                    CompilerDiagnosticCodes.UnknownNameOrProperty or CompilerDiagnosticCodes.UnknownPredicate) &&
                 diagnostic.Location.File == position.File &&
                 Compare(position, diagnostic.Location) <= 0 && Compare(diagnostic.Location, request.End) <= 0);
             var lines = new LineMap(request.Text);
             var actions = new List<object>();
             foreach (var diagnostic in diagnostics)
             {
+                actions.AddRange(StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes
+                    .Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
                 if (diagnostic.Code == CompilerDiagnosticCodes.UnknownScene)
                 {
                     actions.AddRange(StoryQuickFixes.ForMissingScene(analysis, diagnostic)
@@ -551,6 +554,9 @@ public sealed class LanguageServer
                         actions.Add(ToDisabledCodeAction(nameResult.Title ?? "Declare missing name", nameReason, diagnostic, lines));
                     continue;
                 }
+
+                if (diagnostic.Code == CompilerDiagnosticCodes.UnknownPredicate)
+                    continue;
 
                 var result = StoryQuickFixes.ForMissingFlag(analysis, diagnostic);
                 if (result.Fixes.Count == 0 && result.Title is null)
@@ -651,6 +657,7 @@ public sealed class LanguageServer
             {
                 title = fix.Title,
                 kind = "quickfix",
+                isPreferred = fix.IsPreferred,
                 diagnostics = new[] { diagnosticItem },
                 edit = new
                 {
@@ -690,6 +697,7 @@ public sealed class LanguageServer
         {
             title = fix.Title,
             kind = "quickfix",
+            isPreferred = fix.IsPreferred,
             diagnostics = new[] { diagnosticItem },
             edit = workspaceEdit
         };
