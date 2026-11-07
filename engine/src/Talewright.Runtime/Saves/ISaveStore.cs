@@ -9,4 +9,6 @@ public interface ISaveStore
     Task WriteQuickAsync(string storyId, byte[] data);
     Task<byte[]> ReadAutosaveAsync(string storyId);
     Task WriteAutosaveAsync(string storyId, byte[] data);
+    Task<TriggerSave> ReadTriggerAsync(string storyId);
+    Task WriteTriggerAsync(string storyId, TriggerSave save);
 }

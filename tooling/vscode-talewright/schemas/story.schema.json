@@ -465,6 +465,11 @@
           "$ref": "#/definitions/booleanScalar",
           "default": false,
           "description": "When true, the trigger fires at most once."
+        },
+        "save": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": false,
+          "description": "When true, firing this trigger creates or replaces the story's single Trigger checkpoint after the current step settles."
         }
       },
       "additionalProperties": false

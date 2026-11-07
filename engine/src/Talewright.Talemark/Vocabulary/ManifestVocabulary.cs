@@ -28,6 +28,7 @@ internal static class ManifestVocabulary
     internal const string When = "when";
     internal const string Do = "do";
     internal const string Once = SceneVocabulary.Once;
+    internal const string Save = "save";
 
     internal const string Base = "base";
     internal const string Disable = "disable";
@@ -103,7 +104,7 @@ internal static class ManifestVocabulary
     [
         Game, Characters, Factions, Items, Flags, Vars, Triggers,
         Id, Title, Version, Start, Randomness, Seed, Undo, Ruleset, Creation,
-        When, Do, Once, Base, Disable, Stats, Name, Category, Min, Max, Default, GoverningAttribute,
+        When, Do, Once, Save, Base, Disable, Stats, Name, Category, Min, Max, Default, GoverningAttribute,
         FirstName, LastName, Pronouns, Inventory, NameAgreement, Subject, Object, PossessivePronoun, Reflexive,
         Agreement, Determiner, Independent, Uncountable, Modifiers, Standing, Presets, Label,
     ];

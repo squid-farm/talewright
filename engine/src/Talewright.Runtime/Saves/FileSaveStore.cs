@@ -8,6 +8,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
 {
     private const string QuickFile = "quick" + SaveFormat.FileExtension;
     private const string AutosaveFile = "autosave" + SaveFormat.FileExtension;
+    private const string TriggerFile = "trigger" + SaveFormat.FileExtension;
 
     public static string DefaultRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Talewright", "saves");
@@ -41,7 +42,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
         var slots = new List<string>();
         foreach (var path in paths)
         {
-            if (Path.GetFileName(path) == QuickFile || Path.GetFileName(path) == AutosaveFile)
+            if (Path.GetFileName(path) is QuickFile or AutosaveFile or TriggerFile)
             {
                 continue;
             }
@@ -73,7 +74,19 @@ public sealed class FileSaveStore(string root) : ISaveStore
     public Task WriteAutosaveAsync(string storyId, byte[] data) =>
         WriteFileAsync(Path.Combine(StoryDirectory(storyId), AutosaveFile), data, overwrite: true);
 
-    private static async Task<byte[]> ReadFileAsync(string path)
+    public async Task<TriggerSave> ReadTriggerAsync(string storyId)
+    {
+        var encoded = await ReadFileAsync(Path.Combine(StoryDirectory(storyId), TriggerFile), TriggerSaveCodec.MaxEncodedBytes);
+        return TriggerSaveCodec.Decode(encoded);
+    }
+
+    public Task WriteTriggerAsync(string storyId, TriggerSave save)
+    {
+        var encoded = TriggerSaveCodec.Encode(save);
+        return WriteEncodedFileAsync(Path.Combine(StoryDirectory(storyId), TriggerFile), encoded, overwrite: true);
+    }
+
+    private static async Task<byte[]> ReadFileAsync(string path, int maxBytes = StoryHistory.MaxSaveBytes)
     {
         FileStream stream;
         try
@@ -85,7 +98,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
             throw new FileNotFoundException("No save exists at this location.", path, ex);
         }
         await using var ownedStream = stream;
-        if (stream.Length is 0 or > StoryHistory.MaxSaveBytes)
+        if (stream.Length is 0 || stream.Length > maxBytes)
         {
             throw new InvalidDataException("This saved game is empty or too large to load (maximum 2 MiB). Choose another save.");
         }
@@ -101,6 +114,11 @@ public sealed class FileSaveStore(string root) : ISaveStore
     private static async Task WriteFileAsync(string target, byte[] data, bool overwrite)
     {
         SaveNames.ValidateData(data);
+        await WriteEncodedFileAsync(target, data, overwrite);
+    }
+
+    private static async Task WriteEncodedFileAsync(string target, byte[] data, bool overwrite)
+    {
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         await AtomicFileWriter.WriteAsync(target, data, overwrite);
     }

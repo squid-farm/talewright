@@ -58,7 +58,7 @@ async function execute(mode, operation) {
 
 export async function list(storyId) {
     const keys = await execute("readonly", store => store.index("storyId").getAllKeys(IDBKeyRange.only(storyId)));
-    return keys.map(key => key[1]).filter(slot => slot !== "\0quick" && slot !== "\0autosave").sort();
+    return keys.map(key => key[1]).filter(slot => slot !== "\0quick" && slot !== "\0autosave" && slot !== "\0trigger").sort();
 }
 
 export async function read(storyId, slot) {
@@ -78,4 +78,29 @@ export async function write(storyId, slot, data, overwrite) {
     }
     const record = { storyId, slot, data };
     await execute("readwrite", store => overwrite ? store.put(record) : store.add(record));
+}
+
+export async function readTrigger(storyId) {
+    const record = await execute("readonly", store => store.get([storyId, "\0trigger"]));
+    if (!record) {
+        throw new Error("Trigger checkpoint does not exist.");
+    }
+    if (typeof record.triggerId !== "string" || record.triggerId.length === 0
+        || /[\u0000-\u001f\u007f]/.test(record.triggerId)
+        || new TextEncoder().encode(record.triggerId).length > 2 * 1024 * 1024
+        || !(record.data instanceof Uint8Array) || record.data.length === 0 || record.data.length > 2 * 1024 * 1024) {
+        throw new Error("Trigger checkpoint contains invalid or oversized data.");
+    }
+    return { triggerId: record.triggerId, data: record.data };
+}
+
+export async function writeTrigger(storyId, triggerId, data) {
+    if (typeof triggerId !== "string" || triggerId.length === 0
+        || /[\u0000-\u001f\u007f]/.test(triggerId)
+        || new TextEncoder().encode(triggerId).length > 2 * 1024 * 1024
+        || !(data instanceof Uint8Array) || data.length === 0 || data.length > 2 * 1024 * 1024) {
+        throw new Error("This trigger checkpoint is invalid or too large to store.");
+    }
+    const record = { storyId, slot: "\0trigger", triggerId, data };
+    await execute("readwrite", store => store.put(record));
 }

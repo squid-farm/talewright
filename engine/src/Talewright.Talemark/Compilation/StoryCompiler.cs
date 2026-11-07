@@ -157,7 +157,7 @@ public static class StoryCompiler
             var effects = ExpressionParser.ParseEffects(raw.Do, raw.DoLocation, symbols, diagnostics);
             if (when is not null && effects is not null)
             {
-                triggers.Add(new TriggerDefinition(raw.Id, when, effects, raw.Once));
+                triggers.Add(new TriggerDefinition(raw.Id, when, effects, raw.Once) { Save = raw.Save });
             }
         }
 

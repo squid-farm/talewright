@@ -75,6 +75,62 @@ public sealed class FileSaveStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Trigger_checkpoint_is_available_without_autosave_and_separate_from_other_saves()
+    {
+        var data = CreateSave();
+        await Assert.ThrowsAsync<FileNotFoundException>(() => Store.ReadTriggerAsync("story"));
+        await Store.WriteTriggerAsync("story", new TriggerSave("arrival", data));
+        await Store.WriteTriggerAsync("story", new TriggerSave("finale", data));
+        await Store.WriteTriggerAsync("other", new TriggerSave("arrival", [1]));
+
+        var saved = await Store.ReadTriggerAsync("story");
+        Assert.Equal("finale", saved.TriggerId);
+        Assert.Equal(data, saved.Data);
+        Assert.Equal("arrival", (await Store.ReadTriggerAsync("other")).TriggerId);
+        Assert.Empty(await Store.ListAsync("story"));
+
+        var entry = Assert.Single(await Store.ListEntriesAsync("story"));
+        Assert.True(entry.IsTriggerSave);
+        Assert.Equal("Trigger checkpoint", entry.DisplayName);
+        Assert.Equal("finale", entry.TriggerLabel);
+        Assert.Equal("A scene", entry.Summary!.SceneTitle);
+        Assert.Throws<ArgumentException>(() => new TriggerSave("bad\u0000id", data).Validate());
+        await Assert.ThrowsAsync<FileNotFoundException>(() => Store.ReadAutosaveAsync("story"));
+    }
+
+    [Fact]
+    public async Task Failed_trigger_checkpoint_replacement_preserves_payload_and_cleans_temporary_files()
+    {
+        var first = new TriggerSave("arrival", CreateSave());
+        await Store.WriteTriggerAsync("story", first);
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            Store.WriteTriggerAsync("story", new TriggerSave("finale", [])));
+        var saved = await Store.ReadTriggerAsync("story");
+        Assert.Equal(first.TriggerId, saved.TriggerId);
+        Assert.Equal(first.Data, saved.Data);
+
+        var target = Directory.GetFiles(_root, "trigger" + SaveFormat.FileExtension, SearchOption.AllDirectories).Single();
+        var backup = target + ".backup";
+        File.Move(target, backup);
+        Directory.CreateDirectory(target);
+        try
+        {
+            await Assert.ThrowsAnyAsync<IOException>(() =>
+                Store.WriteTriggerAsync("story", new TriggerSave("finale", CreateSave())));
+            Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            Directory.Delete(target);
+            File.Move(backup, target);
+        }
+
+        var preserved = await Store.ReadTriggerAsync("story");
+        Assert.Equal(first.TriggerId, preserved.TriggerId);
+        Assert.Equal(first.Data, preserved.Data);
+    }
+
+    [Fact]
     public async Task Failed_autosave_replacement_preserves_payload_and_cleans_temporary_files()
     {
         await Store.WriteAutosaveAsync("story", [1]);
@@ -228,4 +284,15 @@ public sealed class FileSaveStoreTests : IDisposable
             Directory.Delete(_root, recursive: true);
         }
     }
+
+    private static byte[] CreateSave() => SaveFormat.Write(new SavedGame
+    {
+        StoryId = "story",
+        StoryVersion = "1",
+        ContentFingerprint = "fingerprint",
+        Seed = 7,
+        Choices = [],
+        Cursor = 0,
+        Summary = new("A scene", new DateTimeOffset(2026, 10, 23, 0, 0, 0, TimeSpan.Zero), "Mara"),
+    });
 }

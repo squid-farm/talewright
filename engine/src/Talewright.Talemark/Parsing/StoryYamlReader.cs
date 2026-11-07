@@ -98,7 +98,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
                 continue;
             }
 
-            _yaml.CheckKeys(map, ManifestVocabulary.Id, ManifestVocabulary.When, ManifestVocabulary.Do, ManifestVocabulary.Once);
+            _yaml.CheckKeys(map, ManifestVocabulary.Id, ManifestVocabulary.When, ManifestVocabulary.Do, ManifestVocabulary.Once, ManifestVocabulary.Save);
             if (_analysis is not null)
             {
                 foreach (var (key, kind) in new[] { (ManifestVocabulary.When, ExpressionContextKind.Condition), (ManifestVocabulary.Do, ExpressionContextKind.Effects) })
@@ -133,7 +133,12 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
                     ? onceValue
                     : _yaml.Error(onceNode, CompilerDiagnosticCodes.InvalidConfigurationValue, "once must be true or false.", false)
                 : false;
-            triggers.Add(new RawTrigger(id, when, _yaml.At(Get(map, ManifestVocabulary.When)!), effects, _yaml.At(Get(map, ManifestVocabulary.Do)!), once));
+            var save = Get(map, ManifestVocabulary.Save) is { } saveNode
+                ? bool.TryParse(Scalar(saveNode), out var saveValue)
+                    ? saveValue
+                    : _yaml.Error(saveNode, CompilerDiagnosticCodes.InvalidConfigurationValue, "save must be true or false.", false)
+                : false;
+            triggers.Add(new RawTrigger(id, when, _yaml.At(Get(map, ManifestVocabulary.When)!), effects, _yaml.At(Get(map, ManifestVocabulary.Do)!), once, save));
         }
     }
 }

@@ -26,7 +26,7 @@ public sealed class ManifestFaker
     private readonly List<(TaleItemRef Reference, string Name, KeyValuePair<string, int>[] Modifiers, string? NameAgreement, bool? Uncountable)> _items = [];
     private readonly List<(TaleCharacterRef Reference, string FirstName, string? LastName, string? Pronouns, KeyValuePair<string, int>[] Stats, KeyValuePair<string, int>[] Inventory)> _characters = [];
     private readonly List<(TaleFactionRef Reference, string Name, int Standing)> _factions = [];
-    private readonly List<(string Id, string When, string Do, bool Once)> _triggers = [];
+    private readonly List<(string Id, string When, string Do, bool Once, bool Save)> _triggers = [];
     private readonly List<(string Id, int[] Values)> _creationStats = [];
     private readonly List<(string Id, string Label, KeyValuePair<string, int>[] Stats)> _creationPresets = [];
     private string[]? _creationPronouns;
@@ -188,7 +188,7 @@ public sealed class ManifestFaker
         return reference;
     }
 
-    public void Trigger(string id, string when, string effect, bool once = false)
+    public void Trigger(string id, string when, string effect, bool once = false, bool save = false)
     {
         FakerIdentifier.Require(id, nameof(id));
         ArgumentException.ThrowIfNullOrWhiteSpace(when);
@@ -198,7 +198,7 @@ public sealed class ManifestFaker
             throw new ArgumentException($"Trigger '{id}' is already declared.", nameof(id));
         }
 
-        _triggers.Add((id, when, effect, once));
+        _triggers.Add((id, when, effect, once, save));
         IncludeSection(Section.Triggers);
     }
 
@@ -348,7 +348,7 @@ public sealed class ManifestFaker
 
                 case Section.Triggers:
                     lines.Add("triggers:");
-                    foreach (var (id, when, effect, once) in _triggers)
+                    foreach (var (id, when, effect, once, save) in _triggers)
                     {
                         lines.Add($"  - id: {Scalar(id)}");
                         lines.Add($"    when: {Scalar(when)}");
@@ -356,6 +356,10 @@ public sealed class ManifestFaker
                         if (once)
                         {
                             lines.Add("    once: true");
+                        }
+                        if (save)
+                        {
+                            lines.Add("    save: true");
                         }
                     }
                     break;

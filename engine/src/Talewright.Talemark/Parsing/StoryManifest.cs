@@ -7,7 +7,7 @@ using Talewright.Talemark.Model;
 namespace Talewright.Talemark.Parsing;
 
 /// <summary>An expression or effect list written in story configuration, parsed later once all symbols are known.</summary>
-internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once);
+internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once, bool Save);
 
 /// <summary>Core settings and declarations assembled from the story's configuration inputs.</summary>
 internal sealed class StoryManifest
