@@ -25,4 +25,11 @@
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
   </ItemGroup>
 
+  <Import Project="../../player/src/Talewright.Player/BuildIdentity.targets" />
+
+  <!-- The same identity the player displays, for scripts and bug reports (#315). -->
+  <Target Name="WriteTalewrightVersionJson" AfterTargets="Publish" DependsOnTargets="ResolveTalewrightBuildIdentity">
+    <WriteLinesToFile File="$(PublishDir)wwwroot/version.json" Overwrite="true" Lines="{ &quot;version&quot;: &quot;$(TalewrightBuildVersion)&quot;, &quot;commit&quot;: &quot;$(TalewrightBuildCommit)&quot;, &quot;date&quot;: &quot;$(TalewrightBuildDate)&quot; }" />
+  </Target>
+
 </Project>

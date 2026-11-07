@@ -49,6 +49,35 @@ public sealed class PlayerToolbarRenderTests
             control => Assert.Contains("class=\"tw-choice\"", control));
     }
 
+    [Fact]
+    public async Task Settings_show_the_stamped_build_identity()
+    {
+        await using var services = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton<IJSRuntime, UnusedJsRuntime>()
+            .AddSingleton<PlayerPreferencesStore>()
+            .BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(PlayerToolbar.Title)] = "Test story",
+            });
+            var component = await renderer.RenderComponentAsync<PlayerToolbar>(parameters);
+            return component.ToHtmlString();
+        });
+
+        Assert.Matches(@"^(dev|\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?)$", PlayerBuildIdentity.Version);
+        Assert.Matches("^([0-9a-f]{7}|unknown)$", PlayerBuildIdentity.Commit);
+        Assert.Matches(@"^\d{4}-\d{2}-\d{2}$", PlayerBuildIdentity.Date);
+        var settings = html[html.IndexOf("class=\"tw-settings\"", StringComparison.Ordinal)..];
+        settings = settings[..settings.IndexOf("</dialog>", StringComparison.Ordinal)];
+        Assert.Contains(
+            $"<p class=\"tw-build-identity\">Talewright {PlayerBuildIdentity.Version} · commit {PlayerBuildIdentity.Commit} · built {PlayerBuildIdentity.Date}</p>",
+            System.Net.WebUtility.HtmlDecode(settings));
+    }
+
     private sealed class UnusedJsRuntime : IJSRuntime
     {
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) =>

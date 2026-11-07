@@ -13,7 +13,7 @@ from zipfile import ZipFile, ZipInfo
 SCRIPTS = Path(__file__).resolve().parents[1] / ".github/scripts"
 sys.path.insert(0, str(SCRIPTS))
 from package_version import version_from_tag
-from publish_samples import normalize_base_path
+from publish_samples import normalize_base_path, publish_command
 from verify_packages import ENGINE_ASSEMBLIES, ENGINE_FRAMEWORKS, MAP_ASSETS, PLAYER_ASSETS, smoke, verify, verify_desktop_archive
 import ui_test_image_plan
 
@@ -56,6 +56,34 @@ class PagesPathTests(unittest.TestCase):
         for value in ["relative", "//host", "/../repo", "/./repo", "/repo?query", '/repo"><script>']:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalize_base_path(value)
+
+
+class PlayerBuildIdentityTests(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_hosted_publish_pins_the_date_and_passes_only_an_explicit_version(self):
+        from datetime import datetime, timezone
+        now = datetime(2026, 1, 31, 23, 59, tzinfo=timezone.utc)
+        dev = publish_command("out", now=now)
+        self.assertIn("-p:TalewrightBuildDate=2026-01-31", dev)
+        self.assertFalse(any(argument.startswith("-p:Version=") for argument in dev))
+        self.assertIn("-p:Version=1.0.0-preview.1", publish_command("out", "1.0.0-preview.1", now))
+
+    def test_publish_rejects_an_invalid_version(self):
+        result = subprocess.run([sys.executable, SCRIPTS / "publish_samples.py", "--base-path", "/",
+                                 "--output", "unused", "--version", "1.0"], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("vMAJOR.MINOR.PATCH", result.stderr)
+
+    def test_only_release_versions_replace_the_dev_identity(self):
+        for arguments, expected in [([], "dev"), (["-p:Version=0.0.0-ci.42"], "dev"),
+                                    (["-p:Version=1.0.0-preview.1"], "1.0.0-preview.1"),
+                                    (["-p:Version=1.2.3"], "1.2.3")]:
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(["dotnet", "msbuild", "player/src/Talewright.Player",
+                                         "-getProperty:TalewrightBuildVersion", *arguments],
+                                        cwd=self.ROOT, capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout.strip(), expected)
 
 
 class RepositoryLayoutTests(unittest.TestCase):

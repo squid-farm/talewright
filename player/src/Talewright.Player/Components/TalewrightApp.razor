@@ -89,6 +89,7 @@ else
             {
                 <button type="button" class="tw-choice" @onclick="RetryStoryAsync">Retry opening story</button>
             }
+            <BuildIdentity />
         </section>
     }
     else if (LibraryEnabled && (_story is null || _showLibrary))
@@ -142,6 +143,7 @@ else
                 <h2>@(_failedTitle ?? "Story") has problems</h2>
                 <DiagnosticList Diagnostics="_diagnostics" />
             }
+            <BuildIdentity />
         </section>
     }
 </div>

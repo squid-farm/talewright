@@ -31,8 +31,10 @@ jobs:
       # The player is served from the root of its custom domain (play.trytalewright.com).
       - name: Publish the bundled sample player
         run: |
-          python3 .github/scripts/publish_samples.py --base-path / --output artifacts/pages
+          version=$(python3 .github/scripts/package_version.py --tag "$GITHUB_REF_NAME")
+          python3 .github/scripts/publish_samples.py --base-path / --output artifacts/pages --version "$version"
           grep -q '<base href="/" />' artifacts/pages/wwwroot/index.html
+          grep -q "\"version\": \"$version\"" artifacts/pages/wwwroot/version.json
       - run: python3 player/tests/run_e2e.py install-browsers --browser chromium
       - name: Smoke-test the deployment path
         env:
