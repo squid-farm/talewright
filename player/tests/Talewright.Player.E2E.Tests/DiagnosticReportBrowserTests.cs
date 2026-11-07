@@ -83,6 +83,8 @@ public sealed class DiagnosticReportBrowserTests(WebHostFixture host, ITestOutpu
         await Choose("Walk onward");
         await Expect(preview).ToContainTextAsync("Scene ID: second");
         await Driver.ClickAsync("Saves");
+        // Setting files does not wait for the save form to leave its busy state.
+        await Expect(Page.Locator(".tw-saves")).ToHaveAttributeAsync("data-busy", "false");
         await Page.GetByLabel("Import save file", new() { Exact = true }).SetInputFilesAsync(new FilePayload
         {
             Name = "PRIVATE_SAVE.twsave",

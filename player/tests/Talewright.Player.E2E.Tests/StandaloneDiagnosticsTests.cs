@@ -138,6 +138,8 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         var invalidIndex = JsonSerializer.Serialize(new Dictionary<string, string> { [privateUrl] = new('A', 64) });
         await Page.RouteAsync(new Regex("/story/index\\.json\\?"), route =>
             route.FulfillAsync(new() { Status = 200, ContentType = "application/json", Body = invalidIndex }));
+        // Reloading during the initial WebAssembly download cancels framework requests.
+        await Expect(Page.Locator(".tw-diagnostic-report summary")).ToBeVisibleAsync();
         await ReloadAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Invalid published story index entry");
         await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
