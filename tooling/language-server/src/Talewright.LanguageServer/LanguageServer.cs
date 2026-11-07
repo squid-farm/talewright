@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using System.Diagnostics;
 using Talewright.Authoring;
@@ -76,6 +77,11 @@ public sealed class LanguageServer
         public override object Convert(LineMap lines) => ToLintConfigurationDiagnostic(Message);
     }
     private readonly record struct DiagnosticPosition(int Line, int Character);
+    private sealed record LspPosition(int line, int character);
+    private sealed record LspRange(LspPosition start, LspPosition end);
+    private sealed record DocumentSymbolInformation(string name, int kind, LspRange range,
+        LspRange selectionRange,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? detail);
     private sealed record ProtocolError(int Code, string Message);
     private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions, SemanticTokens }
     private const int DiagnosticLimit = 200;
@@ -404,19 +410,8 @@ public sealed class LanguageServer
             : GetStory(path);
         var relative = Relative(story.Root, path);
         var symbols = story.Workspace.GetSceneSymbols(relative)
-            .Select(symbol =>
-            {
-                var result = new Dictionary<string, object>
-                {
-                    ["name"] = symbol.Id,
-                    ["kind"] = 2,
-                    ["range"] = ToLspRange(symbol.Range),
-                    ["selectionRange"] = ToLspRange(symbol.SelectionRange)
-                };
-                if (symbol.Title is { } title)
-                    result["detail"] = title;
-                return result;
-            })
+            .Select(symbol => new DocumentSymbolInformation(symbol.Id, 2, ToLspRange(symbol.Range),
+                ToLspRange(symbol.SelectionRange), symbol.Title))
             .ToArray();
         return ReplyAsync(id, symbols, cancellationToken);
     }
@@ -1292,11 +1287,9 @@ public sealed class LanguageServer
     private static int Compare(SourceLocation left, SourceLocation right) =>
         left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);
 
-    private static object ToLspRange(SourceRange range) => new
-    {
-        start = new { line = range.Start.Line - 1, character = range.Start.Column - 1 },
-        end = new { line = range.End.Line - 1, character = range.End.Column - 1 }
-    };
+    private static LspRange ToLspRange(SourceRange range) =>
+        new(new(range.Start.Line - 1, range.Start.Column - 1),
+            new(range.End.Line - 1, range.End.Column - 1));
 
     private Task ReplyAsync(JsonElement id, object? result, CancellationToken cancellationToken) =>
         _protocol.WriteAsync(new { jsonrpc = "2.0", id, result }, cancellationToken);
