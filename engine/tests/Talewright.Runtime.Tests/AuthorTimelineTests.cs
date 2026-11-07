@@ -12,11 +12,19 @@ public sealed class AuthorTimelineTests
     private static readonly string Yaml = BuildManifest().Build();
     private static readonly string Tale = BuildTale();
 
-    private static ManifestFaker BuildManifest(bool collision = false, string characterId = "guide", string factionId = "guild")
+    private static ManifestFaker BuildManifest(
+        bool collision = false,
+        string characterId = "guide",
+        string factionId = "guild",
+        bool includeChainFlag = false)
     {
         var manifest = new ManifestFaker("timeline", "Timeline", "start") { Undo = false };
         manifest.Flag("ready");
         manifest.Flag("fired");
+        if (includeChainFlag)
+        {
+            manifest.Flag("chain-0");
+        }
         manifest.Number("count", 0);
         if (collision)
         {
@@ -296,8 +304,8 @@ public sealed class AuthorTimelineTests
                 do: set flag:chain-{i + 1}
                 once: true
             """));
-        var yaml = Yaml[..Yaml.IndexOf("triggers:", StringComparison.Ordinal)]
-            .Replace("flags: [ready, fired]", "flags: [ready, fired, chain-0]") + "triggers:\n" + triggers;
+        var yaml = BuildManifest(includeChainFlag: true).Build();
+        yaml = yaml[..yaml.IndexOf("triggers:", StringComparison.Ordinal)] + "triggers:\n" + triggers;
         var session = Start(Compile("""
             === start
             * [Stay] (requires not flag:ready) -> start

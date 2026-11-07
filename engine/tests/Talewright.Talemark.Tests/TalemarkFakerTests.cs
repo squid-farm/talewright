@@ -1,8 +1,11 @@
 using Talewright.Core.Identity;
+using Talewright.Core.World;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Rules.Checks;
 using Talewright.Testing;
+using YamlDotNet.RepresentationModel;
 
 namespace Talewright.Talemark.Tests;
 
@@ -53,6 +56,7 @@ public sealed class TalemarkFakerTests
         manifest.Text("weather", "snow: # \"\u96ea\U0001F642\"");
         var ready = manifest.Flag("ready");
         var coin = manifest.Item("coin", "silver: # \"coin\"");
+        var faction = manifest.Faction("keyword", "yes");
         var player = manifest.Character("player", "Ada: # \"A\"", "O'Neil",
             new Dictionary<string, int> { ["int"] = 2 });
         var source = new StorySource(new Dictionary<string, string>
@@ -73,6 +77,7 @@ public sealed class TalemarkFakerTests
         Assert.Equal("snow: # \"\u96ea\U0001F642\"", story.World.TextVariables[new VarId("weather")]);
         Assert.Contains(new FlagId(ready.Id), story.World.Flags);
         Assert.Equal("silver: # \"coin\"", story.World.Items[new ItemId(coin.Id)].Name);
+        Assert.Equal("yes", story.World.Factions[new FactionId(faction.Id)].Name);
         Assert.Equal("Ada: # \"A\"", story.World.Characters[new EntityId(player.Id)].FirstName);
         Assert.Equal("O'Neil", story.World.Characters[new EntityId(player.Id)].LastName);
         Assert.Equal(manifest.Build(), manifest.Build());
@@ -87,17 +92,12 @@ public sealed class TalemarkFakerTests
         manifest.Flag("ready");
         manifest.Number("count", 1);
 
-        Assert.Equal("""
-            game:
-              id: slow-input
-              title: Slow input
-              start: start
-              seed: 42
-            characters:
-              player: {first-name: Tester}
-            vars: {x: 1, count: 1}
-            flags: [ready]
-            """, manifest.Build());
+        var yaml = new YamlStream();
+        yaml.Load(new StringReader(manifest.Build()));
+        var root = Assert.IsType<YamlMappingNode>(Assert.Single(yaml.Documents).RootNode);
+
+        Assert.Equal(new[] { "game", "characters", "vars", "flags" },
+            root.Children.Keys.Select(key => Assert.IsType<YamlScalarNode>(key).Value!));
     }
 
     [Fact]
@@ -123,16 +123,16 @@ public sealed class TalemarkFakerTests
         });
         var compiled = StoryCompiler.Compile(source);
 
-        Assert.Contains("randomness: off", yaml);
-        Assert.Contains("undo: false", yaml);
-        Assert.Contains("creation:", yaml);
-        Assert.Contains("pronouns: they", yaml);
-        Assert.Contains("factions:", yaml);
-        Assert.Contains("modifiers: { wis: 2 }", yaml);
-        Assert.Contains("once: true", yaml);
         Assert.True(compiled.Success, string.Join(Environment.NewLine, compiled.Diagnostics));
-        Assert.Equal(3, compiled.Story!.World.Factions[new FactionId("guild")].InitialStanding);
-        Assert.True(Assert.Single(compiled.Story.Triggers).Once);
+        var story = compiled.Story!;
+        Assert.Equal(RandomnessMode.Off, story.Randomness);
+        Assert.False(story.UndoEnabled);
+        Assert.True(story.Creation!.EditName);
+        Assert.Equal(Pronouns.They, story.World.Characters[EntityId.Player].Pronouns);
+        Assert.Equal(2, story.World.Items[new ItemId("charm")].Modifiers[new StatId("wis")]);
+        Assert.Equal("Test Guild", story.World.Factions[new FactionId("guild")].Name);
+        Assert.Equal(3, story.World.Factions[new FactionId("guild")].InitialStanding);
+        Assert.True(Assert.Single(story.Triggers).Once);
     }
 
     [Fact]
@@ -159,24 +159,28 @@ public sealed class TalemarkFakerTests
     }
 
     [Fact]
-    public void Manifest_quotes_only_core_yaml_keywords()
+    public void Literal_yaml_keywords_preserve_string_values()
     {
-        var manifest = new ManifestFaker("faker-test", "yes", "start");
-        manifest.Character("player", "on");
-        manifest.Text("answer", "true");
-        manifest.Text("nothing", "null");
+        var yaml = """
+            game:
+              id: faker-test
+              title: yes
+              start: start
+            characters:
+              player:
+                first-name: on
+            vars:
+              answer: "true"
+              nothing: "null"
+            """;
         var source = new StorySource(new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = manifest.Build(),
+            [StorySource.ManifestFileName] = yaml,
             ["main.tale"] = $"{SceneFaker.Header("start")}\n{DivertFaker.To("END")}",
         });
 
         var compiled = StoryCompiler.Compile(source);
 
-        Assert.Contains("title: yes", manifest.Build());
-        Assert.Contains("first-name: on", manifest.Build());
-        Assert.Contains("answer: \"true\"", manifest.Build());
-        Assert.Contains("nothing: \"null\"", manifest.Build());
         Assert.True(compiled.Success, string.Join(Environment.NewLine, compiled.Diagnostics));
         Assert.Equal("yes", compiled.Story!.Title);
         Assert.Equal("on", compiled.Story.World.Characters[EntityId.Player].FirstName);

@@ -105,7 +105,7 @@ public class StoryAnalysisTests
         Assert.Equal("ready", Slice(source, flag.Declaration!));
         var effects = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Effects);
         Assert.StartsWith("set", Slice(source, effects.Range));
-        Assert.Equal(10, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
+        Assert.Equal(11, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
     }
 
     [Theory]

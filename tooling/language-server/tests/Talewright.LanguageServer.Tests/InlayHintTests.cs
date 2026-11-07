@@ -11,7 +11,7 @@ public sealed partial class ServerTests
     {
         await using var client = new Client();
         File.WriteAllText(client.PathOf(StorySource.ManifestFileName),
-            Manifest.Replace("first-name: Ada", "first-name: Mara, last-name: Burns, pronouns: she"));
+            BuildManifest(firstName: "Mara", lastName: "Burns", pronouns: "she"));
         var initialized = await client.Initialize();
         Assert.True(initialized.GetProperty("result").GetProperty("capabilities").GetProperty("inlayHintProvider").GetBoolean());
         const string text = "=== start\r\n🦑 **{player:name#upper}** {player:pronoun:object#capitalize}\r\n-> END\r\n";
@@ -51,7 +51,7 @@ public sealed partial class ServerTests
             method.GetString() == "workspace/inlayHint/refresh");
         Assert.Equal("\"them\"", (await Hints(client)).GetProperty("result")[0].GetProperty("label").GetString());
         await client.Raw(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = refresh.GetProperty("id"), result = (object?)null }));
-        await client.Open(StorySource.ManifestFileName, Manifest.Replace("first-name: Ada", "first-name: Ada, pronouns: she"), 1);
+        await client.Open(StorySource.ManifestFileName, BuildManifest(pronouns: "she"), 1);
         await client.Next(message => message.TryGetProperty("method", out var method) &&
             method.GetString() == "workspace/inlayHint/refresh");
         Assert.Equal("\"her\"", (await Hints(client)).GetProperty("result")[0].GetProperty("label").GetString());
