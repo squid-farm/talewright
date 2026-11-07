@@ -58,6 +58,81 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Missing_character_action_edits_the_unsaved_manifest_without_offering_for_properties()
+    {
+        await using var client = new Client();
+        await client.Initialize(capabilities: new
+        {
+            workspace = new { workspaceEdit = new { documentChanges = true } }
+        });
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        var diskManifest = File.ReadAllText(client.PathOf(StorySource.ManifestFileName));
+        await client.Open(StorySource.ManifestFileName, manifest, 7);
+        await client.Diagnostics(StorySource.ManifestFileName, 7);
+
+        const string text = "=== start\n> old-man: Hello.\n{player:unknown-property}\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostics = await client.Diagnostics("start.tale", 1);
+        var diagnostic = Assert.Single(diagnostics, item => item.GetProperty("code").GetString() == "TW2001" &&
+            item.GetProperty("message").GetString()!.Contains("character 'old-man'", StringComparison.Ordinal));
+
+        var actions = await CodeActions(client, text, diagnostics);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("Declare character 'old-man'", action.GetProperty("title").GetString());
+        var documentEdit = action.GetProperty("edit").GetProperty("documentChanges")[0];
+        Assert.Equal(client.UriOf(StorySource.ManifestFileName),
+            documentEdit.GetProperty("textDocument").GetProperty("uri").GetString());
+        Assert.Equal(7, documentEdit.GetProperty("textDocument").GetProperty("version").GetInt32());
+        Assert.Equal("  old-man:\n    first-name: Old Man\n",
+            documentEdit.GetProperty("edits")[0].GetProperty("newText").GetString());
+        Assert.Equal(diskManifest, File.ReadAllText(client.PathOf(StorySource.ManifestFileName)));
+    }
+
+    [Fact]
+    public async Task Unsupported_manifest_mapping_returns_a_disabled_name_action_with_a_reason()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters: []\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
+
+        const string text = "=== start\n> old-man: Hello.\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2001");
+
+        var action = Assert.Single(await CodeActions(client, text, [diagnostic]));
+
+        Assert.Equal("Declare character 'old-man'", action.GetProperty("title").GetString());
+        Assert.Contains("not a YAML mapping", action.GetProperty("disabled").GetProperty("reason").GetString());
+        Assert.False(action.TryGetProperty("edit", out _));
+    }
+
+    [Fact]
+    public async Task Unsafe_manifest_insertion_returns_a_disabled_name_action_with_a_reason()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player:\n    first-name: Ada\n    last-name: |\n      Existing text\nitems:\n  rope: Rope\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
+
+        const string text = "=== start\n> old-man: Hello.\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2001");
+
+        var action = Assert.Single(await CodeActions(client, text, [diagnostic]));
+
+        Assert.Equal("Declare character 'old-man'", action.GetProperty("title").GetString());
+        Assert.Contains("could not be verified to preserve existing manifest data",
+            action.GetProperty("disabled").GetProperty("reason").GetString());
+        Assert.False(action.TryGetProperty("edit", out _));
+    }
+
+    [Fact]
     public async Task Missing_scene_code_actions_append_or_create_a_file_without_overwriting()
     {
         await using var client = new Client();
