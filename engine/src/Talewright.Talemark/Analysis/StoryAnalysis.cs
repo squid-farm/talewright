@@ -14,7 +14,11 @@ namespace Talewright.Talemark.Analysis;
 /// <summary>Half-open UTF-16 source range. Lines and columns are 1-based.</summary>
 public sealed record SourceRange(SourceLocation Start, SourceLocation End);
 
-public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story, Directive, Image }
+/// <summary>
+/// Kinds of authoring names. <see cref="Tag"/> and <see cref="Trigger"/> identify authored names that appear only in
+/// <see cref="StoryAnalysis.Names"/>, not in <see cref="StoryAnalysis.Symbols"/>.
+/// </summary>
+public enum AuthoringSymbolKind { Scene, Character, Stat, Item, Faction, Flag, Variable, Predicate, Modifier, Ruleset, Story, Directive, Image, Tag, Trigger }
 
 /// <summary>A declaration, including unresolved declarations retained during incomplete edits.</summary>
 public sealed record AuthoringSymbol(string Name, AuthoringSymbolKind Kind, string Type, SourceRange? Declaration);
@@ -69,6 +73,7 @@ public sealed class StoryAnalysis
         Symbols = original.Symbols;
         Expressions = original.Expressions;
         _sites = original._sites;
+        _names = original._names;
         Tokens = original.Tokens;
         _classifications = original._classifications;
         World = original.World;
@@ -99,7 +104,10 @@ public sealed class StoryAnalysis
         _symbolsByIdentity = new(() => Symbols.GroupBy(symbol => (symbol.Kind, symbol.Name))
             .ToDictionary(group => group.Key, group => group.ToArray()));
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
-        _sites = new CompletionSiteIndex(collector.CompletionSites.ToArray());
+        var siteSources = collector.CompletionSites.ToArray();
+        _sites = new CompletionSiteIndex(siteSources);
+        var names = collector.Names.ToArray();
+        _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources));
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         var classificationSources = collector.ClassificationSources.ToArray();
         _classifications = new(() => Array.AsReadOnly(classificationSources
@@ -116,6 +124,7 @@ public sealed class StoryAnalysis
     }
 
     private readonly CompletionSiteIndex _sites;
+    private readonly Lazy<NameIndex>? _names;
     private readonly Lazy<IReadOnlyList<TalemarkClassification>> _classifications;
     private readonly Lazy<IReadOnlyList<AuthoredScene>> _scenes;
     private readonly string? _currentFile;
@@ -135,6 +144,13 @@ public sealed class StoryAnalysis
 
     /// <summary>Every completion site, computed in full; for tests comparing the indexed query with a scan.</summary>
     internal IEnumerable<CompletionSite> AllCompletionSites() => _sites.All(Symbols);
+
+    /// <summary>
+    /// Declarations and parser-recognized references of authored names across the whole story, built once on first
+    /// access. Current-file analyses only hold one file's references, so they do not provide this index.
+    /// </summary>
+    public NameIndex Names => _names?.Value ??
+        throw new InvalidOperationException("Name references need a whole-story analysis.");
 
     public IReadOnlyList<AuthoringToken> Tokens { get; }
 
@@ -366,6 +382,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoringSymbol> Symbols { get; } = [];
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSiteSource> CompletionSites { get; } = [];
+    internal List<NameOccurrence> Names { get; } = [];
     internal List<AuthoringToken> Tokens { get; } = [];
     internal List<(string File, TaleFileSyntax Syntax)> ClassificationSources { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
@@ -437,6 +454,52 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     AddKeywordPoint(location with { Column = end + 1 }, keywords, details);
             }
         }
+    }
+
+    /// <summary>Records each comma-separated <c>@tags</c> entry as a tag declaration.</summary>
+    internal void Tags(string value, SourceLocation location)
+    {
+        for (var start = 0; start <= value.Length;)
+        {
+            var comma = value.IndexOf(ExpressionVocabulary.ArgumentSeparator, start);
+            var end = comma < 0 ? value.Length : comma;
+            var segment = value.AsSpan(start, end - start);
+            var name = segment.Trim();
+            if (name.Length > 0)
+            {
+                var at = location.Offset(start + segment.Length - segment.TrimStart().Length);
+                Names.Add(new(AuthoringSymbolKind.Tag, name.ToString(), new(at, at.Offset(name.Length)), true));
+            }
+            if (comma < 0) break;
+            start = comma + 1;
+        }
+    }
+
+    /// <summary>Records the tag words of a valid <c>@hub</c> selector, which alternate with and/or.</summary>
+    internal void HubTags(string value, SourceLocation location)
+    {
+        var word = 0;
+        for (var index = 0; index < value.Length;)
+        {
+            while (index < value.Length && char.IsWhiteSpace(value[index])) index++;
+            if (index == value.Length) break;
+            var start = index;
+            while (index < value.Length && !char.IsWhiteSpace(value[index])) index++;
+            if (word++ % 2 == 0)
+            {
+                var at = location.Offset(start);
+                Names.Add(new(AuthoringSymbolKind.Tag, value[start..index], new(at, at.Offset(index - start)), false));
+            }
+        }
+    }
+
+    /// <summary>Records a configuration scalar as the declaration of a name that has no symbol, such as a trigger ID.</summary>
+    internal void NameDeclaration(YamlScalarNode node, AuthoringSymbolKind kind, string file)
+    {
+        if (node.Value is not { Length: > 0 } name) return;
+        Scalar(node, file);
+        var location = new SourceLocation(file, (int)node.Start.Line, (int)node.Start.Column);
+        Names.Add(new(kind, name, _scalars[location].Range(0, name.Length), true));
     }
 
     private void AddKeywordPoint(SourceLocation location, IReadOnlyList<string> keywords,

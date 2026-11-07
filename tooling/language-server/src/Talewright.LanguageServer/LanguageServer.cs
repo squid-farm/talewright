@@ -83,7 +83,7 @@ public sealed class LanguageServer
         LspRange selectionRange,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? detail);
     private sealed record ProtocolError(int Code, string Message);
-    private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions, SemanticTokens }
+    private enum Feature { Completion, Hover, Definition, References, InlayHints, CodeActions, SemanticTokens }
     private const int DiagnosticLimit = 200;
     private static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(150);
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
@@ -107,6 +107,7 @@ public sealed class LanguageServer
         public bool DocumentChangesSupported { get; } = documentChangesSupported;
         public bool CreateFileOperationSupported { get; } = createFileOperationSupported;
         public IReadOnlyDictionary<string, int> DocumentVersions { get; } = documentVersions;
+        public bool IncludeDeclaration { get; init; }
         public bool UseCurrentFileAnalysis { get; set; }
         public StoryAnalysis? SymbolSnapshot { get; set; }
         public CancellationTokenSource Cancellation { get; } = new();
@@ -262,6 +263,7 @@ public sealed class LanguageServer
                         positionEncoding = "utf-16",
                         hoverProvider = true,
                         definitionProvider = true,
+                        referencesProvider = true,
                         documentSymbolProvider = true,
                         workspaceSymbolProvider = true,
                         inlayHintProvider = true,
@@ -318,6 +320,10 @@ public sealed class LanguageServer
                 case "textDocument/definition":
                     if (!hasId) throw new ArgumentException("definition requires a request id.");
                     await StartSemanticAsync(id, parameters, Feature.Definition, cancellationToken);
+                    break;
+                case "textDocument/references":
+                    if (!hasId) throw new ArgumentException("references requires a request id.");
+                    await StartSemanticAsync(id, parameters, Feature.References, cancellationToken);
                     break;
                 case "textDocument/documentSymbol":
                     if (!hasId) throw new ArgumentException("documentSymbol requires a request id.");
@@ -513,7 +519,12 @@ public sealed class LanguageServer
             .ToDictionary(pair => Relative(document.Root, pair.Key), pair => pair.Value.Version, PathComparer);
         var request = new PendingRequest(id, key, method,
             path, document, story, kind, position, end, _hoverMarkdown,
-            _documentChangesSupported, _createFileOperationSupported, documentVersions);
+            _documentChangesSupported, _createFileOperationSupported, documentVersions)
+        {
+            IncludeDeclaration = kind == Feature.References &&
+                parameters.TryGetProperty("context", out var context) && context.ValueKind == JsonValueKind.Object &&
+                context.TryGetProperty("includeDeclaration", out var include) && include.ValueKind == JsonValueKind.True
+        };
         _requests.Add(key, request);
         var published = story.PublishedAnalysis;
         var previous = (kind is Feature.Completion or Feature.Hover or Feature.Definition or Feature.SemanticTokens) &&
@@ -667,6 +678,21 @@ public sealed class LanguageServer
                 }
             };
             return new(result, previous, target);
+        }
+        if (request.Feature == Feature.References)
+        {
+            // References always use a whole-story analysis of the current workspace text, so every range is current.
+            var references = StoryReferences.Find(analysis, position, request.IncludeDeclaration)
+                .Select(range => new
+                {
+                    uri = UriFromPath(Path.GetFullPath(range.Start.File, request.Root)),
+                    range = new
+                    {
+                        start = new { line = range.Start.Line - 1, character = range.Start.Column - 1 },
+                        end = new { line = range.End.Line - 1, character = range.End.Column - 1 }
+                    }
+                }).ToArray();
+            return new(references, previous);
         }
         if (request.Feature == Feature.Hover)
         {

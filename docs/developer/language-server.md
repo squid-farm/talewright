@@ -55,7 +55,7 @@ diagnostics are separately identified by source `talewright`.
 
 The server supports initialize/initialized, shutdown/exit, `$/cancelRequest`, full-text
 didOpen/didChange/didClose, didSave, textDocument/completion, textDocument/hover, textDocument/inlayHint,
-textDocument/definition, and workspace/didChangeWatchedFiles. Documents are the
+textDocument/definition, textDocument/references, and workspace/didChangeWatchedFiles. Documents are the
 root `story.talewright.yaml`, supporting `*.talewright.yaml` files (case-sensitive
 suffix), and `.tale` files; other YAML is ignored. Positions
 are UTF-16 and zero-based. Compiler diagnostics with an end position use that range;
@@ -63,7 +63,8 @@ point locations become zero-width ranges. Both are clamped to the current file,
 and codes, messages, and error/warning severities remain the compiler's.
 Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
 returns a complete list with explicit `textEdit` replacement ranges. Hover returns
-source-aware help with authored-default previews, and definition returns the authored declaration;
+source-aware help with authored-default previews, definition returns the authored declaration,
+and references return every authored occurrence of a declared name;
 signature help, rename, formatting, and autofixes are not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
@@ -103,8 +104,9 @@ stale until the next whole-story analysis publishes, but completion edits and
 hover ranges always come from the current buffer. Hover details for scenes
 declared in other files, such as titles and tags, come from the same snapshot.
 Definition retains its separate safety policy: it does not navigate using an
-old target range after that target changes or is removed. Inlay hints and other
-analysis-dependent requests continue to await the requested revision.
+old target range after that target changes or is removed. References, inlay
+hints and other analysis-dependent requests continue to await the requested
+revision.
 
 Cancelling a request with `$/cancelRequest` returns RequestCancelled (`-32800`)
 without cancelling analysis shared by other requests or diagnostics. If a
@@ -264,6 +266,35 @@ buffers, are used immediately. Built-in ruleset stats, registrations, unknown
 identifiers, and prose return `null`. When an identifier is declared more than
 once, navigation targets the first source cited by the duplicate diagnostic.
 Required missing/invalid metadata returns `-32001`, as for hover.
+
+### Find all references
+
+`textDocument/references` returns a `Location[]` for the author-declared name at
+the position, whether that position is a use or the declaration. It covers
+scenes, characters, items, factions, flags, variables, story-declared stats,
+tags, trigger IDs and the story ID, in `.tale` files, the root manifest and
+supporting configuration files. Results are ordered by story-relative path,
+then position. `context.includeDeclaration` controls whether declaration ranges
+are returned. A flag or variable declared by an effect such as `set flag:x` is
+returned as a reference, so it's listed either way. Trigger and story IDs are
+named only where they're declared, so they return results only when
+declarations are included.
+
+Identities are a kind plus a name within one story: a scene, flag, variable and
+tag spelled `gate` are separate, and another story in the workspace is never
+searched. Tags come from `@tags` entries and from `@hub tag`, `@hub a and b` and
+`@hub a or b` operands. Quoted YAML scalars return their exact source range.
+Prose, keywords, predicates, modifiers, built-in ruleset stats, custom C#
+registrations, names with no authored declaration and expressions that don't
+parse return an empty array.
+
+The index is built once per whole-story analysis from data the compiler already
+records (symbols, completion sites and expression source ranges), the first
+time a references request needs it. References always await the requested
+revision's whole-story analysis, never a symbol snapshot, so an edit while the
+request waits returns ContentModified (`-32801`) rather than stale ranges. Run
+`dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --references`
+to measure cold and warm latency on the 20-chapter realistic story.
 
 ### Story ownership
 

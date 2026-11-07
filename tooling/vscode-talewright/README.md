@@ -238,6 +238,21 @@ Use **Go to Symbol in Editor** (`Ctrl+Shift+O` on Windows/Linux, `Cmd+Shift+O` o
 to browse scenes in the current file, or **Go to Symbol in Workspace** (`Ctrl+T` /
 `Cmd+T`) to search scenes across workspace stories by scene ID or `@title`.
 
+Use **Find All References** (`Shift+Alt+F12` on Windows/Linux, `Shift+Option+F12` on
+macOS) on a name in a `.tale` file or a `*.talewright.yaml` file to list every
+place the story names it. It works from a use or from the declaration and covers
+scenes, characters, items, factions, flags, variables, story-declared stats,
+tags, trigger IDs and the story ID. Tags are found in `@tags` lists and in
+`@hub tag`, `@hub a and b` and `@hub a or b` lines. A trigger ID or the story ID
+is named only where it's declared, so it's listed only when declarations are
+included. Each kind of name is matched separately: a scene, a flag and a tag
+can share a spelling without mixing. Prose is never matched, and each story in
+a multi-story workspace is searched on its own. Built-in ruleset stats,
+keywords, predicates, modifiers and names from custom C# rulesets aren't
+listed. Results include unsaved edits; while the story is still being analyzed
+after an edit, the request waits for that analysis rather than returning old
+locations.
+
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
 inside the first quoted argument, completion suggests supported files from the
 story's `images/` folder, including nested folders. Paths are case-sensitive.
@@ -267,7 +282,7 @@ whole-story settings. It does not know story-specific IDs or whether a reference
 scene, stat, item, or faction exists. The optional language server analyzes the
 root manifest, supporting files, and `.tale` files as one story, including unsaved
 edits, and supplies reference completion, hover, go-to-definition into the
-declaring file, and compiler checks; use `talewright validate <story-folder>` for
+declaring file, Find All References, and compiler checks; use `talewright validate <story-folder>` for
 command-line validation.
 
 For a `TW2002` missing-scene diagnostic in a `.tale` file, the Quick Fix menu offers

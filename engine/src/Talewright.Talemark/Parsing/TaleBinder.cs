@@ -277,6 +277,7 @@ internal sealed partial class TaleBinder
                     _symbols, _diagnostics, At(part.ValueStart));
                 return true;
             case SceneMetadataKey.Tags:
+                _symbols.Analysis?.Tags(value, At(Part(syntax).MetadataValueColumn(syntax)));
                 foreach (var tag in TaleSyntaxParser.ReadTags(value))
                 {
                     scene.Tags.Add(tag);
@@ -292,6 +293,7 @@ internal sealed partial class TaleBinder
                 return true;
             case SceneMetadataKey.Hub:
                 TaleSyntaxParser.TryReadHub(value, out var tags, out var all);
+                _symbols.Analysis?.HubTags(value, At(Part(syntax).MetadataValueColumn(syntax)));
                 scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, all);
                 return true;
             case SceneMetadataKey.HubLimit:

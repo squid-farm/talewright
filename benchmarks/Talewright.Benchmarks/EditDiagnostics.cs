@@ -38,6 +38,80 @@ internal static class EditDiagnostics
         return 0;
     }
 
+    public static async Task<int> RunReferencesAsync()
+    {
+        Console.WriteLine($"Runtime: {RuntimeInformation.FrameworkDescription}; OS: {RuntimeInformation.OSDescription}; processors: {Environment.ProcessorCount}");
+        Console.WriteLine("Find All References on a 20-chapter RealisticStory; three warmups and seven samples. p95 is the maximum.");
+        Console.WriteLine("Cold requests follow a published edit, so they include building the analysis's name index; warm requests repeat on the same analysis.");
+        Console.WriteLine("Operation\tTarget\tReferences\tScenes\tFiles\tUTF-8 bytes\tp50 ms\tp95 ms\tManaged bytes p50/max");
+        var story = RealisticStory.Create(new RealisticStoryProfile { Chapters = 20 });
+        var source = story.ToSource();
+        const string path = "chapters/c000.tale";
+        var original = source.Files[path];
+        await using var client = new Client(source);
+        await client.Initialize();
+        await client.Open(path, original, 1);
+        await client.Published(path, 1);
+        var version = 1;
+        foreach (var (label, needle) in new[] { ("scene", "-> c1.open"), ("flag", "flag:alarm") })
+        {
+            var lines = original.Split('\n');
+            var line = Array.FindIndex(lines, text => text.Contains(needle, StringComparison.Ordinal));
+            var character = lines[line].IndexOf(needle, StringComparison.Ordinal) + needle.Length - 1;
+            var parameters = new
+            {
+                textDocument = new { uri = client.UriOf(path) },
+                position = new { line, character },
+                context = new { includeDeclaration = true }
+            };
+            var cold = new List<(double Time, long Bytes)>(Iterations);
+            var warm = new List<(double Time, long Bytes)>(Iterations);
+            var count = 0;
+            for (var iteration = 0; iteration < Iterations + 3; iteration++)
+            {
+                version++;
+                await client.Change(path, $"{original}// edit {version}\n", version);
+                await client.Published(path, version);
+                var first = await MeasureReferences(client, parameters, line);
+                var second = await MeasureReferences(client, parameters, line);
+                count = second.Count;
+                if (iteration < 3) continue;
+                cold.Add((first.Time, first.Bytes));
+                warm.Add((second.Time, second.Bytes));
+            }
+            ReportReferences("Cold", label, count, story, source, cold);
+            ReportReferences("Warm", label, count, story, source, warm);
+        }
+        return 0;
+    }
+
+    private static async Task<(double Time, long Bytes, int Count)> MeasureReferences(Client client, object parameters, int line)
+    {
+        var before = GC.GetTotalAllocatedBytes(precise: true);
+        var started = Stopwatch.GetTimestamp();
+        var response = await client.Request("textDocument/references", parameters);
+        var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
+        if (response.TryGetProperty("error", out var error))
+            throw new InvalidOperationException($"References failed: {error}");
+        var locations = response.GetProperty("result").EnumerateArray().ToArray();
+        if (locations.Length < 2 || !locations.Any(location =>
+                location.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32() == line))
+            throw new InvalidOperationException("References did not include the requested use and another occurrence.");
+        return (elapsed, allocated, locations.Length);
+    }
+
+    private static void ReportReferences(string operation, string label, int count, RealisticStory story, StorySource source,
+        List<(double Time, long Bytes)> samples)
+    {
+        var times = samples.Select(sample => sample.Time).Order().ToArray();
+        var bytes = samples.Select(sample => sample.Bytes).Order().ToArray();
+        Console.WriteLine(FormattableString.Invariant(
+            $"{operation}\t{label}\t{count}\t{story.SceneCount}\t{source.Files.Count}\t{PerformanceSource.Utf8ByteCount(source)}\t{times[Iterations / 2]:F2}\t{times[^1]:F2}\t{bytes[Iterations / 2]:N0}/{bytes[^1]:N0}"));
+        if (operation == "Warm")
+            Console.WriteLine($"  20 ms warm p95 target: {(times[^1] <= 20 ? "MET" : "MISSED")} (report-only).");
+    }
+
     private static async Task<int> MeasureCurrentRequests(Client client, string path, string target, string method,
         int version, int scenes, int files, long sourceBytes)
     {
