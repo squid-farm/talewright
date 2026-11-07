@@ -3,6 +3,9 @@
 Write in **Talemark**, the story-authoring language that powers Talewright stories.
 Keep scenes in `.tale` files and define your cast and rules in `story.talewright.yaml`.
 
+Talewright is inspired by the great storytelling tools available to the community.
+See [our inspirations](inspirations.md).
+
 ## Writing stories
 
 New here? Play the [web player](https://play.trytalewright.com/), then follow
