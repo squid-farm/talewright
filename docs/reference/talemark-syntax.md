@@ -589,11 +589,9 @@ braces in it are filename characters, not substitutions. Alt text is optional:
 `#decorative` to hide it from assistive technology:
 `{image("ornament.png")#decorative}`. Do not combine `#decorative` with descriptive
 alt text; TW2015 rejects that contradiction. Missing alt on an ordinary image still
-warns and uses the filename fallback. A decorative image in a choice label needs
-literal text, or a descriptive image with literal alt text, in every visible branch;
-otherwise TW2016 rejects the potentially empty accessible name. Variables, names and
-other substitutions can render empty, so they do not count, but a non-blank quoted string
-such as `{"Continue"}` does.
+warns and uses the filename fallback. TW2016 rejects a choice label that contains only
+decorative images, because it has no accessible name. Any label text, substitution or
+descriptive image is trusted to name the choice.
 
 Inside either argument, `\"` means a quote and `\\` means a backslash. Any other backslash escape
 in the path is an error. Alt text follows the reader-text escape rule: a backslash before any ASCII

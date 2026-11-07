@@ -480,10 +480,10 @@ internal sealed partial class TaleBinder
             return;
         }
 
-        if (label is not null && ContainsDecorativeMedia(label) && !HasAccessibleChoiceName(label))
+        if (label is not null && ContainsDecorativeMedia(label) && IsCertainlyNameless(label))
         {
             _diagnostics.Error(CompilerDiagnosticCodes.MissingAccessibleChoiceLabel,
-                "A choice containing decorative media needs literal text or a descriptive image with literal alt text in every visible branch to have an accessible name; variables and other substitutions can render empty.",
+                "A choice label with only decorative images has no accessible name. Add label text or use a descriptive image.",
                 labelLocation ?? start);
         }
 
@@ -518,38 +518,20 @@ internal sealed partial class TaleBinder
     }
 
     /// <summary>
-    /// Whether every visible branch is certain to render a non-blank name. Variables, names and other
-    /// substitutions can render empty, so only text, quoted strings and descriptive images whose alt
-    /// template is itself named count.
+    /// Whether every branch holds only whitespace, line breaks and decorative images. Text, substitutions
+    /// and descriptive images are trusted to name the choice; what they render is left to playtesting.
     /// </summary>
-    private static bool HasAccessibleChoiceName(IReadOnlyList<TemplateInline> inlines)
-    {
-        foreach (var inline in inlines)
+    private static bool IsCertainlyNameless(IReadOnlyList<TemplateInline> inlines) =>
+        inlines.All(inline => inline switch
         {
-            switch (inline)
-            {
-                case TextTemplate text when !string.IsNullOrWhiteSpace(text.Text):
-                    return true;
-                case SubstitutionTemplate { Value: TextLiteral { Value: var literal } } substitution
-                    when !string.IsNullOrWhiteSpace(literal) && substitution.Modifiers.All(KeepsNonBlankText):
-                    return true;
-                case MediaTemplate { Accessibility: MediaAccessibility.Descriptive } media
-                    when media.AltTemplate is null || HasAccessibleChoiceName(media.AltTemplate):
-                    return true;
-                case StyledTemplate styled when HasAccessibleChoiceName(styled.Children):
-                    return true;
-                case ConditionalInlineTemplate conditional
-                    when HasAccessibleChoiceName(conditional.Then) && HasAccessibleChoiceName(conditional.Else):
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    // Custom modifiers may return nothing and #one-many replaces its input, so only the text-transforming built-ins qualify.
-    private static bool KeepsNonBlankText(ITextModifier modifier) =>
-        TextModifierRegistry.IsBuiltIn(modifier) && modifier is not OneManyTextModifier;
+            TextTemplate text => string.IsNullOrWhiteSpace(text.Text),
+            LineBreakTemplate => true,
+            MediaTemplate media => media.Accessibility == MediaAccessibility.Decorative,
+            StyledTemplate styled => IsCertainlyNameless(styled.Children),
+            ConditionalInlineTemplate conditional =>
+                IsCertainlyNameless(conditional.Then) && IsCertainlyNameless(conditional.Else),
+            _ => false,
+        });
 
     private DivertTarget? BindDivert(TaleLineSyntax syntax, TaleClause clause)
     {
