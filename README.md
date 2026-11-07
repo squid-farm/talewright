@@ -141,6 +141,17 @@ in the web and desktop players. World simulation and combat remain future work.
 Follow along on the [roadmap](docs/developer/plan.md#6-milestones) and the
 [project board](https://github.com/orgs/squid-farm/projects/1).
 
+## Inspirations
+
+Talewright wouldn't exist without [Twine](https://twinery.org/),
+[Ren'Py](https://www.renpy.org/), and
+[ChoiceScript](https://www.choiceofgames.com/make-your-own-games/choicescript-intro/).
+They are direct inspirations for this work. Thank you to their creators, maintainers,
+contributors, and communities for making interactive storytelling more accessible.
+
+See [Inspirations and choosing your tools](docs/inspirations.md) for what Talewright does
+differently and when one of these established tools may be a better fit for your story.
+
 ## License
 
 [MPL-2.0](LICENSE). Use Talewright for anything, including commercial games. Your stories are yours.
