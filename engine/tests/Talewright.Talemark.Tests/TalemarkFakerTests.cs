@@ -101,6 +101,27 @@ public sealed class TalemarkFakerTests
     }
 
     [Fact]
+    public void Manifest_output_uses_lf_and_can_be_composed_with_another_section()
+    {
+        var manifest = new ManifestFaker("faker-test", "Faker test", "start");
+        manifest.Character("player", "Tester");
+        var yaml = manifest.Build();
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml + "\nflags:\n  - ready\n",
+            ["main.tale"] = $"{SceneFaker.Header("start")}\n{DivertFaker.To("END")}",
+        });
+
+        var compiled = StoryCompiler.Compile(source);
+
+        Assert.DoesNotContain('\r', yaml);
+        Assert.DoesNotContain("...\n", yaml);
+        Assert.DoesNotContain('\r', manifest.Build(trailingNewline: true));
+        Assert.EndsWith("\n", manifest.Build(trailingNewline: true));
+        Assert.True(compiled.Success, string.Join(Environment.NewLine, compiled.Diagnostics));
+    }
+
+    [Fact]
     public void Manifest_builds_factions_modifiers_pronouns_and_triggers()
     {
         var manifest = new ManifestFaker("faker-test", "Faker test", "start", 42)

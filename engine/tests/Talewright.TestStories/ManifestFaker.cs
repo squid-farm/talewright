@@ -239,7 +239,17 @@ public sealed class ManifestFaker
         var stream = new YamlStream(new YamlDocument(root));
         using (var writer = new StringWriter(CultureInfo.InvariantCulture))
         {
-            stream.Save(writer, assignAnchors: false);
+            var defaults = EmitterSettings.Default;
+            var settings = new EmitterSettings(
+                defaults.BestIndent,
+                defaults.BestWidth,
+                defaults.IsCanonical,
+                defaults.MaxSimpleKeyLength,
+                defaults.SkipAnchorName,
+                defaults.IndentSequences,
+                "\n",
+                defaults.UseUtf16SurrogatePairs);
+            stream.Save(new Emitter(writer, settings), assignAnchors: false);
             var yaml = writer.ToString();
             const string documentEnd = "...\n";
             if (yaml.EndsWith(documentEnd, StringComparison.Ordinal))
