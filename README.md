@@ -1,9 +1,8 @@
 # Talewright
 
-<img width="1584" height="672" alt="image_20785f2d" src="https://github.com/user-attachments/assets/a702c41b-3e51-42c4-9d70-c273be00c98a" />
+<img width="1584" height="672" alt="A fantasy illustration of a large squid working as a blacksmith at a stone anvil under the ocean. The anvil displays the bold text 'TALEWRIGHT'. The squid holds a stone hammer high, striking down to create an explosion of golden sparks and glowing magical runes. The background is a detailed underwater library filled with towering bookshelves, arches, floating manuscripts, jellyfish, an octopus, and small bioluminescent fish." src="https://github.com/user-attachments/assets/a702c41b-3e51-42c4-9d70-c273be00c98a" />
 
-
-<sub>Banner art is AI-generated placeholder art. If Talewright earns its keep, a real artist gets the job.</sub>
+<sub>Temporary art generated with AI. I’d love to bring a real artist on board to give Talewright the hand-crafted look it deserves once the project gets off the ground.</sub>
 
 **Write branching, stat-driven RPG stories in plain text. Play them on the web or the desktop.**
 
