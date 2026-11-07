@@ -159,10 +159,9 @@ public static class StoryQuickFixes
         var title = $"Declare stat '{stat}'";
         if (!analysis.Source.Files.TryGetValue(StorySource.ManifestFileName, out var manifest))
             return new([], $"Cannot declare '{stat}' because the root story manifest is unavailable.", title);
-        if (ManifestListEditor.IsDisabledStoryStat(manifest, stat))
-            return new([]);
-
         var edit = ManifestListEditor.AppendStoryStat(manifest, StorySource.ManifestFileName, stat, Humanize(stat));
+        if (edit.SuppressAction)
+            return new([]);
         if (edit.Edit is not { } textEdit)
             return new([], edit.Reason ?? $"Cannot safely declare '{stat}' in the root story manifest.", title);
 

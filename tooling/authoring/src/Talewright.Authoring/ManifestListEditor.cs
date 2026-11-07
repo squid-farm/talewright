@@ -10,25 +10,15 @@ using YamlDotNet.RepresentationModel;
 namespace Talewright.Authoring;
 
 internal sealed record ManifestTextEdit(SourceRange Range, string NewText);
-internal sealed record ManifestEditResult(ManifestTextEdit? Edit, string? Reason);
+internal sealed record ManifestEditResult(ManifestTextEdit? Edit, string? Reason, bool SuppressAction = false);
 
 internal static class ManifestListEditor
 {
     internal static ManifestEditResult Append(string text, string file, string section, string item)
     {
-        var stream = new YamlStream();
-        try
-        {
-            stream.Load(new StringReader(text));
-        }
-        catch (YamlException)
-        {
-            return new(null, $"Cannot safely edit '{file}' because it contains invalid YAML.");
-        }
-
+        if (!TryLoadRoot(text, file, out var root, out var reason))
+            return new(null, reason);
         var scalar = FormatScalar(item);
-        if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
-            return new(null, $"Cannot safely edit '{file}' because it must contain one YAML mapping.");
         if (root.Style == MappingStyle.Flow)
             return new(null, $"Cannot safely edit '{file}' because its root mapping uses flow style.");
 
@@ -70,18 +60,8 @@ internal static class ManifestListEditor
     internal static ManifestEditResult AppendMappingEntry(
         string text, string file, string section, string key, string blockValue, string flowValue)
     {
-        var stream = new YamlStream();
-        try
-        {
-            stream.Load(new StringReader(text));
-        }
-        catch (YamlException)
-        {
-            return new(null, $"Cannot safely edit '{file}' because it contains invalid YAML.");
-        }
-
-        if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
-            return new(null, $"Cannot safely edit '{file}' because it must contain one YAML mapping.");
+        if (!TryLoadRoot(text, file, out var root, out var reason))
+            return new(null, reason);
         if (root.Style == MappingStyle.Flow)
             return new(null, $"Cannot safely edit '{file}' because its root mapping uses flow style.");
         if (!IdentifierRules.IsValid(key))
@@ -112,54 +92,12 @@ internal static class ManifestListEditor
         if (mapping.Children.Keys.OfType<YamlScalarNode>().Any(existing => existing.Value == key))
             return new(null, $"Cannot safely edit '{file}' because '{key}' is already declared.");
 
-        if (mapping.Style == MappingStyle.Flow)
-        {
-            int offset;
-            string insertion;
-            if (mapping.Children.Count == 0)
-            {
-                offset = checked((int)mapping.Start.Index + 1);
-                insertion = $"{formattedKey}: {flowValue}";
-            }
-            else
-            {
-                var last = mapping.Children.Last();
-                offset = checked((int)last.Value.End.Index);
-                var closingBrace = text.IndexOf('}', offset);
-                if (closingBrace < 0)
-                    return new(null, $"Cannot safely edit '{file}' because the '{section}' source range is unavailable.");
-                var suffix = text[offset..closingBrace];
-                if (suffix.Contains('#'))
-                    return new(null, $"Cannot safely edit '{file}' because '{section}' has a comment inside its flow mapping.");
-                insertion = $", {formattedKey}: {flowValue}";
-            }
-
-            if (offset < 0 || offset > text.Length)
-                return new(null, $"Cannot safely edit '{file}' because the '{section}' source range is unavailable.");
-            return CreateValidatedMappingEdit(
-                text, file, root, section, key, $"{formattedKey}: {flowValue}", offset, insertion);
-        }
-
-        if (mapping.Style != MappingStyle.Block || mapping.Children.Count == 0)
-            return new(null, $"Cannot safely edit '{file}' because '{section}' uses an unsupported YAML mapping style.");
-
-        var lastEntry = mapping.Children.Last();
-        var indent = checked((int)lastEntry.Key.Start.Column - 1);
-        var lineEnd = OffsetAfterLine(text, checked((int)lastEntry.Value.End.Line - 1));
-        if (indent < 0 || lineEnd < 0 || lineEnd > text.Length)
-            return new(null, $"Cannot safely edit '{file}' because the last '{section}' entry has no source line.");
-
-        var newlineForEntry = DetectNewline(text);
-        var hasFollowingContent = lineEnd < text.Length;
-        var finalNewline = EndsInNewline(text);
-        var insertionOffset = lineEnd;
-        var prefix = lineEnd == text.Length && !finalNewline ? newlineForEntry : "";
-        var ending = hasFollowingContent || finalNewline ? newlineForEntry : "";
-        var blockEntry = BlockEntry(formattedKey, blockValue, indent, newlineForEntry);
-        var blockInsertion = $"{prefix}{blockEntry}{ending}";
+        if (!TryCreateMappingInsertion(text, file, section, mapping, key, blockValue, flowValue,
+                out var mappingInsertion, out var insertionReason))
+            return new(null, insertionReason);
         return CreateValidatedMappingEdit(
-            text, file, root, section, key, BlockEntry(formattedKey, blockValue, 0, newlineForEntry),
-            insertionOffset, blockInsertion);
+            text, file, root, section, key, mappingInsertion.ExpectedEntry,
+            mappingInsertion.Offset, mappingInsertion.Text);
     }
 
     internal static ManifestEditResult AppendStoryStat(string text, string file, string id, string name)
@@ -224,6 +162,8 @@ internal static class ManifestListEditor
 
         if (rulesetNode is not YamlMappingNode ruleset)
             return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Ruleset}' is not a mapping.");
+        if (IsDisabledStat(ruleset, id))
+            return new(null, null, SuppressAction: true);
         if (!HasSupportedMappingKeys(ruleset) ||
             ruleset.Children.Keys.OfType<YamlScalarNode>().Any(key =>
                 key.Value is not (ManifestVocabulary.Base or ManifestVocabulary.Disable or ManifestVocabulary.Stats)))
@@ -252,28 +192,83 @@ internal static class ManifestListEditor
             ManifestVocabulary.Stats, newStatsBlock, newStatsFlow, id, name);
     }
 
-    internal static bool IsDisabledStoryStat(string text, string id)
+    private static bool IsDisabledStat(YamlMappingNode ruleset, string id) =>
+        TryFindEntry(ruleset, new YamlScalarNode(ManifestVocabulary.Disable), out var disableNode) &&
+        disableNode is YamlSequenceNode disabled &&
+        disabled.Children.OfType<YamlScalarNode>().Any(item => item.Value == id);
+
+    private sealed record MappingInsertion(int Offset, string Text, string ExpectedEntry);
+
+    private static bool TryCreateMappingInsertion(
+        string text, string file, string mappingName, YamlMappingNode mapping,
+        string key, string blockValue, string flowValue,
+        out MappingInsertion insertion, out string? reason)
     {
-        var stream = new YamlStream();
-        try
+        insertion = null!;
+        reason = null;
+        var formattedKey = FormatScalar(key);
+        var flowEntry = $"{formattedKey}: {flowValue}";
+        if (mapping.Style == MappingStyle.Flow)
         {
-            stream.Load(new StringReader(text));
+            int offset;
+            string textToInsert;
+            if (mapping.Children.Count == 0)
+            {
+                offset = checked((int)mapping.Start.Index + 1);
+                textToInsert = flowEntry;
+            }
+            else
+            {
+                var last = mapping.Children.Last();
+                offset = checked((int)last.Value.End.Index);
+                var closingBrace = text.IndexOf('}', offset);
+                if (closingBrace < 0)
+                {
+                    reason = $"Cannot safely edit '{file}' because the '{mappingName}' source range is unavailable.";
+                    return false;
+                }
+                if (text[offset..closingBrace].Contains('#'))
+                {
+                    reason = $"Cannot safely edit '{file}' because '{mappingName}' has a comment inside its flow mapping.";
+                    return false;
+                }
+                textToInsert = $", {flowEntry}";
+            }
+
+            if (offset < 0 || offset > text.Length)
+            {
+                reason = $"Cannot safely edit '{file}' because the '{mappingName}' source range is unavailable.";
+                return false;
+            }
+
+            insertion = new(offset, textToInsert, flowEntry);
+            return true;
         }
-        catch (YamlException)
+
+        if (mapping.Style != MappingStyle.Block || mapping.Children.Count == 0)
         {
+            reason = $"Cannot safely edit '{file}' because '{mappingName}' uses an unsupported YAML mapping style.";
             return false;
         }
 
-        if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root ||
-            !TryFindEntry(root, new YamlScalarNode(ManifestVocabulary.Game), out var gameNode) ||
-            gameNode is not YamlMappingNode game ||
-            !TryFindEntry(game, new YamlScalarNode(ManifestVocabulary.Ruleset), out var rulesetNode) ||
-            rulesetNode is not YamlMappingNode ruleset ||
-            !TryFindEntry(ruleset, new YamlScalarNode(ManifestVocabulary.Disable), out var disableNode) ||
-            disableNode is not YamlSequenceNode disabled)
+        var lastEntry = mapping.Children.Last();
+        var indent = checked((int)lastEntry.Key.Start.Column - 1);
+        var lineEnd = OffsetAfterLine(text, checked((int)lastEntry.Value.End.Line - 1));
+        if (indent < 0 || lineEnd < 0 || lineEnd > text.Length)
+        {
+            reason = $"Cannot safely edit '{file}' because the last '{mappingName}' entry has no source line.";
             return false;
+        }
 
-        return disabled.Children.OfType<YamlScalarNode>().Any(item => item.Value == id);
+        var newline = DetectNewline(text);
+        var hasFollowingContent = lineEnd < text.Length;
+        var finalNewline = EndsInNewline(text);
+        var prefix = lineEnd == text.Length && !finalNewline ? newline : "";
+        var ending = hasFollowingContent || finalNewline ? newline : "";
+        var entry = BlockEntry(formattedKey, blockValue, indent, newline);
+        insertion = new(lineEnd, $"{prefix}{entry}{ending}",
+            BlockEntry(formattedKey, blockValue, 0, newline));
+        return true;
     }
 
     private static ManifestEditResult AppendMappingChild(
@@ -282,68 +277,20 @@ internal static class ManifestListEditor
     {
         if (!HasSupportedMappingKeys(parent))
             return new(null, $"Cannot safely edit '{file}' because '{parentName}' contains an unsupported or invalid entry.");
-        var formattedKey = FormatScalar(key);
-        if (parent.Style == MappingStyle.Flow)
-        {
-            int offset;
-            string insertion;
-            if (parent.Children.Count == 0)
-            {
-                offset = checked((int)parent.Start.Index + 1);
-                insertion = $"{formattedKey}: {flowValue}";
-            }
-            else
-            {
-                var last = parent.Children.Last();
-                offset = checked((int)last.Value.End.Index);
-                var closingBrace = text.IndexOf('}', offset);
-                if (closingBrace < 0 || text[offset..closingBrace].Contains('#'))
-                    return new(null, $"Cannot safely edit '{file}' because the '{parentName}' source range is unavailable or contains a flow comment.");
-                insertion = $", {formattedKey}: {flowValue}";
-            }
-
-            return CreateValidatedStatEdit(text, file, root, offset, 0, insertion, statId, statName);
-        }
-
-        if (parent.Style != MappingStyle.Block || parent.Children.Count == 0)
-            return new(null, $"Cannot safely edit '{file}' because '{parentName}' uses an unsupported YAML mapping style.");
-
-        var lastEntry = parent.Children.Last();
-        var indent = checked((int)lastEntry.Key.Start.Column - 1);
-        var lineEnd = OffsetAfterLine(text, checked((int)lastEntry.Value.End.Line - 1));
-        if (indent < 0 || lineEnd < 0 || lineEnd > text.Length)
-            return new(null, $"Cannot safely edit '{file}' because the last '{parentName}' entry has no source line.");
-
-        var newline = DetectNewline(text);
-        var hasFollowingContent = lineEnd < text.Length;
-        var finalNewline = EndsInNewline(text);
-        var prefix = lineEnd == text.Length && !finalNewline ? newline : "";
-        var ending = hasFollowingContent || finalNewline ? newline : "";
-        var insertionBlock = BlockEntry(formattedKey, blockValue, indent, newline);
-        var insertionText = $"{prefix}{insertionBlock}{ending}";
-        return CreateValidatedStatEdit(text, file, root, lineEnd, 0, insertionText, statId, statName);
+        if (!TryCreateMappingInsertion(text, file, parentName, parent, key, blockValue, flowValue,
+                out var insertion, out var reason))
+            return new(null, reason);
+        return CreateValidatedEdit(text, file, root, insertion.Offset, 0, insertion.Text,
+            editedRoot => MatchesAfterAddingStoryStat(root, editedRoot, statId, statName));
     }
 
     private static ManifestEditResult AppendFlowStat(
         string text, string file, YamlMappingNode root, YamlSequenceNode stats,
         string flowStat, string statId, string statName)
     {
-        int offset;
-        string insertion;
-        if (stats.Children.Count == 0)
-        {
-            offset = checked((int)stats.Start.Index + 1);
-            insertion = flowStat;
-        }
-        else
-        {
-            offset = checked((int)stats.Children[^1].End.Index);
-            var closingBracket = text.IndexOf(']', offset);
-            if (closingBracket < 0 || text[offset..closingBracket].Contains('#'))
-                return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Stats}' source range is unavailable or contains a flow comment.");
-            insertion = $", {flowStat}";
-        }
-
+        if (!TryCreateFlowSequenceInsertion(text, file, ManifestVocabulary.Stats, stats, flowStat,
+                rejectComments: true, out var offset, out var insertion, out var reason))
+            return new(null, reason);
         return CreateValidatedStatEdit(text, file, root, offset, 0, insertion, statId, statName);
     }
 
@@ -382,6 +329,12 @@ internal static class ManifestListEditor
     private static ManifestEditResult CreateValidatedStatEdit(
         string text, string file, YamlMappingNode originalRoot, int offset, int length,
         string insertion, string statId, string statName)
+        => CreateValidatedEdit(text, file, originalRoot, offset, length, insertion,
+            editedRoot => MatchesAfterAddingStoryStat(originalRoot, editedRoot, statId, statName));
+
+    private static ManifestEditResult CreateValidatedEdit(
+        string text, string file, YamlMappingNode originalRoot, int offset, int length,
+        string insertion, Func<YamlMappingNode, bool> preservesData)
     {
         var reason = $"Cannot safely edit '{file}' because the change could not be verified to preserve existing manifest data.";
         if (offset < 0 || length < 0 || offset + length > text.Length)
@@ -399,7 +352,7 @@ internal static class ManifestListEditor
 
         if (stream.Documents.Count != 1 ||
             stream.Documents[0].RootNode is not YamlMappingNode editedRoot ||
-            !MatchesAfterAddingStoryStat(originalRoot, editedRoot, statId, statName))
+            !preservesData(editedRoot))
             return new(null, reason);
 
         var start = LocationAt(file, text, offset);
@@ -573,29 +526,11 @@ internal static class ManifestListEditor
         string expectedEntry, int offset, string insertion)
     {
         var reason = $"Cannot safely edit '{file}' because the change could not be verified to preserve existing manifest data.";
-        if (offset < 0 || offset > text.Length ||
-            !TryParseMappingEntry(expectedEntry, out var expectedKey, out var expectedValue) ||
+        if (!TryParseMappingEntry(expectedEntry, out var expectedKey, out var expectedValue) ||
             !NodesEqual(expectedKey, new YamlScalarNode(key)))
             return new(null, reason);
-
-        var editedText = text.Insert(offset, insertion);
-        var editedStream = new YamlStream();
-        try
-        {
-            editedStream.Load(new StringReader(editedText));
-        }
-        catch (YamlException)
-        {
-            return new(null, reason);
-        }
-
-        if (editedStream.Documents.Count != 1 ||
-            editedStream.Documents[0].RootNode is not YamlMappingNode editedRoot ||
-            !MatchesAfterAddingEntry(originalRoot, editedRoot, section, expectedKey, expectedValue))
-            return new(null, reason);
-
-        var point = LocationAt(file, text, offset);
-        return new(new(new(point, point), insertion), null);
+        return CreateValidatedEdit(text, file, originalRoot, offset, 0, insertion,
+            editedRoot => MatchesAfterAddingEntry(originalRoot, editedRoot, section, expectedKey, expectedValue));
     }
 
     private static bool TryParseMappingEntry(string text, out YamlNode key, out YamlNode value)
@@ -711,8 +646,20 @@ internal static class ManifestListEditor
 
     private static ManifestEditResult AppendFlow(string text, string file, string section, YamlSequenceNode sequence, string item)
     {
-        int offset;
-        string insertion;
+        if (!TryCreateFlowSequenceInsertion(text, file, section, sequence, item,
+                rejectComments: false, out var offset, out var insertion, out var reason))
+            return new(null, reason);
+        var point = LocationAt(file, text, offset);
+        return new(new(new(point, point), insertion), null);
+    }
+
+    private static bool TryCreateFlowSequenceInsertion(
+        string text, string file, string section, YamlSequenceNode sequence, string item,
+        bool rejectComments, out int offset, out string insertion, out string? reason)
+    {
+        offset = 0;
+        insertion = "";
+        reason = null;
         if (sequence.Children.Count == 0)
         {
             offset = checked((int)sequence.Start.Index + 1);
@@ -720,15 +667,23 @@ internal static class ManifestListEditor
         }
         else
         {
-            var last = sequence.Children[^1];
-            offset = checked((int)last.End.Index);
+            offset = checked((int)sequence.Children[^1].End.Index);
+            var closingBracket = text.IndexOf(']', offset);
+            if (closingBracket < 0 ||
+                rejectComments && text[offset..closingBracket].Contains('#'))
+            {
+                reason = $"Cannot safely edit '{file}' because '{section}' source range is unavailable or contains a flow comment.";
+                return false;
+            }
             insertion = $", {item}";
         }
 
         if (offset < 0 || offset > text.Length)
-            return new(null, $"Cannot safely edit '{file}' because the '{section}' source range is unavailable.");
-        var point = LocationAt(file, text, offset);
-        return new(new(new(point, point), insertion), null);
+        {
+            reason = $"Cannot safely edit '{file}' because the '{section}' source range is unavailable.";
+            return false;
+        }
+        return true;
     }
 
     private static ManifestEditResult AppendBlock(string text, string file, string section, YamlSequenceNode sequence, string item)
