@@ -15,7 +15,7 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | Component | Job |
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
-| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
+| `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Shows a character sheet only when the story declares stats, items or factions, and gives the transcript the full layout column when no sheet is needed. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
 | `DiagnosticReport` | Accessible, inspectable session report and optional download control; available even when no story opens. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
 | `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, import/export, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
@@ -24,7 +24,7 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`, and `MediaView` for resolved images on every narrative surface. |
 | `MediaView` | Viewport-lazy image lease and independent decode/presentation. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |
-| `CharacterSheet` | Built from the ruleset: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts, faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
+| `CharacterSheet` | Built from story declarations: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts (including “Nothing.” when declared items are not held), and player faction standings with tier names. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
 
 ## Player preferences
