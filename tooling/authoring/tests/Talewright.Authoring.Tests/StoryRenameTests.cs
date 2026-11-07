@@ -278,6 +278,7 @@ public sealed class StoryRenameTests
         Assert.Contains("player character", Refusal(Story, "town.tale", "{|player:first-name}"), StringComparison.Ordinal);
         Assert.Contains("ends the story", Refusal(Story, "gate.tale", "failure: -> |END"), StringComparison.Ordinal);
         Assert.Contains("built into the story's ruleset", Refusal(Story, "town.tale", "player:|str"), StringComparison.Ordinal);
+        Assert.Contains("\"Change a built-in stat\"", Refusal(Story, "town.tale", "player:|str"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -306,6 +307,7 @@ public sealed class StoryRenameTests
         var refusal = Refusal(story, "start.tale", "player:|str");
 
         Assert.Contains("overrides a built-in stat", refusal, StringComparison.Ordinal);
+        Assert.Contains("\"Change a built-in stat\"", refusal, StringComparison.Ordinal);
         Assert.Equal(refusal, Refusal(story, StorySource.ManifestFileName, "{id: |str"));
     }
 

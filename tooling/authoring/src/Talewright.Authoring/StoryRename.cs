@@ -29,11 +29,13 @@ public sealed record StoryRenameResult(IReadOnlyList<StoryRenameEdit> Edits, str
 
 /// <summary>
 /// Renames an author-declared name across a whole story, using the occurrences <see cref="StoryReferences"/> finds.
-/// A rename is refused unless the edited story would analyze with the same diagnostics and lint findings and the new
-/// name would have exactly the occurrences the old one had.
+/// A rename is refused if the edited story would add diagnostics or lint findings, or if the new
+/// name would not have exactly the occurrences the old one had.
 /// </summary>
 public static class StoryRename
 {
+    private const string BuiltInStatGuide =
+        "To show it under another name or replace it, see \"Change a built-in stat\" in the Writing Stories guide.";
     /// <summary>Finds the renameable name at <paramref name="position"/>. <paramref name="analysis"/> must be a whole-story analysis.</summary>
     public static StoryRenamePreparation Prepare(StoryAnalysis analysis, SourceLocation position)
     {
@@ -48,7 +50,7 @@ public static class StoryRename
         if (kind == AuthoringSymbolKind.Stat && analysis.BaseRulesetStats.Contains(name))
             return new(null, $"Stat '{name}' overrides a built-in stat of the same ID in the story's base ruleset. " +
                 "The ruleset's code refers to it by that ID, so renaming it would leave the built-in stat in place " +
-                "and change what every reference means.");
+                "and change what every reference means. " + BuiltInStatGuide);
 
         var occurrences = analysis.Names.Occurrences(kind, name);
         var declarations = occurrences.Count(item => item.IsDeclaration);
@@ -137,7 +139,7 @@ public static class StoryRename
                 AuthoringSymbolKind.Scene when name == SceneVocabulary.End =>
                     $"'{name}' ends the story; it is not a scene and cannot be renamed.",
                 AuthoringSymbolKind.Stat when analysis.BaseRulesetStats.Contains(name) =>
-                    $"Stat '{name}' is built into the story's ruleset and cannot be renamed.",
+                    $"Stat '{name}' is built into the story's ruleset and cannot be renamed. {BuiltInStatGuide}",
                 AuthoringSymbolKind.Predicate or AuthoringSymbolKind.Modifier or AuthoringSymbolKind.Ruleset =>
                     $"{Describe(site.Kinds[0], true)} '{name}' is registered in C# code and cannot be renamed here.",
                 AuthoringSymbolKind.Image => null,

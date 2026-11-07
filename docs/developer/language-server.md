@@ -313,9 +313,12 @@ when the position isn't on a renameable name, or error `-32803`
 - a name on the same line as an error that could hide a reference to it.
 
 `textDocument/rename` returns `-32803` when the new name is invalid for the
-kind, collides with an existing name of the same kind, or would change the
-story's compiler diagnostics or lint findings. The server checks the last case
-by applying the edits to a copy of the analyzed source and analyzing it again.
+kind, collides with an existing name of the same kind, or would add a compiler
+diagnostic or lint finding. A rename that removes one is allowed. The server
+checks for new findings by applying the edits to a copy of the analyzed source
+and analyzing it again, comparing severity, code, file and line; renames never
+move lines. Lint findings use the story's lint configuration, so every enabled
+rule counts.
 It also refuses if the new name's occurrences don't match the old name's.
 Edits replace only the name's source range, preserving YAML quoting and
 comments, and never rename files.
