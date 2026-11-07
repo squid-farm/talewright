@@ -107,6 +107,8 @@ public sealed class LanguageServer
         public bool DocumentChangesSupported { get; } = documentChangesSupported;
         public bool CreateFileOperationSupported { get; } = createFileOperationSupported;
         public IReadOnlyDictionary<string, int> DocumentVersions { get; } = documentVersions;
+        public bool UseCurrentFileAnalysis { get; set; }
+        public StoryAnalysis? SymbolSnapshot { get; set; }
         public CancellationTokenSource Cancellation { get; } = new();
     }
 
@@ -513,16 +515,19 @@ public sealed class LanguageServer
             path, document, story, kind, position, end, _hoverMarkdown,
             _documentChangesSupported, _createFileOperationSupported, documentVersions);
         _requests.Add(key, request);
-        var previous = (kind is Feature.Hover or Feature.Definition or Feature.SemanticTokens) &&
-            story.PublishedAnalysis is { } published &&
+        var published = story.PublishedAnalysis;
+        var previous = (kind is Feature.Completion or Feature.Hover or Feature.Definition or Feature.SemanticTokens) &&
+            published is not null &&
             published.Source.Files.TryGetValue(position.File, out var publishedText) && publishedText == document.Text
                 ? published : null;
+        request.UseCurrentFileAnalysis = (kind is Feature.Completion or Feature.Hover) && previous is null;
+        request.SymbolSnapshot = published;
         StartRequest(request, previous);
     }
 
     private void StartRequest(PendingRequest request, StoryAnalysis? previous)
     {
-        var shared = previous is null
+        var shared = previous is null && !request.UseCurrentFileAnalysis
             ? request.Story.Pending ?? throw new InvalidOperationException("No analysis is scheduled for the request.")
             : null;
         shared?.StartImmediately();
@@ -537,6 +542,12 @@ public sealed class LanguageServer
         try
         {
             var analysis = previous;
+            if (analysis is null && request.UseCurrentFileAnalysis)
+            {
+                analysis = request.Story.Workspace.AnalyzeCurrentFile(
+                    Relative(request.Root, request.Path), request.Text, request.SymbolSnapshot, request.Cancellation.Token);
+                previous = request.SymbolSnapshot;
+            }
             if (analysis is null)
             {
                 if (shared is null) throw new InvalidOperationException("No analysis is available for the request.");

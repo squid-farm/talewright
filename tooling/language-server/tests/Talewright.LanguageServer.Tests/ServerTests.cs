@@ -942,6 +942,14 @@ public sealed partial class ServerTests
                 message.GetProperty("params").GetProperty("version").ToString() == (version?.ToString() ?? ""));
             return message.GetProperty("params").GetProperty("diagnostics").EnumerateArray().ToArray();
         }
+        public async Task EnsureAnalyzed(string name)
+        {
+            await Request("textDocument/inlayHint", new
+            {
+                textDocument = new { uri = UriOf(name) },
+                range = new { start = new { line = 0, character = 0 }, end = new { line = 0, character = 0 } }
+            });
+        }
         public async Task<JsonElement> Request(string method, object parameters)
         {
             var id = ++_id;

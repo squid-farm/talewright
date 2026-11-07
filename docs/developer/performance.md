@@ -115,3 +115,31 @@ reuse (#411) or claim that #392's latency target is satisfied.
 The measured workload waits for publication between edits, so each sample is
 one isolated edit plus the full quiet window. Tests cover burst coalescing,
 cancellation of running analysis, paced edits and latest-only publication.
+
+## Current-text completion and hover
+
+The #410 Release harness publishes a warm story-wide snapshot, then sends a
+current-buffer edit before each framed in-process LSP completion or hover
+request. The edited file contains one scene; the catalog scenes are spread over
+files of at most 100 scenes. It reports seven samples after three warmups, with
+nearest-rank p95 (the maximum). The source size includes the manifest and all
+Tale files.
+
+Recorded locally on Linux Mint 22.3 x64 with .NET 10.0.14, an AMD Ryzen 9 7940HS
+(16 logical processors), 27 GiB RAM, tiered compilation disabled and the
+performance governor. Build and test work was not run concurrently; desktop
+processes remained active. This is a local observation, not a device-wide
+guarantee.
+
+| Cross-file scene symbols | Files | UTF-8 bytes | Completion p50 / p95 ms | Hover p50 / p95 ms | Completion managed bytes p50 / max | Hover managed bytes p50 / max |
+|---:|---:|---:|---:|---:|---:|---:|
+| 100 | 3 | 11,917 | 0.21 / 0.32 | 0.21 / 0.30 | 31,640 / 49,312 | 68,600 / 68,640 |
+| 1,000 | 12 | 120,818 | 0.30 / 0.35 | 0.24 / 0.32 | 76,400 / 76,440 | 70,216 / 74,872 |
+| 10,000 | 102 | 1,236,819 | 2.36 / 5.03 | 1.11 / 1.48 | 518,432 / 519,320 | 81,848 / 104,296 |
+
+All measured p95 values met the 20 ms request target. Managed bytes use the
+process-wide counter, including server-thread allocations; they are neither
+retained memory nor peak memory. The increase for completion with 10,000 scene
+symbols is visible and is retained as a future optimization signal. The
+deterministic concurrency tests separately verify that these requests do not
+start or await whole-story analysis while the current buffer is being edited.

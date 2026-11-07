@@ -131,6 +131,7 @@ public static class StoryCompiler
             Analysis = analysis,
             ImageSource = source,
         };
+        if (analysis is not null) analysis.SymbolContext = symbols;
 
         var parsed = new List<ParsedScene>();
         var seen = new HashSet<SceneId>();

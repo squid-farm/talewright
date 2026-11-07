@@ -265,6 +265,37 @@ public sealed class SyntaxReuseTests
         Assert.False(oldAnalysis.TryGetTarget(out _));
     }
 
+    [Fact]
+    public void Current_file_analysis_cache_releases_obsolete_text_analyses()
+    {
+        var source = Source();
+        var workspace = new StoryWorkspace(source);
+        var snapshot = StoryAnalyzer.Analyze(source);
+        var obsolete = ReplaceCurrentFileAnalysis(workspace, snapshot, source.Files["a.tale"]);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(obsolete.TryGetTarget(out _));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<StoryAnalysis> ReplaceCurrentFileAnalysis(
+        StoryWorkspace workspace, StoryAnalysis snapshot, string originalText)
+    {
+        var firstText = originalText + "\n// first";
+        workspace.Open("a.tale", 1, firstText);
+        var first = workspace.AnalyzeCurrentFile("a.tale", firstText, snapshot, CancellationToken.None);
+        Assert.Same(first, workspace.AnalyzeCurrentFile("a.tale", firstText, snapshot, CancellationToken.None));
+        var obsolete = new WeakReference<StoryAnalysis>(first);
+
+        var latestText = originalText + "\n// latest";
+        workspace.Change("a.tale", 2, latestText);
+        var latest = workspace.AnalyzeCurrentFile("a.tale", latestText, snapshot, CancellationToken.None);
+        GC.KeepAlive(latest);
+        return obsolete;
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference<TaleFileSyntax> SyntaxReference(StoryWorkspace workspace, string path) =>
         new(workspace.Syntax[path]);

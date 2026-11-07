@@ -340,10 +340,11 @@ public sealed partial class ServerTests
 
     private static Predicate<JsonElement> HasLabel(string label) => item => item.GetProperty("label").GetString() == label;
     private static JsonElement[] Items(JsonElement response) => response.GetProperty("result").GetProperty("items").EnumerateArray().ToArray();
-    private static Task<JsonElement> Completion(Client client, string file, string marked)
+    private static async Task<JsonElement> Completion(Client client, string file, string marked)
     {
+        await client.EnsureAnalyzed(file);
         var prefix = marked[..marked.IndexOf('|')].ReplaceLineEndings("\n").Split('\n');
-        return client.Request("textDocument/completion", new
+        return await client.Request("textDocument/completion", new
         {
             textDocument = new { uri = client.UriOf(file) },
             position = new { line = prefix.Length - 1, character = prefix[^1].Length }

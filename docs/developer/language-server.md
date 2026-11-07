@@ -93,11 +93,17 @@ reloads, but binding and validation still run story-wide. See the
 [cache lifecycle](authoring-analysis.md#workspace-lifecycle)
 and [measured end-to-end budget](performance.md#file-syntax-reuse-and-edit-diagnostics).
 
-Hover and definition may use the last published analysis when the requested
-document's text is unchanged. Cross-file semantic information may therefore be
-older, but a definition does not use a previous target if that target's text
-has changed or the target has been removed; it waits for current analysis
-instead. Completion and inlay hints always wait for the requested revision.
+Completion and hover use the last published analysis when the requested
+document's text is unchanged. For changed text, they parse and bind only the
+requested file against the last usable story-wide symbol snapshot, without
+starting or waiting for whole-story analysis. Before the first snapshot is
+published, they return current-file syntax and local declarations only; they
+do not invent cross-file semantic candidates. Cross-file suggestions may remain
+stale until the next whole-story analysis publishes, but completion edits and
+hover ranges always come from the current buffer. Definition retains its
+separate safety policy: it does not navigate using an old target range after
+that target changes or is removed. Inlay hints and other analysis-dependent
+requests continue to await the requested revision.
 
 Cancelling a request with `$/cancelRequest` returns RequestCancelled (`-32800`)
 without cancelling analysis shared by other requests or diagnostics. If a
@@ -114,9 +120,11 @@ results or CLI validation and lint output.
 
 The compiler records reference slots using its Talemark parser, expression lexer,
 and existing YAML representation tree. `Talewright.Authoring` matches those slots
-against the current whole-story partial symbol table; clients contain no
-completion rules. A request uses the shared analysis for the latest accepted
-document versions, without waiting for the diagnostic debounce.
+against the latest usable symbol snapshot while reading syntax, prefixes, and
+replacement ranges from the current document version; clients contain no
+completion rules. A changed document is analyzed locally, so the request does
+not start or wait for whole-story binding. Cross-file candidates may be stale
+until analysis publishes the latest workspace revision.
 
 Supported slots include scene diverts (including `END`), speech characters,
 scene metadata directives, skill-check actors/stats, and expression namespaces
@@ -161,8 +169,8 @@ and a valid UTF-16 position; malformed/out-of-bounds requests return `-32602`.
 
 ### Source-aware hover
 
-`textDocument/hover` uses the same current whole-story snapshot as completion.
-The shared authoring provider resolves parser-recognized references and
+`textDocument/hover` uses the same current-text and last-usable-symbol-snapshot
+policy as completion. The shared authoring provider resolves parser-recognized references and
 declarations for scenes, characters, stats, items, factions, flags, variables,
 rulesets, registered predicates, and modifiers. Results include the symbol kind
 and type, a declaration location and authored source line when available, or

@@ -14,6 +14,118 @@ internal static class EditDiagnostics
 {
     private const int Iterations = 7;
 
+    public static async Task<int> RunCurrentTextAsync()
+    {
+        Console.WriteLine($"Runtime: {RuntimeInformation.FrameworkDescription}; OS: {RuntimeInformation.OSDescription}; processors: {Environment.ProcessorCount}");
+        Console.WriteLine("Each request follows a current-buffer edit in a warm workspace; three warmups and seven samples. p95 is the maximum.");
+        Console.WriteLine("Operation\tScenes\tFiles\tUTF-8 bytes\tp50 ms\tp95 ms\tManaged bytes p50/max");
+        foreach (var count in new[] { 100, 1_000, 10_000 })
+        {
+            var source = CreateSceneCorpus(count);
+            var path = "current.tale";
+            var target = $"scene.{count - 1}";
+            await using var client = new Client(source);
+            await client.Initialize();
+            await client.Open(path, CurrentText(target, 1), 1);
+            await client.Published(path, 1);
+
+            var version = 1;
+            version = await MeasureCurrentRequests(client, path, target, "textDocument/completion", version, count,
+                source.Files.Count, PerformanceSource.Utf8ByteCount(source));
+            await MeasureCurrentRequests(client, path, target, "textDocument/hover", version, count,
+                source.Files.Count, PerformanceSource.Utf8ByteCount(source));
+        }
+        return 0;
+    }
+
+    private static async Task<int> MeasureCurrentRequests(Client client, string path, string target, string method,
+        int version, int scenes, int files, long sourceBytes)
+    {
+        var times = new List<double>(Iterations);
+        var allocations = new List<long>(Iterations);
+        var uri = client.UriOf(path);
+        var line = 2;
+        var character = 3 + target.Length - (method == "textDocument/hover" ? 1 : 0);
+        for (var iteration = 0; iteration < Iterations + 3; iteration++)
+        {
+            version++;
+            var text = CurrentText(target, version);
+            await client.Change(path, text, version);
+            var parameters = new
+            {
+                textDocument = new { uri },
+                position = new { line, character }
+            };
+            var before = GC.GetTotalAllocatedBytes(precise: true);
+            var started = Stopwatch.GetTimestamp();
+            var response = await client.Request(method, parameters);
+            var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
+            ValidateCurrentResponse(method, response, target, line);
+            if (iteration >= 3)
+            {
+                times.Add(elapsed);
+                allocations.Add(allocated);
+            }
+        }
+
+        times.Sort();
+        allocations.Sort();
+        var label = method == "textDocument/completion" ? "Completion" : "Hover";
+        var p50 = times[Iterations / 2];
+        var p95 = times[^1];
+        Console.WriteLine(FormattableString.Invariant(
+            $"{label}\t{scenes}\t{files}\t{sourceBytes}\t{p50:F2}\t{p95:F2}\t{allocations[Iterations / 2]:N0}/{allocations[^1]:N0}"));
+        Console.WriteLine($"  20 ms p95 target: {(p95 <= 20 ? "MET" : "MISSED")} (report-only).");
+        return version;
+    }
+
+    private static void ValidateCurrentResponse(string method, JsonElement response, string target, int line)
+    {
+        if (response.TryGetProperty("error", out var error))
+            throw new InvalidOperationException($"{method} failed: {error}");
+        if (method == "textDocument/completion")
+        {
+            var matching = response.GetProperty("result").GetProperty("items").EnumerateArray()
+                .FirstOrDefault(item => item.GetProperty("label").GetString() == target);
+            if (matching.ValueKind == JsonValueKind.Undefined ||
+                matching.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32() != line)
+                throw new InvalidOperationException($"Current-text completion did not return '{target}' with a current-line edit.");
+        }
+        else if (!response.GetProperty("result").GetProperty("contents").GetProperty("value").GetString()!.Contains(target, StringComparison.Ordinal) ||
+                 response.GetProperty("result").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32() != line)
+            throw new InvalidOperationException($"Current-text hover did not describe '{target}' at the current line.");
+    }
+
+    private static string CurrentText(string target, int version) =>
+        $"=== current\n// edit {version}\n-> {target}\n";
+
+    private static StorySource CreateSceneCorpus(int count)
+    {
+        var generated = BenchmarkStories.CreateSceneLoop(count);
+        var files = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = generated.Files[StorySource.ManifestFileName],
+            ["current.tale"] = CurrentText($"scene.{count - 1}", 1),
+        };
+        var fileIndex = 0;
+        var scenesInFile = 0;
+        var text = new System.Text.StringBuilder();
+        foreach (var line in generated.Files[BenchmarkStories.TaleFileName].Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (line.StartsWith("=== scene.", StringComparison.Ordinal) && scenesInFile == 100)
+            {
+                files[$"catalog-{fileIndex++:D3}.tale"] = text.ToString();
+                text.Clear();
+                scenesInFile = 0;
+            }
+            if (line.StartsWith("=== scene.", StringComparison.Ordinal)) scenesInFile++;
+            text.Append(line).Append('\n');
+        }
+        if (text.Length > 0) files[$"catalog-{fileIndex:D3}.tale"] = text.ToString();
+        return new StorySource(files, generated.ImagePaths);
+    }
+
     public static async Task<int> RunAsync()
     {
         var source = RealisticStory.Create(new RealisticStoryProfile { Chapters = 20 }).ToSource();
@@ -157,7 +269,7 @@ internal static class EditDiagnostics
             _reader = Read();
         }
 
-        private string UriOf(string path) => new Uri(Path.Combine(_root, path)).AbsoluteUri;
+        public string UriOf(string path) => new Uri(Path.Combine(_root, path)).AbsoluteUri;
 
         public async Task Initialize()
         {
@@ -191,11 +303,24 @@ internal static class EditDiagnostics
 
         private Task Send(object message) => _protocol.WriteAsync(message, _lifetime.Token);
 
-        private async Task Next(Func<JsonElement, bool> matches)
+        public async Task<JsonElement> Request(string method, object parameters)
+        {
+            var id = Interlocked.Increment(ref _requestId);
+            await Send(new { jsonrpc = "2.0", id, method, @params = parameters });
+            return await Next(message => message.TryGetProperty("id", out var responseId) && responseId.GetInt32() == id);
+        }
+
+        private int _requestId = 1;
+
+        private async Task<JsonElement> Next(Func<JsonElement, bool> matches)
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
-            while (!matches(await _messages.Reader.ReadAsync(timeout.Token))) { }
+            while (true)
+            {
+                var message = await _messages.Reader.ReadAsync(timeout.Token);
+                if (matches(message)) return message;
+            }
         }
 
         private async Task Read()

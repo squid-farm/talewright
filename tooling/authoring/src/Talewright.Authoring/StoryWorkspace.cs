@@ -63,6 +63,7 @@ public sealed class SharedAnalysis
 public sealed class StoryWorkspace
 {
     private readonly object _gate = new();
+    private readonly object _currentFileGate = new();
     private readonly Dictionary<string, string> _disk;
     private readonly HashSet<string> _imagePaths;
     private readonly Dictionary<string, (int Version, string Text)> _open = new(StringComparer.Ordinal);
@@ -76,7 +77,10 @@ public sealed class StoryWorkspace
     private long _revision;
     private StoryAnalysis? _current;
     private SharedAnalysis? _shared;
+    private CurrentFileAnalysis? _currentFileAnalysis;
     private int _syntaxParseCount;
+
+    private sealed record CurrentFileAnalysis(string File, string Text, StoryAnalysis? Snapshot, StoryAnalysis Analysis);
 
     public StoryWorkspace(StorySource source, CompilerOptions? options = null, bool requiresProjectMetadata = false)
         : this(source, options, requiresProjectMetadata, null, null)
@@ -230,6 +234,51 @@ public sealed class StoryWorkspace
         }
     }
 
+    internal StoryAnalysis AnalyzeCurrentFile(string path, string text, StoryAnalysis? snapshot,
+        CancellationToken cancellationToken)
+    {
+        path = Normalize(path);
+        lock (_currentFileGate)
+        {
+            lock (_gate)
+            {
+                if (_currentFileAnalysis is { } cached &&
+                    cached.File == path && cached.Text == text && ReferenceEquals(cached.Snapshot, snapshot))
+                    return cached.Analysis;
+            }
+
+            Dictionary<string, string> files;
+            string[] images;
+            lock (_gate)
+            {
+                files = snapshot?.Source.Files.ToDictionary(StringComparer.Ordinal) ?? new(_disk, StringComparer.Ordinal);
+                if (snapshot is null)
+                    foreach (var (openPath, document) in _open)
+                        files[openPath] = document.Text;
+                images = _imagePaths.ToArray();
+            }
+            files[path] = text;
+            var source = new StorySource(files, images);
+            var syntax = path.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase)
+                ? GetSyntax(path, text, cancellationToken)
+                : null;
+            var analysis = StoryAnalyzer.AnalyzeCurrentFile(source, path, syntax, snapshot, _options, cancellationToken);
+            if (_missingMetadata && !analysis.Diagnostics.Any(diagnostic =>
+                    diagnostic.Code == AuthoringDiagnosticCodes.CustomFeaturesUnavailable))
+                analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error,
+                    AuthoringDiagnosticCodes.CustomFeaturesUnavailable,
+                    "Project authoring metadata is missing. Explicitly supply the project's CompilerOptions or exported authoring metadata; editing never loads project assemblies.",
+                    new SourceLocation(StorySource.ManifestFileName, 1, 1)));
+
+            lock (_gate)
+            {
+                if (TryGetText(path, out var current) && string.Equals(current, text, StringComparison.Ordinal))
+                    _currentFileAnalysis = new(path, text, snapshot, analysis);
+            }
+            return analysis;
+        }
+    }
+
     internal IReadOnlyList<SceneNavigationSymbol> GetSceneSymbols(string? file = null)
     {
         var files = new List<(string Path, string Text)>();
@@ -369,6 +418,8 @@ public sealed class StoryWorkspace
 
     private void Invalidate(string? path = null)
     {
+        if (path is null || _currentFileAnalysis?.File == path)
+            _currentFileAnalysis = null;
         if (path is not null && _syntax.TryGetValue(path, out var syntax) &&
             (!TryGetText(path, out var text) || !string.Equals(text, syntax.Text, StringComparison.Ordinal)))
             _syntax.Remove(path);
