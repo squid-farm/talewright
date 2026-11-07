@@ -107,6 +107,8 @@ story ends there.
 Lint rules use stable `TWL` IDs, separate from compiler diagnostic codes. They run on shared source-aware
 analysis and do not replace or duplicate compiler diagnostics. Their severities and per-file suppressions
 are configured in the optional story-root `talewright.lint.json`; see the [`lint` CLI reference](cli.md#lint).
+The naming rules are off by default because naming style is your choice; enable them in that file or
+with `--rule`.
 
 | Code | Meaning | Usual fix |
 |---|---|---|

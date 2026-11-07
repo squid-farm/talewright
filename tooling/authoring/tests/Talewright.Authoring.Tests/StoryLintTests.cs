@@ -7,6 +7,9 @@ namespace Talewright.Authoring.Tests;
 
 public sealed class StoryLintTests
 {
+    private static readonly LintConfiguration NamingRulesEnabled =
+        LintConfiguration.Parse("""{"rules":{"TWL001":"warning","TWL002":"warning"}}""");
+
     private static StorySource Source(string id = "night-ferry", string scene = "ending.empty-handed") => new(
         new Dictionary<string, string>
         {
@@ -24,10 +27,20 @@ public sealed class StoryLintTests
     }
 
     [Fact]
+    public void Naming_rules_are_off_until_a_story_enables_them()
+    {
+        var result = StoryLintAnalyzer.Analyze(StoryAnalyzer.Analyze(Source("Night_Ferry", "ending.empty_Handed")));
+
+        Assert.All(StoryLintRules.All, rule => Assert.Equal(LintSeverity.Off, rule.DefaultSeverity));
+        Assert.Empty(result.CompilerDiagnostics);
+        Assert.Empty(result.RuleDiagnostics);
+    }
+
+    [Fact]
     public void Noncanonical_story_and_scene_ids_report_precise_authored_ranges()
     {
         var source = Source("Night_Ferry", "ending.empty_Handed");
-        var result = StoryLintAnalyzer.Analyze(StoryAnalyzer.Analyze(source));
+        var result = StoryLintAnalyzer.Analyze(StoryAnalyzer.Analyze(source), NamingRulesEnabled);
 
         Assert.Empty(result.CompilerDiagnostics);
         Assert.Collection(result.RuleDiagnostics,
@@ -57,7 +70,7 @@ public sealed class StoryLintTests
         files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName]
             .Replace("id: night-ferry", "id: \"Night_Ferry\"", StringComparison.Ordinal);
         var storySource = new StorySource(files);
-        var result = StoryLintAnalyzer.Analyze(StoryAnalyzer.Analyze(storySource));
+        var result = StoryLintAnalyzer.Analyze(StoryAnalyzer.Analyze(storySource), NamingRulesEnabled);
         var diagnostic = Assert.Single(result.RuleDiagnostics,
             finding => finding.Code == StoryLintRules.StoryIdStyle);
 
@@ -68,7 +81,7 @@ public sealed class StoryLintTests
     public void Invalid_scene_ids_do_not_receive_duplicate_style_findings()
     {
         var analysis = StoryAnalyzer.Analyze(Source(scene: "bad!id"));
-        var result = StoryLintAnalyzer.Analyze(analysis);
+        var result = StoryLintAnalyzer.Analyze(analysis, NamingRulesEnabled);
 
         Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == "TW1008");
         Assert.DoesNotContain(result.RuleDiagnostics, diagnostic => diagnostic.Code == StoryLintRules.SceneIdStyle);
@@ -79,7 +92,7 @@ public sealed class StoryLintTests
     {
         var configurationJson = JsonSerializer.Serialize(new
         {
-            rules = new Dictionary<string, string> { ["TWL001"] = "off" },
+            rules = new Dictionary<string, string> { ["TWL001"] = "warning" },
             suppressions = new Dictionary<string, string[]>
             {
                 [StorySource.ManifestFileName] = [StoryLintRules.StoryIdStyle],
@@ -87,8 +100,8 @@ public sealed class StoryLintTests
         });
         var configuration = LintConfiguration.Parse(configurationJson);
 
-        Assert.Equal(LintSeverity.Off, configuration.SeverityFor(StoryLintRules.SceneIdStyle));
-        Assert.Equal(LintSeverity.Warning, configuration.SeverityFor(StoryLintRules.StoryIdStyle));
+        Assert.Equal(LintSeverity.Warning, configuration.SeverityFor(StoryLintRules.SceneIdStyle));
+        Assert.Equal(LintSeverity.Off, configuration.SeverityFor(StoryLintRules.StoryIdStyle));
         Assert.True(configuration.IsSuppressed(StorySource.ManifestFileName, StoryLintRules.StoryIdStyle));
         Assert.False(configuration.IsSuppressed("main.tale", StoryLintRules.StoryIdStyle));
     }

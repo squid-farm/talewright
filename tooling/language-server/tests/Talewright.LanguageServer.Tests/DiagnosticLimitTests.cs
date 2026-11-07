@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Talewright.Authoring;
 using Talewright.Cli;
 using Talewright.Testing;
 
@@ -69,6 +70,7 @@ public sealed partial class ServerTests
             tale.Append(SceneFaker.Header("Bad_Scene")).Append('\n').Append(DivertFaker.To("END")).Append('\n');
         var text = tale.ToString();
         File.WriteAllText(client.PathOf("start.tale"), text);
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"warning"}}""");
 
         var output = new StringWriter();
         Assert.Equal(1, CommandLine.Run(["lint", client.Root, "--format", "json"], output, new StringWriter()));

@@ -18,7 +18,7 @@ Story identifiers start with an ASCII letter (`A`-`Z`, `a`-`z`) or `_`. The rema
 ASCII letters, digits or `_`, with optional single `.` or `-` separators between groups.
 Separators cannot be adjacent or end a name. Names are case-sensitive.
 Lowercase kebab-case is a style recommendation, not a parser restriction. The scene/story
-naming lint diagnostics TWL001 and TWL002 are warnings about that style.
+naming lint rules TWL001 and TWL002 check that style only when a story enables them.
 
 - Valid: `weapon.knife`, `camp.arrival`, `_guide`, `north-gate`, `act.2`.
 - Invalid: `2doors`, `camp..arrival`, `north.-gate`, `door-`, `café`.

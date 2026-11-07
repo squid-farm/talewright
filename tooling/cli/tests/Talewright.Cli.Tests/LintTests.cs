@@ -9,10 +9,27 @@ public sealed class LintTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-lint-{Guid.NewGuid():N}");
 
+    private const string NamingRulesEnabled = """{"rules":{"TWL001":"warning","TWL002":"warning"}}""";
+
     public LintTests()
     {
         Directory.CreateDirectory(_root);
         WriteStory("Night_Ferry", "ending.empty_Handed", "-> END");
+        File.WriteAllText(Path.Combine(_root, LintConfiguration.FileName), NamingRulesEnabled);
+    }
+
+    [Fact]
+    public void Naming_rules_are_off_without_configuration()
+    {
+        File.Delete(Path.Combine(_root, LintConfiguration.FileName));
+
+        var result = Run("--format", "json", "--warnings-as-errors");
+
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        Assert.True(json.RootElement.GetProperty("success").GetBoolean());
+        Assert.Empty(json.RootElement.GetProperty("diagnostics").EnumerateArray());
     }
 
     private (int Code, string Output, string Error) Run(params string[] options)
@@ -48,6 +65,7 @@ public sealed class LintTests : IDisposable
     {
         var config = JsonSerializer.Serialize(new
         {
+            rules = new Dictionary<string, string> { ["TWL001"] = "warning", ["TWL002"] = "warning" },
             suppressions = new Dictionary<string, string[]>
             {
                 [StorySource.ManifestFileName] = [StoryLintRules.StoryIdStyle],
@@ -67,7 +85,7 @@ public sealed class LintTests : IDisposable
     public void Command_line_rule_override_takes_precedence_over_config()
     {
         File.WriteAllText(Path.Combine(_root, LintConfiguration.FileName),
-            """{"rules":{"TWL001":"off"}}""");
+            """{"rules":{"TWL001":"off","TWL002":"warning"}}""");
 
         var result = Run("--format", "json", "--rule", "TWL001=error");
 

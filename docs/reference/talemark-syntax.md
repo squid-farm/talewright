@@ -89,8 +89,8 @@ underscores, and single dots or hyphens between words; start with a letter or un
 Scene IDs cannot match character IDs, and `scene` is reserved for the current-scene visit-count
 reference.
 Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser restriction.
-The naming lint rules TWL001/TWL002 warn about style; they do not make an otherwise valid name
-illegal.
+The naming lint rules TWL001/TWL002 check that style only if you enable them; they do not make an
+otherwise valid name illegal.
 
 The [Talemark operator registry](talemark-operators.md) is a deeper technical reference for symbols,
 calculation order and quoting rules. Most authors will not need it for a first story.

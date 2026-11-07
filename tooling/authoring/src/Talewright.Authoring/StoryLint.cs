@@ -23,10 +23,11 @@ public static class StoryLintRules
     private static readonly Regex StoryIdPattern = new(@"\A[a-z0-9]+(?:-[a-z0-9]+)*\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    // Naming style is the author's preference, so these rules report nothing until a story opts in.
     public static IReadOnlyList<StoryLintRule> All { get; } = Array.AsReadOnly(new[]
     {
-        new StoryLintRule(SceneIdStyle, "Scene IDs use lowercase kebab-case segments, optionally grouped with dots.", LintSeverity.Warning),
-        new StoryLintRule(StoryIdStyle, "The story ID uses lowercase kebab-case.", LintSeverity.Warning),
+        new StoryLintRule(SceneIdStyle, "Scene IDs use lowercase kebab-case segments, optionally grouped with dots.", LintSeverity.Off),
+        new StoryLintRule(StoryIdStyle, "The story ID uses lowercase kebab-case.", LintSeverity.Off),
     });
 
     public static bool IsStoryIdStyle(string id) => StoryIdPattern.IsMatch(id);
