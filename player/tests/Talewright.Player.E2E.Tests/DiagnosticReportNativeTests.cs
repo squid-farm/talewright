@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using Talewright.Testing;
 using Xunit.Abstractions;
 
@@ -46,6 +47,25 @@ public sealed class DiagnosticReportNativeTests(WebHostFixture host, ITestOutput
         Assert.Contains("Host: Desktop", report);
         Assert.DoesNotContain(path, report);
         Assert.DoesNotContain("PRIVATE_STORY", report);
+    }
+
+    [Fact]
+    public async Task Native_report_matches_the_displayed_player_build_identity()
+    {
+        Directory.CreateDirectory(_fixtures);
+        var path = Path.Combine(_fixtures, "invalid.zip");
+        await File.WriteAllBytesAsync(path, TestArchives.Invalid("zip"));
+        await Driver.StartAsync("--no-library", path);
+        await AssertState(state => Assert.Contains("Couldn't open", state.Library));
+
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        await native.ActivateAsync("Diagnostics");
+        var snapshot = await WaitForAsync(native, "Player version:");
+        var identity = Regex.Match(snapshot.Content,
+            @"Talewright (?<version>[0-9A-Za-z.+-]+) \u00B7 commit (?<commit>[0-9A-Za-z]+) \u00B7 built [0-9]{4}-[0-9]{2}-[0-9]{2}");
+        Assert.True(identity.Success, $"The player build identity was not displayed: {snapshot.Content}");
+        Assert.Contains($"Player version: {identity.Groups["version"].Value}", snapshot.Content);
+        Assert.Contains($"Player commit: {identity.Groups["commit"].Value}", snapshot.Content);
     }
 
     [Fact]

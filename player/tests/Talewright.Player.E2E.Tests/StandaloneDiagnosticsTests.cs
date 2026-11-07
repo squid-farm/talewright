@@ -132,12 +132,35 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
 
     [StandaloneFact]
     [Trait("Host", "Browser")]
+    public async Task Published_report_matches_the_player_build_identity()
+    {
+        await WaitForPublishedStoryAsync();
+        var response = await Page.APIRequest.GetAsync(new Uri(new Uri(Page.Url), "version.json").ToString());
+        Assert.True(response.Ok, $"version.json returned HTTP {response.Status}");
+        var identity = await response.JsonAsync();
+        var version = identity!.Value.GetProperty("version").GetString();
+        var commit = identity.Value.GetProperty("commit").GetString();
+        Assert.False(string.IsNullOrEmpty(version));
+        Assert.False(string.IsNullOrEmpty(commit));
+
+        await Page.Locator(".tw-diagnostic-report summary").ClickAsync();
+        var preview = Page.GetByLabel("Diagnostic report");
+        await Expect(preview).ToContainTextAsync($"Player version: {version}");
+        await Expect(preview).ToContainTextAsync($"Player commit: {commit}");
+        var download = await Page.RunAndWaitForDownloadAsync(() =>
+            Page.GetByRole(AriaRole.Button, new() { Name = "Download diagnostic report" }).ClickAsync());
+        await using var stream = await download.CreateReadStreamAsync();
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var lines = (await reader.ReadToEndAsync()).Split('\n', StringSplitOptions.TrimEntries);
+        Assert.Contains($"Player version: {version}", lines);
+        Assert.Contains($"Player commit: {commit}", lines);
+    }
+
+    [StandaloneFact]
+    [Trait("Host", "Browser")]
     public async Task Published_story_load_failure_remains_inspectable_without_a_library()
     {
-        var ready = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1"
-            ? Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })
-            : Latest;
-        await Expect(ready).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        await WaitForPublishedStoryAsync();
 
         const string privateUrl = "https://private.example/SECRET_TOKEN";
         var invalidIndex = JsonSerializer.Serialize(new Dictionary<string, string> { [privateUrl] = new('A', 64) });
@@ -157,5 +180,13 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         var report = await reader.ReadToEndAsync();
         Assert.Contains("Story ID: unavailable", report);
         Assert.DoesNotContain(privateUrl, report);
+    }
+
+    private async Task WaitForPublishedStoryAsync()
+    {
+        var ready = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1"
+            ? Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })
+            : Latest;
+        await Expect(ready).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 }

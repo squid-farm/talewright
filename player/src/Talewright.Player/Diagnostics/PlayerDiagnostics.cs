@@ -92,10 +92,11 @@ public sealed class PlayerDiagnostics
             sceneId = _sceneId;
         }
 
+        var identity = PlayerBuildIdentity.Current;
         var report = new StringBuilder();
         report.AppendLine("Talewright diagnostic report");
-        report.AppendLine("Player version: unavailable");
-        report.AppendLine("Player commit: unavailable");
+        report.AppendLine($"Player version: {identity.Version}");
+        report.AppendLine($"Player commit: {identity.Commit}");
         report.AppendLine($"Host: {(OperatingSystem.IsBrowser() ? "Browser" : "Desktop")}");
         report.AppendLine($"Platform: {Platform()} ({RuntimeInformation.ProcessArchitecture})");
         report.AppendLine($".NET runtime: {Environment.Version}");

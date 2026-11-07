@@ -16,6 +16,16 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class PlayerDiagnosticsTests
 {
     [Fact]
+    public void Report_includes_the_loaded_player_build_identity()
+    {
+        var identity = PlayerBuildIdentity.Current;
+        var report = new PlayerDiagnostics().CreateReport();
+
+        Assert.Contains($"Player version: {identity.Version}{Environment.NewLine}", report);
+        Assert.Contains($"Player commit: {identity.Commit}{Environment.NewLine}", report);
+    }
+
+    [Fact]
     public void Buffer_retains_only_the_most_recent_entries_and_is_session_local()
     {
         var diagnostics = new PlayerDiagnostics();

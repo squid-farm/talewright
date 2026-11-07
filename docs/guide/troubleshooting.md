@@ -89,8 +89,9 @@ available when a story fails to open, including in a published game. Review the 
 **Download diagnostic report** if you want to attach it to a bug report. Nothing is uploaded
 automatically.
 
-The report includes the player host and available platform and build information, story and scene
-IDs when available, and up to 100 recent warnings and errors with their operation and a safe cause.
+The report includes the player version and commit, host and available platform information, story
+and scene IDs when available, and up to 100 recent warnings and errors with their operation and a
+safe cause. Development builds may show `dev` for the version or `unknown` for the commit.
 Compiler diagnostics include their codes. The report does not include story text, save contents,
 full paths, URLs or exception messages. IDs can still be identifying, so check the report before
 sharing it. The buffer belongs to the current player session and is cleared when the player is
@@ -106,5 +107,9 @@ shared minimal story or save may be needed to reproduce some problems.
 
 [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
 Include your operating system, the Talewright version, what you tried, and the exact error message.
+In the web or desktop player, copy the line that starts with "Talewright" from the bottom of the
+library page or the **Settings** dialog, for example `Talewright 1.0.0 · commit 1a2b3c4 · built 2026-01-31`.
+A published game shows the version of the player it was built with. `dev` means a local or
+development build rather than a release.
 A GitHub account is required. Don't include private story files or personal information.
 If useful, you can attach a small example that shows the problem, but story files are optional.
