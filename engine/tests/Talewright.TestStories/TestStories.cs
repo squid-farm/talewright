@@ -222,7 +222,7 @@ public static class TestStories
         === start
         No route is available.
         * [Use a missing rope] (requires player has rope) -> END
-        """) { ExpectedWarningCodes = ["TW3013"] };
+        """);
 
     public static StoryFixture AutosaveOptOut(string id)
     {

@@ -24,19 +24,15 @@ public class StoryAnalysisTests
         new Dictionary<string, string> { ["story.talewright.yaml"] = yaml ?? Manifest, ["main.tale"] = tale });
 
     [Fact]
-    public void Choice_availability_warning_matches_compiler_and_clears_after_an_unconditional_exit()
+    public void Conditional_choices_without_an_unconditional_exit_are_not_reported_while_editing()
     {
         var source = Source("=== first\n* [Maybe] (requires player:hp > 0) -> END");
         var compiled = StoryCompiler.Compile(source);
         var analysis = StoryAnalyzer.Analyze(source);
 
         Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));
-        Assert.Equal(compiled.Diagnostics, analysis.Diagnostics);
-        var warning = Assert.Single(analysis.Diagnostics);
-        Assert.Equal("TW3013", warning.Code);
-        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
-        Assert.Equal(new SourceLocation("main.tale", 1, 1), warning.Location);
-        Assert.Empty(StoryAnalyzer.Analyze(Source("=== first\n* [Maybe] (requires player:hp > 0) -> END\n* -> END")).Diagnostics);
+        Assert.Empty(compiled.Diagnostics);
+        Assert.Empty(analysis.Diagnostics);
     }
 
     [Fact]

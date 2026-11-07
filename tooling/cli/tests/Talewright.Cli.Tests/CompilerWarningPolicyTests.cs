@@ -3,11 +3,11 @@ using Talewright.Cli;
 
 namespace Talewright.Cli.Tests;
 
-public sealed class ChoiceAvailabilityTests : IDisposable
+public sealed class CompilerWarningPolicyTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-choices-{Guid.NewGuid():N}");
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-warnings-{Guid.NewGuid():N}");
 
-    public ChoiceAvailabilityTests()
+    public CompilerWarningPolicyTests()
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), """
@@ -19,6 +19,8 @@ public sealed class ChoiceAvailabilityTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "main.tale"), """
             === start
             * [Maybe] (requires flag:ready) -> END
+            === orphan
+            -> END
             """);
     }
 
@@ -37,7 +39,7 @@ public sealed class ChoiceAvailabilityTests : IDisposable
     [InlineData("validate", "json")]
     [InlineData("lint", "human")]
     [InlineData("lint", "json")]
-    public void Availability_warning_succeeds_normally_and_fails_when_warnings_are_errors(string command, string format)
+    public void Compiler_warning_succeeds_normally_and_fails_when_warnings_are_errors(string command, string format)
     {
         var normal = Run(command, format, strict: false);
         var strict = Run(command, format, strict: true);
@@ -48,10 +50,9 @@ public sealed class ChoiceAvailabilityTests : IDisposable
         Assert.Empty(strict.Error);
         if (format == "human")
         {
-            Assert.Contains("main.tale:1:1: warning TW3013:", normal.Output);
-            Assert.Contains("main.tale:1:1: warning TW3013:", strict.Output);
-            Assert.Contains("'start'", normal.Output);
-            Assert.Contains("* -> target", normal.Output);
+            Assert.Contains("main.tale:3:1: warning TW3009:", normal.Output);
+            Assert.Contains("main.tale:3:1: warning TW3009:", strict.Output);
+            Assert.Contains("'orphan'", normal.Output);
         }
         else
         {
@@ -62,13 +63,12 @@ public sealed class ChoiceAvailabilityTests : IDisposable
             var warning = Assert.Single(normalJson.RootElement.GetProperty("diagnostics").EnumerateArray());
             var strictWarning = Assert.Single(strictJson.RootElement.GetProperty("diagnostics").EnumerateArray());
             Assert.Equal(warning.GetRawText(), strictWarning.GetRawText());
-            Assert.Equal("TW3013", warning.GetProperty("code").GetString());
+            Assert.Equal("TW3009", warning.GetProperty("code").GetString());
             Assert.Equal("warning", warning.GetProperty("severity").GetString());
             Assert.Equal("main.tale", warning.GetProperty("file").GetString());
-            Assert.Equal(1, warning.GetProperty("line").GetInt32());
+            Assert.Equal(3, warning.GetProperty("line").GetInt32());
             Assert.Equal(1, warning.GetProperty("column").GetInt32());
-            Assert.Contains("'start'", warning.GetProperty("message").GetString());
-            Assert.Contains("* -> target", warning.GetProperty("message").GetString());
+            Assert.Contains("'orphan'", warning.GetProperty("message").GetString());
         }
     }
 

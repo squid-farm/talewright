@@ -93,7 +93,6 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW3010", Story("=== start\n-> END\n=== start\n-> END")),
         Error("TW3011", Scene("* [Leave] -> END\nProse.")),
         Warning("TW3012", Scene("-> END\nAfter.")),
-        Warning("TW3013", Scene("* [Maybe] (requires player:hp > 0) -> END")),
         Error("TW3014", Story("=== start\n-> END\n=== camp\n-> END", """
             game: {id: coverage, title: Coverage, start: start}
             characters:
