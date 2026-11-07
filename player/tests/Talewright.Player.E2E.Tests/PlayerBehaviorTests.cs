@@ -251,6 +251,19 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Hosted_player_shows_the_build_identity_published_in_version_json()
+    {
+        var response = await Page.APIRequest.GetAsync(new Uri(new Uri(Page.Url), "version.json").ToString());
+        Assert.True(response.Ok, $"version.json returned HTTP {response.Status}");
+        var identity = await response.JsonAsync();
+        string Value(string name) => identity!.Value.GetProperty(name).GetString()!;
+
+        await Expect(Page.Locator(".tw-library .tw-build-identity")).ToHaveTextAsync(
+            $"Talewright {Value("version")} · commit {Value("commit")} · built {Value("date")}");
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Transcript_formats_prose_and_preserves_previous_frames()
     {
         await Upload(TestStories.Linear);

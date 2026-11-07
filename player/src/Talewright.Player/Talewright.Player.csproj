@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
   <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.Cli" />
     <InternalsVisibleTo Include="Talewright.Player.E2E.Tests" />
   </ItemGroup>
 
@@ -24,5 +25,19 @@
     <ProjectReference Include="../../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" PrivateAssets="all" />
     <ProjectReference Include="../../../packaging/Talewright/Talewright.csproj" />
   </ItemGroup>
+
+  <Import Project="BuildIdentity.targets" />
+
+  <!-- Constants rather than assembly attributes, so WebAssembly trimming cannot remove the identity. -->
+  <Target Name="GenerateTalewrightBuildIdentity" BeforeTargets="CoreCompile" DependsOnTargets="ResolveTalewrightBuildIdentity">
+    <PropertyGroup>
+      <TalewrightBuildIdentityFile>$(IntermediateOutputPath)PlayerBuildIdentity.g.cs</TalewrightBuildIdentityFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(TalewrightBuildIdentityFile)" Overwrite="true" WriteOnlyWhenDifferent="true" Lines="// &lt;auto-generated /&gt;;namespace Talewright.Player%3B;internal static partial class PlayerBuildIdentity;{;    public const string Version = &quot;$(TalewrightBuildVersion)&quot;%3B;    public const string Commit = &quot;$(TalewrightBuildCommit)&quot;%3B;    public const string Date = &quot;$(TalewrightBuildDate)&quot;%3B;}" />
+    <ItemGroup>
+      <Compile Include="$(TalewrightBuildIdentityFile)" />
+      <FileWrites Include="$(TalewrightBuildIdentityFile)" />
+    </ItemGroup>
+  </Target>
 
 </Project>

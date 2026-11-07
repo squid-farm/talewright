@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     <TalewrightIncludeSamples Condition="'$(TalewrightIncludeSamples)' == ''">true</TalewrightIncludeSamples>
+    <TalewrightBuildIdentityTargets Condition="'$(TalewrightBuildIdentityTargets)' == ''">../../player/src/Talewright.Player/BuildIdentity.targets</TalewrightBuildIdentityTargets>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,5 +25,12 @@
     <ProjectReference Include="../../player/src/Talewright.Player/Talewright.Player.csproj" />
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
   </ItemGroup>
+
+  <Import Project="$(TalewrightBuildIdentityTargets)" />
+
+  <!-- The same identity the player displays, for scripts and bug reports (#315). -->
+  <Target Name="WriteTalewrightVersionJson" AfterTargets="Publish" DependsOnTargets="ResolveTalewrightBuildIdentity">
+    <WriteLinesToFile File="$(PublishDir)wwwroot/version.json" Overwrite="true" Lines="{ &quot;version&quot;: &quot;$(TalewrightBuildVersion)&quot;, &quot;commit&quot;: &quot;$(TalewrightBuildCommit)&quot;, &quot;date&quot;: &quot;$(TalewrightBuildDate)&quot; }" />
+  </Target>
 
 </Project>

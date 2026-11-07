@@ -86,5 +86,9 @@ for the portable CLI and player requirements.
 
 [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
 Include your operating system, the Talewright version, what you tried, and the exact error message.
+In the web or desktop player, copy the line that starts with "Talewright" from the bottom of the
+library page or the **Settings** dialog, for example `Talewright 1.0.0 · commit 1a2b3c4 · built 2026-01-31`.
+A published game shows the version of the player it was built with. `dev` means a local or
+development build rather than a release.
 A GitHub account is required. Don't include private story files or personal information.
 If useful, you can attach a small example that shows the problem, but story files are optional.

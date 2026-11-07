@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Xml.Linq;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using Talewright.Player;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli;
@@ -561,6 +562,15 @@ public sealed class PublishCommand : Command<PublishSettings>
         foreach (var argument in new[] { "publish", project, "-c", "Release", "-o", published, "-p:TalewrightIncludeSamples=false" })
         {
             start.ArgumentList.Add(argument);
+        }
+
+        if (target == "web")
+        {
+            var identity = PlayerBuildIdentity.Current;
+            start.ArgumentList.Add("-p:TalewrightBuildIdentityTargets=BuildIdentity.targets");
+            start.ArgumentList.Add($"-p:TalewrightBuildVersion={identity.Version}");
+            start.ArgumentList.Add($"-p:TalewrightBuildCommit={identity.Commit}");
+            start.ArgumentList.Add($"-p:TalewrightBuildDate={identity.Date}");
         }
 
         if (runtime is not null)

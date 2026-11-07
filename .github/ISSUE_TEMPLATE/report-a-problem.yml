@@ -38,7 +38,7 @@ body:
     id: version
     attributes:
       label: Talewright version
-      description: Include the download or extension version, if known. For the web player, you can enter "Web player".
+      description: Include the download or extension version, if known. For the web or desktop player, copy the "Talewright … · commit … · built …" line from the library page or Settings.
     validations:
       required: false
   - type: textarea
