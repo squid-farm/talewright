@@ -224,6 +224,26 @@ public static class TestStories
         * [Use a missing rope] (requires player has rope) -> END
         """) { ExpectedWarningCodes = ["TW3013"] };
 
+    public static StoryFixture AutosaveOptOut(string id)
+    {
+        var manifest = new ManifestFaker(id, "Autosave opt-out", "start")
+        {
+            Autosave = false,
+        };
+        var ready = manifest.Flag("ready");
+        var checkpointed = manifest.Flag("checkpointed");
+        manifest.Character("player", "Tester");
+        manifest.Trigger("checkpoint", ready.ToString(), EffectFaker.Set(checkpointed), save: true);
+        return new StoryFixture(id, manifest.Build(), $"""
+            === start
+            A new start.
+            {ChoiceFaker.Create("finish", "Continue", effect: EffectFaker.Set(ready))}
+            === finish
+            Finished.
+            -> END
+            """);
+    }
+
     public static StoryFixture Check(string id, string actor, bool entry, bool success)
     {
         var skill = actor == "guide" ? "guide survival" : "athletics";

@@ -5,6 +5,7 @@ import html
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -19,6 +20,9 @@ TARGETS = [
 GROUPS = ("build", "unit", "browser", "linux-desktop", "editor", "checks")
 CHECK_TARGETS = ("ci-check", "check", "budget")
 E2E_TARGETS = ("e2e-web", "e2e-linux", "e2e-published-web", "e2e-published-linux")
+# Regression suites split across shard jobs; the short published-artifact smokes run in shard 1 only.
+SHARDED_TARGETS = ("e2e-web", "e2e-linux")
+EVIDENCE_PREFIX = "Evidence: "
 MAX_FAILURES_IN_SUMMARY = 20
 MAX_ASSERTION_LENGTH = 400
 
@@ -62,9 +66,58 @@ def selection_summary(plan, graph, args):
     return "\n".join(lines)
 
 
+def parse_shard(value):
+    try:
+        index, count = map(int, value.split("/"))
+    except ValueError:
+        raise argparse.ArgumentTypeError("expected INDEX/COUNT, for example 2/3") from None
+    if not 1 <= index <= count:
+        raise argparse.ArgumentTypeError("shard index must be between 1 and the shard count")
+    return index, count
+
+
+def shard_of(args):
+    return getattr(args, "shard", None) or (1, 1)
+
+
+def shard_label(args):
+    index, count = shard_of(args)
+    return f"{index}/{count}" if count > 1 else ""
+
+
+def runs_in_shard(args, target):
+    return shard_of(args)[0] == 1 or target in SHARDED_TARGETS
+
+
 def execution_path(args):
     suffix = f"-{args.browser}" if args.group == "browser" else ""
+    index, count = shard_of(args)
+    if count > 1:
+        suffix += f"-{index}-of-{count}"
     return args.plan.parent / f"execution-{args.group}{suffix}.json"
+
+
+def prune_passing_evidence():
+    """Delete evidence directories of passing E2E cases so CI uploads keep only failure evidence."""
+    results = (ROOT / "artifacts/test-results").resolve()
+    removed = 0
+    for report in e2e_reports():
+        try:
+            root = ET.parse(report).getroot()
+        except (OSError, ET.ParseError):
+            continue
+        for result in root.iterfind(".//{*}UnitTestResult"):
+            output = result.find("./{*}Output/{*}StdOut")
+            if result.attrib.get("outcome") != "Passed" or output is None:
+                continue
+            for line in (output.text or "").splitlines():
+                if not line.startswith(EVIDENCE_PREFIX):
+                    continue
+                evidence = Path(line[len(EVIDENCE_PREFIX):].strip()).resolve()
+                if evidence != results and evidence.is_relative_to(results) and evidence.is_dir():
+                    shutil.rmtree(evidence)
+                    removed += 1
+    print(f"Removed evidence for {removed} passing E2E case(s); failed cases keep theirs.")
 
 
 def e2e_reports():
@@ -182,8 +235,11 @@ def save_execution(args, record):
 
 
 def execution_summary(args):
+    context = [args.browser] if args.group == "browser" else []
+    if label := shard_label(args):
+        context.append(f"shard {label}")
     lines = [f"## Nx execution: {args.group}" + (
-        f" ({args.browser})" if args.group == "browser" else ""
+        f" ({', '.join(context)})" if context else ""
     ), "", "Router batch timings include Nx prerequisites. They exclude job setup and queueing.",
         "Batches may run projects concurrently; these are not per-project timings or total workflow time.", ""]
     if not args.plan.exists():
@@ -209,7 +265,9 @@ def execution_summary(args):
                     continue
                 batch = next((batch for batch in record["batches"] if batch["target"] == target),
                              None) if record else None
-                outcome = batch["outcome"] if batch else "incomplete (no record)"
+                outcome = batch["outcome"] if batch else (
+                    "runs in shard 1" if not runs_in_shard(args, target) else "incomplete (no record)"
+                )
                 elapsed = batch.get("seconds") if batch else None
                 duration = f"{elapsed:.2f}" if elapsed is not None else "Not available"
                 if outcome in ("pending", "running"):
@@ -376,7 +434,8 @@ def run_group(args):
         {"target": target, "projects": [
             task["project"] for task in tasks if task["target"] == target
         ], "outcome": "pending"}
-        for target in TARGETS if any(task["target"] == target for task in tasks)
+        for target in TARGETS
+        if runs_in_shard(args, target) and any(task["target"] == target for task in tasks)
     ]}
     save_execution(args, record)
     try:
@@ -389,11 +448,14 @@ def run_group(args):
             ]
             if target == "e2e-web":
                 arguments.append(f"--configuration={args.browser}")
+            environment = {"BROWSER": args.browser}
+            if shard_label(args) and target in SHARDED_TARGETS:
+                environment["TALEWRIGHT_E2E_SHARD"] = shard_label(args)
             batch["outcome"] = "running"
             save_execution(args, record)
             start = time.monotonic()
             try:
-                nx(*arguments, environment={"BROWSER": args.browser})
+                nx(*arguments, environment=environment)
             except subprocess.CalledProcessError as error:
                 batch["outcome"] = "failure"
                 projects = ", ".join(batch["projects"])
@@ -417,6 +479,8 @@ def run_group(args):
         record["outcome"] = "success"
     finally:
         save_execution(args, record)
+        if args.group in ("browser", "linux-desktop"):
+            prune_passing_evidence()
 
 
 def verify_results(needs, expected):
@@ -455,10 +519,12 @@ def main():
     run.add_argument("group", choices=GROUPS)
     run.add_argument("--plan", type=Path, default=ROOT / "artifacts/ci/plan.json")
     run.add_argument("--browser", choices=("chromium", "firefox", "webkit"), default="chromium")
+    run.add_argument("--shard", type=parse_shard, default="1/1", help="E2E shard as INDEX/COUNT")
     summary = commands.add_parser("summary")
     summary.add_argument("group", choices=GROUPS)
     summary.add_argument("--plan", type=Path, default=ROOT / "artifacts/ci/plan.json")
     summary.add_argument("--browser", choices=("chromium", "firefox", "webkit"), default="chromium")
+    summary.add_argument("--shard", type=parse_shard, default="1/1", help="E2E shard as INDEX/COUNT")
     aggregate = commands.add_parser("aggregate")
     aggregate.add_argument("--needs", required=True)
     aggregate.add_argument("--expected", required=True)

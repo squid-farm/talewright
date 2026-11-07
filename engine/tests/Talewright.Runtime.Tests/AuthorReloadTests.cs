@@ -17,9 +17,10 @@ public sealed class AuthorReloadTests
         string playerName = "Tester",
         int initialCount = 0,
         int triggerIncrement = 10,
-        bool includeChainFlag = false)
+        bool includeChainFlag = false,
+        bool? autosave = null)
     {
-        var manifest = new ManifestFaker("reload", "Reload", "start");
+        var manifest = new ManifestFaker("reload", "Reload", "start") { Autosave = autosave };
         manifest.Flag("ready");
         manifest.Flag("rewarded");
         if (includeChainFlag)
@@ -228,6 +229,15 @@ public sealed class AuthorReloadTests
         {
             Assert.Throws<AuthorReloadException>(() => original.Reload(Compile(yaml: yaml)));
         }
+    }
+
+    [Fact]
+    public void Autosave_setting_changes_require_restart()
+    {
+        var original = AuthorSession.Create(Compile(), new("start"), seed: 42);
+
+        Assert.Throws<AuthorReloadException>(() =>
+            original.Reload(Compile(yaml: BuildManifest(autosave: false).Build())));
     }
 
     [Fact]

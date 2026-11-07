@@ -11,6 +11,7 @@ namespace Talewright.Player.E2E.Tests;
 
 [Trait("Host", "Browser")]
 [Trait("Suite", "HistoryNavigationPerformance")]
+[Collection(SerialCollection.Name)]
 public sealed class HistoryNavigationPerformanceTests : PlayerTest
 {
     private readonly WebHostFixture _host;

@@ -56,7 +56,7 @@ they exclude environment setup, queueing, and artifact upload. Parallel job timi
 as workflow wall time. Unit report validation can fail the router even after its Nx batch succeeds.
 
 The router atomically updates `artifacts/ci/execution-<group>.json`; browser records additionally
-include the browser name. Pending/running batches and missing records are incomplete, never
+include the browser name, and sharded E2E records end in `-<index>-of-<count>`. Pending/running batches and missing records are incomplete, never
 zero-duration successes. Job summaries run with `always()` so ordinary failures and interruptions
 can still be described. A forced runner termination can prevent the final summary step from running;
 the aggregate job summary also exposes missing/cancelled/unexpectedly skipped job outcomes.
@@ -172,8 +172,8 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 |---|---|
 | `build` | Existing Release solution build, NuGet packs, clean library consumers, installed CLI and publication checks. |
 | `tests / unit` | Every test in each affected headless unit project, in Release. The normal `Talewright.Talemark.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
-| `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit. Also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
-| `tests / linux-desktop` | Accessibility/chooser probe, complete regular native regression suite, then focused published-desktop smoke. Regression and standalone reports have separate names. |
+| `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit, each split across two disjoint shard jobs. Shard 1 also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
+| `tests / linux-desktop` | Accessibility/chooser probe in each of three shard jobs, which together run the complete regular native regression suite; shard 1 then runs the focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
 | `tests / checks` | Every CI/selection regression test, documentation-link check, performance-report Python test, and bounded performance budget on every PR, plus any affected leaf compilation. |
 
@@ -185,7 +185,9 @@ existing longer timeouts and schedule.
 Both reusable Tests verification and the Build **CI verification** aggregate run with `if: always()`.
 They require successful selection, success for every selected job, and `skipped` only for explicitly
 unselected jobs. Failures, cancellations, missing results, unexpected execution/skips, and selection
-errors fail closed. Browser matrix fail-fast remains disabled, so every browser produces evidence.
+errors fail closed. E2E matrix fail-fast remains disabled, so every browser and shard produces evidence.
+After each E2E job, the router deletes evidence directories of passing cases named by the TRX reports;
+uploads keep every report plus failed-case traces, screenshots and DOM for 14 days.
 NuGet/sample publication additionally requires the aggregate.
 
 For a no-impact PR, `build` and all Tests work jobs except `checks` skip. A failed `checks` job fails

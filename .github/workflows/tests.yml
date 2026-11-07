@@ -103,6 +103,8 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+        # Each shard job runs a disjoint share of the regression suite; shard 1 also runs published smokes.
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,19 +115,20 @@ jobs:
         with:
           name: nx-ci-plan
           path: artifacts/ci
-      - run: python3 .github/scripts/nx_ci.py run browser --browser ${{ matrix.browser }}
+      - run: python3 .github/scripts/nx_ci.py run browser --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
       - uses: actions/upload-artifact@v4
         id: results
         if: always()
         with:
-          name: player-${{ matrix.browser }}
+          name: player-${{ matrix.browser }}-${{ matrix.shard }}-of-2
           path: artifacts/test-results
           if-no-files-found: error
+          retention-days: 14
       - name: Summarize Nx execution
         if: always()
         env:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
-        run: python3 .github/scripts/nx_ci.py summary browser --browser ${{ matrix.browser }}
+        run: python3 .github/scripts/nx_ci.py summary browser --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
 
   linux-desktop:
     needs: plan
@@ -135,6 +138,10 @@ jobs:
     container:
       image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
       options: --user 1001:1001 --init --shm-size=1g
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -145,19 +152,20 @@ jobs:
         with:
           name: nx-ci-plan
           path: artifacts/ci
-      - run: python3 .github/scripts/nx_ci.py run linux-desktop
+      - run: python3 .github/scripts/nx_ci.py run linux-desktop --shard ${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
         id: results
         if: always()
         with:
-          name: player-linux-desktop
+          name: player-linux-desktop-${{ matrix.shard }}-of-3
           path: artifacts/test-results
           if-no-files-found: error
+          retention-days: 14
       - name: Summarize Nx execution
         if: always()
         env:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
-        run: python3 .github/scripts/nx_ci.py summary linux-desktop
+        run: python3 .github/scripts/nx_ci.py summary linux-desktop --shard ${{ matrix.shard }}/3
 
   editor:
     needs: plan
