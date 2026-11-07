@@ -23,6 +23,26 @@
 :root[data-tw-line-spacing="compact"] { --tw-transcript-line-height: 1.35; }
 :root[data-tw-line-spacing="relaxed"] { --tw-transcript-line-height: 1.9; }
 
+:root[data-tw-reduced-motion="reduce"],
+:root[data-tw-reduced-motion="reduce"] *,
+:root[data-tw-reduced-motion="reduce"] *::before,
+:root[data-tw-reduced-motion="reduce"] *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root,
+    :root *,
+    :root *::before,
+    :root *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+        transition: none !important;
+    }
+}
+
 :root[data-tw-theme="light"] {
     color-scheme: light;
 }

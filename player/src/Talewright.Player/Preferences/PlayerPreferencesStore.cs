@@ -25,13 +25,20 @@ public enum PlayerLineSpacing
     Relaxed,
 }
 
+public enum PlayerReducedMotion
+{
+    System,
+    Reduce,
+}
+
 public sealed record PlayerPreferences(
     int Version,
     PlayerTheme Theme,
     int TextSizePercent,
     bool HideMechanicalNotes,
     PlayerReadingWidth ReadingWidth,
-    PlayerLineSpacing LineSpacing)
+    PlayerLineSpacing LineSpacing,
+    PlayerReducedMotion ReducedMotion)
 {
     public const int CurrentVersion = 1;
     public const int DefaultTextSizePercent = 100;
@@ -40,9 +47,11 @@ public sealed record PlayerPreferences(
         Array.AsReadOnly([PlayerReadingWidth.Narrow, PlayerReadingWidth.Normal, PlayerReadingWidth.Wide]);
     public static IReadOnlyList<PlayerLineSpacing> SupportedLineSpacings { get; } =
         Array.AsReadOnly([PlayerLineSpacing.Compact, PlayerLineSpacing.Normal, PlayerLineSpacing.Relaxed]);
+    public static IReadOnlyList<PlayerReducedMotion> SupportedReducedMotions { get; } =
+        Array.AsReadOnly([PlayerReducedMotion.System, PlayerReducedMotion.Reduce]);
     public static PlayerPreferences Default { get; } =
         new(CurrentVersion, PlayerTheme.System, DefaultTextSizePercent, false,
-            PlayerReadingWidth.Normal, PlayerLineSpacing.Normal);
+            PlayerReadingWidth.Normal, PlayerLineSpacing.Normal, PlayerReducedMotion.System);
 
     public static bool IsSupportedTextSize(int percent) => SupportedTextSizes.Contains(percent);
 }
@@ -85,6 +94,7 @@ public sealed class PlayerPreferencesStore(
         await _module.InvokeVoidAsync("applyHideMechanicalNotes", Current.HideMechanicalNotes);
         await _module.InvokeVoidAsync("applyReadingWidth", ReadingWidthValue(Current.ReadingWidth));
         await _module.InvokeVoidAsync("applyLineSpacing", LineSpacingValue(Current.LineSpacing));
+        await _module.InvokeVoidAsync("applyReducedMotion", ReducedMotionValue(Current.ReducedMotion));
         _initialized = true;
     }
 
@@ -170,6 +180,24 @@ public sealed class PlayerPreferencesStore(
         await PersistAsync(module);
     }
 
+    public async Task SetReducedMotionAsync(PlayerReducedMotion reducedMotion)
+    {
+        if (!Enum.IsDefined(reducedMotion))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reducedMotion), reducedMotion,
+                "Unknown player reduced-motion preference.");
+        }
+        var module = _module;
+        if (!_initialized || module is null)
+        {
+            throw new InvalidOperationException("Player preferences must be initialized before they can be changed.");
+        }
+
+        Current = Current with { Version = PlayerPreferences.CurrentVersion, ReducedMotion = reducedMotion };
+        await module.InvokeVoidAsync("applyReducedMotion", ReducedMotionValue(reducedMotion));
+        await PersistAsync(module);
+    }
+
     private async Task PersistAsync(IJSObjectReference module)
     {
         try
@@ -177,7 +205,8 @@ public sealed class PlayerPreferencesStore(
             var value = JsonSerializer.Serialize(
                 new StoredPreferences(PlayerPreferences.CurrentVersion, ThemeValue(Current.Theme),
                     Current.TextSizePercent, Current.HideMechanicalNotes,
-                    ReadingWidthValue(Current.ReadingWidth), LineSpacingValue(Current.LineSpacing)),
+                    ReadingWidthValue(Current.ReadingWidth), LineSpacingValue(Current.LineSpacing),
+                    ReducedMotionValue(Current.ReducedMotion)),
                 JsonOptions);
             await module.InvokeVoidAsync("write", value);
             Warning = null;
@@ -229,8 +258,9 @@ public sealed class PlayerPreferencesStore(
 
         var readingWidth = ParseReadingWidth(stored.ReadingWidth);
         var lineSpacing = ParseLineSpacing(stored.LineSpacing);
+        var reducedMotion = ParseReducedMotion(stored.ReducedMotion);
         return new(PlayerPreferences.CurrentVersion, theme, textSizePercent,
-            stored.HideMechanicalNotes ?? false, readingWidth, lineSpacing);
+            stored.HideMechanicalNotes ?? false, readingWidth, lineSpacing, reducedMotion);
     }
 
     private static string ThemeValue(PlayerTheme theme) => theme switch
@@ -285,6 +315,27 @@ public sealed class PlayerPreferencesStore(
         _ => throw new ArgumentOutOfRangeException(nameof(lineSpacing), lineSpacing, "Unknown player line spacing."),
     };
 
+    private PlayerReducedMotion ParseReducedMotion(string? value) => value switch
+    {
+        null or "system" => PlayerReducedMotion.System,
+        "reduce" => PlayerReducedMotion.Reduce,
+        _ => InvalidReducedMotion(value),
+    };
+
+    private PlayerReducedMotion InvalidReducedMotion(string value)
+    {
+        logger.LogWarning("Stored player reduced-motion preference '{ReducedMotion}' is unsupported; using the system preference.", value);
+        return PlayerReducedMotion.System;
+    }
+
+    private static string ReducedMotionValue(PlayerReducedMotion reducedMotion) => reducedMotion switch
+    {
+        PlayerReducedMotion.System => "system",
+        PlayerReducedMotion.Reduce => "reduce",
+        _ => throw new ArgumentOutOfRangeException(nameof(reducedMotion), reducedMotion,
+            "Unknown player reduced-motion preference."),
+    };
+
     public async ValueTask DisposeAsync()
     {
         if (_module is not null)
@@ -305,5 +356,6 @@ public sealed class PlayerPreferencesStore(
         int? TextSizePercent,
         bool? HideMechanicalNotes,
         string? ReadingWidth,
-        string? LineSpacing);
+        string? LineSpacing,
+        string? ReducedMotion);
 }

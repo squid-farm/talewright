@@ -24,7 +24,7 @@ The web player, the desktop player and published games all share the same screen
 | **Back** / **Forward** | Step through your choices, like undo and redo. Picking a different choice after going back starts a new path. Authors can hide these with `game.undo: false`. |
 | **Quick Save** | Write or replace this story's one quick checkpoint, without an overwrite prompt. Named saves are never replaced by this action. |
 | **Saves** | Open the Saves dialog to create, load, export or import a save. Replacing an existing named save asks you to confirm. |
-| **More actions → Settings** | Choose a theme, text size, reading width (narrow / normal / wide) and line spacing (compact / normal / relaxed), and hide mechanical notes. These preferences are saved on this device and apply across stories. |
+| **More actions → Settings** | Choose a theme, text size, reading width (narrow / normal / wide), line spacing (compact / normal / relaxed) and reduced motion (system / reduce), and hide mechanical notes. These preferences are saved on this device and apply across stories. |
 | **More actions → Restart** | Confirm starting again from the beginning. Your saves are kept. |
 | **More actions → Library** | Return to the list of stories (not shown in published games). |
 
@@ -34,6 +34,10 @@ browser zoom.
 
 Reading width and line spacing apply to the story transcript and recorded history. They work
 alongside text size and adapt to the available window width.
+
+Reduced motion follows the operating system by default. Choose **Reduce** to suppress player
+animations and reveal new passages instantly, regardless of the operating system setting. Stories
+cannot override this preference.
 
 When mechanical notes are hidden, they are removed from both the display and accessibility tree.
 This changes presentation only; story events, game state, history and saves are unchanged.

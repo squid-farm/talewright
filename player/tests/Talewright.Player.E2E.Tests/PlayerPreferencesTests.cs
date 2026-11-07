@@ -35,6 +35,8 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Page.GetByLabel("Line spacing", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Reduced motion", new() { Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(theme).ToBeFocusedAsync();
@@ -85,6 +87,7 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reading-width", "normal");
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-line-spacing", "normal");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reduced-motion", "system");
         Assert.Equal("18px", await Page.Locator("html").EvaluateAsync<string>(
             "element => getComputedStyle(element).fontSize"));
         Assert.Equal("rgb(28, 26, 23)", await Page.Locator("body").EvaluateAsync<string>(
@@ -113,6 +116,81 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reading-width", width);
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-line-spacing", spacing);
+    }
+
+    [Theory]
+    [InlineData("{\"version\":1,\"theme\":\"dark\"}")]
+    [InlineData("{\"version\":1,\"theme\":\"dark\",\"reducedMotion\":\"invalid\"}")]
+    [Trait("Host", "Browser")]
+    public async Task Missing_or_invalid_reduced_motion_uses_the_system_preference(string stored)
+    {
+        await Page.EvaluateAsync(
+            "stored => localStorage.setItem('talewright.player.preferences', stored)",
+            stored);
+        await ReloadAsync();
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reduced-motion", "system");
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Reduced_motion_preference_disables_motion_and_reveals_passages_instantly()
+    {
+        await Page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.NoPreference });
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var reducedMotion = Page.GetByLabel("Reduced motion", new() { Exact = true });
+        await Expect(reducedMotion.Locator("option")).ToHaveTextAsync(["System", "Reduce"]);
+        await reducedMotion.SelectOptionAsync("reduce");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reduced-motion", "reduce");
+
+        await Page.AddStyleTagAsync(new()
+        {
+            Content = ".motion-probe { animation: motion-probe 10s infinite; transition: opacity 10s; scroll-behavior: smooth; }",
+        });
+        var styles = await Page.EvaluateAsync<string[]>("""
+            () => {
+                const probe = document.createElement('div');
+                probe.className = 'motion-probe';
+                document.body.append(probe);
+                const style = getComputedStyle(probe);
+                const result = [style.animationName, style.transitionDuration, style.scrollBehavior];
+                probe.remove();
+                return result;
+            }
+            """);
+        Assert.Equal(["none", "0s", "auto"], styles);
+
+        await Page.Keyboard.PressAsync("Escape");
+        await Page.EvaluateAsync("""
+            () => {
+                window.__twRevealBehavior = null;
+                const scrollIntoView = Element.prototype.scrollIntoView;
+                Element.prototype.scrollIntoView = function (options) {
+                    if (this.classList.contains('tw-latest')) {
+                        window.__twRevealBehavior = options?.behavior;
+                    }
+                    return scrollIntoView.call(this, options);
+                };
+            }
+            """);
+        await Choose("Walk onward");
+        await Expect(Latest).ToContainTextAsync("Second passage text.");
+        Assert.Equal("auto", await Page.EvaluateAsync<string>("() => window.__twRevealBehavior"));
+
+        var stored = await Page.EvaluateAsync<string>(
+            "() => localStorage.getItem('talewright.player.preferences')");
+        using (var preferences = System.Text.Json.JsonDocument.Parse(stored))
+        {
+            Assert.Equal("reduce", preferences.RootElement.GetProperty("reducedMotion").GetString());
+        }
+
+        await ReloadAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reduced-motion", "reduce");
     }
 
     [Fact]

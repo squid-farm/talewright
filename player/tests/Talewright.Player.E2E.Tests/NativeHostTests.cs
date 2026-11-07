@@ -135,6 +135,69 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Reduced_motion_preference_keeps_new_desktop_passages_in_view()
+    {
+        var fixture = TestStories.Linear with
+        {
+            Tale = """
+                === start
+                @title First passage
+                First paragraph: a long passage begins here and continues long enough to make
+                scrolling necessary before the player can reach the Continue choice.
+
+                Second paragraph: readers can choose reduced motion to make newly revealed
+                passages appear immediately, even when their operating system allows motion.
+
+                Third paragraph: the preference belongs to the player and is not controlled by
+                this story or any author-provided configuration.
+
+                Fourth paragraph: this text helps ensure that the next choice and passage require
+                a meaningful scroll in the resized desktop window.
+
+                Fifth paragraph: new content should still be moved into view without animated
+                scrolling after the reader makes a choice.
+
+                Sixth paragraph: this passage continues to occupy enough vertical space for the
+                reduced-motion setting to be exercised.
+
+                Seventh paragraph: the player should keep focus on the new passage after it has
+                been revealed instantly.
+
+                Eighth paragraph: the new passage remains readable in the desktop host.
+                * [Continue] -> finish
+                === finish
+                @title Second passage
+                The new passage is visible.
+                -> END
+                """,
+        };
+        await Driver.StartAsync();
+        await Upload(fixture);
+        await Observe(new(null, "First passage"));
+        await Driver.ResizeAsync(720, 600);
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var reducedMotion = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "combo box" && node.Name == "Reduced motion");
+        for (var index = 0; index < 5; index++)
+        {
+            await Driver.PressAsync("Tab");
+        }
+        Assert.True(Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "combo box" && node.Name == "Reduced motion").Focused);
+        await Driver.PressAsync("End");
+        await Driver.ClickAsync("Close settings");
+        await Driver.ChooseAsync("Continue");
+
+        var next = await Driver.ObserveAsync();
+        Assert.Contains("The new passage is visible.", next.Passage);
+        Assert.True(next.PassageFocused);
+        Assert.True(next.PassageInWindow);
+    }
+
+    [Fact]
     public async Task Hiding_mechanical_notes_removes_them_from_the_desktop_accessibility_tree()
     {
         await Driver.StartAsync();

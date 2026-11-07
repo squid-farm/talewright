@@ -4,6 +4,7 @@
     let hideMechanicalNotes = false;
     let readingWidth = "normal";
     let lineSpacing = "normal";
+    let reducedMotion = "system";
     try {
         const value = localStorage.getItem("talewright.player.preferences");
         if (value !== null) {
@@ -22,6 +23,9 @@
                 if (["compact", "normal", "relaxed"].includes(preferences.lineSpacing)) {
                     lineSpacing = preferences.lineSpacing;
                 }
+                if (["system", "reduce"].includes(preferences.reducedMotion)) {
+                    reducedMotion = preferences.reducedMotion;
+                }
             } else {
                 console.warn("Stored player preferences are unsupported; using defaults.");
             }
@@ -34,5 +38,6 @@
     document.documentElement.dataset.twHideMechanicalNotes = String(hideMechanicalNotes);
     document.documentElement.dataset.twReadingWidth = readingWidth;
     document.documentElement.dataset.twLineSpacing = lineSpacing;
+    document.documentElement.dataset.twReducedMotion = reducedMotion;
     document.documentElement.style.setProperty("--tw-base-font-size", `${18 * textSizePercent / 100}px`);
 })();
