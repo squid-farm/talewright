@@ -31,23 +31,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     public async Task Disabling_autosave_keeps_trigger_checkpoints_available()
     {
         var id = $"autosave-opt-out-{Guid.NewGuid():N}";
-        var manifest = new ManifestFaker(id, "Autosave opt-out", "start")
-        {
-            Autosave = false,
-        };
-        var ready = manifest.Flag("ready");
-        manifest.Character("player", "Tester");
-        manifest.Trigger("checkpoint", "true", EffectFaker.Set(ready), save: true);
-        var fixture = new StoryFixture(id, manifest.Build(), """
-            === start
-            A new start.
-            * [Continue] -> finish
-            === finish
-            Finished.
-            -> END
-            """);
-
-        await Upload(fixture);
+        await Upload(TestStories.AutosaveOptOut(id));
         await Choose("Continue");
 
         if (PlayerTarget.IsDesktop)
