@@ -86,6 +86,20 @@ When proposing shorthand, name the canonical model it lowers to. When proposing 
 where absence is represented and where the value is chosen. Tests should verify equivalent models
 for sugar and preserve the distinction between absent and explicitly authored values for defaults.
 
+### Diagnostics report certain mistakes
+
+Authors are writing while diagnostics appear, so each one must be a mistake we can prove from the
+source alone, such as an unknown name, a type mismatch, a missing image file, a scene with no way out
+or a line that can never run.
+
+- Trust authored conditions, variables and substitutions to do what the author intends. Do not warn
+  because a requirement might fail, a substitution might render empty or a branch might be skipped.
+- Do not ask authors to restructure working content only so the compiler can prove it safe.
+- Problems that depend on how a playthrough goes are deferred to the planned automated playtester,
+  which reports them once a run reaches them. Examples: a scene where no choice is available, a choice
+  label that renders empty, an image that fails to display.
+- Style preferences, such as naming conventions, are lint rules that are off until a story enables them.
+
 ## Ship together
 
 For each surface, implement the change or explicitly explain why it is unaffected:
@@ -151,6 +165,7 @@ Complementary tests enforce these boundaries:
 
 - [ ] Test canonical examples and invalid inputs, not just token acceptance. Cover quoted punctuation,
   escapes, defaults, modifier order, old spellings and identifier collisions where applicable.
+- [ ] Confirm each new diagnostic reports a [certain mistake](#diagnostics-report-certain-mistakes).
 - [ ] For each new compiler diagnostic, use a literal code in the compiler source, document its meaning
   in the [diagnostic reference](../reference/diagnostics.md), and add an emitting fixture to
   [CompilerDiagnosticCoverageTests](../../engine/tests/Talewright.Talemark.Tests/CompilerDiagnosticCoverageTests.cs).
