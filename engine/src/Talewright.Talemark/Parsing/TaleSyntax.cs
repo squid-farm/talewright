@@ -218,14 +218,15 @@ internal sealed class TaleSceneSyntax
     private readonly TaleLinePart[] _parts;
     private readonly TaleClause[] _clauses;
 
-    internal TaleSceneSyntax(int start, int line, int headerIndent, int headerLength, string id, TaleLineSyntax[] lines,
-        TaleLinePart[] parts, TaleClause[] clauses, int lineCount, TaleSyntaxDiagnostic[] diagnostics)
+    internal TaleSceneSyntax(int start, int line, int headerIndent, int headerIdColumn, int headerLength, string id,
+        TaleLineSyntax[] lines, TaleLinePart[] parts, TaleClause[] clauses, int lineCount, TaleSyntaxDiagnostic[] diagnostics)
     {
         _parts = parts;
         _clauses = clauses;
         Start = start;
         Line = line;
         HeaderIndent = headerIndent;
+        HeaderIdColumn = headerIdColumn;
         HeaderLength = headerLength;
         Id = id;
         Lines = lines;
@@ -240,6 +241,9 @@ internal sealed class TaleSceneSyntax
     public int Line { get; }
 
     public int HeaderIndent { get; }
+
+    /// <summary>Zero-based source column of the scene ID in its header.</summary>
+    public int HeaderIdColumn { get; }
 
     /// <summary>Raw header line length.</summary>
     public int HeaderLength { get; }

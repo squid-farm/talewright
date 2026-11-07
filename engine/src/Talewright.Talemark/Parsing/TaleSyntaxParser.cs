@@ -38,9 +38,10 @@ internal static partial class TaleSyntaxParser
             {
                 if (scene is not null)
                     scenes.Add(scene.Build(line));
-                scene = new SceneState(start, line, indent, length,
-                    content[SceneVocabulary.SceneHeader.Length..].Trim().ToString(), lineBuffer, partBuffer, clauseBuffer,
-                    cancellationToken);
+                var header = content[SceneVocabulary.SceneHeader.Length..];
+                var idColumn = indent + SceneVocabulary.SceneHeader.Length + header.Length - header.TrimStart().Length;
+                scene = new SceneState(start, line, indent, idColumn, length, header.Trim().ToString(), lineBuffer,
+                    partBuffer, clauseBuffer, cancellationToken);
             }
             else if (scene is null)
             {

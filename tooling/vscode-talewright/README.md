@@ -232,6 +232,10 @@ escapes and `{image("path", "alt text")}` calls. Markdown images are highlighted
 and reported as unexpected reader-text syntax. These colors describe syntax, not whether
 your story compiles. The renderer still determines what appears during play;
 images are currently placeholders, not image rendering support.
+Use **Go to Symbol in Editor** (`Ctrl+Shift+O` on Windows/Linux, `Cmd+Shift+O` on macOS)
+to browse scenes in the current file, or **Go to Symbol in Workspace** (`Ctrl+T` /
+`Cmd+T`) to search scenes across workspace stories by scene ID or `@title`.
+
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
 inside the first quoted argument, completion suggests supported files from the
 story's `images/` folder, including nested folders. Paths are case-sensitive.

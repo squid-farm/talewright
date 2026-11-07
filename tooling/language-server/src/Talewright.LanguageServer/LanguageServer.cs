@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using System.Diagnostics;
 using Talewright.Authoring;
@@ -76,6 +77,11 @@ public sealed class LanguageServer
         public override object Convert(LineMap lines) => ToLintConfigurationDiagnostic(Message);
     }
     private readonly record struct DiagnosticPosition(int Line, int Character);
+    private sealed record LspPosition(int line, int character);
+    private sealed record LspRange(LspPosition start, LspPosition end);
+    private sealed record DocumentSymbolInformation(string name, int kind, LspRange range,
+        LspRange selectionRange,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? detail);
     private sealed record ProtocolError(int Code, string Message);
     private enum Feature { Completion, Hover, Definition, InlayHints, CodeActions, SemanticTokens }
     private const int DiagnosticLimit = 200;
@@ -254,6 +260,8 @@ public sealed class LanguageServer
                         positionEncoding = "utf-16",
                         hoverProvider = true,
                         definitionProvider = true,
+                        documentSymbolProvider = true,
+                        workspaceSymbolProvider = true,
                         inlayHintProvider = true,
                         codeActionProvider = new { codeActionKinds = new[] { "quickfix" }, resolveProvider = false },
                         completionProvider = new { resolveProvider = false, triggerCharacters = AuthoringSyntaxVocabulary.CompletionTriggerCharacters },
@@ -308,6 +316,14 @@ public sealed class LanguageServer
                 case "textDocument/definition":
                     if (!hasId) throw new ArgumentException("definition requires a request id.");
                     await StartSemanticAsync(id, parameters, Feature.Definition, cancellationToken);
+                    break;
+                case "textDocument/documentSymbol":
+                    if (!hasId) throw new ArgumentException("documentSymbol requires a request id.");
+                    await DocumentSymbolsAsync(id, parameters, cancellationToken);
+                    break;
+                case "workspace/symbol":
+                    if (!hasId) throw new ArgumentException("workspace/symbol requires a request id.");
+                    await WorkspaceSymbolsAsync(id, parameters, cancellationToken);
                     break;
                 case "textDocument/inlayHint":
                     if (!hasId) throw new ArgumentException("inlayHint requires a request id.");
@@ -384,6 +400,52 @@ public sealed class LanguageServer
                 _metadataPath = string.IsNullOrWhiteSpace(path.GetString()) ? null : path.GetString();
             if (options.TryGetProperty("requiresProjectMetadata", out var required)) _requiresMetadata = required.GetBoolean();
         }
+    }
+
+    private Task DocumentSymbolsAsync(JsonElement id, JsonElement parameters, CancellationToken cancellationToken)
+    {
+        var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
+        var story = _documents.TryGetValue(path, out var document)
+            ? _stories[document.Root]
+            : GetStory(path);
+        var relative = Relative(story.Root, path);
+        var symbols = story.Workspace.GetSceneSymbols(relative)
+            .Select(symbol => new DocumentSymbolInformation(symbol.Id, 2, ToLspRange(symbol.Range),
+                ToLspRange(symbol.SelectionRange), symbol.Title))
+            .ToArray();
+        return ReplyAsync(id, symbols, cancellationToken);
+    }
+
+    private Task WorkspaceSymbolsAsync(JsonElement id, JsonElement parameters, CancellationToken cancellationToken)
+    {
+        var query = parameters.GetProperty("query").GetString() ?? string.Empty;
+        var roots = new HashSet<string>(PathComparer);
+        foreach (var folder in _folders.ToArray())
+            roots.Add(GetStory(folder).Root);
+        foreach (var root in _stories.Keys)
+            roots.Add(root);
+
+        var symbols = new List<object>();
+        foreach (var root in roots.OrderBy(root => root, PathComparer))
+        {
+            var story = _stories[root];
+            foreach (var symbol in story.Workspace.GetSceneSymbols()
+                         .Where(symbol => symbol.Id.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                             symbol.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
+                         .OrderBy(symbol => symbol.File, StringComparer.Ordinal)
+                         .ThenBy(symbol => symbol.Range.Start, Comparer<SourceLocation>.Create(Compare)))
+            {
+                var path = Path.GetFullPath(symbol.File, root);
+                symbols.Add(new
+                {
+                    name = symbol.Id,
+                    kind = 2,
+                    location = new { uri = UriFromPath(path), range = ToLspRange(symbol.Range) },
+                    containerName = symbol.File
+                });
+            }
+        }
+        return ReplyAsync(id, symbols, cancellationToken);
     }
 
     private void Open(JsonElement parameters)
@@ -1224,6 +1286,10 @@ public sealed class LanguageServer
 
     private static int Compare(SourceLocation left, SourceLocation right) =>
         left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);
+
+    private static LspRange ToLspRange(SourceRange range) =>
+        new(new(range.Start.Line - 1, range.Start.Column - 1),
+            new(range.End.Line - 1, range.End.Column - 1));
 
     private Task ReplyAsync(JsonElement id, object? result, CancellationToken cancellationToken) =>
         _protocol.WriteAsync(new { jsonrpc = "2.0", id, result }, cancellationToken);
