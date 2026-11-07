@@ -1,6 +1,6 @@
 [
-  { "file": "defaults.yaml", "schemaValid": true, "compilerCodes": [] },
-  { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "defaults.yaml", "schemaValid": true, "compilerCodes": [], "autosaveValue": true },
+  { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [], "autosaveValue": false },
   { "file": "empty-optional-containers.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "null-optional-containers.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
   { "file": "null-nested-containers.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
@@ -13,6 +13,7 @@
   { "file": "preset-whitespace.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "preset-too-long.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "wrong-type.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
+  { "file": "autosave-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "trigger-once-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "trigger-save-true.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "trigger-save-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },

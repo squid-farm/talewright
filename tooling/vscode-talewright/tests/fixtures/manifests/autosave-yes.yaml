@@ -1,0 +1,8 @@
+game:
+  id: autosave-yes
+  title: Autosave value
+  start: beginning
+  autosave: yes
+characters:
+  player:
+    first-name: Ada

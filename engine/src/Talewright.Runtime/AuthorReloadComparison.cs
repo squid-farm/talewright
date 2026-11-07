@@ -37,6 +37,7 @@ internal static class AuthorReloadComparison
         Require(original.Id == candidate.Id && original.Version == candidate.Version
             && original.Start == candidate.Start && original.Randomness == candidate.Randomness
             && original.Seed == candidate.Seed && original.UndoEnabled == candidate.UndoEnabled
+            && original.AutosaveEnabled == candidate.AutosaveEnabled
             && Equal(original.Creation, candidate.Creation)
             && Equal(original.World, candidate.World) && Equal(original.Triggers, candidate.Triggers),
             "world declarations, creation, triggers or rules changed (including Talemark auto-declarations)");

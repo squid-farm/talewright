@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using Talewright.Runtime.Saves;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -23,6 +24,46 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
             }
 
             await Observe(step);
+        }
+    }
+
+    [Fact]
+    public async Task Disabling_autosave_keeps_trigger_checkpoints_available()
+    {
+        var id = $"autosave-opt-out-{Guid.NewGuid():N}";
+        var manifest = new ManifestFaker(id, "Autosave opt-out", "start")
+        {
+            Autosave = false,
+        };
+        var ready = manifest.Flag("ready");
+        manifest.Character("player", "Tester");
+        manifest.Trigger("checkpoint", "true", EffectFaker.Set(ready), save: true);
+        var fixture = new StoryFixture(id, manifest.Build(), """
+            === start
+            A new start.
+            * [Continue] -> finish
+            === finish
+            Finished.
+            -> END
+            """);
+
+        await Upload(fixture);
+        await Choose("Continue");
+
+        if (PlayerTarget.IsDesktop)
+        {
+            var entries = await new FileSaveStore(NativeSaveRoot).ListEntriesAsync(id);
+            Assert.DoesNotContain(entries, entry => entry.IsAutosave);
+            Assert.Equal("checkpoint", Assert.Single(entries, entry => entry.IsTriggerSave).TriggerLabel);
+        }
+        else
+        {
+            await Driver.ClickAsync("Saves");
+            var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true });
+            await Expect(dialog.Locator("[data-save-kind=autosave]")).ToHaveCountAsync(0);
+            var trigger = dialog.Locator("[data-save-kind=trigger]");
+            await Expect(trigger).ToHaveCountAsync(1);
+            await Expect(trigger).ToContainTextAsync("checkpoint");
         }
     }
 
