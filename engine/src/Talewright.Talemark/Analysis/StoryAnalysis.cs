@@ -750,7 +750,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             TaleBinder.Parse(file, fileSyntax, symbols, diagnostics, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             RecoveryImageDiagnostics.AddRange(diagnostics.Items.Where(diagnostic =>
-                diagnostic.Code is CompilerDiagnosticCodes.UnsafeImagePath or CompilerDiagnosticCodes.UnsupportedImageFormat or CompilerDiagnosticCodes.MissingImage or CompilerDiagnosticCodes.AmbiguousImagePath or CompilerDiagnosticCodes.MissingImageAlt));
+                diagnostic.Code is CompilerDiagnosticCodes.UnsafeImagePath or CompilerDiagnosticCodes.UnsupportedImageFormat or
+                    CompilerDiagnosticCodes.MissingImage or CompilerDiagnosticCodes.AmbiguousImagePath or
+                    CompilerDiagnosticCodes.MissingImageAlt or CompilerDiagnosticCodes.DecorativeImageHasAlt or
+                    CompilerDiagnosticCodes.MissingAccessibleChoiceLabel));
         }
     }
 }

@@ -18,7 +18,7 @@ Story identifiers start with an ASCII letter (`A`-`Z`, `a`-`z`) or `_`. The rema
 ASCII letters, digits or `_`, with optional single `.` or `-` separators between groups.
 Separators cannot be adjacent or end a name. Names are case-sensitive.
 Lowercase kebab-case is a style recommendation, not a parser restriction. The scene/story
-naming lint diagnostics TWL001 and TWL002 are warnings about that style.
+naming lint rules TWL001 and TWL002 check that style only when a story enables them.
 
 - Valid: `weapon.knife`, `camp.arrival`, `_guide`, `north-gate`, `act.2`.
 - Invalid: `2doors`, `camp..arrival`, `north.-gate`, `door-`, `café`.
@@ -178,7 +178,7 @@ handled as reader text, so `\* [Go] -> hall` is prose rather than a choice.
 | `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
 | `~` | Effect batch at the start of a line; executes in source order. Triggers settle after the whole semicolon-separated batch. | `~ var:coins += 1` | TW1003 malformed effect; TW3011 after choices; name/type errors. |
 | `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed choice effect; TW1009 unclosed outcome effect. |
-| `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted literal path and optional quoted alt, comma-separated. Alt uses the prose template language and cannot contain a nested image. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "{guide:first-name} at the camp")}` | TW1014 malformed call/escape or nested image. Asset validation uses TW2010–TW2014. |
+| `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted literal path and optional quoted alt, comma-separated. Alt uses the prose template language and cannot contain a nested image. Append `#decorative` only when the image has no descriptive alt text. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "{guide:first-name} at the camp")}` or `{image("ornament.png")#decorative}` | TW1014 malformed call/escape, unsupported manipulator or nested image; TW2015 contradictory alt; TW2016 inaccessible choice label. Asset validation uses TW2010–TW2014. |
 | `:::` | Delimit a skill check executed at this line. Opening takes `skill-check [actor] skill dc number-expression`; closing line has only `:::`. Both outcomes are required; an entry outcome without a target continues at the next line. | `::: skill-check perception dc 12` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3011 after choices. |
 | `:` in labels | Separates skill-check outcome labels from their contents: `success:`, `failure:`. Not a property read in this context. | `success: -> hall` | TW1009 misplaced/missing outcomes. |
 | `//` | Comment when it begins a trimmed line; the rest of the line is ignored. It is not a trailing-comment operator. | `// The guard remembers this.` | None for comment contents. |

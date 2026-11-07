@@ -10,6 +10,7 @@
   {"owner":"expression","member":"Visits","spelling":"visits","line":"@requires scene:player:visits > 0","reference":"scene:player:visits"},
   {"owner":"expression","member":"Has","spelling":"has","line":"@requires player has rope","reference":"player has rope"},
   {"owner":"expression","member":"Image","spelling":"image","line":"{image(\"camp\")}","reference":"{image(\"path\", \"alt text\")}"},
+  {"owner":"expression","member":"Decorative","spelling":"decorative","line":"{image(\"ornament.png\")#decorative}","reference":"#decorative"},
   {"owner":"expression","member":"Faction","spelling":"faction","line":"{faction:guild}","reference":"faction:<id>"},
   {"owner":"expression","member":"Item","spelling":"item","line":"{item:rope}","reference":"item:<id>"},
   {"owner":"expression","member":"Flag","spelling":"flag","line":"{flag:ready}","reference":"flag:<id>"},

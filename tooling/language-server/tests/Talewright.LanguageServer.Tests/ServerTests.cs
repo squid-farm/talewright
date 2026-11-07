@@ -739,7 +739,7 @@ public sealed partial class ServerTests
         File.WriteAllText(client.PathOf("story.talewright.yaml"), manifest);
         File.WriteAllText(client.PathOf("start.tale"), tale);
         File.WriteAllText(client.PathOf(LintConfiguration.FileName),
-            """{"rules":{"TWL001":"error"},"suppressions":{"story.talewright.yaml":["TWL002"]}}""");
+            """{"rules":{"TWL001":"error","TWL002":"warning"},"suppressions":{"story.talewright.yaml":["TWL002"]}}""");
 
         var output = new StringWriter();
         Assert.Equal(1, CommandLine.Run(["lint", client.Root, "--format", "json"], output, new StringWriter()));
@@ -800,14 +800,14 @@ public sealed partial class ServerTests
             Assert.Equal(1, diagnostic.GetProperty("severity").GetInt32());
             Assert.Contains("Invalid lint configuration", diagnostic.GetProperty("message").GetString());
         });
-        Assert.Contains(await client.Diagnostics("start.tale", 1),
+        Assert.DoesNotContain(await client.Diagnostics("start.tale", 1),
             diagnostic => diagnostic.GetProperty("code").GetString() == "TWL001");
 
-        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"off"}}""");
+        File.WriteAllText(client.PathOf(LintConfiguration.FileName), """{"rules":{"TWL001":"warning"}}""");
         await client.Watch(LintConfiguration.FileName, 2);
 
         Assert.Empty(await client.Diagnostics(LintConfiguration.FileName, null));
-        Assert.DoesNotContain(await client.Diagnostics("start.tale", 1),
+        Assert.Contains(await client.Diagnostics("start.tale", 1),
             diagnostic => diagnostic.GetProperty("code").GetString() == "TWL001");
         var unknown = await client.Request("unknown", new { });
         Assert.Equal(-32601, unknown.GetProperty("error").GetProperty("code").GetInt32());

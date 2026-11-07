@@ -33,6 +33,8 @@ public static class CompilerDiagnosticCodes
     public const string MissingImage = "TW2012";
     public const string AmbiguousImagePath = "TW2013";
     public const string MissingImageAlt = "TW2014";
+    public const string DecorativeImageHasAlt = "TW2015";
+    public const string MissingAccessibleChoiceLabel = "TW2016";
 
     public const string TextOutsideSceneOrNoFiles = "TW3001";
     public const string DeadEndScene = "TW3002";
@@ -44,7 +46,6 @@ public static class CompilerDiagnosticCodes
     public const string DuplicateScene = "TW3010";
     public const string StepAfterChoice = "TW3011";
     public const string UnreachableStep = "TW3012";
-    public const string MayHaveNoAvailableChoice = "TW3013";
     public const string SceneCharacterIdCollision = "TW3014";
 
     public const string InvalidYaml = "TW4001";

@@ -66,4 +66,5 @@ public sealed record RenderedLineBreak : RenderedInline;
 public sealed record RenderedMedia(string MediaId, string AltText) : RenderedInline
 {
     public TextStyle Style { get; init; }
+    public MediaAccessibility Accessibility { get; init; } = MediaAccessibility.Descriptive;
 }

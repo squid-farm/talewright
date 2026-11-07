@@ -406,6 +406,7 @@ internal sealed partial class TaleBinder
         var scene = _scene!;
         var start = At(syntax.Indent);
         IReadOnlyList<TemplateInline>? label = null;
+        SourceLocation? labelLocation = null;
         Expr? requires = null;
         IReadOnlyList<Effect> effects = [];
         DivertTarget? divert = null;
@@ -421,6 +422,7 @@ internal sealed partial class TaleBinder
             switch (clause.Kind)
             {
                 case TaleClauseKind.Label:
+                    labelLocation = location;
                     label = InlineParser.Parse(SourceText.Single(value, location), _symbols, _diagnostics,
                         cancellationToken: _cancellationToken);
                     break;
@@ -478,6 +480,13 @@ internal sealed partial class TaleBinder
             return;
         }
 
+        if (label is not null && ContainsDecorativeMedia(label) && IsCertainlyNameless(label))
+        {
+            _diagnostics.Error(CompilerDiagnosticCodes.MissingAccessibleChoiceLabel,
+                "A choice label with only decorative images has no accessible name. Add label text or use a descriptive image.",
+                labelLocation ?? start);
+        }
+
         scene.CurrentSteps.Add(new ChoiceStep(StepId(start), SpanFrom(start), new ChoiceDefinition
         {
             Key = $"c{scene.ChoiceCount++}",
@@ -488,6 +497,41 @@ internal sealed partial class TaleBinder
             Divert = divert,
         }));
     }
+
+    private static bool ContainsDecorativeMedia(IReadOnlyList<TemplateInline> inlines)
+    {
+        foreach (var inline in inlines)
+        {
+            switch (inline)
+            {
+                case MediaTemplate { Accessibility: MediaAccessibility.Decorative }:
+                    return true;
+                case StyledTemplate styled when ContainsDecorativeMedia(styled.Children):
+                    return true;
+                case ConditionalInlineTemplate conditional
+                    when ContainsDecorativeMedia(conditional.Then) || ContainsDecorativeMedia(conditional.Else):
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether every branch holds only whitespace, line breaks and decorative images. Text, substitutions
+    /// and descriptive images are trusted to name the choice; what they render is left to playtesting.
+    /// </summary>
+    private static bool IsCertainlyNameless(IReadOnlyList<TemplateInline> inlines) =>
+        inlines.All(inline => inline switch
+        {
+            TextTemplate text => string.IsNullOrWhiteSpace(text.Text),
+            LineBreakTemplate => true,
+            MediaTemplate media => media.Accessibility == MediaAccessibility.Decorative,
+            StyledTemplate styled => IsCertainlyNameless(styled.Children),
+            ConditionalInlineTemplate conditional =>
+                IsCertainlyNameless(conditional.Then) && IsCertainlyNameless(conditional.Else),
+            _ => false,
+        });
 
     private DivertTarget? BindDivert(TaleLineSyntax syntax, TaleClause clause)
     {

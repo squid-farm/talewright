@@ -35,14 +35,23 @@ public sealed record StyledTemplate(TextStyle Style, IReadOnlyList<TemplateInlin
 
 public sealed record LineBreakTemplate : TemplateInline;
 
+/// <summary>Whether image media is described to assistive technology or intentionally hidden from it.</summary>
+public enum MediaAccessibility
+{
+    Descriptive,
+    Decorative,
+}
+
 /// <summary>
 /// Image media with a resolved story-root-relative asset path. <see cref="AltText"/> is the literal alt,
 /// including the filename fallback. When <see cref="AltTemplate"/> is set, rendering uses that template
-/// and the state where the image appears. Presentation is separate.
+/// and the state where the image appears. <see cref="Accessibility"/> controls whether assistive technology
+/// receives the rendered alt text.
 /// </summary>
 public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInline
 {
     public IReadOnlyList<TemplateInline>? AltTemplate { get; init; }
+    public MediaAccessibility Accessibility { get; init; } = MediaAccessibility.Descriptive;
 }
 
 /// <summary>

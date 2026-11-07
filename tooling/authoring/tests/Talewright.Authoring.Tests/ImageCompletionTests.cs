@@ -1,6 +1,7 @@
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring.Tests;
 
@@ -98,6 +99,22 @@ public sealed class ImageCompletionTests
         var diagnostic = Assert.Single(analysis.Diagnostics, diagnostic => diagnostic.Code == code);
         Assert.Equal(new SourceLocation("main.tale", 2, 8), diagnostic.Location);
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics, analysis.Diagnostics);
+    }
+
+    [Fact]
+    public void Decorative_image_modifier_has_semantic_classification_and_hover_help()
+    {
+        const string marked = "=== start\n{image(\"camp.jpeg\")#|decorative}\n-> END";
+        var (analysis, position) = Analyze(marked);
+        var modifier = Assert.Single(analysis.Classifications,
+            item => item.Kind == TalemarkClassificationKind.Modifier &&
+                item.Range.Start.Line == position.Line &&
+                item.Range.Start.Column == position.Column);
+
+        Assert.Equal(ExpressionVocabulary.Decorative.Length, modifier.Range.End.Column - modifier.Range.Start.Column);
+        var hover = StoryHover.Get(analysis, position);
+        Assert.NotNull(hover);
+        Assert.Contains("purely decorative", hover.Markdown, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

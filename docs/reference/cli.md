@@ -135,11 +135,12 @@ The optional `talewright.lint.json` file lives at the story root, beside the can
 }
 ```
 
-Rule severities are `off`, `warning` or `error`. Both initial rules default to `warning`; config values
-override those defaults. A suppression hides only the listed lint rule in that relative file. Paths use
-forward slashes and cannot contain `.` or `..` path segments. Repeat `--rule ID=SEVERITY` to override
-configuration for individual rules; command-line values take precedence. `--warnings-as-errors` uses the
-same policy as `validate`, and warnings otherwise pass by default.
+Rule severities are `off`, `warning` or `error`. Naming style is your choice, so both naming rules are
+`off` until you enable them; config values override those defaults. A suppression hides only the listed
+lint rule in that relative file. Paths use forward slashes and cannot contain `.` or `..` path segments.
+Repeat `--rule ID=SEVERITY` to override configuration for individual rules; command-line values take
+precedence. `--warnings-as-errors` uses the same policy as `validate`, and warnings otherwise pass by
+default.
 
 | Option | Effect |
 |---|---|

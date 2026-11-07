@@ -13,6 +13,9 @@ chapters/03-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 ```
 
 **Errors** stop the story from loading. **Warnings** (marked ⚠) don't, but usually point at a mistake.
+Talewright reports only mistakes it can be certain of from the source. It trusts your conditions and
+variables to do what you intend; problems that depend on how a playthrough goes, such as a scene
+where no choice is available, show up when you playtest.
 When you see several errors, fix the first one and check again: one mistake can cause others.
 
 ## TW1xxx: writing mistakes in `.tale` files
@@ -32,7 +35,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires ...) { effects } -> target` or `* -> target` for **Continue**. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires ` exactly and close `]`, `)` and `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
-| TW1014 | Malformed image call, image path escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
+| TW1014 | Malformed image call, image path escape, unsupported image manipulator, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")#decorative}`. Quote each supplied argument; separate path and alt text with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
 | TW1015 | Unexpected syntax in reader text, including the simple `![alt](path)` image form. | Use `{image("path", "alt")}` for an image. |
 | TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |
 | TW1017 | A reader-text line ends with an unpaired backslash. | Remove the trailing `\`; line breaks render as written. |
@@ -52,17 +55,19 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW2011 | Unsupported image format. | Use PNG (`.png`), JPEG (`.jpg` or `.jpeg`), or WebP (`.webp`). |
 | TW2012 | Image file not found. | Put the file in the story's `images/` folder and match its path's case exactly. |
 | ⚠ TW2013 | An extensionless image path matches several files. | Include the extension to choose explicitly. Otherwise the first match wins in `.png`, `.jpg`, `.jpeg`, `.webp` order. |
-| ⚠ TW2014 | Image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. |
+| ⚠ TW2014 | Descriptive image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. Mark an intentionally decorative image with `#decorative` instead. |
+| TW2015 | A decorative image also supplies descriptive alt text. | Remove the alt text or remove `#decorative`; an image cannot be both decorative and described. |
+| TW2016 | A choice label contains only decorative images, so it has no accessible name. | Add label text, a substitution, or a descriptive image. Text, substitutions and conditions are trusted to provide the name; the compiler does not check what they render. |
 
-Story compilation, `talewright validate` and editor analysis report these image codes
-through the same resolver. Diagnostics point to the image path's opening quote in
-the authored narrative, including dialogue and choices. Malformed image calls receive
-syntax diagnostics instead of resolver errors. Editors refresh the catalogue and
-diagnostics when files change. Lookup reads paths, not image bytes; it does not
-validate file contents or render images. Successful compilation stores the selected
-story-root-relative path in each media node, with literal alt text or an alt template.
-Missing or blank alt still stores the filename fallback. The rendered alt is what display,
-history and load failures use.
+Story compilation, `talewright validate` and editor analysis report these image
+diagnostics consistently. TW2010–TW2014 point to the image path's opening quote;
+TW2015 points to the decorative modifier, and TW2016 to the choice label.
+Malformed image calls receive syntax diagnostics instead of resolver errors. Editors
+refresh the catalogue and diagnostics when files change. Lookup reads paths, not image
+bytes; it does not validate file contents or render images. Successful compilation
+stores the selected story-root-relative path in each media node, with literal alt text
+or an alt template. Missing or blank alt on a descriptive image still stores the
+filename fallback; decorative media stores empty alt text.
 
 For an unknown skill, check the id's spelling and its declaration under `game.ruleset.stats`.
 Giving a character a value does not declare the skill. See the complete
@@ -82,20 +87,11 @@ Giving a character a value does not declare the skill. See the complete
 | TW3010 | Two scenes have the same id. | Rename one. The message says where the first one is. |
 | TW3011 | A non-choice step follows the scene's first choice, including inside another condition branch. | Move prose, images, effects, diverts and checks before the final choice block. |
 | ⚠ TW3012 | A line cannot run because an earlier step always leaves its block. | Move the line before the exit, make the exit conditional, or remove the unreachable line. |
-| ⚠ TW3013 | A scene may reach its choices with none available. | Add an unconditional choice such as `* -> target` or `* [The end] -> END`, or give every continuing `{if}` / `{else}` branch an unconditional choice. |
 | TW3014 | A scene ID matches a character ID. | Rename either the scene or the character; these IDs must be distinct. |
 
-TW3013 counts authored choices without a choice requirement. Hub offers do not guarantee a choice:
-their storylets can all be ineligible or already visited. A conditional `->` may be skipped
-and therefore does not guarantee an exit. The compiler does not solve requirements, so even
-complementary choices such as `(requires var:gold > 5)` and `(requires var:gold <= 5)`
-still warn. Restructure them as a single `{if}` / `{else}` with an unconditional choice in
-each branch, or add an unconditional exit.
-
-The warning does not prevent a story from compiling by default. Both
-`talewright validate --warnings-as-errors` and `talewright lint --warnings-as-errors` reject it.
-If play nevertheless reaches an empty choice set, the existing "The story cannot continue"
-note is shown.
+Validation does not predict which choice requirements or hub offers will be available during play.
+If play reaches a scene where none is, the reader sees a "The story cannot continue" note and the
+story ends there.
 
 ## TW4xxx: `story.talewright.yaml`
 
@@ -114,6 +110,8 @@ note is shown.
 Lint rules use stable `TWL` IDs, separate from compiler diagnostic codes. They run on shared source-aware
 analysis and do not replace or duplicate compiler diagnostics. Their severities and per-file suppressions
 are configured in the optional story-root `talewright.lint.json`; see the [`lint` CLI reference](cli.md#lint).
+The naming rules are off by default because naming style is your choice; enable them in that file or
+with `--rule`.
 
 | Code | Meaning | Usual fix |
 |---|---|---|

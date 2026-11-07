@@ -68,7 +68,8 @@ ZIPs. Test a web game through a web server, not by double-clicking its HTML file
 Use PNG for graphics that need lossless detail or transparency, and JPEG or WebP for photographs
 and artwork where smaller downloads matter. Resize images for their intended display rather
 than shipping camera originals. Images fit narrow windows without stretching their aspect ratio;
-provide descriptive alt text for readers and for visible failure states.
+provide descriptive alt text for readers and for visible failure states. For an image that adds no
+information, mark it `#decorative` instead of supplying a description.
 
 Web games download illustrations as readers scroll them into view, rather than downloading the
 whole artwork collection before play. Large images still mean longer downloads and use more

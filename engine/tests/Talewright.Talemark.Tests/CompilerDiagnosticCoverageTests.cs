@@ -73,6 +73,13 @@ public sealed class CompilerDiagnosticCoverageTests
         Warning("TW2013", Scene("{image(\"map\", \"Map\")}\n-> END",
             imagePaths: ["images/map.png", "images/map.jpg"])),
         Warning("TW2014", Scene("{image(\"map\")}\n-> END", imagePaths: ["images/map.png"])),
+        Error("TW2015", Scene("""{image("map.png", "A map")#decorative}""" + "\n-> END",
+            imagePaths: ["images/map.png"]), new(MainFile, 2, """{image("map.png", "A map")""".Length + 1),
+            Scene("""{image("map.png")#decorative}""" + "\n-> END", imagePaths: ["images/map.png"])),
+        Error("TW2016", Scene("""* [{image("map.png")#decorative}] -> END""",
+            imagePaths: ["images/map.png"]), new(MainFile, 2, 4),
+            Scene("""* [Look at the map {image("map.png")#decorative}] -> END""",
+                imagePaths: ["images/map.png"])),
 
         Error("TW3001", Story("Text before a scene.\n=== start\n-> END"), new(MainFile, 1, 1),
             Scene("-> END")),
@@ -86,7 +93,6 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW3010", Story("=== start\n-> END\n=== start\n-> END")),
         Error("TW3011", Scene("* [Leave] -> END\nProse.")),
         Warning("TW3012", Scene("-> END\nAfter.")),
-        Warning("TW3013", Scene("* [Maybe] (requires player:hp > 0) -> END")),
         Error("TW3014", Story("=== start\n-> END\n=== camp\n-> END", """
             game: {id: coverage, title: Coverage, start: start}
             characters:
@@ -134,6 +140,8 @@ public sealed class CompilerDiagnosticCoverageTests
     [InlineData("TW1007")]
     [InlineData("TW1009")]
     [InlineData("TW1012")]
+    [InlineData("TW2015")]
+    [InlineData("TW2016")]
     [InlineData("TW3001")]
     [InlineData("TW3014")]
     public void Previously_uncovered_codes_have_a_location_and_a_valid_counterpart(string code)

@@ -37,14 +37,14 @@ public sealed class StoryProjectValidatorTests : IDisposable
     }
 
     [Fact]
-    public void Choice_availability_warning_is_reported_in_build_format_without_rejecting_the_story()
+    public void Warnings_are_reported_in_build_format_without_rejecting_the_story()
     {
         File.WriteAllText(Path.Combine(_root, "main.tale"),
-            "=== a\n* [Continue] (requires @Ready) -> END\n");
+            "=== a\n* [Continue] (requires @Ready) -> END\n=== orphan\n-> END\n");
         using var output = new StringWriter();
 
         Assert.Equal(0, StoryProjectValidator.Validate(_root, Options(), output));
-        Assert.Contains($"{Path.Combine(_root, "main.tale")}(1,1): warning TW3013:", output.ToString());
+        Assert.Contains($"{Path.Combine(_root, "main.tale")}(3,1): warning TW3009:", output.ToString());
     }
 
     [Fact]

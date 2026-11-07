@@ -56,7 +56,26 @@ internal static class ImageSyntax
 
         SkipSpace();
         if (index < end && text[index] == ExpressionVocabulary.CloseParen)
+        {
             Add(index, index + 1, TalemarkClassificationKind.Punctuation);
+            index++;
+            SkipSpace();
+        }
+
+        if (index < end && text[index] == ExpressionVocabulary.ModifierMarker)
+        {
+            Add(index, index + 1, TalemarkClassificationKind.Punctuation);
+            index++;
+            var modifierStart = index;
+            var modifierWork = 0;
+            while (index < end && !char.IsWhiteSpace(text[index]))
+            {
+                if ((++modifierWork & 255) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+                index++;
+            }
+            Add(modifierStart, index, TalemarkClassificationKind.Modifier);
+        }
 
         void ClassifyAlt()
         {
@@ -140,6 +159,8 @@ internal static class ImageSyntax
         ArgumentNullException.ThrowIfNull(symbols.ImageSource);
         var text = source.Text;
         var i = start;
+        var accessibility = MediaAccessibility.Descriptive;
+        var modifierOffset = -1;
         SkipSpace();
         i += ExpressionVocabulary.Image.Length;
         SkipSpace();
@@ -172,6 +193,30 @@ internal static class ImageSyntax
 
         i++;
         SkipSpace();
+        if (i < end && text[i] == ExpressionVocabulary.ModifierMarker)
+        {
+            modifierOffset = i;
+            i++;
+            var modifierStart = i;
+            if (!text.AsSpan(i, end - i).StartsWith(ExpressionVocabulary.Decorative, StringComparison.Ordinal))
+            {
+                Error($"Unexpected text after the image call. Use '{ExpressionVocabulary.ModifierMarker}{ExpressionVocabulary.Decorative}' for a purely decorative image.", modifierOffset);
+                return null;
+            }
+
+            i += ExpressionVocabulary.Decorative.Length;
+            if (i < end && !char.IsWhiteSpace(text[i]))
+            {
+                Error($"Unexpected text after the image call. Use '{ExpressionVocabulary.ModifierMarker}{ExpressionVocabulary.Decorative}' for a purely decorative image.", modifierOffset);
+                return null;
+            }
+
+            accessibility = MediaAccessibility.Decorative;
+            symbols.Analysis?.Reference(ExpressionVocabulary.Decorative, source.Locate(modifierStart),
+                AuthoringSymbolKind.Modifier, ExpressionVocabulary.Decorative);
+            SkipSpace();
+        }
+
         if (i != end)
         {
             Error("Unexpected text after the image call. Close it with '}'.", i);
@@ -184,11 +229,23 @@ internal static class ImageSyntax
             return null;
         }
 
-        var resolved = StoryImageResolver.Resolve(symbols.ImageSource, path, alt, source.Locate(pathOffset), diagnostics);
-        if (resolved is null) return null;
+        var hasAltConflict = accessibility == MediaAccessibility.Decorative && !string.IsNullOrWhiteSpace(alt);
+        var resolved = StoryImageResolver.Resolve(symbols.ImageSource, path, alt, source.Locate(pathOffset), diagnostics,
+            accessibility);
+        if (hasAltConflict)
+        {
+            diagnostics.Error(CompilerDiagnosticCodes.DecorativeImageHasAlt,
+                $"An image marked '{ExpressionVocabulary.ModifierMarker}{ExpressionVocabulary.Decorative}' cannot also have descriptive alt text. Remove the alt text or the modifier.",
+                source.Locate(modifierOffset));
+        }
+        if (resolved is null || hasAltConflict) return null;
         return altTemplate is null
-            ? new MediaTemplate(resolved.Path, resolved.AltText)
-            : new MediaTemplate(resolved.Path, resolved.AltText) { AltTemplate = altTemplate };
+            ? new MediaTemplate(resolved.Path, resolved.AltText) { Accessibility = accessibility }
+            : new MediaTemplate(resolved.Path, resolved.AltText)
+            {
+                AltTemplate = altTemplate,
+                Accessibility = accessibility,
+            };
 
         void SkipSpace()
         {

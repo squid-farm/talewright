@@ -1,8 +1,9 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@using Talewright.Narrative.Templates
 
-<span class="tw-media @StyleClass">
-    <img @ref="_image" alt="@Media.AltText" hidden="@(_error is not null)" />
+<span class="tw-media @StyleClass" aria-hidden="@(Media.Accessibility == MediaAccessibility.Decorative ? "true" : null)">
+    <img @ref="_image" alt="@(Media.Accessibility == MediaAccessibility.Decorative ? "" : Media.AltText)" hidden="@(_error is not null)" />
     @if (_error is not null)
     {
         <span class="tw-media-error">

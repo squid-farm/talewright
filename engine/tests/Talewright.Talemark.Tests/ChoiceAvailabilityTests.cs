@@ -1,5 +1,4 @@
 using Talewright.Talemark.Compilation;
-using Talewright.Talemark.Diagnostics;
 using Talewright.Testing;
 
 namespace Talewright.Talemark.Tests;
@@ -19,7 +18,7 @@ public sealed class ChoiceAvailabilityTests
             ["chapter.tale"] = $"=== start\n{body}",
         }));
 
-    public static TheoryData<string, string> UnsafeStories => new()
+    public static TheoryData<string, string> ConditionalStories => new()
     {
         { "all choices conditional", """
             * [Ready] (requires flag:ready) -> END
@@ -98,20 +97,15 @@ public sealed class ChoiceAvailabilityTests
             """ },
     };
 
+    // Whether requirements hold depends on play; validation trusts the author's conditions.
     [Theory]
-    [MemberData(nameof(UnsafeStories))]
-    public void Possible_empty_choice_sets_warn(string scenario, string body)
+    [MemberData(nameof(ConditionalStories))]
+    public void Choices_that_depend_on_story_state_do_not_warn(string scenario, string body)
     {
         var result = Compile(body);
 
         Assert.True(result.Success, $"{scenario}: {string.Join("\n", result.Diagnostics)}");
-        var warning = Assert.Single(result.Warnings);
-        Assert.Equal("TW3013", warning.Code);
-        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
-        Assert.Equal(new SourceLocation("chapter.tale", 1, 1), warning.Location);
-        Assert.Contains("'start'", warning.Message);
-        Assert.Contains("* -> target", warning.Message);
-        Assert.Contains("* [The end] -> END", warning.Message);
+        Assert.Empty(result.Diagnostics);
     }
 
     public static TheoryData<string, string> SafeStories => new()
@@ -215,7 +209,7 @@ public sealed class ChoiceAvailabilityTests
     }
 
     [Fact]
-    public void Unreachable_choices_and_hub_offers_do_not_trigger_the_warning()
+    public void Unreachable_choices_and_hub_offers_report_only_reachability_warnings()
     {
         var choices = Compile("""
             -> END
@@ -236,37 +230,12 @@ public sealed class ChoiceAvailabilityTests
     }
 
     [Fact]
-    public void Each_unsafe_scene_is_reported_at_its_own_header()
-    {
-        var result = Compile("""
-            * [Maybe] (requires flag:ready) -> second
-            === second
-            * [Maybe] (requires flag:ready) -> END
-            """);
-
-        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        var warnings = result.Warnings.ToArray();
-        Assert.Equal(2, warnings.Length);
-        Assert.Equal(["TW3013", "TW3013"], warnings.Select(warning => warning.Code));
-        Assert.Equal([1, 3], warnings.Select(warning => warning.Location.Line));
-        Assert.Contains("'start'", warnings[0].Message);
-        Assert.Contains("'second'", warnings[1].Message);
-    }
-
-    [Fact]
-    public void Intentionally_stranded_runtime_fixture_remains_valid_but_warns()
+    public void Intentionally_stranded_runtime_fixture_compiles_without_warnings()
     {
         var result = StoryCompiler.Compile(TestStories.NoRoute.Source());
 
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.Equal("TW3013", Assert.Single(result.Warnings).Code);
+        Assert.Empty(result.Diagnostics);
         TestStories.NoRoute.Compile();
-        var unexpected = Assert.Throws<InvalidOperationException>(() =>
-            (TestStories.NoRoute with { ExpectedWarningCodes = [] }).Compile());
-        Assert.Contains("expected warnings []", unexpected.Message);
-        Assert.Contains("TW3013", unexpected.Message);
-        var missing = Assert.Throws<InvalidOperationException>(() =>
-            (TestStories.NoRoute with { ExpectedWarningCodes = ["TW3013", "TW3008"] }).Compile());
-        Assert.Contains("TW3008", missing.Message);
     }
 }
