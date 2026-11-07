@@ -6,8 +6,7 @@ using static Microsoft.Playwright.Assertions;
 
 namespace Talewright.Player.E2E.Tests;
 
-[Collection(BrowserCollection.Name)]
-public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) : IAsyncLifetime
+public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) : IClassFixture<WebHostFixture>, IAsyncLifetime
 {
     private readonly List<string> _errors = [];
     private bool _reloading;

@@ -4,7 +4,7 @@ using Talewright.Testing;
 namespace Talewright.Player.E2E.Tests;
 
 [Trait("Host", "Linux")]
-[Collection(BrowserCollection.Name)]
+[Collection(SerialCollection.Name)]
 public sealed class NativeCliRunTests
 {
     private static string Cli => Environment.GetEnvironmentVariable("TALEWRIGHT_CLI_EXECUTABLE")

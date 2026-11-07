@@ -32,12 +32,52 @@ def host_filter(host, selected):
     return f"{scope}&({selected})" if selected else scope
 
 
+def parse_shard(value):
+    try:
+        index, count = map(int, value.split("/"))
+    except ValueError:
+        raise argparse.ArgumentTypeError("expected INDEX/COUNT, for example 2/3") from None
+    if not 1 <= index <= count:
+        raise argparse.ArgumentTypeError("shard index must be between 1 and the shard count")
+    return index, count
+
+
+def escape_filter_value(value):
+    return "".join("\\" + char if char in "\\()&|=!~" else char for char in value)
+
+
+def shard_filter(names, shard):
+    """Deal sorted test names round-robin so long-running classes spread across shards."""
+    index, count = shard
+    names = sorted(set(names))
+    selected = names[index - 1::count]
+    if not selected:
+        raise RuntimeError(f"Shard {index}/{count} has no tests")
+    print(f"Shard {index}/{count}: {len(selected)} of {len(names)} test methods", flush=True)
+    return "|".join("FullyQualifiedName=" + escape_filter_value(name) for name in selected)
+
+
+def list_tests(selection):
+    with tempfile.TemporaryDirectory(prefix="talewright-tests-") as temporary:
+        listing = Path(temporary) / "tests.txt"
+        run(["dotnet", "vstest", BIN / "Talewright.Player.E2E.Tests.dll", "--ListFullyQualifiedTests",
+             f"--TestCaseFilter:{selection}", f"--ListTestsTargetPath:{listing}"], stdout=subprocess.DEVNULL)
+        return [line.strip() for line in listing.read_text().splitlines() if line.strip()]
+
+
+def test_filter(host, selected, shard):
+    selection = host_filter(host, selected)
+    return shard_filter(list_tests(selection), shard) if shard else selection
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("suite", choices=["install-browsers", "web", "linux"])
     parser.add_argument("--browser", choices=["all", "chromium", "firefox", "webkit"], default="all")
     parser.add_argument("--probe", action="store_true", help="Linux accessibility feasibility gate only")
     parser.add_argument("--filter", help="dotnet test filter (both hosts)")
+    parser.add_argument("--shard", type=parse_shard, default=os.environ.get("TALEWRIGHT_E2E_SHARD") or None,
+                        help="run INDEX/COUNT of the selected tests (default: $TALEWRIGHT_E2E_SHARD)")
     args = parser.parse_args()
     if args.probe and (args.suite != "linux" or args.filter):
         parser.error("--probe is Linux-only and cannot be combined with --filter")
@@ -52,13 +92,14 @@ def main():
             return 0
         with tempfile.TemporaryDirectory(prefix="talewright-web-") as temporary:
             run(["dotnet", "publish", "apps/web", "-c", "Release", "-o", temporary])
+            selection = test_filter("web", args.filter, args.shard)
             failed = []
             for browser in browsers:
                 environment = dict(os.environ, TALEWRIGHT_TARGET="web", BROWSER=browser, TALEWRIGHT_WEB_ROOT=str(Path(temporary) / "wwwroot"),
                                    TALEWRIGHT_TEST_RESULTS=str(results))
                 command = ["dotnet", "test", PROJECT, "-c", "Release", "--no-build",
                            "--logger", f"trx;LogFileName={browser}.trx", "--results-directory", results,
-                           "--filter", host_filter("web", args.filter)]
+                           "--filter", selection]
                 report = results / f"{browser}.trx"
                 report.unlink(missing_ok=True)
                 try:
@@ -116,7 +157,10 @@ def main():
                    "--output", results / "linux", "--",
                    "dotnet", "test", PROJECT, "-c", "Release", "--no-build",
                    "--logger", "trx;LogFileName=linux.trx", "--results-directory", results,
-                   "--filter", host_filter("linux", "Category=Probe" if args.probe else args.filter)]
+                   "--filter", host_filter("linux", "Category=Probe") if args.probe
+                   else test_filter("linux", args.filter, args.shard),
+                   # Native windows share one X display, accessibility bus and save directory.
+                   "--", "xUnit.ParallelizeTestCollections=false"]
         report = results / "linux.trx"
         report.unlink(missing_ok=True)
         run(command, env=environment)

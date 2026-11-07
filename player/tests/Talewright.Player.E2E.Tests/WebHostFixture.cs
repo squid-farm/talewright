@@ -11,19 +11,24 @@ using Microsoft.Playwright;
 
 namespace Talewright.Player.E2E.Tests;
 
-[CollectionDefinition(Name)]
-public sealed class BrowserCollection : ICollectionFixture<WebHostFixture>
+/// <summary>Collections that must not overlap other tests: timing budgets and native windows.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class SerialCollection
 {
-    public const string Name = "Published player";
+    public const string Name = "Serial";
 }
 
+/// <summary>
+/// Gives each test class the process-wide published-player server and browser. Classes run in
+/// parallel collections, and every test still creates its own isolated browser context.
+/// </summary>
 public sealed class WebHostFixture : IAsyncLifetime
 {
-    private WebApplication? _server;
-    private IPlaywright? _playwright;
-    public IBrowser Browser { get; private set; } = null!;
-    public string BaseUrl { get; private set; } = "";
-    public string BrowserName { get; } = Environment.GetEnvironmentVariable("BROWSER") ?? "chromium";
+    private static readonly Lazy<Task<SharedWebHost>> Shared = new(SharedWebHost.StartAsync);
+    private SharedWebHost? _host;
+    public IBrowser Browser => _host?.Browser ?? throw new InvalidOperationException("The web host is not started.");
+    public string BaseUrl => _host?.BaseUrl ?? "";
+    public string BrowserName => SharedWebHost.BrowserName;
 
     public async Task InitializeAsync()
     {
@@ -32,11 +37,33 @@ public sealed class WebHostFixture : IAsyncLifetime
             throw new InvalidOperationException($"Unknown TALEWRIGHT_TARGET '{PlayerTarget.Name}'.");
         }
 
-        if (PlayerTarget.IsDesktop)
+        if (!PlayerTarget.IsDesktop)
         {
-            return;
+            _host = await Shared.Value;
         }
+    }
 
+    public Task DisposeAsync() => Task.CompletedTask;
+}
+
+internal sealed class SharedWebHost
+{
+    private WebApplication? _server;
+    private IPlaywright? _playwright;
+    public IBrowser Browser { get; private set; } = null!;
+    public string BaseUrl { get; private set; } = "";
+    public static string BrowserName { get; } = Environment.GetEnvironmentVariable("BROWSER") ?? "chromium";
+
+    public static async Task<SharedWebHost> StartAsync()
+    {
+        var host = new SharedWebHost();
+        await host.InitializeAsync();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => host.DisposeAsync().Wait(TimeSpan.FromSeconds(10));
+        return host;
+    }
+
+    private async Task InitializeAsync()
+    {
         var path = Environment.GetEnvironmentVariable("TALEWRIGHT_WEB_BASE_PATH") ?? "";
         var basePath = path.TrimEnd('/');
         if (basePath.Length > 0 && (!basePath.StartsWith('/') || basePath.Contains("..")))

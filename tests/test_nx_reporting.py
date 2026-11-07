@@ -247,5 +247,111 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("Nx batch failed: e2e-web", stderr.getvalue())
 
 
+    def test_passing_e2e_evidence_is_pruned_and_failure_evidence_is_kept(self):
+        results = self.root / "artifacts/test-results"
+        passed, failed, nested = (results / "chromium" / name for name in ("passed", "failed", "theory"))
+        outside = self.root / "outside"
+        for directory in (passed, failed, nested, outside):
+            directory.mkdir(parents=True)
+            (directory / "trace.zip").write_text("trace")
+
+        def result(outcome, *paths):
+            output = "\n".join(f"Evidence: {path}" for path in paths)
+            return (f'<UnitTestResult testName="T" outcome="{outcome}"><Output><StdOut>Browser: x\n'
+                    f"{output}</StdOut></Output></UnitTestResult>")
+
+        (results / "chromium.trx").write_text(
+            "<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><Results>"
+            + result("Passed", passed) + result("Failed", failed) + result("Passed", nested)
+            + result("Passed", outside) + result("Passed", results) + "</Results></TestRun>"
+        )
+        (results / "broken.trx").write_text("<TestRun>")
+        with patch("nx_ci.ROOT", self.root), redirect_stdout(io.StringIO()):
+            nx_ci.prune_passing_evidence()
+        self.assertFalse(passed.exists())
+        self.assertFalse(nested.exists())
+        self.assertTrue((failed / "trace.zip").exists())
+        self.assertTrue((outside / "trace.zip").exists())
+        self.assertTrue((results / "chromium.trx").exists())
+
+    def test_e2e_shards_split_regression_suites_and_run_published_smokes_once(self):
+        self.args.group = "browser"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["browser"] = [
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"},
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-published-web"},
+        ]
+        self.args.plan.write_text(json.dumps(plan))
+        for shard, targets in (((1, 2), ["e2e-web", "e2e-published-web"]), ((2, 2), ["e2e-web"])):
+            with self.subTest(shard=shard):
+                self.args.shard = shard
+                with patch("nx_ci.nx") as run, patch("nx_ci.ROOT", self.root), \
+                        redirect_stdout(io.StringIO()):
+                    nx_ci.run_group(self.args)
+                self.assertEqual(
+                    [f"--targets={target}" for target in targets],
+                    [call.args[2] for call in run.call_args_list],
+                )
+                environments = [call.kwargs["environment"] for call in run.call_args_list]
+                self.assertEqual(f"{shard[0]}/2", environments[0]["TALEWRIGHT_E2E_SHARD"])
+                self.assertTrue(all("TALEWRIGHT_E2E_SHARD" not in environment
+                                    for environment in environments[1:]))
+                self.assertTrue(nx_ci.execution_path(self.args).name.endswith(
+                    f"-chromium-{shard[0]}-of-2.json"))
+                self.assertEqual("success", self.record()["outcome"])
+
+        self.summary.write_text("")
+        nx_ci.execution_summary(self.args)
+        summary = self.summary.read_text()
+        self.assertIn("## Nx execution: browser (chromium, shard 2/2)", summary)
+        self.assertIn("| `e2e-published-web` | `Talewright.Player.E2E.Tests` | runs in shard 1 |", summary)
+
+    def test_unsharded_e2e_runs_do_not_request_a_shard(self):
+        self.args.group = "linux-desktop"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["linux-desktop"] = [{"project": "Talewright.Player.E2E.Tests", "target": "e2e-linux"}]
+        self.args.plan.write_text(json.dumps(plan))
+        with patch("nx_ci.nx") as run, patch("nx_ci.ROOT", self.root), redirect_stdout(io.StringIO()):
+            nx_ci.run_group(self.args)
+        self.assertNotIn("TALEWRIGHT_E2E_SHARD", run.call_args.kwargs["environment"])
+        self.assertEqual("execution-linux-desktop.json", nx_ci.execution_path(self.args).name)
+
+
+class E2EShardTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / "player/tests"))
+        import run_e2e
+        cls.run_e2e = run_e2e
+
+    def test_shards_are_disjoint_complete_and_keep_theory_rows_together(self):
+        names = [f"Tests.Class{n % 4}.Method{n}" for n in range(11)] + ["Tests.Class0.Method0"]
+        selected = []
+        for index in (1, 2, 3):
+            with redirect_stdout(io.StringIO()):
+                expression = self.run_e2e.shard_filter(names, (index, 3))
+            selected.append([term.removeprefix("FullyQualifiedName=") for term in expression.split("|")])
+        flattened = [name for shard in selected for name in shard]
+        self.assertEqual(sorted(set(names)), sorted(flattened))
+        self.assertEqual(len(flattened), len(set(flattened)))
+        self.assertLessEqual(max(map(len, selected)) - min(map(len, selected)), 1)
+
+    def test_filter_values_are_escaped_and_empty_shards_fail(self):
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual("FullyQualifiedName=A.B\\(x\\=1\\)",
+                             self.run_e2e.shard_filter(["A.B(x=1)"], (1, 1)))
+        with self.assertRaisesRegex(RuntimeError, "no tests"):
+            self.run_e2e.shard_filter(["A.B"], (2, 2))
+
+    def test_shard_values_are_validated(self):
+        self.assertEqual((2, 3), self.run_e2e.parse_shard("2/3"))
+        self.assertEqual((2, 3), nx_ci.parse_shard("2/3"))
+        for value in ("0/2", "3/2", "2", "a/b"):
+            with self.subTest(value=value):
+                for parse in (self.run_e2e.parse_shard, nx_ci.parse_shard):
+                    with self.assertRaises(Exception):
+                        parse(value)
+
+
 if __name__ == "__main__":
     unittest.main()

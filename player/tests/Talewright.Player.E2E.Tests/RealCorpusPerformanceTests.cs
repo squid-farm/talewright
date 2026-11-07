@@ -8,6 +8,7 @@ using Xunit.Abstractions;
 
 namespace Talewright.Player.E2E.Tests;
 
+[Collection(SerialCollection.Name)]
 public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
 {
     private readonly WebHostFixture _host;
@@ -172,6 +173,7 @@ public sealed class RealCorpusBrowserPerformanceTests : PlayerTest
     }
 }
 
+[Collection(SerialCollection.Name)]
 public sealed class RealCorpusNativePerformanceTests : PlayerTest
 {
     private readonly ITestOutputHelper _output;

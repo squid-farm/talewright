@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace Talewright.Player.E2E.Tests;
 
 [Trait("Host", "Linux")]
-[Collection(BrowserCollection.Name)]
+[Collection(SerialCollection.Name)]
 public sealed class NativeImageTests
 {
     [Fact]

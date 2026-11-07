@@ -6,6 +6,7 @@ using Xunit.Abstractions;
 namespace Talewright.Player.E2E.Tests;
 
 [Trait("Host", "Browser")]
+[Collection(SerialCollection.Name)]
 public sealed class PerformanceTests : PlayerTest
 {
     private readonly ITestOutputHelper _output;
