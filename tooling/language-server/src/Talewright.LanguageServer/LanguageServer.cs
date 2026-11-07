@@ -551,6 +551,8 @@ public sealed class LanguageServer
                 }
 
                 var result = StoryQuickFixes.ForMissingFlag(analysis, diagnostic);
+                if (result.Fixes.Count == 0 && result.Title is null)
+                    result = StoryQuickFixes.ForMissingVariable(analysis, diagnostic);
                 actions.AddRange(result.Fixes.Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
                 if (result.DisabledReason is { } reason)
                     actions.Add(ToDisabledCodeAction(result.Title ?? "Declare missing flag", reason, diagnostic, lines));
