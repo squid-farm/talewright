@@ -163,7 +163,9 @@ public sealed class StoryQuickFixesTests
         var analysis = AnalyzeManifest(manifest, story);
         var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
 
-        var fix = Assert.Single(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+        var result = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
 
         Assert.Equal(", silver-sword: Silver Sword", fix.NewText);
         Assert.Equal(fix.Range.Start, fix.Range.End);
@@ -214,9 +216,6 @@ public sealed class StoryQuickFixesTests
     [InlineData("characters:\n  player:\n    first-name: Ada\nitems:\n  rope: Rope\n")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n\n# keep this comment\nitems:\n  rope: Rope\n")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    # trailing comment\nitems:\n  rope: Rope\n")]
-    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: |\n      Line one\n      Line two\nitems:\n  rope: Rope\n")]
-    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: >-\n      Folded\n\nitems:\n  rope: Rope\n")]
-    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: \"Quoted\n      across lines\"\nitems:\n  rope: Rope\n")]
     public void Missing_manifest_name_appends_after_a_multiline_entry_followed_by_another_section(string sections)
     {
         var manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n" + sections;
@@ -224,7 +223,9 @@ public sealed class StoryQuickFixesTests
         var analysis = AnalyzeManifest(manifest, story);
         var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
 
-        var fix = Assert.Single(StoryQuickFixes.ForMissingManifestName(analysis, diagnostic).Fixes);
+        var result = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+        Assert.True(result.Fixes.Count == 1, result.DisabledReason);
+        var fix = result.Fixes[0];
 
         var updated = ApplyInsertion(manifest, fix);
         Assert.Equal(manifest, updated.Replace("  old-man:\n    first-name: Old Man\n", ""));
@@ -232,6 +233,24 @@ public sealed class StoryQuickFixesTests
         var edited = AnalyzeManifest(updated, story);
         Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
         Assert.DoesNotContain(edited.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Theory]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: |\n      Line one\n      Line two\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: >-\n      Folded\n\nitems:\n  rope: Rope\n")]
+    [InlineData("characters:\n  player:\n    first-name: Ada\n    last-name: \"Quoted\n      across lines\"\nitems:\n  rope: Rope\n")]
+    public void Missing_manifest_name_disables_edit_when_multiline_scalar_cannot_be_verified(string value)
+    {
+        var manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n" + value;
+        const string story = "=== start\n> old-man: Hello.\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+
+        Assert.Empty(result.Fixes);
+        Assert.Contains("could not be verified to preserve existing manifest data", result.DisabledReason);
+        Assert.Equal(manifest, analysis.Source.Files[StorySource.ManifestFileName]);
     }
 
     [Fact]

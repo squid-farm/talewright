@@ -111,6 +111,28 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Unsafe_manifest_insertion_returns_a_disabled_name_action_with_a_reason()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player:\n    first-name: Ada\n    last-name: |\n      Existing text\nitems:\n  rope: Rope\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
+
+        const string text = "=== start\n> old-man: Hello.\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2001");
+
+        var action = Assert.Single(await CodeActions(client, text, [diagnostic]));
+
+        Assert.Equal("Declare character 'old-man'", action.GetProperty("title").GetString());
+        Assert.Contains("could not be verified to preserve existing manifest data",
+            action.GetProperty("disabled").GetProperty("reason").GetString());
+        Assert.False(action.TryGetProperty("edit", out _));
+    }
+
+    [Fact]
     public async Task Missing_scene_code_actions_append_or_create_a_file_without_overwriting()
     {
         await using var client = new Client();

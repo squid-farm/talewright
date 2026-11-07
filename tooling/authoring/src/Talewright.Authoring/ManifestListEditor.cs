@@ -98,8 +98,9 @@ internal static class ManifestListEditor
             var rootIndent = root.Children.Count == 0 ? 0 : checked((int)root.Children.First().Key.Start.Column - 1);
             var entry = BlockEntry(formattedKey, blockValue, rootIndent + 2, newline);
             var insertion = $"{separator}{new string(' ', rootIndent)}{FormatScalar(section)}:{newline}{entry}{sectionEnding}";
-            var point = LocationAt(file, text, text.Length);
-            return new(new(new(point, point), insertion), null);
+            return CreateValidatedMappingEdit(
+                text, file, root, section, key, BlockEntry(formattedKey, blockValue, 0, newline),
+                text.Length, insertion);
         }
 
         if (node is not YamlMappingNode mapping)
@@ -133,8 +134,8 @@ internal static class ManifestListEditor
 
             if (offset < 0 || offset > text.Length)
                 return new(null, $"Cannot safely edit '{file}' because the '{section}' source range is unavailable.");
-            var point = LocationAt(file, text, offset);
-            return new(new(new(point, point), insertion), null);
+            return CreateValidatedMappingEdit(
+                text, file, root, section, key, $"{formattedKey}: {flowValue}", offset, insertion);
         }
 
         if (mapping.Style != MappingStyle.Block || mapping.Children.Count == 0)
@@ -154,8 +155,150 @@ internal static class ManifestListEditor
         var ending = hasFollowingContent || finalNewline ? newlineForEntry : "";
         var blockEntry = BlockEntry(formattedKey, blockValue, indent, newlineForEntry);
         var blockInsertion = $"{prefix}{blockEntry}{ending}";
-        var insertionPoint = LocationAt(file, text, insertionOffset);
-        return new(new(new(insertionPoint, insertionPoint), blockInsertion), null);
+        return CreateValidatedMappingEdit(
+            text, file, root, section, key, BlockEntry(formattedKey, blockValue, 0, newlineForEntry),
+            insertionOffset, blockInsertion);
+    }
+
+    private static ManifestEditResult CreateValidatedMappingEdit(
+        string text, string file, YamlMappingNode originalRoot, string section, string key,
+        string expectedEntry, int offset, string insertion)
+    {
+        var reason = $"Cannot safely edit '{file}' because the change could not be verified to preserve existing manifest data.";
+        if (offset < 0 || offset > text.Length ||
+            !TryParseMappingEntry(expectedEntry, out var expectedKey, out var expectedValue) ||
+            !NodesEqual(expectedKey, new YamlScalarNode(key)))
+            return new(null, reason);
+
+        var editedText = text.Insert(offset, insertion);
+        var editedStream = new YamlStream();
+        try
+        {
+            editedStream.Load(new StringReader(editedText));
+        }
+        catch (YamlException)
+        {
+            return new(null, reason);
+        }
+
+        if (editedStream.Documents.Count != 1 ||
+            editedStream.Documents[0].RootNode is not YamlMappingNode editedRoot ||
+            !MatchesAfterAddingEntry(originalRoot, editedRoot, section, expectedKey, expectedValue))
+            return new(null, reason);
+
+        var point = LocationAt(file, text, offset);
+        return new(new(new(point, point), insertion), null);
+    }
+
+    private static bool TryParseMappingEntry(string text, out YamlNode key, out YamlNode value)
+    {
+        key = null!;
+        value = null!;
+        var stream = new YamlStream();
+        try
+        {
+            stream.Load(new StringReader(text));
+        }
+        catch (YamlException)
+        {
+            return false;
+        }
+
+        if (stream.Documents.Count != 1 ||
+            stream.Documents[0].RootNode is not YamlMappingNode { Children.Count: 1 } mapping)
+            return false;
+
+        var entry = mapping.Children.Single();
+        key = entry.Key;
+        value = entry.Value;
+        return true;
+    }
+
+    private static bool MatchesAfterAddingEntry(
+        YamlMappingNode original, YamlMappingNode edited, string section,
+        YamlNode expectedKey, YamlNode expectedValue)
+    {
+        var sectionKey = new YamlScalarNode(section);
+        var hasSection = TryFindEntry(original, sectionKey, out var originalSection);
+        if (edited.Children.Count != original.Children.Count + (hasSection ? 0 : 1) ||
+            !TryFindEntry(edited, sectionKey, out var editedSection) ||
+            editedSection is not YamlMappingNode editedMapping)
+            return false;
+
+        if (hasSection)
+        {
+            if (originalSection is not YamlMappingNode originalMapping ||
+                !MappingMatchesAfterAddingEntry(originalMapping, editedMapping, expectedKey, expectedValue))
+                return false;
+        }
+        else if (!MappingMatchesAfterAddingEntry(
+                     new YamlMappingNode(), editedMapping, expectedKey, expectedValue))
+        {
+            return false;
+        }
+
+        foreach (var entry in original.Children)
+        {
+            if (NodesEqual(entry.Key, sectionKey))
+                continue;
+            if (!TryFindEntry(edited, entry.Key, out var editedValue) || !NodesEqual(entry.Value, editedValue))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool MappingMatchesAfterAddingEntry(
+        YamlMappingNode original, YamlMappingNode edited, YamlNode expectedKey, YamlNode expectedValue)
+    {
+        if (edited.Children.Count != original.Children.Count + 1 ||
+            !TryFindEntry(edited, expectedKey, out var addedValue) ||
+            !NodesEqual(addedValue, expectedValue))
+            return false;
+
+        foreach (var entry in original.Children)
+        {
+            if (!TryFindEntry(edited, entry.Key, out var editedValue) || !NodesEqual(entry.Value, editedValue))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryFindEntry(YamlMappingNode mapping, YamlNode key, out YamlNode value)
+    {
+        foreach (var entry in mapping.Children)
+        {
+            if (NodesEqual(entry.Key, key))
+            {
+                value = entry.Value;
+                return true;
+            }
+        }
+
+        value = null!;
+        return false;
+    }
+
+    private static bool NodesEqual(YamlNode left, YamlNode right)
+    {
+        if (left.GetType() != right.GetType() ||
+            !Equals(left.Tag, right.Tag) ||
+            !Equals(left.Anchor, right.Anchor))
+            return false;
+
+        return (left, right) switch
+        {
+            (YamlScalarNode leftScalar, YamlScalarNode rightScalar) => leftScalar.Value == rightScalar.Value,
+            (YamlSequenceNode leftSequence, YamlSequenceNode rightSequence) =>
+                leftSequence.Children.Count == rightSequence.Children.Count &&
+                leftSequence.Children.Zip(rightSequence.Children).All(pair => NodesEqual(pair.First, pair.Second)),
+            (YamlMappingNode leftMapping, YamlMappingNode rightMapping) =>
+                leftMapping.Children.Count == rightMapping.Children.Count &&
+                leftMapping.Children.All(entry =>
+                    TryFindEntry(rightMapping, entry.Key, out var value) && NodesEqual(entry.Value, value)),
+            _ => left.Equals(right)
+        };
     }
 
     private static ManifestEditResult AppendFlow(string text, string file, string section, YamlSequenceNode sequence, string item)
