@@ -1,4 +1,5 @@
 using Talewright.Authoring;
+using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
@@ -727,6 +728,172 @@ public sealed class StoryQuickFixesTests
         var diagnostic = new Diagnostic(DiagnosticSeverity.Error, code, "test", new("main.tale", 2, 6));
 
         Assert.Empty(StoryQuickFixes.ForMissingScene(analysis, diagnostic));
+    }
+
+    [Theory]
+    [InlineData("strt", "start")]
+    [InlineData("staart", "start")]
+    [InlineData("stort", "start")]
+    [InlineData("camp.mpa", "camp.map")]
+    public void Close_scene_matches_replace_only_the_name_and_clear_the_diagnostic(string target, string expected)
+    {
+        var extraScene = expected == "start" ? "" : $"=== {expected}\n-> END\n";
+        var text = $"=== start\n* -> {target}\n{extraScene}";
+        var analysis = Analyze("main.tale", text);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2002");
+
+        var fix = Assert.Single(StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes);
+        var targetLine = $"* -> {target}";
+        var startColumn = targetLine.IndexOf(target, StringComparison.Ordinal) + 1;
+        Assert.Equal($"Change to `{expected}`", fix.Title);
+        Assert.True(fix.IsPreferred);
+        Assert.Equal(new SourceLocation("main.tale", 2, startColumn), fix.Range.Start);
+        Assert.Equal(new SourceLocation("main.tale", 2, startColumn + target.Length), fix.Range.End);
+
+        var edited = ApplyTextEdit(text, fix);
+        Assert.DoesNotContain(Analyze("main.tale", edited).Diagnostics, item => item.Code == "TW2002");
+    }
+
+    [Fact]
+    public void Close_scene_matches_are_ranked_and_limited_to_three()
+    {
+        const string text = "=== start\n* -> camp.hubb\n=== camp.hub\n-> END\n=== camp.hubx\n-> END\n=== camp.hu\n-> END\n=== camp.hb\n-> END\n";
+        var analysis = Analyze("main.tale", text);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2002");
+
+        var fixes = StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes;
+
+        Assert.Equal(
+            ["Change to `camp.hub`", "Change to `camp.hubx`", "Change to `camp.hb`"],
+            fixes.Select(fix => fix.Title));
+        Assert.All(fixes, fix => Assert.False(fix.IsPreferred));
+        Assert.DoesNotContain(fixes, fix => fix.NewText == "camp.hu");
+    }
+
+    [Fact]
+    public void Close_scene_matches_reject_candidates_beyond_the_length_relative_threshold()
+    {
+        const string text = "=== start\n* -> strt\n=== stap\n-> END\n";
+        var analysis = Analyze("main.tale", text);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2002");
+
+        var fixes = StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes;
+
+        Assert.Equal(["start"], fixes.Select(fix => fix.NewText));
+    }
+
+    [Fact]
+    public void Close_name_matches_do_not_cross_kinds_or_suggest_distant_names()
+    {
+        const string manifest = """
+            game:
+              id: quick-fix
+              title: Quick Fix
+              start: start
+            characters:
+              player: {first-name: Ada}
+              camp.hub: {first-name: Camp}
+            """;
+
+        foreach (var target in new[] { "camp.hubb", "zzzzzzzz" })
+        {
+            var analysis = AnalyzeManifest(manifest, $"=== start\n* -> {target}\n");
+            var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2002");
+
+            Assert.Empty(StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes);
+        }
+    }
+
+    [Fact]
+    public void Close_name_matches_cover_each_diagnostic_name_category()
+    {
+        const string manifest = """
+            game:
+              id: quick-fix
+              title: Quick Fix
+              version: 1
+              start: start
+              ruleset:
+                base: none
+                stats:
+                  - id: strength
+                    name: Strength
+                    category: custom
+                    min: 0
+                    max: 10
+                    default: 1
+            characters:
+              player: {first-name: Ada}
+              old-man: {first-name: Old}
+            items: {silver-sword: Silver Sword}
+            factions: {river-guild: {name: River Guild}}
+            flags: [ready]
+            vars: {coins: 1}
+            """;
+        var cases = new (string Story, string Code, string Expected)[]
+        {
+            ("> old-mna: Hello.\n", "TW2001", "old-man"),
+            ("{if player has silver-sowrd}Seen.{/if}\n", "TW2001", "silver-sword"),
+            ("{faction:river-gulid:name}\n", "TW2001", "river-guild"),
+            ("~ player:strenth += 1\n", "TW2001", "strength"),
+            ("{if player:pronoun:subjet == \"they\"}Seen.{/if}\n", "TW2001", "subject"),
+            ("{if flag:reayd}Seen.{/if}\n", "TW2004", "ready"),
+            ("The total is {var:cois}.\n", "TW2004", "coins")
+        };
+
+        foreach (var (story, code, expected) in cases)
+        {
+            var text = $"=== start\n{story}-> END\n";
+            var analysis = AnalyzeManifest(manifest, text);
+            var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == code);
+
+            var fix = Assert.Single(StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes);
+
+            Assert.Equal(expected, fix.NewText);
+            Assert.True(fix.IsPreferred);
+            Assert.DoesNotContain(AnalyzeManifest(manifest, ApplyTextEdit(text, fix)).Diagnostics,
+                item => item.Code == code);
+        }
+    }
+
+    [Fact]
+    public void Close_predicate_matches_preserve_the_at_sign_and_replace_only_the_name()
+    {
+        const string manifest = """
+            game:
+              id: quick-fix
+              title: Quick Fix
+              start: start
+            characters:
+              player: {first-name: Ada}
+            """;
+        const string text = "=== start\n{if @Raedy}Seen.{/if}\n-> END\n";
+        var source = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = text
+        });
+        var options = new CompilerOptions
+        {
+            Predicates = new NamedPredicateRegistry().Register("Ready", _ => true)
+        };
+        var analysis = StoryAnalyzer.Analyze(source, options);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2005");
+
+        var fix = Assert.Single(StoryQuickFixes.ForCloseNameMatches(analysis, diagnostic).Fixes);
+
+        Assert.Equal("Change to `@Ready`", fix.Title);
+        Assert.Equal("Ready", fix.NewText);
+        Assert.True(fix.IsPreferred);
+        Assert.Equal(new SourceLocation("main.tale", 2, 6), fix.Range.Start);
+        Assert.Equal(new SourceLocation("main.tale", 2, 11), fix.Range.End);
+        var editedSource = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = ApplyTextEdit(text, fix)
+        });
+        Assert.DoesNotContain(StoryAnalyzer.Analyze(editedSource, options).Diagnostics,
+            item => item.Code == "TW2005");
     }
 
     private static StoryAnalysis Analyze(string file, string text, params (string File, string Text)[] additionalFiles)
