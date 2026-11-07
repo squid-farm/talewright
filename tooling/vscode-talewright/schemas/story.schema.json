@@ -42,6 +42,11 @@
           "default": true,
           "description": "Whether players can navigate backward and forward. Saves remain available when false."
         },
+        "autosave": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": true,
+          "description": "Whether to write automatic recovery saves at the start and after each completed choice. Defaults to true; false stops new automatic writes without deleting existing saves."
+        },
         "creation": {
           "$ref": "#/definitions/creation",
           "description": "Optional player character creation choices."

@@ -141,6 +141,11 @@ public class EditorManifestSchemaTests
             }));
             Assert.Equal(expectedCodes, result.Diagnostics.Select(diagnostic => diagnostic.Code).Order().ToArray());
             Assert.Equal(!expectedCodes.Any(code => code is "TW4003" or "TW4006"), result.Success);
+            if (file == "autosave-yes.yaml")
+            {
+                Assert.Contains(result.Diagnostics, diagnostic =>
+                    diagnostic.Code == "TW4003" && diagnostic.Message == "autosave must be true or false.");
+            }
             Assert.All(result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4006"), diagnostic =>
             {
                 Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -192,6 +197,10 @@ public class EditorManifestSchemaTests
                 Assert.Equal(expected, story.Creation!.EditName);
                 Assert.Equal(expected, story.World.Items[new ItemId("coin")].Uncountable);
                 Assert.Equal(expected, Assert.Single(story.Triggers).Once);
+            }
+            if (fixture.TryGetProperty("autosaveValue", out var autosaveValue))
+            {
+                Assert.Equal(autosaveValue.GetBoolean(), story.AutosaveEnabled);
             }
 
             var player = story.World.Characters[EntityId.Player];

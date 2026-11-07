@@ -128,6 +128,7 @@ public sealed class TalemarkFakerTests
         {
             Randomness = "off",
             Undo = false,
+            Autosave = false,
             CreationName = true,
         };
         var ready = new TaleFlagRef("ready");
@@ -148,6 +149,7 @@ public sealed class TalemarkFakerTests
         var story = compiled.Story!;
         Assert.Equal(RandomnessMode.Off, story.Randomness);
         Assert.False(story.UndoEnabled);
+        Assert.False(story.AutosaveEnabled);
         Assert.True(story.Creation!.EditName);
         Assert.Equal(Pronouns.They, story.World.Characters[EntityId.Player].Pronouns);
         Assert.Equal(2, story.World.Items[new ItemId("charm")].Modifiers[new StatId("wis")]);

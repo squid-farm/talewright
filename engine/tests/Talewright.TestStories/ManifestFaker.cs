@@ -52,6 +52,7 @@ public sealed class ManifestFaker
     public string? BaseRuleset { get; init; }
     public string? Randomness { get; init; }
     public bool? Undo { get; init; }
+    public bool? Autosave { get; init; }
     public bool? CreationName { get; init; }
 
     internal void IncludeItemsSection() => IncludeSection(Section.Items);
@@ -289,6 +290,10 @@ public sealed class ManifestFaker
         if (Undo is not null)
         {
             Add(game, "undo", Undo.Value);
+        }
+        if (Autosave is not null)
+        {
+            Add(game, "autosave", Autosave.Value);
         }
 
         if (CreationName is not null || _creationPronouns is not null || _creationStats.Count > 0 || _creationPresets.Count > 0)

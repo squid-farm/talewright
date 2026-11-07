@@ -10,6 +10,25 @@ public class PlayerFixtureTests
     public static IEnumerable<object[]> Scenarios => TestStories.Scenarios.Select(s => new object[] { s.Id });
     public static IEnumerable<object[]> Fixtures => TestStories.All.Select(f => new object[] { f.Id });
 
+    [Fact]
+    public void Autosave_opt_out_fixture_requests_trigger_checkpoint_after_choice()
+    {
+        var story = TestStories.AutosaveOptOut("autosave-opt-out").Compile();
+        var history = new StoryHistory(story, 42);
+        Assert.False(story.AutosaveEnabled);
+        Assert.Null(history.TriggerSaveId);
+
+        history.Choose(Assert.Single(history.Current.Choices, choice => choice.Text == "Continue").Key);
+
+        Assert.Equal("checkpoint", history.TriggerSaveId);
+        Assert.Contains(history.Events, e => e is TriggerFired { TriggerId: "checkpoint" });
+        Assert.True(history.State.GetFlag(new FlagId("checkpointed")));
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.True(restored.State.GetFlag(new FlagId("checkpointed")));
+        Assert.Null(restored.TriggerSaveId);
+    }
+
     [Theory]
     [MemberData(nameof(Scenarios))]
     public void Explicit_ui_scenarios_have_valid_runtime_expectations(string id)

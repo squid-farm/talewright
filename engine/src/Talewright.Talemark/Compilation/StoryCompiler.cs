@@ -182,6 +182,7 @@ public static class StoryCompiler
             ReplayCompatibilityId = string.IsNullOrWhiteSpace(options.CompatibilityId)
                 ? null : $"{ReplayVersion}\n{options.CompatibilityId}",
             UndoEnabled = manifest.UndoEnabled,
+            AutosaveEnabled = manifest.AutosaveEnabled,
             Creation = manifest.Creation,
             Start = new SceneId(manifest.Start),
             Randomness = manifest.Randomness,

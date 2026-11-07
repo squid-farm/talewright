@@ -23,6 +23,7 @@ public sealed class StoryDefinition
     /// <summary>Identity of the replay semantics and registered extensions, independent of story content.</summary>
     public string? ReplayCompatibilityId { get; init; }
     public bool UndoEnabled { get; init; } = true;
+    public bool AutosaveEnabled { get; init; } = true;
     public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }

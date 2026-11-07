@@ -6,6 +6,7 @@ game:
   randomness: off
   seed: 42
   undo: false
+  autosave: false
   ruleset:
     base: none
     stats:

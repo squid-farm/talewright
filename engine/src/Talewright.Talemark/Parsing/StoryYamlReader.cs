@@ -33,7 +33,9 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             _yaml.Diagnostics.Error(CompilerDiagnosticCodes.MissingRequiredConfiguration, "The root story configuration must declare a 'game:' mapping.", _yaml.At(root));
         }
         var game = gameNode is null ? new YamlMappingNode() : _yaml.Mapping(gameNode, ManifestVocabulary.Game) ?? new YamlMappingNode();
-        _yaml.CheckKeys(game, ManifestVocabulary.Id, ManifestVocabulary.Title, ManifestVocabulary.Version, ManifestVocabulary.Start, ManifestVocabulary.Randomness, ManifestVocabulary.Seed, ManifestVocabulary.Undo, ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
+        _yaml.CheckKeys(game, ManifestVocabulary.Id, ManifestVocabulary.Title, ManifestVocabulary.Version,
+            ManifestVocabulary.Start, ManifestVocabulary.Randomness, ManifestVocabulary.Seed,
+            ManifestVocabulary.Undo, ManifestVocabulary.Autosave, ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
 
         var ruleset = new StoryYamlRulesetReader(_yaml, _options, _analysis).Read(Get(game, ManifestVocabulary.Ruleset));
         var world = new StoryYamlWorldReader(_yaml);
@@ -76,6 +78,13 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
                 ? enabled
                 : _yaml.Error(undo, CompilerDiagnosticCodes.InvalidConfigurationValue, "undo must be true or false.", true);
+        }
+
+        if (Get(game, ManifestVocabulary.Autosave) is { } autosave)
+        {
+            manifest.AutosaveEnabled = bool.TryParse(Scalar(autosave), out var enabled)
+                ? enabled
+                : _yaml.Error(autosave, CompilerDiagnosticCodes.InvalidConfigurationValue, "autosave must be true or false.", true);
         }
 
         ReadTriggers(Get(root, ManifestVocabulary.Triggers), manifest.Triggers);

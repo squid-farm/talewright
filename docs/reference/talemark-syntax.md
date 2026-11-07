@@ -130,6 +130,7 @@ game:
   randomness: checks-only # off | checks-only (default)
   seed: 1234 # optional; omitted = random per playthrough
   undo: true # default; false hides Back/Forward without disabling saves
+  autosave: true # default; false stops new automatic recovery writes
   ruleset:
     base: generic # generic | none
     disable: [cha] # remove stats from the base ruleset
@@ -173,8 +174,8 @@ triggers:
 
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
-This applies to `game.undo`, `game.creation.name`, item `uncountable`, and
-trigger `once`.
+This applies to `game.undo`, `game.autosave`, `game.creation.name`, item
+`uncountable`, and trigger `once`.
 
 Optional mappings and lists may be omitted. Where empty containers are allowed,
 write `{}` or `[]` explicitly. YAML null values (`null`, `~`, or a key with no

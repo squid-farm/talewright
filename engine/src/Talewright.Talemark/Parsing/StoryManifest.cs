@@ -20,6 +20,7 @@ internal sealed class StoryManifest
     public RandomnessMode Randomness { get; set; } = RandomnessMode.ChecksOnly;
     public ulong? Seed { get; set; }
     public bool UndoEnabled { get; set; } = true;
+    public bool AutosaveEnabled { get; set; } = true;
     public CharacterCreation? Creation { get; set; }
     public required WorldDefinition World { get; init; }
     public IReadOnlyDictionary<EntityId, SourceLocation> CharacterLocations { get; init; } =

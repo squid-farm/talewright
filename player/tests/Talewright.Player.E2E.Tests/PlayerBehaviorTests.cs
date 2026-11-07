@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Microsoft.Playwright;
+using Talewright.Runtime.Saves;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -23,6 +25,40 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
             }
 
             await Observe(step);
+        }
+    }
+
+    [Fact]
+    public async Task Disabling_autosave_keeps_trigger_checkpoints_available()
+    {
+        var id = $"autosave-opt-out-{Guid.NewGuid():N}";
+        await Upload(TestStories.AutosaveOptOut(id));
+        await Choose("Continue");
+
+        if (PlayerTarget.IsDesktop)
+        {
+            // Choosing only clicks; trigger checkpoints are written asynchronously.
+            var store = new FileSaveStore(NativeSaveRoot);
+            var timer = Stopwatch.StartNew();
+            var entries = await store.ListEntriesAsync(id);
+            while (!entries.Any(entry => entry.IsTriggerSave))
+            {
+                Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "Trigger checkpoint did not appear.");
+                await Task.Delay(100);
+                entries = await store.ListEntriesAsync(id);
+            }
+
+            Assert.Equal("checkpoint", Assert.Single(entries, entry => entry.IsTriggerSave).TriggerLabel);
+            Assert.DoesNotContain(entries, entry => entry.IsAutosave);
+        }
+        else
+        {
+            await Driver.ClickAsync("Saves");
+            var dialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Saves", Exact = true });
+            var trigger = dialog.Locator("[data-save-kind=trigger]");
+            await Expect(trigger).ToHaveCountAsync(1);
+            await Expect(trigger).ToContainTextAsync("checkpoint");
+            await Expect(dialog.Locator("[data-save-kind=autosave]")).ToHaveCountAsync(0);
         }
     }
 

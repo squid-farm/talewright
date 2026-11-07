@@ -92,7 +92,12 @@ If Quick Save fails, the previous checkpoint is kept: follow the storage advice 
 | Desktop (macOS) | `~/Library/Application Support/Talewright/saves` |
 | Desktop (Linux) | `~/.local/share/Talewright/saves` |
 
-Autosave is on by default. Talewright saves the initial playable point and each completed choice
+Autosave is on by default. Authors can set `game.autosave: false` in
+`story.talewright.yaml` to stop writing new automatic recovery saves. Existing autosaves are
+preserved and remain available to resume or load. This setting does not affect trigger checkpoints,
+Quick Save, or named saves.
+
+When autosave is enabled, Talewright saves the initial playable point and each completed choice
 to one recovery slot. When you reopen the same story, choose **Resume saved game** or **Start a new
 game**; progress is never restored silently. While playing, the **Saves** list also shows the
 **Autosave** entry so you can load your latest autosave at any time. You can't overwrite it, and

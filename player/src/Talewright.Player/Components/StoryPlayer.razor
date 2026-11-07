@@ -354,7 +354,7 @@
     private async Task QueueAutosaveAsync()
     {
         var store = SaveStore;
-        if (store is null) return;
+        if (store is null || !Story.AutosaveEnabled) return;
 
         var sequence = ++_autosaveSequence;
         var generation = _generation;
