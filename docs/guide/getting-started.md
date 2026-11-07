@@ -2,7 +2,8 @@
 
 Talewright stories are folders of text files. Write in **Talemark**, check your changes, then
 play the story and share it. We recommend VS Code with the Talewright extension for writing help.
-You can also use any plain-text editor and the browser player.
+You can also use any plain-text editor and the browser player. If a term is unfamiliar, see the
+[glossary](../reference/glossary.md).
 
 ## 1. Set up your story folder
 

@@ -159,7 +159,7 @@ Check and reopen your story as you normally would. If you're using the Author
 Debugger, restart the story after changing settings files. Keep the whole folder
 together when [sharing your story](sharing-your-story.md).
 
-## The Lost Relic: chapters and a related cast
+## The Lost Relic: chapters and related characters
 
 [The Lost Relic](../../samples/LostRelic) keeps shared expedition settings in
 one root file and builds features across four chapters:
@@ -179,8 +179,8 @@ LostRelic/
 ```
 
 The root holds the game/rules, player, Tomas, trail items, guild and all triggers,
-including the dream's three-mark trigger. The dream settings hold the six-character
-cast, glyph item, variables and promise flag beside their scenes.
+including the dream's three-mark trigger. The dream settings hold the six
+characters, glyph item, variables and promise flag beside their scenes.
 Camp introduces conversations, supplies and the register; the trail adds checks
 and an optional night watch; the temple brings routes together; endings show
 their consequences. Scene prefixes (`camp.`, `trail.`, `temple.`, `ending.`)
