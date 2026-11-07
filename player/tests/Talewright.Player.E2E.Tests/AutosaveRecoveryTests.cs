@@ -177,6 +177,10 @@ public sealed class AutosaveRecoveryTests : IDisposable
             ? Task.FromException<byte[]>(new IOException("Read failed."))
             : inner.ReadAutosaveAsync(storyId);
 
+        public Task<TriggerSave> ReadTriggerAsync(string storyId) => inner.ReadTriggerAsync(storyId);
+
+        public Task WriteTriggerAsync(string storyId, TriggerSave save) => inner.WriteTriggerAsync(storyId, save);
+
         public Task WriteAsync(string storyId, string slot, byte[] data, bool overwrite = false) => FailNamedWrite
             ? Task.FromException(new IOException("Recovery copy failed."))
             : inner.WriteAsync(storyId, slot, data, overwrite);

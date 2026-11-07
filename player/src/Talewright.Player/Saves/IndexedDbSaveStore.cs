@@ -72,6 +72,42 @@ public sealed class IndexedDbSaveStore(IJSRuntime js) : ISaveStore, IAsyncDispos
         await WriteSlotAsync(storyId, SaveEntry.AutosaveSlot, data, overwrite: true);
     }
 
+    public async Task<TriggerSave> ReadTriggerAsync(string storyId)
+    {
+        SaveNames.Validate(storyId);
+        var module = await ModuleAsync();
+        try
+        {
+            var save = await module.InvokeAsync<TriggerSave>("readTrigger", storyId);
+            if (save is null)
+            {
+                throw new InvalidDataException("The trigger checkpoint contains invalid or oversized data.");
+            }
+            save.Validate();
+            return save;
+        }
+        catch (JSException ex) when (ex.Message.Contains("does not exist.", StringComparison.Ordinal))
+        {
+            throw new FileNotFoundException("The trigger checkpoint does not exist.", ex);
+        }
+        catch (JSException ex) when (ex.Message.Contains("invalid or oversized data.", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The trigger checkpoint contains invalid or oversized data.", ex);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidDataException("The trigger checkpoint contains invalid or oversized data.", ex);
+        }
+    }
+
+    public async Task WriteTriggerAsync(string storyId, TriggerSave save)
+    {
+        SaveNames.Validate(storyId);
+        save.Validate();
+        var module = await ModuleAsync();
+        await module.InvokeVoidAsync("writeTrigger", storyId, save.TriggerId, save.Data);
+    }
+
     private async Task WriteSlotAsync(string storyId, string slot, byte[] data, bool overwrite)
     {
         SaveNames.ValidateData(data);

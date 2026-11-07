@@ -16,11 +16,16 @@ public sealed class AuthorReloadTests
         bool includeItems = false,
         string playerName = "Tester",
         int initialCount = 0,
-        int triggerIncrement = 10)
+        int triggerIncrement = 10,
+        bool includeChainFlag = false)
     {
         var manifest = new ManifestFaker("reload", "Reload", "start");
         manifest.Flag("ready");
         manifest.Flag("rewarded");
+        if (includeChainFlag)
+        {
+            manifest.Flag("chain-0");
+        }
         manifest.Number("count", initialCount);
         manifest.Character("player", playerName);
         manifest.Trigger("reward", "flag:ready", EffectFaker.Increase(new TaleVariableRef("count"), triggerIncrement));
@@ -246,8 +251,8 @@ public sealed class AuthorReloadTests
                 do: set flag:chain-{i + 1}
                 once: true
             """));
-        var yaml = Yaml[..Yaml.IndexOf("triggers:", StringComparison.Ordinal)]
-            .Replace("flags: [ready, rewarded]", "flags: [ready, rewarded, chain-0]") + "triggers:\n" + triggers;
+        var yaml = BuildManifest(includeChainFlag: true).Build();
+        yaml = yaml[..yaml.IndexOf("triggers:", StringComparison.Ordinal)] + "triggers:\n" + triggers;
         var original = AuthorSession.Create(Compile(yaml: yaml), new("current"), captureDecisions: true, seed: 42);
         var events = original.Events;
         var decisions = original.Decisions;

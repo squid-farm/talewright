@@ -30,7 +30,9 @@ public sealed class StoryHistory
         _timeline = new ReplayCursor(0, 0);
         _session = new StorySession(story, seed, character: Character);
         var initialState = ReplayEvidence.InitialState(story, _session.State);
+        var eventStart = _session.Events.Count;
         _frames = [new HistoryFrame(_session.Start())];
+        TriggerSaveId = TriggerSaveFiredSince(eventStart);
         _evidence = CanRecordEvidence(story) ? [ReplayEvidence.Start(story, _session, Character, initialState)] : null;
         _replayChoiceIdentities = _evidence is null ? null : [];
     }
@@ -61,6 +63,8 @@ public sealed class StoryHistory
     public int Cursor => _timeline.Position;
     public bool CanBack => Story.UndoEnabled && _timeline.CanBack;
     public bool CanForward => Story.UndoEnabled && _timeline.CanForward;
+    /// <summary>The last saving trigger to fire during the latest start or choice step, if any.</summary>
+    public string? TriggerSaveId { get; private set; }
     /// <summary>The original slot's progress after a load, until the timeline changes.</summary>
     public string? RestoredProgressKey { get; private set; }
 
@@ -95,6 +99,7 @@ public sealed class StoryHistory
         var previousFrame = Current;
         var eventStart = _session.Events.Count;
         var frame = _session.Choose(key);
+        TriggerSaveId = TriggerSaveFiredSince(eventStart);
         if (_evidence is not null && choice.ReplayIdentity is { } identity)
         {
             var next = ReplayEvidence.Next(_evidence[_timeline.Position], previousFrame, identity, _session.Events, eventStart);
@@ -144,7 +149,16 @@ public sealed class StoryHistory
         _session = session;
         _frames = frames;
         _timeline = timeline;
+        TriggerSaveId = null;
         RestoredProgressKey = null;
+    }
+
+    private string? TriggerSaveFiredSince(int eventStart)
+    {
+        var savingTriggers = Story.Triggers.Where(trigger => trigger.Save)
+            .Select(trigger => trigger.Id).ToHashSet(StringComparer.Ordinal);
+        return _session.Events.Skip(eventStart).OfType<TriggerFired>()
+            .LastOrDefault(trigger => savingTriggers.Contains(trigger.TriggerId))?.TriggerId;
     }
 
     public byte[] Save(SaveSummary? summary = null)

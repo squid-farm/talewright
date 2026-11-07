@@ -48,6 +48,11 @@ Each new save shows its name, scene title, save time in your local time zone and
 If saved details cannot be read, the dialog marks them unavailable rather than inventing a timestamp.
 Each story has its own Quick Save checkpoint. Saving again replaces only that checkpoint; use named
 saves to keep multiple points in the story.
+A story can also keep one **Trigger checkpoint** when an author marks a trigger with `save: true`.
+It is labeled with the trigger ID and appears separately from Autosave, Quick Save and named saves.
+The next saving trigger replaces it, even when it has a different ID. If multiple saving triggers fire
+in one step, they produce one checkpoint labeled by the last saving trigger to fire. This
+checkpoint is independent of whether autosave is enabled.
 
 ### Reading earlier passages
 

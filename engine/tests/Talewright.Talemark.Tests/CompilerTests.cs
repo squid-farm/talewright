@@ -819,6 +819,29 @@ public class CompilerTests
         Assert.Equal("once must be true or false.", error.Message);
     }
 
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    public void Trigger_save_accepts_true_or_false(string value, bool expected)
+    {
+        var yaml = Yaml.Replace("once: true", $"once: true\n    save: {value}");
+        var story = Ok("=== a\n-> END", yaml);
+
+        Assert.Equal(expected, Assert.Single(story.Triggers).Save);
+    }
+
+    [Theory]
+    [InlineData("yes")]
+    [InlineData("no")]
+    [InlineData("banana")]
+    public void Trigger_save_rejects_non_boolean_words(string value)
+    {
+        var yaml = Yaml.Replace("once: true", $"once: true\n    save: {value}");
+        var error = Error("=== a\n-> END", "TW4003", yaml);
+
+        Assert.Equal("save must be true or false.", error.Message);
+    }
+
     [Fact]
     public void Rejects_duplicate_trigger_ids()
     {

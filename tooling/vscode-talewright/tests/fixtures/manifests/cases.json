@@ -14,6 +14,8 @@
   { "file": "preset-too-long.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "wrong-type.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "trigger-once-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
+  { "file": "trigger-save-true.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "trigger-save-yes.yaml", "schemaValid": false, "compilerCodes": ["TW4003"] },
   { "file": "boolean-true.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": true },
   { "file": "boolean-false.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": false },
   { "file": "boolean-quoted-true.yaml", "schemaValid": true, "compilerCodes": [], "booleanValue": true },

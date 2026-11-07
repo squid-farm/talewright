@@ -11,11 +11,21 @@ public sealed class AuthorReloadTests : IDisposable
     private static readonly string Yaml = BuildManifest();
     private static readonly string Tale = BuildTale();
 
-    private static string BuildManifest()
+    private static string BuildManifest(bool includeReady = true, bool includeCount = true, bool includeChainFlag = false)
     {
         var manifest = new ManifestFaker("watched", "Watched", "start");
-        manifest.Flag("ready");
-        manifest.Number("count", 0);
+        if (includeReady)
+        {
+            manifest.Flag("ready");
+        }
+        if (includeChainFlag)
+        {
+            manifest.Flag("chain-0");
+        }
+        if (includeCount)
+        {
+            manifest.Number("count", 0);
+        }
         manifest.Character("player", "Tester");
         return manifest.Build();
     }
@@ -219,8 +229,7 @@ public sealed class AuthorReloadTests : IDisposable
         var field = model.Numbers.Single(field => field.Label == "var:count");
         field.Enabled = true;
         field.Value = "7";
-        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml.Replace("flags: [ready]", "flags: []")
-            .Replace("vars: {count: 0}", "vars: {}"));
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), BuildManifest(includeReady: false, includeCount: false));
         Write(Tale.Replace("~ var:count += 1", ""));
         model.Reload();
         Assert.Same(original, model.Session);
@@ -253,8 +262,8 @@ public sealed class AuthorReloadTests : IDisposable
                 do: set flag:chain-{i + 1}
                 once: true
             """));
-        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), Yaml.Replace("flags: [ready]", "flags: [ready, chain-0]")
-            + "\ntriggers:\n" + triggers);
+        var chainManifest = BuildManifest(includeChainFlag: true);
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), chainManifest + "\ntriggers:\n" + triggers);
         model.Reload();
         model.Start();
         model.Choose("c0");

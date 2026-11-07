@@ -10,7 +10,10 @@ namespace Talewright.Rules.Triggers;
 /// A reactive rule: when <see cref="When"/> becomes true, run <see cref="Effects"/>.
 /// Triggers fire on the rising edge (false → true); <see cref="Once"/> triggers fire at most once per playthrough.
 /// </summary>
-public sealed record TriggerDefinition(string Id, Expr When, IReadOnlyList<Effect> Effects, bool Once);
+public sealed record TriggerDefinition(string Id, Expr When, IReadOnlyList<Effect> Effects, bool Once)
+{
+    public bool Save { get; init; }
+}
 
 /// <summary>
 /// Evaluates triggers after every state change. Cascades (a trigger's effects firing another trigger)

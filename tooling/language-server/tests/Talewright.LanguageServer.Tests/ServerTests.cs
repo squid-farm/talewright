@@ -21,10 +21,14 @@ public sealed partial class ServerTests
     private const string Valid = "=== start\nHello.\n-> END\n";
     private const string Invalid = "=== start\nHello.\n* [Missing] -> missing\n";
 
-    private static string BuildManifest()
+    private static string BuildManifest(
+        string firstName = "Ada",
+        string? lastName = null,
+        string? pronouns = null,
+        IReadOnlyDictionary<string, int>? inventory = null)
     {
         var manifest = new ManifestFaker("lsp-test", "LSP test", "start");
-        manifest.Character("player", "Ada");
+        manifest.Character("player", firstName, lastName, pronouns: pronouns, inventory: inventory);
         return manifest.Build(trailingNewline: true);
     }
 

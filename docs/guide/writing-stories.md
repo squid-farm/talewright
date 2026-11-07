@@ -313,7 +313,11 @@ triggers:
     when: faction:explorers-guild:tier <= hostile
     do: set flag:guild-hostile
     once: true
+    save: true
 ```
+
+`save: true` keeps a checkpoint when this trigger fires. The checkpoint appears in the player's
+Saves list with this trigger's ID; saving triggers do not add Talemark syntax.
 
 ## Character creation
 

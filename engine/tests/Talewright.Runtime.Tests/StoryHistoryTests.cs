@@ -1,4 +1,5 @@
 using System.Text;
+using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
@@ -13,7 +14,8 @@ public class StoryHistoryTests
     private static readonly string Yaml = BuildManifest().Build();
     private static readonly string Tale = BuildTale();
 
-    private static ManifestFaker BuildManifest(bool declareVariables = false, bool? undo = null)
+    private static ManifestFaker BuildManifest(bool declareVariables = false, bool? undo = null,
+        bool saveTrigger = false, bool multipleSavingTriggers = false, bool repeatedSavingTrigger = false)
     {
         var manifest = new ManifestFaker("history", "History", "a")
         {
@@ -27,7 +29,18 @@ public class StoryHistoryTests
             manifest.Number("trigger-count", 0);
         }
 
-        manifest.Trigger("first", "var:visits >= 1", EffectFaker.Increase(new TaleVariableRef("trigger-count"), 1), once: true);
+        manifest.Trigger("first", "var:visits >= 1", EffectFaker.Increase(new TaleVariableRef("trigger-count"), 1),
+            once: true, save: saveTrigger);
+        if (multipleSavingTriggers)
+        {
+            manifest.Trigger("second", "var:visits >= 1", EffectFaker.Increase(new TaleVariableRef("trigger-count"), 1),
+                once: true, save: true);
+        }
+        if (repeatedSavingTrigger)
+        {
+            manifest.Trigger("repeat", "var:visits >= 2", EffectFaker.Increase(new TaleVariableRef("trigger-count"), 1),
+                save: true);
+        }
         return manifest;
     }
 
@@ -73,6 +86,35 @@ public class StoryHistoryTests
         Assert.Null(withoutDetails.Summary);
         Assert.Equal(entry.ProgressKey, withoutDetails.ProgressKey);
         Assert.Null(SaveFormat.Read(history.Save()).Summary);
+    }
+
+    [Fact]
+    public void Saving_triggers_coalesce_per_step_and_restore_without_repeating_the_save_request()
+    {
+        var story = Compile(BuildManifest(declareVariables: true, saveTrigger: true, multipleSavingTriggers: true).Build());
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal(["first", "second"], history.Events.OfType<TriggerFired>().Select(trigger => trigger.TriggerId));
+        Assert.Equal("second", history.TriggerSaveId);
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Null(restored.TriggerSaveId);
+        Assert.Equal(history.Events, restored.Events);
+        Assert.Equal(history.State.GetVariable(new VarId("trigger-count")),
+            restored.State.GetVariable(new VarId("trigger-count")));
+    }
+
+    [Fact]
+    public void Repeated_saving_trigger_is_reported_again_after_a_later_step()
+    {
+        var history = new StoryHistory(
+            Compile(BuildManifest(declareVariables: true, saveTrigger: true, repeatedSavingTrigger: true).Build()), 42);
+
+        Assert.Equal("first", history.TriggerSaveId);
+        history.Choose("c0");
+
+        Assert.Equal("repeat", history.TriggerSaveId);
+        Assert.Equal(1, history.Events.OfType<TriggerFired>().Count(trigger => trigger.TriggerId == "repeat"));
     }
 
     [Theory]

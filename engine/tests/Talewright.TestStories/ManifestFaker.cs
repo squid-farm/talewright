@@ -1,5 +1,6 @@
 using System.Globalization;
-using System.Text.Json;
+using YamlDotNet.Core;
+using YamlDotNet.RepresentationModel;
 
 namespace Talewright.Testing;
 
@@ -16,17 +17,12 @@ public sealed class ManifestFaker
         Triggers,
     }
 
-    private static readonly HashSet<string> YamlKeywords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "true", "false", "null",
-    };
-
     private readonly List<TaleFlagRef> _flags = [];
-    private readonly List<(TaleVariableRef Reference, string Value, bool IsText)> _variables = [];
+    private readonly List<(TaleVariableRef Reference, object Value)> _variables = [];
     private readonly List<(TaleItemRef Reference, string Name, KeyValuePair<string, int>[] Modifiers, string? NameAgreement, bool? Uncountable)> _items = [];
     private readonly List<(TaleCharacterRef Reference, string FirstName, string? LastName, string? Pronouns, KeyValuePair<string, int>[] Stats, KeyValuePair<string, int>[] Inventory)> _characters = [];
     private readonly List<(TaleFactionRef Reference, string Name, int Standing)> _factions = [];
-    private readonly List<(string Id, string When, string Do, bool Once)> _triggers = [];
+    private readonly List<(string Id, string When, string Do, bool Once, bool Save)> _triggers = [];
     private readonly List<(string Id, int[] Values)> _creationStats = [];
     private readonly List<(string Id, string Label, KeyValuePair<string, int>[] Stats)> _creationPresets = [];
     private string[]? _creationPronouns;
@@ -103,12 +99,12 @@ public sealed class ManifestFaker
         return flag;
     }
 
-    public TaleVariableRef Number(string id, int value) => Variable(id, value.ToString(CultureInfo.InvariantCulture), false);
+    public TaleVariableRef Number(string id, int value) => Variable(id, value);
 
     public TaleVariableRef Text(string id, string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return Variable(id, value, true);
+        return Variable(id, value);
     }
 
     public TaleItemRef Item(
@@ -188,7 +184,7 @@ public sealed class ManifestFaker
         return reference;
     }
 
-    public void Trigger(string id, string when, string effect, bool once = false)
+    public void Trigger(string id, string when, string effect, bool once = false, bool save = false)
     {
         FakerIdentifier.Require(id, nameof(id));
         ArgumentException.ThrowIfNullOrWhiteSpace(when);
@@ -198,177 +194,314 @@ public sealed class ManifestFaker
             throw new ArgumentException($"Trigger '{id}' is already declared.", nameof(id));
         }
 
-        _triggers.Add((id, when, effect, once));
+        _triggers.Add((id, when, effect, once, save));
         IncludeSection(Section.Triggers);
     }
 
     public string Build(bool trailingNewline = false)
     {
-        List<string> lines =
-        [
-            "game:",
-            $"  id: {Scalar(Id)}",
-            $"  title: {Scalar(Title)}",
-        ];
+        var manifest = Mapping();
+        Add(manifest, "game", BuildGame());
+        foreach (var section in _sections)
+        {
+            Add(manifest, SectionKey(section), BuildSection(section));
+        }
+
+        var textVariableIds = _variables
+            .Where(variable => variable.Value is string)
+            .Select(variable => variable.Reference.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var root = ToYamlNode(manifest) as YamlMappingNode
+            ?? throw new InvalidOperationException("The generated manifest root must be a mapping.");
+
+        if (textVariableIds.Count > 0)
+        {
+            var variablesEntry = root.Children.SingleOrDefault(entry =>
+                entry.Key is YamlScalarNode { Value: "vars" });
+            if (variablesEntry.Value is not YamlMappingNode variables)
+            {
+                throw new InvalidOperationException("The generated text variables must be a mapping.");
+            }
+
+            foreach (var (key, value) in variables.Children)
+            {
+                if (key is YamlScalarNode { Value: { } id } && textVariableIds.Contains(id))
+                {
+                    if (value is not YamlScalarNode scalar)
+                    {
+                        throw new InvalidOperationException($"Generated text variable '{id}' must be a scalar.");
+                    }
+                    scalar.Style = ScalarStyle.DoubleQuoted;
+                }
+            }
+        }
+
+        var stream = new YamlStream(new YamlDocument(root));
+        using (var writer = new StringWriter(CultureInfo.InvariantCulture))
+        {
+            var defaults = EmitterSettings.Default;
+            var settings = new EmitterSettings(
+                defaults.BestIndent,
+                defaults.BestWidth,
+                defaults.IsCanonical,
+                defaults.MaxSimpleKeyLength,
+                defaults.SkipAnchorName,
+                defaults.IndentSequences,
+                "\n",
+                defaults.UseUtf16SurrogatePairs);
+            stream.Save(new Emitter(writer, settings), assignAnchors: false);
+            var yaml = writer.ToString();
+            const string documentEnd = "...\n";
+            if (yaml.EndsWith(documentEnd, StringComparison.Ordinal))
+            {
+                yaml = yaml[..^documentEnd.Length];
+            }
+
+            if (trailingNewline)
+            {
+                return yaml.EndsWith('\n') ? yaml : yaml + "\n";
+            }
+
+            return yaml.EndsWith("\r\n", StringComparison.Ordinal) ? yaml[..^2]
+                : yaml.EndsWith('\n') ? yaml[..^1]
+                : yaml;
+        }
+    }
+
+    private Dictionary<string, object?> BuildGame()
+    {
+        var game = Mapping();
+        Add(game, "id", Id);
+        Add(game, "title", Title);
         if (Version is not null)
         {
-            lines.Add($"  version: {Scalar(Version)}");
+            Add(game, "version", Version);
         }
-
-        lines.Add($"  start: {Scalar(Start)}");
+        Add(game, "start", Start);
         if (Randomness is not null)
         {
-            lines.Add($"  randomness: {Scalar(Randomness)}");
+            Add(game, "randomness", Randomness);
         }
-
         if (Seed is not null)
         {
-            lines.Add($"  seed: {Seed.Value.ToString(CultureInfo.InvariantCulture)}");
+            Add(game, "seed", Seed.Value);
         }
-
         if (Undo is not null)
         {
-            lines.Add($"  undo: {Undo.Value.ToString().ToLowerInvariant()}");
+            Add(game, "undo", Undo.Value);
         }
 
         if (CreationName is not null || _creationPronouns is not null || _creationStats.Count > 0 || _creationPresets.Count > 0)
         {
-            lines.Add("  creation:");
+            var creation = Mapping();
             if (CreationName is not null)
             {
-                lines.Add($"    name: {CreationName.Value.ToString().ToLowerInvariant()}");
+                Add(creation, "name", CreationName.Value);
             }
-
             if (_creationPronouns is not null)
             {
-                lines.Add($"    pronouns: [{string.Join(", ", _creationPronouns.Select(Scalar))}]");
+                Add(creation, "pronouns", _creationPronouns);
             }
-
             if (_creationStats.Count > 0)
             {
-                lines.Add("    stats:");
+                var stats = Mapping();
                 foreach (var (id, values) in _creationStats)
                 {
-                    lines.Add($"      {Scalar(id)}: [{string.Join(", ", values.Select(value => value.ToString(CultureInfo.InvariantCulture)))}]");
+                    Add(stats, id, values);
                 }
+                Add(creation, "stats", stats);
             }
-
             if (_creationPresets.Count > 0)
             {
-                lines.Add("    presets:");
-                foreach (var (id, label, stats) in _creationPresets)
+                var presets = Mapping();
+                foreach (var (id, label, values) in _creationPresets)
                 {
-                    lines.Add($"      {Scalar(id)}:");
-                    lines.Add($"        label: {Scalar(label)}");
-                    if (stats.Length > 0)
+                    var preset = Mapping();
+                    Add(preset, "label", label);
+                    if (values.Length > 0)
                     {
-                        lines.Add($"        stats: {{ {string.Join(", ", stats.Select(stat =>
-                            $"{Scalar(stat.Key)}: {stat.Value.ToString(CultureInfo.InvariantCulture)}"))} }}");
+                        Add(preset, "stats", BuildValues(values));
                     }
+                    Add(presets, id, preset);
                 }
+                Add(creation, "presets", presets);
             }
+            Add(game, "creation", creation);
         }
 
         if (BaseRuleset is not null)
         {
-            lines.Add("  ruleset:");
-            lines.Add($"    base: {Scalar(BaseRuleset)}");
+            var ruleset = Mapping();
+            Add(ruleset, "base", BaseRuleset);
+            Add(game, "ruleset", ruleset);
         }
 
-        foreach (var section in _sections)
-        {
-            switch (section)
-            {
-                case Section.Flags:
-                    lines.Add($"flags: [{string.Join(", ", _flags.Select(flag => Scalar(flag.Id)))}]");
-                    break;
-
-                case Section.Variables:
-                    lines.Add($"vars: {{{string.Join(", ", _variables.Select(variable =>
-                        $"{Scalar(variable.Reference.Id)}: {(variable.IsText ? Quoted(variable.Value) : variable.Value)}"))}}}");
-                    break;
-
-                case Section.Items:
-                    lines.Add("items:");
-                    foreach (var (reference, name, modifiers, nameAgreement, uncountable) in _items)
-                    {
-                        var modifierText = modifiers.Length == 0
-                            ? ""
-                            : $", modifiers: {{ {string.Join(", ", modifiers.Select(modifier =>
-                                $"{Scalar(modifier.Key)}: {modifier.Value.ToString(CultureInfo.InvariantCulture)}"))} }}";
-                        var agreementText = nameAgreement is null ? "" : $", name-agreement: {Scalar(nameAgreement)}";
-                        var uncountableText = uncountable is null ? "" : $", uncountable: {uncountable.Value.ToString().ToLowerInvariant()}";
-                        lines.Add($"  {Scalar(reference.Id)}: {{ name: {Scalar(name)}{modifierText}{agreementText}{uncountableText} }}");
-                    }
-                    break;
-
-                case Section.Characters:
-                    lines.Add("characters:");
-                    foreach (var (reference, firstName, lastName, pronouns, stats, inventory) in _characters)
-                    {
-                        if (lastName is null && pronouns is null && stats.Length == 0 && inventory.Length == 0)
-                        {
-                            lines.Add($"  {Scalar(reference.Id)}: {{first-name: {Scalar(firstName)}}}");
-                            continue;
-                        }
-
-                        lines.Add($"  {Scalar(reference.Id)}:");
-                        lines.Add($"    first-name: {Scalar(firstName)}");
-                        if (lastName is not null)
-                        {
-                            lines.Add($"    last-name: {Scalar(lastName)}");
-                        }
-
-                        if (pronouns is not null)
-                        {
-                            lines.Add($"    pronouns: {Scalar(pronouns)}");
-                        }
-
-                        if (stats.Length > 0)
-                        {
-                            lines.Add($"    stats: {{ {string.Join(", ", stats.Select(stat =>
-                                $"{Scalar(stat.Key)}: {stat.Value.ToString(CultureInfo.InvariantCulture)}"))} }}");
-                        }
-
-                        if (inventory.Length > 0)
-                        {
-                            lines.Add($"    inventory: {{ {string.Join(", ", inventory.Select(item =>
-                                $"{Scalar(item.Key)}: {item.Value.ToString(CultureInfo.InvariantCulture)}"))} }}");
-                        }
-                    }
-                    break;
-
-                case Section.Factions:
-                    lines.Add("factions:");
-                    foreach (var (reference, name, standing) in _factions)
-                    {
-                        lines.Add($"  {Scalar(reference.Id)}: {{ name: {Scalar(name)}, standing: {standing.ToString(CultureInfo.InvariantCulture)} }}");
-                    }
-                    break;
-
-                case Section.Triggers:
-                    lines.Add("triggers:");
-                    foreach (var (id, when, effect, once) in _triggers)
-                    {
-                        lines.Add($"  - id: {Scalar(id)}");
-                        lines.Add($"    when: {Scalar(when)}");
-                        lines.Add($"    do: {Scalar(effect)}");
-                        if (once)
-                        {
-                            lines.Add("    once: true");
-                        }
-                    }
-                    break;
-
-                default:
-                    throw new InvalidOperationException($"Unknown manifest section '{section}'.");
-            }
-        }
-
-        return string.Join('\n', lines) + (trailingNewline ? "\n" : "");
+        return game;
     }
 
-    private TaleVariableRef Variable(string id, string value, bool isText)
+    private object BuildSection(Section section) => section switch
+    {
+        Section.Flags => _flags.Select(flag => flag.Id).ToArray(),
+        Section.Variables => BuildVariables(),
+        Section.Items => BuildItems(),
+        Section.Characters => BuildCharacters(),
+        Section.Factions => BuildFactions(),
+        Section.Triggers => BuildTriggers(),
+        _ => throw new InvalidOperationException($"Unknown manifest section '{section}'."),
+    };
+
+    private Dictionary<string, object?> BuildVariables()
+    {
+        var variables = Mapping();
+        foreach (var (reference, value) in _variables)
+        {
+            Add(variables, reference.Id, value);
+        }
+
+        return variables;
+    }
+
+    private Dictionary<string, object?> BuildItems()
+    {
+        var items = Mapping();
+        foreach (var (reference, name, modifiers, nameAgreement, uncountable) in _items)
+        {
+            var item = Mapping();
+            Add(item, "name", name);
+            if (modifiers.Length > 0)
+            {
+                Add(item, "modifiers", BuildValues(modifiers));
+            }
+            if (nameAgreement is not null)
+            {
+                Add(item, "name-agreement", nameAgreement);
+            }
+            if (uncountable is not null)
+            {
+                Add(item, "uncountable", uncountable.Value);
+            }
+            Add(items, reference.Id, item);
+        }
+
+        return items;
+    }
+
+    private Dictionary<string, object?> BuildCharacters()
+    {
+        var characters = Mapping();
+        foreach (var (reference, firstName, lastName, pronouns, stats, inventory) in _characters)
+        {
+            var character = Mapping();
+            Add(character, "first-name", firstName);
+            if (lastName is not null)
+            {
+                Add(character, "last-name", lastName);
+            }
+            if (pronouns is not null)
+            {
+                Add(character, "pronouns", pronouns);
+            }
+            if (stats.Length > 0)
+            {
+                Add(character, "stats", BuildValues(stats));
+            }
+            if (inventory.Length > 0)
+            {
+                Add(character, "inventory", BuildValues(inventory));
+            }
+            Add(characters, reference.Id, character);
+        }
+
+        return characters;
+    }
+
+    private Dictionary<string, object?> BuildFactions()
+    {
+        var factions = Mapping();
+        foreach (var (reference, name, standing) in _factions)
+        {
+            var faction = Mapping();
+            Add(faction, "name", name);
+            Add(faction, "standing", standing);
+            Add(factions, reference.Id, faction);
+        }
+
+        return factions;
+    }
+
+    private List<Dictionary<string, object?>> BuildTriggers()
+    {
+        var triggers = new List<Dictionary<string, object?>>(_triggers.Count);
+        foreach (var (id, when, effect, once, save) in _triggers)
+        {
+            var trigger = Mapping();
+            Add(trigger, "id", id);
+            Add(trigger, "when", when);
+            Add(trigger, "do", effect);
+            if (once)
+            {
+                Add(trigger, "once", true);
+            }
+            if (save)
+            {
+                Add(trigger, "save", true);
+            }
+            triggers.Add(trigger);
+        }
+
+        return triggers;
+    }
+
+    private static Dictionary<string, object?> BuildValues(IEnumerable<KeyValuePair<string, int>> values)
+    {
+        var mapping = Mapping();
+        foreach (var (key, value) in values)
+        {
+            Add(mapping, key, value);
+        }
+
+        return mapping;
+    }
+
+    private static Dictionary<string, object?> Mapping() => new(StringComparer.Ordinal);
+
+    private static void Add(Dictionary<string, object?> mapping, string key, object? value) =>
+        mapping.Add(key, value);
+
+    private static YamlNode ToYamlNode(object? value) => value switch
+    {
+        Dictionary<string, object?> mapping => ToYamlMapping(mapping),
+        string text => new YamlScalarNode(text),
+        int number => new YamlScalarNode(number.ToString(CultureInfo.InvariantCulture)) { Style = ScalarStyle.Plain },
+        ulong number => new YamlScalarNode(number.ToString(CultureInfo.InvariantCulture)) { Style = ScalarStyle.Plain },
+        bool boolean => new YamlScalarNode(boolean ? "true" : "false") { Style = ScalarStyle.Plain },
+        System.Collections.IEnumerable sequence => new YamlSequenceNode(sequence.Cast<object?>().Select(ToYamlNode)),
+        _ => throw new InvalidOperationException($"Unsupported manifest value type '{value?.GetType().FullName ?? "null"}'."),
+    };
+
+    private static YamlMappingNode ToYamlMapping(Dictionary<string, object?> mapping)
+    {
+        var node = new YamlMappingNode();
+        foreach (var (key, value) in mapping)
+        {
+            node.Add(key, ToYamlNode(value));
+        }
+
+        return node;
+    }
+
+    private static string SectionKey(Section section) => section switch
+    {
+        Section.Flags => "flags",
+        Section.Variables => "vars",
+        Section.Items => "items",
+        Section.Characters => "characters",
+        Section.Factions => "factions",
+        Section.Triggers => "triggers",
+        _ => throw new InvalidOperationException($"Unknown manifest section '{section}'."),
+    };
+
+    private TaleVariableRef Variable(string id, object value)
     {
         var reference = new TaleVariableRef(id);
         if (_variables.Any(variable => variable.Reference.Id == id))
@@ -376,7 +509,7 @@ public sealed class ManifestFaker
             throw new ArgumentException($"Variable '{id}' is already declared.", nameof(id));
         }
 
-        _variables.Add((reference, value, isText));
+        _variables.Add((reference, value));
         IncludeSection(Section.Variables);
         return reference;
     }
@@ -389,19 +522,4 @@ public sealed class ManifestFaker
         }
     }
 
-    private static string Scalar(string text)
-    {
-        if (text.Length > 0 &&
-            char.IsAsciiLetterOrDigit(text[0]) &&
-            text == text.Trim() &&
-            text.All(character => char.IsAsciiLetterOrDigit(character) || character is ' ' or '-' or '_' or '.') &&
-            !YamlKeywords.Contains(text))
-        {
-            return text;
-        }
-
-        return Quoted(text);
-    }
-
-    private static string Quoted(string text) => JsonSerializer.Serialize(text);
 }
