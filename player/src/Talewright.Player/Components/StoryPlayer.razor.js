@@ -3,8 +3,11 @@ const scrollInterrupts = new WeakMap();
 export function initialize(transcript) {
     if (!transcript || scrollInterrupts.has(transcript)) return;
     const interrupt = () => {
-        // Keep the pressed target under the pointer until the reader releases it.
-        window.scrollTo({ left: window.scrollX, top: window.scrollY, behavior: "instant" });
+        // Keep the pressed target under the pointer until the reader releases it. Firefox ignores an instant
+        // scroll to the current position, so step 1px away and back to cancel any smooth scroll in progress.
+        const { scrollX: left, scrollY: top } = window;
+        window.scrollTo({ left, top: top > 0 ? top - 1 : top + 1, behavior: "instant" });
+        window.scrollTo({ left, top, behavior: "instant" });
     };
     transcript.addEventListener("pointerdown", interrupt, { capture: true });
     scrollInterrupts.set(transcript, interrupt);

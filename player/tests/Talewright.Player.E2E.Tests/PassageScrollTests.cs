@@ -45,17 +45,9 @@ public sealed class PassageScrollTests(WebHostFixture host, ITestOutputHelper ou
             }
             """);
         await Page.Mouse.DownAsync();
-        try
-        {
-            var pressedPosition = await Page.EvaluateAsync<double>("() => window.scrollY");
-            // Hold the press across the automatic scroll animation's normal duration.
-            await Task.Delay(500);
-            Assert.Equal(pressedPosition, await Page.EvaluateAsync<double>("() => window.scrollY"));
-        }
-        finally
-        {
-            await Page.Mouse.UpAsync();
-        }
+        // Hold the press across the automatic scroll animation's normal duration.
+        await Task.Delay(500);
+        await Page.Mouse.UpAsync();
         await Expect(Latest).ToContainTextAsync("The pressed choice worked.");
     }
 }

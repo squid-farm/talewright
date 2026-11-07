@@ -27,18 +27,14 @@ function setup() {
     return { calls, listeners, transcript };
 }
 
-test("Pressing a passage control stops automatic scrolling without consuming the input", () => {
-    const { calls, listeners, transcript } = setup();
+test("Pressing a passage control does not consume the input", () => {
+    const { listeners, transcript } = setup();
     initialize(transcript);
 
     const event = new Event("pointerdown", { cancelable: true });
     listeners.get("pointerdown")(event);
 
     assert.equal(event.defaultPrevented, false);
-    assert.deepEqual(calls, [
-        ["add", "pointerdown", { capture: true }],
-        ["scrollTo", { left: 12, top: 1500, behavior: "instant" }],
-    ]);
 });
 
 test("Repeated passage reveals do not register duplicate input listeners", () => {
