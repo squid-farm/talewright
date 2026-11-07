@@ -199,7 +199,8 @@ ID/version/fingerprint, extension and engine/tool compatibility, character, seed
 prerequisite overrides, choices, live edits, jumps and the timeline cursor (including redo).
 It does **not** export arbitrary state, events, source code or extensions. Share the matching story
 source separately and use the same tool version.
-Before v1, scenario formats may change without migration support; older recipes can become unsupported.
+Scenario files are a testing tool and are not covered by the 1.0 compatibility freeze: before 1.0, an
+older recipe can become unsupported. Your stories and player saves are unaffected.
 
 1. Set **Scenario file path** to an absolute path outside your story and player-save folders.
    The initial suggestion is in your local application's `Talewright/author-scenarios` directory,

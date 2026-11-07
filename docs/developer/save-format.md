@@ -113,7 +113,8 @@ names; effect and expression kinds use the encoder's own tokens or the current T
 spellings. `ChoiceReplayIdentityEncodingTests` pins descriptions and identities for every built-in effect,
 expression and operator, and fails when a new effect or expression type has no encoding. If one of
 those vectors fails, the change altered saved identities: either keep the old token or deliberately
-change the version tag and record the compatibility decision. Preview saves are not migrated.
+change the version tag. Changing an identity is a compatibility break under the
+[compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
 
 Replay evidence is a versioned SHA-256 chain. Its start binds the story and replay/extension identity,
 seed, character selection, initial ruleset and world state, and start events. Each decision binds its
@@ -127,7 +128,11 @@ changes evidence. `ReplayEvidenceEncodingTests` pins the input bytes of every ga
 of a representative initial state and rule configuration, plus complete-timeline evidence with
 checks, triggers and redo; `StoryCompatibilityTests` pins two more evidence values. A failing vector
 means saved evidence would change: keep the old encoding, or deliberately bump the evidence version
-and record the compatibility decision. Preview saves are not migrated.
+and record the compatibility decision. From 1.0.0-preview.1, saves made by a preview must keep loading:
+changing evidence is a compatibility break under the
+[compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze), which needs a project-lead decision,
+a version bump and migration notes. The golden save tests
+([#570](https://github.com/squid-farm/talewright/issues/570)) load real saves to prove gameplay is unchanged.
 
 Prose, label, unrelated-choice, ordering, and availability-requirement changes can be compatible.
 Changed starting values or recorded gameplay outcomes are not. This checks a replay path, not a saved

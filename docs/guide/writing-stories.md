@@ -83,7 +83,7 @@ Select stored forms with `:subject`, `:object`, `:reflexive`,
 `:possessive-pronoun:determiner` or `:possessive-pronoun:independent` after
 `player:pronoun`. These properties also work in comparisons and text assignments.
 See [substitutions](../reference/talemark-syntax.md#3-substitutions) for everything you can insert and the
-`#modifiers` you can apply.
+`#manipulators` you can apply.
 For a complete two-branch example, see [change a name in one place](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
 
 For wording that changes with a character's chosen pronouns, supply both forms:
@@ -120,6 +120,37 @@ for the optional `governing-attribute` setting.
 
 Change stats with effects: `~ player:hp -= 2` on its own line where the change should happen, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
+
+### Change a built-in stat
+
+Rename Symbol in VS Code can't rename a built-in stat such as `hp`, because the ruleset owns its ID.
+To show a different name to players, keep the ID and redeclare the stat in `ruleset.stats` with a new
+`name`. A redeclaration replaces the whole definition, so repeat the range and default too:
+
+```yaml
+game:
+  ruleset:
+    stats:
+      - { id: hp, name: Vigor, category: resource, min: 0, max: 999, default: 10 }
+```
+
+Your story still writes `player:hp`; players see "Vigor".
+
+To use a different ID, add your own stat, disable the built-in one, and replace `hp` with your ID in
+your story files and character `stats:` by hand:
+
+```yaml
+game:
+  ruleset:
+    disable: [hp]
+    stats:
+      - { id: vigor, name: Vigor, category: resource, min: 0, max: 999, default: 10 }
+```
+
+Keep `xp` and `level` if you want automatic leveling, since leveling looks them up by ID. Built-in
+skills use the attributes (`str`, `dex`, ...) as their governing attribute. If you replace an
+attribute, redeclare the skills that used it with
+[`governing-attribute`](authoring-recipes.md#link-a-skill-to-a-custom-attribute) set to your new ID.
 
 ## Items
 
@@ -275,10 +306,10 @@ Or as a block, which can also contain choices, effects and `->` lines:
 {/if}
 ```
 
-## Hubs and storylets
+## Hubs
 
 Instead of wiring every option by hand, tag scenes and let a **hub** offer whichever ones are currently
-available. Scenes offered this way are sometimes called **storylets**:
+available:
 
 ```tale
 === camp

@@ -76,11 +76,12 @@ optional developer feature; see [C# extensions](../developer/csharp-extensions.m
 
 ## Compatibility
 
-Talemark and the engine are versioned together. A major version may change or remove syntax, but
-only when unavoidable, with advance notice, and with errors that show the replacement plus a
-migration note. Adding new syntax needs no compatibility handling and can happen in any release.
-Adding syntax that reserves a character existing prose may already use counts as a change, not an
-addition.
+Talemark and the engine are versioned together. From 1.0.0-preview.1, Talemark syntax, story files
+and saves made by a preview keep working in later 1.x releases. Syntax is changed or removed only to
+fix a severe defect, such as a security or data-loss bug, with advance notice, an error that shows the
+replacement, and a migration note. New syntax may arrive in any release, but only if existing stories
+compile the same way: syntax that reserves a character or word existing prose may already use counts
+as a change, not an addition.
 
 Identifiers are names for scenes, characters, items and other story parts. Use letters, numbers,
 underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
@@ -92,6 +93,7 @@ Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser
 The naming lint rules TWL001/TWL002 check that style only if you enable them; they do not make an
 otherwise valid name illegal.
 
+The [glossary](glossary.md) defines the terms used throughout these docs.
 The [Talemark operator registry](talemark-operators.md) is a deeper technical reference for symbols,
 calculation order and quoting rules. Most authors will not need it for a first story.
 
@@ -315,7 +317,7 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `@hub tag`                                         | At this scene, offer each available scene with the tag as a choice.                            |
 | `@hub a and b [and c…]`                            | Offer scenes that have every listed tag.                                                      |
 | `@hub a or b [or c…]`                              | Offer scenes that have at least one listed tag.                                               |
-| `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
+| `@hub-limit N`                                    | Cap generated hub choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (bold and italic formatting).                                                       |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
@@ -384,7 +386,6 @@ A scene-level `->` leaves immediately, showing the prose already rendered with a
 There is no implicit fallback or gather. A scene without a possible choice, divert or hub is a dead end.
 If play reaches a scene whose choice requirements all fail and whose hub offers nothing, the story shows
 "The story cannot continue" and ends. Validation does not predict which requirements will hold.
-These are breaking pre-v1 execution rules; the replay fingerprint changed, not the save format.
 
 **Advanced: hub selection.** A scene may have only one `@hub` and one
 `@hub-limit`. A hub checks tags, requirements and `@once`, then sorts matching scenes by priority
@@ -426,7 +427,7 @@ editor's soft wrapping for display instead.
 
 ## 3. Substitutions
 
-`{reference#modifier#modifier…}`
+`{reference#manipulator#manipulator…}`
 
 | Reference                                                                                   | Value                                     |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -451,7 +452,7 @@ comparisons to reputation tiers with `faction:<id>:tier`.
 
 Any character id can replace `player`.
 
-| Modifier            | Effect                                                                                       |
+| Manipulator         | Effect                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | `#possessive`       | Grammatically correct English possessive (Chicago style): `Mara's`, `Burns's`, `the guards'` |
 | `#capitalize`       | First letter upper case                                                                      |
@@ -462,7 +463,7 @@ Any character id can replace `player`.
 | `#bold` / `#italic` | Apply bold or italic formatting to the value                                                  |
 
 `#bold` and `#italic` produce formatted text without changing its characters. They may follow
-text modifiers, and may be chained with each other; text modifiers cannot follow them. Use
+text manipulators, and may be chained with each other; text manipulators cannot follow them. Use
 `#upper#bold`, not `#bold#upper`.
 
 Prose formatting is syntax sugar for the same style model: `**{player:first-name}**` and
@@ -471,7 +472,7 @@ correspond to `#italic`. This does not turn a default into an alias: a textless 
 authored label, and its **Continue** label is chosen by the player.
 
 **Pronoun properties.** `{player:pronoun}` is shorthand for `{player:pronoun:subject}`.
-Choose a stored form with property access, then chain text modifiers after the value:
+Choose a stored form with property access, then chain text manipulators after the value:
 
 | Write                                         | `she`     | `they`       |
 | --------------------------------------------- | --------- | ------------ |
@@ -493,7 +494,6 @@ These are ordinary text expressions, usable in comparisons and text assignments:
 ```
 
 `#possessive` is a text transformation, not a way to select stored pronoun data.
-This is a breaking pre-alpha syntax change with no compatibility aliases or migration handling.
 
 **Pronoun agreement.** Supply two wordings with `#one-many("singular", "plural")`:
 
@@ -510,7 +510,7 @@ Custom sets use their required `agreement` setting.
 
 The selector outputs only the chosen text, not the pronoun. Both strings are
 required (empty strings are allowed); authors control the wording, including
-nonstandard grammar. Other text modifiers can follow it, as with `#capitalize`.
+nonstandard grammar. Other text manipulators can follow it, as with `#capitalize`.
 Inside these quoted arguments, `\"` means a quote and `\\` means a backslash.
 Other backslash escapes are errors. Commas, apostrophes, braces and `#` inside a quoted string are text.
 
@@ -523,7 +523,7 @@ their `name-agreement`, as described below. Character names, text variables,
 population and item quantities never select a branch. Unsupported
 targets, missing arguments and extra arguments produce TW2006; an unclosed quote
 can leave the substitution unclosed (TW1004). This adds no general multi-argument
-modifier support or grammar inference.
+manipulator support or grammar inference.
 
 ### Item-name grammar
 
@@ -559,7 +559,7 @@ string, singular first. `uncountable` changes `#a` to `some`, not agreement:
 armor still takes "this" and "is". `#possessive` also respects name agreement:
 `handcuffs'` and `armor's`.
 
-The original item reference retains its grammar throughout a modifier chain:
+The original item reference retains its grammar throughout a manipulator chain:
 `{item:pants#upper#one-many("is", "are")}` still gives "are". Inventory quantity
 does not matter: one unit of pants remains plural; five swords do not change
 the singular displayed name. Assigning `~ var:word = item:pants` copies only the

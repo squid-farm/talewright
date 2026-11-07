@@ -17,6 +17,7 @@ public sealed class LanguageServer
     private readonly Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? _analyze;
     private readonly Func<TimeSpan, CancellationToken, Task>? _delay;
     private readonly Action<DiagnosticPublication>? _measure;
+    private readonly Func<Task>? _beforeRequestFinished;
     private readonly Channel<object> _events = Channel.CreateUnbounded<object>(new() { SingleReader = true });
     private readonly Dictionary<string, Story> _stories = new(PathComparer);
     private readonly Dictionary<string, Document> _documents = new(PathComparer);
@@ -32,6 +33,8 @@ public sealed class LanguageServer
     private bool _inlayRefreshSupported;
     private bool _documentChangesSupported;
     private bool _createFileOperationSupported;
+    private bool _changeAnnotationsSupported;
+    private bool _prepareRenameSupported;
     private bool _inlayRefreshPending;
     private const string InlayRefreshId = "talewright/inlayHintRefresh";
 
@@ -42,13 +45,15 @@ public sealed class LanguageServer
 
     internal LanguageServer(Stream input, Stream output, TextWriter errors,
         Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? analyze,
-        Func<TimeSpan, CancellationToken, Task>? delay, Action<DiagnosticPublication>? measure = null)
+        Func<TimeSpan, CancellationToken, Task>? delay, Action<DiagnosticPublication>? measure = null,
+        Func<Task>? beforeRequestFinished = null)
     {
         _protocol = new(input, output);
         _errors = errors;
         _analyze = analyze;
         _delay = delay;
         _measure = measure;
+        _beforeRequestFinished = beforeRequestFinished;
     }
 
     private static StringComparer PathComparer => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -83,7 +88,7 @@ public sealed class LanguageServer
         LspRange selectionRange,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? detail);
     private sealed record ProtocolError(int Code, string Message);
-    private enum Feature { Completion, Hover, Definition, References, InlayHints, CodeActions, SemanticTokens }
+    private enum Feature { Completion, Hover, Definition, References, InlayHints, CodeActions, SemanticTokens, PrepareRename, Rename }
     private const int DiagnosticLimit = 200;
     private static readonly TimeSpan DiagnosticsDebounce = TimeSpan.FromMilliseconds(150);
     private sealed class PendingRequest(JsonElement id, string key, string method, string path, Document document,
@@ -108,6 +113,8 @@ public sealed class LanguageServer
         public bool CreateFileOperationSupported { get; } = createFileOperationSupported;
         public IReadOnlyDictionary<string, int> DocumentVersions { get; } = documentVersions;
         public bool IncludeDeclaration { get; init; }
+        public string? NewName { get; init; }
+        public bool ChangeAnnotationsSupported { get; init; }
         public bool UseCurrentFileAnalysis { get; set; }
         public StoryAnalysis? SymbolSnapshot { get; set; }
         public CancellationTokenSource Cancellation { get; } = new();
@@ -264,6 +271,7 @@ public sealed class LanguageServer
                         hoverProvider = true,
                         definitionProvider = true,
                         referencesProvider = true,
+                        renameProvider = _prepareRenameSupported ? new { prepareProvider = true } : (object)true,
                         documentSymbolProvider = true,
                         workspaceSymbolProvider = true,
                         inlayHintProvider = true,
@@ -324,6 +332,14 @@ public sealed class LanguageServer
                 case "textDocument/references":
                     if (!hasId) throw new ArgumentException("references requires a request id.");
                     await StartSemanticAsync(id, parameters, Feature.References, cancellationToken);
+                    break;
+                case "textDocument/prepareRename":
+                    if (!hasId) throw new ArgumentException("prepareRename requires a request id.");
+                    await StartSemanticAsync(id, parameters, Feature.PrepareRename, cancellationToken);
+                    break;
+                case "textDocument/rename":
+                    if (!hasId) throw new ArgumentException("rename requires a request id.");
+                    await StartSemanticAsync(id, parameters, Feature.Rename, cancellationToken);
                     break;
                 case "textDocument/documentSymbol":
                     if (!hasId) throw new ArgumentException("documentSymbol requires a request id.");
@@ -390,7 +406,14 @@ public sealed class LanguageServer
                 resourceOperations.ValueKind == JsonValueKind.Array &&
                 resourceOperations.EnumerateArray().Any(operation =>
                     operation.ValueKind == JsonValueKind.String && operation.GetString() == "create");
+            _changeAnnotationsSupported = _documentChangesSupported &&
+                workspaceEdit.TryGetProperty("changeAnnotationSupport", out var changeAnnotations) &&
+                changeAnnotations.ValueKind == JsonValueKind.Object;
         }
+        _prepareRenameSupported = parameters.TryGetProperty("capabilities", out clientCapabilities) &&
+            clientCapabilities.TryGetProperty("textDocument", out var textDocumentCapabilities) &&
+            textDocumentCapabilities.TryGetProperty("rename", out var rename) && rename.ValueKind == JsonValueKind.Object &&
+            rename.TryGetProperty("prepareSupport", out var prepareSupport) && prepareSupport.ValueKind == JsonValueKind.True;
         if (parameters.TryGetProperty("capabilities", out var capabilities) &&
             capabilities.TryGetProperty("textDocument", out var textDocument) &&
             textDocument.TryGetProperty("hover", out var hover) &&
@@ -494,6 +517,13 @@ public sealed class LanguageServer
                 ? parameters.GetProperty("range").GetProperty("start") : parameters.GetProperty("position"));
         var end = isRangeRequest ? Position(parameters.GetProperty("range").GetProperty("end")) : position;
         if (Compare(position, end) > 0) throw new ArgumentException($"{feature} range is reversed.");
+        string? newName = null;
+        if (kind == Feature.Rename)
+        {
+            if (!parameters.TryGetProperty("newName", out var newNameElement) || newNameElement.ValueKind != JsonValueKind.String)
+                throw new ArgumentException("Rename requires a newName string.");
+            newName = newNameElement.GetString()!;
+        }
         if (story.MetadataError is { } error)
         {
             await ErrorAsync(id, -32001, $"{feature} unavailable: {error.Message}", cancellationToken);
@@ -512,6 +542,7 @@ public sealed class LanguageServer
             Feature.InlayHints => "textDocument/inlayHint",
             Feature.CodeActions => "textDocument/codeAction",
             Feature.SemanticTokens => "textDocument/semanticTokens/full",
+            Feature.PrepareRename => "textDocument/prepareRename",
             _ => $"textDocument/{feature.ToLowerInvariant()}"
         };
         var documentVersions = _documents
@@ -523,7 +554,9 @@ public sealed class LanguageServer
         {
             IncludeDeclaration = kind == Feature.References &&
                 parameters.TryGetProperty("context", out var context) && context.ValueKind == JsonValueKind.Object &&
-                context.TryGetProperty("includeDeclaration", out var include) && include.ValueKind == JsonValueKind.True
+                context.TryGetProperty("includeDeclaration", out var include) && include.ValueKind == JsonValueKind.True,
+            NewName = newName,
+            ChangeAnnotationsSupported = _changeAnnotationsSupported
         };
         _requests.Add(key, request);
         var published = story.PublishedAnalysis;
@@ -542,7 +575,12 @@ public sealed class LanguageServer
             ? request.Story.Pending ?? throw new InvalidOperationException("No analysis is scheduled for the request.")
             : null;
         shared?.StartImmediately();
-        var task = Task.Run(() => CalculateSemanticAsync(request, shared, previous));
+        var task = Task.Run(async () =>
+        {
+            var result = await CalculateSemanticAsync(request, shared, previous).ConfigureAwait(false);
+            if (_beforeRequestFinished is not null) await _beforeRequestFinished().ConfigureAwait(false);
+            return result;
+        });
         _requestTasks.Add(task, request);
         _ = task.ContinueWith(completed => _events.Writer.TryWrite(new RequestFinished(request, completed)),
             CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
@@ -679,6 +717,25 @@ public sealed class LanguageServer
             };
             return new(result, previous, target);
         }
+        if (request.Feature == Feature.PrepareRename)
+        {
+            var preparation = StoryRename.Prepare(analysis, position);
+            if (preparation.Refusal is { } refusal) return new(null, ErrorCode: -32803, ErrorMessage: refusal);
+            return new(preparation.Target is not { } target ? null : new
+            {
+                range = ToLspRange(target.Range),
+                placeholder = target.Name
+            }, previous);
+        }
+        if (request.Feature == Feature.Rename)
+        {
+            // Rename always uses a whole-story analysis of the current workspace text, so each edit and version is current.
+            var result = StoryRename.Rename(analysis, position, request.NewName!,
+                (source, token) => request.Story.Workspace.AnalyzeEdited(source, token),
+                request.Story.LintConfiguration, cancellationToken);
+            if (result.Refusal is { } refusal) return new(null, ErrorCode: -32803, ErrorMessage: refusal);
+            return new(ToRenameEdit(result, request), previous);
+        }
         if (request.Feature == Feature.References)
         {
             // References always use a whole-story analysis of the current workspace text, so every range is current.
@@ -802,6 +859,47 @@ public sealed class LanguageServer
         };
     }
 
+    private const string RenameAnnotation = "talewright.rename";
+
+    private static object ToRenameEdit(StoryRenameResult result, PendingRequest request)
+    {
+        var files = result.Edits.GroupBy(edit => edit.Range.Start.File, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => (
+                Uri: UriFromPath(Path.GetFullPath(group.Key, request.Root)),
+                File: group.Key,
+                Edits: group.OrderBy(edit => edit.Range.Start.Line).ThenBy(edit => edit.Range.Start.Column).ToArray()))
+            .ToArray();
+        if (!request.DocumentChangesSupported)
+            return new
+            {
+                changes = files.ToDictionary(file => file.Uri,
+                    file => file.Edits.Select(edit => (object)new { range = ToLspRange(edit.Range), newText = edit.NewText }).ToArray())
+            };
+
+        var annotate = request.ChangeAnnotationsSupported && result.Warning is not null;
+        var documentChanges = files.Select(file => new
+        {
+            textDocument = new
+            {
+                uri = file.Uri,
+                version = request.DocumentVersions.TryGetValue(file.File, out var version) ? (int?)version : null
+            },
+            edits = file.Edits.Select(edit => annotate
+                ? (object)new { range = ToLspRange(edit.Range), newText = edit.NewText, annotationId = RenameAnnotation }
+                : new { range = ToLspRange(edit.Range), newText = edit.NewText }).ToArray()
+        }).ToArray();
+        if (!annotate) return new { documentChanges };
+        return new
+        {
+            documentChanges,
+            changeAnnotations = new Dictionary<string, object>
+            {
+                [RenameAnnotation] = new { label = "Rename", needsConfirmation = true, description = result.Warning }
+            }
+        };
+    }
+
     private static object ToDisabledCodeAction(string title, string reason, Diagnostic diagnostic, LineMap lines) => new
     {
         title,
@@ -835,26 +933,26 @@ public sealed class LanguageServer
             return;
         }
         var result = await finished.Task;
-        if (result.ErrorCode is { } code)
-        {
-            if (result.Error is { } error) await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {error.Message}");
-            await FinishRequestErrorAsync(request, code, result.ErrorMessage!, cancellationToken);
-            return;
-        }
         if (!_documents.TryGetValue(request.Path, out var document) || document.Text != request.Text ||
             !PathComparer.Equals(document.Root, request.Root) || !_stories.TryGetValue(request.Root, out var story))
         {
             await FinishRequestErrorAsync(request, -32801, "Document content was modified.", cancellationToken);
             return;
         }
-        if (story.MetadataError is { } metadataError)
-        {
-            await FinishRequestErrorAsync(request, -32001, $"{request.Feature} unavailable: {metadataError.Message}", cancellationToken);
-            return;
-        }
         if (result.Previous is null && (!ReferenceEquals(story, request.Story) || story.Generation != request.Generation))
         {
             await FinishRequestErrorAsync(request, -32801, "Document content was modified.", cancellationToken);
+            return;
+        }
+        if (result.ErrorCode is { } code)
+        {
+            if (result.Error is { } error) await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {error.Message}");
+            await FinishRequestErrorAsync(request, code, result.ErrorMessage!, cancellationToken);
+            return;
+        }
+        if (story.MetadataError is { } metadataError)
+        {
+            await FinishRequestErrorAsync(request, -32001, $"{request.Feature} unavailable: {metadataError.Message}", cancellationToken);
             return;
         }
         if (result.Previous is { } previous && result.Target is { } target &&

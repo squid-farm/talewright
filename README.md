@@ -6,18 +6,16 @@
 
 **Write branching, stat-driven RPG stories in plain text. Play them on the web or the desktop.**
 
-> ## ⚠️ PRE-1.0 PREVIEW: BACKWARD COMPATIBILITY IS NOT GUARANTEED
->
-> Talewright is currently in public preview. Before `v1.0`, story syntax, save formats, APIs, tooling,
-> and project structure may change without notice. **Do not expect backward compatibility until v1.**
->
-> Development targets the current format and API, not compatibility shims or migrations for older
-> versions. Any pre-v1 compatibility exception requires an explicit project-lead decision.
+> **1.0 preview: stories and saves are stable.** From 1.0.0-preview.1, Talemark syntax, story files
+> and saves made by a preview will keep working in later 1.x releases. We will break this only to fix
+> a severe defect, such as a security or data-loss bug, and will announce it in advance, with an error
+> that names the replacement and migration notes. Tooling, debugger scenario files and C# extension
+> APIs may still change before 1.0.
 
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
 and many branches. **Talemark is the story-authoring language that powers your Talewright stories.**
 Its `.tale` files combine bold and italic formatting, dialogue, choices, conditions, and RPG effects;
-`story.talewright.yaml` defines your cast and rules. No programming required.
+`story.talewright.yaml` defines your characters and rules. No programming required.
 
 ```tale
 === temple.entrance
@@ -36,8 +34,8 @@ Its `.tale` files combine bold and italic formatting, dialogue, choices, conditi
 - **Write in Talemark.** Plain-text stories with bold and italic formatting, dialogue lines, choices, and inline or block `{if}` conditions. Backticks are ordinary text.
 - **Proper RPG rules.** Stats, skills, d20 skill checks, items that modify stats, factions with
   reputation tiers, XP and levels. Use the default ruleset, tweak it, or replace it.
-- **Big branching stories.** Hubs and storylets offer whichever scenes are currently available, so you
-  don't have to wire every path by hand. Benchmarks compile 10,000-scene stories in under a second.
+- **Big branching stories.** Hubs offer whichever scenes are currently available, so you don't
+  have to wire every path by hand. Benchmarks compile 10,000-scene stories in under a second.
   See the [performance results](docs/developer/performance.md).
 - **Grammar handled for you.** Names, pronouns (including custom sets), possessives ("Burns's") and a/an.
 - **Errors caught before players see them.** Broken links, unknown items and typo'd stats are reported
