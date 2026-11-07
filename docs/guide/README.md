@@ -15,4 +15,5 @@ Talemark is the story-authoring language in your `.tale` files. No programming r
 7. **[Troubleshooting](troubleshooting.md):** common problems and fixes.
 
 The [Talemark syntax reference](../reference/talemark-syntax.md) has quick examples first and the full language details after.
+The [author cheat sheet](cheat-sheet.md) summarizes syntax and VS Code shortcuts.
 Use [error codes](../reference/diagnostics.md) when a check reports a problem; start with the first error.

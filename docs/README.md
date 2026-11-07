@@ -15,6 +15,7 @@ New here? Play the [web player](https://play.trytalewright.com/), then follow
 |---|---|
 | [Getting started](guide/getting-started.md) | Play in the browser; install the desktop tools |
 | [Your first story](guide/first-story.md) | A complete story, step by step |
+| [Author cheat sheet](guide/cheat-sheet.md) | Talemark syntax and VS Code shortcuts |
 | [Writing stories](guide/writing-stories.md) | Characters, stats, items, factions, checks, hubs, conditions |
 | [Playing and saving](guide/playing-and-saving.md) | The player screen, saves, Back/Forward |
 | [Testing your story](guide/testing-your-story.md) | Validation and the Author Debugger |
