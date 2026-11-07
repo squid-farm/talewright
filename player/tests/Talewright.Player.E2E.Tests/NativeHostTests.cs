@@ -172,9 +172,9 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
                 """,
         };
         await Driver.StartAsync();
-        await Driver.ResizeAsync(720, 600);
         await Upload(fixture);
         await Observe(new(null, "First passage"));
+        await Driver.ResizeAsync(720, 600);
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
 

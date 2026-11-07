@@ -74,3 +74,31 @@ test("Restart still focuses the first passage from the toolbar", () => {
         ["focus", { preventScroll: true }],
     ]);
 });
+
+for (const { preference, systemReducesMotion, behavior } of [
+    { preference: "system", systemReducesMotion: false, behavior: "smooth" },
+    { preference: "system", systemReducesMotion: true, behavior: "auto" },
+    { preference: "reduce", systemReducesMotion: false, behavior: "auto" },
+    { preference: "reduce", systemReducesMotion: true, behavior: "auto" },
+]) {
+    for (const isFirst of [true, false]) {
+        test(`${preference} preference with OS reduction ${systemReducesMotion} uses ${behavior} for ${isFirst ? "first" : "later"} passages`, () => {
+            const { calls, latest, transcript } = setup();
+            document.documentElement = { dataset: { twReducedMotion: preference } };
+            window.matchMedia = query => {
+                assert.equal(query, "(prefers-reduced-motion: reduce)");
+                return { matches: systemReducesMotion };
+            };
+
+            revealLatest(transcript, isFirst);
+
+            assert.equal(document.activeElement, latest);
+            assert.deepEqual(calls, [
+                isFirst
+                    ? ["scrollTo", { top: 0, behavior }]
+                    : ["scrollIntoView", { block: "start", behavior }],
+                ["focus", { preventScroll: true }],
+            ]);
+        });
+    }
+}

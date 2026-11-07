@@ -13,8 +13,8 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
         return;
     }
 
-    const reduceMotion = document.documentElement.dataset.twReducedMotion === "reduce"
-        || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        || document.documentElement.dataset.twReducedMotion === "reduce";
     const behavior = reduceMotion ? "auto" : "smooth";
     if (isFirst) {
         window.scrollTo({ top: 0, behavior });
