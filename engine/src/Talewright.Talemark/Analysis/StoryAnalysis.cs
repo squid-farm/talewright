@@ -73,6 +73,7 @@ public sealed class StoryAnalysis
         Symbols = original.Symbols;
         Expressions = original.Expressions;
         _sites = original._sites;
+        _names = original._names;
         Tokens = original.Tokens;
         _classifications = original._classifications;
         World = original.World;

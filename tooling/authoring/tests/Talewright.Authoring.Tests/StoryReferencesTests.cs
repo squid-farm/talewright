@@ -257,4 +257,16 @@ public sealed class StoryReferencesTests
         var current = workspace.AnalyzeCurrentFile("town.tale", Story.Files["town.tale"], Analysis.Value, CancellationToken.None);
         Assert.Throws<InvalidOperationException>(() => StoryReferences.Find(current, Find("town.tale", "> |guide:"), true));
     }
+
+    [Fact]
+    public void Diagnostic_extended_analysis_preserves_story_wide_references()
+    {
+        var analysis = Analysis.Value;
+        var expected = StoryReferences.Find(analysis, Find("town.tale", "> |guide:"), includeDeclaration: true);
+        var extended = analysis.WithDiagnostic(new(DiagnosticSeverity.Warning, "HOST001", "Host warning.",
+            new SourceLocation("town.tale", 1, 1)));
+
+        Assert.Same(analysis.Names, extended.Names);
+        Assert.Equal(expected, StoryReferences.Find(extended, Find("town.tale", "> |guide:"), includeDeclaration: true));
+    }
 }
