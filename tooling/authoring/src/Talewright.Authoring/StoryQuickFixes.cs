@@ -45,6 +45,49 @@ public static class StoryQuickFixes
         ], Title: title);
     }
 
+    public static StoryQuickFixResult ForMissingVariable(StoryAnalysis analysis, Diagnostic diagnostic)
+    {
+        if (diagnostic.Code != CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable ||
+            !diagnostic.Location.File.EndsWith(".tale", StringComparison.OrdinalIgnoreCase))
+            return new([]);
+
+        var variable = analysis.CompletionSitesAt(diagnostic.Location)
+            .FirstOrDefault(site => site.Range.Start == diagnostic.Location &&
+                site.Kinds.Contains(AuthoringSymbolKind.Variable) &&
+                IdentifierRules.IsValid(site.Text))?.Text;
+        if (variable is null || analysis.Symbols.Any(symbol =>
+                symbol.Kind == AuthoringSymbolKind.Variable && symbol.Name == variable))
+            return new([]);
+
+        var title = $"Declare variable '{variable}'";
+        if (!analysis.Source.Files.TryGetValue(StorySource.ManifestFileName, out var manifest))
+            return new([], $"Cannot declare '{variable}' because the root story manifest is unavailable.", title);
+
+        VariableUsageType[] types = VariableUsageInference.Infer(analysis, diagnostic.Location, variable) switch
+        {
+            VariableUsageType.Number => [VariableUsageType.Number],
+            VariableUsageType.Text => [VariableUsageType.Text],
+            _ => [VariableUsageType.Number, VariableUsageType.Text]
+        };
+        var fixes = new List<StoryQuickFix>();
+        foreach (var type in types)
+        {
+            var value = type == VariableUsageType.Number ? NumberInitialValue : TextInitialValue;
+            var edit = ManifestListEditor.AppendMappingEntry(
+                manifest, StorySource.ManifestFileName, ManifestVocabulary.Vars, variable, value, value);
+            if (edit.Edit is not { } textEdit)
+                return new([], edit.Reason ?? $"Cannot safely declare '{variable}' in the root story manifest.", title);
+            var description = type == VariableUsageType.Number ? "a number" : ManifestVocabulary.SymbolText;
+            fixes.Add(new($"{title} as {description}", StoryQuickFixKind.TextEdit, StorySource.ManifestFileName,
+                textEdit.Range, textEdit.NewText));
+        }
+
+        return new(fixes, Title: title);
+    }
+
+    private const string NumberInitialValue = "0";
+    private const string TextInitialValue = "\"\"";
+
     public static StoryQuickFixResult ForMissingManifestName(StoryAnalysis analysis, Diagnostic diagnostic)
     {
         if (diagnostic.Code != CompilerDiagnosticCodes.UnknownNameOrProperty ||

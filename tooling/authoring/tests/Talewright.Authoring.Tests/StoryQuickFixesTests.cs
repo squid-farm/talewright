@@ -122,6 +122,180 @@ public sealed class StoryQuickFixesTests
     }
 
     [Theory]
+    [InlineData("{if var:gold > 3}Rich.{/if}", "gold", "a number", "0")]
+    [InlineData("{if var:gold + 1 == 4}Rich.{/if}", "gold", "a number", "0")]
+    [InlineData("{if -var:gold < 0}Owed.{/if}", "gold", "a number", "0")]
+    [InlineData("{if 3 == (var:gold)}Three.{/if}", "gold", "a number", "0")]
+    [InlineData("{if var:weather == \"rain\"}Wet.{/if}", "weather", "text", "\"\"")]
+    [InlineData("{if \"rain\" != var:weather}Dry.{/if}", "weather", "text", "\"\"")]
+    [InlineData("~ var:mood = \"calm\"\n{if var:weather == var:mood}Same.{/if}", "weather", "text", "\"\"")]
+    [InlineData("~ var:total = 1\n{if var:total == var:bonus}Same.{/if}", "bonus", "a number", "0")]
+    [InlineData("~ var:total = 1\n~ var:total += var:bonus", "bonus", "a number", "0")]
+    [InlineData("~ var:total = 1\n~ var:total = var:bonus", "bonus", "a number", "0")]
+    [InlineData("~ var:mood = \"calm\"\n~ var:mood = var:weather", "weather", "text", "\"\"")]
+    [InlineData("~ give player rope var:count", "count", "a number", "0")]
+    public void Missing_variable_infers_its_declaration_from_usage(
+        string body, string variable, string description, string value)
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\nitems:\n  rope: Rope\n";
+        var story = $"=== start\n{body}\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var result = StoryQuickFixes.ForMissingVariable(analysis, diagnostic);
+
+        Assert.Null(result.DisabledReason);
+        var fix = Assert.Single(result.Fixes);
+        Assert.Equal($"Declare variable '{variable}' as {description}", fix.Title);
+        Assert.Equal(StoryQuickFixKind.TextEdit, fix.Kind);
+        Assert.Equal(StorySource.ManifestFileName, fix.File);
+        Assert.Equal($"\nvars:\n  {variable}: {value}\n", fix.NewText);
+        Assert.Contains($"\nvars:\n  {variable}: {value}\n", ApplyInsertion(manifest, fix));
+        var edited = AnalyzeManifest(ApplyInsertion(manifest, fix), story);
+        Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("The purse holds {var:gold}.")]
+    [InlineData("{if var:gold}Seen.{/if}")]
+    [InlineData("{if var:gold == var:other}Same.{/if}")]
+    public void Missing_variable_with_undetermined_type_offers_number_and_text(string body)
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\nvars: {}\n";
+        var story = $"=== start\n{body}\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = analysis.Diagnostics.First(item => item.Code == "TW2004");
+
+        var result = StoryQuickFixes.ForMissingVariable(analysis, diagnostic);
+
+        Assert.Null(result.DisabledReason);
+        Assert.Collection(result.Fixes,
+            number =>
+            {
+                Assert.Equal("Declare variable 'gold' as a number", number.Title);
+                Assert.Equal("gold: 0", number.NewText);
+            },
+            text =>
+            {
+                Assert.Equal("Declare variable 'gold' as text", text.Title);
+                Assert.Equal("gold: \"\"", text.NewText);
+            });
+    }
+
+    [Fact]
+    public void Missing_variable_substitution_accepts_either_declaration()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\nThe purse holds {var:gold}.\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fixes = StoryQuickFixes.ForMissingVariable(analysis, diagnostic).Fixes;
+
+        Assert.Equal(2, fixes.Count);
+        foreach (var fix in fixes)
+        {
+            var edited = AnalyzeManifest(ApplyInsertion(manifest, fix), story);
+            Assert.DoesNotContain(edited.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        }
+    }
+
+    [Fact]
+    public void Missing_variable_appends_to_a_flow_mapping()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters: {player: {first-name: Ada}}\nvars: {gold: 1}\n";
+        const string story = "=== start\n{if var:weather == \"rain\"}Wet.{/if}\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingVariable(analysis, diagnostic).Fixes);
+
+        Assert.Equal(", weather: \"\"", fix.NewText);
+        var updated = ApplyInsertion(manifest, fix);
+        Assert.Contains("vars: {gold: 1, weather: \"\"}", updated);
+        Assert.DoesNotContain(AnalyzeManifest(updated, story).Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Missing_variable_preserves_comments_and_crlf_in_block_mappings()
+    {
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\nvars:\r\n  gold: 1 # keep gold\r\n  # keep this comment\r\n  weather: \"sunny\"\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
+        const string story = "=== start\r\n{if var:gold > var:debt}Rich.{/if}\r\n-> END\r\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingVariable(analysis, diagnostic).Fixes);
+
+        Assert.Equal("  debt: 0\r\n", fix.NewText);
+        Assert.Equal(new SourceLocation(StorySource.ManifestFileName, 9, 1), fix.Range.Start);
+        var updated = ApplyInsertion(manifest, fix);
+        Assert.Contains("  gold: 1 # keep gold\r\n  # keep this comment\r\n  weather: \"sunny\"\r\n  debt: 0\r\ncharacters:", updated);
+        Assert.DoesNotContain(AnalyzeManifest(updated, story).Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("vars:\n  gold: 1\n", "=== start\n{if var:gold > 1}Rich.{/if}\n-> END\n")]
+    [InlineData("", "=== start\n~ var:gold = 1\n{if var:gold > 1}Rich.{/if}\n-> END\n")]
+    public void Declared_or_assigned_variables_do_not_get_declaration_fixes(string vars, string story)
+    {
+        var manifest = $"game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {{first-name: Ada}}\n{vars}";
+
+        var analysis = AnalyzeManifest(manifest, story);
+
+        Assert.DoesNotContain(analysis.Diagnostics, item => item.Code == "TW2004");
+    }
+
+    [Fact]
+    public void Missing_variable_in_a_supporting_manifest_declaration_gets_no_fix()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        var analysis = AnalyzeManifest(manifest, "=== start\n{if var:gold > 1}Rich.{/if}\n-> END\n",
+            ("world/economy.talewright.yaml", "vars:\n  gold: 1\n"));
+
+        Assert.DoesNotContain(analysis.Diagnostics, item => item.Code == "TW2004");
+    }
+
+    [Fact]
+    public void Flag_and_variable_fixes_ignore_each_others_diagnostics()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        var analysis = AnalyzeManifest(manifest, "=== start\n{if flag:ready}Ready.{/if}\n{if var:gold > 1}Rich.{/if}\n-> END\n");
+        var diagnostics = analysis.Diagnostics.Where(item => item.Code == "TW2004").ToArray();
+        Assert.Equal(2, diagnostics.Length);
+
+        Assert.Empty(StoryQuickFixes.ForMissingVariable(analysis, diagnostics[0]).Fixes);
+        Assert.Null(StoryQuickFixes.ForMissingVariable(analysis, diagnostics[0]).Title);
+        Assert.Empty(StoryQuickFixes.ForMissingFlag(analysis, diagnostics[1]).Fixes);
+        Assert.Null(StoryQuickFixes.ForMissingFlag(analysis, diagnostics[1]).Title);
+    }
+
+    [Theory]
+    [InlineData("vars: [gold]")]
+    [InlineData("vars: not-a-mapping")]
+    public void Unsupported_variable_sections_return_a_disabled_reason_without_edits(string vars)
+    {
+        var manifest = $"game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n{vars}\ncharacters:\n  player: {{first-name: Ada}}\n";
+        var analysis = AnalyzeManifest(manifest, "=== start\n{if var:debt > 1}Owed.{/if}\n-> END\n");
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var result = StoryQuickFixes.ForMissingVariable(analysis, diagnostic);
+
+        Assert.Empty(result.Fixes);
+        Assert.Equal("Declare variable 'debt'", result.Title);
+        Assert.NotNull(result.DisabledReason);
+    }
+
+    [Fact]
+    public void Missing_variable_in_malformed_yaml_is_not_edited()
+    {
+        var result = ManifestListEditor.AppendMappingEntry(
+            "vars: {gold: 1", StorySource.ManifestFileName, ManifestVocabulary.Vars, "debt", "0", "0");
+
+        Assert.Null(result.Edit);
+        Assert.Contains("invalid YAML", result.Reason);
+    }
+
+    [Theory]
     [InlineData(
         "=== start\n> old-man: Hello.\n-> END\n",
         "  old-man:\n    first-name: Old Man",
