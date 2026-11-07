@@ -141,6 +141,10 @@ availability requirements may be compatible; changed starting values or recorded
 Saves without replay evidence have no cross-revision compatibility guarantee. A failed load leaves
 the original save and current game untouched.
 
+These rules apply to the autosave, named saves, Quick Save and trigger checkpoints, and imported files. A
+compatible save opens at its saved point with the updated story's text and choices, including
+newly added ones; **Back** and **Forward** replay the saved path with the same outcomes and rolls.
+
 See the [v1 story-update contract](../developer/save-format.md#compatibility) for the exact rules.
 General state mappings and save-format migration remain planned
 ([#39](https://github.com/squid-farm/talewright/issues/39)).
