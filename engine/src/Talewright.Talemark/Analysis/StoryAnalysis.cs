@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
@@ -74,6 +75,7 @@ public sealed class StoryAnalysis
         Expressions = original.Expressions;
         _sites = original._sites;
         _names = original._names;
+        BaseRulesetStats = original.BaseRulesetStats;
         Tokens = original.Tokens;
         _classifications = original._classifications;
         World = original.World;
@@ -120,6 +122,7 @@ public sealed class StoryAnalysis
             ? new(() => OverlayScenes(snapshot, currentFile!, scenes))
             : new(() => scenes);
         SymbolContext = collector.SymbolContext;
+        BaseRulesetStats = collector.BaseRulesetStats.ToFrozenSet(StringComparer.Ordinal);
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
@@ -162,6 +165,12 @@ public sealed class StoryAnalysis
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
     public IReadOnlyList<AuthoredScene> Scenes => _scenes.Value;
     internal StorySymbols? SymbolContext { get; }
+
+    /// <summary>
+    /// Stat IDs the story's base ruleset defines before the story disables or overrides any, so a story stat with one
+    /// of these IDs overrides a built-in stat. Only whole-story analyses read the ruleset configuration.
+    /// </summary>
+    internal IReadOnlySet<string> BaseRulesetStats { get; }
 
     // Scene definitions carry no source file, so a snapshot scene belongs to the edited file only when the
     // snapshot declares it there and nowhere else.
@@ -383,6 +392,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<ExpressionContext> Expressions { get; } = [];
     internal List<CompletionSiteSource> CompletionSites { get; } = [];
     internal List<NameOccurrence> Names { get; } = [];
+    internal HashSet<string> BaseRulesetStats { get; } = new(StringComparer.Ordinal);
     internal List<AuthoringToken> Tokens { get; } = [];
     internal List<(string File, TaleFileSyntax Syntax)> ClassificationSources { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
@@ -608,6 +618,11 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         while (start < line.Length && char.IsWhiteSpace(line[start])) start++;
         Symbols.Add(new(id.Value, AuthoringSymbolKind.Scene, ManifestVocabulary.SymbolScene,
             Range(location with { Column = start + 1 }, id.Value)));
+    }
+
+    internal void BaseRuleset(Talewright.Core.Rulesets.Ruleset ruleset)
+    {
+        foreach (var stat in ruleset.Stats) BaseRulesetStats.Add(stat.Id.Value);
     }
 
     internal void DisabledStats(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset) =>

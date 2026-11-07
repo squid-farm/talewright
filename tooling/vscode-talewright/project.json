@@ -10,7 +10,8 @@
       "{workspaceRoot}/docs/guide/authoring-recipes.md",
       "{workspaceRoot}/docs/guide/organizing-your-story.md",
       "{workspaceRoot}/docs/guide/debugger-test-plan.md",
-      "{workspaceRoot}/docs/guide/writing-stories.md"
+      "{workspaceRoot}/docs/guide/writing-stories.md",
+      "{workspaceRoot}/docs/guide/cheat-sheet.md"
     ]
   },
   "targets": {

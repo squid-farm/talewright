@@ -64,8 +64,9 @@ and codes, messages, and error/warning severities remain the compiler's.
 Completion advertises `:`, `@`, `#`, `>`, and `(` triggers and
 returns a complete list with explicit `textEdit` replacement ranges. Hover returns
 source-aware help with authored-default previews, definition returns the authored declaration,
-and references return every authored occurrence of a declared name;
-signature help, rename, formatting, and autofixes are not advertised.
+references return every authored occurrence of a declared name, and rename
+edits every occurrence of one; signature help, formatting, and autofixes are
+not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
 ### Requests, analysis, and diagnostics
@@ -295,6 +296,40 @@ revision's whole-story analysis, never a symbol snapshot, so an edit while the
 request waits returns ContentModified (`-32801`) rather than stale ranges. Run
 `dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --references`
 to measure cold and warm latency on the 20-chapter realistic story.
+
+### Rename
+
+`renameProvider` advertises `prepareProvider: true` only when the client sets
+`textDocument.rename.prepareSupport`. Rename uses the same identities as
+references, so it covers the same kinds and never crosses into another story.
+`textDocument/prepareRename` returns the name's range and placeholder, `null`
+when the position isn't on a renameable name, or error `-32803`
+(RequestFailed) with an author-facing reason for a fixed name. Fixed names are:
+
+- `END` and the `player` character;
+- built-in ruleset stats, keywords, predicates and modifiers;
+- a story stat that overrides a ruleset stat;
+- a name with ambiguous duplicate declarations;
+- a name on the same line as an error that could hide a reference to it.
+
+`textDocument/rename` returns `-32803` when the new name is invalid for the
+kind, collides with an existing name of the same kind, or would add a compiler
+diagnostic or lint finding. A rename that removes one is allowed. The server
+checks for new findings by applying the edits to a copy of the analyzed source
+and analyzing it again, comparing severity, code, file and line; renames never
+move lines. Lint findings use the story's lint configuration, so every enabled
+rule counts.
+It also refuses if the new name's occurrences don't match the old name's.
+Edits replace only the name's source range, preserving YAML quoting and
+comments, and never rename files.
+
+Clients with `workspace.workspaceEdit.documentChanges` get `documentChanges`
+ordered by story-relative path. Each has the open document's version, or
+`null` for an unopened file; other clients get `changes`. When the client also
+supports change annotations, every edit references the `talewright.rename`
+annotation with `needsConfirmation: true` and a description warning that saved
+games aren't migrated. Like references, rename awaits the requested revision's
+whole-story analysis and returns ContentModified (`-32801`) after a newer edit.
 
 ### Story ownership
 

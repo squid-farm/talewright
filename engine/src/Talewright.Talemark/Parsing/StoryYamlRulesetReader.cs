@@ -20,13 +20,13 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
     {
         if (node is null)
         {
-            return _options.Rulesets[Rulesets.Generic.GenericRuleset.Id]();
+            return Base(_options.Rulesets[Rulesets.Generic.GenericRuleset.Id]());
         }
 
         var map = _yaml.Mapping(node, ManifestVocabulary.Ruleset);
         if (map is null)
         {
-            return _options.Rulesets[Rulesets.Generic.GenericRuleset.Id]();
+            return Base(_options.Rulesets[Rulesets.Generic.GenericRuleset.Id]());
         }
 
         _yaml.CheckKeys(map, ManifestVocabulary.Base, ManifestVocabulary.Disable, ManifestVocabulary.Stats);
@@ -39,7 +39,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
             factory = _options.Rulesets[Rulesets.Generic.GenericRuleset.Id];
         }
 
-        var baseRuleset = factory();
+        var baseRuleset = Base(factory());
         var builder = baseRuleset.ToBuilder();
         var governingAttributes = new Dictionary<StatId, YamlNode>();
         if (Get(map, ManifestVocabulary.Disable) is { } disable)
@@ -134,6 +134,12 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
             }
         }
 
+        return ruleset;
+    }
+
+    private Ruleset Base(Ruleset ruleset)
+    {
+        _analysis?.BaseRuleset(ruleset);
         return ruleset;
     }
 }
