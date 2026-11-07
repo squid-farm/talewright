@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Talewright.Authoring;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
@@ -301,6 +302,32 @@ public sealed partial class ServerTests
         });
 
         Assert.Empty(response.GetProperty("result").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Unknown_predicate_code_action_replaces_only_the_name_and_is_preferred()
+    {
+        await using var client = new Client();
+        var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["Ready"] };
+        File.WriteAllText(client.PathOf("project.authoring.json"), metadata.ToJson());
+        await client.Initialize(new { metadataPath = "project.authoring.json" });
+
+        const string text = "=== start\n{if @Raedy}Seen.{/if}\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2005");
+
+        var action = Assert.Single(await CodeActions(client, text, [diagnostic]));
+
+        Assert.Equal("Change to `@Ready`", action.GetProperty("title").GetString());
+        Assert.True(action.GetProperty("isPreferred").GetBoolean());
+        Assert.Equal("TW2005", action.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        var edit = action.GetProperty("edit").GetProperty("changes")
+            .GetProperty(client.UriOf("start.tale"))[0];
+        Assert.Equal("Ready", edit.GetProperty("newText").GetString());
+        Assert.Equal(1, edit.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(5, edit.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
+        Assert.Equal(10, edit.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32());
     }
 
     [Fact]
