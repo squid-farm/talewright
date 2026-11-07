@@ -36,7 +36,8 @@ declarations. Syntactically invalid YAML cannot provide a trustworthy manifest
 tree: Talemark declarations and contexts are retained independently, but the API
 does not invent a repaired manifest or reuse stale symbols from a prior snapshot.
 Diagnostics include the compiler's diagnostics for that exact input, including
-TW2010–TW2014 from the shared image resolver, reported once per image reference.
+TW2010–TW2015 from shared image parsing and lookup and TW2016 from choice-label
+analysis, reported once per issue.
 Lookup reads the source's image catalogue, not image bytes. Compilation stores
 resolved paths and either literal alt text or an alt template in media nodes; presentation renders the alt.
 If a missing or malformed manifest prevents normal compilation, editor recovery

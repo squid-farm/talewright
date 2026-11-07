@@ -86,6 +86,10 @@ public sealed class AuthoringSyntaxVocabularyTests
 
         Assert.True(AuthoringSyntaxVocabulary.TryGetHelp(AuthoringTokenKind.Choice, out var choice));
         Assert.Equal("Choice: * [label] with optional conditions and effects, followed by a divert or skill check. Omit the label with * -> target to show Continue.", choice.Description);
+
+        Assert.True(AuthoringSyntaxVocabulary.TryGetKeywordHelp(ExpressionVocabulary.Decorative, out var decorative));
+        Assert.Equal($"{modifier}{ExpressionVocabulary.Decorative}", decorative.Spelling);
+        Assert.Contains("assistive technology", decorative.Description);
     }
 
     [Theory]

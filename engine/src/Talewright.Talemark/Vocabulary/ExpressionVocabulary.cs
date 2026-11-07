@@ -33,6 +33,7 @@ internal static class ExpressionVocabulary
     internal const string Visits = "visits";
     internal const string Has = "has";
     internal const string Image = "image";
+    internal const string Decorative = "decorative";
 
     internal const string Faction = "faction";
     internal const string Item = "item";

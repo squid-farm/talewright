@@ -85,7 +85,11 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
                     output.Add(new RenderedLineBreak());
                     break;
                 case MediaTemplate m:
-                    output.Add(new RenderedMedia(m.MediaId, RenderAlt(m, context)) { Style = style });
+                    output.Add(new RenderedMedia(m.MediaId, RenderAlt(m, context))
+                    {
+                        Style = style,
+                        Accessibility = m.Accessibility,
+                    });
                     break;
                 case SubstitutionTemplate s:
                     output.Add(new RenderedText(Substitute(s, context), style));

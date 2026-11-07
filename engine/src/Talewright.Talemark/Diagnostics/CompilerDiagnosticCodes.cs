@@ -33,6 +33,8 @@ public static class CompilerDiagnosticCodes
     public const string MissingImage = "TW2012";
     public const string AmbiguousImagePath = "TW2013";
     public const string MissingImageAlt = "TW2014";
+    public const string DecorativeImageHasAlt = "TW2015";
+    public const string MissingAccessibleChoiceLabel = "TW2016";
 
     public const string TextOutsideSceneOrNoFiles = "TW3001";
     public const string DeadEndScene = "TW3002";

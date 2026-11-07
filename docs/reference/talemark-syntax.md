@@ -318,7 +318,7 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `@hub-limit N`                                    | Cap generated storylet choices at positive integer N; requires `@hub`.                         |
 | blank-line separated text                          | Paragraphs (bold and italic formatting).                                                       |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
-| `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Lookup and display are separate features. |
+| `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
 | `* (requires expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
@@ -585,7 +585,13 @@ Both arguments are double-quoted strings, separated by a comma. The path is requ
 relative to the story's `images/` folder, with an optional extension. It is a file path, not a
 story identifier, so quote it even when it contains no spaces. The path stays a literal string:
 braces in it are filename characters, not substitutions. Alt text is optional:
-`{image("maps/old_map-v2")}`.
+`{image("maps/old_map-v2")}`. For an image that adds no information, append
+`#decorative` to hide it from assistive technology:
+`{image("ornament.png")#decorative}`. Do not combine `#decorative` with descriptive
+alt text; TW2015 rejects that contradiction. Missing alt on an ordinary image still
+warns and uses the filename fallback. A decorative image in a choice label needs
+meaningful text or a descriptive image in every visible branch; otherwise TW2016
+rejects the potentially empty accessible name.
 
 Inside either argument, `\"` means a quote and `\\` means a backslash. Any other backslash escape
 in the path is an error. Alt text follows the reader-text escape rule: a backslash before any ASCII
@@ -617,7 +623,9 @@ The character reference `{image:name}` still means the `name` property of the ch
 
 Compilation, `talewright validate` and editor analysis check path safety, supported formats,
 file existence, ambiguous extensions and missing alt through the shared resolver's
-[TW2010–TW2014 diagnostics](diagnostics.md#tw2xxx-names-and-types).
+[TW2010–TW2014 diagnostics](diagnostics.md#tw2xxx-names-and-types). TW2015 rejects
+decorative images with descriptive alt text, and TW2016 checks choice labels for an
+accessible name.
 The editor suggests paths from `images/` in the first quoted argument and refreshes
 suggestions and diagnostics when files change. Lookup reads paths, not image bytes.
 Omitted, empty or whitespace-only alt warns and uses sentence-case filename fallback.
@@ -630,8 +638,9 @@ the image appears. The filename fallback is stored as text.
 The native desktop folder player and native folder Author Debugger display these images,
 as do the built-in samples in the desktop and web players. Images load only when their
 mounted occurrence approaches the viewport. They fit the available width, retain their
-aspect ratio, and use the rendered alt text. Dialogue, choices, chosen-choice history,
-styles and conditionals use the same renderer.
+aspect ratio, and use the rendered alt text unless marked decorative. Decorative images
+stay visible, including the visible loading-failure message, but are hidden from assistive
+technology. Dialogue, choices, chosen-choice history, styles and conditionals use the same renderer.
 
 Folder images are **live files**, not a byte snapshot. Within an accepted story generation,
 occurrences of the same resolved filename share a read and Blob URL while any loaded holder

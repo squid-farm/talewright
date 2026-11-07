@@ -32,7 +32,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires ...) { effects } -> target` or `* -> target` for **Continue**. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires ` exactly and close `]`, `)` and `}`. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
 | TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
-| TW1014 | Malformed image call, image path escape, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")}`. Quote both arguments and separate them with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
+| TW1014 | Malformed image call, image path escape, unsupported image manipulator, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")#decorative}`. Quote each supplied argument; separate path and alt text with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
 | TW1015 | Unexpected syntax in reader text, including the simple `![alt](path)` image form. | Use `{image("path", "alt")}` for an image. |
 | TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |
 | TW1017 | A reader-text line ends with an unpaired backslash. | Remove the trailing `\`; line breaks render as written. |
@@ -52,17 +52,19 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW2011 | Unsupported image format. | Use PNG (`.png`), JPEG (`.jpg` or `.jpeg`), or WebP (`.webp`). |
 | TW2012 | Image file not found. | Put the file in the story's `images/` folder and match its path's case exactly. |
 | ⚠ TW2013 | An extensionless image path matches several files. | Include the extension to choose explicitly. Otherwise the first match wins in `.png`, `.jpg`, `.jpeg`, `.webp` order. |
-| ⚠ TW2014 | Image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. |
+| ⚠ TW2014 | Descriptive image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. Mark an intentionally decorative image with `#decorative` instead. |
+| TW2015 | A decorative image also supplies descriptive alt text. | Remove the alt text or remove `#decorative`; an image cannot be both decorative and described. |
+| TW2016 | A choice containing decorative media may have no accessible name in a visible branch. | Add meaningful text to the label or use a descriptive image in every branch. |
 
-Story compilation, `talewright validate` and editor analysis report these image codes
-through the same resolver. Diagnostics point to the image path's opening quote in
-the authored narrative, including dialogue and choices. Malformed image calls receive
-syntax diagnostics instead of resolver errors. Editors refresh the catalogue and
-diagnostics when files change. Lookup reads paths, not image bytes; it does not
-validate file contents or render images. Successful compilation stores the selected
-story-root-relative path in each media node, with literal alt text or an alt template.
-Missing or blank alt still stores the filename fallback. The rendered alt is what display,
-history and load failures use.
+Story compilation, `talewright validate` and editor analysis report these image
+diagnostics consistently. TW2010–TW2014 point to the image path's opening quote;
+TW2015 points to the decorative modifier, and TW2016 to the choice label.
+Malformed image calls receive syntax diagnostics instead of resolver errors. Editors
+refresh the catalogue and diagnostics when files change. Lookup reads paths, not image
+bytes; it does not validate file contents or render images. Successful compilation
+stores the selected story-root-relative path in each media node, with literal alt text
+or an alt template. Missing or blank alt on a descriptive image still stores the
+filename fallback; decorative media stores empty alt text.
 
 For an unknown skill, check the id's spelling and its declaration under `game.ruleset.stats`.
 Giving a character a value does not declare the skill. See the complete

@@ -406,6 +406,7 @@ internal sealed partial class TaleBinder
         var scene = _scene!;
         var start = At(syntax.Indent);
         IReadOnlyList<TemplateInline>? label = null;
+        SourceLocation? labelLocation = null;
         Expr? requires = null;
         IReadOnlyList<Effect> effects = [];
         DivertTarget? divert = null;
@@ -421,6 +422,7 @@ internal sealed partial class TaleBinder
             switch (clause.Kind)
             {
                 case TaleClauseKind.Label:
+                    labelLocation = location;
                     label = InlineParser.Parse(SourceText.Single(value, location), _symbols, _diagnostics,
                         cancellationToken: _cancellationToken);
                     break;
@@ -478,6 +480,13 @@ internal sealed partial class TaleBinder
             return;
         }
 
+        if (label is not null && ContainsDecorativeMedia(label) && !HasAccessibleChoiceName(label))
+        {
+            _diagnostics.Error(CompilerDiagnosticCodes.MissingAccessibleChoiceLabel,
+                "A choice containing decorative media needs text or a descriptive image in every visible branch to have an accessible name.",
+                labelLocation ?? start);
+        }
+
         scene.CurrentSteps.Add(new ChoiceStep(StepId(start), SpanFrom(start), new ChoiceDefinition
         {
             Key = $"c{scene.ChoiceCount++}",
@@ -487,6 +496,47 @@ internal sealed partial class TaleBinder
             Check = check,
             Divert = divert,
         }));
+    }
+
+    private static bool ContainsDecorativeMedia(IReadOnlyList<TemplateInline> inlines)
+    {
+        foreach (var inline in inlines)
+        {
+            switch (inline)
+            {
+                case MediaTemplate { Accessibility: MediaAccessibility.Decorative }:
+                    return true;
+                case StyledTemplate styled when ContainsDecorativeMedia(styled.Children):
+                    return true;
+                case ConditionalInlineTemplate conditional
+                    when ContainsDecorativeMedia(conditional.Then) || ContainsDecorativeMedia(conditional.Else):
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAccessibleChoiceName(IReadOnlyList<TemplateInline> inlines)
+    {
+        foreach (var inline in inlines)
+        {
+            switch (inline)
+            {
+                case TextTemplate text when !string.IsNullOrWhiteSpace(text.Text):
+                case SubstitutionTemplate:
+                    return true;
+                case MediaTemplate { Accessibility: MediaAccessibility.Descriptive }:
+                    return true;
+                case StyledTemplate styled when HasAccessibleChoiceName(styled.Children):
+                    return true;
+                case ConditionalInlineTemplate conditional
+                    when HasAccessibleChoiceName(conditional.Then) && HasAccessibleChoiceName(conditional.Else):
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private DivertTarget? BindDivert(TaleLineSyntax syntax, TaleClause clause)

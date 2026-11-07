@@ -3,6 +3,7 @@ using Talewright.Narrative.Templates;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 using Talewright.Testing;
 
 namespace Talewright.Talemark.Tests;
@@ -82,6 +83,38 @@ public sealed class ImageCompilationTests
         var warning = Assert.Single(result.Diagnostics);
         Assert.Equal("TW2014", warning.Code);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Equal(result.Diagnostics, StoryAnalyzer.Analyze(source).Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(", \"\"")]
+    [InlineData(", \"  \"")]
+    public void Decorative_images_have_empty_alt_without_missing_alt_warning(string altArgument)
+    {
+        var source = Source($"{{image(\"maps/ornament.png\"{altArgument})#decorative}}", "images/maps/ornament.png");
+        var result = StoryCompiler.Compile(source);
+        var media = Media(result);
+
+        Assert.Equal("", media.AltText);
+        Assert.Equal(MediaAccessibility.Decorative, media.Accessibility);
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(result.Diagnostics, StoryAnalyzer.Analyze(source).Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("A map")]
+    [InlineData("A {player:first-name} map")]
+    public void Decorative_images_reject_descriptive_alt_text(string alt)
+    {
+        var source = Source($$"""{image("maps/ornament.png", "{{alt}}")#decorative}""", "images/maps/ornament.png");
+        var result = StoryCompiler.Compile(source);
+        var error = Assert.Single(result.Errors);
+
+        Assert.Equal(CompilerDiagnosticCodes.DecorativeImageHasAlt, error.Code);
+        Assert.Contains("cannot also have descriptive alt text", error.Message);
+        Assert.Equal(new SourceLocation("chapters/main.tale", 2,
+            source.Files["chapters/main.tale"].Split('\n')[1].IndexOf(ExpressionVocabulary.ModifierMarker) + 1), error.Location);
         Assert.Equal(result.Diagnostics, StoryAnalyzer.Analyze(source).Diagnostics);
     }
 

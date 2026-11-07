@@ -1,6 +1,8 @@
+@using Talewright.Narrative.Templates
+
 <span class="tw-history-media">
     <button type="button" class="tw-link" aria-expanded="@(_revealed ? "true" : "false")" @onclick="Toggle">
-        @(_revealed ? "Hide image: " : "Reveal image: ")@Media.AltText
+        @ToggleText
     </button>
     @if (_revealed)
     {
@@ -14,6 +16,9 @@
     [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
     [Parameter] public StoryImages? Images { get; set; }
     private bool _revealed;
+    private string ToggleText => Media.Accessibility == MediaAccessibility.Decorative
+        ? _revealed ? "Hide decorative image" : "Reveal decorative image"
+        : (_revealed ? "Hide image: " : "Reveal image: ") + Media.AltText;
 
     private void Toggle() => _revealed = !_revealed;
 }

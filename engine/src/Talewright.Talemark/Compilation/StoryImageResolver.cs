@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using System.Globalization;
 using Humanizer;
+using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Compilation;
@@ -25,8 +26,12 @@ public static partial class StoryImageResolver
     /// Reports errors and warnings at the image reference, returning null on error.
     /// </summary>
     public static ResolvedStoryImage? Resolve(StorySource source, string path, string? altText,
-        SourceLocation location, DiagnosticBag diagnostics)
+        SourceLocation location, DiagnosticBag diagnostics,
+        MediaAccessibility accessibility = MediaAccessibility.Descriptive)
     {
+        if (accessibility is not (MediaAccessibility.Descriptive or MediaAccessibility.Decorative))
+            throw new ArgumentOutOfRangeException(nameof(accessibility));
+
         if (!IsSafePath(path))
         {
             diagnostics.Error(CompilerDiagnosticCodes.UnsafeImagePath,
@@ -59,7 +64,11 @@ public static partial class StoryImageResolver
                 location);
         }
 
-        if (string.IsNullOrWhiteSpace(altText))
+        if (accessibility == MediaAccessibility.Decorative)
+        {
+            altText = "";
+        }
+        else if (string.IsNullOrWhiteSpace(altText))
         {
             altText = FallbackAltText(matches[0]);
             diagnostics.Warning(CompilerDiagnosticCodes.MissingImageAlt, $"Image '{path}' has no alt text. Using '{altText}'; supply descriptive alt text.", location);

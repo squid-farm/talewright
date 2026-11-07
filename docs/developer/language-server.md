@@ -306,12 +306,13 @@ substitutions, and no image-path suggestions. Every
 narrative-template surface, including dialogue and choice labels, uses the same
 behavior; plain-string fields such as titles do not acquire image syntax.
 
-Editor analysis uses the same compiler image lookup for complete, well-formed calls,
-publishing TW2010–TW2014 at the path's opening quote. File notifications rebuild
+Editor analysis shares image parsing and asset lookup with compilation. It reports
+TW2010–TW2014 at the path's opening quote, TW2015 at the decorative modifier, and
+TW2016 at the choice label. File notifications rebuild
 the catalogue and refresh suggestions and diagnostics while preserving unsaved
 buffers. Report a rename as deletion of the old path and creation of the new path.
 No image bytes are read and no images are rendered. Ordinary compilation and
-`talewright validate` report the same resolver diagnostics; compiled media carries
+`talewright validate` report the same image diagnostics; compiled media carries
 the selected asset path and either literal alt text or an alt template.
 
 Use `initializationOptions.metadataPath` for an explicit data-only metadata file
