@@ -699,6 +699,92 @@ public sealed class ConcurrencyTests
         Assert.Equal(0, await client.WaitForExit());
     }
 
+    private static object References(InProcessClient client) => new
+    {
+        textDocument = new { uri = client.UriOf("start.tale") },
+        position = new { line = 1, character = 4 },
+        context = new { includeDeclaration = true }
+    };
+
+    [Fact]
+    public async Task References_wait_for_current_analysis_even_when_the_document_is_unchanged()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+
+        client.Write("other.tale", string.Join('\n', SceneFaker.Header("other"), DivertFaker.To("next"), ""));
+        await client.Watch("other.tale", 1);
+        var debounce = await control.NextDelay();
+        await client.Request(2, "textDocument/references", References(client));
+        var analysis = await control.NextAnalysis();
+        await client.Barrier(3);
+        Assert.False(client.HasResponse(2));
+
+        debounce.Release();
+        analysis.Release();
+        var locations = (await client.Response(2)).GetProperty("result").EnumerateArray()
+            .Select(location => location.GetProperty("uri").GetString()!).ToArray();
+        Assert.Equal(new[] { client.UriOf("next.tale"), client.UriOf("other.tale"), client.UriOf("start.tale") }, locations);
+        await client.Diagnostics("start.tale", 1);
+    }
+
+    [Fact]
+    public async Task Cancelled_references_request_does_not_cancel_shared_analysis()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+        await client.Change("start.tale", Reference + "\n", 2);
+        var debounce = await control.NextDelay();
+        await client.Request(2, "textDocument/references", References(client));
+        var analysis = await control.NextAnalysis();
+
+        await client.Send("$/cancelRequest", new { id = 2 });
+        Assert.Equal(-32800, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
+        Assert.False(analysis.CancellationRequested);
+
+        debounce.Release();
+        analysis.Release();
+        await client.Diagnostics("start.tale", 2);
+    }
+
+    [Fact]
+    public async Task References_report_content_modified_instead_of_stale_ranges()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+        await client.Change("start.tale", Reference + "\n", 2);
+        var firstDelay = await control.NextDelay();
+        await client.Request(2, "textDocument/references", References(client));
+        var first = await control.NextAnalysis();
+
+        await client.Change("start.tale", "\n" + Reference, 3);
+        var nextDelay = await control.NextDelay();
+        Assert.Equal(-32801, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
+
+        firstDelay.Release();
+        first.Release();
+        nextDelay.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 3);
+        await client.Request(3, "textDocument/references", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 2, character = 4 },
+            context = new { includeDeclaration = false }
+        });
+        var current = Assert.Single((await client.Response(3)).GetProperty("result").EnumerateArray());
+        Assert.Equal(2, current.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

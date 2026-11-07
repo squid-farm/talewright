@@ -142,6 +142,9 @@ DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks
 # Measure warm current-text completion and hover across symbol-table sizes.
 DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --current-text-requests
 
+# Measure cold and warm Find All References on the 20-chapter realistic story.
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --references
+
 python3 player/tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
 ```
 
@@ -179,6 +182,14 @@ samples; the reported p95 is the maximum. Managed bytes use the process-wide
 counter so work on server threads is included; concurrent background analysis
 may therefore contribute if a run is heavily delayed. The 20 ms request p95
 target is reported, not enforced as a CI timing gate.
+
+The `--references` workload opens a chapter of the 20-chapter `RealisticStory`
+and requests references, with declarations, for a scene divert and the
+widely used `alarm` flag. Each sample edits the open chapter and waits for the
+analysis to publish. It then times a cold request, which builds that analysis's
+name index, and a warm repeat. Both get three warmups and seven samples, with
+the same process-wide allocation counter. The 20 ms warm p95 target is reported,
+not enforced.
 
 The default slow-input ladder analyzes paragraphs with substitutions and inline
 conditions, single-line substitutions, nested block conditions, nested

@@ -124,6 +124,9 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
                 continue;
             }
 
+            if (idNode is YamlScalarNode idScalar)
+                _analysis?.NameDeclaration(idScalar, AuthoringSymbolKind.Trigger, _yaml.At(idScalar).File);
+
             if (!ids.Add(id))
             {
                 _yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"Trigger id '{id}' is declared more than once.", _yaml.At(idNode ?? item));
