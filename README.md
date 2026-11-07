@@ -15,7 +15,7 @@
 Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
 and many branches. **Talemark is the story-authoring language that powers your Talewright stories.**
 Its `.tale` files combine bold and italic formatting, dialogue, choices, conditions, and RPG effects;
-`story.talewright.yaml` defines your cast and rules. No programming required.
+`story.talewright.yaml` defines your characters and rules. No programming required.
 
 ```tale
 === temple.entrance
@@ -34,8 +34,8 @@ Its `.tale` files combine bold and italic formatting, dialogue, choices, conditi
 - **Write in Talemark.** Plain-text stories with bold and italic formatting, dialogue lines, choices, and inline or block `{if}` conditions. Backticks are ordinary text.
 - **Proper RPG rules.** Stats, skills, d20 skill checks, items that modify stats, factions with
   reputation tiers, XP and levels. Use the default ruleset, tweak it, or replace it.
-- **Big branching stories.** Hubs and storylets offer whichever scenes are currently available, so you
-  don't have to wire every path by hand. Benchmarks compile 10,000-scene stories in under a second.
+- **Big branching stories.** Hubs offer whichever scenes are currently available, so you don't
+  have to wire every path by hand. Benchmarks compile 10,000-scene stories in under a second.
   See the [performance results](docs/developer/performance.md).
 - **Grammar handled for you.** Names, pronouns (including custom sets), possessives ("Burns's") and a/an.
 - **Errors caught before players see them.** Broken links, unknown items and typo'd stats are reported

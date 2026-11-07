@@ -1,7 +1,7 @@
 # Talewright documentation
 
 Write in **Talemark**, the story-authoring language that powers Talewright stories.
-Keep scenes in `.tale` files and define your cast and rules in `story.talewright.yaml`.
+Keep scenes in `.tale` files and define your characters and rules in `story.talewright.yaml`.
 
 Talewright is inspired by the great storytelling tools available to the community.
 See [our inspirations](inspirations.md).
@@ -27,6 +27,7 @@ New here? Play the [web player](https://play.trytalewright.com/), then follow
 | | |
 |---|---|
 | [Talemark syntax](reference/talemark-syntax.md) | Every `story.talewright.yaml` field and Talemark directive |
+| [Glossary](reference/glossary.md) | What each Talemark and Talewright term means |
 | [Error codes](reference/diagnostics.md) | What each `TWxxxx` code means and how to fix it |
 | [CLI](reference/cli.md) | `validate`, `lint`, `run`, `debug` and `publish` options, output and limits |
 | [Distribution and runtime safety](reference/safety.md) | Framework boundaries, author/player responsibilities and current limitations |
