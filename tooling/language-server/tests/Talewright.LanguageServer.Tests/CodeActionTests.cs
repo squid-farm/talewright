@@ -108,6 +108,56 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Missing_stat_action_expands_the_unsaved_ruleset_shorthand()
+    {
+        await using var client = new Client();
+        await client.Initialize(capabilities: new
+        {
+            workspace = new { workspaceEdit = new { documentChanges = true } }
+        });
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: none\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 7);
+        await client.Diagnostics(StorySource.ManifestFileName, 7);
+
+        const string text = "=== start\n~ player:charm += 1\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2001");
+        Assert.StartsWith("Unknown stat 'charm'", diagnostic.GetProperty("message").GetString());
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("Declare stat 'charm'", action.GetProperty("title").GetString());
+        var documentEdit = action.GetProperty("edit").GetProperty("documentChanges")[0];
+        Assert.Equal(7, documentEdit.GetProperty("textDocument").GetProperty("version").GetInt32());
+        Assert.Equal(
+            ":\n    base: none\n    stats:\n      - id: charm\n        name: Charm\n        category: custom\n        min: 0\n        max: 2147483647\n        default: 0",
+            documentEdit.GetProperty("edits")[0].GetProperty("newText").GetString());
+    }
+
+    [Fact]
+    public async Task Unsupported_stat_configuration_returns_a_disabled_action_with_a_reason()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {base: none, stats: {charm: custom}}\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
+
+        const string text = "=== start\n~ player:charm += 1\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2001");
+        Assert.StartsWith("Unknown stat 'charm'", diagnostic.GetProperty("message").GetString());
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("Declare stat 'charm'", action.GetProperty("title").GetString());
+        Assert.Contains("not a list", action.GetProperty("disabled").GetProperty("reason").GetString());
+        Assert.False(action.TryGetProperty("edit", out _));
+    }
+
+    [Fact]
     public async Task Missing_character_action_edits_the_unsaved_manifest_without_offering_for_properties()
     {
         await using var client = new Client();

@@ -544,6 +544,8 @@ public sealed class LanguageServer
                 if (diagnostic.Code == CompilerDiagnosticCodes.UnknownNameOrProperty)
                 {
                     var nameResult = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+                    if (nameResult.Fixes.Count == 0 && nameResult.Title is null)
+                        nameResult = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
                     actions.AddRange(nameResult.Fixes.Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
                     if (nameResult.DisabledReason is { } nameReason)
                         actions.Add(ToDisabledCodeAction(nameResult.Title ?? "Declare missing name", nameReason, diagnostic, lines));

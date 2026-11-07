@@ -141,6 +141,36 @@ public static class StoryQuickFixes
         ], Title: title);
     }
 
+    public static StoryQuickFixResult ForMissingStat(StoryAnalysis analysis, Diagnostic diagnostic)
+    {
+        if (diagnostic.Code != CompilerDiagnosticCodes.UnknownNameOrProperty ||
+            !diagnostic.Message.StartsWith("Unknown stat '", StringComparison.Ordinal) ||
+            !diagnostic.Location.File.EndsWith(".tale", StringComparison.OrdinalIgnoreCase))
+            return new([]);
+
+        var stat = analysis.CompletionSitesAt(diagnostic.Location)
+            .FirstOrDefault(site => site.Range.Start == diagnostic.Location &&
+                site.Kinds.Contains(AuthoringSymbolKind.Stat) &&
+                IdentifierRules.IsValid(site.Text))?.Text;
+        if (stat is null || analysis.Symbols.Any(symbol =>
+                symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat))
+            return new([]);
+
+        var title = $"Declare stat '{stat}'";
+        if (!analysis.Source.Files.TryGetValue(StorySource.ManifestFileName, out var manifest))
+            return new([], $"Cannot declare '{stat}' because the root story manifest is unavailable.", title);
+        var edit = ManifestListEditor.AppendStoryStat(manifest, StorySource.ManifestFileName, stat, Humanize(stat));
+        if (edit.SuppressAction)
+            return new([]);
+        if (edit.Edit is not { } textEdit)
+            return new([], edit.Reason ?? $"Cannot safely declare '{stat}' in the root story manifest.", title);
+
+        return new([
+            new(title, StoryQuickFixKind.TextEdit, StorySource.ManifestFileName,
+                textEdit.Range, textEdit.NewText)
+        ], Title: title);
+    }
+
     public static IReadOnlyList<StoryQuickFix> ForMissingScene(StoryAnalysis analysis, Diagnostic diagnostic)
     {
         if (diagnostic.Code != CompilerDiagnosticCodes.UnknownScene ||

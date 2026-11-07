@@ -284,6 +284,17 @@ and comments and use the open manifest buffer. No declaration action is offered
 for `player`, existing declarations, or unknown properties. Unsupported
 manifest shapes produce a disabled action with a reason.
 
+For an unknown stat reported by `TW2001`, the Quick Fix menu offers
+**Declare stat `<id>`** under `game.ruleset.stats`. The scaffold uses a
+human-readable name derived from the ID and the documented schema defaults:
+`category: custom`, `min: 0`, `max: 2147483647`, and `default: 0`. It does not
+guess whether the stat is an attribute or a skill. The action preserves the
+selected `generic` or `none` base, existing disables and stat overrides, and
+expands a shorthand `ruleset: generic` or `ruleset: none` into a mapping when
+needed. Disabled built-in stats are not reintroduced as custom stats. The edit
+preserves manifest formatting and comments, uses the open manifest buffer, and
+is disabled with a reason when the YAML shape cannot be safely edited.
+
 For a variable that `TW2004` reports as read but never assigned or declared,
 the Quick Fix menu offers to declare it under the root manifest's `vars`. Numeric
 uses (arithmetic, ordered comparisons, item quantities, or comparing with a
