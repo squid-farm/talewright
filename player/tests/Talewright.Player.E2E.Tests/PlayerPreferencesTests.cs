@@ -29,11 +29,11 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Page.GetByLabel("Text size", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Hide mechanical notes", new() { Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
         await Expect(Page.GetByLabel("Reading width", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Page.GetByLabel("Line spacing", new() { Exact = true })).ToBeFocusedAsync();
-        await Page.Keyboard.PressAsync("Tab");
-        await Expect(Page.GetByLabel("Hide mechanical notes", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");

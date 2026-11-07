@@ -55,6 +55,10 @@
             <option value="@textSize">@textSize%</option>
         }
     </select>
+    <label class="tw-settings-toggle">
+        <input type="checkbox" checked="@_hideMechanicalNotes" @onchange="ChangeHideMechanicalNotes" />
+        Hide mechanical notes
+    </label>
     <label for="tw-reading-width">Reading width</label>
     <select id="tw-reading-width" value="@ReadingWidthValue(_readingWidth)" @onchange="ChangeReadingWidth">
         @foreach (var readingWidth in PlayerPreferences.SupportedReadingWidths)
@@ -69,10 +73,6 @@
             <option value="@LineSpacingValue(lineSpacing)">@lineSpacing</option>
         }
     </select>
-    <label class="tw-settings-toggle">
-        <input type="checkbox" checked="@_hideMechanicalNotes" @onchange="ChangeHideMechanicalNotes" />
-        Hide mechanical notes
-    </label>
     @if (Preferences.Warning is not null)
     {
         <p class="tw-error" role="status">@Preferences.Warning</p>

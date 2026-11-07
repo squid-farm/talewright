@@ -96,6 +96,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
 
         await Driver.PressAsync("Tab");
         await Driver.PressAsync("Tab");
+        await Driver.PressAsync("Tab");
         var readingWidth = Assert.Single((await native.SnapshotAsync()).Descendants(),
             node => node.Role == "combo box" && node.Name == "Reading width");
         Assert.True(readingWidth.Focused);
