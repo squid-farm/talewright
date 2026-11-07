@@ -16,6 +16,7 @@
   <ItemGroup>
     <EmbeddedResource Include="../../../samples/**/*.tale;../../../samples/**/*.yaml;../../../samples/**/images/**/*"
                       LogicalName="stories/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../native/atspi_adapter.py" Link="native/atspi_adapter.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

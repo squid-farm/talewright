@@ -482,7 +482,10 @@ remove controls between a presence check and a text read. A driver regression ex
 
 The Build workflow calls the reusable Tests workflow once per run. Tests retains
 unit, Chromium, Firefox, WebKit, and real Linux Photino jobs on Ubuntu 24.04.
-Each job uploads its reports/evidence even on failure. Both Build (including
+Each browser's regression suite is split across two shard jobs and the Linux suite across three;
+`run_e2e.py --shard INDEX/COUNT` (or `TALEWRIGHT_E2E_SHARD`) deals the sorted test methods round-robin
+so every test runs in exactly one shard, and shard 1 also runs the published-artifact smoke tests.
+Each job uploads its reports even on success, and evidence for failed cases, for 14 days. Both Build (including
 package verification) and Tests must pass before any publishing job.
 
 Test projects retain their original project references and suite boundaries.
@@ -736,7 +739,13 @@ this execution matrix.
 
 Each case records a screenshot, DOM, trace, and browser-error list under
 `artifacts/test-results/<browser>/<case-id>/`. The xUnit output associates the case with that directory.
-Evidence is retained for successful cases too, making a later visual comparison possible without rerunning.
+Local runs keep evidence for every case. CI deletes the directories of passing cases after reading the
+TRX reports, so uploads contain traces only for failures.
+
+Browser test classes run two at a time (`xunit.runner.json`); each test still gets its own browser
+context, while one published-player server and browser process are shared. Timing-budget classes and
+native windows use the non-parallel `SerialCollection`, and `run_e2e.py linux` disables collection
+parallelism because native windows share one X display, accessibility bus and save directory.
 The helper also writes one TRX report per browser. Open traces with the matching Playwright trace viewer
 locally; they can contain story text and should not be uploaded to public trace-viewing services.
 
