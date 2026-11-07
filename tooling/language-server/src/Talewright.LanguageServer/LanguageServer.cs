@@ -17,6 +17,7 @@ public sealed class LanguageServer
     private readonly Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? _analyze;
     private readonly Func<TimeSpan, CancellationToken, Task>? _delay;
     private readonly Action<DiagnosticPublication>? _measure;
+    private readonly Func<Task>? _beforeRequestFinished;
     private readonly Channel<object> _events = Channel.CreateUnbounded<object>(new() { SingleReader = true });
     private readonly Dictionary<string, Story> _stories = new(PathComparer);
     private readonly Dictionary<string, Document> _documents = new(PathComparer);
@@ -44,13 +45,15 @@ public sealed class LanguageServer
 
     internal LanguageServer(Stream input, Stream output, TextWriter errors,
         Func<StorySource, CompilerOptions, CancellationToken, Task<StoryAnalysis>>? analyze,
-        Func<TimeSpan, CancellationToken, Task>? delay, Action<DiagnosticPublication>? measure = null)
+        Func<TimeSpan, CancellationToken, Task>? delay, Action<DiagnosticPublication>? measure = null,
+        Func<Task>? beforeRequestFinished = null)
     {
         _protocol = new(input, output);
         _errors = errors;
         _analyze = analyze;
         _delay = delay;
         _measure = measure;
+        _beforeRequestFinished = beforeRequestFinished;
     }
 
     private static StringComparer PathComparer => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -572,7 +575,12 @@ public sealed class LanguageServer
             ? request.Story.Pending ?? throw new InvalidOperationException("No analysis is scheduled for the request.")
             : null;
         shared?.StartImmediately();
-        var task = Task.Run(() => CalculateSemanticAsync(request, shared, previous));
+        var task = Task.Run(async () =>
+        {
+            var result = await CalculateSemanticAsync(request, shared, previous).ConfigureAwait(false);
+            if (_beforeRequestFinished is not null) await _beforeRequestFinished().ConfigureAwait(false);
+            return result;
+        });
         _requestTasks.Add(task, request);
         _ = task.ContinueWith(completed => _events.Writer.TryWrite(new RequestFinished(request, completed)),
             CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
@@ -925,26 +933,26 @@ public sealed class LanguageServer
             return;
         }
         var result = await finished.Task;
-        if (result.ErrorCode is { } code)
-        {
-            if (result.Error is { } error) await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {error.Message}");
-            await FinishRequestErrorAsync(request, code, result.ErrorMessage!, cancellationToken);
-            return;
-        }
         if (!_documents.TryGetValue(request.Path, out var document) || document.Text != request.Text ||
             !PathComparer.Equals(document.Root, request.Root) || !_stories.TryGetValue(request.Root, out var story))
         {
             await FinishRequestErrorAsync(request, -32801, "Document content was modified.", cancellationToken);
             return;
         }
-        if (story.MetadataError is { } metadataError)
-        {
-            await FinishRequestErrorAsync(request, -32001, $"{request.Feature} unavailable: {metadataError.Message}", cancellationToken);
-            return;
-        }
         if (result.Previous is null && (!ReferenceEquals(story, request.Story) || story.Generation != request.Generation))
         {
             await FinishRequestErrorAsync(request, -32801, "Document content was modified.", cancellationToken);
+            return;
+        }
+        if (result.ErrorCode is { } code)
+        {
+            if (result.Error is { } error) await _errors.WriteLineAsync($"{LanguageServerLogCodes.BackgroundFailure}: {request.Method}: {error.Message}");
+            await FinishRequestErrorAsync(request, code, result.ErrorMessage!, cancellationToken);
+            return;
+        }
+        if (story.MetadataError is { } metadataError)
+        {
+            await FinishRequestErrorAsync(request, -32001, $"{request.Feature} unavailable: {metadataError.Message}", cancellationToken);
             return;
         }
         if (result.Previous is { } previous && result.Target is { } target &&
