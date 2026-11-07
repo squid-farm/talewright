@@ -8,6 +8,7 @@
         "default",
         "{workspaceRoot}/.github/**/*",
         "{workspaceRoot}/engine/tests/Talewright.Talemark.Tests/project.json",
+        "{workspaceRoot}/engine/tests/Talewright.Runtime.Tests/project.json",
         "{workspaceRoot}/player/src/Talewright.Player/BuildIdentity.targets",
         "{workspaceRoot}/player/src/Talewright.Player/Talewright.Player.csproj",
         "{workspaceRoot}/tooling/vscode-talewright/project.json",

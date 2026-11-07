@@ -419,6 +419,8 @@ letter, digit, space or non-ASCII character stays visible, as in `C:\stories` an
 inline constructs and ASCII punctuation escapes. Backticks are ordinary text. Italic may use
 `*emphasis*` or `_emphasis_`; bold may use `**strong**` or `__strong__`. Unsupported Markdown-like
 syntax, including links, entities, headings and lists, remains literal text.
+This keeps Markdown-like punctuation from silently consuming your prose or changing its meaning.
+The same rules apply to dialogue, choice labels and image alt text, with or without substitutions.
 
 Each line break inside a paragraph renders as a line break. A line whose content renders empty,
 such as an inline conditional whose condition is false, does not leave an empty line. A trailing
@@ -684,6 +686,8 @@ hostile … allied          reputation tier names (compare with faction:<id>:tie
 Types are checked at compile time (number, bool, text, tier).
 Only player visits are tracked. Scene visit counts are numeric, including for hubs; `scene` refers
 to the current scene, while `<scene-id>:player:visits` refers to a named scene.
+Choice history is replay input, not directly queryable in Talemark. There is no general choice or
+event-history query syntax; use flags or variables to track other authored history.
 Use parentheses to group expressions, for example `(true)`.
 Put spaces around subtraction: `player:hp - 3` subtracts three, whereas
 `player:hp-3` refers to a stat named `hp-3`. Hyphens and dots are allowed inside identifiers.
