@@ -11,13 +11,38 @@ public enum PlayerTheme
     Dark,
 }
 
-public sealed record PlayerPreferences(int Version, PlayerTheme Theme, int TextSizePercent, bool HideMechanicalNotes)
+public enum PlayerReadingWidth
+{
+    Narrow,
+    Normal,
+    Wide,
+}
+
+public enum PlayerLineSpacing
+{
+    Compact,
+    Normal,
+    Relaxed,
+}
+
+public sealed record PlayerPreferences(
+    int Version,
+    PlayerTheme Theme,
+    int TextSizePercent,
+    bool HideMechanicalNotes,
+    PlayerReadingWidth ReadingWidth,
+    PlayerLineSpacing LineSpacing)
 {
     public const int CurrentVersion = 1;
     public const int DefaultTextSizePercent = 100;
     public static IReadOnlyList<int> SupportedTextSizes { get; } = Array.AsReadOnly([100, 125, 150, 175, 200]);
+    public static IReadOnlyList<PlayerReadingWidth> SupportedReadingWidths { get; } =
+        Array.AsReadOnly([PlayerReadingWidth.Narrow, PlayerReadingWidth.Normal, PlayerReadingWidth.Wide]);
+    public static IReadOnlyList<PlayerLineSpacing> SupportedLineSpacings { get; } =
+        Array.AsReadOnly([PlayerLineSpacing.Compact, PlayerLineSpacing.Normal, PlayerLineSpacing.Relaxed]);
     public static PlayerPreferences Default { get; } =
-        new(CurrentVersion, PlayerTheme.System, DefaultTextSizePercent, false);
+        new(CurrentVersion, PlayerTheme.System, DefaultTextSizePercent, false,
+            PlayerReadingWidth.Normal, PlayerLineSpacing.Normal);
 
     public static bool IsSupportedTextSize(int percent) => SupportedTextSizes.Contains(percent);
 }
@@ -58,6 +83,8 @@ public sealed class PlayerPreferencesStore(
         await _module.InvokeVoidAsync("applyTheme", ThemeValue(Current.Theme));
         await _module.InvokeVoidAsync("applyTextSize", Current.TextSizePercent);
         await _module.InvokeVoidAsync("applyHideMechanicalNotes", Current.HideMechanicalNotes);
+        await _module.InvokeVoidAsync("applyReadingWidth", ReadingWidthValue(Current.ReadingWidth));
+        await _module.InvokeVoidAsync("applyLineSpacing", LineSpacingValue(Current.LineSpacing));
         _initialized = true;
     }
 
@@ -109,13 +136,48 @@ public sealed class PlayerPreferencesStore(
         await PersistAsync(module);
     }
 
+    public async Task SetReadingWidthAsync(PlayerReadingWidth readingWidth)
+    {
+        if (!Enum.IsDefined(readingWidth))
+        {
+            throw new ArgumentOutOfRangeException(nameof(readingWidth), readingWidth, "Unknown player reading width.");
+        }
+        var module = _module;
+        if (!_initialized || module is null)
+        {
+            throw new InvalidOperationException("Player preferences must be initialized before they can be changed.");
+        }
+
+        Current = Current with { Version = PlayerPreferences.CurrentVersion, ReadingWidth = readingWidth };
+        await module.InvokeVoidAsync("applyReadingWidth", ReadingWidthValue(readingWidth));
+        await PersistAsync(module);
+    }
+
+    public async Task SetLineSpacingAsync(PlayerLineSpacing lineSpacing)
+    {
+        if (!Enum.IsDefined(lineSpacing))
+        {
+            throw new ArgumentOutOfRangeException(nameof(lineSpacing), lineSpacing, "Unknown player line spacing.");
+        }
+        var module = _module;
+        if (!_initialized || module is null)
+        {
+            throw new InvalidOperationException("Player preferences must be initialized before they can be changed.");
+        }
+
+        Current = Current with { Version = PlayerPreferences.CurrentVersion, LineSpacing = lineSpacing };
+        await module.InvokeVoidAsync("applyLineSpacing", LineSpacingValue(lineSpacing));
+        await PersistAsync(module);
+    }
+
     private async Task PersistAsync(IJSObjectReference module)
     {
         try
         {
             var value = JsonSerializer.Serialize(
                 new StoredPreferences(PlayerPreferences.CurrentVersion, ThemeValue(Current.Theme),
-                    Current.TextSizePercent, Current.HideMechanicalNotes),
+                    Current.TextSizePercent, Current.HideMechanicalNotes,
+                    ReadingWidthValue(Current.ReadingWidth), LineSpacingValue(Current.LineSpacing)),
                 JsonOptions);
             await module.InvokeVoidAsync("write", value);
             Warning = null;
@@ -165,8 +227,10 @@ public sealed class PlayerPreferencesStore(
             textSizePercent = PlayerPreferences.DefaultTextSizePercent;
         }
 
+        var readingWidth = ParseReadingWidth(stored.ReadingWidth);
+        var lineSpacing = ParseLineSpacing(stored.LineSpacing);
         return new(PlayerPreferences.CurrentVersion, theme, textSizePercent,
-            stored.HideMechanicalNotes ?? false);
+            stored.HideMechanicalNotes ?? false, readingWidth, lineSpacing);
     }
 
     private static string ThemeValue(PlayerTheme theme) => theme switch
@@ -175,6 +239,50 @@ public sealed class PlayerPreferencesStore(
         PlayerTheme.Light => "light",
         PlayerTheme.Dark => "dark",
         _ => throw new ArgumentOutOfRangeException(nameof(theme), theme, "Unknown player theme."),
+    };
+
+    private PlayerReadingWidth ParseReadingWidth(string? value) => value switch
+    {
+        null or "normal" => PlayerReadingWidth.Normal,
+        "narrow" => PlayerReadingWidth.Narrow,
+        "wide" => PlayerReadingWidth.Wide,
+        _ => InvalidReadingWidth(value),
+    };
+
+    private PlayerReadingWidth InvalidReadingWidth(string value)
+    {
+        logger.LogWarning("Stored player reading width '{ReadingWidth}' is unsupported; using the default width.", value);
+        return PlayerReadingWidth.Normal;
+    }
+
+    private PlayerLineSpacing ParseLineSpacing(string? value) => value switch
+    {
+        null or "normal" => PlayerLineSpacing.Normal,
+        "compact" => PlayerLineSpacing.Compact,
+        "relaxed" => PlayerLineSpacing.Relaxed,
+        _ => InvalidLineSpacing(value),
+    };
+
+    private PlayerLineSpacing InvalidLineSpacing(string value)
+    {
+        logger.LogWarning("Stored player line spacing '{LineSpacing}' is unsupported; using the default spacing.", value);
+        return PlayerLineSpacing.Normal;
+    }
+
+    private static string ReadingWidthValue(PlayerReadingWidth readingWidth) => readingWidth switch
+    {
+        PlayerReadingWidth.Narrow => "narrow",
+        PlayerReadingWidth.Normal => "normal",
+        PlayerReadingWidth.Wide => "wide",
+        _ => throw new ArgumentOutOfRangeException(nameof(readingWidth), readingWidth, "Unknown player reading width."),
+    };
+
+    private static string LineSpacingValue(PlayerLineSpacing lineSpacing) => lineSpacing switch
+    {
+        PlayerLineSpacing.Compact => "compact",
+        PlayerLineSpacing.Normal => "normal",
+        PlayerLineSpacing.Relaxed => "relaxed",
+        _ => throw new ArgumentOutOfRangeException(nameof(lineSpacing), lineSpacing, "Unknown player line spacing."),
     };
 
     public async ValueTask DisposeAsync()
@@ -192,5 +300,10 @@ public sealed class PlayerPreferencesStore(
     }
 
     private sealed record StoredPreferences(
-        int? Version, string? Theme, int? TextSizePercent, bool? HideMechanicalNotes);
+        int? Version,
+        string? Theme,
+        int? TextSizePercent,
+        bool? HideMechanicalNotes,
+        string? ReadingWidth,
+        string? LineSpacing);
 }

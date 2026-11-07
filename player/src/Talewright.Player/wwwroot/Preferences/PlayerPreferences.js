@@ -1,6 +1,8 @@
 const storageKey = "talewright.player.preferences";
 const themes = ["system", "light", "dark"];
 const textSizes = [100, 125, 150, 175, 200];
+const readingWidths = ["narrow", "normal", "wide"];
+const lineSpacings = ["compact", "normal", "relaxed"];
 
 export function read() {
     return localStorage.getItem(storageKey);
@@ -30,4 +32,18 @@ export function applyHideMechanicalNotes(hide) {
         throw new TypeError("Mechanical-note preference must be a boolean.");
     }
     document.documentElement.dataset.twHideMechanicalNotes = String(hide);
+}
+
+export function applyReadingWidth(readingWidth) {
+    if (!readingWidths.includes(readingWidth)) {
+        throw new TypeError(`Unknown player reading width '${readingWidth}'.`);
+    }
+    document.documentElement.dataset.twReadingWidth = readingWidth;
+}
+
+export function applyLineSpacing(lineSpacing) {
+    if (!lineSpacings.includes(lineSpacing)) {
+        throw new TypeError(`Unknown player line spacing '${lineSpacing}'.`);
+    }
+    document.documentElement.dataset.twLineSpacing = lineSpacing;
 }

@@ -31,6 +31,10 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Page.GetByLabel("Hide mechanical notes", new() { Exact = true })).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Reading width", new() { Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByLabel("Line spacing", new() { Exact = true })).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
         await Expect(close).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(theme).ToBeFocusedAsync();
@@ -79,6 +83,8 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await ReloadAsync();
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reading-width", "normal");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-line-spacing", "normal");
         Assert.Equal("18px", await Page.Locator("html").EvaluateAsync<string>(
             "element => getComputedStyle(element).fontSize"));
         Assert.Equal("rgb(28, 26, 23)", await Page.Locator("body").EvaluateAsync<string>(
@@ -91,6 +97,22 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Driver.ClickAsync("Settings");
         await Expect(Page.GetByLabel("Hide mechanical notes", new() { Exact = true })).Not.ToBeCheckedAsync();
         await Page.Keyboard.PressAsync("Escape");
+    }
+
+    [Theory]
+    [InlineData("{\"version\":1,\"theme\":\"dark\",\"readingWidth\":\"invalid\",\"lineSpacing\":\"relaxed\"}", "normal", "relaxed")]
+    [InlineData("{\"version\":1,\"theme\":\"dark\",\"readingWidth\":\"wide\",\"lineSpacing\":\"invalid\"}", "wide", "normal")]
+    [Trait("Host", "Browser")]
+    public async Task Unsupported_reading_preferences_fall_back_independently(string stored, string width, string spacing)
+    {
+        await Page.EvaluateAsync(
+            "stored => localStorage.setItem('talewright.player.preferences', stored)",
+            stored);
+        await ReloadAsync();
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reading-width", width);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-line-spacing", spacing);
     }
 
     [Fact]
@@ -277,6 +299,121 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
             "Settings dialog should fit in a narrow window.");
         Assert.True(await textSize.EvaluateAsync<bool>("element => element.getBoundingClientRect().right <= innerWidth"));
         await Page.Keyboard.PressAsync("Escape");
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Reading_width_and_line_spacing_persist_and_keep_choices_usable_at_every_size()
+    {
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var readingWidth = Page.GetByLabel("Reading width", new() { Exact = true });
+        var lineSpacing = Page.GetByLabel("Line spacing", new() { Exact = true });
+        await Expect(readingWidth.Locator("option")).ToHaveTextAsync(["Narrow", "Normal", "Wide"]);
+        await Expect(lineSpacing.Locator("option")).ToHaveTextAsync(["Compact", "Normal", "Relaxed"]);
+
+        var widthTokens = new Dictionary<string, string>
+        {
+            ["narrow"] = "38rem",
+            ["normal"] = "52rem",
+            ["wide"] = "68rem",
+        };
+        var spacingTokens = new Dictionary<string, string>
+        {
+            ["compact"] = "1.35",
+            ["normal"] = "1.6",
+            ["relaxed"] = "1.9",
+        };
+
+        await Page.SetViewportSizeAsync(1600, 900);
+        var renderedWidths = new Dictionary<string, double>();
+        foreach (var (width, widthToken) in widthTokens)
+        foreach (var (spacing, spacingToken) in spacingTokens)
+        {
+            await readingWidth.SelectOptionAsync(width);
+            await lineSpacing.SelectOptionAsync(spacing);
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reading-width", width);
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-line-spacing", spacing);
+            Assert.Equal(widthToken, await Page.Locator("html").EvaluateAsync<string>(
+                "element => getComputedStyle(element).getPropertyValue('--tw-transcript-max-width').trim()"));
+            Assert.Equal(spacingToken, await Page.Locator("html").EvaluateAsync<string>(
+                "element => getComputedStyle(element).getPropertyValue('--tw-transcript-line-height').trim()"));
+            Assert.True(await Page.Locator(".tw-transcript").EvaluateAsync<bool>(
+                "element => parseFloat(getComputedStyle(element).lineHeight) > 0"));
+            Assert.True(await Page.Locator(".tw-transcript").EvaluateAsync<bool>(
+                "element => element.scrollWidth <= element.clientWidth + 1"),
+                $"{width} reading width and {spacing} spacing should fit the transcript.");
+            if (spacing == "normal")
+            {
+                renderedWidths[width] = await Page.Locator(".tw-transcript").EvaluateAsync<double>(
+                    "element => element.getBoundingClientRect().width");
+            }
+
+            await Page.SetViewportSizeAsync(320, 720);
+            Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"),
+                $"{width} reading width and {spacing} spacing should not overflow a narrow window.");
+            foreach (var choice in await Page.Locator(".tw-choices button").AllAsync())
+            {
+                Assert.True(await choice.EvaluateAsync<bool>(
+                    "element => element.getBoundingClientRect().right <= innerWidth + 1"),
+                    $"{width} reading width and {spacing} spacing should keep choices in the viewport.");
+            }
+            Assert.True((await Driver.ObserveAsync()).SheetStacked,
+                $"{width} reading width and {spacing} spacing should retain the stacked sheet layout.");
+            await Page.SetViewportSizeAsync(1600, 900);
+        }
+        Assert.True(renderedWidths["narrow"] < renderedWidths["normal"]
+            && renderedWidths["normal"] < renderedWidths["wide"],
+            $"Each reading width should change the desktop transcript width: {string.Join(", ", renderedWidths.Select(pair => $"{pair.Key}={pair.Value}px"))}.");
+
+        await Page.GetByLabel("Text size", new() { Exact = true }).SelectOptionAsync("200");
+        await Page.SetViewportSizeAsync(320, 720);
+        foreach (var (width, widthToken) in widthTokens)
+        foreach (var (spacing, spacingToken) in spacingTokens)
+        {
+            await readingWidth.SelectOptionAsync(width);
+            await lineSpacing.SelectOptionAsync(spacing);
+            Assert.Equal(widthToken, await Page.Locator("html").EvaluateAsync<string>(
+                "element => getComputedStyle(element).getPropertyValue('--tw-transcript-max-width').trim()"));
+            Assert.Equal(spacingToken, await Page.Locator("html").EvaluateAsync<string>(
+                "element => getComputedStyle(element).getPropertyValue('--tw-transcript-line-height').trim()"));
+            Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"),
+                $"{width} reading width and {spacing} spacing at 200% text should not overflow a narrow window.");
+            foreach (var choice in await Page.Locator(".tw-choices button").AllAsync())
+            {
+                Assert.True(await choice.EvaluateAsync<bool>(
+                    "element => element.getBoundingClientRect().right <= innerWidth + 1"),
+                    $"{width} reading width and {spacing} spacing at 200% text should keep choices in the viewport.");
+            }
+        }
+
+        await Page.Keyboard.PressAsync("Escape");
+        var stored = await Page.EvaluateAsync<string>(
+            "() => localStorage.getItem('talewright.player.preferences')");
+        using (var preferences = System.Text.Json.JsonDocument.Parse(stored))
+        {
+            Assert.Equal("wide", preferences.RootElement.GetProperty("readingWidth").GetString());
+            Assert.Equal("relaxed", preferences.RootElement.GetProperty("lineSpacing").GetString());
+        }
+
+        await ReloadAsync();
+        await Upload(TestStories.Linear);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-reading-width", "wide");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-line-spacing", "relaxed");
+        Assert.Equal("68rem", await Page.Locator("html").EvaluateAsync<string>(
+            "element => getComputedStyle(element).getPropertyValue('--tw-transcript-max-width').trim()"));
+        Assert.Equal("1.9", await Page.Locator("html").EvaluateAsync<string>(
+            "element => getComputedStyle(element).getPropertyValue('--tw-transcript-line-height').trim()"));
+
+        await Driver.ClickAsync("History");
+        Assert.Equal("68rem", await Page.Locator(".tw-history").EvaluateAsync<string>(
+            "element => getComputedStyle(element).getPropertyValue('--tw-transcript-max-width').trim()"));
+        Assert.Equal("1.9", await Page.Locator(".tw-history").EvaluateAsync<string>(
+            "element => getComputedStyle(element).getPropertyValue('--tw-transcript-line-height').trim()"));
+        await Driver.ClickAsync("Return to play");
     }
 
     private static async Task AssertAllHiddenAsync(ILocator elements)

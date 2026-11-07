@@ -59,6 +59,20 @@
         <input type="checkbox" checked="@_hideMechanicalNotes" @onchange="ChangeHideMechanicalNotes" />
         Hide mechanical notes
     </label>
+    <label for="tw-reading-width">Reading width</label>
+    <select id="tw-reading-width" value="@ReadingWidthValue(_readingWidth)" @onchange="ChangeReadingWidth">
+        @foreach (var readingWidth in PlayerPreferences.SupportedReadingWidths)
+        {
+            <option value="@ReadingWidthValue(readingWidth)">@readingWidth</option>
+        }
+    </select>
+    <label for="tw-line-spacing">Line spacing</label>
+    <select id="tw-line-spacing" value="@LineSpacingValue(_lineSpacing)" @onchange="ChangeLineSpacing">
+        @foreach (var lineSpacing in PlayerPreferences.SupportedLineSpacings)
+        {
+            <option value="@LineSpacingValue(lineSpacing)">@lineSpacing</option>
+        }
+    </select>
     @if (Preferences.Warning is not null)
     {
         <p class="tw-error" role="status">@Preferences.Warning</p>
@@ -102,12 +116,16 @@
     private bool _focusMenu;
     private PlayerTheme _theme = PlayerTheme.System;
     private int _textSizePercent = PlayerPreferences.DefaultTextSizePercent;
+    private PlayerReadingWidth _readingWidth = PlayerReadingWidth.Normal;
+    private PlayerLineSpacing _lineSpacing = PlayerLineSpacing.Normal;
     private bool _hideMechanicalNotes;
 
     protected override void OnInitialized()
     {
         _theme = Preferences.Current.Theme;
         _textSizePercent = Preferences.Current.TextSizePercent;
+        _readingWidth = Preferences.Current.ReadingWidth;
+        _lineSpacing = Preferences.Current.LineSpacing;
         _hideMechanicalNotes = Preferences.Current.HideMechanicalNotes;
     }
 
@@ -190,6 +208,50 @@
         await Preferences.SetHideMechanicalNotesAsync(hide);
         _hideMechanicalNotes = hide;
     }
+
+    private async Task ChangeReadingWidth(ChangeEventArgs args)
+    {
+        var readingWidth = args.Value?.ToString() switch
+        {
+            "narrow" => PlayerReadingWidth.Narrow,
+            "normal" => PlayerReadingWidth.Normal,
+            "wide" => PlayerReadingWidth.Wide,
+            _ => throw new InvalidOperationException($"Unknown reading width selection '{args.Value}'."),
+        };
+
+        await Preferences.SetReadingWidthAsync(readingWidth);
+        _readingWidth = readingWidth;
+    }
+
+    private async Task ChangeLineSpacing(ChangeEventArgs args)
+    {
+        var lineSpacing = args.Value?.ToString() switch
+        {
+            "compact" => PlayerLineSpacing.Compact,
+            "normal" => PlayerLineSpacing.Normal,
+            "relaxed" => PlayerLineSpacing.Relaxed,
+            _ => throw new InvalidOperationException($"Unknown line spacing selection '{args.Value}'."),
+        };
+
+        await Preferences.SetLineSpacingAsync(lineSpacing);
+        _lineSpacing = lineSpacing;
+    }
+
+    private static string ReadingWidthValue(PlayerReadingWidth readingWidth) => readingWidth switch
+    {
+        PlayerReadingWidth.Narrow => "narrow",
+        PlayerReadingWidth.Normal => "normal",
+        PlayerReadingWidth.Wide => "wide",
+        _ => throw new ArgumentOutOfRangeException(nameof(readingWidth), readingWidth, "Unknown player reading width."),
+    };
+
+    private static string LineSpacingValue(PlayerLineSpacing lineSpacing) => lineSpacing switch
+    {
+        PlayerLineSpacing.Compact => "compact",
+        PlayerLineSpacing.Normal => "normal",
+        PlayerLineSpacing.Relaxed => "relaxed",
+        _ => throw new ArgumentOutOfRangeException(nameof(lineSpacing), lineSpacing, "Unknown player line spacing."),
+    };
 
     private async Task CancelRestart() =>
         await _module!.InvokeVoidAsync("closeConfirmation", _confirmation, _toggle);

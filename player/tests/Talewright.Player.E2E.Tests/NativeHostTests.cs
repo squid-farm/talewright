@@ -60,6 +60,81 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Reading_preferences_apply_to_the_desktop_transcript_and_fit_a_narrow_window()
+    {
+        var fixture = TestStories.Linear with
+        {
+            Tale = """
+                === start
+                @title First passage
+                A long passage stays readable as its width and line spacing change. Readers can use
+                a narrow column with compact lines, a normal column with normal lines, or a wide
+                column with relaxed lines. The transcript should remain inside the window and the
+                choices should remain usable at every combination of these preferences.
+                * [Continue] -> finish
+                === finish
+                The end.
+                -> END
+                """,
+        };
+        await Driver.StartAsync();
+        await Upload(fixture);
+        await Observe(new(null, "First passage"));
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var before = await native.SnapshotAsync();
+        var transcriptBefore = Assert.Single(before.Descendants(), node => node.Name == "Story transcript");
+        var passageBefore = Assert.Single(before.Descendants(), node => node.Name == "Current passage");
+
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        var settings = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "dialog" && node.Name == "Settings");
+        Assert.Contains(settings.Descendants(),
+            node => node.Role == "combo box" && node.Name == "Reading width");
+        Assert.Contains(settings.Descendants(),
+            node => node.Role == "combo box" && node.Name == "Line spacing");
+
+        await Driver.PressAsync("Tab");
+        await Driver.PressAsync("Tab");
+        await Driver.PressAsync("Tab");
+        var readingWidth = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "combo box" && node.Name == "Reading width");
+        Assert.True(readingWidth.Focused);
+        await Driver.PressAsync("Home");
+        await Driver.PressAsync("Tab");
+        var lineSpacing = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "combo box" && node.Name == "Line spacing");
+        Assert.True(lineSpacing.Focused);
+        await Driver.PressAsync("End");
+        await Driver.ClickAsync("Close settings");
+
+        var after = await native.SnapshotAsync();
+        var transcriptAfter = Assert.Single(after.Descendants(), node => node.Name == "Story transcript");
+        var passageAfter = Assert.Single(after.Descendants(), node => node.Name == "Current passage");
+        Assert.True(transcriptAfter.Bounds.Width < transcriptBefore.Bounds.Width,
+            "Narrow reading width should reduce the desktop transcript width.");
+        Assert.True(passageAfter.Bounds.Height > passageBefore.Bounds.Height,
+            "Relaxed line spacing should increase the desktop passage height.");
+
+        await Driver.ResizeAsync(640, 760);
+        var narrow = await native.SnapshotAsync();
+        var window = Assert.Single(narrow.Descendants(), node => node.Role == "frame");
+        foreach (var control in new[]
+                 {
+                     Assert.Single(narrow.Descendants(), node =>
+                         node.Role == "push button" && node.Name == "More actions"),
+                     Assert.Single(narrow.Descendants(), node =>
+                         node.Role == "push button" && node.Name.Contains("Continue", StringComparison.Ordinal)),
+                 })
+        {
+            Assert.True(control.Bounds.X >= window.Bounds.X
+                && control.Bounds.X + control.Bounds.Width <= window.Bounds.X + window.Bounds.Width,
+                $"{control.Name} remains within the narrow desktop window.");
+        }
+        Assert.True((await Driver.ObserveAsync()).SheetStacked);
+    }
+
+    [Fact]
     public async Task Hiding_mechanical_notes_removes_them_from_the_desktop_accessibility_tree()
     {
         await Driver.StartAsync();
