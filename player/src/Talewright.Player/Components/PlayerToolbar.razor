@@ -73,6 +73,15 @@
             <option value="@LineSpacingValue(lineSpacing)">@lineSpacing</option>
         }
     </select>
+    <label for="tw-reduced-motion">Reduced motion</label>
+    <select id="tw-reduced-motion" value="@ReducedMotionValue(_reducedMotion)" @onchange="ChangeReducedMotion">
+        @foreach (var reducedMotion in PlayerPreferences.SupportedReducedMotions)
+        {
+            <option value="@ReducedMotionValue(reducedMotion)">
+                @(reducedMotion == PlayerReducedMotion.System ? "System" : "Reduce")
+            </option>
+        }
+    </select>
     @if (Preferences.Warning is not null)
     {
         <p class="tw-error" role="status">@Preferences.Warning</p>
@@ -118,6 +127,7 @@
     private int _textSizePercent = PlayerPreferences.DefaultTextSizePercent;
     private PlayerReadingWidth _readingWidth = PlayerReadingWidth.Normal;
     private PlayerLineSpacing _lineSpacing = PlayerLineSpacing.Normal;
+    private PlayerReducedMotion _reducedMotion = PlayerReducedMotion.System;
     private bool _hideMechanicalNotes;
 
     protected override void OnInitialized()
@@ -126,6 +136,7 @@
         _textSizePercent = Preferences.Current.TextSizePercent;
         _readingWidth = Preferences.Current.ReadingWidth;
         _lineSpacing = Preferences.Current.LineSpacing;
+        _reducedMotion = Preferences.Current.ReducedMotion;
         _hideMechanicalNotes = Preferences.Current.HideMechanicalNotes;
     }
 
@@ -237,6 +248,19 @@
         _lineSpacing = lineSpacing;
     }
 
+    private async Task ChangeReducedMotion(ChangeEventArgs args)
+    {
+        var reducedMotion = args.Value?.ToString() switch
+        {
+            "system" => PlayerReducedMotion.System,
+            "reduce" => PlayerReducedMotion.Reduce,
+            _ => throw new InvalidOperationException($"Unknown reduced-motion selection '{args.Value}'."),
+        };
+
+        await Preferences.SetReducedMotionAsync(reducedMotion);
+        _reducedMotion = reducedMotion;
+    }
+
     private static string ReadingWidthValue(PlayerReadingWidth readingWidth) => readingWidth switch
     {
         PlayerReadingWidth.Narrow => "narrow",
@@ -251,6 +275,14 @@
         PlayerLineSpacing.Normal => "normal",
         PlayerLineSpacing.Relaxed => "relaxed",
         _ => throw new ArgumentOutOfRangeException(nameof(lineSpacing), lineSpacing, "Unknown player line spacing."),
+    };
+
+    private static string ReducedMotionValue(PlayerReducedMotion reducedMotion) => reducedMotion switch
+    {
+        PlayerReducedMotion.System => "system",
+        PlayerReducedMotion.Reduce => "reduce",
+        _ => throw new ArgumentOutOfRangeException(nameof(reducedMotion), reducedMotion,
+            "Unknown player reduced-motion preference."),
     };
 
     private async Task CancelRestart() =>

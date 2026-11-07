@@ -3,6 +3,7 @@ const themes = ["system", "light", "dark"];
 const textSizes = [100, 125, 150, 175, 200];
 const readingWidths = ["narrow", "normal", "wide"];
 const lineSpacings = ["compact", "normal", "relaxed"];
+const reducedMotions = ["system", "reduce"];
 
 export function read() {
     return localStorage.getItem(storageKey);
@@ -46,4 +47,11 @@ export function applyLineSpacing(lineSpacing) {
         throw new TypeError(`Unknown player line spacing '${lineSpacing}'.`);
     }
     document.documentElement.dataset.twLineSpacing = lineSpacing;
+}
+
+export function applyReducedMotion(reducedMotion) {
+    if (!reducedMotions.includes(reducedMotion)) {
+        throw new TypeError(`Unknown player reduced-motion preference '${reducedMotion}'.`);
+    }
+    document.documentElement.dataset.twReducedMotion = reducedMotion;
 }

@@ -29,13 +29,16 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 ## Player preferences
 
 The shared player exposes per-device theme, text-size, reading-width (narrow / normal / wide),
-line-spacing (compact / normal / relaxed) and mechanical-note visibility settings in the toolbar's
-More actions menu. `PlayerPreferencesStore` owns the versioned preferences record and
-persists it in browser storage, shared across stories. Hidden mechanical notes are removed from
-both the display and accessibility tree without changing story events. Hosts register the store as
-a scoped service; web hosts should load `PlayerPreferencesBootstrap.js` before the player
-stylesheet to apply saved preferences before first paint. The desktop host initializes the same
-store before rendering the player.
+line-spacing (compact / normal / relaxed), reduced-motion (system / reduce) and mechanical-note
+visibility settings in the toolbar's More actions menu. `PlayerPreferencesStore` owns the
+versioned preferences record and persists it in browser storage, shared across stories. Hidden
+mechanical notes are removed from both the display and accessibility tree without changing story
+events. Hosts register the store as a scoped service; web hosts should load
+`PlayerPreferencesBootstrap.js` before the player stylesheet to apply saved preferences before
+first paint. The desktop host initializes the same store before rendering the player.
+
+Reduced motion follows the operating system by default. The Reduce setting overrides the system
+preference; stories cannot set or override it.
 
 ## Story libraries (`Library/StoryLibraries.cs`)
 

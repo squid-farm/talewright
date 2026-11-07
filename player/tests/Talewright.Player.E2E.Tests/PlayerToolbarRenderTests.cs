@@ -45,6 +45,7 @@ public sealed class PlayerToolbarRenderTests
             control => Assert.Contains("type=\"checkbox\"", control),
             control => Assert.Contains("id=\"tw-reading-width\"", control),
             control => Assert.Contains("id=\"tw-line-spacing\"", control),
+            control => Assert.Contains("id=\"tw-reduced-motion\"", control),
             control => Assert.Contains("class=\"tw-choice\"", control));
     }
 
