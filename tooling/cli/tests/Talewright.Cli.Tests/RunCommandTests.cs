@@ -265,7 +265,7 @@ public sealed class RunCommandTests : IDisposable
             cancellation.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => launch);
             Assert.False(IsRunning(parentId));
-            Assert.False(IsRunning(childId));
+            Assert.False(await StillRunningAfter(childId, TimeSpan.FromSeconds(5)));
         }
         finally
         {
@@ -281,16 +281,37 @@ public sealed class RunCommandTests : IDisposable
         }
     }
 
+    // The killed grandchild is reparented, so it can remain a zombie until its new parent reaps it.
+    private static async Task<bool> StillRunningAfter(int id, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (IsRunning(id) && DateTime.UtcNow < deadline) await Task.Delay(25);
+        return IsRunning(id);
+    }
+
     private static bool IsRunning(int id)
     {
         try
         {
             using var process = Process.GetProcessById(id);
-            return !process.HasExited;
+            return !process.HasExited && !IsZombie(id);
         }
         catch (ArgumentException)
         {
             return false;
+        }
+    }
+
+    private static bool IsZombie(int id)
+    {
+        try
+        {
+            var stat = File.ReadAllText($"/proc/{id}/stat");
+            return stat[(stat.LastIndexOf(')') + 2)..].StartsWith('Z');
+        }
+        catch (IOException)
+        {
+            return !Directory.Exists($"/proc/{id}");
         }
     }
 
