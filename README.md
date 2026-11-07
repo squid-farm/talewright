@@ -1,6 +1,7 @@
 # Talewright
 
-<img width="1408" height="768" alt="Talewright banner art" src="https://github.com/user-attachments/assets/7bb26ecc-f688-4b54-98b3-85eb6fa67bcc" />
+<img width="1584" height="672" alt="image_20785f2d" src="https://github.com/user-attachments/assets/a702c41b-3e51-42c4-9d70-c273be00c98a" />
+
 
 <sub>Banner art is AI-generated placeholder art. If Talewright earns its keep, a real artist gets the job.</sub>
 
