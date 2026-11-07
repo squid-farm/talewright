@@ -9,6 +9,7 @@ internal static partial class TaleSyntaxParser
     private sealed partial class SceneState
     {
         private readonly int _headerIndent;
+        private readonly int _headerIdColumn;
         private readonly int _headerLength;
         private readonly string _id;
         private readonly List<TaleLinePart> _parts;
@@ -25,13 +26,14 @@ internal static partial class TaleSyntaxParser
         private (int Line, int Column, bool InsideBlock, bool Success, bool Failure)? _check;
 
         /// <summary>Starts a scene, reusing the previous scene's buffers.</summary>
-        public SceneState(int start, int line, int headerIndent, int headerLength, string id,
+        public SceneState(int start, int line, int headerIndent, int headerIdColumn, int headerLength, string id,
             List<TaleLineSyntax> lines, List<TaleLinePart> parts, List<TaleClause> clauses,
             CancellationToken cancellationToken)
         {
             Start = start;
             Line = line;
             _headerIndent = headerIndent;
+            _headerIdColumn = headerIdColumn;
             _headerLength = headerLength;
             _id = id;
             Lines = lines;
@@ -178,7 +180,7 @@ internal static partial class TaleSyntaxParser
                     diagnostics.Add(new(CompilerDiagnosticCodes.UnbalancedCondition, message, _blocks[index].Line,
                         _blocks[index].Column));
             }
-            return new TaleSceneSyntax(Start, Line, _headerIndent, _headerLength, _id, Lines.ToArray(),
+            return new TaleSceneSyntax(Start, Line, _headerIndent, _headerIdColumn, _headerLength, _id, Lines.ToArray(),
                 _parts.ToArray(), _clauses.ToArray(), endLine - Line, diagnostics.ToArray());
         }
     }

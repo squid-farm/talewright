@@ -40,6 +40,9 @@ public sealed partial class ServerTests
         Assert.Equal(-32002, uninitialized.GetProperty("error").GetProperty("code").GetInt32());
         var initialized = await client.Initialize();
         Assert.Equal("utf-16", initialized.GetProperty("result").GetProperty("capabilities").GetProperty("positionEncoding").GetString());
+        var capabilities = initialized.GetProperty("result").GetProperty("capabilities");
+        Assert.True(capabilities.GetProperty("documentSymbolProvider").GetBoolean());
+        Assert.True(capabilities.GetProperty("workspaceSymbolProvider").GetBoolean());
         Assert.Equal(1, initialized.GetProperty("result").GetProperty("capabilities").GetProperty("textDocumentSync").GetProperty("change").GetInt32());
         var semanticTokens = initialized.GetProperty("result").GetProperty("capabilities").GetProperty("semanticTokensProvider");
         Assert.Equal(["comment", "keyword", "operator", "number", "string", "variable", "namespace", "property", "function", "modifier"],
@@ -917,10 +920,12 @@ public sealed partial class ServerTests
 
         public string PathOf(string name) => Path.Combine(Root, name);
         public string UriOf(string name) => new Uri(PathOf(name)).AbsoluteUri;
-        public Task<JsonElement> Initialize(object? options = null, bool includeRoot = true, object? capabilities = null) => Request("initialize", new
+        public Task<JsonElement> Initialize(object? options = null, bool includeRoot = true, object? capabilities = null,
+            object? workspaceFolders = null) => Request("initialize", new
         {
             processId = Environment.ProcessId,
             rootUri = includeRoot ? new Uri(Root).AbsoluteUri : null,
+            workspaceFolders,
             capabilities = capabilities ?? new { },
             initializationOptions = options
         });
