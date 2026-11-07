@@ -523,7 +523,8 @@ public sealed class LanguageServer
         if (request.Feature == Feature.CodeActions)
         {
             var diagnostics = analysis.Diagnostics.Where(diagnostic =>
-                (diagnostic.Code is CompilerDiagnosticCodes.UnknownScene or CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable) && diagnostic.Location.File == position.File &&
+                (diagnostic.Code is CompilerDiagnosticCodes.UnknownScene or CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable or CompilerDiagnosticCodes.UnknownNameOrProperty) &&
+                diagnostic.Location.File == position.File &&
                 Compare(position, diagnostic.Location) <= 0 && Compare(diagnostic.Location, request.End) <= 0);
             var lines = new LineMap(request.Text);
             var actions = new List<object>();
@@ -537,6 +538,15 @@ public sealed class LanguageServer
                             !File.Exists(Path.GetFullPath(fix.File, request.Root)) &&
                             !Directory.Exists(Path.GetFullPath(fix.File, request.Root)))
                         .Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
+                    continue;
+                }
+
+                if (diagnostic.Code == CompilerDiagnosticCodes.UnknownNameOrProperty)
+                {
+                    var nameResult = StoryQuickFixes.ForMissingManifestName(analysis, diagnostic);
+                    actions.AddRange(nameResult.Fixes.Select(fix => ToCodeAction(fix, diagnostic, request, analysis, lines)));
+                    if (nameResult.DisabledReason is { } nameReason)
+                        actions.Add(ToDisabledCodeAction(nameResult.Title ?? "Declare missing name", nameReason, diagnostic, lines));
                     continue;
                 }
 

@@ -275,6 +275,15 @@ For an undeclared flag reported by `TW2004`, the Quick Fix menu offers
 formatting and using an open manifest buffer (including unsaved edits). When
 the manifest cannot be edited safely, the action is disabled with a reason.
 
+For a `TW2001` unknown character, item, or faction reference in a `.tale` file,
+the Quick Fix menu offers **Declare character `<id>`**, **Declare item `<id>`**,
+or **Declare faction `<id>`** in the root manifest. Character and item
+declarations use a readable name derived from the ID; factions start with their
+default name and standing. These edits preserve the manifest's YAML formatting
+and comments and use the open manifest buffer. No declaration action is offered
+for `player`, existing declarations, or unknown properties. Unsupported
+manifest shapes produce a disabled action with a reason.
+
 Editors that don't use the SchemaStore catalog can use the same schema with this
 modeline at the top of `story.talewright.yaml`:
 
