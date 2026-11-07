@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Photino.Blazor;
+using Photino.NET;
+using Talewright.Player.Diagnostics;
 using Talewright.Player.Library;
 using Talewright.Player.Preferences;
 using Talewright.Runtime.Saves;
@@ -34,6 +36,7 @@ internal static class Program
             var builder = PhotinoBlazorAppBuilder.CreateDefault(fileProvider, args);
             PlayerLaunchOptions? player = null;
             MapExportDialog? mapExportDialog = null;
+            PhotinoWindow? window = null;
             if (play)
             {
                 player = new PlayerLaunchOptions(root);
@@ -41,6 +44,17 @@ internal static class Program
                 builder.Services.AddSingleton<IStoryLibrary>(new FileSystemStoryLibrary([root]));
                 builder.Services.AddSingleton(player);
                 builder.Services.AddSingleton<ISaveStore>(new FileSaveStore(FileSaveStore.DefaultRoot));
+                builder.Services.AddSingleton<IDiagnosticReportExporter>(new LocalDiagnosticReportExporter(async name =>
+                {
+                    var ready = window ?? throw new InvalidOperationException("The desktop window is not ready.");
+                    if (Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY") is { Length: > 0 } directory)
+                    {
+                        return Path.Combine(directory, name);
+                    }
+                    var folder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    return await ready.ShowSaveFileAsync("Export diagnostic report", folder, [("Text file", ["txt"])]);
+                }));
+                builder.Services.AddScoped<PlayerDiagnostics>();
                 builder.Services.AddScoped<PlayerPreferencesStore>();
                 builder.RootComponents.Add<PlayerHost>("app");
             }
@@ -52,6 +66,7 @@ internal static class Program
                 builder.RootComponents.Add<Workbench>("app");
             }
             var app = builder.Build();
+            window = app.MainWindow;
             if (player is not null)
             {
                 app.MainWindow.LogVerbosity = 0;

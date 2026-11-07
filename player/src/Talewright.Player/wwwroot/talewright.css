@@ -81,6 +81,9 @@ button { font: inherit; color: inherit; }
 .tw-autosave-error { margin: 0 0 1rem; }
 .tw-empty { color: var(--tw-muted); font-style: italic; }
 .tw-build-identity { margin: 1.5rem 0 0; font-family: var(--tw-ui-font); font-size: 0.75rem; color: var(--tw-muted); overflow-wrap: anywhere; }
+.tw-diagnostic-report { margin-top: 2rem; font-family: var(--tw-ui-font); }
+.tw-diagnostic-report summary { cursor: pointer; color: var(--tw-accent); min-height: 44px; }
+.tw-diagnostic-report pre { max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 1rem; background: var(--tw-panel); border: 1px solid var(--tw-border); }
 
 /* Player layout */
 .tw-bar { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem 1rem; align-items: center; background: var(--tw-bg); border-bottom: 1px solid var(--tw-border); margin-bottom: 1rem; }

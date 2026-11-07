@@ -16,6 +16,7 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 |---|---|
 | `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
+| `DiagnosticReport` | Accessible, inspectable session report and optional download control; available even when no story opens. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
 | `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, import/export, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
@@ -55,6 +56,17 @@ libraries. The compiler's source and pure renderer never own image I/O or resour
 
 Register one as a singleton `IStoryLibrary` in the host.
 Register `PlayerPreferencesStore` as a scoped service in hosts that render `TalewrightApp`.
+
+### Player diagnostics
+
+Register a scoped `PlayerDiagnostics` to share the session's report with preferences, and register
+`IDiagnosticReportExporter` as `BrowserDiagnosticReportExporter` on web or as a
+`LocalDiagnosticReportExporter` with a native path chooser on desktop. `NativeSaveFileDialog.ChooseReportAsync`
+provides a text-file chooser for desktop hosts. Without these registrations, existing hosts still render:
+the root keeps a local report and explicitly indicates that download is unavailable. Direct
+`StoryPlayer` or media consumers can cascade a `PlayerDiagnostics` instance to capture their failures.
+The report keeps the latest 100 warnings and errors and excludes exception messages, paths, story text
+and save contents. See [collecting diagnostics](../../../docs/guide/troubleshooting.md#collecting-diagnostics).
 
 ### Image host coverage and ownership
 

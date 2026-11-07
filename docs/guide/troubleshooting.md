@@ -82,6 +82,27 @@ install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (th
 runtime), then open a new terminal. See [which .NET version you need](getting-started.md#which-net-version-do-i-need)
 for the portable CLI and player requirements.
 
+## Collecting diagnostics
+
+In the browser or desktop player, open **Diagnostics** near the bottom of the player. It is also
+available when a story fails to open, including in a published game. Review the report, then choose
+**Download diagnostic report** if you want to attach it to a bug report. Nothing is uploaded
+automatically.
+
+The report includes the player version and commit, host and available platform information, story
+and scene IDs when available, and up to 100 recent warnings and errors with their operation and a
+safe cause. Development builds may show `dev` for the version or `unknown` for the commit.
+Compiler diagnostics include their codes. The report does not include story text, save contents,
+full paths, URLs or exception messages. IDs can still be identifying, so check the report before
+sharing it. The buffer belongs to the current player session and is cleared when the player is
+restarted; it cannot recover details after every process crash.
+
+For a CLI problem, copy the command and its terminal output, including any errors. For an editor
+problem, open **View > Output**, choose **Talewright Language Server**, and copy the relevant output.
+Review terminal and editor output before sharing: unlike the player report, they may contain paths,
+story text or other private information. Reproduction steps are often helpful, and a separately
+shared minimal story or save may be needed to reproduce some problems.
+
 ## Still stuck?
 
 [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).

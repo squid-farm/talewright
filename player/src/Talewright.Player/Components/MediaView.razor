@@ -1,5 +1,6 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@using Talewright.Player.Diagnostics
 @using Talewright.Narrative.Templates
 
 <span class="tw-media @StyleClass" aria-hidden="@(Media.Accessibility == MediaAccessibility.Decorative ? "true" : null)">
@@ -16,6 +17,7 @@
 @code {
     [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
     [Parameter] public StoryImages? Images { get; set; }
+    [CascadingParameter] public PlayerDiagnostics? Report { get; set; }
 
     private ElementReference _image;
     private IJSObjectReference? _module;
@@ -36,7 +38,12 @@
 
     protected override void OnParametersSet()
     {
-        if (Images is null) _error = "Images are unavailable for this story source.";
+        if (Images is null)
+        {
+            var wasUnavailable = _error == "Images are unavailable for this story source.";
+            _error = "Images are unavailable for this story source.";
+            if (!wasUnavailable) Report?.Record(PlayerDiagnosticOperation.ImageLoad, PlayerDiagnosticCause.Unavailable);
+        }
     }
 
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -60,6 +67,7 @@
             {
                 _error = "Image loading is unavailable in this host.";
                 Console.Error.WriteLine($"Image loader failed: {ex.Message}");
+                Report?.Record(PlayerDiagnosticOperation.ImageLoad, ex);
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -78,7 +86,11 @@
             var url = await _lease.Url.WaitAsync(token);
             if (_disposed || token.IsCancellationRequested) return;
             var loaded = await _module.InvokeAsync<bool>("display", token, _handle, url);
-            if (!loaded && !_disposed) _error = "This image could not be displayed.";
+            if (!loaded && !_disposed)
+            {
+                _error = "This image could not be displayed.";
+                Report?.Record(PlayerDiagnosticOperation.ImageLoad, PlayerDiagnosticCause.InvalidData);
+            }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException
             && (_disposed || Images.Lifetime.IsCancellationRequested))
@@ -91,6 +103,7 @@
             {
                 _error = "This image could not be loaded.";
                 Console.Error.WriteLine($"Image '{Media.MediaId}' failed: {ex.Message}");
+                Report?.Record(PlayerDiagnosticOperation.ImageLoad, ex);
             }
         }
         if (!_disposed) await InvokeAsync(StateHasChanged);

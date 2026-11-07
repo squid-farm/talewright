@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using Talewright.Player.Diagnostics;
 
 namespace Talewright.Player.Preferences;
 
@@ -58,8 +59,12 @@ public sealed record PlayerPreferences(
 
 public sealed class PlayerPreferencesStore(
     IJSRuntime js,
-    ILogger<PlayerPreferencesStore> logger) : IAsyncDisposable
+    ILogger<PlayerPreferencesStore> logger,
+    PlayerDiagnostics? diagnostics) : IAsyncDisposable
 {
+    public PlayerPreferencesStore(IJSRuntime js, ILogger<PlayerPreferencesStore> logger)
+        : this(js, logger, null) { }
+
     private const string ModulePath = "./_content/Talewright.Player/Preferences/PlayerPreferences.js";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private IJSObjectReference? _module;
@@ -84,6 +89,7 @@ public sealed class PlayerPreferencesStore(
         catch (JSException ex)
         {
             logger.LogError(ex, "Could not read player preferences from browser storage.");
+            diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, ex);
             Warning = "Settings could not be loaded or saved in this host.";
             value = null;
         }
@@ -214,6 +220,7 @@ public sealed class PlayerPreferencesStore(
         catch (JSException ex)
         {
             logger.LogError(ex, "Could not persist player preferences to browser storage.");
+            diagnostics?.Record(PlayerDiagnosticOperation.PreferencesWrite, ex);
             Warning = "These settings will only last for the current session because they could not be saved.";
         }
     }
@@ -233,6 +240,7 @@ public sealed class PlayerPreferencesStore(
         catch (JsonException ex)
         {
             logger.LogWarning(ex, "Stored player preferences are malformed; using defaults.");
+            diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, ex, warning: true);
             return PlayerPreferences.Default;
         }
 
@@ -240,6 +248,7 @@ public sealed class PlayerPreferencesStore(
             stored.Theme is not ("system" or "light" or "dark"))
         {
             logger.LogWarning("Stored player preferences have an unsupported version or theme; using defaults.");
+            diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, PlayerDiagnosticCause.Unsupported, warning: true);
             return PlayerPreferences.Default;
         }
 
@@ -253,6 +262,7 @@ public sealed class PlayerPreferencesStore(
         if (!PlayerPreferences.IsSupportedTextSize(textSizePercent))
         {
             logger.LogWarning("Stored player text size is unsupported; using the default size.");
+            diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, PlayerDiagnosticCause.Unsupported, warning: true);
             textSizePercent = PlayerPreferences.DefaultTextSizePercent;
         }
 
@@ -282,6 +292,7 @@ public sealed class PlayerPreferencesStore(
     private PlayerReadingWidth InvalidReadingWidth(string value)
     {
         logger.LogWarning("Stored player reading width '{ReadingWidth}' is unsupported; using the default width.", value);
+        diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, PlayerDiagnosticCause.Unsupported, warning: true);
         return PlayerReadingWidth.Normal;
     }
 
@@ -296,6 +307,7 @@ public sealed class PlayerPreferencesStore(
     private PlayerLineSpacing InvalidLineSpacing(string value)
     {
         logger.LogWarning("Stored player line spacing '{LineSpacing}' is unsupported; using the default spacing.", value);
+        diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, PlayerDiagnosticCause.Unsupported, warning: true);
         return PlayerLineSpacing.Normal;
     }
 
@@ -325,6 +337,7 @@ public sealed class PlayerPreferencesStore(
     private PlayerReducedMotion InvalidReducedMotion(string value)
     {
         logger.LogWarning("Stored player reduced-motion preference '{ReducedMotion}' is unsupported; using the system preference.", value);
+        diagnostics?.Record(PlayerDiagnosticOperation.PreferencesRead, PlayerDiagnosticCause.Unsupported, warning: true);
         return PlayerReducedMotion.System;
     }
 

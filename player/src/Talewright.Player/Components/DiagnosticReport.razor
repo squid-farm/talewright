@@ -1,0 +1,58 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@using System.Text
+@using Microsoft.Extensions.DependencyInjection
+@using Talewright.Player.Diagnostics
+
+<details class="tw-diagnostic-report">
+    <summary>Diagnostics</summary>
+    <h2>Diagnostic report</h2>
+    <p>Review this report before sharing it. It includes story and scene IDs, but not story text, saved games, paths or exception messages. It is not sent automatically.</p>
+    <pre tabindex="0" aria-label="Diagnostic report">@Diagnostics.CreateReport()</pre>
+    @if (Services.GetService<IDiagnosticReportExporter>() is not null)
+    {
+        <button type="button" class="tw-choice" @onclick="DownloadAsync">Download diagnostic report</button>
+    }
+    else
+    {
+        <p>Downloading diagnostic reports is unavailable in this host.</p>
+    }
+    @if (_status is not null)
+    {
+        <p role="@(_failed ? "alert" : "status")">@_status</p>
+    }
+</details>
+
+@code {
+    [Parameter, EditorRequired]
+    public PlayerDiagnostics Diagnostics { get; set; } = default!;
+
+    private string? _status;
+    private bool _failed;
+
+    protected override void OnInitialized() => Diagnostics.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task DownloadAsync()
+    {
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(Diagnostics.CreateReport());
+            var exporter = Services.GetRequiredService<IDiagnosticReportExporter>();
+            _status = await exporter.ExportAsync("talewright-diagnostics.txt", bytes)
+                ? "Diagnostic report download requested."
+                : "Diagnostic report download canceled.";
+            _failed = false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or
+            NotSupportedException or DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or JSException)
+        {
+            Diagnostics.Record(PlayerDiagnosticOperation.ReportExport, ex);
+            _status = "The diagnostic report could not be downloaded. Check your storage or browser settings and try again.";
+            _failed = true;
+        }
+    }
+
+    public void Dispose() => Diagnostics.Changed -= OnChanged;
+}

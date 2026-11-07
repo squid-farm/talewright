@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Talewright.Host.Web;
+using Talewright.Player.Diagnostics;
 using Talewright.Player.Library;
 using Talewright.Player.Preferences;
 using Talewright.Player.Saves;
@@ -16,6 +17,8 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddSingleton<IStoryLibrary>(new EmbeddedStoryLibrary(typeof(App).Assembly, enableImages: true));
 builder.Services.AddScoped<ISaveStore, IndexedDbSaveStore>();
 builder.Services.AddScoped<ISaveFileExporter, BrowserSaveFileExporter>();
+builder.Services.AddScoped<PlayerDiagnostics>();
+builder.Services.AddScoped<IDiagnosticReportExporter, BrowserDiagnosticReportExporter>();
 builder.Services.AddScoped<PlayerPreferencesStore>();
 
 await builder.Build().RunAsync();

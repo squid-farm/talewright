@@ -1,6 +1,7 @@
 @* Plays one compiled story with bounded transcript presentation and a character sheet. *@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@using Talewright.Player.Diagnostics
 @using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
 
@@ -103,6 +104,9 @@
 </div>
 
 @code {
+    [CascadingParameter]
+    public PlayerDiagnostics? Report { get; set; }
+
     /// <summary>The compiled story to play.</summary>
     [Parameter, EditorRequired]
     public StoryDefinition Story { get; set; } = default!;
@@ -219,6 +223,7 @@
         bool preserveExistingFocus = false, bool initialTriggerSave = false)
     {
         _session = session;
+        UpdateDiagnosticContext();
         _generation++;
         _busy = false;
         _showSaves = false;
@@ -247,6 +252,9 @@
         _focusLatest = true;
         _preserveFocusOnReveal = preserveExistingFocus;
     }
+
+    private void UpdateDiagnosticContext() =>
+        Report?.SetContext(Story.Id, _session.Current?.Scene?.Value);
 
     private async Task Restart()
     {
@@ -292,6 +300,7 @@
                 _autosaveReadFailed = bytes is null;
                 _autosaveRecovery = new AutosaveRecovery(saveStore, story.Id, bytes);
                 _autosaveStartupError = bytes is null ? $"Couldn't read this story's autosave: {ex.Message}" : ex.Message;
+                Report?.Record(PlayerDiagnosticOperation.AutosaveRead, ex);
             }
         }
         finally
@@ -369,6 +378,7 @@
         {
             _autosavePending = false;
             _autosaveError = AutosaveFailureMessage(ex);
+            Report?.Record(PlayerDiagnosticOperation.AutosaveWrite, ex);
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -410,6 +420,7 @@
                 _autosaveError = recovery is { NeedsPreservation: true }
                     ? AutosaveRecoveryFailureMessage(ex)
                     : AutosaveFailureMessage(ex);
+                Report?.Record(PlayerDiagnosticOperation.AutosaveWrite, ex);
                 await InvokeAsync(StateHasChanged);
             }
             return;
@@ -464,6 +475,7 @@
                 _triggerSaveError =
                     $"Couldn't create the trigger checkpoint from '{triggerId}'. Any previous trigger checkpoint, if present, is preserved. {ex.Message}";
                 _pendingTriggerSave = null;
+                Report?.Record(PlayerDiagnosticOperation.TriggerSave, ex);
                 await InvokeAsync(StateHasChanged);
                 return;
             }
@@ -497,6 +509,7 @@
             {
                 _triggerSaveWritePending = false;
                 _triggerSaveError = TriggerSaveFailureMessage(save.TriggerId, ex);
+                Report?.Record(PlayerDiagnosticOperation.TriggerSave, ex);
                 await InvokeAsync(StateHasChanged);
             }
             return;
@@ -526,6 +539,7 @@
             return;
         }
         _session.Choose(choice.Key);
+        UpdateDiagnosticContext();
         RequestReveal();
         await QueueTriggerSaveAsync();
         await QueueAutosaveAsync();
@@ -535,6 +549,7 @@
     {
         CloseHistory();
         _session.Back();
+        UpdateDiagnosticContext();
         RequestReveal();
     }
 
@@ -542,6 +557,7 @@
     {
         CloseHistory();
         _session.Forward();
+        UpdateDiagnosticContext();
         RequestReveal();
     }
 
@@ -562,7 +578,7 @@
         _pendingOverwrite = null;
     }
 
-    private Task RefreshSlotsAsync() => SaveOperationAsync(async generation =>
+    private Task RefreshSlotsAsync() => SaveOperationAsync(PlayerDiagnosticOperation.SaveList, async generation =>
     {
         var slots = await SaveStore!.ListEntriesAsync(Story.Id);
         if (generation == _generation)
@@ -580,7 +596,7 @@
             return Task.CompletedTask;
         }
 
-        return SaveOperationAsync(async generation =>
+        return SaveOperationAsync(PlayerDiagnosticOperation.SaveWrite, async generation =>
         {
             SaveNames.Validate(Story.Id, slot);
             if (overwrite && _pendingOverwrite != slot)
@@ -593,7 +609,7 @@
     }
 
     private Task QuickSaveAsync() =>
-        SaveOperationAsync(generation => PersistAsync(SaveEntry.QuickSlot, overwrite: true, generation));
+        SaveOperationAsync(PlayerDiagnosticOperation.SaveWrite, generation => PersistAsync(SaveEntry.QuickSlot, overwrite: true, generation));
 
     private async Task PersistAsync(string slot, bool overwrite, int generation)
     {
@@ -615,7 +631,7 @@
         }
     }
 
-    private Task RequestLoadAsync(string slot) => SaveOperationAsync(async generation =>
+    private Task RequestLoadAsync(string slot) => SaveOperationAsync(PlayerDiagnosticOperation.SaveLoad, async generation =>
     {
         await _autosaveTail;
         await _triggerSaveTail;
@@ -647,7 +663,7 @@
     private Task ConfirmLoadAsync()
     {
         var slot = _pendingLoad ?? throw new InvalidOperationException("Choose a save before confirming a load.");
-        return SaveOperationAsync(generation => LoadAsync(slot, generation));
+        return SaveOperationAsync(PlayerDiagnosticOperation.SaveLoad, generation => LoadAsync(slot, generation));
     }
 
     private async Task LoadAsync(string slot, int generation)
@@ -667,6 +683,7 @@
             _triggerSaveWritePending = false;
             _triggerSaveError = null;
             _session = candidate;
+            UpdateDiagnosticContext();
             _showHistory = false;
             _historyFrames = [];
             _restoreReadingPosition = false;
@@ -678,7 +695,7 @@
         }
     }
 
-    private Task ExportAsync(string slot) => SaveOperationAsync(async generation =>
+    private Task ExportAsync(string slot) => SaveOperationAsync(PlayerDiagnosticOperation.SaveExport, async generation =>
     {
         var story = Story;
         var data = await ReadSaveAsync(story.Id, slot);
@@ -710,7 +727,7 @@
     {
         try
         {
-            await SaveOperationAsync(async generation =>
+            await SaveOperationAsync(PlayerDiagnosticOperation.SaveImport, async generation =>
             {
                 var story = Story;
                 var slot = _slot.Trim();
@@ -755,7 +772,7 @@
     private Task ConfirmImportAsync()
     {
         var pending = _pendingImport ?? throw new InvalidOperationException("Choose a save before confirming an import.");
-        return SaveOperationAsync(generation => ImportValidatedAsync(pending, overwrite: true, generation));
+        return SaveOperationAsync(PlayerDiagnosticOperation.SaveImport, generation => ImportValidatedAsync(pending, overwrite: true, generation));
     }
 
     private void CancelImport() => _pendingImport = null;
@@ -778,7 +795,7 @@
         }
     }
 
-    private async Task SaveOperationAsync(Func<int, Task> operation)
+    private async Task SaveOperationAsync(PlayerDiagnosticOperation kind, Func<int, Task> operation)
     {
         if (_busy)
         {
@@ -798,6 +815,7 @@
             if (generation == _generation)
             {
                 _saveError = true;
+                Report?.Record(kind, ex);
                 _saveMessage = ex switch
                 {
                     FileNotFoundException or DirectoryNotFoundException =>
@@ -862,6 +880,7 @@
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
+                await _module.InvokeVoidAsync("initialize", _transcriptElement);
                 await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1, preserveExistingFocus);
             }
 
@@ -920,6 +939,7 @@
         {
             try
             {
+                await _module.InvokeVoidAsync("dispose", _transcriptElement);
                 await _module.DisposeAsync();
             }
             catch (JSDisconnectedException)
