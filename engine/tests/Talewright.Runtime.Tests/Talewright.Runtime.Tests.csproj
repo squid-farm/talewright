@@ -22,4 +22,9 @@
     <ProjectReference Include="../Talewright.TestStories/Talewright.TestStories.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The golden CSharpStory save must replay against the example's real extension registrations. -->
+    <Compile Include="../../../examples/CSharpStory/Story/StoryExtensions.cs" Link="SaveSamples/golden/CSharpStoryExtensions.cs" />
+  </ItemGroup>
+
 </Project>

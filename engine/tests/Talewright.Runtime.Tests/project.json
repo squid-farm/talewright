@@ -1,0 +1,20 @@
+{
+  "name": "Talewright.Runtime.Tests",
+  "implicitDependencies": ["talewright-samples"],
+  "targets": {
+    "test": {
+      "inputs": [
+        "default",
+        "^production",
+        {"workingDirectory": "absolute"},
+        {"dependentTasksOutputFiles": "**/*"},
+        {"env": "NUGET_PACKAGES"},
+        "{workspaceRoot}/Directory.Build.props",
+        "{workspaceRoot}/global.json",
+        "testWorkflow",
+        "{workspaceRoot}/examples/CSharpStory/Story/StoryExtensions.cs",
+        "{workspaceRoot}/examples/CSharpStory/Story/Content/**/*"
+      ]
+    }
+  }
+}
