@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Talewright.Runtime.Saves;
 
 namespace Talewright.Player.Saves;
 
@@ -11,9 +10,9 @@ internal static class GtkSaveFileDialog
     private const int Cancel = -6;
     private const int Close = -7;
 
-    internal static string? Choose(string suggestedName)
+    internal static string? Choose(string suggestedName, string title, string filterName, string extension)
     {
-        var dialog = gtk_file_chooser_dialog_new("Export saved game", nint.Zero, Save, nint.Zero);
+        var dialog = gtk_file_chooser_dialog_new(title, nint.Zero, Save, nint.Zero);
         if (dialog == nint.Zero)
         {
             throw new InvalidOperationException("The desktop save dialog could not be created.");
@@ -36,8 +35,8 @@ internal static class GtkSaveFileDialog
             {
                 throw new InvalidOperationException("The desktop save file filter could not be created.");
             }
-            gtk_file_filter_set_name(filter, "Talewright saved game");
-            gtk_file_filter_add_pattern(filter, "*" + SaveFormat.FileExtension);
+            gtk_file_filter_set_name(filter, filterName);
+            gtk_file_filter_add_pattern(filter, "*" + extension);
             gtk_file_chooser_add_filter(dialog, filter);
 
             var response = gtk_dialog_run(dialog);

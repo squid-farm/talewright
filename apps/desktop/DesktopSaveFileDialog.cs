@@ -19,4 +19,15 @@ internal static class DesktopSaveFileDialog
         return NativeSaveFileDialog.ChooseAsync(suggestedName, action => window.Invoke(action),
             OperatingSystem.IsWindows() ? () => window.WindowHandle : null);
     }
+
+    internal static Task<string?> ChooseReportAsync(PhotinoWindow window, string suggestedName)
+    {
+        if (Environment.GetEnvironmentVariable(TestExportDirectoryVariable) is { Length: > 0 } directory)
+        {
+            return Task.FromResult<string?>(Path.Combine(directory, suggestedName));
+        }
+
+        return NativeSaveFileDialog.ChooseReportAsync(suggestedName, action => window.Invoke(action),
+            OperatingSystem.IsWindows() ? () => window.WindowHandle : null);
+    }
 }

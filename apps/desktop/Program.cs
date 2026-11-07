@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor;
 using Photino.NET;
+using Talewright.Player.Diagnostics;
 using Talewright.Player.Library;
 using Talewright.Player.Preferences;
 using Talewright.Player.Saves;
@@ -48,6 +49,9 @@ internal static class Program
         PhotinoWindow? window = null;
         builder.Services.AddSingleton<ISaveFileExporter>(new LocalSaveFileExporter(name =>
             DesktopSaveFileDialog.ChooseAsync(window ?? throw new InvalidOperationException("The desktop window is not ready."), name)));
+        builder.Services.AddSingleton<IDiagnosticReportExporter>(new LocalDiagnosticReportExporter(name =>
+            DesktopSaveFileDialog.ChooseReportAsync(window ?? throw new InvalidOperationException("The desktop window is not ready."), name)));
+        builder.Services.AddScoped<PlayerDiagnostics>();
         builder.Services.AddScoped<PlayerPreferencesStore>();
         builder.RootComponents.Add<App>("app");
 

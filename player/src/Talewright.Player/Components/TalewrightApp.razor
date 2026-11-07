@@ -4,6 +4,7 @@
 @inject IServiceProvider Services
 @inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 @using Microsoft.Extensions.DependencyInjection
+@using Talewright.Player.Diagnostics
 @using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
 @implements IAsyncDisposable
@@ -14,6 +15,7 @@
 }
 else
 {
+<CascadingValue Value="Report" IsFixed="true">
 <div class="tw-app">
     @if (_story is not null)
     {
@@ -144,7 +146,9 @@ else
             }
         </section>
     }
+    <DiagnosticReport Diagnostics="Report" />
 </div>
+</CascadingValue>
 }
 
 @code {
@@ -186,6 +190,8 @@ else
     private IReadOnlyList<Diagnostic> _diagnostics = [];
     private string? _error;
     private string? _failedTitle;
+    private readonly PlayerDiagnostics _fallbackReport = new();
+    private PlayerDiagnostics Report => Services.GetService<PlayerDiagnostics>() ?? _fallbackReport;
     private ISaveStore? SaveStore => Services.GetService<ISaveStore>();
 
     protected override async Task OnInitializedAsync()
@@ -205,6 +211,7 @@ else
         else if (!LibraryEnabled)
         {
             _error = "The selected story could not be found.";
+            Report.Record(PlayerDiagnosticOperation.StoryOpen, PlayerDiagnosticCause.NotFound, includeContext: false);
         }
     }
 
@@ -224,7 +231,10 @@ else
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException)
         {
             if (!_disposed && generation == _openGeneration)
+            {
                 _error = $"Couldn't open {entry.Title}: {ex.Message}";
+                Report.Record(PlayerDiagnosticOperation.StoryOpen, ex, includeContext: false);
+            }
         }
         finally
         {
@@ -261,7 +271,10 @@ else
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
             if (!_disposed && generation == _openGeneration)
+            {
                 _error = $"Couldn't read {e.File.Name}: {ex.Message}";
+                Report.Record(PlayerDiagnosticOperation.StoryUpload, ex, includeContext: false);
+            }
         }
         finally
         {
@@ -273,6 +286,8 @@ else
     {
         var result = StoryCompiler.Compile(loaded.Source, Options);
         _diagnostics = result.Diagnostics;
+        if (result.Success) Report.SetContext(result.Story!.Id, null);
+        foreach (var diagnostic in result.Diagnostics) Report.RecordCompiler(diagnostic, includeContext: result.Success);
         if (result.Success)
         {
             var previous = _loaded;
@@ -344,6 +359,7 @@ else
                 _resumeReadFailed = bytes is null;
                 _rejectedAutosaveData = bytes;
                 _resumeCheckError = bytes is null ? $"Couldn't read this story's autosave: {ex.Message}" : ex.Message;
+                Report.Record(PlayerDiagnosticOperation.AutosaveRead, ex);
             }
         }
         finally

@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Talewright.Runtime.Saves;
 
 namespace Talewright.Player.Saves;
 
@@ -29,7 +28,7 @@ internal static class NfdSaveFileDialog
         public nint ParentHandle;
     }
 
-    internal static string? Choose(string suggestedName, nint owner)
+    internal static string? Choose(string suggestedName, nint owner, string description, string extension)
     {
         if (NFD_Init() != Okay)
         {
@@ -40,8 +39,8 @@ internal static class NfdSaveFileDialog
         nint folder = nint.Zero, name = nint.Zero;
         try
         {
-            filterName = Marshal.StringToCoTaskMemUTF8("Talewright saved game");
-            extensions = Marshal.StringToCoTaskMemUTF8(SaveFormat.FileExtension[1..]);
+            filterName = Marshal.StringToCoTaskMemUTF8(description);
+            extensions = Marshal.StringToCoTaskMemUTF8(extension[1..]);
             filter = Marshal.AllocHGlobal(Marshal.SizeOf<Filter>());
             Marshal.StructureToPtr(new Filter { Name = filterName, Extensions = extensions }, filter, false);
             var defaultFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
