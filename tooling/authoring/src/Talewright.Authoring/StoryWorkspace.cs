@@ -116,6 +116,10 @@ public sealed class StoryWorkspace
     internal StoryAnalysis AnalyzeSnapshot(StorySource snapshot, CompilerOptions options, CancellationToken token) =>
         StoryAnalyzer.Analyze(snapshot, options, token, GetSyntax);
 
+    /// <summary>Analyzes an edited copy of the story with this workspace's options, reusing unchanged files' syntax.</summary>
+    internal StoryAnalysis AnalyzeEdited(StorySource edited, CancellationToken token) =>
+        AnalyzeSnapshot(edited, _options, token);
+
     internal IReadOnlyDictionary<string, TaleFileSyntax> Syntax
     {
         get { lock (_gate) return new Dictionary<string, TaleFileSyntax>(_syntax, StringComparer.Ordinal); }

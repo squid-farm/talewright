@@ -785,6 +785,45 @@ public sealed class ConcurrencyTests
         Assert.Equal(2, current.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
     }
 
+    [Fact]
+    public async Task Rename_reports_content_modified_instead_of_stale_edits()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+        await client.Change("start.tale", Reference + "\n", 2);
+        var firstDelay = await control.NextDelay();
+        await client.Request(2, "textDocument/rename", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 1, character = 4 },
+            newName = "hall"
+        });
+        var first = await control.NextAnalysis();
+
+        await client.Change("start.tale", "\n" + Reference, 3);
+        var nextDelay = await control.NextDelay();
+        Assert.Equal(-32801, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
+
+        firstDelay.Release();
+        first.Release();
+        nextDelay.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 3);
+        await client.Request(3, "textDocument/rename", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 2, character = 4 },
+            newName = "hall"
+        });
+        var edits = (await client.Response(3)).GetProperty("result").GetProperty("changes");
+        var current = Assert.Single(edits.GetProperty(client.UriOf("start.tale")).EnumerateArray());
+        Assert.Equal(2, current.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Single(edits.GetProperty(client.UriOf("next.tale")).EnumerateArray());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
