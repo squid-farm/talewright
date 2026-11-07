@@ -58,6 +58,56 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Missing_variable_actions_offer_both_types_when_usage_does_not_decide()
+    {
+        await using var client = new Client();
+        await client.Initialize(capabilities: new
+        {
+            workspace = new { workspaceEdit = new { documentChanges = true } }
+        });
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\nvars: {gold: 1}\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 3);
+        await client.Diagnostics(StorySource.ManifestFileName, 3);
+
+        const string text = "=== start\nThe weather is {var:weather}.\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2004");
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        Assert.Equal(
+            ["Declare variable 'weather' as a number", "Declare variable 'weather' as text"],
+            actions.Select(action => action.GetProperty("title").GetString()));
+        Assert.Equal(
+            [", weather: 0", ", weather: \"\""],
+            actions.Select(action => action.GetProperty("edit").GetProperty("documentChanges")[0]
+                .GetProperty("edits")[0].GetProperty("newText").GetString()));
+        Assert.All(actions, action => Assert.Equal(3, action.GetProperty("edit").GetProperty("documentChanges")[0]
+            .GetProperty("textDocument").GetProperty("version").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Unsafe_manifest_shape_returns_a_disabled_variable_action_with_a_reason()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\nvars: [gold]\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 2);
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
+
+        const string text = "=== start\n{if var:debt > 1}Owed.{/if}\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2004");
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("Declare variable 'debt'", action.GetProperty("title").GetString());
+        Assert.Contains("not a YAML mapping", action.GetProperty("disabled").GetProperty("reason").GetString());
+        Assert.False(action.TryGetProperty("edit", out _));
+    }
+
+    [Fact]
     public async Task Missing_character_action_edits_the_unsaved_manifest_without_offering_for_properties()
     {
         await using var client = new Client();

@@ -284,6 +284,17 @@ and comments and use the open manifest buffer. No declaration action is offered
 for `player`, existing declarations, or unknown properties. Unsupported
 manifest shapes produce a disabled action with a reason.
 
+For a variable that `TW2004` reports as read but never assigned or declared,
+the Quick Fix menu offers to declare it under the root manifest's `vars`. Numeric
+uses (arithmetic, ordered comparisons, item quantities, or comparing with a
+number) offer **Declare variable `<id>` as a number**, which adds `<id>: 0`.
+Text uses (comparing with or assigning to text) offer
+**Declare variable `<id>` as text**, which adds `<id>: ""`. When the usage does
+not decide the type, such as a plain `{var:<id>}` substitution, both actions are
+offered. Like other declarations, the edit preserves YAML formatting and
+comments, uses the open manifest buffer, and is disabled with a reason when the
+manifest cannot be edited safely.
+
 Editors that don't use the SchemaStore catalog can use the same schema with this
 modeline at the top of `story.talewright.yaml`:
 
