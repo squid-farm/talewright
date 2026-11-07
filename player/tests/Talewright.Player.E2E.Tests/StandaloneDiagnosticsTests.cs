@@ -134,12 +134,15 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
     [Trait("Host", "Browser")]
     public async Task Published_story_load_failure_remains_inspectable_without_a_library()
     {
+        var ready = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1"
+            ? Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })
+            : Latest;
+        await Expect(ready).ToBeVisibleAsync(new() { Timeout = 15_000 });
+
         const string privateUrl = "https://private.example/SECRET_TOKEN";
         var invalidIndex = JsonSerializer.Serialize(new Dictionary<string, string> { [privateUrl] = new('A', 64) });
         await Page.RouteAsync(new Regex("/story/index\\.json\\?"), route =>
             route.FulfillAsync(new() { Status = 200, ContentType = "application/json", Body = invalidIndex }));
-        // Reloading during the initial WebAssembly download cancels framework requests.
-        await Expect(Page.Locator(".tw-diagnostic-report summary")).ToBeVisibleAsync();
         await ReloadAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Invalid published story index entry");
         await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
