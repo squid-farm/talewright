@@ -83,7 +83,7 @@ Select stored forms with `:subject`, `:object`, `:reflexive`,
 `:possessive-pronoun:determiner` or `:possessive-pronoun:independent` after
 `player:pronoun`. These properties also work in comparisons and text assignments.
 See [substitutions](../reference/talemark-syntax.md#3-substitutions) for everything you can insert and the
-`#modifiers` you can apply.
+`#manipulators` you can apply.
 For a complete two-branch example, see [change a name in one place](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
 
 For wording that changes with a character's chosen pronouns, supply both forms:
@@ -275,10 +275,10 @@ Or as a block, which can also contain choices, effects and `->` lines:
 {/if}
 ```
 
-## Hubs and storylets
+## Hubs
 
 Instead of wiring every option by hand, tag scenes and let a **hub** offer whichever ones are currently
-available. Scenes offered this way are sometimes called **storylets**:
+available:
 
 ```tale
 === camp
