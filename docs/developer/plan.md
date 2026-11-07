@@ -8,7 +8,7 @@ This document combines the original product/design proposal, historical M0/M1 re
 milestone roadmap. Use [architecture](architecture.md) for current built behavior. Track current requirements,
 status, blockers, and implementation in [GitHub Issues](https://github.com/squid-farm/talewright/issues)
 and the [Development Project](https://github.com/orgs/squid-farm/projects/1); this plan is not a live task
-board. Sections 1–5 preserve original research and proposals; section 6 is the milestone roadmap; sections
+board. Sections 1–5 describe design decisions and original proposals; section 6 is the milestone roadmap; sections
 7–9 preserve completed M0/M1 scope, outcomes, and historical notes. Historical proposals and future-tense
 text in those records are not current contracts or implementation gates. See [issue tracking](issues.md)
 for legacy IDs and coordination.
@@ -31,46 +31,21 @@ Write a reusable engine for tabletop-style text RPGs and visual novels in which:
 - the engine is **three-tiered and decoupled**: Presentation → Template Renderer (Narrative) → Rules → RPG Engine;
 - the game ships to **desktop and web** (one-click play on itch.io), with room left for images and open-world play later.
 
-## 2. Research findings (session 1)
+## 2. Design rationale
 
-### 2.1 Ink — your concern is confirmed
-- Ink is strong for prose-first branching dialogue, but its state is a **flat set of global variables plus `LIST` flags**. It has no records, collections of characters, or typed entities.
-- Stat-heavy logic ends up either inline (`{str > 12 && has_sword && rep_guild >= 3: …}`) all through the prose, or in C# through `EXTERNAL` functions. Ink then becomes a text formatter with a **second state store** that has to be kept in sync.
-- Yarn Spinner has the same limitation.
-- The model you described is **storylets / quality-based narrative** (Fallen London, StoryNexus): content units become eligible through predicates over world state. It fits on-rails play (narrow predicates plus explicit gotos) and open-world play (broad predicates plus hubs) without changing the core. **We adopt it.**
+Talewright combines typed RPG state with state-dependent scenes. Authors can use explicit diverts
+for branching paths and hubs to offer scenes whose requirements are met. The
+[architecture](architecture.md) describes how the pieces fit together; the
+[Talemark syntax reference](../reference/talemark-syntax.md) describes authoring.
 
-### 2.2 Existing engines — none fit; build custom
-| Option | Why not |
-|---|---|
-| Ren'Py | Python, VN-focused, weak stat modeling |
-| Twine / SugarCube / Harlowe | JavaScript, string-macro state |
-| Naninovel / Fungus | Unity-bound |
-| ink / Yarn Spinner | Dialogue layer only (see above) |
-| GoRogue / RogueSharp | Roguelike grids/maps, not narrative |
-
-Reusable pieces:
-- **Talemark reader-text parser:** the bounded inline grammar defined in the
-  [reader-text reference](../reference/talemark-operators.md#reader-text-grammar).
-- **YamlDotNet**: `story.talewright.yaml` and front matter.
-- **Photino.Blazor** (v4.x): cross-platform desktop host.
-- **NRules** was considered and **rejected for the core**. It compiles expression trees at runtime, which is slow under WASM interpretation and adds a heavy dependency. A small custom typed predicate evaluator is simpler and faster for storylet selection.
-- **Scriban, Fluid and RazorLight** were rejected because they are string-template engines. We use a typed template AST instead.
-
-### 2.3 Blazor + WASM — good fit
-- Blazor WASM publishes as **pure static files**: GitHub Pages, Netlify, or an **itch.io HTML5 zip**. No server needed.
-- Cost: a one-time first load of about 2–4 MB compressed (trimmed); later loads come from cache. AOT is optional and is a size-versus-speed trade-off. Not needed at first.
-- Desktop host: **MAUI Blazor Hybrid does not support Linux** (the dev machine is Linux). **Photino.Blazor** supports Windows, macOS and Linux (it needs WebKitGTK on Linux).
-- Shape: one **Razor Class Library** of UI shared by a Photino host and a WASM host.
-- Target **.NET 10 (LTS)**; it is installed locally.
-
-## 3. Decisions log (confirmed with user)
+## 3. Decisions log
 
 | # | Decision |
 |---|---|
 | D1 | .NET 10, C#, Blazor; Photino desktop + Blazor WASM web. **Desktop first.** |
 | D2 | Name **Talewright**; namespaces/packages `Talewright.*` |
-| D3 | License **MPL-2.0**. User acknowledged that commercial use is allowed; only modified engine files must stay open. |
-| D4 | Story-authoring language: **Talemark**, written in **`.tale`** files, combines bold and italic formatting with story directives and expressions; backticks are ordinary text. `story.talewright.yaml` holds story configuration and schema. The compiler identity is `Talewright.Talemark`; aggregate package IDs, individual API names, and the `.tale` extension are unchanged; see [ADR 0003](adr/0003-tale-markup.md). See the [operator registry](../reference/talemark-operators.md); further formatting design is tracked in #200. |
+| D3 | License: [MPL-2.0](../../LICENSE). |
+| D4 | Story-authoring language: **Talemark**, written in **`.tale`** files, combines bold and italic formatting with story directives and expressions; backticks are ordinary text. `story.talewright.yaml` holds story configuration and schema. The compiler identity is `Talewright.Talemark`; aggregate package IDs, individual API names, and the `.tale` extension are unchanged; see [compiler identity migration](csharp-extensions.md#compiler-identity-migration). See the [operator registry](../reference/talemark-operators.md); further formatting design is tracked in #200. |
 | D5 | Two authoring paths sharing **one compiler library**: (a) **no-code** story folder/zip loaded by the player app, compiled once at load; (b) **C# story project** compiled at build time, with errors as build diagnostics (shipped in M2). The runtime never parses text during play; it runs on a typed AST. |
 | D6 | The template renderer outputs a **presentation-agnostic document model (AST)**, not HTML. It includes media placeholders for future images. |
 | D7 | Conditions: **both** inline expressions and named C# predicates. Both compile to the same predicate tree and run in one evaluator, the rules engine. |
@@ -82,7 +57,7 @@ Reusable pieces:
 | D13 | M2 delivered saves with format/story identity and explicit rejection of incompatible saves without modifying them. Version-to-version migration is a separate **M8** milestone with explicit migration contracts and old/new fixtures; it is not an M3 requirement. |
 | D14 | The story is **never built into the engine**. Samples live in `samples/` as standalone story folders/projects. |
 | D15 | Distribution: M1 points the player at a folder or zip. M2 delivered `talewright publish`, which **bakes a story into the player** to produce itch.io-ready web and desktop zips. |
-| D16 | Repo: `git init`; commit `README.md`, `LICENSE`, the plan and architecture docs (now under `docs/developer/`), the syntax reference (now `docs/reference/talemark-syntax.md`), and ADRs (now `docs/developer/adr/`). |
+| D16 | Repo: `git init`; commit `README.md`, `LICENSE`, the plan and architecture docs (now under `docs/developer/`), and the syntax reference (now `docs/reference/talemark-syntax.md`). |
 | D17 | Authoring tools are **editor-neutral**: CLI, MSBuild, and a C# Language Server Protocol (LSP) server reuse shared Talemark analysis and diagnostics. The VS Code extension is a thin client, not a second semantic implementation. |
 | D18 | Original phase plan: **M2** CLI validation and **M3** shared analysis, linting, and LSP/VS Code intelligence are shipped; **M9** safe autofixes remain planned, lowest priority. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
 | D19 | **Production readiness before breadth, not backlog removal.** M2 prioritizes core reliability; M3 focuses on authoring. Preserve previously milestone-scoped features as numbered milestones: M4 media, M5 world simulation, M6 combat, M7 runtime plugins, M8 save migration, M9 autofix. Supporting work is organized as epics with explicit dependencies and acceptance criteria. |
@@ -251,7 +226,7 @@ Track validation in [#28](https://github.com/squid-farm/talewright/issues/28), s
 ```
 Talewright.sln
 README.md  LICENSE  .gitignore  Directory.Build.props  global.json
-docs/  README.md  guide/  reference/talemark-syntax.md  developer/plan.md  developer/architecture.md  developer/adr/
+docs/  README.md  guide/  reference/talemark-syntax.md  developer/plan.md  developer/architecture.md
 src/
   Talewright.Core/              RPG engine: entities, stats, inventory, factions, events, state, RNG
   Talewright.Rules/             predicates, evaluator, storylets, modifiers, triggers, skill checks
@@ -276,8 +251,6 @@ The authoritative spec is the [Talemark syntax reference](../reference/talemark-
 - Prose uses Talemark reader text with `{player:first-name#possessive}` substitutions and `{if}/{else}/{/if}` conditionals.
 - `> who: text` speaker lines, `~ effect` lines, `* [label] (requires expr) { effects } -> target` choices, `-> target` diverts.
 - `skill-check` on a choice or as a `::: skill-check` block.
-
-Not in v0: inline function definitions, loops, ink-style tunnels/threads, visible-but-locked choices.
 
 ## 6. Milestones
 
@@ -369,7 +342,6 @@ GitHub instead of recreating a local board.
 - **Tier 2 (M7):** plugins inside the generic player.
   - Desktop: AssemblyLoadContext (full trust, no sandbox).
   - Web: arbitrary DLLs are fragile under trimming, so **sandboxed script plugins (Jint/MoonSharp) are preferred**.
-  - Roslyn scripting in the browser was rejected (10+ MB, slow).
 
 ## 7. Completed M0 + M1 record (historical)
 
@@ -377,7 +349,7 @@ GitHub instead of recreating a local board.
 
 | id | title | depends on | status |
 |---|---|---|---|
-| repo-init | git init, .gitignore, LICENSE (MPL-2.0), README, docs/PLAN.md, ARCHITECTURE.md, TALE-SYNTAX.md, initial ADRs; first commit | — | done |
+| repo-init | git init, .gitignore, LICENSE (MPL-2.0), README, docs/PLAN.md, ARCHITECTURE.md, TALE-SYNTAX.md; first commit | — | done |
 | solution-skeleton | Talewright.sln, Directory.Build.props (net10.0, nullable, warnings-as-errors), global.json, all src/tests projects, build+test green | repo-init | done |
 | core-entities | Typed IDs, Entity + components, stat definitions, ruleset builder (add/remove/replace) | solution-skeleton | done |
 | core-events | GameEvent records, event store, state projection (fold), read-only IGameStateView, scene-visit queries | core-entities | done |
@@ -413,7 +385,7 @@ current limitations and GitHub for current status.
   - Characters carry `name-agreement: singular|plural` for displayed-name grammar; pronouns carry separate `agreement: singular|plural`. Neither describes population or group composition.
   - Overrides (AP style, or invented sci-fi/fantasy forms) are a **future phase**, handled through the `IGrammar` seam.
   - Note: this makes `{player:last-name#possessive}` → `Burns's`, not the `Burns'` from the original example.
-- **Path syntax:** use `entity:path` **everywhere**, in both substitutions and expressions, for consistency (e.g. `player:dex >= 12`). Flagged in case you prefer `player.dex` in expressions.
+- **Path syntax:** use `entity:path` in both substitutions and expressions (e.g. `player:dex >= 12`).
 - **Event-log growth** in long open-world games: snapshots come later. Not an M1 concern.
 - The no-code path parses text **once at load**. That is accepted under D5; per-frame rendering never parses strings.
 
@@ -443,15 +415,3 @@ the plan above:
 - **Verification:** 69 automated tests including 300 seeded random playthroughs of the sample; the desktop
   app was launched against the sample; the published web build was played to an ending in headless Chromium, and
   good and broken zips were uploaded.
-
-### Original M1 review questions (historical; not the current issue list)
-
-1. Fall-through divert semantics: resolved by ordered scene execution (#321); removed.
-2. The `none` ruleset keeps the generic reputation tiers. Should it have no tiers?
-3. Embedding all of `samples/` in both hosts: fine for now, to be replaced by `talewright publish` in M2?
-4. Item names are lowercase in the sample ("sputtering torch") and appear that way on the character sheet. Should
-   the sheet capitalise, or should authors write display case?
-5. **Licence: decided 2026-10-20, keep MPL-2.0.** GPL-3.0 with a linking exception was considered (the goal being
-   "the engine stays open, games can use any licence"). It was rejected: MPL already gives games that freedom, no
-   open-source licence prevents reselling or copying the engine, and stronger copyleft wouldn't stop anyone
-   determined to reimplement it. Revisit only if dual licensing (a paid commercial tier) is ever wanted.

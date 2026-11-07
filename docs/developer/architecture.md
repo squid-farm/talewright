@@ -1,9 +1,9 @@
 # Architecture
 
 This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
-extension points are, and where to look when something breaks. [the plan](plan.md) records _why_ (decisions,
-research, roadmap); this document records _what is actually built_. The [ADRs](adr) hold the big decisions in
-long form, and the [Talemark syntax reference](../reference/talemark-syntax.md) is the authoritative reference for the story language.
+extension points are, and where to look when something breaks. [The plan](plan.md) records decisions and the
+roadmap; this document records _what is actually built_ and the rationale behind it. The
+[Talemark syntax reference](../reference/talemark-syntax.md) is the authoritative reference for the story language.
 
 Contents:
 
@@ -158,6 +158,10 @@ source paths; packaging is independent of code organization.
 
 Ordinary story authors need no NuGet project dependencies. C# customizers normally
 install only `Talewright.Player`; headless/custom-UI consumers install `Talewright`.
+
+Talewright uses [MPL-2.0](../../LICENSE), a file-level copyleft license. Games built with it
+may use their own licenses, including commercial ones. Distributing changes to MPL-covered
+Talewright files carries the license's source-availability obligations.
 
 ### Repository areas
 
@@ -328,6 +332,10 @@ everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
 
 ### 3.5 `Talewright.Talemark` — the compiler
 
+Talemark is the story language; Talewright is the engine, player and tooling brand.
+See [compiler identity migration](csharp-extensions.md#compiler-identity-migration) for assembly/API
+naming and the unchanged `.tale` extension and editor identities.
+
 Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → CompilationResult(Story?, Diagnostics)`.
 
 ```mermaid
@@ -397,8 +405,24 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
 - **`Model/StoryDefinition.cs`**: the compiled story. `StoryDefinition` (Id, Title, Start, Randomness, Seed,
   World, Scenes, Triggers, Predicates), `SceneDefinition`, `ChoiceDefinition`, `CheckBranch`/`CheckOutcome`,
   `ConditionalEffect`, `ConditionalDivert`, `DivertTarget` (`End` is a target too).
+  Compiled stories retain source positions for debugging, but not full source text or editor workspaces.
 - **`Diagnostics/Diagnostic.cs`**: `Diagnostic(Severity, Code, Message, SourceLocation(File, Line, Column))`.
   Codes are documented in the [diagnostics reference](../reference/diagnostics.md).
+
+#### Reader-text parser rationale
+
+Talemark owns a small reader-text grammar rather than inheriting CommonMark behavior. The earlier
+Markdig integration silently lost prose that looked like setext headings, reference definitions or
+links, and applied formatting and entity decoding that Talemark had not specified. Masking story
+constructs, mapping source positions and bounding cancellation also required extra library plumbing.
+The replacement recognizes only documented Talemark constructs and preserves unsupported forms as
+literal text.
+
+Substitution-capable text uses the same reader grammar, including image alt text even when it has
+no substitution. An argument's slot determines whether it is a name, expression, literal text or
+reader text; quotation marks only delimit it. The current rules and before/after examples live in
+the [reader-text grammar](../reference/talemark-operators.md#reader-text-grammar).
+The replacement decision is recorded in [#399](https://github.com/squid-farm/talewright/issues/399).
 
 ### 3.6 `Talewright.Runtime` — the orchestrator
 
@@ -448,6 +472,9 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
   mode via `prefers-color-scheme`. Hosts link it as `_content/Talewright.Player/talewright.css`.
 
 ### 3.8 The hosts
+
+Both thin hosts reuse one `Talewright.Player` Razor Class Library rather than maintaining separate
+UIs. Photino provides a Linux-capable desktop host; WebAssembly provides a static web build.
 
 - **`Talewright.Host.Desktop`** (Photino.Blazor): a native window using the OS webview (WebView2 / WKWebView /
   WebKitGTK). No browser, no server, no ports. `Program.cs` registers a composite library (embedded samples +
@@ -597,6 +624,9 @@ keys, a session produces the same events, frames and ending. Saves store those i
 format/story versions, source/extension fingerprint, outcome identities and replay evidence. V1
 compatibility checks the full recorded path, including redo, against an updated story. Unknown,
 corrupt or incompatible saves are rejected without rewriting the original.
+Event sourcing alone does not provide compatibility with changed stories or event schemas.
+Restore verifies replay into a replacement session before adopting it; failure leaves the active
+session untouched. This is a replay compatibility boundary, not general state migration.
 Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
 see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
 stories omit the character. From 1.0.0-preview.1, replay contracts are frozen: saves made by a preview
