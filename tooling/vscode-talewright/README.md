@@ -4,6 +4,8 @@ Write Talewright stories in **Talemark** (`.tale` files), insert common story st
 schema support, shared semantic completion/hover, and live compiler diagnostics without
 running your story.
 
+[Author cheat sheet: Talemark syntax and VS Code shortcuts](https://github.com/squid-farm/talewright/blob/main/docs/guide/cheat-sheet.md).
+
 ![A Talemark scene in VS Code with highlighting and grey previews of each substitution's text](https://raw.githubusercontent.com/squid-farm/talewright/main/docs/images/vscode-editor.png)
 
 ## Install
