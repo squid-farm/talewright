@@ -182,6 +182,25 @@ public sealed class CompilerDiagnosticCoverageTests
         Assert.Equal(new SourceLocation(MainFile, 2, 1), diagnostic.Location);
     }
 
+    [Fact]
+    public void Empty_variable_does_not_give_decorative_choice_an_accessible_name()
+    {
+        const string yaml = """
+            game: { id: coverage, title: Coverage, start: start }
+            characters:
+              player: { first-name: Ada }
+            vars: { word: "" }
+            """;
+        var source = Scene("""* [{var:word}{image("map.png")#decorative}] -> END""",
+            yaml, "images/map.png");
+
+        var result = StoryCompiler.Compile(source);
+
+        var diagnostic = Assert.Single(result.Diagnostics, item => item.Code == "TW2016");
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(new SourceLocation(MainFile, 2, 4), diagnostic.Location);
+    }
+
     private static IReadOnlyList<string> CheckContract(
         IReadOnlySet<string> compilerCodes,
         IReadOnlySet<string> documentedCodes,

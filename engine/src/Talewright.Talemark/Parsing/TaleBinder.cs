@@ -524,7 +524,6 @@ internal sealed partial class TaleBinder
             switch (inline)
             {
                 case TextTemplate text when !string.IsNullOrWhiteSpace(text.Text):
-                case SubstitutionTemplate:
                     return true;
                 case MediaTemplate { Accessibility: MediaAccessibility.Descriptive }:
                     return true;
