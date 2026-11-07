@@ -215,10 +215,11 @@ public sealed partial class ServerTests
     }
 
     private static string Text(JsonElement response) => response.GetProperty("result").GetProperty("contents").GetProperty("value").GetString()!;
-    private static Task<JsonElement> Hover(Client client, string file, string marked)
+    private static async Task<JsonElement> Hover(Client client, string file, string marked)
     {
+        await client.EnsureAnalyzed(file);
         var lines = marked[..marked.IndexOf('|')].ReplaceLineEndings("\n").Split('\n');
-        return client.Request("textDocument/hover", new
+        return await client.Request("textDocument/hover", new
         {
             textDocument = new { uri = client.UriOf(file) },
             position = new { line = lines.Length - 1, character = lines[^1].Length }

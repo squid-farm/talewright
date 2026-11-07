@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
@@ -29,6 +30,39 @@ public sealed record AuthoredScene(SceneDefinition Definition, bool HasExplicitP
 /// <summary>Immutable, source-aware authoring data, separate from the runtime story model.</summary>
 public sealed class StoryAnalysis
 {
+    private sealed class OverlaySymbols(
+        IReadOnlyList<AuthoringSymbol> snapshot,
+        string replacedFile,
+        IReadOnlyList<AuthoringSymbol> currentFile) : IReadOnlyList<AuthoringSymbol>
+    {
+        private int _count = -1;
+
+        public int Count => _count >= 0 ? _count :
+            (_count = snapshot.Count(symbol => symbol.Declaration?.Start.File != replacedFile) + currentFile.Count);
+
+        public AuthoringSymbol this[int index]
+        {
+            get
+            {
+                if (index < 0) throw new ArgumentOutOfRangeException(nameof(index));
+                foreach (var symbol in this)
+                    if (index-- == 0) return symbol;
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+        }
+
+        public IEnumerator<AuthoringSymbol> GetEnumerator()
+        {
+            foreach (var symbol in snapshot)
+                if (symbol.Declaration?.Start.File != replacedFile)
+                    yield return symbol;
+            foreach (var symbol in currentFile)
+                yield return symbol;
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     private StoryAnalysis(StoryAnalysis original, Diagnostic additional)
     {
         Source = original.Source;
@@ -39,13 +73,31 @@ public sealed class StoryAnalysis
         _classifications = original._classifications;
         World = original.World;
         Substitutions = original.Substitutions;
-        Scenes = original.Scenes;
+        _scenes = original._scenes;
+        SymbolContext = original.SymbolContext;
+        _currentFile = original._currentFile;
+        _currentFileSymbols = original._currentFileSymbols;
+        _symbolsByIdentity = original._symbolsByIdentity;
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
+        : this(source, collector, diagnostics, null, null, false) { }
+    internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
+        StoryAnalysis? snapshot, string currentFile)
+        : this(source, collector, diagnostics, snapshot, currentFile, true) { }
+
+    private StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
+        StoryAnalysis? snapshot, string? currentFile, bool currentFileAnalysis)
     {
         Source = source;
-        Symbols = Array.AsReadOnly(collector.Symbols.Distinct().ToArray());
+        _currentFile = currentFileAnalysis ? currentFile : null;
+        var currentSymbols = collector.Symbols.Distinct().ToArray();
+        _currentFileSymbols = currentFileAnalysis ? Array.AsReadOnly(currentSymbols) : [];
+        Symbols = currentFileAnalysis && snapshot is not null
+            ? new OverlaySymbols(snapshot.Symbols, currentFile!, _currentFileSymbols)
+            : Array.AsReadOnly(currentSymbols);
+        _symbolsByIdentity = new(() => Symbols.GroupBy(symbol => (symbol.Kind, symbol.Name))
+            .ToDictionary(group => group.Key, group => group.ToArray()));
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
         _sites = new CompletionSiteIndex(collector.CompletionSites.ToArray());
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
@@ -55,12 +107,20 @@ public sealed class StoryAnalysis
             .ToArray()));
         World = collector.AuthoredWorld;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
-        Scenes = Array.AsReadOnly(collector.Scenes.ToArray());
+        var scenes = Array.AsReadOnly(collector.Scenes.ToArray());
+        _scenes = currentFileAnalysis && snapshot is not null
+            ? new(() => OverlayScenes(snapshot, currentFile!, scenes))
+            : new(() => scenes);
+        SymbolContext = collector.SymbolContext;
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
 
     private readonly CompletionSiteIndex _sites;
     private readonly Lazy<IReadOnlyList<TalemarkClassification>> _classifications;
+    private readonly Lazy<IReadOnlyList<AuthoredScene>> _scenes;
+    private readonly string? _currentFile;
+    private readonly IReadOnlyList<AuthoringSymbol> _currentFileSymbols;
+    private readonly Lazy<Dictionary<(AuthoringSymbolKind Kind, string Name), AuthoringSymbol[]>> _symbolsByIdentity;
 
     public StorySource Source { get; }
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
@@ -84,7 +144,36 @@ public sealed class StoryAnalysis
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
-    public IReadOnlyList<AuthoredScene> Scenes { get; }
+    public IReadOnlyList<AuthoredScene> Scenes => _scenes.Value;
+    internal StorySymbols? SymbolContext { get; }
+
+    // Scene definitions carry no source file, so a snapshot scene belongs to the edited file only when the
+    // snapshot declares it there and nowhere else.
+    private static IReadOnlyList<AuthoredScene> OverlayScenes(StoryAnalysis snapshot, string file,
+        IReadOnlyList<AuthoredScene> currentScenes)
+    {
+        var replaced = snapshot.Symbols
+            .Where(symbol => symbol.Kind == AuthoringSymbolKind.Scene && symbol.Declaration?.Start.File == file &&
+                !snapshot.HasSymbolOutside(file, AuthoringSymbolKind.Scene, symbol.Name))
+            .Select(symbol => symbol.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        return Array.AsReadOnly(snapshot.Scenes
+            .Where(scene => !replaced.Contains(scene.Definition.Id.Value))
+            .Concat(currentScenes)
+            .ToArray());
+    }
+
+    internal bool HasSymbolOutside(string file, AuthoringSymbolKind kind, string name) =>
+        _symbolsByIdentity.Value.TryGetValue((kind, name), out var symbols) &&
+        symbols.Any(symbol => symbol.Declaration?.Start.File != file);
+
+    internal AuthoringSymbol? DeclaredAt(SourceLocation position) =>
+        (_currentFile is not null && position.File == _currentFile ? _currentFileSymbols : Symbols)
+        .FirstOrDefault(symbol => symbol.Declaration is { } range &&
+            position.File == range.Start.File && Compare(range.Start, position) <= 0 && Compare(position, range.End) < 0);
+
+    private static int Compare(SourceLocation left, SourceLocation right) =>
+        left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);
 
     /// <summary>Creates a result with an additional host diagnostic, leaving this snapshot unchanged.</summary>
     public StoryAnalysis WithDiagnostic(Diagnostic diagnostic) => new(this, diagnostic);
@@ -109,6 +198,160 @@ public static class StoryAnalyzer
         cancellationToken.ThrowIfCancellationRequested();
         return analysis;
     }
+
+    internal static StoryAnalysis AnalyzeCurrentFile(StorySource source, string file, TaleFileSyntax? syntax,
+        StoryAnalysis? snapshot, CompilerOptions options, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var collector = new AnalysisCollector(source, options);
+        var diagnostics = new DiagnosticBag();
+        var inheritedDiagnostics = snapshot?.Diagnostics.ToArray() ?? [];
+        var previousSymbols = snapshot?.Symbols ?? [];
+        var context = snapshot?.SymbolContext;
+        var previousWorld = context?.World ?? EmptyWorld();
+        if (context is null) collector.Registrations();
+
+        if (StorySource.IsConfigurationFile(file))
+        {
+            var flags = context?.Flags.ToHashSet() ?? [];
+            var numbers = previousWorld.Variables.ToDictionary();
+            var textVariables = previousWorld.TextVariables.ToDictionary();
+            var unresolved = context?.UnresolvedVariables.ToHashSet() ?? [];
+            RemovePreviousFileSymbols(file, previousSymbols, snapshot, flags, numbers, textVariables, unresolved, null);
+            var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
+                previousWorld.Items.Values, previousWorld.Factions.Values, flags, numbers, textVariables);
+            collector.World(baseWorld, unresolved);
+            var root = new StoryYamlContext(file, diagnostics).Parse(file, source.Files[file]);
+            if (root is not null) collector.Manifest(root, file);
+        }
+        else
+        {
+            if (syntax is null)
+                throw new ArgumentNullException(nameof(syntax), "Current-file syntax is required for a TaleMark document.");
+
+            var declarations = new List<VariableDeclaration>();
+            var discoveredNumbers = new Dictionary<VarId, int>();
+            var localFlags = new HashSet<FlagId>();
+            var localVariables = new HashSet<VarId>();
+            var currentScenes = new HashSet<SceneId>();
+            void DiscoverEffects(string text, SourceLocation location) =>
+                ExpressionParser.CollectDeclarations(text, localFlags, discoveredNumbers,
+                    declaration: (name, flag, _) =>
+                    {
+                        if (flag) localFlags.Add(new FlagId(name));
+                        else localVariables.Add(new VarId(name));
+                    },
+                    typedDeclaration: declarations.Add, location: location);
+
+            TaleDeclarations.Collect(file, syntax, (id, location) =>
+            {
+                currentScenes.Add(id);
+                collector.Scene(id, location);
+            }, DiscoverEffects, cancellationToken);
+
+            var previousFileSymbols = previousSymbols
+                .Where(symbol => symbol.Declaration?.Start.File == file).ToArray();
+            var unchangedDeclarations = context is not null &&
+                !previousFileSymbols.Any(symbol => symbol.Kind is AuthoringSymbolKind.Flag or AuthoringSymbolKind.Variable) &&
+                localFlags.Count == 0 && localVariables.Count == 0 &&
+                currentScenes.SetEquals(previousFileSymbols
+                    .Where(symbol => symbol.Kind == AuthoringSymbolKind.Scene)
+                    .Select(symbol => new SceneId(symbol.Name)));
+
+            WorldDefinition world;
+            IReadOnlySet<FlagId> flags;
+            IReadOnlySet<VarId> variables;
+            IReadOnlySet<VarId> unresolved;
+            IReadOnlySet<SceneId> scenes;
+            if (unchangedDeclarations)
+            {
+                world = previousWorld;
+                flags = context!.Flags;
+                variables = context.Variables;
+                unresolved = context.UnresolvedVariables;
+                scenes = context.Scenes;
+                collector.CurrentWorld(world);
+            }
+            else
+            {
+                var mutableFlags = context?.Flags.ToHashSet() ?? [];
+                var numbers = previousWorld.Variables.ToDictionary();
+                var textVariables = previousWorld.TextVariables.ToDictionary();
+                var mutableUnresolved = context?.UnresolvedVariables.ToHashSet() ?? [];
+                var mutableScenes = context?.Scenes.ToHashSet() ?? [];
+                RemovePreviousFileSymbols(file, previousFileSymbols, snapshot, mutableFlags, numbers,
+                    textVariables, mutableUnresolved, mutableScenes);
+                mutableFlags.UnionWith(localFlags);
+                mutableScenes.UnionWith(currentScenes);
+                var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
+                    previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables);
+                var localUnresolved = VariableDiscovery.Resolve(baseWorld, mutableFlags, mutableScenes,
+                    declarations, numbers, textVariables, options, diagnostics);
+                mutableUnresolved.UnionWith(localUnresolved);
+                world = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
+                    previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables);
+                collector.World(world, mutableUnresolved);
+                flags = mutableFlags;
+                variables = numbers.Keys.Concat(textVariables.Keys).Concat(mutableUnresolved).ToHashSet();
+                unresolved = mutableUnresolved;
+                scenes = mutableScenes;
+            }
+
+            collector.ClassificationSources.Add((file, syntax));
+            var currentSymbols = new StorySymbols
+            {
+                Analysis = collector,
+                ImageSource = source,
+                World = world,
+                Flags = flags,
+                Variables = variables,
+                UnresolvedVariables = unresolved,
+                Scenes = scenes,
+                Predicates = context?.Predicates ?? options.Predicates,
+                Modifiers = context?.Modifiers ?? options.Modifiers,
+            };
+            collector.SymbolContext = currentSymbols;
+            var parsedScenes = TaleBinder.Parse(file, syntax, currentSymbols, diagnostics, cancellationToken);
+            foreach (var scene in parsedScenes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                collector.Scenes.Add(new(scene.Definition, scene.HasExplicitPriority));
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return new StoryAnalysis(source, collector, inheritedDiagnostics.Concat(diagnostics.Items).ToArray(),
+            snapshot, file);
+    }
+
+    private static void RemovePreviousFileSymbols(string file, IReadOnlyList<AuthoringSymbol> previousSymbols,
+        StoryAnalysis? snapshot, HashSet<FlagId> flags, Dictionary<VarId, int> numbers,
+        Dictionary<VarId, string> textVariables, HashSet<VarId> unresolved, HashSet<SceneId>? scenes)
+    {
+        foreach (var symbol in previousSymbols.Where(symbol => symbol.Declaration?.Start.File == file))
+        {
+            if (snapshot?.HasSymbolOutside(file, symbol.Kind, symbol.Name) == true)
+                continue;
+            switch (symbol.Kind)
+            {
+                case AuthoringSymbolKind.Scene:
+                    scenes?.Remove(new SceneId(symbol.Name));
+                    break;
+                case AuthoringSymbolKind.Flag:
+                    flags.Remove(new FlagId(symbol.Name));
+                    break;
+                case AuthoringSymbolKind.Variable:
+                    var variable = new VarId(symbol.Name);
+                    numbers.Remove(variable);
+                    textVariables.Remove(variable);
+                    unresolved.Remove(variable);
+                    break;
+            }
+        }
+    }
+
+    private static WorldDefinition EmptyWorld() =>
+        new(new RulesetBuilder("current-file").Build(), [], [], [], [], new Dictionary<VarId, int>());
 }
 
 internal sealed class AnalysisCollector(StorySource source, CompilerOptions options)
@@ -129,6 +372,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
     internal List<AuthoredScene> Scenes { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
+    internal StorySymbols? SymbolContext { get; set; }
 
     private void AddSite(CompletionSite site) => CompletionSites.Add(CompletionSiteSource.Of(site));
 
@@ -469,6 +713,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             if (!Symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat.Id.Value))
                 Symbols.Add(new(stat.Id.Value, AuthoringSymbolKind.Stat, ManifestVocabulary.SymbolInteger, null));
     }
+
+    internal void CurrentWorld(WorldDefinition world) => AuthoredWorld = world;
 
     internal void Registrations()
     {

@@ -23,6 +23,12 @@ public sealed class ConcurrencyTests
         position = new { line, character }
     };
 
+    private static object InlayHint(InProcessClient client) => new
+    {
+        textDocument = new { uri = client.UriOf("start.tale") },
+        range = new { start = new { line = 0, character = 0 }, end = new { line = 0, character = 0 } }
+    };
+
     private static async Task PublishInitial(AnalysisControl control, InProcessClient client, string text)
     {
         await client.Open("start.tale", text, 1);
@@ -160,26 +166,203 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
-    public async Task Change_then_completion_shares_one_analysis()
+    public async Task Current_text_completion_and_hover_do_not_wait_for_whole_story_analysis()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+
+        const string partial = "=== start\n// current text\n-> ne";
+        await client.Change("start.tale", partial, 2);
+        var debounce = await control.NextDelay();
+        await client.Request(2, "textDocument/completion", Position(client, 2, 5));
+        var completion = (await client.Response(2)).GetProperty("result").GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("label").GetString() == "next");
+        var completionRange = completion.GetProperty("textEdit").GetProperty("range");
+        Assert.Equal(2, completionRange.GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(3, completionRange.GetProperty("start").GetProperty("character").GetInt32());
+        Assert.Equal(5, completionRange.GetProperty("end").GetProperty("character").GetInt32());
+        Assert.Equal(1, control.AnalysisCount);
+
+        const string current = "=== start\n// current text\n-> next";
+        await client.Change("start.tale", current, 3);
+        var latestDebounce = await control.NextDelay();
+        await client.Request(3, "textDocument/hover", Position(client, 2, 5));
+        var hover = (await client.Response(3)).GetProperty("result");
+        Assert.Contains("Scene: next", hover.GetProperty("contents").GetProperty("value").GetString());
+        Assert.Equal(2, hover.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(1, control.AnalysisCount);
+
+        debounce.Release();
+        latestDebounce.Release();
+        var requestAnalysis = await control.NextAnalysis();
+        Assert.Equal(current, requestAnalysis.Source.Files["start.tale"]);
+        requestAnalysis.Release();
+        await client.Diagnostics("start.tale", 3);
+        Assert.Equal(2, control.AnalysisCount);
+    }
+
+    [Fact]
+    public async Task Current_text_hover_keeps_other_file_scene_facts()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", "=== next\n@title Quiet Forest\n@tags forest, calm\n-> END\n");
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+
+        const string current = "=== start\n// current text\n-> next";
+        await client.Change("start.tale", current, 2);
+        var debounce = await control.NextDelay();
+        await client.Request(2, "textDocument/hover", Position(client, 2, 5));
+        var value = (await client.Response(2)).GetProperty("result").GetProperty("contents").GetProperty("value").GetString();
+        Assert.Contains("Quiet Forest", value);
+        Assert.Contains("calm, forest", value);
+        Assert.Equal(1, control.AnalysisCount);
+
+        debounce.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 2);
+    }
+
+    [Fact]
+    public async Task Cold_completion_returns_local_syntax_without_waiting_for_initialization()
     {
         var control = new AnalysisControl();
         await using var client = new InProcessClient(control);
         await client.Initialize();
-        await PublishInitial(control, client, Original);
-
-        await client.Change("start.tale", Changed, 2);
+        await client.Open("start.tale", "=== start\n@req", 1);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
-        var requestAnalysis = await control.NextAnalysis();
-        debounce.Release();
 
-        Assert.Equal(Changed, requestAnalysis.Source.Files["start.tale"]);
-        requestAnalysis.Release();
-        await client.Response(2);
+        await client.Request(2, "textDocument/completion", Position(client, 1, 4));
+        var items = (await client.Response(2)).GetProperty("result").GetProperty("items").EnumerateArray();
+        Assert.Contains(items, item => item.GetProperty("label").GetString() == "requires");
+        Assert.Equal(0, control.AnalysisCount);
+
+        await client.Change("start.tale", "=== start\n@requires", 2);
+        var latestDebounce = await control.NextDelay();
+        await client.Request(3, "textDocument/hover", Position(client, 1, 5));
+        var hover = (await client.Response(3)).GetProperty("result");
+        Assert.Contains("Boolean condition", hover.GetProperty("contents").GetProperty("value").GetString());
+        Assert.Equal(1, hover.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(0, control.AnalysisCount);
+
+        debounce.Release();
+        latestDebounce.Release();
+        (await control.NextAnalysis()).Release();
         await client.Diagnostics("start.tale", 2);
-        await client.Request(3, "unknown", new { });
-        await client.Response(3);
+        Assert.Equal(1, control.AnalysisCount);
+    }
+
+    [Fact]
+    public async Task Typing_burst_uses_each_current_buffer_without_restarting_whole_story_analysis()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+
+        Gate? latestDebounce = null;
+        for (var version = 2; version <= 25; version++)
+        {
+            var current = $"=== start\n// edit {version}\n-> ne";
+            await client.Change("start.tale", current, version);
+            latestDebounce = await control.NextDelay();
+            await client.Request(version, "textDocument/completion", Position(client, 2, 5));
+            var item = (await client.Response(version)).GetProperty("result").GetProperty("items").EnumerateArray()
+                .Single(candidate => candidate.GetProperty("label").GetString() == "next");
+            Assert.Equal(2, item.GetProperty("textEdit").GetProperty("range").GetProperty("start")
+                .GetProperty("line").GetInt32());
+            Assert.Equal(1, control.AnalysisCount);
+        }
+
+        latestDebounce!.Release();
+        var analysis = await control.NextAnalysis();
+        Assert.Equal("=== start\n// edit 25\n-> ne", analysis.Source.Files["start.tale"]);
+        analysis.Release();
+        await client.Diagnostics("start.tale", 25);
         Assert.Equal(2, control.AnalysisCount);
+    }
+
+    [Fact]
+    public async Task Completion_uses_published_cross_file_symbols_until_new_analysis_finishes()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+
+        client.Write("next.tale", "=== second\n-> END\n");
+        await client.Watch("next.tale", 2);
+        _ = await control.NextDelay();
+        const string current = "=== start\n// current\n-> se";
+        await client.Change("start.tale", current, 2);
+        var debounce = await control.NextDelay();
+        await client.Request(2, "textDocument/completion", Position(client, 2, 5));
+        var staleItems = (await client.Response(2)).GetProperty("result").GetProperty("items").EnumerateArray();
+        Assert.DoesNotContain(staleItems, item => item.GetProperty("label").GetString() == "second");
+        Assert.Equal(1, control.AnalysisCount);
+
+        debounce.Release();
+        var analysis = await control.NextAnalysis();
+        Assert.Equal("=== second\n-> END\n", analysis.Source.Files["next.tale"]);
+        Assert.Equal(current, analysis.Source.Files["start.tale"]);
+        analysis.Release();
+        await client.Diagnostics("start.tale", 2);
+        await client.Request(3, "textDocument/completion", Position(client, 2, 5));
+        var refreshedItems = (await client.Response(3)).GetProperty("result").GetProperty("items").EnumerateArray();
+        Assert.Contains(refreshedItems, item => item.GetProperty("label").GetString() == "second");
+        Assert.Equal(2, control.AnalysisCount);
+    }
+
+    [Fact]
+    public async Task Current_yaml_completion_uses_current_declarations_and_replacement_ranges()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        var originalManifest = new ManifestFaker("current-yaml", "Current YAML", "start", 42);
+        originalManifest.Character("player", "Ada");
+        originalManifest.Item("rope", "Rope");
+        var updatedManifest = new ManifestFaker("current-yaml", "Current YAML", "start", 42);
+        updatedManifest.Character("player", "Ada");
+        updatedManifest.Item("lantern", "Lantern");
+        var original = originalManifest.Build(trailingNewline: true);
+        var current = updatedManifest.Build(trailingNewline: true)
+            .Replace("first-name: Ada", "first-name: Ada\n    inventory: [lan]", StringComparison.Ordinal);
+        client.Write(StorySource.ManifestFileName, original);
+        client.Write("start.tale", Tale("Hello."));
+        await client.Initialize();
+        await client.Open(StorySource.ManifestFileName, original, 1);
+        (await control.NextDelay()).Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics(StorySource.ManifestFileName, 1);
+
+        await client.Change(StorySource.ManifestFileName, current, 2);
+        var debounce = await control.NextDelay();
+        var lines = current.Split('\n');
+        var inventoryLine = Array.FindIndex(lines, line => line.Contains("inventory: [lan]", StringComparison.Ordinal));
+        Assert.True(inventoryLine >= 0);
+        await client.Request(2, "textDocument/completion", new
+        {
+            textDocument = new { uri = client.UriOf(StorySource.ManifestFileName) },
+            position = new { line = inventoryLine, character = lines[inventoryLine].IndexOf("lan]", StringComparison.Ordinal) + 3 }
+        });
+        var items = (await client.Response(2)).GetProperty("result").GetProperty("items").EnumerateArray().ToArray();
+        Assert.Contains(items, item => item.GetProperty("label").GetString() == "lantern");
+        Assert.DoesNotContain(items, item => item.GetProperty("label").GetString() == "rope");
+        var range = Assert.Single(items, item => item.GetProperty("label").GetString() == "lantern")
+            .GetProperty("textEdit").GetProperty("range");
+        Assert.Equal(inventoryLine, range.GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(inventoryLine, range.GetProperty("end").GetProperty("line").GetInt32());
+        Assert.Equal(1, control.AnalysisCount);
+
+        debounce.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics(StorySource.ManifestFileName, 2);
     }
 
     [Fact]
@@ -212,7 +395,7 @@ public sealed class ConcurrencyTests
         await client.Initialize();
         await client.Open("start.tale", Original, 1);
         var firstDelay = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var first = await control.NextAnalysis();
 
         var otherUri = client.CreateOtherStory(Tale("Other story."));
@@ -227,7 +410,7 @@ public sealed class ConcurrencyTests
 
         firstDelay.Release();
         first.Release();
-        Assert.Equal(JsonValueKind.Object, (await client.Response(2)).GetProperty("result").ValueKind);
+        Assert.Equal(JsonValueKind.Array, (await client.Response(2)).GetProperty("result").ValueKind);
         await client.Diagnostics("start.tale", 1);
     }
 
@@ -240,10 +423,10 @@ public sealed class ConcurrencyTests
         await PublishInitial(control, client, Original);
         await client.Change("start.tale", Changed, 2);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var analysis = await control.NextAnalysis();
-        await client.Request("2", "textDocument/completion", Position(client));
-        await client.Request(3, "textDocument/completion", Position(client));
+        await client.Request("2", "textDocument/inlayHint", InlayHint(client));
+        await client.Request(3, "textDocument/inlayHint", InlayHint(client));
         await client.Barrier(4);
         Assert.False(client.HasResponse(3));
 
@@ -257,7 +440,7 @@ public sealed class ConcurrencyTests
 
         debounce.Release();
         analysis.Release();
-        Assert.Equal(JsonValueKind.Object, (await client.Response(3)).GetProperty("result").ValueKind);
+        Assert.Equal(JsonValueKind.Array, (await client.Response(3)).GetProperty("result").ValueKind);
         await client.Diagnostics("start.tale", 2);
         Assert.Equal(2, control.AnalysisCount);
     }
@@ -271,7 +454,7 @@ public sealed class ConcurrencyTests
         await PublishInitial(control, client, Original);
         await client.Change("start.tale", Changed, 2);
         var firstDelay = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var first = await control.NextAnalysis();
 
         await client.Change("start.tale", Tale("Ignored."), 1);
@@ -303,7 +486,7 @@ public sealed class ConcurrencyTests
 
         await client.Change("start.tale", Changed, 2);
         var firstDelay = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var first = await control.NextAnalysis();
         Assert.False(first.CancellationRequested);
 
@@ -315,7 +498,7 @@ public sealed class ConcurrencyTests
         Assert.False(client.HasDiagnostics("start.tale", 2));
         Assert.Equal(2, control.AnalysisCount);
 
-        await client.Request(3, "textDocument/completion", Position(client));
+        await client.Request(3, "textDocument/inlayHint", InlayHint(client));
         var newest = await control.NextAnalysis();
         Assert.Equal(newestText, newest.Source.Files["start.tale"]);
         Assert.False(newest.CancellationRequested);
@@ -327,7 +510,7 @@ public sealed class ConcurrencyTests
         first.Release();
         newestDelay.Release();
         newest.Release();
-        Assert.Equal(JsonValueKind.Object, (await client.Response(3)).GetProperty("result").ValueKind);
+        Assert.Equal(JsonValueKind.Array, (await client.Response(3)).GetProperty("result").ValueKind);
         await client.Diagnostics("start.tale", 3);
         Assert.False(client.HasDiagnostics("start.tale", 2));
         Assert.Equal(3, control.AnalysisCount);
@@ -341,7 +524,7 @@ public sealed class ConcurrencyTests
         await client.Initialize();
         await client.Open("start.tale", Original, 1);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var analysis = await control.NextAnalysis();
         await client.Send("textDocument/didClose", new { textDocument = new { uri = client.UriOf("start.tale") } });
         await client.Barrier(3);
@@ -358,17 +541,17 @@ public sealed class ConcurrencyTests
         await client.Initialize();
         await client.Open("start.tale", Original, 1);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var analysis = await control.NextAnalysis();
         for (var id = 3; id < 34; id++)
-            await client.Request(id, "textDocument/completion", Position(client));
+            await client.Request(id, "textDocument/inlayHint", InlayHint(client));
         await client.Barrier(100);
         Assert.Equal(1, control.AnalysisCount);
 
         debounce.Release();
         analysis.Release();
         for (var id = 2; id < 34; id++)
-            Assert.Equal(JsonValueKind.Object, (await client.Response(id)).GetProperty("result").ValueKind);
+            Assert.Equal(JsonValueKind.Array, (await client.Response(id)).GetProperty("result").ValueKind);
         await client.Diagnostics("start.tale", 1);
         Assert.Equal(1, control.AnalysisCount);
     }
@@ -385,7 +568,7 @@ public sealed class ConcurrencyTests
         client.Write("other.tale", string.Join('\n', SceneFaker.Header("other"), DivertFaker.To("END"), ""));
         await client.Watch("other.tale", 1);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client, 1, 4));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var analysis = await control.NextAnalysis();
         await client.Request(3, "textDocument/hover", Position(client, 1, 4));
         await client.Request(4, "textDocument/definition", Position(client, 1, 4));
@@ -442,14 +625,15 @@ public sealed class ConcurrencyTests
         client.Write("other.tale", string.Join('\n', SceneFaker.Header("other"), DivertFaker.To("END"), ""));
         await client.Watch("other.tale", 1);
         var firstDelay = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client, 1, 4));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var first = await control.NextAnalysis();
         await client.Change("start.tale", Reference + "\n", 2);
         var nextDelay = await control.NextDelay();
         await client.Request(3, "textDocument/hover", Position(client, 1, 4));
         await client.Request(4, "textDocument/definition", Position(client, 1, 4));
-        await client.Barrier(5);
-        Assert.False(client.HasResponse(3));
+        var hover = (await client.Response(3)).GetProperty("result");
+        Assert.Equal(JsonValueKind.Object, hover.ValueKind);
+        Assert.Equal(1, hover.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
         Assert.False(client.HasResponse(4));
         Assert.Equal(-32801, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
 
@@ -458,11 +642,9 @@ public sealed class ConcurrencyTests
         var next = await control.NextAnalysis();
         Assert.Equal(Reference + "\n", next.Source.Files["start.tale"]);
         await client.Barrier(6);
-        Assert.False(client.HasResponse(3));
         Assert.False(client.HasResponse(4));
         nextDelay.Release();
         next.Release();
-        Assert.Equal(JsonValueKind.Object, (await client.Response(3)).GetProperty("result").ValueKind);
         Assert.Equal(client.UriOf("next.tale"), (await client.Response(4)).GetProperty("result").GetProperty("uri").GetString());
         await client.Diagnostics("start.tale", 2);
     }
@@ -506,7 +688,7 @@ public sealed class ConcurrencyTests
         await client.Initialize();
         await client.Open("start.tale", Original, 1);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var analysis = await control.NextAnalysis();
         await client.Request(3, "shutdown", new { });
         Assert.Equal(-32800, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
@@ -527,7 +709,7 @@ public sealed class ConcurrencyTests
         await client.Initialize();
         await client.Open("start.tale", Original, 1);
         var debounce = await control.NextDelay();
-        await client.Request(2, "textDocument/completion", Position(client));
+        await client.Request(2, "textDocument/inlayHint", InlayHint(client));
         var analysis = await control.NextAnalysis();
         debounce.Release();
         analysis.Fail(invalidOperation

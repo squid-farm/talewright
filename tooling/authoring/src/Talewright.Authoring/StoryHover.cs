@@ -33,7 +33,7 @@ public static class StoryHover
     {
         if (analysis.Diagnostics.Any(diagnostic => diagnostic.Code is AuthoringDiagnosticCodes.CustomFeaturesUnavailable or AuthoringDiagnosticCodes.StoryAnalysisUnavailable))
             throw new InvalidOperationException("Hover is unavailable until project authoring metadata is supplied and valid.");
-        var declaration = analysis.Symbols.FirstOrDefault(symbol => symbol.Declaration is { } range && Contains(range, position));
+        var declaration = analysis.DeclaredAt(position);
         if (declaration is not null) return Describe(analysis, declaration, declaration.Declaration!);
         var sites = analysis.CompletionSitesAt(position);
         foreach (var site in sites.Where(site => site.Text.Length > 0 && Contains(site.Range, position)))

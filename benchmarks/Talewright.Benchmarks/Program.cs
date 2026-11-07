@@ -14,10 +14,13 @@ using Talewright.Testing;
 if (args is ["--edit-diagnostics"])
     return await EditDiagnostics.RunAsync();
 
+if (args is ["--current-text-requests"])
+    return await EditDiagnostics.RunCurrentTextAsync();
+
 if (args.Length > 1 || args.Length == 1 &&
     args[0] is not ("--slow-input-stress" or "--choice-recovery-stress" or "--realistic-only"))
 {
-    Console.Error.WriteLine("Usage: Talewright.Benchmarks [--slow-input-stress | --choice-recovery-stress | --realistic-only | --edit-diagnostics]");
+    Console.Error.WriteLine("Usage: Talewright.Benchmarks [--slow-input-stress | --choice-recovery-stress | --realistic-only | --edit-diagnostics | --current-text-requests]");
     return 2;
 }
 

@@ -139,6 +139,9 @@ DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks
 # Check the existing realistic-corpus allocation ceilings without the other workloads.
 DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --realistic-only
 
+# Measure warm current-text completion and hover across symbol-table sizes.
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/Talewright.Benchmarks -c Release -- --current-text-requests
+
 python3 player/tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
 ```
 
@@ -167,6 +170,15 @@ ceilings. First compile includes compiler JIT cost; later sizes share a warmed
 process. Timings are not cold OS/process startup measurements, peak memory or
 guarantees for arbitrary author code. For comparisons, record the runtime,
 corpus, CPU, power source and power mode, and run without other build/test work.
+
+The `--current-text-requests` workload publishes a story-wide snapshot, then
+measures framed in-process LSP completion and hover requests after edits to a
+separate current buffer. It uses 100, 1,000 and 10,000 cross-file scene symbols,
+with 100 scenes per catalog file. Each operation has three warmups and seven
+samples; the reported p95 is the maximum. Managed bytes use the process-wide
+counter so work on server threads is included; concurrent background analysis
+may therefore contribute if a run is heavily delayed. The 20 ms request p95
+target is reported, not enforced as a CI timing gate.
 
 The default slow-input ladder analyzes paragraphs with substitutions and inline
 conditions, single-line substitutions, nested block conditions, nested
