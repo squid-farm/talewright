@@ -483,7 +483,7 @@ internal sealed partial class TaleBinder
         if (label is not null && ContainsDecorativeMedia(label) && !HasAccessibleChoiceName(label))
         {
             _diagnostics.Error(CompilerDiagnosticCodes.MissingAccessibleChoiceLabel,
-                "A choice containing decorative media needs text or a descriptive image in every visible branch to have an accessible name.",
+                "A choice containing decorative media needs literal text or a descriptive image with literal alt text in every visible branch to have an accessible name; variables and other substitutions can render empty.",
                 labelLocation ?? start);
         }
 
@@ -517,6 +517,11 @@ internal sealed partial class TaleBinder
         return false;
     }
 
+    /// <summary>
+    /// Whether every visible branch is certain to render a non-blank name. Variables, names and other
+    /// substitutions can render empty, so only text, quoted strings and descriptive images whose alt
+    /// template is itself named count.
+    /// </summary>
     private static bool HasAccessibleChoiceName(IReadOnlyList<TemplateInline> inlines)
     {
         foreach (var inline in inlines)
@@ -525,7 +530,11 @@ internal sealed partial class TaleBinder
             {
                 case TextTemplate text when !string.IsNullOrWhiteSpace(text.Text):
                     return true;
-                case MediaTemplate { Accessibility: MediaAccessibility.Descriptive }:
+                case SubstitutionTemplate { Value: TextLiteral { Value: var literal } } substitution
+                    when !string.IsNullOrWhiteSpace(literal) && substitution.Modifiers.All(KeepsNonBlankText):
+                    return true;
+                case MediaTemplate { Accessibility: MediaAccessibility.Descriptive } media
+                    when media.AltTemplate is null || HasAccessibleChoiceName(media.AltTemplate):
                     return true;
                 case StyledTemplate styled when HasAccessibleChoiceName(styled.Children):
                     return true;
@@ -537,6 +546,10 @@ internal sealed partial class TaleBinder
 
         return false;
     }
+
+    // Custom modifiers may return nothing and #one-many replaces its input, so only the text-transforming built-ins qualify.
+    private static bool KeepsNonBlankText(ITextModifier modifier) =>
+        TextModifierRegistry.IsBuiltIn(modifier) && modifier is not OneManyTextModifier;
 
     private DivertTarget? BindDivert(TaleLineSyntax syntax, TaleClause clause)
     {

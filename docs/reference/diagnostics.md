@@ -54,7 +54,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | ⚠ TW2013 | An extensionless image path matches several files. | Include the extension to choose explicitly. Otherwise the first match wins in `.png`, `.jpg`, `.jpeg`, `.webp` order. |
 | ⚠ TW2014 | Descriptive image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. Mark an intentionally decorative image with `#decorative` instead. |
 | TW2015 | A decorative image also supplies descriptive alt text. | Remove the alt text or remove `#decorative`; an image cannot be both decorative and described. |
-| TW2016 | A choice containing decorative media may have no accessible name in a visible branch. | Add meaningful text to the label or use a descriptive image in every branch. |
+| TW2016 | A choice containing decorative media may have no accessible name in a visible branch. | Add literal text to the label, or use a descriptive image with literal alt text, in every branch. Variables, names and other substitutions can render empty and do not count; a non-blank quoted string such as `{"Continue"}` does. |
 
 Story compilation, `talewright validate` and editor analysis report these image
 diagnostics consistently. TW2010–TW2014 point to the image path's opening quote;
