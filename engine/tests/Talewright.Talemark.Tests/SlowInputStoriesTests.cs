@@ -12,17 +12,17 @@ namespace Talewright.Talemark.Tests;
 public sealed class SlowInputStoriesTests
 {
     [Theory]
-    [InlineData(SlowInputShape.ParagraphLines, 41_166, "737ABC47E5BD491AA0F45930FF916A0B765B13956083A695A315B121162C8055")]
-    [InlineData(SlowInputShape.InlineSubstitutions, 11_167, "30CF5996FC9C085D26B5A461DD961FD870AEBF7DC4884B3C8580985C98C7C062")]
-    [InlineData(SlowInputShape.NestedConditions, 22_174, "355D6230101072136C8087BC4CA5F75834D258C064F142B1A7AB75DD2070A8A8")]
-    [InlineData(SlowInputShape.UnmatchedEmphasis, 3_167, "E81CA2347132C809944BC1432F3D28036FD137F6D8EF099814BDFC186AAF5E92")]
-    [InlineData(SlowInputShape.UnclosedLinks, 4_167, "2D9B68D53911BD882088BA164EC3213076ABD25E7CA24689B7D5BD0145B6B644")]
-    [InlineData(SlowInputShape.Choices, 22_049, "053FD46B604D0ACAA1B25F5F15B4F22B5F87323046FDE820FA2FFEFC7FEBA37E")]
-    [InlineData(SlowInputShape.ChoicesWithExpressions, 66_049, "87B22BC189A14403B900C328B005E77CBE157A7283E105D67B9E1B8190CA4B75")]
-    [InlineData(SlowInputShape.NestedParentheses, 2_182, "BC9E630280B9216D3D844B5B8758885957F34B878B851F9D81411299ACCEA390")]
-    [InlineData(SlowInputShape.UnaryPrefixes, 1_182, "7C72C05219A6D9588E23CCBFA04EEA4BA81257F40742FEC355B23930E4FF0C97")]
-    [InlineData(SlowInputShape.BrokenChoiceLines, 60_159, "28DA220F80906EC5A095AA1096CFA5FC071A289508947E33ED216DC052A3C1EC")]
-    [InlineData(SlowInputShape.UnclosedChoiceLabel, 1_172, "0BF25CEA1DA3CCF1129FE76E7650B57B39088BC0A2DF1A9B30DA0633515731A6")]
+    [InlineData(SlowInputShape.ParagraphLines, 41_169, "9B670763C32A77A8E2C16581E98D2C3B67EBE8E0C047BBC78620556EC783B4DE")]
+    [InlineData(SlowInputShape.InlineSubstitutions, 11_170, "CA20B8280C4FF0FFA5D8AEFF6229CE2F2F645821429260E5E09944E44CEFFCD7")]
+    [InlineData(SlowInputShape.NestedConditions, 22_177, "9C1A8F200AE271DB677837F35728DEA8C3FDAA520CE94C8B1FB334AD1630A938")]
+    [InlineData(SlowInputShape.UnmatchedEmphasis, 3_170, "D551B35FFF047123539C9F295F67DD360C56B27CF45C5B3B15CC7944B9C12143")]
+    [InlineData(SlowInputShape.UnclosedLinks, 4_170, "FB73B0A6B8BDEFE3EA1115BE6D01F141B0A063F448FAEABAD156E87E3EA7A8E1")]
+    [InlineData(SlowInputShape.Choices, 22_052, "56E6FD41DBA8B8C98FCE143868A4F026F404AD2B204C1BBFE54EF9665908C94C")]
+    [InlineData(SlowInputShape.ChoicesWithExpressions, 66_052, "818E5FFAD1414F187CEA376A2A651C61D210FC4E2C24FA498DDB22EA58F26624")]
+    [InlineData(SlowInputShape.NestedParentheses, 2_185, "89095E9A6E6347A175498459DB0238FC6FC05FF4DEABE68F0BCFA87D26E4DD9B")]
+    [InlineData(SlowInputShape.UnaryPrefixes, 1_185, "1A29128039B727EE0C4DA92398A8975EB993E4E6441314C1833DB2B83FDD2699")]
+    [InlineData(SlowInputShape.BrokenChoiceLines, 60_162, "AAD0244F5AE926E297E40262F48870316E60603607388CD79E297DF41108931F")]
+    [InlineData(SlowInputShape.UnclosedChoiceLabel, 1_175, "5533D6ED46329BC506E74B639E4DADF6A80E88791C2493109AA219C0F4E9C110")]
     public void Reference_ladder_preserves_source_bytes(SlowInputShape shape, int expectedBytes, string expectedHash)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -38,9 +38,13 @@ public sealed class SlowInputStoriesTests
                       start: start
                       seed: 42
                     characters:
-                      player: {first-name: Tester}
-                    vars: {x: 1, count: 1}
-                    flags: [ready]
+                      player:
+                        first-name: Tester
+                    vars:
+                      x: 1
+                      count: 1
+                    flags:
+                    - ready
                     """, source.Files[StorySource.ManifestFileName]);
                 Assert.Equal(expectedBytes, PerformanceSource.Utf8ByteCount(source));
             }

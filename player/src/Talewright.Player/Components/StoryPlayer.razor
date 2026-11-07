@@ -52,6 +52,17 @@
         </p>
     }
 
+    @if (_triggerSaveError is not null)
+    {
+        <p class="tw-error tw-trigger-save-error" role="alert">
+            @_triggerSaveError
+            @if (_pendingTriggerSave is not null)
+            {
+                <button type="button" class="tw-link" disabled="@_triggerSaveWritePending" @onclick="RetryTriggerSaveAsync">Retry trigger save</button>
+            }
+        </p>
+    }
+
     @if (SaveStore is not null)
     {
         <SavedGamesPanel Open="_showSaves" Busy="_busy" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
@@ -165,6 +176,12 @@
     private string? _autosaveError;
     private bool _autosavePending;
     private bool _initialAutosavePending;
+    private string? _triggerSaveError;
+    private TriggerSave? _pendingTriggerSave;
+    private bool _triggerSaveWritePending;
+    private bool _initialTriggerSavePending;
+    private int _triggerSaveSequence;
+    private Task _triggerSaveTail = Task.CompletedTask;
     private bool _disposed;
     private int _autosaveSequence;
     private Task _autosaveTail = Task.CompletedTask;
@@ -176,7 +193,8 @@
         {
             _startedStory = Story;
             ResetSession(ResumeHistory ?? new StoryHistory(Story, Seed, Character),
-                initialAutosave: ResumeHistory is null, preserveExistingFocus: true);
+                initialAutosave: ResumeHistory is null, preserveExistingFocus: true,
+                initialTriggerSave: ResumeHistory is null);
             _autosaveCheckComplete = AutosaveResumeChecked || SaveStore is null || ResumeHistory is not null;
             _resumePrompt = false;
             _startupResumeHistory = null;
@@ -198,7 +216,7 @@
     }
 
     private void ResetSession(StoryHistory session, bool initialAutosave, bool clearAutosaveError = true,
-        bool preserveExistingFocus = false)
+        bool preserveExistingFocus = false, bool initialTriggerSave = false)
     {
         _session = session;
         _generation++;
@@ -215,6 +233,11 @@
         _autosavePending = false;
         _initialAutosavePending = initialAutosave;
         _autosaveSequence++;
+        _triggerSaveError = null;
+        _pendingTriggerSave = null;
+        _triggerSaveWritePending = false;
+        _initialTriggerSavePending = initialTriggerSave && session.TriggerSaveId is not null;
+        _triggerSaveSequence++;
         _slots = [];
         RequestReveal(preserveExistingFocus);
     }
@@ -225,10 +248,13 @@
         _preserveFocusOnReveal = preserveExistingFocus;
     }
 
-    private Task Restart()
+    private async Task Restart()
     {
-        ResetSession(new StoryHistory(Story, Seed, _session.Character), initialAutosave: true, clearAutosaveError: false);
-        return QueueAutosaveAsync();
+        ResetSession(new StoryHistory(Story, Seed, _session.Character), initialAutosave: true,
+            clearAutosaveError: false, initialTriggerSave: true);
+        _initialTriggerSavePending = false;
+        await QueueTriggerSaveAsync();
+        await QueueAutosaveAsync();
     }
 
     private async Task CheckAutosaveForResumeAsync(StoryDefinition story, ISaveStore saveStore, int generation)
@@ -278,6 +304,11 @@
 
         if (generation != _generation) return;
         await InvokeAsync(StateHasChanged);
+        if (generation == _generation && !_resumePrompt && _autosaveStartupError is null && _initialTriggerSavePending)
+        {
+            _initialTriggerSavePending = false;
+            await QueueTriggerSaveAsync();
+        }
         if (generation == _generation && !_resumePrompt && _autosaveStartupError is null && _initialAutosavePending)
         {
             _initialAutosavePending = false;
@@ -305,7 +336,7 @@
         return Task.CompletedTask;
     }
 
-    private Task StartNewGame()
+    private async Task StartNewGame()
     {
         _startupResumeHistory = null;
         _resumePrompt = false;
@@ -313,7 +344,9 @@
         _autosaveCheckComplete = true;
         _initialAutosavePending = false;
         RequestReveal();
-        return QueueAutosaveAsync();
+        _initialTriggerSavePending = false;
+        await QueueTriggerSaveAsync();
+        await QueueAutosaveAsync();
     }
 
     private Task RetryAutosaveAsync() => QueueAutosaveAsync();
@@ -406,6 +439,86 @@
     private static string AutosaveRecoveryFailureMessage(Exception ex) =>
         $"Couldn't preserve your earlier autosave, so automatic saving is paused to avoid replacing it. Try Quick Save or a named save. {ex.Message} Fix the storage problem or choose Retry autosave.";
 
+    private static string TriggerSaveFailureMessage(string triggerId, Exception ex) =>
+        $"Couldn't save the trigger checkpoint from '{triggerId}'. Any previous trigger checkpoint, if present, is preserved. {ex.Message} Fix the problem and choose Retry trigger save.";
+
+    private Task RetryTriggerSaveAsync() => _pendingTriggerSave is { } save
+        ? QueueTriggerSaveAsync(save)
+        : Task.CompletedTask;
+
+    private async Task QueueTriggerSaveAsync(TriggerSave? retry = null)
+    {
+        var store = SaveStore;
+        if (store is null) return;
+
+        var save = retry;
+        if (save is null)
+        {
+            if (_session.TriggerSaveId is not { } triggerId) return;
+            try
+            {
+                save = new TriggerSave(triggerId, _session.Save(_session.CaptureSummary(DateTimeOffset.UtcNow)));
+            }
+            catch (Exception ex) when (IsAutosaveFailure(ex))
+            {
+                _triggerSaveError =
+                    $"Couldn't create the trigger checkpoint from '{triggerId}'. Any previous trigger checkpoint, if present, is preserved. {ex.Message}";
+                _pendingTriggerSave = null;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+        }
+
+        if (save is null) return;
+        var sequence = ++_triggerSaveSequence;
+        var generation = _generation;
+        var storyId = Story.Id;
+        _pendingTriggerSave = save;
+        _triggerSaveWritePending = true;
+        var previous = _triggerSaveTail;
+        var current = PersistTriggerSaveAfterAsync(previous, store, storyId, save, generation, sequence);
+        _triggerSaveTail = current;
+        await current;
+    }
+
+    private async Task PersistTriggerSaveAfterAsync(Task previous, ISaveStore store, string storyId,
+        TriggerSave save, int generation, int sequence)
+    {
+        await previous;
+        if (!TriggerSaveIsCurrent(generation, sequence)) return;
+
+        try
+        {
+            await store.WriteTriggerAsync(storyId, save);
+        }
+        catch (Exception ex) when (IsAutosaveFailure(ex))
+        {
+            if (TriggerSaveIsCurrent(generation, sequence))
+            {
+                _triggerSaveWritePending = false;
+                _triggerSaveError = TriggerSaveFailureMessage(save.TriggerId, ex);
+                await InvokeAsync(StateHasChanged);
+            }
+            return;
+        }
+
+        if (TriggerSaveIsCurrent(generation, sequence))
+        {
+            _triggerSaveWritePending = false;
+            _pendingTriggerSave = null;
+            _triggerSaveError = null;
+            var entry = StoryHistory.DescribeSave(SaveEntry.TriggerSlot, save.Data) with { TriggerLabel = save.TriggerId };
+            _slots = _slots.Where(existing => !existing.IsTriggerSave)
+                .Append(entry)
+                .OrderByDescending(existing => existing.Summary?.SavedAt ?? DateTimeOffset.MinValue)
+                .ToArray();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private bool TriggerSaveIsCurrent(int generation, int sequence) =>
+        !_disposed && generation == _generation && sequence == _triggerSaveSequence;
+
     private async Task Choose(ChoiceView choice)
     {
         if (_session.Cursor >= StoryHistory.MaxChoices)
@@ -414,6 +527,7 @@
         }
         _session.Choose(choice.Key);
         RequestReveal();
+        await QueueTriggerSaveAsync();
         await QueueAutosaveAsync();
     }
 
@@ -504,6 +618,7 @@
     private Task RequestLoadAsync(string slot) => SaveOperationAsync(async generation =>
     {
         await _autosaveTail;
+        await _triggerSaveTail;
         if (generation != _generation)
         {
             return;
@@ -538,6 +653,7 @@
     private async Task LoadAsync(string slot, int generation)
     {
         await _autosaveTail;
+        await _triggerSaveTail;
         if (generation != _generation) return;
         var story = Story;
         var bytes = await ReadSaveAsync(story.Id, slot);
@@ -546,6 +662,10 @@
         {
             _autosaveSequence++;
             _autosavePending = false;
+            _triggerSaveSequence++;
+            _pendingTriggerSave = null;
+            _triggerSaveWritePending = false;
+            _triggerSaveError = null;
             _session = candidate;
             _showHistory = false;
             _historyFrames = [];
@@ -579,8 +699,12 @@
     {
         SaveEntry.QuickSlot => SaveStore!.ReadQuickAsync(storyId),
         SaveEntry.AutosaveSlot => SaveStore!.ReadAutosaveAsync(storyId),
+        SaveEntry.TriggerSlot => ReadTriggerSaveAsync(storyId),
         _ => SaveStore!.ReadAsync(storyId, slot),
     };
+
+    private async Task<byte[]> ReadTriggerSaveAsync(string storyId) =>
+        (await SaveStore!.ReadTriggerAsync(storyId)).Data;
 
     private async Task ImportAsync(InputFileChangeEventArgs args)
     {
@@ -708,10 +832,19 @@
             await CheckAutosaveForResumeAsync(Story, SaveStore, generation);
             return;
         }
-        else if (_autosaveCheckComplete && _initialAutosavePending && !_resumePrompt && _autosaveStartupError is null)
+        else if (_autosaveCheckComplete && !_resumePrompt && _autosaveStartupError is null
+            && (_initialTriggerSavePending || _initialAutosavePending))
         {
-            _initialAutosavePending = false;
-            await QueueAutosaveAsync();
+            if (_initialTriggerSavePending)
+            {
+                _initialTriggerSavePending = false;
+                await QueueTriggerSaveAsync();
+            }
+            if (_initialAutosavePending)
+            {
+                _initialAutosavePending = false;
+                await QueueAutosaveAsync();
+            }
         }
 
         if (_restoreReadingPosition && Visible)
@@ -782,6 +915,7 @@
     {
         _disposed = true;
         _autosaveSequence++;
+        _triggerSaveSequence++;
         if (_module is not null)
         {
             try

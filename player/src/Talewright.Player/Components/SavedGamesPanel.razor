@@ -55,10 +55,14 @@
             <ul class="tw-save-list" aria-label="Saved games">
                 @foreach (var entry in Slots.OrderByDescending(entry => entry.Summary?.SavedAt ?? DateTimeOffset.MinValue))
                 {
-                    var named = !entry.IsQuick && !entry.IsAutosave;
-                    <li @key="entry.Slot" data-save-kind="@(entry.IsQuick ? "quick" : entry.IsAutosave ? "autosave" : "named")"
-                        aria-label="@($"{(entry.IsQuick ? "Checkpoint" : entry.IsAutosave ? "Recovery save" : "Named save")}: {entry.DisplayName}")">
+                    var named = !entry.IsQuick && !entry.IsAutosave && !entry.IsTriggerSave;
+                    <li @key="entry.Slot" data-save-kind="@(entry.IsTriggerSave ? "trigger" : entry.IsQuick ? "quick" : entry.IsAutosave ? "autosave" : "named")"
+                        aria-label="@($"{(entry.IsTriggerSave ? "Trigger checkpoint" : entry.IsQuick ? "Checkpoint" : entry.IsAutosave ? "Recovery save" : "Named save")}: {entry.DisplayName}{(entry.TriggerLabel is null ? "" : $" ({entry.TriggerLabel})")}")">
                         <strong>@entry.DisplayName</strong>
+                        @if (entry.TriggerLabel is not null)
+                        {
+                            <span>From trigger: @entry.TriggerLabel</span>
+                        }
                         @if (named && (entry.DisplayName == SaveEntry.DisplayNameFor(SaveEntry.QuickSlot)
                             || entry.DisplayName == SaveEntry.DisplayNameFor(SaveEntry.AutosaveSlot)))
                         {

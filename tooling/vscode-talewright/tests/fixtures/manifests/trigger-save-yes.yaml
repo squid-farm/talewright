@@ -1,0 +1,11 @@
+game:
+  id: trigger-save-yes
+  title: Trigger save yes
+  start: beginning
+characters:
+  player: {first-name: Ada}
+triggers:
+  - id: greeting
+    when: "true"
+    do: set flag:greeted
+    save: yes

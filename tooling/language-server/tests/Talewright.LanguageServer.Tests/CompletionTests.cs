@@ -197,7 +197,7 @@ public sealed partial class ServerTests
         await using var client = new Client();
         await client.Initialize();
         var marked = list.StartsWith("inventory", StringComparison.Ordinal)
-            ? Manifest.Replace("player: {first-name: Ada}", "player: {first-name: Ada, " + list + "}") + "items: {rope: Rope}\n"
+            ? Manifest.Replace("first-name: Ada", "first-name: Ada\n    " + list) + "items: {rope: Rope}\n"
             : Manifest.Replace("  start: start",
                 "  start: start\n  ruleset: {" + list.Replace("\n", "\n    ", StringComparison.Ordinal) + "}\n");
         await client.Open(StorySource.ManifestFileName, marked.Replace("|", ""), 1);

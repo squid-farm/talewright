@@ -170,6 +170,26 @@ public sealed class StoryHoverTests
     }
 
     [Fact]
+    public void Trigger_save_help_comes_from_the_manifest_schema()
+    {
+        var yaml = Manifest + """
+
+            triggers:
+              - id: checkpoint
+                when: "true"
+                do: set flag:greeted
+                save: true
+            """;
+        var index = yaml.IndexOf("save:", StringComparison.Ordinal);
+        var analysis = Source("=== first\n-> END", yaml);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(
+            analysis, Position(StorySource.ManifestFileName, yaml[..index])));
+
+        Assert.Contains("single Trigger checkpoint", hover.PlainText);
+        Assert.Contains("step settles", hover.PlainText);
+    }
+
+    [Fact]
     public void Escaped_manifest_references_and_quoted_declarations_keep_authored_ranges()
     {
         var marked = Manifest.Replace("start: first", "start: \"\\u0073ec|ond\"");
