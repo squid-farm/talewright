@@ -38,6 +38,8 @@ alongside text size and adapt to the available window width.
 Reduced motion follows the operating system by default. Choose **Reduce** to suppress player
 animations and reveal new passages instantly, regardless of the operating system setting. Stories
 cannot override this preference.
+Pressing within the story stops automatic passage scrolling, so choices stay under your pointer
+until you release it.
 
 When mechanical notes are hidden, they are removed from both the display and accessibility tree.
 This changes presentation only; story events, game state, history and saves are unchanged.
