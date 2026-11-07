@@ -80,6 +80,7 @@ button { font: inherit; color: inherit; }
 .tw-resume-prompt .tw-choice { display: block; width: 100%; margin-top: .5rem; }
 .tw-autosave-error { margin: 0 0 1rem; }
 .tw-empty { color: var(--tw-muted); font-style: italic; }
+.tw-build-identity { margin: 1.5rem 0 0; font-family: var(--tw-ui-font); font-size: 0.75rem; color: var(--tw-muted); overflow-wrap: anywhere; }
 
 /* Player layout */
 .tw-bar { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem 1rem; align-items: center; background: var(--tw-bg); border-bottom: 1px solid var(--tw-border); margin-bottom: 1rem; }

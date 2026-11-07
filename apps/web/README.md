@@ -13,8 +13,9 @@ dotnet run --project apps/web          # dev server, prints the URL
 
 For a standalone game with exactly one story and relative URLs:
 `talewright publish story-folder -a --target web --output game.zip`.
-See the [CLI reference](../../docs/reference/cli.md#publish). Development hosts retain samples by
-default; `TalewrightIncludeSamples=false` disables them in custom builds.
+The ZIP's `version.json` identifies the player bundled with the CLI. See the
+[CLI reference](../../docs/reference/cli.md#publish). Development hosts retain samples by default;
+`TalewrightIncludeSamples=false` disables them in custom builds.
 
 ```bash
 dotnet publish apps/web -c Release -o out/web
@@ -31,7 +32,10 @@ python3 -m http.server 8080 --directory out/web/wwwroot
 Each valid version-tag push that passes Build publishes that tagged host, with all bundled samples, to
 GitHub Pages at the root of the custom domain, <https://play.trytalewright.com/>. The root serves the
 most recently deployed eligible tag, including previews; pushes to `main` do not deploy it. The workflow
-publishes with base path `/`, smoke-tests the result at the root and uploads only `wwwroot`. See
+publishes with base path `/` and the tag's version, smoke-tests the result at the root and uploads
+only `wwwroot`. Every publish writes `wwwroot/version.json` with the same `version`, `commit` and `date`
+the player shows at the bottom of the library and Settings; builds without a release version report
+`dev`. See
 [releasing and CI](../../docs/developer/releasing.md) for repository settings.
 
 The publish script also supports subpath hosting. Reproduce one locally, then serve it under

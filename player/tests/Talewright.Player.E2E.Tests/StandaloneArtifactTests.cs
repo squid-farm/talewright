@@ -22,6 +22,26 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
     protected override bool StartsInLibrary => false;
 
     [StandaloneFact]
+    [Trait("Host", "Browser")]
+    public async Task Published_game_build_identity_matches_version_json()
+    {
+        if (Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1")
+        {
+            await Driver.ClickAsync("Start story");
+        }
+
+        var response = await Page.APIRequest.GetAsync(new Uri(new Uri(Page.Url), "version.json").ToString());
+        Assert.True(response.Ok, $"version.json returned HTTP {response.Status}");
+        var identity = await response.JsonAsync();
+        string Value(string name) => identity!.Value.GetProperty(name).GetString()!;
+
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        await Expect(Page.Locator(".tw-settings .tw-build-identity")).ToHaveTextAsync(
+            $"Talewright {Value("version")} · commit {Value("commit")} · built {Value("date")}");
+    }
+
+    [StandaloneFact]
     public async Task Selected_story_autostarts_plays_saves_and_reloads_without_other_samples()
     {
         var title = Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_TITLE") ?? "The Lost Relic";

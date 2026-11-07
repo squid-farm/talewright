@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    The player's build identity (#315). Import this from a project file body so $(Version) is only
+    the explicitly passed version, not the SDK's 1.0.0 default. Release builds pass -p:Version from a
+    validated tag; untagged CI versions (0.0.0-ci.N) and unstamped local builds are reported as "dev".
+  -->
+  <PropertyGroup>
+    <TalewrightBuildVersion Condition="'$(TalewrightBuildVersion)' == '' and '$(Version)' != '' and !$([System.String]::Copy('$(Version)').StartsWith('0.0.0-ci.'))">$(Version)</TalewrightBuildVersion>
+    <TalewrightBuildVersion Condition="'$(TalewrightBuildVersion)' == ''">dev</TalewrightBuildVersion>
+    <TalewrightBuildDate Condition="'$(TalewrightBuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</TalewrightBuildDate>
+  </PropertyGroup>
+
+  <Target Name="ResolveTalewrightBuildIdentity" DependsOnTargets="InitializeSourceControlInformation">
+    <PropertyGroup>
+      <TalewrightBuildCommit Condition="'$(TalewrightBuildCommit)' == '' and $([System.String]::Copy('$(SourceRevisionId)').Length) &gt;= 7">$(SourceRevisionId.Substring(0, 7))</TalewrightBuildCommit>
+      <TalewrightBuildCommit Condition="'$(TalewrightBuildCommit)' == ''">unknown</TalewrightBuildCommit>
+    </PropertyGroup>
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(TalewrightBuildVersion)|$(TalewrightBuildCommit)|$(TalewrightBuildDate)', '^[0-9A-Za-z.+-]+\|[0-9A-Za-z]+\|[0-9]{4}-[0-9]{2}-[0-9]{2}$'))"
+           Text="Invalid Talewright build identity '$(TalewrightBuildVersion)', '$(TalewrightBuildCommit)', '$(TalewrightBuildDate)'." />
+  </Target>
+</Project>
