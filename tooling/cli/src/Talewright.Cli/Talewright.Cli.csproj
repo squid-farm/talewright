@@ -18,6 +18,8 @@
   <ItemGroup>
     <None Pack="false" Include="../../../../apps/web/*.cs;../../../../apps/web/*.razor;../../../../apps/web/*.csproj"
              Link="publish-assets/web/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Pack="false" Include="../../../../player/src/Talewright.Player/BuildIdentity.targets"
+             Link="publish-assets/web/BuildIdentity.targets" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../../../apps/web/wwwroot/**"
              Link="publish-assets/web/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../../../apps/desktop/*.cs;../../../../apps/desktop/*.razor;../../../../apps/desktop/*.csproj;../../../../apps/desktop/THIRD-PARTY-NOTICES.txt"

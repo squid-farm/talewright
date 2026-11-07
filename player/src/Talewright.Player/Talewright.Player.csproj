@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
   <ItemGroup>
+    <InternalsVisibleTo Include="Talewright.Cli" />
     <InternalsVisibleTo Include="Talewright.Player.E2E.Tests" />
   </ItemGroup>
 

@@ -75,6 +75,15 @@ def verify_desktop_archive(path):
     print("Verified six self-contained desktop builds and launchers", flush=True)
 
 
+def verify_web_identity(identity, version):
+    expected_version = "dev" if version.startswith("0.0.0-ci.") else version
+    if (not isinstance(identity, dict) or set(identity) != {"version", "commit", "date"}
+            or identity["version"] != expected_version
+            or not isinstance(identity["commit"], str) or not identity["commit"]
+            or not isinstance(identity["date"], str) or not identity["date"]):
+        raise ValueError("Published web player has an invalid or mismatched build identity")
+
+
 def verify(directory, version):
     version_from_tag("v" + version)
     found = {}
@@ -115,6 +124,7 @@ def verify(directory, version):
                                   "tools/net10.0/any/debug-assets/_content/Talewright.Player/talewright.css",
                                   *[f"tools/net10.0/any/{asset}" for asset in PLAYER_ASSETS],
                                   "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
+                                  "tools/net10.0/any/publish-assets/web/BuildIdentity.targets",
                                   "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
                                   "tools/net10.0/any/publish-assets/standalone/web/App.razor",
                                   "tools/net10.0/any/publish-assets/standalone/web/Program.cs",
@@ -350,6 +360,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
             if "index.html" not in published.namelist() or not any(
                     name.startswith("_framework/") for name in published.namelist()):
                 raise ValueError("Installed CLI did not publish a complete standalone web site")
+            verify_web_identity(json.loads(published.read("version.json")), version)
             index = json.loads(published.read("story/index.json"))
             for name in ["chapter.fr.tale", "characters/player.talewright.yaml"]:
                 if name not in index or published.read("story/" + name) != (story / name).read_bytes():

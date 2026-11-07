@@ -13,8 +13,9 @@ dotnet run --project apps/web          # dev server, prints the URL
 
 For a standalone game with exactly one story and relative URLs:
 `talewright publish story-folder -a --target web --output game.zip`.
-See the [CLI reference](../../docs/reference/cli.md#publish). Development hosts retain samples by
-default; `TalewrightIncludeSamples=false` disables them in custom builds.
+The ZIP's `version.json` identifies the player bundled with the CLI. See the
+[CLI reference](../../docs/reference/cli.md#publish). Development hosts retain samples by default;
+`TalewrightIncludeSamples=false` disables them in custom builds.
 
 ```bash
 dotnet publish apps/web -c Release -o out/web
