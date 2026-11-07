@@ -63,9 +63,12 @@ def publish(vsix, tag, sha, repository, additional_assets=()):
             "the tagged source. Self-contained CLI archives and checksums are attached separately; "
             "player binaries are not included. See "
             f"[getting started](https://github.com/{repository}/blob/{tag}/docs/guide/getting-started.md).\n\n"
-            "**Before 1.0, story syntax, APIs and save formats may change without compatibility "
-            "guarantees. Back up stories and saves before upgrading.** Review the changes below "
-            "for migration details; maintainers should add any specific save-breaking changes.\n\n"
+            "**1.0 preview: stories and saves are stable.** From 1.0.0-preview.1, Talemark syntax, "
+            "story files and saves made by a preview will keep working in later 1.x releases. We "
+            "will break this only to fix a severe defect, such as a security or data-loss bug, and "
+            "will announce it in advance, with an error that names the replacement and migration "
+            "notes. Tooling, debugger scenario files and C# extension APIs may still change before "
+            "1.0.\n\n"
             + generated["body"]
         )
         release = request("POST", f"{base}/releases", {

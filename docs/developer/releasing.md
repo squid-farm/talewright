@@ -15,19 +15,21 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 | Valid version-tag push | After verification, **Publish Samples** builds that tagged web player, checks that a sample opens and a choice works at the site root, then deploys to [GitHub Pages](https://play.trytalewright.com/). The root represents the most recently deployed eligible tag, including previews. **Publish NuGet** pushes four packages to nuget.org using OIDC; the Marketplace job publishes all six inspected platform VSIXs; then the GitHub release job attaches them and publishes generated notes. Linux x64 is runtime-tested; the other five platforms are provisional. Package publishing jobs use environment `release`. |
 | PR / manual | Validation only. |
 
-## Preview save-compatibility notice
+## Preview compatibility notice
 
-Use this prepared copy in preview release notes and tester announcements while released saves require
-the exact story revision. Update it if the shipped save behavior changes. This copy does not authorize
-publishing a release or contacting testers; the project lead controls both.
+Use this prepared copy in preview release notes and tester announcements. It matches the README banner
+and the generated release notes. This copy does not authorize publishing a release or contacting
+testers; the project lead controls both.
 
-> **Save compatibility:** Saves in this preview are tied to the exact story revision and a compatible
-> player version. Even a prose-only story edit can make a save unavailable, and player or extension
-> changes may also prevent loading. This preview does not migrate incompatible saves. Keep the exact
-> story files and a compatible player version used for each save. Exporting or backing up a save
-> preserves the file; it does not make the save compatible with a changed story or player. Autosave
-> is on by default and keeps one rolling recovery save, not a backup. If you test an update, note what
-> changed and whether the save still loads. Please do not share private story content without permission.
+> **1.0 preview: stories and saves are stable.** From 1.0.0-preview.1, Talemark syntax, story files
+> and saves made by a preview will keep working in later 1.x releases. We will break this only to fix
+> a severe defect, such as a security or data-loss bug, and will announce it in advance, with an error
+> that names the replacement and migration notes. Tooling, debugger scenario files and C# extension
+> APIs may still change before 1.0.
+>
+> Editing your story can still make its existing saves unavailable; keep the story files that match
+> each save. Autosave is on by default and keeps one rolling recovery save, not a backup. Please do
+> not share private story content without permission.
 
 The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
 public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/update procedure is documented in
@@ -171,8 +173,9 @@ never publishes, even when run against a tag.
 - GitHub supplies versioned **Source code (zip)** and **Source code (tar.gz)** archives automatically.
   Use the [releases list](https://github.com/squid-farm/talewright/releases) to find previews:
   `/releases/latest` excludes prereleases and may be empty before a stable release.
-  Generated notes include an author/source-install explanation and a pre-1.0 save compatibility
-  warning. Curate specific migration/save-breaking details in the release notes as needed.
+  Generated notes include an author/source-install explanation and the 1.0 preview compatibility
+  statement from the README banner: stories and saves made by a preview keep working in later 1.x
+  releases. A release containing an approved breaking change must add its migration notes.
 - **Never move or reuse a release tag.** Fix mistakes with a new version. Version-tag runs are not
   cancelled by newer CI runs. If artifacts expire before a retry, rerun full validation on the
   unchanged tag; never substitute locally built artifacts.
