@@ -28,8 +28,9 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 
 ## Player preferences
 
-The shared player exposes per-device theme, text-size and mechanical-note visibility settings in the
-toolbar's More actions menu. `PlayerPreferencesStore` owns the versioned preferences record and
+The shared player exposes per-device theme, text-size, reading-width (narrow / normal / wide),
+line-spacing (compact / normal / relaxed) and mechanical-note visibility settings in the toolbar's
+More actions menu. `PlayerPreferencesStore` owns the versioned preferences record and
 persists it in browser storage, shared across stories. Hidden mechanical notes are removed from
 both the display and accessibility tree without changing story events. Hosts register the store as
 a scoped service; web hosts should load `PlayerPreferencesBootstrap.js` before the player

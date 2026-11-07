@@ -2,6 +2,8 @@
     let theme = "system";
     let textSizePercent = 100;
     let hideMechanicalNotes = false;
+    let readingWidth = "normal";
+    let lineSpacing = "normal";
     try {
         const value = localStorage.getItem("talewright.player.preferences");
         if (value !== null) {
@@ -14,6 +16,12 @@
                 if (typeof preferences.hideMechanicalNotes === "boolean") {
                     hideMechanicalNotes = preferences.hideMechanicalNotes;
                 }
+                if (["narrow", "normal", "wide"].includes(preferences.readingWidth)) {
+                    readingWidth = preferences.readingWidth;
+                }
+                if (["compact", "normal", "relaxed"].includes(preferences.lineSpacing)) {
+                    lineSpacing = preferences.lineSpacing;
+                }
             } else {
                 console.warn("Stored player preferences are unsupported; using defaults.");
             }
@@ -24,5 +32,7 @@
     document.documentElement.dataset.twTheme = theme;
     document.documentElement.dataset.twTextSize = String(textSizePercent);
     document.documentElement.dataset.twHideMechanicalNotes = String(hideMechanicalNotes);
+    document.documentElement.dataset.twReadingWidth = readingWidth;
+    document.documentElement.dataset.twLineSpacing = lineSpacing;
     document.documentElement.style.setProperty("--tw-base-font-size", `${18 * textSizePercent / 100}px`);
 })();
