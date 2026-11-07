@@ -349,9 +349,8 @@ maintain a second copy of the schema, so the schema file must not move. Submissi
 automatic discovery is available: SchemaStore must accept and publish the entry,
 and an editor may need to refresh its catalog.
 
-The rolling schema follows the current manifest format. Before v1, breaking
-manifest and schema changes are permitted without compatibility shims or migration
-support. To pin validation, replace `main` in the modeline URL with the
+The rolling schema follows the current manifest format. From 1.0.0-preview.1, manifest changes
+are additive, so story files written for a preview keep validating. To pin validation, replace `main` in the modeline URL with the
 commit or release tag matching your Talewright version, or use a local copy.
 The VSIX always uses its bundled schema, independent of catalog/network access.
 

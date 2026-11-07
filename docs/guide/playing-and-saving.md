@@ -115,7 +115,7 @@ still checks story and player compatibility.
 
 If the autosave cannot be loaded and you start a new game, Talewright keeps its original bytes as a
 separate **Recovered autosave** named save before writing the new autosave. Find it in **Saves**;
-it may still need the earlier story or player version to load. If the old autosave cannot be read or
+it may still need the earlier story version to load. If the old autosave cannot be read or
 preserved, automatic saving pauses rather than replacing it. Try a named save or Quick Save, then
 fix the storage problem and choose **Retry autosave**.
 
@@ -133,10 +133,10 @@ the file against the same story and player compatibility rules as loading; a dam
 file leaves your existing saves and current playthrough unchanged. Import adds a named save; it does
 not load it or replace the separate Quick Save checkpoint. Select **Load** to play it.
 Save files are compressed binary files, not text. Editing them can damage the save; they are not
-tamper-proof. Exporting or backing up a save preserves the file; it does not make the save compatible
-with a different story revision or player version. Keep the exact story files and a compatible player
-version with each backup. Backups can move between web and desktop when the story files and player
-save format are compatible.
+tamper-proof. From 1.0.0-preview.1, saves made by a preview keep loading in later 1.x players.
+Exporting or backing up a save preserves the file; it does not make the save compatible with a
+changed story, so keep the story files that match each backup. Backups can move between web and
+desktop.
 
 ## Updating a story with existing saves
 

@@ -178,11 +178,11 @@ Avoid publishing two builds to the same path at once. Without force, publish sto
 appears or an approved file observably changes during the build. This is a safety check, not a lock
 against every possible filesystem race; see the [replacement policy](../reference/cli.md#advanced-replacing-an-existing-archive).
 
-Current released saves require the exact story revision; even a prose-only edit can make a save
-unavailable, and player or extension changes can also prevent loading. Exporting a backup preserves
-the save file but does not make it compatible with a changed story or player. Keep a copy of each
-released story and a compatible player version so players can reopen their saves.
-V1 story updates use replay evidence: prose and label changes or unrelated choices may be compatible,
+From 1.0.0-preview.1, saves made by a preview keep loading in later 1.x players, so updating
+Talewright does not strand your players' saves. Changing your story can: exporting a backup preserves
+the save file but does not make it compatible with a changed story. Keep a copy of each released story
+so players can reopen their saves.
+Story updates use replay evidence: prose and label changes or unrelated choices may be compatible,
 but changed starting values or recorded gameplay outcomes are not. Saves without replay evidence
 have no cross-revision compatibility guarantee. See
 [updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves).

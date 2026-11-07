@@ -76,11 +76,12 @@ optional developer feature; see [C# extensions](../developer/csharp-extensions.m
 
 ## Compatibility
 
-Talemark and the engine are versioned together. A major version may change or remove syntax, but
-only when unavoidable, with advance notice, and with errors that show the replacement plus a
-migration note. Adding new syntax needs no compatibility handling and can happen in any release.
-Adding syntax that reserves a character existing prose may already use counts as a change, not an
-addition.
+Talemark and the engine are versioned together. From 1.0.0-preview.1, Talemark syntax, story files
+and saves made by a preview keep working in later 1.x releases. Syntax is changed or removed only to
+fix a severe defect, such as a security or data-loss bug, with advance notice, an error that shows the
+replacement, and a migration note. New syntax may arrive in any release, but only if existing stories
+compile the same way: syntax that reserves a character or word existing prose may already use counts
+as a change, not an addition.
 
 Identifiers are names for scenes, characters, items and other story parts. Use letters, numbers,
 underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
@@ -384,7 +385,6 @@ A scene-level `->` leaves immediately, showing the prose already rendered with a
 There is no implicit fallback or gather. A scene without a possible choice, divert or hub is a dead end.
 If play reaches a scene whose choice requirements all fail and whose hub offers nothing, the story shows
 "The story cannot continue" and ends. Validation does not predict which requirements will hold.
-These are breaking pre-v1 execution rules; the replay fingerprint changed, not the save format.
 
 **Advanced: hub selection.** A scene may have only one `@hub` and one
 `@hub-limit`. A hub checks tags, requirements and `@once`, then sorts matching scenes by priority
@@ -493,7 +493,6 @@ These are ordinary text expressions, usable in comparisons and text assignments:
 ```
 
 `#possessive` is a text transformation, not a way to select stored pronoun data.
-This is a breaking pre-alpha syntax change with no compatibility aliases or migration handling.
 
 **Pronoun agreement.** Supply two wordings with `#one-many("singular", "plural")`:
 

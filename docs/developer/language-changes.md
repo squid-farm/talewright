@@ -29,7 +29,13 @@ meanings and the difference between implemented and decided syntax.
   For a callable, complete the [callable construct contract](../reference/talemark-operators.md#callable-construct-contract)
   and follow its shape guideline, or justify the exception.
 - [ ] Define errors and source ranges for malformed, incomplete and obsolete spellings.
-  Pre-1.0 changes need no compatibility mode; old forms must name their replacement.
+  From 1.0.0-preview.1, syntax changes must be additive. An additive change reserves no character
+  or word that existing prose may already use, and existing stories compile the same way. A breaking
+  change needs a severe defect, an explicit project-lead decision, advance notice, an error that names
+  the replacement, a version bump and migration notes. See the
+  [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
+- [ ] Show that existing stories and saves are unchanged: the shipped samples compile with the same
+  diagnostics and the golden save tests pass without updating their fixtures.
 - [ ] Check identifier collisions, hyphen/subtraction ambiguity and interactions with nested
   conditions, formatting and quoted delimiters.
 - [ ] Identify any decided-but-unimplemented prerequisite. Agree on a scoped issue with the
@@ -60,8 +66,10 @@ meanings and the difference between implemented and decided syntax.
     ([#497](https://github.com/squid-farm/talewright/issues/497)). Text renders as it sits in the file.
 11. **Use the glossary's terms** in diagnostics, docs and hover text
     ([#500](https://github.com/squid-farm/talewright/issues/500)).
-12. **Breaking changes include migration help.** Old forms produce an error that shows the
-    replacement. Any change that silently alters rendering is called out in the release notes.
+12. **Existing stories keep working.** New syntax is additive and leaves existing stories and saves
+    unchanged. A breaking change is reserved for severe defects; its old form produces an error that
+    shows the replacement, with migration notes. Any change that silently alters rendering is called
+    out in the release notes.
 13. **Sugar and defaults are different contracts.** Sugar is another spelling of the same meaning
     and compiles to the canonical model. A default is omitted author input that stays absent in the
     model until the boundary that owns its behavior supplies a value. For example, bold shorthand

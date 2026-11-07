@@ -599,7 +599,8 @@ compatibility checks the full recorded path, including redo, against an updated 
 corrupt or incompatible saves are rejected without rewriting the original.
 Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
 see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
-stories omit the character. Pre-v1 replay contracts may change without support for previous versions.
+stories omit the character. From 1.0.0-preview.1, replay contracts are frozen: saves made by a preview
+keep loading under the [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
 
 ---
 
