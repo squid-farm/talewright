@@ -183,6 +183,28 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
+    public async Task Document_symbols_respond_before_whole_story_analysis_starts()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        await client.Initialize();
+        await client.Open("start.tale", Original, 1);
+        var debounce = await control.NextDelay();
+
+        await client.Request(2, "textDocument/documentSymbol", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") }
+        });
+        var response = await client.Response(2);
+        Assert.Equal("start", response.GetProperty("result")[0].GetProperty("name").GetString());
+        Assert.Equal(0, control.AnalysisCount);
+
+        debounce.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 1);
+    }
+
+    [Fact]
     public async Task Notifications_and_other_story_diagnostics_progress_while_a_request_waits()
     {
         var control = new AnalysisControl();

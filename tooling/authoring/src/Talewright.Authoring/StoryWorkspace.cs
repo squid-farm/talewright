@@ -2,12 +2,16 @@ using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Parsing;
+using Talewright.Talemark.Vocabulary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Talewright.Authoring;
 
 public sealed record AnalysisUpdate(long Revision, StoryAnalysis Analysis, bool Published);
+
+internal sealed record SceneNavigationSymbol(string File, string Id, string? Title, SourceRange Range,
+    SourceRange SelectionRange);
 
 /// <summary>One cancellable analysis shared by callers interested in the same workspace revision.</summary>
 public sealed class SharedAnalysis
@@ -226,6 +230,46 @@ public sealed class StoryWorkspace
         }
     }
 
+    internal IReadOnlyList<SceneNavigationSymbol> GetSceneSymbols(string? file = null)
+    {
+        var files = new List<(string Path, string Text)>();
+        lock (_gate)
+        {
+            var paths = file is null
+                ? _disk.Keys.Concat(_open.Keys).Distinct(StringComparer.Ordinal).ToArray()
+                : [Normalize(file)];
+            foreach (var path in paths)
+                if (path.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase) &&
+                    TryGetText(path, out var text))
+                    files.Add((path, text));
+        }
+
+        var symbols = new List<SceneNavigationSymbol>();
+        foreach (var (path, text) in files)
+        {
+            var syntax = GetSyntax(path, text, CancellationToken.None);
+            for (var index = 0; index < syntax.Scenes.Count; index++)
+            {
+                var scene = syntax.Scenes[index];
+                var title = scene.Lines
+                    .Where(line => line.MetadataKey == SceneMetadataKey.Title)
+                    .Select(line => syntax.Value(scene, line).ToString())
+                    .LastOrDefault();
+                var start = new SourceLocation(path, scene.Line + 1, scene.HeaderIndent + 1);
+                var end = index + 1 < syntax.Scenes.Count
+                    ? new SourceLocation(path, syntax.Scenes[index + 1].Line + 1,
+                        syntax.Scenes[index + 1].HeaderIndent + 1)
+                    : EndLocation(path, syntax);
+                var selectionStart = new SourceLocation(path, scene.Line + 1, scene.HeaderIdColumn + 1);
+                var selectionEnd = new SourceLocation(path, scene.Line + 1,
+                    scene.HeaderIdColumn + scene.Id.Length + 1);
+                symbols.Add(new(path, scene.Id, title, new(start, end),
+                    new(selectionStart, selectionEnd)));
+            }
+        }
+        return symbols;
+    }
+
     private SharedAnalysis GetSharedAnalysis(TimeSpan debounce)
     {
         lock (_gate)
@@ -305,6 +349,12 @@ public sealed class StoryWorkspace
                 _syntax[path] = syntax;
         }
         return syntax;
+    }
+
+    private static SourceLocation EndLocation(string path, TaleFileSyntax syntax)
+    {
+        var lastLineStart = syntax.Text.AsSpan().LastIndexOfAny("\r\n\u0085\u2028\u2029") + 1;
+        return new SourceLocation(path, syntax.LineCount, syntax.Text.Length - lastLineStart + 1);
     }
 
     private bool TryGetText(string path, [NotNullWhen(true)] out string? text)
