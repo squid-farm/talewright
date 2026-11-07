@@ -785,6 +785,91 @@ public sealed class ConcurrencyTests
         Assert.Equal(2, current.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
     }
 
+    [Fact]
+    public async Task Rename_reports_content_modified_instead_of_stale_edits()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+        await client.Change("start.tale", Reference + "\n", 2);
+        var firstDelay = await control.NextDelay();
+        await client.Request(2, "textDocument/rename", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 1, character = 4 },
+            newName = "hall"
+        });
+        var first = await control.NextAnalysis();
+
+        await client.Change("start.tale", "\n" + Reference, 3);
+        var nextDelay = await control.NextDelay();
+        Assert.Equal(-32801, (await client.Response(2)).GetProperty("error").GetProperty("code").GetInt32());
+
+        firstDelay.Release();
+        first.Release();
+        nextDelay.Release();
+        (await control.NextAnalysis()).Release();
+        await client.Diagnostics("start.tale", 3);
+        await client.Request(3, "textDocument/rename", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 2, character = 4 },
+            newName = "hall"
+        });
+        var edits = (await client.Response(3)).GetProperty("result").GetProperty("changes");
+        var current = Assert.Single(edits.GetProperty(client.UriOf("start.tale")).EnumerateArray());
+        Assert.Equal(2, current.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Single(edits.GetProperty(client.UriOf("next.tale")).EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Superseded_rename_refusal_reports_content_modified()
+    {
+        var control = new AnalysisControl();
+        var requestFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowRequestFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pauseRequestFinished = 0;
+        async Task BeforeRequestFinished()
+        {
+            if (Interlocked.Exchange(ref pauseRequestFinished, 0) != 1) return;
+            requestFinished.TrySetResult();
+            await allowRequestFinished.Task;
+        }
+
+        await using var client = new InProcessClient(control, beforeRequestFinished: BeforeRequestFinished);
+        client.Write("next.tale", Target);
+        await client.Initialize();
+        await PublishInitial(control, client, Reference);
+        await client.Change("start.tale", Reference + "\n", 2);
+        var debounce = await control.NextDelay();
+        Volatile.Write(ref pauseRequestFinished, 1);
+        await client.Request(2, "textDocument/rename", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 1, character = 4 },
+            newName = "start"
+        });
+        var analysis = await control.NextAnalysis();
+        debounce.Release();
+        analysis.Release();
+        await requestFinished.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await client.Change("start.tale", "\n" + Reference, 3);
+        await client.Barrier(3);
+        allowRequestFinished.TrySetResult();
+
+        var response = await client.Response(2);
+        Assert.Equal(-32801, response.GetProperty("error").GetProperty("code").GetInt32());
+
+        var nextDebounce = await control.NextDelay();
+        nextDebounce.Release();
+        var nextAnalysis = await control.NextAnalysis();
+        nextAnalysis.Release();
+        await client.Diagnostics("start.tale", 3);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -902,7 +987,7 @@ public sealed class ConcurrencyTests
 
         public string Root { get; } = Path.Combine(Path.GetTempPath(), $"talewright-lsp-concurrency-{Guid.NewGuid():N}");
 
-        public InProcessClient(AnalysisControl control, bool realAnalyzer = false)
+        public InProcessClient(AnalysisControl control, bool realAnalyzer = false, Func<Task>? beforeRequestFinished = null)
         {
             _control = control;
             Directory.CreateDirectory(Root);
@@ -913,7 +998,8 @@ public sealed class ConcurrencyTests
             _serverOutput = new AnonymousPipeClientStream(PipeDirection.Out, _fromServer.ClientSafePipeHandle);
             _protocol = new Protocol(_fromServer, _toServer);
             _server = new LanguageServer(_serverInput, _serverOutput, _errors,
-                realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null).RunAsync();
+                realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null,
+                beforeRequestFinished).RunAsync();
         }
 
         private string PathOf(string name) => Path.Combine(Root, name);

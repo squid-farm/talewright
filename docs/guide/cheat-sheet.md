@@ -150,6 +150,8 @@ With the Talewright extension installed. Keys can be customized; on macOS, funct
 | Trigger suggestions | `Ctrl+Space` | `Ctrl+Space` |
 | Quick Fix | `Ctrl+.` | `Cmd+.` |
 | Go to definition | `F12` | `F12` |
+| Find all references | `Shift+Alt+F12` | `Shift+Option+F12` |
+| Rename name everywhere | `F2` | `F2` |
 | Scenes in this file | `Ctrl+Shift+O` | `Cmd+Shift+O` |
 | Search scenes in workspace | `Ctrl+T` | `Cmd+T` |
 | Problems panel | `Ctrl+Shift+M` | `Cmd+Shift+M` |

@@ -77,6 +77,7 @@ exports.run = async () => {
   }
   await testYamlSchema();
   await testLiveDiagnostics();
+  await testRename();
   assert.equal((await bundledServerProcesses(extension)).length, 1,
     'The installed extension must run exactly its own bundled server executable');
 };
@@ -485,6 +486,41 @@ async function testLiveDiagnostics() {
     console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion, source-aware Markdown hover and supporting-file navigation.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function testRename() {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-rename-'));
+  try {
+    const manifestFile = path.join(folder, 'story.talewright.yaml');
+    await fs.writeFile(manifestFile, 'game:\n  id: rename\n  title: Rename\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
+    const hallFile = path.join(folder, 'hall.tale');
+    await fs.writeFile(hallFile, '=== hall\n-> start\n');
+    await fs.writeFile(path.join(folder, 'start.tale'), '=== start\n-> hall\n');
+    const start = await vscode.workspace.openTextDocument(path.join(folder, 'start.tale'));
+    await vscode.window.showTextDocument(start);
+    await waitForCompiler(start, items => items.length === 0);
+
+    const edit = await vscode.commands.executeCommand(
+      'vscode.executeDocumentRenameProvider', start.uri, new vscode.Position(0, 5), 'entry');
+    assert.ok(edit, 'Rename must return a workspace edit for a scene');
+    const entries = edit.entries();
+    assert.deepEqual(entries.map(([uri]) => path.basename(uri.fsPath)).sort(),
+      ['hall.tale', 'start.tale', 'story.talewright.yaml']);
+    assert.ok(entries.every(([, edits]) => edits.every(item => item.newText === 'entry')));
+
+    const plain = new vscode.WorkspaceEdit();
+    for (const [uri, edits] of entries) for (const item of edits) plain.replace(uri, item.range, item.newText);
+    assert.equal(await vscode.workspace.applyEdit(plain), true);
+    assert.equal(start.getText(), '=== entry\n-> hall\n');
+    assert.equal((await vscode.workspace.openTextDocument(hallFile)).getText(), '=== hall\n-> entry\n');
+    assert.match((await vscode.workspace.openTextDocument(manifestFile)).getText(), /\n  start: entry\n/);
+    await waitForCompiler(start, items => items.length === 0);
+    console.log('Installed VSIX rename smoke passed: cross-file scene rename including the manifest start reference.');
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.files.saveAll');
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     await fs.rm(folder, { recursive: true, force: true });
   }
 }
