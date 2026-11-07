@@ -325,11 +325,9 @@ Broader typography and presentation remain in
 
 ## Reader-text grammar
 
-**Implemented.** [ADR 0006](../developer/adr/0006-talemark-reader-text.md) records
-the decision. [#400](https://github.com/squid-farm/talewright/issues/400) adds the bounded scanner and
-[#401](https://github.com/squid-farm/talewright/issues/401) replaces Markdig with these rules.
-The [escape and line-break updates](#escapes) remove the remaining unneeded Markdown-inspired behavior.
-CommonMark is not the specification. Anything not listed here is literal text.
+**Implemented.** CommonMark is not the specification. Anything not listed here is literal text.
+The [parser rationale](../developer/architecture.md#reader-text-parser-rationale) explains why
+Talemark owns this grammar.
 
 ### Text units
 
@@ -518,7 +516,7 @@ The language server uses the shared authoring completion provider.
 | Comma-separated multi-argument manipulators | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future manipulator work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold and italic | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new manipulator here. |
-| [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399) and [ADR 0006](../developer/adr/0006-talemark-reader-text.md). Bounded scanner in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal is handled in [#402](https://github.com/squid-farm/talewright/issues/402); remaining delimiter callers are tracked by [#403](https://github.com/squid-farm/talewright/issues/403). |
+| [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399). Bounded scanner implemented in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal and remaining delimiter-caller migration were completed in [#402](https://github.com/squid-farm/talewright/issues/402) and [#403](https://github.com/squid-farm/talewright/issues/403). |
 | Alt text always reader text | Approved in [#399](https://github.com/squid-farm/talewright/issues/399); implemented in [#401](https://github.com/squid-farm/talewright/issues/401). |
 | Choice clauses | Both orders remain accepted; [#384](https://github.com/squid-farm/talewright/issues/384) diagnoses duplicate, incomplete and misplaced clauses. |
 | Line-directive escape | A leading backslash before ASCII punctuation is reader text, not a directive; it uses the same escape rule as prose ([#404](https://github.com/squid-farm/talewright/issues/404)). |
