@@ -30,7 +30,7 @@ public sealed record AccessibleNode(
 }
 
 public sealed class NativePlayerDriver(string artifacts, string? executableOverride = null,
-    bool windowInChildProcess = false, string? xdgDataHome = null) : IPlayerDriver
+    bool windowInChildProcess = false, string? xdgDataHome = null, string? gtkTheme = null) : IPlayerDriver
 {
     private Process? _adapter;
     private Task<string>? _stderr;
@@ -66,6 +66,8 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
                 Directory.CreateDirectory(_dataHome);
                 start.Environment["XDG_DATA_HOME"] = _dataHome;
             }
+            if (gtkTheme is not null)
+                start.Environment["GTK_THEME"] = gtkTheme;
             if (windowInChildProcess)
             {
                 start.ArgumentList.Add("--child-window");
@@ -169,6 +171,14 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task<AccessibleNode> SnapshotAsync() =>
         (await CommandAsync("snapshot")).Deserialize<AccessibleNode>(Json)
         ?? throw new InvalidDataException("Missing accessibility snapshot.");
+
+    public async Task<int[]> ReadImagePixelAsync(string path, int x, int y) =>
+        (await CommandAsync("image-pixel", new { path, x, y })).Deserialize<int[]>(Json)
+        ?? throw new InvalidDataException("Missing image pixel.");
+
+    public async Task<int[]> ReadScreenPixelAsync(int x, int y) =>
+        (await CommandAsync("screen-pixel", new { x, y })).Deserialize<int[]>(Json)
+        ?? throw new InvalidDataException("Missing screen pixel.");
 
     public async Task<PlayerObservation> ObserveAsync()
     {

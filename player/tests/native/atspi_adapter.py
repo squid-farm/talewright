@@ -15,7 +15,8 @@ import traceback
 import gi
 
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk, GLib
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gdk, GdkPixbuf, GLib
 import pyatspi
 
 
@@ -257,6 +258,19 @@ def serve(args):
                     raise RuntimeError("Launch the app first")
                 elif command == "snapshot":
                     result = app.wait(app.snapshot, "read accessibility tree")
+                elif command == "image-pixel":
+                    image = GdkPixbuf.Pixbuf.new_from_file(arguments["path"])
+                    x, y = arguments["x"], arguments["y"]
+                    if not 0 <= x < image.get_width() or not 0 <= y < image.get_height():
+                        raise ValueError("Pixel coordinates are outside the image")
+                    offset = y * image.get_rowstride() + x * image.get_n_channels()
+                    result = list(image.get_pixels()[offset:offset + 3])
+                elif command == "screen-pixel":
+                    window = Gdk.get_default_root_window()
+                    image = Gdk.pixbuf_get_from_window(window, arguments["x"], arguments["y"], 1, 1)
+                    if image is None:
+                        raise RuntimeError("Could not capture native display pixel")
+                    result = list(image.get_pixels()[:3])
                 elif command == "click":
                     app.click(**arguments)
                 elif command == "activate":

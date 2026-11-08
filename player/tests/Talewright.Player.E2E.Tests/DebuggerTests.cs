@@ -707,8 +707,11 @@ public sealed class DebuggerTests
             ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py."),
             $"story-map.{extension}");
 
-    [Fact]
-    public async Task Native_map_exports_full_svg_and_png_with_the_current_run()
+    [Theory]
+    [InlineData("Adwaita", 250, 248, 243, "rgb(34, 34, 34)")]
+    [InlineData("Adwaita:dark", 28, 26, 23, "rgb(232, 226, 214)")]
+    public async Task Native_map_exports_full_svg_and_png_with_the_current_run(
+        string theme, int red, int green, int blue, string foreground)
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
             ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
@@ -738,7 +741,7 @@ public sealed class DebuggerTests
                 @title Unreachable scene
                 -> END
                 """);
-            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await using var driver = new NativePlayerDriver(artifacts, executable, gtkTheme: theme);
             await driver.StartAsync(root);
             await WaitFor(driver, "Scene setup");
             await driver.ClickAsync("Start selected scene");
@@ -746,7 +749,16 @@ public sealed class DebuggerTests
             await driver.ChooseAsync("Continue");
             await WaitFor(driver, "Ending");
             await driver.ActivateAsync("Map");
-            await WaitFor(driver, "Current scene: next");
+            var snapshot = await WaitFor(driver, "Current scene: next");
+            var fit = snapshot.Descendants().Single(node => node.Role == "push button" && node.Name == "Fit map").Bounds;
+            var canvasX = (int)fit.X + 10;
+            var canvasY = (int)(fit.Y + fit.Height) + 30;
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+            {
+                while (!(await driver.ReadScreenPixelAsync(canvasX, canvasY)).SequenceEqual(new[] { red, green, blue }))
+                    await Task.Delay(100, timeout.Token);
+            }
+            Assert.Equal(new[] { red, green, blue }, await driver.ReadScreenPixelAsync(canvasX, canvasY));
 
             await driver.ClickAsync("Export SVG");
             await WaitFor(driver, $"Saved map to {svgPath}");
@@ -760,6 +772,11 @@ public sealed class DebuggerTests
             Assert.Contains("END", labels);
             Assert.Contains(labels, label => label.Contains("CURRENT", StringComparison.Ordinal));
             Assert.Contains(labels, label => label.Contains("#fire", StringComparison.Ordinal));
+            Assert.All(svg.Descendants().Attributes().Where(attribute => attribute.Name is { LocalName: "fill" or "stroke" }),
+                attribute => Assert.DoesNotContain("light-dark(", attribute.Value));
+            Assert.Equal($"rgb({red}, {green}, {blue})", svg.Root!.Elements(svgNamespace + "rect").Single().Attribute("fill")!.Value);
+            Assert.Equal(foreground, svg.Descendants(svgNamespace + "text")
+                .Single(node => node.Value == "Beginning").Attribute("fill")!.Value);
 
             await driver.ClickAsync("Export PNG");
             await WaitFor(driver, $"Saved map to {pngPath}");
@@ -772,6 +789,7 @@ public sealed class DebuggerTests
             Assert.InRange(width, 1, 8192);
             Assert.InRange(height, 1, 8192);
             Assert.True((long)width * height <= 16_777_216);
+            Assert.Equal(new[] { red, green, blue }, await driver.ReadImagePixelAsync(pngPath, 0, 0));
         }
         finally
         {

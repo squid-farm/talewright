@@ -214,6 +214,8 @@ remain YAML or Talemark, not JSON.
 1. Open **Map** and expect every scene, divert and hub offer from the last successful compilation.
    Select a scene and confirm its diverts, hub offers and preview appear. The unreachable area follows
    diverts and hub offers only; it does not evaluate whether their conditions are satisfiable.
+   Check both light and dark system themes: the canvas background must match the debugger theme,
+   with readable scene and divert labels. Repeat these color checks on SVG and PNG exports.
 2. With a synthetic playtest active, choose a divert, then use **Back command** and **Forward command**.
    Expect visited scenes and taken diverts or hub offers to remain highlighted in route order and track
    the command cursor.
