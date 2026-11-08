@@ -343,6 +343,19 @@ class E2EShardTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "no tests"):
             self.run_e2e.shard_filter(["A.B"], (2, 2))
 
+    def test_jobs_split_the_shard_into_disjoint_complete_processes(self):
+        names = [f"Tests.Class{n % 4}.Method{n}" for n in range(12)]
+        with patch.object(self.run_e2e, "list_tests", return_value=names), redirect_stdout(io.StringIO()):
+            shard = self.run_e2e.shard_filter(names, (2, 3)).split("|")
+            parts = self.run_e2e.test_filters("web", None, (2, 3), 3)
+            self.assertEqual(["Host!=Linux"], self.run_e2e.test_filters("web", None, None, 1))
+            self.assertEqual(2, len(self.run_e2e.test_filters("web", None, None, 2)))
+            self.assertEqual(12, len(self.run_e2e.test_filters("web", None, None, 20)))
+        terms = [term for part in parts for term in part.split("|")]
+        self.assertEqual(3, len(parts))
+        self.assertEqual(sorted(shard), sorted(terms))
+        self.assertEqual(len(terms), len(set(terms)))
+
     def test_shard_values_are_validated(self):
         self.assertEqual((2, 3), self.run_e2e.parse_shard("2/3"))
         self.assertEqual((2, 3), nx_ci.parse_shard("2/3"))
