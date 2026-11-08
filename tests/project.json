@@ -12,10 +12,11 @@
         "{workspaceRoot}/player/src/Talewright.Player/BuildIdentity.targets",
         "{workspaceRoot}/player/src/Talewright.Player/Talewright.Player.csproj",
         "{workspaceRoot}/tooling/vscode-talewright/project.json",
-        "{workspaceRoot}/tooling/vscode-talewright/tests/story-schema.test.mjs"
+        "{workspaceRoot}/tooling/vscode-talewright/tests/story-schema.test.mjs",
+        "{workspaceRoot}/tooling/install-dev.py"
       ],
       "options": {
-        "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_release.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
+        "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_release.py' -v && python3 -m unittest discover -s tests -p 'test_install_dev.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
       }
     }
   }
