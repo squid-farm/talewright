@@ -888,7 +888,6 @@
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-                await _module.InvokeVoidAsync("initialize", _transcriptElement);
                 await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1, preserveExistingFocus);
             }
 
@@ -947,7 +946,6 @@
         {
             try
             {
-                await _module.InvokeVoidAsync("dispose", _transcriptElement);
                 await _module.DisposeAsync();
             }
             catch (JSDisconnectedException)
