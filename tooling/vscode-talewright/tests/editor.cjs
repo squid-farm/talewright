@@ -562,21 +562,30 @@ async function testRename() {
     await renameThroughInput(renderer, start, new vscode.Position(0, 5), 'entry');
     await waitUntil(() => !start.isDirty && start.getText().startsWith('=== entry'), 'Direct rename must save');
     assert.equal(start.getText(), '=== entry\n-> hall\n');
-    const hall = await vscode.workspace.openTextDocument(hallFile);
-    const manifest = await vscode.workspace.openTextDocument(manifestFile);
+    let hall = await vscode.workspace.openTextDocument(hallFile);
+    let manifest = await vscode.workspace.openTextDocument(manifestFile);
+    const waitForRenameContents = async name => {
+      await waitUntil(async () => {
+        // Undo/redo can recreate supporting models; don't read a closed document's stale text.
+        hall = await vscode.workspace.openTextDocument(hallFile);
+        manifest = await vscode.workspace.openTextDocument(manifestFile);
+        return start.getText() === `=== ${name}\n-> hall\n` &&
+          hall.getText() === `=== hall\n-> ${name}\n` && manifest.getText().includes(`\n  start: ${name}\n`);
+      }, `Rename must update all affected documents to '${name}' as one workspace edit`);
+    };
     await waitUntil(() => !hall.isDirty && !manifest.isDirty, 'All cross-file rename edits must be saved');
     assert.equal(await fs.readFile(hallFile, 'utf8'), '=== hall\n-> entry\n');
     assert.match(await fs.readFile(manifestFile, 'utf8'), /\n  start: entry\n/);
     assert.equal(await renderer.evaluate(`!!document.querySelector('.bulk-edit-panel .buttons')`), false,
       'Enter must not force a preview');
     await vscode.commands.executeCommand('undo');
-    await waitUntil(() => start.getText().startsWith('=== start'), 'Rename must undo as one workspace edit');
+    await waitForRenameContents('start');
     assert.equal(hall.getText(), '=== hall\n-> start\n');
     assert.match(manifest.getText(), /\n  start: start\n/);
     assert.equal(start.isDirty, true, 'Undo must not be automatically saved');
     assert.equal(await fs.readFile(start.uri.fsPath, 'utf8'), '=== entry\n-> hall\n');
     await vscode.commands.executeCommand('redo');
-    await waitUntil(() => start.getText().startsWith('=== entry'), 'Rename must redo as one workspace edit');
+    await waitForRenameContents('entry');
 
     const unsaved = new vscode.WorkspaceEdit();
     unsaved.insert(start.uri, start.positionAt(start.getText().length), '\n// Earlier unsaved story edit.\n');
