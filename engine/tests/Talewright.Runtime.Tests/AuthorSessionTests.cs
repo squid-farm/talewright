@@ -25,6 +25,7 @@ public sealed class AuthorSessionTests
         {
             Randomness = "checks-only",
             CreationName = creationName ? true : null,
+            BaseRuleset = "rpg",
         };
         manifest.Flag("ready");
         manifest.Flag("fired");

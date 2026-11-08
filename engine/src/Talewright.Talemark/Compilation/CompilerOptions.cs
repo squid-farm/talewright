@@ -4,6 +4,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Rulesets.Generic;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Compilation;
 
@@ -13,7 +14,7 @@ namespace Talewright.Talemark.Compilation;
 /// </summary>
 public sealed class CompilerOptions
 {
-    /// <summary>Options with the built-in modifiers and the <c>generic</c> and <c>none</c> rulesets.</summary>
+    /// <summary>Options with the built-in modifiers and the <c>rpg</c> and <c>none</c> rulesets.</summary>
     public static CompilerOptions Default => new() { CompatibilityId = "talewright-builtins-v1" };
 
     /// <summary>
@@ -28,17 +29,17 @@ public sealed class CompilerOptions
     /// <summary>Modifiers usable as <c>#name</c> in substitutions.</summary>
     public TextModifierRegistry Modifiers { get; init; } = TextModifierRegistry.CreateDefault();
 
-    /// <summary>Rulesets selectable with <c>ruleset.base</c> in story.talewright.yaml.</summary>
+    /// <summary>Rulesets selectable with <c>ruleset</c> or <c>ruleset.base</c> in story.talewright.yaml.</summary>
     public IReadOnlyDictionary<string, Func<Ruleset>> Rulesets { get; init; } = DefaultRulesets();
 
     /// <summary>
-    /// The built-in catalog: <c>generic</c> (the d20-style ruleset) and <c>none</c> (no stats and no check rule,
-    /// but the standard reputation tiers so factions still work).
+    /// The built-in catalog: <c>rpg</c> (the d20-style ruleset a story opts into) and <c>none</c> (the default: no
+    /// stats and no check rule, but the standard reputation tiers so factions still work).
     /// </summary>
     public static IReadOnlyDictionary<string, Func<Ruleset>> DefaultRulesets() => new Dictionary<string, Func<Ruleset>>
     {
         [GenericRuleset.Id] = GenericRuleset.Create,
-        ["none"] = () => new RulesetBuilder("none").WithTiers(GenericRuleset.Create().Tiers.ToArray()).Build(),
+        [ManifestVocabulary.RulesetNone] = () => new RulesetBuilder(ManifestVocabulary.RulesetNone).WithTiers(GenericRuleset.Create().Tiers.ToArray()).Build(),
     };
 }
 

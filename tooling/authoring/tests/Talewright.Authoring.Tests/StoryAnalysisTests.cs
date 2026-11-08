@@ -26,7 +26,8 @@ public class StoryAnalysisTests
     [Fact]
     public void Conditional_choices_without_an_unconditional_exit_are_not_reported_while_editing()
     {
-        var source = Source("=== first\n* [Maybe] (requires player:hp > 0) -> END");
+        var source = Source("=== first\n* [Maybe] (requires player:hp > 0) -> END",
+            Manifest.Replace("  start: first", "  start: first\n  ruleset: rpg"));
         var compiled = StoryCompiler.Compile(source);
         var analysis = StoryAnalyzer.Analyze(source);
 
@@ -293,7 +294,7 @@ public class StoryAnalysisTests
     public void Valid_analysis_matches_compilation_and_preserves_source_ranges()
     {
         var source = Source("  === first\r\n{player:first-name}\r\n~ set flag:ready; var:count += 1\r\n-> END",
-            Manifest + "\nitems: {coin: Silver coin}\nfactions: {guild: {}}\nvars: {attempts: 0}");
+            Manifest.Replace("  start: first", "  start: first\n  ruleset: rpg") + "\nitems: {coin: Silver coin}\nfactions: {guild: {}}\nvars: {attempts: 0}");
         var result = StoryAnalyzer.Analyze(source);
         Assert.Equal(StoryCompiler.Compile(source).Diagnostics, result.Diagnostics);
         Assert.Same(source, result.Source);
@@ -301,8 +302,8 @@ public class StoryAnalysisTests
         Assert.Equal(new SourceLocation("main.tale", 1, 7), scene.Declaration!.Start);
         Assert.Equal(new SourceLocation("main.tale", 1, 12), scene.Declaration.End);
         var player = Assert.Single(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Character);
-        Assert.Equal(new SourceLocation("story.talewright.yaml", 6, 3), player.Declaration!.Start);
-        Assert.Equal(new SourceLocation("story.talewright.yaml", 6, 9), player.Declaration.End);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 7, 3), player.Declaration!.Start);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 7, 9), player.Declaration.End);
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Item && symbol.Name == "coin");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Faction && symbol.Name == "guild");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == "str");

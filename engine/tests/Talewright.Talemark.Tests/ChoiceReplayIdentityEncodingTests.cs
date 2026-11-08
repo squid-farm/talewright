@@ -126,7 +126,7 @@ public sealed class ChoiceReplayIdentityEncodingTests
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                game: { id: replay, title: Replay, start: start }
+                game: { id: replay, title: Replay, start: start, ruleset: rpg }
                 characters:
                   player: { first-name: Ada }
                 vars: { gold: 10 }

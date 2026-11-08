@@ -143,6 +143,7 @@ button { font: inherit; color: inherit; }
 .tw-history-media { display: inline-block; max-width: 100%; vertical-align: middle; }
 .tw-history-image { display: block; height: 18rem; max-width: 100%; overflow: auto; overflow-anchor: none; }
 @media (max-width: 52rem) { .tw-columns { grid-template-columns: minmax(0, 1fr); } }
+.tw-columns--full { grid-template-columns: minmax(0, 1fr); }
 
 /* Transcript */
 .tw-frame { outline: none; }

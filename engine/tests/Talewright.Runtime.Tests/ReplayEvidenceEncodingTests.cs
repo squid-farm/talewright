@@ -81,7 +81,7 @@ public sealed class ReplayEvidenceEncodingTests
         var input = ReplayEvidence.InitialStateInput(story, state);
 
         Assert.Equal("""
-            ["initial-state-v1","ChecksOnly","generic",[["acrobatics",0,10,0,"dex"],["animal-handling",0,10,0,"wis"],
+            ["initial-state-v1","ChecksOnly","rpg",[["acrobatics",0,10,0,"dex"],["animal-handling",0,10,0,"wis"],
             ["arcana",0,10,0,"int"],["athletics",0,10,0,"str"],["cha",1,30,10,null],["con",1,30,10,null],["deception",
             0,10,0,"cha"],["dex",1,30,10,null],["history",0,10,0,"int"],["hp",0,999,10,null],["insight",0,10,0,"wis"],
             ["int",1,30,10,null],["intimidation",0,10,0,"cha"],["investigation",0,10,0,"int"],["level",1,20,1,null],
@@ -119,7 +119,7 @@ public sealed class ReplayEvidenceEncodingTests
         Assert.Equal(1, history.Cursor);
         Assert.Contains(history.Events, gameEvent => gameEvent is SkillCheckResolved);
         Assert.Contains(history.Events, gameEvent => gameEvent is TriggerFired);
-        Assert.Equal("032B1AB118195B8FF3ABDCFC7121AD38656DD509255BBA08147AF5FD584154C59D",
+        Assert.Equal("03E91828F36103C192CC169BF37921844B97C98CD66FA9A64FD5005C57FA71A4A9",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -128,7 +128,7 @@ public sealed class ReplayEvidenceEncodingTests
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                game: { id: evidence, title: Evidence, start: start, seed: 42 }
+                game: { id: evidence, title: Evidence, start: start, seed: 42, ruleset: rpg }
                 characters:
                   player:
                     first-name: Mara

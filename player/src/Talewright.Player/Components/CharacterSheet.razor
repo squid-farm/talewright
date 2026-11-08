@@ -2,7 +2,10 @@
    grouped by category. Nothing here knows about "strength" or "hit points". *@
 
 <aside class="tw-sheet" aria-label="Character sheet">
-    <h2>@Character.FullName</h2>
+    @if (Ruleset.Stats.Count > 0 || CharacterId == EntityId.Player && State.World.Factions.Count > 0)
+    {
+        <h2>@Character.FullName</h2>
+    }
 
     @foreach (var group in Ruleset.Stats.GroupBy(s => s.Category))
     {
@@ -30,20 +33,23 @@
         </dl>
     }
 
-    @{ var inventory = State.GetInventory(CharacterId).Where(i => i.Value > 0).ToList(); }
-    <h3>Inventory</h3>
-    @if (inventory.Count == 0)
+    @if (State.World.Items.Count > 0)
     {
-        <p class="tw-empty">Nothing.</p>
-    }
-    else
-    {
-        <ul class="tw-inventory">
-            @foreach (var (item, count) in inventory)
-            {
-                <li>@ItemName(item)@(count > 1 ? $" ×{count}" : string.Empty)</li>
-            }
-        </ul>
+        var inventory = State.GetInventory(CharacterId).Where(i => i.Value > 0).ToList();
+        <h3>Inventory</h3>
+        @if (inventory.Count == 0)
+        {
+            <p class="tw-empty">Nothing.</p>
+        }
+        else
+        {
+            <ul class="tw-inventory">
+                @foreach (var (item, count) in inventory)
+                {
+                    <li>@ItemName(item)@(count > 1 ? $" ×{count}" : string.Empty)</li>
+                }
+            </ul>
+        }
     }
 
     @if (CharacterId == EntityId.Player && State.World.Factions.Count > 0)

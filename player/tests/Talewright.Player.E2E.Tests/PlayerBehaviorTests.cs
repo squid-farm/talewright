@@ -180,6 +180,44 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Story_without_sheet_uses_full_transcript_layout_at_wide_and_narrow_widths()
+    {
+        await Upload(TestStories.NoStats);
+        await AssertState(state =>
+        {
+            Assert.Empty(state.Sheet);
+            Assert.True(state.TranscriptFullWidth);
+        });
+
+        await Driver.ResizeAsync(520, 900);
+        await AssertState(state =>
+        {
+            Assert.Empty(state.Sheet);
+            Assert.True(state.TranscriptFullWidth);
+        });
+    }
+
+    [Fact]
+    [Trait("Host", "Linux")]
+    public async Task Story_without_sheet_keeps_transcript_visible_at_wide_and_narrow_desktop_widths()
+    {
+        await Upload(TestStories.NoStats);
+        await AssertState(state =>
+        {
+            Assert.Empty(state.Sheet);
+            Assert.True(state.PassageVisible);
+        });
+
+        await Driver.ResizeAsync(520, 900);
+        await AssertState(state =>
+        {
+            Assert.Empty(state.Sheet);
+            Assert.True(state.PassageVisible);
+        });
+    }
+
+    [Fact]
     public async Task Bundled_sample_progresses_from_camp_to_night_watch_and_preserves_save_navigation()
     {
         await Driver.OpenBundledAsync();

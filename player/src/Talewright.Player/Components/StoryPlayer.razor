@@ -1,4 +1,4 @@
-@* Plays one compiled story with bounded transcript presentation and a character sheet. *@
+@* Plays one compiled story with bounded transcript presentation and an optional character sheet. *@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @using Talewright.Player.Diagnostics
@@ -78,7 +78,7 @@
     {
         <TranscriptHistory @key="_session" Frames="_historyFrames" OnClose="CloseHistory" />
     }
-    <div class="tw-columns" hidden="@_showHistory">
+    <div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@_showHistory">
         <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="_transcriptElement">
             @{ var transcript = _transcript; }
             @for (var i = Math.Max(0, transcript.Count - TranscriptPresentation.PassageWindow); i < transcript.Count; i++)
@@ -98,7 +98,10 @@
             }
         </main>
 
-        <CharacterSheet State="_session.State" />
+        @if (HasCharacterSheet)
+        {
+            <CharacterSheet State="_session.State" />
+        }
     </div>
     }
 </div>
@@ -190,6 +193,11 @@
     private int _autosaveSequence;
     private Task _autosaveTail = Task.CompletedTask;
     private int _autosaveCheckStartedGeneration = -1;
+
+    private bool HasCharacterSheet =>
+        Story.World.Ruleset.Stats.Count > 0 ||
+        Story.World.Items.Count > 0 ||
+        Story.World.Factions.Count > 0;
 
     protected override void OnParametersSet()
     {
@@ -880,7 +888,6 @@
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-                await _module.InvokeVoidAsync("initialize", _transcriptElement);
                 await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1, preserveExistingFocus);
             }
 
@@ -939,7 +946,6 @@
         {
             try
             {
-                await _module.InvokeVoidAsync("dispose", _transcriptElement);
                 await _module.DisposeAsync();
             }
             catch (JSDisconnectedException)

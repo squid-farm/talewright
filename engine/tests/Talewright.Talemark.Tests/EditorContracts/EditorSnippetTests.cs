@@ -49,6 +49,7 @@ public class EditorSnippetTests
                   id: editor-snippets
                   title: Editor snippets
                   start: {(isScene ? "scene.id" : "snippet.start")}
+                  ruleset: rpg
                 characters:
                   player:
                     first-name: Mara

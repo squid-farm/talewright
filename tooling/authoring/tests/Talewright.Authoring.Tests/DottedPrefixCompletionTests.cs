@@ -28,7 +28,7 @@ public sealed class DottedPrefixCompletionTests
               title: Dotted completion
               start: start
               ruleset:
-                base: generic
+                base: rpg
                 stats: [{ id: weapon.knowledge, default: 1 }]
             characters:
               player: { first-name: Ada }

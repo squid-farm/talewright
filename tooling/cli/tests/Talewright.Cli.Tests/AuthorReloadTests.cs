@@ -13,7 +13,7 @@ public sealed class AuthorReloadTests : IDisposable
 
     private static string BuildManifest(bool includeReady = true, bool includeCount = true, bool includeChainFlag = false)
     {
-        var manifest = new ManifestFaker("watched", "Watched", "start");
+        var manifest = new ManifestFaker("watched", "Watched", "start") { BaseRuleset = "rpg" };
         if (includeReady)
         {
             manifest.Flag("ready");

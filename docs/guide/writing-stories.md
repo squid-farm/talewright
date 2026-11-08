@@ -99,7 +99,17 @@ there is no general name/item grammar inference.
 
 ## Stats and skills
 
-By default, stories use a familiar d20-style ruleset:
+### Turning on RPG rules
+
+A story has no stats, skill checks or levelling until you turn them on. Add `ruleset: rpg` to the
+`game` section to use a familiar d20-style ruleset:
+
+```yaml
+game:
+  ruleset: rpg
+```
+
+It gives every character these stats:
 
 | Kind | Stats |
 |---|---|
@@ -108,8 +118,8 @@ By default, stories use a familiar d20-style ruleset:
 | Resources | `hp` (default 10) |
 | Progression | `xp`, `level` (1–20) |
 
-You can add your own stats (`courage`, `sanity`, ...), remove ones you don't want, or start from an
-empty ruleset. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
+You can add your own stats (`courage`, `sanity`, ...) or remove ones you don't want. A `ruleset`
+section without `base: rpg` declares only your own stats, with no RPG rules. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
 For a complete declaration and check, see [add a skill for your setting](authoring-recipes.md#add-a-skill-for-your-setting).
 Lost Relic adds Courage (a bounded custom stat) and Lucidity (a bounded skill).
 Scholar starts with Lucidity 3 and Will 14; solving the journal adds 2 Lucidity.
@@ -130,6 +140,7 @@ To show a different name to players, keep the ID and redeclare the stat in `rule
 ```yaml
 game:
   ruleset:
+    base: rpg
     stats:
       - { id: hp, name: Vigor, category: resource, min: 0, max: 999, default: 10 }
 ```
@@ -142,6 +153,7 @@ your story files and character `stats:` by hand:
 ```yaml
 game:
   ruleset:
+    base: rpg
     disable: [hp]
     stats:
       - { id: vigor, name: Vigor, category: resource, min: 0, max: 999, default: 10 }
@@ -234,8 +246,8 @@ Standing is a number. Its tier name is what players see and what you'll usually 
 | `friendly` | 10 to 49 |
 | `allied` | 50 or higher |
 
-Standing has no upper or lower limit; these tiers just label the ranges. They come from the built-in
-ruleset and can't be changed in `story.talewright.yaml` yet. The built-in tiers are ready to use as
+Standing has no upper or lower limit; these tiers just label the ranges. Every story has them,
+with or without RPG rules, and they can't be changed in `story.talewright.yaml` yet. The built-in tiers are ready to use as
 they are; you do not need to change them to write or publish a story.
 
 > **For developers:** Changing the tiers requires a

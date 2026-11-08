@@ -24,6 +24,7 @@ public sealed partial class ServerTests
     public async Task Hover_categories_share_the_stdio_contract(string marked, string expected, string token)
     {
         await using var client = new Client();
+        DeclareRpg(client);
         var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["IsHero"], Modifiers = ["custom"], BuiltInModifiers = [] };
         File.WriteAllText(client.PathOf("project.authoring.json"), metadata.ToJson());
         File.AppendAllText(client.PathOf(StorySource.ManifestFileName),
@@ -174,6 +175,7 @@ public sealed partial class ServerTests
     public async Task Hover_uses_utf16_in_an_incomplete_crlf_substitution()
     {
         await using var client = new Client();
+        DeclareRpg(client);
         await client.Initialize();
         const string marked = "=== start\r\nA 🦑 {player:h|p";
         await client.Open("start.tale", marked.Replace("|", ""), 1);

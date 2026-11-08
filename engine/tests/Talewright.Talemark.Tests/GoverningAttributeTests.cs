@@ -17,7 +17,7 @@ public sealed class GoverningAttributeTests
                   title: Governing attribute
                   start: start
                   ruleset:
-                    base: generic
+                    base: rpg
                     disable: {{disable}}
                     stats:
                 {{stats}}

@@ -14,7 +14,7 @@ public sealed class TalemarkFakerTests
     [Fact]
     public void Composed_syntax_and_manifest_produce_a_story_the_compiler_and_analyzer_accept()
     {
-        var manifest = new ManifestFaker("faker-test", "Faker test", "start", 42);
+        var manifest = new ManifestFaker("faker-test", "Faker test", "start", 42) { BaseRuleset = "rpg" };
         var count = manifest.Number("count", 1);
         var ready = manifest.Flag("ready");
         var player = manifest.Character("player", "Tester");
@@ -49,7 +49,7 @@ public sealed class TalemarkFakerTests
         var manifest = new ManifestFaker("faker-test", "A: title # with \"quotes\"", "start", 42)
         {
             Version = "1.0.0",
-            BaseRuleset = "generic",
+            BaseRuleset = "rpg",
         };
         var count = manifest.Number("count", 3);
         manifest.Text("label", "12");
@@ -130,6 +130,7 @@ public sealed class TalemarkFakerTests
             Undo = false,
             Autosave = false,
             CreationName = true,
+            BaseRuleset = "rpg",
         };
         var ready = new TaleFlagRef("ready");
         manifest.Character("player", "Tester", pronouns: "they");

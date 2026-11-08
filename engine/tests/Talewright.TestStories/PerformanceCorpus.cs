@@ -190,7 +190,7 @@ public sealed class PerformanceCorpus : IDisposable
         var manifest = new ManifestFaker($"performance-{tierName.ToLowerInvariant()}", $"{tierName} performance corpus", "scene.0", SeedValue)
         {
             Version = "1.0.0",
-            BaseRuleset = "generic",
+            BaseRuleset = "rpg",
         };
         manifest.Number(Visits.Id, 0);
         manifest.Character(TaleCharacterRef.Player.Id, "Tester");

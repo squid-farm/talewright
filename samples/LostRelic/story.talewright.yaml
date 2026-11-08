@@ -11,7 +11,7 @@ game:
   # seed: 1234            # uncomment for the same rolls every playthrough
   undo: true
   ruleset:
-    base: generic # d20-style attributes, skills, hp, xp and levels
+    base: rpg # d20-style attributes, skills, hp, xp and levels
     disable: [performance] # no stage performances on this expedition
     stats:
       - id: courage

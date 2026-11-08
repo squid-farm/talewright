@@ -12,7 +12,7 @@ See [architecture §3.1](../../../docs/developer/architecture.md#31-talewrightco
   instead store a seed and choice history, then rebuild the event log by replaying the story; `Truncate`
   rewinds an in-memory log.
 - **Ruleset-defined.** There are no built-in stats. A `Ruleset` declares stats, reputation tiers and pluggable
-  rules (skill checks, leveling, modifiers). The default d20 set lives in `Talewright.Rulesets.Generic`.
+  rules (skill checks, leveling, modifiers). The opt-in d20 set (`ruleset: rpg`) lives in `Talewright.Rulesets.Generic`.
 - **Strongly typed ids.** `StatId`, `ItemId`, `FactionId` … are distinct types, so they can't be mixed up.
 
 ## Files
