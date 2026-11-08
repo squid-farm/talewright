@@ -297,6 +297,64 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Mechanical_notes_checkbox_scales_and_remains_usable_in_a_narrow_window()
+    {
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Page.SetViewportSizeAsync(320, 720);
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var checkbox = Page.GetByLabel("Hide mechanical notes", new() { Exact = true });
+        var label = Page.Locator(".tw-settings-toggle");
+        var textSize = Page.GetByLabel("Text size", new() { Exact = true });
+        var initial = await checkbox.BoundingBoxAsync();
+        Assert.NotNull(initial);
+        Assert.InRange(initial.Width, 26.9, 27.1);
+        Assert.InRange(initial.Height, 26.9, 27.1);
+        Assert.True(await label.EvaluateAsync<bool>("element => element.getBoundingClientRect().height >= 44"));
+
+        await textSize.SelectOptionAsync("200");
+        var enlarged = await checkbox.BoundingBoxAsync();
+        Assert.NotNull(enlarged);
+        Assert.InRange(enlarged.Width, initial.Width * 2 - 0.1, initial.Width * 2 + 0.1);
+        Assert.InRange(enlarged.Height, initial.Height * 2 - 0.1, initial.Height * 2 + 0.1);
+        Assert.True(await label.EvaluateAsync<bool>("""
+            element => {
+                const dialog = element.closest('dialog');
+                const label = element.getBoundingClientRect();
+                const checkbox = element.querySelector('input').getBoundingClientRect();
+                const bounds = dialog.getBoundingClientRect();
+                return element.scrollWidth <= element.clientWidth + 1
+                    && label.left >= bounds.left && label.right <= bounds.right
+                    && checkbox.left >= label.left && checkbox.right <= label.right;
+            }
+            """), "The checkbox and label should fit in the settings dialog at 200%.");
+
+        var labelBounds = await label.BoundingBoxAsync();
+        Assert.NotNull(labelBounds);
+        await label.ClickAsync(new() { Position = new() { X = labelBounds.Width - 2, Y = labelBounds.Height / 2 } });
+        await Expect(checkbox).ToBeCheckedAsync();
+        await checkbox.FocusAsync();
+        await Page.Keyboard.PressAsync("Space");
+        await Expect(checkbox).Not.ToBeCheckedAsync();
+        await Page.Keyboard.PressAsync("Space");
+        await Expect(checkbox).ToBeCheckedAsync();
+        await Expect(checkbox).ToBeFocusedAsync();
+
+        await Page.Keyboard.PressAsync("Escape");
+        await ReloadAsync();
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        await Expect(checkbox).ToBeCheckedAsync();
+        Assert.Equal("36px", await Page.Locator("html").EvaluateAsync<string>(
+            "element => getComputedStyle(element).fontSize"));
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Maximum_text_size_persists_and_reflows_player_content_in_a_narrow_window()
     {
         await Upload(TestStories.Linear);
