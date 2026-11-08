@@ -19,7 +19,7 @@ public sealed class TextlessChoiceTests
         ChoiceFaker.Create("road"),
         SceneFaker.Header("road"),
         "The road.",
-        ChoiceFaker.Create("start", requires: ExpressionFaker.Not(Ready),
+        ChoiceFaker.Create("start", "Continue", requires: ExpressionFaker.Not(Ready),
             effect: string.Join("; ", EffectFaker.Set(Ready), EffectFaker.Increase(Visits, 1))),
         ChoiceFaker.Create("final", "Stop"),
         SceneFaker.Header("final"),
@@ -58,7 +58,7 @@ public sealed class TextlessChoiceTests
     }
 
     [Fact]
-    public void Textless_choices_follow_requirements_order_and_effects_before_reaching_end()
+    public void Labelled_continue_choices_follow_requirements_order_and_effects_before_reaching_end()
     {
         var session = new StorySession(Compile());
         var first = session.Start();

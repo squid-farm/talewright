@@ -29,7 +29,9 @@ public sealed class ChoiceAvailabilityTests
             * [Less] (requires var:gold <= 5) -> END
             """ },
         { "conditional textless choice", """
-            * (requires flag:ready) -> END
+            {if flag:ready}
+            * -> END
+            {/if}
             """ },
         { "if without else", """
             {if flag:ready}

@@ -1,5 +1,6 @@
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Tests;
@@ -19,13 +20,9 @@ public sealed class TextlessChoiceTests
     }));
 
     [Theory]
-    [InlineData("* -> road", "road", false, false)]
-    [InlineData("* -> END", "END", false, false)]
-    [InlineData("* (requires flag:ready) -> road", "road", true, false)]
-    [InlineData("* { set flag:left } -> END", "END", false, true)]
-    [InlineData("* (requires flag:ready) { set flag:left } -> road", "road", true, true)]
-    public void Textless_choices_parse_destinations_requirements_and_effects(
-        string line, string target, bool hasRequirement, bool hasEffect)
+    [InlineData("* -> road", "road")]
+    [InlineData("* -> END", "END")]
+    public void Textless_choices_parse_only_destinations(string line, string target)
     {
         var result = Compile($"=== start\n{line}\n=== road\n-> END");
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
@@ -33,8 +30,8 @@ public sealed class TextlessChoiceTests
         Assert.Equal("c0", choice.Key);
         Assert.Null(choice.Label);
         Assert.Equal(target, choice.Divert!.ToString());
-        Assert.Equal(hasRequirement, choice.Requires is not null);
-        Assert.Equal(hasEffect, choice.Effects.Count != 0);
+        Assert.Null(choice.Requires);
+        Assert.Empty(choice.Effects);
     }
 
     [Fact]
@@ -43,8 +40,8 @@ public sealed class TextlessChoiceTests
         var result = Compile("""
             === start
             * [First] -> road
-            * (requires flag:ready) { set flag:left; var:count += 1 } -> road
-            * [] -> END
+            * [Continue] (requires flag:ready) { set flag:left; var:count += 1 } -> road
+            * [] (requires flag:ready) { set flag:left } -> END
             * -> END
             === road
             -> END
@@ -53,20 +50,54 @@ public sealed class TextlessChoiceTests
         var scene = result.Story!.Scenes[0];
         Assert.Equal(["c0", "c1", "c2", "c3"], scene.Choices.Select(choice => choice.Key));
         Assert.NotNull(scene.Choices[0].Label);
-        Assert.Null(scene.Choices[1].Label);
+        Assert.NotNull(scene.Choices[1].Label);
         Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<TemplateInline>>(scene.Choices[2].Label));
         Assert.Null(scene.Choices[3].Label);
         Assert.Equal(2, scene.Choices[1].Effects.Count);
+        Assert.NotNull(scene.Choices[2].Requires);
+        Assert.Single(scene.Choices[2].Effects);
         Assert.Equal(["road", "road", "END", "END"], SceneSteps.Targets(scene.Steps).Select(target => target.ToString()));
         Assert.Equal(["step:2:1", "step:3:1", "step:4:1", "step:5:1"], scene.Steps.Select(step => step.Id));
     }
 
     [Theory]
+    [InlineData("* (requires flag:ready) -> road", "(requires flag:ready)", "Wrap it in a `{if ...}` block")]
+    [InlineData("* { set flag:left } -> road", "{ set flag:left }", "Add a label")]
+    public void Textless_choice_clauses_report_replacements_at_exact_source_ranges(
+        string line, string clause, string replacement)
+    {
+        var result = Compile($"=== start\n{line}\n=== road\n-> END");
+        var diagnostic = Assert.Single(result.Errors, item => item.Code == "TW1011");
+        var start = line.IndexOf(clause, StringComparison.Ordinal) + 1;
+
+        Assert.Equal(new SourceLocation("main.tale", 2, start), diagnostic.Location);
+        Assert.Equal(new SourceLocation("main.tale", 2, start + clause.Length), diagnostic.EndLocation);
+        Assert.Contains(replacement, diagnostic.Message);
+        Assert.Contains("* [Continue]", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Textless_choices_reject_requirements_and_effects_independently()
+    {
+        const string line = "* (requires flag:ready) { set flag:left } -> road";
+        var diagnostics = Compile($"=== start\n{line}\n=== road\n-> END").Errors
+            .Where(item => item.Code == "TW1011")
+            .ToArray();
+        const string requires = "(requires flag:ready)";
+        const string effects = "{ set flag:left }";
+
+        Assert.Equal(2, diagnostics.Length);
+        var requiresStart = line.IndexOf(requires, StringComparison.Ordinal) + 1;
+        var effectsStart = line.IndexOf(effects, StringComparison.Ordinal) + 1;
+        Assert.Equal(new SourceLocation("main.tale", 2, requiresStart), diagnostics[0].Location);
+        Assert.Equal(new SourceLocation("main.tale", 2, requiresStart + requires.Length), diagnostics[0].EndLocation);
+        Assert.Equal(new SourceLocation("main.tale", 2, effectsStart), diagnostics[1].Location);
+        Assert.Equal(new SourceLocation("main.tale", 2, effectsStart + effects.Length), diagnostics[1].EndLocation);
+    }
+
+    [Theory]
     [InlineData("*")]
     [InlineData("*   ")]
-    [InlineData("* { set flag:left }")]
-    [InlineData("* (requires flag:ready)")]
-    [InlineData("* (requires flag:ready) { set flag:left }")]
     public void Textless_choices_without_a_divert_report_tw1011(string line)
     {
         var result = Compile($"=== start\n{line}");
