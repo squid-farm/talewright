@@ -14,7 +14,7 @@ game:
   title: My Story
   version: 0.1.0
   start: camp
-  ruleset: rpg # stats, skill checks and levelling
+  ruleset: rpg # built-in stats and levelling
 characters:
   player: { first-name: Alex }
   guide: { first-name: Sam }

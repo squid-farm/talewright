@@ -34,12 +34,16 @@ public sealed class CompilerOptions
 
     /// <summary>
     /// The built-in catalog: <c>rpg</c> (the d20-style ruleset a story opts into) and <c>none</c> (the default: no
-    /// stats and no check rule, but the standard reputation tiers so factions still work).
+    /// stats and no levelling rule, but the standard reputation tiers so factions still work and the d20 check rule
+    /// so <c>skill-check</c> works on any stat the story declares).
     /// </summary>
     public static IReadOnlyDictionary<string, Func<Ruleset>> DefaultRulesets() => new Dictionary<string, Func<Ruleset>>
     {
         [GenericRuleset.Id] = GenericRuleset.Create,
-        [ManifestVocabulary.RulesetNone] = () => new RulesetBuilder(ManifestVocabulary.RulesetNone).WithTiers(GenericRuleset.Create().Tiers.ToArray()).Build(),
+        [ManifestVocabulary.RulesetNone] = () => new RulesetBuilder(ManifestVocabulary.RulesetNone)
+            .WithTiers(GenericRuleset.Create().Tiers.ToArray())
+            .WithSkillCheckRule(new D20SkillCheckRule())
+            .Build(),
     };
 }
 

@@ -6,6 +6,7 @@ using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
+using Talewright.Rulesets.Generic;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
@@ -636,8 +637,9 @@ public class CompilerTests
         Assert.Equal("none", story.World.Ruleset.Id);
         Assert.False(story.World.Ruleset.HasStat(new StatId("str")));
 
-        // No check rule in "none", and unknown RPG stats are rejected.
-        Error("=== a\n* [x] skill-check charm dc 5\n  success: -> END\n  failure: -> END", "TW3005", DatingSim);
+        // "none" checks any declared stat with the d20 rule, and unknown RPG stats are rejected.
+        var checkedStory = Ok("=== a\n* [x] skill-check charm dc 5\n  success: -> END\n  failure: -> END", DatingSim);
+        Assert.IsType<D20SkillCheckRule>(checkedStory.World.Ruleset.SkillCheckRule);
         Error("=== a\n{player:str}\n-> END", "TW2001", DatingSim);
 
         const string NoCharisma = """
@@ -668,12 +670,12 @@ public class CompilerTests
         var plain = Ok("=== a\n{if faction:guild:tier == friendly}Welcome.{/if}\n-> END", NoRuleset);
         Assert.Equal("none", plain.World.Ruleset.Id);
         Assert.Empty(plain.World.Ruleset.Stats);
-        Assert.Null(plain.World.Ruleset.SkillCheckRule);
+        Assert.IsType<D20SkillCheckRule>(plain.World.Ruleset.SkillCheckRule);
         Assert.Null(plain.World.Ruleset.LevelingRule);
         Assert.Equal(["hostile", "unfriendly", "neutral", "friendly", "allied"],
             plain.World.Ruleset.Tiers.Select(tier => tier.Id));
         Error("=== a\n{player:hp}\n-> END", "TW2001", NoRuleset);
-        Error("=== a\n* [x] skill-check athletics dc 5\n  success: -> END\n  failure: -> END", "TW3005", NoRuleset);
+        Error("=== a\n* [x] skill-check athletics dc 5\n  success: -> END\n  failure: -> END", "TW2001", NoRuleset);
 
         foreach (var ruleset in new[] { "ruleset: rpg", "ruleset: { base: rpg }" })
         {
@@ -693,8 +695,76 @@ public class CompilerTests
         var custom = Ok("=== a\n{player:charm}\n-> END", declared);
         Assert.Equal("none", custom.World.Ruleset.Id);
         Assert.Equal([new StatId("charm")], custom.World.Ruleset.Stats.Select(stat => stat.Id));
-        Assert.Null(custom.World.Ruleset.SkillCheckRule);
+        Assert.IsType<D20SkillCheckRule>(custom.World.Ruleset.SkillCheckRule);
         Error("=== a\n{player:hp}\n-> END", "TW2001", declared);
+    }
+
+    [Fact]
+    public void Skill_checks_work_on_declared_stats_without_a_ruleset()
+    {
+        const string Bridge = """
+            game:
+              id: bridge
+              title: Bridge
+              start: a
+              ruleset:
+                stats:
+                  - { id: nerve, name: Nerve }
+            characters:
+              player: { first-name: Ada, stats: { nerve: 3 } }
+            """;
+        var story = Ok("=== a\n* [Cross] skill-check nerve dc 12\n  success: -> END\n  failure: -> END", Bridge);
+        var ruleset = story.World.Ruleset;
+        Assert.Equal("none", ruleset.Id);
+        Assert.IsType<D20SkillCheckRule>(ruleset.SkillCheckRule);
+        Assert.Null(ruleset.LevelingRule);
+        Assert.Equal([new StatId("nerve")], ruleset.Stats.Select(stat => stat.Id));
+        Assert.Equal(StatCategory.Custom, ruleset.StatsById[new StatId("nerve")].Category);
+
+        Error("=== a\n* [Cross] skill-check grit dc 12\n  success: -> END\n  failure: -> END", "TW2001", Bridge);
+        Assert.Empty(CompilerOptions.DefaultRulesets()["none"]().Stats);
+    }
+
+    [Fact]
+    public void Documented_own_stat_recipe_compiles_and_demonstrates_its_check_maths()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var recipe = File.ReadAllText(Path.Combine(root.FullName, "docs", "guide", "authoring-recipes.md"))
+            .Split("## Your own stats with skill checks", StringSplitOptions.None)[1]
+            .Split("\n## ", StringSplitOptions.None)[0];
+        var blocks = System.Text.RegularExpressions.Regex.Matches(recipe, @"```(yaml|tale)\r?\n([\s\S]*?)\r?\n```");
+        var yaml = Assert.Single(blocks, block => block.Groups[1].Value == "yaml").Groups[2].Value;
+        var tale = Assert.Single(blocks, block => block.Groups[1].Value == "tale").Groups[2].Value;
+
+        StoryDefinition Compile(string manifest)
+        {
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                [StorySource.ManifestFileName] = manifest,
+                ["main.tale"] = tale,
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            Assert.Empty(result.Diagnostics);
+            return result.Story!;
+        }
+
+        SkillCheckResult Check(StoryDefinition story, int? roll) => story.World.Ruleset.SkillCheckRule!.Resolve(
+            GameState.CreateInitial(story.World, 42), new(EntityId.Player, new StatId("nerve"), 12, roll));
+
+        var story = Compile(yaml);
+        Assert.Equal("none", story.World.Ruleset.Id);
+        Assert.Equal(StatCategory.Custom, story.World.Ruleset.StatsById[new StatId("nerve")].Category);
+        Assert.Equal(13, Check(story, null).Total);
+        Assert.True(Check(story, 9).Success);
+        Assert.False(Check(story, 8).Success);
+
+        // The documented gotcha: a 0-10 attribute of 5 rolls at -3.
+        var attribute = Compile(yaml
+            .Replace("{ id: nerve, name: Nerve }", "{ id: nerve, name: Nerve, category: attribute, min: 0, max: 10 }")
+            .Replace("nerve: 3", "nerve: 5"));
+        Assert.Equal(-3, Check(attribute, null).Modifier);
     }
 
     [Theory]

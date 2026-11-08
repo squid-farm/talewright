@@ -80,7 +80,7 @@ Giving a character a value does not declare the skill. See the complete
 | TW3001 | Text before the first scene, or no `.tale` files at all. | Start each file with `=== scene.id`. |
 | TW3002 | Dead end: a scene with no way out. | Add choices, `-> target` or `-> END`. |
 | TW3003 | A choice or choice-check outcome has no explicit target. | Add `-> target` or `-> END` to that choice/outcome. Scene diverts are not fallbacks. Also appears as a side effect of TW2002. |
-| TW3005 | The ruleset has no skill-check rule. | Add `ruleset: rpg` to the `game` section, or remove the checks. |
+| TW3005 | The ruleset has no skill-check rule. This only happens with a ruleset registered from C#; the built-in `none` and `rpg` rulesets both have one. | Add a check rule to the C# ruleset, use a built-in ruleset, or remove the checks. |
 | TW3007 | The `start` scene doesn't exist. | Fix `game.start:` in `story.talewright.yaml`. |
 | ⚠ TW3008 | A hub has no scenes with its tags. | Tag some scenes, or fix the hub's tag. |
 | ⚠ TW3009 | A scene can never be reached. | Link to it, or remove it. Only shown once there are no errors. |

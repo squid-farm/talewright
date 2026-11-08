@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using Talewright.Core.Identity;
+using Talewright.Core.Rulesets;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Testing;
@@ -19,10 +21,33 @@ public sealed class CompilerDiagnosticCoverageTests
           id: coverage
           title: Coverage
           start: start
-          ruleset: {base: none}
+          ruleset: {base: freeform}
         characters:
           player: {first-name: Ada}
         """;
+
+    private const string DeclaredNerveYaml = """
+        game:
+          id: coverage
+          title: Coverage
+          start: start
+          ruleset:
+            stats:
+              - {id: nerve, name: Nerve}
+        characters:
+          player: {first-name: Ada}
+        """;
+
+    // A C#-registered ruleset with a stat but no skill-check rule.
+    private static readonly CompilerOptions NoChecksOptions = new()
+    {
+        Rulesets = new Dictionary<string, Func<Ruleset>>(CompilerOptions.DefaultRulesets())
+        {
+            ["freeform"] = () => new RulesetBuilder("freeform")
+                .AddStat(new StatDefinition(new StatId("nerve"), "Nerve", StatCategory.Custom, 0, 10, 0))
+                .Build(),
+        },
+    };
 
     private static readonly Regex ReferenceRowPattern = new(
         @"(?m)^\|[^\w|]*(?<code>TW[0-9]{4})\s*\|\s*(?<meaning>[^|\r\n]+)\|",
@@ -33,7 +58,8 @@ public sealed class CompilerDiagnosticCoverageTests
         StorySource Invalid,
         DiagnosticSeverity Severity,
         SourceLocation? Location = null,
-        StorySource? Valid = null);
+        StorySource? Valid = null,
+        CompilerOptions? Options = null);
 
     private static readonly StorySource ValidCheck = Scene(
         "::: skill-check athletics dc 1\nsuccess: -> END\nfailure: -> END\n:::");
@@ -85,8 +111,10 @@ public sealed class CompilerDiagnosticCoverageTests
             Scene("-> END")),
         Error("TW3002", Scene("Just text.")),
         Error("TW3003", Scene("* [Wait]")),
-        Error("TW3005", Scene("::: skill-check athletics dc 1\nsuccess: -> END\nfailure: -> END\n:::",
-            NoChecksYaml)),
+        Error("TW3005", Scene("::: skill-check nerve dc 1\nsuccess: -> END\nfailure: -> END\n:::",
+            NoChecksYaml), null,
+            Scene("::: skill-check nerve dc 1\nsuccess: -> END\nfailure: -> END\n:::", DeclaredNerveYaml),
+            NoChecksOptions),
         Error("TW3007", Story("=== elsewhere\n-> END")),
         Warning("TW3008", Scene("@hub nonexistent\n-> END")),
         Warning("TW3009", Story("=== start\n-> END\n=== orphan\n-> END")),
@@ -191,7 +219,7 @@ public sealed class CompilerDiagnosticCoverageTests
         var emitted = new HashSet<string>(StringComparer.Ordinal);
         foreach (var fixture in cases)
         {
-            var result = StoryCompiler.Compile(fixture.Invalid);
+            var result = StoryCompiler.Compile(fixture.Invalid, fixture.Options);
             emitted.UnionWith(result.Diagnostics.Select(diagnostic => diagnostic.Code));
             if (result.Diagnostics.Any(diagnostic => diagnostic.Code == fixture.Code
                 && diagnostic.Severity == fixture.Severity
@@ -208,7 +236,7 @@ public sealed class CompilerDiagnosticCoverageTests
 
             if (fixture.Valid is { } validSource)
             {
-                var valid = StoryCompiler.Compile(validSource);
+                var valid = StoryCompiler.Compile(validSource, fixture.Options);
                 emitted.UnionWith(valid.Diagnostics.Select(diagnostic => diagnostic.Code));
                 if (!valid.Success || valid.Diagnostics.Any(diagnostic => diagnostic.Code == fixture.Code))
                 {
@@ -243,7 +271,8 @@ public sealed class CompilerDiagnosticCoverageTests
             .ToHashSet(StringComparer.Ordinal);
 
     private static DiagnosticCase Error(string code, StorySource invalid, SourceLocation? location = null,
-        StorySource? valid = null) => new(code, invalid, DiagnosticSeverity.Error, location, valid);
+        StorySource? valid = null, CompilerOptions? options = null) =>
+        new(code, invalid, DiagnosticSeverity.Error, location, valid, options);
 
     private static DiagnosticCase Warning(string code, StorySource invalid) =>
         new(code, invalid, DiagnosticSeverity.Warning);
