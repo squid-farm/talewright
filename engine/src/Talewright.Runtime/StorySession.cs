@@ -326,20 +326,25 @@ public sealed class StorySession : IStorySession
                 _log.Events.Count, _log.Events.Count));
     }
 
-    private List<OfferedChoice> OfferChoices(SceneDefinition scene, IReadOnlyList<OfferedChoice> choices)
+    private List<VisibleChoice> OfferChoices(SceneDefinition scene, IReadOnlyList<VisibleChoice> choices)
     {
-        var offered = new List<OfferedChoice>(choices);
+        var offered = new List<VisibleChoice>(choices);
 
         if (scene.Hub is { } hub)
         {
-            var hubOffers = new Dictionary<SceneId, OfferedChoice>();
-            var storylets = StoryletSelector.SelectEligible(Story.Scenes, hub, Context, scene.Id,
+            var hubOffers = new Dictionary<SceneId, VisibleChoice>();
+            var storylets = StoryletSelector.SelectMenuCandidates(Story.Scenes, hub, Context, scene.Id,
                 scene.HubLimit, _observer, _log.Events.Count, storylet =>
                 {
                     var key = StoryletKeyPrefix + storylet.Id.Value;
                     var target = new DivertTarget(storylet.Id);
                     var candidate = new ChoiceCandidate(key, storylet.Requires,
                         () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)],
+                        storylet.Shown is { } shown
+                            ? shown.Text is { } text
+                                ? () => _executor.Render(text)
+                                : () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)]
+                            : null,
                         notes =>
                         {
                             _log.Append(new ChoiceMade(scene.Id, key));
@@ -351,28 +356,28 @@ public sealed class StorySession : IStorySession
                     {
                         hubOffers.Add(storylet.Id, offer);
                     }
-                    return (offer is not null, trace);
+                    return (offer?.IsAvailable ?? false, offer is { IsAvailable: false }, trace);
                 });
             foreach (var storylet in storylets)
             {
-                offered.Add(hubOffers[storylet.Id]);
+                offered.Add(hubOffers[storylet.Storylet.Id]);
             }
         }
 
         return offered;
     }
 
-    private List<OfferedChoice> ContinueTo(
+    private List<VisibleChoice> ContinueTo(
         SceneDefinition source, DivertTarget target)
     {
-        var candidate = new ChoiceCandidate(ContinueKey, null, () => ChoiceView.ContinueLabel,
+        var candidate = new ChoiceCandidate(ContinueKey, null, () => ChoiceView.ContinueLabel, null,
             notes =>
             {
                 _log.Append(new ChoiceMade(source.Id, ContinueKey));
                 Enter(target, notes);
             },
             _replayIdentities.ForDivert(source.Id, target));
-        return [new(candidate, ChoiceAvailability.CreateView(candidate))];
+        return [new(candidate, ChoiceAvailability.CreateView(candidate), IsAvailable: true)];
     }
 
     // ---- choosing --------------------------------------------------------------------------------------------------
@@ -432,15 +437,22 @@ public sealed class StorySession : IStorySession
     private IEnumerable<RenderedBlock> NotesSince(int mark) =>
         EventNarrator.Describe(_log.Events.Skip(mark).ToList(), _log.State);
 
-    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, List<OfferedChoice> choices)
+    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, List<VisibleChoice> choices)
     {
         _actions.Clear();
-        foreach (var choice in choices)
+        foreach (var choice in choices.Where(choice => choice.IsAvailable))
         {
             _actions[choice.Candidate.Key] = (choice.Candidate.Destination, choice.View.ReplayIdentity);
         }
 
-        Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks), choices.Select(c => c.View).ToList(), IsEnded: false);
+        var menu = choices.Select((choice, index) =>
+            new ChoiceMenuEntry(index + 1, choice.View.Key, choice.View.Label, choice.IsAvailable)).ToArray();
+        var availableChoices = choices.Where(choice => choice.IsAvailable).Select(choice => choice.View).ToArray();
+        Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks),
+            Array.AsReadOnly(availableChoices), IsEnded: false)
+        {
+            Menu = Array.AsReadOnly(menu),
+        };
         return Current;
     }
 

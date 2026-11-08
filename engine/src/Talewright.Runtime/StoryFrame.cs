@@ -19,6 +19,21 @@ public sealed record ChoiceView(string Key, IReadOnlyList<RenderedInline> Label)
     public string Text => RenderedInline.ToPlainText(Label);
 }
 
+/// <summary>A numbered entry in the complete menu shown for the current frame.</summary>
+/// <param name="Number">One-based position in the menu, including unavailable entries.</param>
+/// <param name="Key">Opaque choice key; pass it to <see cref="IStorySession.Choose"/> only when available.</param>
+/// <param name="Label">Rendered menu label.</param>
+/// <param name="IsAvailable">Whether the player may select this entry now.</param>
+public sealed record ChoiceMenuEntry(
+    int Number,
+    string Key,
+    IReadOnlyList<RenderedInline> Label,
+    bool IsAvailable)
+{
+    /// <summary>Plain-text label (for tests, logs, accessibility).</summary>
+    public string Text => RenderedInline.ToPlainText(Label);
+}
+
 /// <summary>
 /// One step of play, ready to present: what happened as a result of the last choice (notes), the scene's
 /// rendered text, and what the player can do next. Presentation layers only ever consume frames, never the
@@ -30,11 +45,19 @@ public sealed record ChoiceView(string Key, IReadOnlyList<RenderedInline> Label)
 /// Blocks to show, in order: notes for consequences of the previous choice (check results, stat/item/standing
 /// changes), then the scene's prose, then notes for anything that happened on entering the scene.
 /// </param>
-/// <param name="Choices">Available choices. Empty if and only if <see cref="IsEnded"/>.</param>
+/// <param name="Choices">Available choices only; unavailable menu entries are not selectable through this list.</param>
 /// <param name="IsEnded">True when the story has reached <c>-&gt; END</c>.</param>
 public sealed record StoryFrame(
     SceneId? Scene,
     string? Title,
     RenderedDocument Document,
     IReadOnlyList<ChoiceView> Choices,
-    bool IsEnded);
+    bool IsEnded)
+{
+    /// <summary>
+    /// The complete visible menu, in display order. Numbers remain stable across available and unavailable entries.
+    /// </summary>
+    public IReadOnlyList<ChoiceMenuEntry> Menu { get; init; } =
+        Array.AsReadOnly(Choices.Select((choice, index) =>
+            new ChoiceMenuEntry(index + 1, choice.Key, choice.Label, IsAvailable: true)).ToArray());
+}

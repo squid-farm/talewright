@@ -8,22 +8,28 @@ internal sealed record ChoiceCandidate(
     string Key,
     Expr? Requirement,
     Func<IReadOnlyList<RenderedInline>> LabelSource,
+    Func<IReadOnlyList<RenderedInline>>? ShownLabelSource,
     Action<List<RenderedBlock>> Destination,
     ReadOnlyMemory<byte>? ReplayIdentity);
 
-internal sealed record OfferedChoice(ChoiceCandidate Candidate, ChoiceView View);
+internal sealed record VisibleChoice(ChoiceCandidate Candidate, ChoiceView View, bool IsAvailable);
 
 internal static class ChoiceAvailability
 {
-    public static OfferedChoice? Evaluate(ChoiceCandidate candidate, EvaluationContext context, bool capture,
+    public static VisibleChoice? Evaluate(ChoiceCandidate candidate, EvaluationContext context, bool capture,
         out ExpressionTrace? trace)
     {
-        if (!RuleObservation.Test(candidate.Requirement, context, capture, out trace))
+        if (RuleObservation.Test(candidate.Requirement, context, capture, out trace))
+        {
+            return new(candidate, CreateView(candidate), IsAvailable: true);
+        }
+
+        if (candidate.ShownLabelSource is not { } shownLabelSource)
         {
             return null;
         }
 
-        return new(candidate, CreateView(candidate));
+        return new(candidate, CreateView(candidate.Key, shownLabelSource, candidate.ReplayIdentity), IsAvailable: false);
     }
 
     public static ChoiceView CreateView(ChoiceCandidate candidate) =>

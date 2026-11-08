@@ -1,5 +1,6 @@
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Effects;
@@ -9,7 +10,7 @@ using Talewright.Talemark.Model;
 namespace Talewright.Runtime;
 
 internal sealed record SceneExecution(IReadOnlyList<RenderedBlock> Blocks,
-    IReadOnlyList<OfferedChoice> Choices, DivertTarget? Target);
+    IReadOnlyList<VisibleChoice> Choices, DivertTarget? Target);
 
 /// <summary>Executes authored steps; StorySession owns entry, transitions, history and presentation.</summary>
 internal sealed class SceneExecutor(StoryDefinition story, EventLog log, TemplateRenderer renderer,
@@ -43,7 +44,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             _settled.Clear();
         }
         var blocks = new List<RenderedBlock>();
-        var choices = new List<OfferedChoice>();
+        var choices = new List<VisibleChoice>();
         _replayChoices.Clear();
         var target = Execute(scene, scene.Steps, blocks, choices, _replayChoices, refresh, out _);
         if (!refresh && rememberEntry)
@@ -55,7 +56,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     }
 
     private DivertTarget? Execute(SceneDefinition scene, IReadOnlyList<SceneStep> steps, List<RenderedBlock> blocks,
-        List<OfferedChoice> choices, List<ChoiceStep> replayChoices, bool refresh,
+        List<VisibleChoice> choices, List<ChoiceStep> replayChoices, bool refresh,
         out DecisionReason stopReason)
     {
         DivertTarget? target = null;
@@ -205,11 +206,21 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             () => choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel,
             _replayIdentities.For(choice));
 
+    public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text) =>
+        renderer.RenderInlines(text, log.State);
+
     private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step) =>
-        new(step.Choice.Key, step.Choice.Requires,
-            () => step.Choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel,
+        new(step.Choice.Key, step.Choice.Requires, LabelSource(step.Choice),
+            step.Choice.Shown is { } shown
+                ? shown.Text is { } text
+                    ? () => renderer.RenderInlines(text, log.State)
+                    : LabelSource(step.Choice)
+                : null,
             notes => makeChoice(scene, step, notes),
             _replayIdentities.For(step.Choice));
+
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice) =>
+        () => choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel;
 
     private static void RequireSettled(bool settled)
     {
