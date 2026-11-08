@@ -297,6 +297,94 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Open_settings_options_scale_and_support_keyboard_selection()
+    {
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+
+        var theme = Page.GetByLabel("Theme", new() { Exact = true });
+        await theme.ClickAsync();
+        var list = Page.GetByRole(AriaRole.Listbox, new() { Name = "Theme", Exact = true });
+        await Expect(list).ToBeVisibleAsync();
+        var initial = await list.GetByRole(AriaRole.Option).First.BoundingBoxAsync();
+        Assert.NotNull(initial);
+        Assert.Equal("18px", await list.EvaluateAsync<string>("element => getComputedStyle(element).fontSize"));
+        await Page.Keyboard.PressAsync("End");
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(list).ToHaveCountAsync(0);
+        await Expect(theme).ToHaveValueAsync("System");
+        await Expect(theme).ToBeFocusedAsync();
+
+        await Page.GetByLabel("Text size", new() { Exact = true }).SelectOptionAsync("200");
+        await Page.SetViewportSizeAsync(320, 720);
+        foreach (var name in new[] { "Theme", "Text size", "Reading width", "Line spacing", "Reduced motion" })
+        {
+            var control = Page.GetByLabel(name, new() { Exact = true });
+            await control.FocusAsync();
+            await Page.Keyboard.PressAsync("Enter");
+            var options = Page.GetByRole(AriaRole.Listbox, new() { Name = name, Exact = true });
+            await Expect(options).ToBeVisibleAsync();
+            await Expect(options).ToBeFocusedAsync();
+            Assert.Equal("36px", await options.EvaluateAsync<string>("element => getComputedStyle(element).fontSize"));
+            Assert.Equal("36px", await options.GetByRole(AriaRole.Option).First.EvaluateAsync<string>(
+                "element => getComputedStyle(element).fontSize"));
+            var enlarged = await options.GetByRole(AriaRole.Option).First.BoundingBoxAsync();
+            Assert.NotNull(enlarged);
+            Assert.True(enlarged.Height >= initial.Height * 2 - 1,
+                $"{name} option rows should at least double in height, with more room when text wraps.");
+            Assert.Equal("18px", await options.GetByRole(AriaRole.Option).First.EvaluateAsync<string>(
+                "element => getComputedStyle(element).paddingTop"));
+            Assert.True(await options.EvaluateAsync<bool>("""
+                element => {
+                    const bounds = element.parentElement.getBoundingClientRect();
+                    return bounds.left >= 0 && bounds.right <= innerWidth + 1
+                        && bounds.top >= 0 && bounds.bottom <= innerHeight + 1;
+                }
+                """), $"{name} options should fit the narrow viewport at 200%.");
+            await Page.Keyboard.PressAsync("Escape");
+            await Expect(control).ToBeFocusedAsync();
+        }
+
+        await theme.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Page.Keyboard.PressAsync("End");
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
+        await Expect(theme).ToBeFocusedAsync();
+        await theme.ClickAsync();
+        await Page.Keyboard.PressAsync("Home");
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "light");
+        await Expect(Page.GetByLabel("Text size", new() { Exact = true })).ToBeFocusedAsync();
+
+        await theme.ClickAsync();
+        await Page.GetByRole(AriaRole.Listbox, new() { Name = "Theme", Exact = true })
+            .GetByRole(AriaRole.Option, new() { Name = "Dark", Exact = true }).ClickAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-tw-theme", "dark");
+        await Expect(theme).ToBeFocusedAsync();
+        await theme.ClickAsync();
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Close settings", Exact = true })).ToBeFocusedAsync();
+
+        var motion = Page.GetByLabel("Reduced motion", new() { Exact = true });
+        await motion.ClickAsync();
+        await Page.Keyboard.PressAsync("r");
+        await Page.Keyboard.PressAsync("Enter");
+        await Expect(motion).ToHaveValueAsync("reduce");
+        await motion.ClickAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Close settings", Exact = true })).ToBeFocusedAsync();
+        await theme.ClickAsync();
+        await Page.Mouse.ClickAsync(1, 1);
+        await Expect(list).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Settings", Exact = true })).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Mechanical_notes_checkbox_scales_and_remains_usable_in_a_narrow_window()
     {
         await Upload(TestStories.Linear);

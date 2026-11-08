@@ -60,6 +60,42 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Settings_dropdown_options_scale_on_desktop()
+    {
+        await Driver.StartAsync();
+        await Upload(TestStories.Linear);
+        await Observe(new(null, "First passage"));
+        await Driver.ClickAsync("More actions");
+        await Driver.ClickAsync("Settings");
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+
+        await native.ActivateAsync("Theme");
+        await AssertState(state => Assert.Contains("System", state.Library));
+        var initialList = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "list box" && node.Name == "Theme");
+        var initialOption = Assert.Single(initialList.Descendants(), node => node.Name == "System");
+        Assert.True(initialOption.Bounds.Height >= 44);
+        await Driver.PressAsync("Escape");
+        await native.ActivateAsync("Text size");
+        await AssertState(state => Assert.Contains("200%", state.Library));
+        await Driver.PressAsync("End");
+        await Driver.PressAsync("Enter");
+        await native.ActivateAsync("Theme");
+        await AssertState(state => Assert.Contains("System", state.Library));
+
+        var enlargedList = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "list box" && node.Name == "Theme");
+        var enlargedOption = Assert.Single(enlargedList.Descendants(), node => node.Name == "System");
+        Assert.InRange(enlargedOption.Bounds.Height,
+            initialOption.Bounds.Height * 2 - 2, initialOption.Bounds.Height * 2 + 2);
+        await Driver.PressAsync("End");
+        await Driver.PressAsync("Enter");
+        Assert.True(Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "combo box" && node.Name == "Theme").Focused);
+        await Driver.ClickAsync("Close settings");
+    }
+
+    [Fact]
     public async Task Reading_preferences_apply_to_the_desktop_transcript_and_fit_a_narrow_window()
     {
         var fixture = TestStories.Linear with
