@@ -18,10 +18,7 @@ internal readonly record struct RequirementClauseSyntax(
     int SuffixStart,
     int SuffixLength,
     bool HasShown,
-    int ShownOffset,
-    bool HasText,
-    int TextOffset,
-    int TextLength,
+    RequirementClauseText? Text,
     IReadOnlyList<int> CommaOffsets,
     IReadOnlyList<int> ShownOffsets,
     IReadOnlyList<RequirementClauseText> TextSlots,
@@ -30,52 +27,16 @@ internal readonly record struct RequirementClauseSyntax(
     public static RequirementClauseSyntax Parse(string text, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
-        var hasComma = false;
-        for (var index = 0; index < text.Length; index++)
-        {
-            checkpoint?.Check();
-            if (text[index] != ExpressionVocabulary.ArgumentSeparator)
-                continue;
-            hasComma = true;
-            break;
-        }
-
-        if (!hasComma)
-            return new(text.Length, false, 0, 0, false, -1, false, -1, 0,
-                [], [], [], []);
+        if (text.IndexOf(ExpressionVocabulary.ArgumentSeparator) < 0)
+            return WithoutSuffix(text);
 
         var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, cancellationToken: cancellationToken);
-        var commas = new List<int>();
-        for (var index = 0; index < text.Length; index++)
-        {
-            checkpoint?.Check();
-            if (text[index] is TextVocabulary.QuoteMark or ExpressionVocabulary.OpenParen or SceneVocabulary.InlineOpen)
-            {
-                if (!scan.TryGetClose(index, out var close))
-                    break;
-                index = close;
-                continue;
-            }
-
-            if (text[index] == ExpressionVocabulary.ArgumentSeparator)
-                commas.Add(index);
-        }
-
+        var commas = scan.FindTopLevel(text, ExpressionVocabulary.ArgumentSeparator, cancellationToken);
         if (commas.Count == 0)
-            return new(text.Length, false, 0, 0, false, -1, false, -1, 0,
-                [], [], [], []);
+            return WithoutSuffix(text);
 
-        var expressionLength = commas[0];
-        while (expressionLength > 0 && char.IsWhiteSpace(text[expressionLength - 1]))
-            expressionLength--;
-
+        var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
         var errors = new List<RequirementClauseError>();
-        var hasShown = false;
-        var shownOffset = -1;
-        var hasText = false;
-        var textOffset = -1;
-        var textLength = 0;
         var shownOffsets = new List<int>();
         var textSlots = new List<RequirementClauseText>();
         var suffixStart = 0;
@@ -83,78 +44,55 @@ internal readonly record struct RequirementClauseSyntax(
         for (var clauseIndex = 0; clauseIndex < commas.Count; clauseIndex++)
         {
             checkpoint?.Check();
-            var start = commas[clauseIndex] + 1;
-            var end = clauseIndex + 1 < commas.Count ? commas[clauseIndex + 1] : text.Length;
-            while (start < end && char.IsWhiteSpace(text[start]))
-                start++;
-            while (end > start && char.IsWhiteSpace(text[end - 1]))
-                end--;
+            var clauseEnd = clauseIndex + 1 < commas.Count ? commas[clauseIndex + 1] : text.Length;
+            var start = TextScanning.SkipWhitespace(text, commas[clauseIndex] + 1, clauseEnd);
+            var end = TextScanning.TrimWhitespaceEnd(text, start, clauseEnd);
             if (clauseIndex == 0)
             {
                 suffixStart = start;
-                while (suffixStart + suffixLength < end &&
-                       !char.IsWhiteSpace(text[suffixStart + suffixLength]))
+                while (suffixStart + suffixLength < end && !char.IsWhiteSpace(text[suffixStart + suffixLength]))
                     suffixLength++;
             }
 
-            if (start == end || !text.AsSpan(start).StartsWith(SceneVocabulary.Shown, StringComparison.Ordinal) ||
-                !IsWordEnd(text, start + SceneVocabulary.Shown.Length, end))
+            if (!TextScanning.IsWordAt(text, start, end, SceneVocabulary.Shown))
             {
                 errors.Add(new(RequirementClauseErrorKind.ExpectedShown, start));
                 continue;
             }
 
-            shownOffsets.Add(start);
-            if (hasShown)
+            if (shownOffsets.Count > 0)
                 errors.Add(new(RequirementClauseErrorKind.DuplicateShown, start));
-            else
-            {
-                hasShown = true;
-                shownOffset = start;
-            }
+            shownOffsets.Add(start);
 
-            var valueStart = start + SceneVocabulary.Shown.Length;
-            while (valueStart < end && char.IsWhiteSpace(text[valueStart]))
-                valueStart++;
+            var valueStart = TextScanning.SkipWhitespace(text, start + SceneVocabulary.Shown.Length, end);
             if (valueStart == end)
                 continue;
-
-            if (text[valueStart] != TextVocabulary.QuoteMark ||
-                !scan.TryGetClose(valueStart, out var quoteEnd))
-            {
-                errors.Add(text[valueStart] == TextVocabulary.QuoteMark
-                    ? new(RequirementClauseErrorKind.MissingTextQuote, valueStart)
-                    : new(RequirementClauseErrorKind.UnexpectedAfterShown, valueStart));
-                continue;
-            }
-            if (quoteEnd >= end)
+            if (text[valueStart] != TextVocabulary.QuoteMark)
             {
                 errors.Add(new(RequirementClauseErrorKind.UnexpectedAfterShown, valueStart));
                 continue;
             }
+            if (!scan.TryGetClose(valueStart, out var closingQuote))
+            {
+                errors.Add(new(RequirementClauseErrorKind.MissingTextQuote, valueStart));
+                continue;
+            }
 
-            var trailing = quoteEnd + 1;
-            while (trailing < end && char.IsWhiteSpace(text[trailing]))
-                trailing++;
+            var trailing = TextScanning.SkipWhitespace(text, closingQuote + 1, end);
             if (trailing < end)
                 errors.Add(new(RequirementClauseErrorKind.UnexpectedAfterShown, trailing));
-            var contentStart = valueStart + 1;
-            var contentLength = quoteEnd - contentStart;
-            textSlots.Add(new(contentStart, contentLength));
-            if (!hasText)
-            {
-                hasText = true;
-                textOffset = contentStart;
-                textLength = contentLength;
-            }
+            textSlots.Add(new(valueStart, closingQuote + 1));
         }
 
-        return new(expressionLength, true, suffixStart, suffixLength, hasShown, shownOffset,
-            hasText, textOffset, textLength, commas, shownOffsets, textSlots, errors);
+        return new(TextScanning.TrimWhitespaceEnd(text, 0, commas[0]), true, suffixStart, suffixLength,
+            shownOffsets.Count > 0, textSlots.Count > 0 ? textSlots[0] : null, commas, shownOffsets, textSlots,
+            errors);
     }
 
-    private static bool IsWordEnd(string text, int offset, int end) =>
-        offset == end || char.IsWhiteSpace(text[offset]);
+    private static RequirementClauseSyntax WithoutSuffix(string text) =>
+        new(text.Length, false, 0, 0, false, null, [], [], [], []);
 }
 
-internal readonly record struct RequirementClauseText(int Offset, int Length);
+/// <param name="QuoteOffset">Offset of the opening quote.</param>
+/// <param name="End">Offset after the closing quote.</param>
+internal readonly record struct RequirementClauseText(int QuoteOffset, int End);

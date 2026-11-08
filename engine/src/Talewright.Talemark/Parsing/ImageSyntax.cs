@@ -1,4 +1,3 @@
-using System.Text;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
@@ -82,68 +81,18 @@ internal static class ImageSyntax
             if (index >= end || text[index] != TextVocabulary.QuoteMark)
                 return;
 
+            var alt = QuotedReaderTextSyntax.Read(source, index, end, cancellationToken);
             Add(index, index + 1, TalemarkClassificationKind.Punctuation);
-            index++;
-            var authored = new StringBuilder();
-            var locations = new List<SourceLocation>();
-            var work = 0;
-            while (index < end)
-            {
-                if ((++work & 255) == 0)
-                    cancellationToken.ThrowIfCancellationRequested();
-                var unit = QuotedStringSyntax.ReadUnit(text, index, end);
-                if (unit.ClosingQuote)
-                {
-                    index = unit.End;
-                    Add(index - 1, index, TalemarkClassificationKind.Punctuation);
-                    locations.Add(source.Locate(index));
-                    AppendInlineClassifications(authored, locations);
-                    return;
-                }
-
-                if (unit.Escaped)
-                {
-                    var next = unit.Character;
-                    index = unit.End;
-                    if (next == TextVocabulary.QuoteMark)
-                    {
-                        authored.Append(next);
-                        locations.Add(source.Locate(index - 1));
-                    }
-                    else
-                    {
-                        authored.Append(TextVocabulary.EscapeMark).Append(next);
-                        locations.Add(source.Locate(index - 2));
-                        locations.Add(source.Locate(index - 1));
-                    }
-                    continue;
-                }
-
-                authored.Append(unit.Character);
-                locations.Add(source.Locate(index));
-                index = unit.End;
-            }
-
-            locations.Add(source.Locate(index));
-            AppendInlineClassifications(authored, locations);
-
-            void AppendInlineClassifications(StringBuilder value, List<SourceLocation> positions)
-            {
-                foreach (var classification in InlineParser.Classify(SourceText.Mapped(value.ToString(), positions),
-                             cancellationToken))
-                    output.Add(classification);
-            }
+            foreach (var escape in alt.QuoteEscapes)
+                Add(escape, escape + 2, TalemarkClassificationKind.Escape);
+            foreach (var classification in InlineParser.Classify(alt.ToSource(), cancellationToken))
+                output.Add(classification);
+            if (alt.Closed)
+                Add(alt.End - 1, alt.End, TalemarkClassificationKind.Punctuation);
+            index = alt.End;
         }
 
-        void SkipSpace()
-        {
-            while (index < end && char.IsWhiteSpace(text[index]))
-            {
-                if ((index & 1023) == 0)
-                    cancellationToken.ThrowIfCancellationRequested();
-                index++;
-            }
-        }
+        void SkipSpace() => index = TextScanning.SkipWhitespace(text, index, end);
 
         void Add(int from, int to, TalemarkClassificationKind kind)
         {
@@ -247,14 +196,7 @@ internal static class ImageSyntax
                 Accessibility = accessibility,
             };
 
-        void SkipSpace()
-        {
-            while (i < end && char.IsWhiteSpace(text[i]))
-            {
-                if ((i & 1023) == 0) cancellationToken.ThrowIfCancellationRequested();
-                i++;
-            }
-        }
+        void SkipSpace() => i = TextScanning.SkipWhitespace(text, i, end);
 
         bool ReadString(out string value)
         {
@@ -302,72 +244,16 @@ internal static class ImageSyntax
             }
 
             var quote = i;
-            i++;
-            var templateText = new StringBuilder();
-            var plain = new StringBuilder();
-            var locations = new List<SourceLocation>();
-            var nextCancellationCheck = i;
-            while (i < end)
+            var alt = QuotedReaderTextSyntax.Read(source, i, end, cancellationToken);
+            i = alt.End;
+            if (alt.Closed)
             {
-                if (i >= nextCancellationCheck)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    nextCancellationCheck = i + Math.Min(1024, end - i);
-                }
-                var unit = QuotedStringSyntax.ReadUnit(text, i, end);
-                if (unit.ClosingQuote)
-                {
-                    i = unit.End;
-                    locations.Add(source.Locate(i));
-                    decoded = plain.ToString();
-                    var authored = templateText.ToString();
-                    var parsed = InlineParser.Parse(SourceText.Mapped(authored, locations), symbols, diagnostics,
-                        allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false);
-                    if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
+                decoded = alt.Plain;
+                var parsed = InlineParser.Parse(alt.ToSource(), symbols, diagnostics,
+                    allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false);
+                if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
 
-                    return true;
-                }
-
-                if (unit.Escaped)
-                {
-                    var next = unit.Character;
-                    i = unit.End;
-                    if (next == TextVocabulary.QuoteMark)
-                    {
-                        templateText.Append(next);
-                        plain.Append(next);
-                        locations.Add(source.Locate(i - 1));
-                    }
-                    else if (next == TextVocabulary.EscapeMark)
-                    {
-                        templateText.Append(TextVocabulary.EscapeMark).Append(TextVocabulary.EscapeMark);
-                        plain.Append(next);
-                        locations.Add(source.Locate(i - 2));
-                        locations.Add(source.Locate(i - 1));
-                    }
-                    else if (DelimiterScanner.IsReaderTextEscape(next))
-                    {
-                        templateText.Append(TextVocabulary.EscapeMark).Append(next);
-                        plain.Append(next);
-                        locations.Add(source.Locate(i - 2));
-                        locations.Add(source.Locate(i - 1));
-                    }
-                    else
-                    {
-                        templateText.Append(TextVocabulary.EscapeMark).Append(next);
-                        plain.Append(TextVocabulary.EscapeMark).Append(next);
-                        locations.Add(source.Locate(i - 2));
-                        locations.Add(source.Locate(i - 1));
-                    }
-
-                    continue;
-                }
-
-                var c = unit.Character;
-                templateText.Append(c);
-                plain.Append(c);
-                locations.Add(source.Locate(i));
-                i = unit.End;
+                return true;
             }
 
             AnalyzePartial(trimTrailingCall: true);
@@ -381,8 +267,8 @@ internal static class ImageSyntax
             void AnalyzePartial(bool trimTrailingCall)
             {
                 if (symbols.Analysis is null) return;
-                var authored = templateText.ToString();
-                var count = locations.Count;
+                var authored = alt.Authored;
+                var count = authored.Length;
                 var endAt = i;
                 if (trimTrailingCall && authored.EndsWith(ExpressionVocabulary.CloseParen))
                 {
@@ -396,7 +282,7 @@ internal static class ImageSyntax
                 for (var index = 0; index < count; index++)
                 {
                     if ((index & 1023) == 0) cancellationToken.ThrowIfCancellationRequested();
-                    mapped.Add(locations[index]);
+                    mapped.Add(alt.Locations[index]);
                 }
                 mapped.Add(source.Locate(endAt));
                 InlineParser.Parse(SourceText.Mapped(authored, mapped), symbols, new DiagnosticBag(),

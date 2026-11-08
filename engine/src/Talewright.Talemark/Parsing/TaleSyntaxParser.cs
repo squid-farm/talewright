@@ -205,12 +205,5 @@ internal static partial class TaleSyntaxParser
         return null;
     }
 
-    private static int SkipSpaces(string text, int pos)
-    {
-        while (pos < text.Length && char.IsWhiteSpace(text[pos]))
-            pos++;
-        return pos;
-    }
-
     private static int Lead(ReadOnlySpan<char> text) => text.Length - text.TrimStart().Length;
 }

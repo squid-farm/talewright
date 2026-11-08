@@ -417,4 +417,17 @@ public sealed class ChoiceDiagnosticsTests
         Assert.Throws<OperationCanceledException>(() =>
             ChoiceSyntax.FindTrailingClause("{", 0, codeScan, 0, source.Token));
     }
+
+    [Theory]
+    [InlineData("a, b , c", new[] { 1, 5 })]
+    [InlineData("has(\"x, y\"), {a, b}, [c, d], e", new[] { 11, 19, 27 })]
+    [InlineData("a, \"b, c", new[] { 1 })]
+    [InlineData("a, (b, c", new[] { 1 })]
+    [InlineData("no separators", new int[0])]
+    public void Top_level_search_skips_matched_pairs_and_stops_at_unclosed_openers(string text, int[] expected)
+    {
+        var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup);
+
+        Assert.Equal(expected, scan.FindTopLevel(text, ','));
+    }
 }

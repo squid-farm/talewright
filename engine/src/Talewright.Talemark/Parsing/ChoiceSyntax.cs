@@ -163,15 +163,13 @@ internal static class ChoiceSyntax
         if (text[open] != ExpressionVocabulary.OpenParen)
             return false;
 
-        var index = open + 1;
-        while (index < text.Length && char.IsWhiteSpace(text[index]))
-            index++;
-        if (!text.AsSpan(index).StartsWith(SceneVocabulary.Shown, StringComparison.Ordinal))
-            return false;
-
-        var after = index + SceneVocabulary.Shown.Length;
-        return after == text.Length || char.IsWhiteSpace(text[after]) ||
-               text[after] is ExpressionVocabulary.CloseParen or ExpressionVocabulary.ArgumentSeparator;
+        var index = TextScanning.SkipWhitespace(text, open + 1);
+        var wordEnd = index + SceneVocabulary.Shown.Length;
+        var end = wordEnd < text.Length &&
+                  text[wordEnd] is ExpressionVocabulary.CloseParen or ExpressionVocabulary.ArgumentSeparator
+            ? wordEnd
+            : text.Length;
+        return TextScanning.IsWordAt(text, index, end, SceneVocabulary.Shown);
     }
 
     public static int FindTrailingClause(string text, int start, DelimiterScanResult scan, int scanOffset,

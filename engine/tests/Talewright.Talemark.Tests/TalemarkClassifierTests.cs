@@ -210,6 +210,24 @@ public sealed class TalemarkClassifierTests
         Assert.Equal(2, escape.Range.Start.Line);
     }
 
+    [Theory]
+    [InlineData("A {image(\"map\", \"%\")} waits.")]
+    [InlineData("* [Go] (requires true, shown \"%\") -> END")]
+    public void Quoted_reader_text_classifies_the_same_in_every_syntax(string template)
+    {
+        var tale = "=== start\n" + template.Replace("%", @"Say \""hi\"" \{ {var:count}", StringComparison.Ordinal);
+
+        var classifications = TalemarkClassifier.Classify("main.tale", tale);
+        var texts = classifications.Select(classification => (classification.Kind, TextOf(tale, classification)))
+            .ToArray();
+
+        Assert.Equal(2, texts.Count(item => item == (TalemarkClassificationKind.Escape, @"\""")));
+        Assert.Contains((TalemarkClassificationKind.Escape, @"\{"), texts);
+        Assert.Contains((TalemarkClassificationKind.Identifier, "count"), texts);
+        Assert.Contains((TalemarkClassificationKind.Punctuation, "}"), texts);
+        Assert.DoesNotContain(texts, item => item.Item2 == "}\"");
+    }
+
     [Fact]
     public void Story_analysis_exposes_classifications_from_its_parsed_syntax()
     {

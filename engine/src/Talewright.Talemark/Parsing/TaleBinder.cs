@@ -790,16 +790,16 @@ internal sealed partial class TaleBinder
             return (requirement, null);
 
         IReadOnlyList<TemplateInline>? text = null;
-        if (parsed.HasText)
+        if (parsed.Text is { } slot)
         {
-            if (parsed.TextLength == 0)
+            var quoted = QuotedReaderTextSyntax.Read(SourceText.Single(value, sourceLocation), slot.QuoteOffset,
+                slot.End, _cancellationToken);
+            if (quoted.Authored.Length == 0)
                 _diagnostics.Warning(diagnosticCode,
                     $"An empty '{SceneVocabulary.Shown}' text will display no text while the requirement is false.",
-                    sourceLocation.Offset(parsed.TextOffset - 1));
-            text = InlineParser.Parse(
-                SourceText.Single(value.Substring(parsed.TextOffset, parsed.TextLength),
-                    sourceLocation.Offset(parsed.TextOffset)),
-                _symbols, _diagnostics, cancellationToken: _cancellationToken);
+                    sourceLocation.Offset(slot.QuoteOffset));
+            text = InlineParser.Parse(quoted.ToSource(), _symbols, _diagnostics,
+                cancellationToken: _cancellationToken);
         }
 
         return (requirement, new ShownDefinition(text));

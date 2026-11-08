@@ -401,12 +401,14 @@ public static class TalemarkClassifier
                     TalemarkClassificationKind.Keyword);
             foreach (var slot in parsed.TextSlots)
             {
-                Add(location.Offset(slot.Offset - 1), location.Offset(slot.Offset),
+                var quoted = QuotedReaderTextSyntax.Read(SourceText.Single(value, location), slot.QuoteOffset,
+                    slot.End, cancellationToken);
+                Add(location.Offset(slot.QuoteOffset), location.Offset(slot.QuoteOffset + 1),
                     TalemarkClassificationKind.Punctuation);
-                AddInline(SourceText.Single(value.Substring(slot.Offset, slot.Length),
-                    location.Offset(slot.Offset)));
-                Add(location.Offset(slot.Offset + slot.Length),
-                    location.Offset(slot.Offset + slot.Length + 1), TalemarkClassificationKind.Punctuation);
+                foreach (var escape in quoted.QuoteEscapes)
+                    Add(location.Offset(escape), location.Offset(escape + 2), TalemarkClassificationKind.Escape);
+                AddInline(quoted.ToSource());
+                Add(location.Offset(slot.End - 1), location.Offset(slot.End), TalemarkClassificationKind.Punctuation);
             }
         }
 
