@@ -792,6 +792,12 @@ Browser test classes run two at a time (`xunit.runner.json`); each test still ge
 context, while one published-player server and browser process are shared. Timing-budget classes and
 native windows use the non-parallel `SerialCollection`, and `run_e2e.py linux` disables collection
 parallelism because native windows share one X display, accessibility bus and save directory.
+Functional browser contexts emulate the OS reduced-motion preference so rapid scripted clicks do not
+race automatic passage scrolling. This does not change the player's stored preferences or default
+behavior; motion-specific presentation and preference tests explicitly select the motion mode they
+exercise. The browser driver's choice helper waits for a different current-passage element after each
+click, not just completion of the mouse action, so consecutive identical labels cannot race a render.
+Choice, image, save and error assertions remain unchanged; no retries or longer timeouts are used.
 The helper also writes one TRX report per browser. Open traces with the matching Playwright trace viewer
 locally; they can contain story text and should not be uploaded to public trace-viewing services.
 
