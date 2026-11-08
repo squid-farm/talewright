@@ -192,6 +192,102 @@ internal static class ManifestListEditor
             ManifestVocabulary.Stats, newStatsBlock, newStatsFlow, id, name);
     }
 
+    internal static ManifestEditResult SetRulesetBase(string text, string file, string baseId, string statId)
+    {
+        if (!TryLoadRoot(text, file, out var root, out var reason))
+            return new(null, reason);
+        if (root.Style == MappingStyle.Flow)
+            return new(null, $"Cannot safely edit '{file}' because its root mapping uses flow style.");
+        if (!TryFindEntry(root, new YamlScalarNode(ManifestVocabulary.Game), out var gameNode) ||
+            gameNode is not YamlMappingNode game)
+            return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Game}' must be a mapping.");
+
+        var rulesetKey = new YamlScalarNode(ManifestVocabulary.Ruleset);
+        if (!TryFindEntry(game, rulesetKey, out var rulesetNode))
+            return AppendMappingEntry(text, file, ManifestVocabulary.Game, ManifestVocabulary.Ruleset,
+                FormatScalar(baseId), FormatScalar(baseId));
+        if (rulesetNode is not YamlMappingNode ruleset)
+            return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Ruleset}' must be a mapping.");
+        if (!HasSupportedMappingKeys(ruleset) ||
+            ruleset.Children.Keys.OfType<YamlScalarNode>().Any(key =>
+                key.Value is not (ManifestVocabulary.Base or ManifestVocabulary.Disable or ManifestVocabulary.Stats)))
+            return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Ruleset}' contains an unsupported entry.");
+
+        if (TryFindEntry(ruleset, new YamlScalarNode(ManifestVocabulary.Disable), out var disableNode))
+        {
+            if (disableNode is not YamlSequenceNode disabled ||
+                disabled.Children.Any(entry =>
+                    entry is not YamlScalarNode scalar ||
+                    scalar.Style is not (ScalarStyle.Plain or ScalarStyle.SingleQuoted or ScalarStyle.DoubleQuoted) ||
+                    !IdentifierRules.IsValid(scalar.Value ?? "")))
+                return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Disable}' is not a supported list of stat IDs.");
+            if (disabled.Children.OfType<YamlScalarNode>().Any(entry => entry.Value == statId))
+                return new(null, null, SuppressAction: true);
+        }
+
+        if (TryFindEntry(ruleset, new YamlScalarNode(ManifestVocabulary.Stats), out var statsNode) &&
+            (statsNode is not YamlSequenceNode stats || !HasSupportedStatEntries(stats, out _)))
+            return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Stats}' is not a supported list of stat definitions.");
+
+        var baseKey = new YamlScalarNode(ManifestVocabulary.Base);
+        if (!TryFindEntry(ruleset, baseKey, out var baseNode))
+            return ruleset.Style == MappingStyle.Block
+                ? InsertRulesetBaseAtStart(text, file, root, game, baseId)
+                : AppendRulesetBase(text, file, root, ruleset, baseId);
+        if (baseNode is not YamlScalarNode baseScalar)
+            return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Base}' is not a scalar.");
+        if (baseScalar.Value == baseId)
+            return new(null, null, SuppressAction: true);
+        if (baseScalar.Value != "none")
+            return new(null, $"Cannot safely enable '{baseId}' because '{ManifestVocabulary.Base}' is not absent or 'none'.");
+        var plainString = new YamlScalarNode("none");
+        if (baseScalar.Style is not (ScalarStyle.Plain or ScalarStyle.SingleQuoted or ScalarStyle.DoubleQuoted) ||
+            !Equals(baseScalar.Anchor, plainString.Anchor) || !Equals(baseScalar.Tag, plainString.Tag))
+            return new(null, $"Cannot safely edit '{file}' because '{ManifestVocabulary.Base}' uses an unsupported scalar style, tag, or anchor.");
+
+        var start = checked((int)baseScalar.Start.Index);
+        var end = checked((int)baseScalar.End.Index);
+        return CreateValidatedEdit(text, file, root, start, end - start, FormatScalar(baseId),
+            editedRoot => MatchesAfterSettingRulesetBase(root, editedRoot, baseId));
+    }
+
+    private static ManifestEditResult AppendRulesetBase(
+        string text, string file, YamlMappingNode root, YamlMappingNode ruleset, string baseId)
+    {
+        if (!TryCreateMappingInsertion(text, file, ManifestVocabulary.Ruleset, ruleset,
+                ManifestVocabulary.Base, FormatScalar(baseId), FormatScalar(baseId),
+                out var insertion, out var reason))
+            return new(null, reason);
+        return CreateValidatedEdit(text, file, root, insertion.Offset, 0, insertion.Text,
+            editedRoot => MatchesAfterAddingRulesetBase(root, editedRoot, baseId));
+    }
+
+    private static ManifestEditResult InsertRulesetBaseAtStart(
+        string text, string file, YamlMappingNode root, YamlMappingNode game, string baseId)
+    {
+        var rulesetKey = game.Children.Keys.FirstOrDefault(key =>
+            key is YamlScalarNode { Value: ManifestVocabulary.Ruleset });
+        if (rulesetKey is not YamlScalarNode scalarKey)
+            return new(null, $"Cannot safely edit '{file}' because the '{ManifestVocabulary.Ruleset}' source range is unavailable.");
+
+        var keyEnd = checked((int)scalarKey.End.Index);
+        var lineEnd = text.IndexOfAny(['\r', '\n'], keyEnd);
+        if (lineEnd < 0)
+            return new(null, $"Cannot safely edit '{file}' because the '{ManifestVocabulary.Ruleset}' block has no source line.");
+        var suffix = text[keyEnd..lineEnd].TrimStart();
+        if (!suffix.StartsWith(':') ||
+            suffix[1..].Trim() is { Length: > 0 } trailing && !trailing.StartsWith('#'))
+            return new(null, $"Cannot safely edit '{file}' because the '{ManifestVocabulary.Ruleset}' header has unsupported trailing content.");
+
+        var newlineLength = text[lineEnd] == '\r' && lineEnd + 1 < text.Length && text[lineEnd + 1] == '\n' ? 2 : 1;
+        var offset = lineEnd + newlineLength;
+        var parentIndent = checked((int)scalarKey.Start.Column - 1);
+        var indent = parentIndent + 2;
+        var insertion = $"{new string(' ', indent)}{ManifestVocabulary.Base}: {FormatScalar(baseId)}{DetectNewline(text)}";
+        return CreateValidatedEdit(text, file, root, offset, 0, insertion,
+            editedRoot => MatchesAfterAddingRulesetBase(root, editedRoot, baseId));
+    }
+
     private static bool IsDisabledStat(YamlMappingNode ruleset, string id) =>
         TryFindEntry(ruleset, new YamlScalarNode(ManifestVocabulary.Disable), out var disableNode) &&
         disableNode is YamlSequenceNode disabled &&
@@ -605,6 +701,79 @@ internal static class ManifestListEditor
                 return false;
         }
 
+        return true;
+    }
+
+    private static bool MatchesAfterSettingRulesetBase(
+        YamlMappingNode original, YamlMappingNode edited, string baseId)
+    {
+        if (!TryGetRulesetMappingsPreservingOtherEntries(
+                original, edited, out var originalRuleset, out var editedRuleset))
+            return false;
+
+        var baseKey = new YamlScalarNode(ManifestVocabulary.Base);
+        if (originalRuleset.Children.Count != editedRuleset.Children.Count)
+            return false;
+        if (!TryFindEntry(editedRuleset, baseKey, out var editedBaseNode))
+            return false;
+        if (editedBaseNode is not YamlScalarNode editedBase || editedBase.Value != baseId)
+            return false;
+
+        return MappingsMatchExcept(originalRuleset, editedRuleset, baseKey);
+    }
+
+    private static bool MatchesAfterAddingRulesetBase(
+        YamlMappingNode original, YamlMappingNode edited, string baseId)
+    {
+        if (!TryGetRulesetMappingsPreservingOtherEntries(
+                original, edited, out var originalRuleset, out var editedRuleset))
+            return false;
+
+        var baseKey = new YamlScalarNode(ManifestVocabulary.Base);
+        if (editedRuleset.Children.Count != originalRuleset.Children.Count + 1)
+            return false;
+        if (!TryFindEntry(editedRuleset, baseKey, out var editedBaseNode))
+            return false;
+        if (editedBaseNode is not YamlScalarNode editedBase || editedBase.Value != baseId)
+            return false;
+
+        return MappingsMatchExcept(originalRuleset, editedRuleset, baseKey);
+    }
+
+    private static bool TryGetRulesetMappingsPreservingOtherEntries(
+        YamlMappingNode original, YamlMappingNode edited,
+        out YamlMappingNode originalRuleset, out YamlMappingNode editedRuleset)
+    {
+        originalRuleset = null!;
+        editedRuleset = null!;
+
+        if (original.Children.Count != edited.Children.Count)
+            return false;
+
+        var gameKey = new YamlScalarNode(ManifestVocabulary.Game);
+        if (!TryFindEntry(original, gameKey, out var originalGameNode) ||
+            originalGameNode is not YamlMappingNode originalGame)
+            return false;
+        if (!TryFindEntry(edited, gameKey, out var editedGameNode) ||
+            editedGameNode is not YamlMappingNode editedGame)
+            return false;
+        if (!MappingsMatchExcept(original, edited, gameKey))
+            return false;
+        if (originalGame.Children.Count != editedGame.Children.Count)
+            return false;
+
+        var rulesetKey = new YamlScalarNode(ManifestVocabulary.Ruleset);
+        if (!TryFindEntry(originalGame, rulesetKey, out var originalRulesetNode) ||
+            originalRulesetNode is not YamlMappingNode originalMapping)
+            return false;
+        if (!TryFindEntry(editedGame, rulesetKey, out var editedRulesetNode) ||
+            editedRulesetNode is not YamlMappingNode editedMapping)
+            return false;
+        if (!MappingsMatchExcept(originalGame, editedGame, rulesetKey))
+            return false;
+
+        originalRuleset = originalMapping;
+        editedRuleset = editedMapping;
         return true;
     }
 

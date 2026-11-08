@@ -316,16 +316,24 @@ and comments and use the open manifest buffer. No declaration action is offered
 for `player`, existing declarations, or unknown properties. Unsupported
 manifest shapes produce a disabled action with a reason.
 
-For an unknown stat reported by `TW2001`, the Quick Fix menu offers
-**Declare stat `<id>`** under `game.ruleset.stats`. The scaffold uses a
-human-readable name derived from the ID and the documented schema defaults:
-`category: custom`, `min: 0`, `max: 2147483647`, and `default: 0`. It does not
-guess whether the stat is an attribute or a skill. The action preserves the
-selected `rpg` or `none` base, existing disables and stat overrides, and
-expands a shorthand `ruleset: rpg` or `ruleset: none` into a mapping when
-needed. Disabled built-in stats are not reintroduced as custom stats. The edit
-preserves manifest formatting and comments, uses the open manifest buffer, and
-is disabled with a reason when the YAML shape cannot be safely edited.
+For an unknown stat reported by `TW2001`, **Enable rpg ruleset** is the preferred
+Quick Fix when the registered `rpg` ruleset provides that stat. It adds
+`ruleset: rpg` when no ruleset is configured, or sets `base: rpg` when the
+existing ruleset mapping has no base or uses `base: none`, preserving its
+`disable` and `stats` entries. Unsupported or unsafe manifest shapes disable
+this action with a reason. If another registered ruleset provides the stat,
+the RPG action is not offered.
+
+**Declare stat `<id>`** remains available under `game.ruleset.stats`. Its
+scaffold uses a human-readable name derived from the ID and the documented
+schema defaults: `category: custom`, `min: 0`, `max: 2147483647`, and
+`default: 0`. It does not guess whether the stat is an attribute or a skill.
+The action preserves the selected `rpg` or `none` base, existing disables and
+stat overrides, and expands a shorthand `ruleset: rpg` or `ruleset: none` into
+a mapping when needed. Disabled built-in stats are not reintroduced as custom
+stats. The edit preserves manifest formatting and comments, uses the open
+manifest buffer, and is disabled with a reason when the YAML shape cannot be
+safely edited.
 
 For a variable that `TW2004` reports as read but never assigned or declared,
 the Quick Fix menu offers to declare it under the root manifest's `vars`. Numeric

@@ -52,6 +52,9 @@ internal sealed class StatDiagnosticGuidance
             DeclareCustom(stat);
     }
 
+    internal string? ProviderNameFor(StatId stat) =>
+        _providers.Value.TryGetValue(stat, out var provider) ? provider.Name : null;
+
     internal string ForInvalidDisable(StatId stat)
     {
         if (_baseRuleset?.HasStat(stat) == true || !_providers.Value.TryGetValue(stat, out var provider)) return "";

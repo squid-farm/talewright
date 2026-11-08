@@ -1,4 +1,5 @@
 using Talewright.Authoring;
+using Talewright.Core.Rulesets;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
@@ -372,6 +373,116 @@ public sealed class StoryQuickFixesTests
         Assert.Contains("  ruleset:\r\n    stats:\r\n      - id: charm\r\n", edited);
         Assert.DoesNotContain("\r\r\n", edited);
         Assert.DoesNotContain(AnalyzeManifest(edited, story).Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Rpg_stat_offers_a_preferred_ruleset_action_and_keeps_declare_stat()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:hp += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+        Assert.Equal("rpg", analysis.StatProviderName("hp"));
+        Assert.DoesNotContain("hp", analysis.BaseRulesetStats);
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+
+        var enable = Assert.Single(result.Fixes, fix => fix.Title == "Enable rpg ruleset");
+        var declare = Assert.Single(result.Fixes, fix => fix.Title == "Declare stat 'hp'");
+        Assert.True(enable.IsPreferred);
+        Assert.False(declare.IsPreferred);
+        var edited = ApplyTextEdit(manifest, enable);
+        Assert.Contains("  ruleset: rpg\n", edited);
+        var compiled = AnalyzeManifest(edited, story);
+        Assert.DoesNotContain(compiled.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(compiled.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Rpg_stat_adds_missing_base_without_changing_disable_or_stats_entries()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset:\n    disable: [str]\n    stats:\n      - id: grit\n        category: custom\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:hp += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+        Assert.Equal("rpg", analysis.StatProviderName("hp"));
+        Assert.DoesNotContain("hp", analysis.BaseRulesetStats);
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.Empty(result.DisabledActions);
+        var enable = Assert.Single(result.Fixes,
+            fix => fix.Title == "Enable rpg ruleset");
+        var edited = ApplyTextEdit(manifest, enable);
+
+        Assert.Contains("    disable: [str]\n", edited);
+        Assert.Contains("    stats:\n      - id: grit\n        category: custom\n", edited);
+        Assert.Contains("    base: rpg\n", edited);
+        var compiled = AnalyzeManifest(edited, story);
+        Assert.DoesNotContain(compiled.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(compiled.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Rpg_stat_replaces_none_base_and_preserves_disable_stats_and_comments()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset:\n    base: none # keep base comment\n    disable: [str] # keep disable comment\n    stats:\n      - id: grit\n        category: custom\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:hp += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+        Assert.Equal("rpg", analysis.StatProviderName("hp"));
+        Assert.DoesNotContain("hp", analysis.BaseRulesetStats);
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+        Assert.Empty(result.DisabledActions);
+        var enable = Assert.Single(result.Fixes,
+            fix => fix.Title == "Enable rpg ruleset");
+        var edited = ApplyTextEdit(manifest, enable);
+
+        Assert.Contains("base: rpg # keep base comment", edited);
+        Assert.Contains("disable: [str] # keep disable comment", edited);
+        Assert.Contains("      - id: grit\n        category: custom", edited);
+        var compiled = AnalyzeManifest(edited, story);
+        Assert.DoesNotContain(compiled.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(compiled.Diagnostics, item => item.Code == "TW2001");
+    }
+
+    [Fact]
+    public void Rpg_ruleset_action_is_disabled_for_unsupported_manifest_shapes()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {base: none, stats: {hp: custom}}\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:hp += 1\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+
+        var disabled = Assert.Single(result.DisabledActions);
+        Assert.Equal("Enable rpg ruleset", disabled.Title);
+        Assert.Contains("supported list of stat definitions", disabled.Reason);
+        Assert.Contains("not a list", result.DisabledReason);
+        Assert.Equal("Declare stat 'hp'", result.Title);
+    }
+
+    [Fact]
+    public void Rpg_ruleset_action_does_not_override_a_different_registered_stat_provider()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n~ player:hp += 1\n-> END\n";
+        var rulesets = new Dictionary<string, Func<Ruleset>>(CompilerOptions.Default.Rulesets, StringComparer.Ordinal)
+        {
+            ["astral"] = () => new RulesetBuilder("astral")
+                .AddStat(new StatDefinition(new("hp"), "Health", StatCategory.Custom, 0, 100, 10))
+                .Build()
+        };
+        var analysis = AnalyzeManifest(manifest, story, new CompilerOptions { Rulesets = rulesets });
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
+
+        var result = StoryQuickFixes.ForMissingStat(analysis, diagnostic);
+
+        var declare = Assert.Single(result.Fixes);
+        Assert.Equal("Declare stat 'hp'", declare.Title);
+        Assert.False(declare.IsPreferred);
+        Assert.Empty(result.DisabledActions);
     }
 
     [Fact]
@@ -961,4 +1072,11 @@ public sealed class StoryQuickFixesTests
         foreach (var (file, text) in additionalFiles) files.Add(file, text);
         return StoryAnalyzer.Analyze(new StorySource(files));
     }
+
+    private static StoryAnalysis AnalyzeManifest(string manifest, string story, CompilerOptions options) =>
+        StoryAnalyzer.Analyze(new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = story
+        }), options);
 }
