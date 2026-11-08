@@ -41,6 +41,7 @@ first paint. The desktop host initializes the same store before rendering the pl
 Settings dropdowns open an in-page accessible listbox so option text and row padding scale with
 the text-size preference, including on desktop hosts whose operating-system popup menus do
 not follow page fonts. Enter selects an option, Escape cancels, and Tab selects and moves on.
+An open option list stays anchored to its control when the settings dialog scrolls or resizes.
 
 Reduced motion follows the operating system by default. The Reduce setting overrides the system
 preference; stories cannot set or override it.

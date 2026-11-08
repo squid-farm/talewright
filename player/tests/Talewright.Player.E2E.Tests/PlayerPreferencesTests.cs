@@ -327,6 +327,14 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
             var options = Page.GetByRole(AriaRole.Listbox, new() { Name = name, Exact = true });
             await Expect(options).ToBeVisibleAsync();
             await Expect(options).ToBeFocusedAsync();
+            await Page.SetViewportSizeAsync(360, 720);
+            await Expect(options).ToBeVisibleAsync();
+            await Expect(options).ToBeFocusedAsync();
+            await Page.SetViewportSizeAsync(320, 720);
+            await Page.GetByRole(AriaRole.Dialog, new() { Name = "Settings", Exact = true })
+                .EvaluateAsync("element => element.scrollTop += 10");
+            await Expect(options).ToBeVisibleAsync();
+            await Expect(options).ToBeFocusedAsync();
             Assert.Equal("36px", await options.EvaluateAsync<string>("element => getComputedStyle(element).fontSize"));
             Assert.Equal("36px", await options.GetByRole(AriaRole.Option).First.EvaluateAsync<string>(
                 "element => getComputedStyle(element).fontSize"));

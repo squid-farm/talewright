@@ -3,7 +3,28 @@ export function initializeSettingsSelects(dialog) {
     let source = null;
     let list = null;
     let selectedIndex = 0;
-    let anchorTop = 0;
+
+    const position = () => {
+        if (!popup) return;
+        const bounds = source.getBoundingClientRect();
+        const margin = 8;
+        const below = Math.max(0, innerHeight - bounds.bottom - margin);
+        const above = Math.max(0, bounds.top - margin);
+        const width = Math.min(innerWidth - margin * 2,
+            Math.max(bounds.width, 18 * parseFloat(getComputedStyle(source).fontSize)));
+        popup.style.left = `${Math.max(margin, Math.min(bounds.left, innerWidth - width - margin))}px`;
+        popup.style.width = `${width}px`;
+        popup.style.maxHeight = `${Math.max(above, below)}px`;
+        popup.style.top = "auto";
+        popup.style.bottom = "auto";
+        if (below >= above) {
+            popup.style.top = `${Math.max(margin, bounds.bottom)}px`;
+        } else {
+            popup.style.bottom = `${Math.max(margin, innerHeight - bounds.top)}px`;
+        }
+    };
+    const resize = new ResizeObserver(position);
+    resize.observe(dialog);
 
     const close = (restoreFocus = false) => {
         if (!popup) return;
@@ -66,20 +87,7 @@ export function initializeSettingsSelects(dialog) {
         select.setAttribute("aria-expanded", "true");
         select.setAttribute("aria-controls", list.id);
 
-        const bounds = select.getBoundingClientRect();
-        anchorTop = bounds.top;
-        const margin = 8;
-        const below = innerHeight - bounds.bottom - margin;
-        const above = bounds.top - margin;
-        const width = Math.max(bounds.width, Math.min(18 * parseFloat(getComputedStyle(select).fontSize), innerWidth - margin * 2));
-        popup.style.left = `${Math.max(margin, Math.min(bounds.left, innerWidth - width - margin))}px`;
-        popup.style.width = `${width}px`;
-        popup.style.maxHeight = `${Math.max(above, below)}px`;
-        if (below >= above) {
-            popup.style.top = `${bounds.bottom}px`;
-        } else {
-            popup.style.bottom = `${innerHeight - bounds.top}px`;
-        }
+        position();
         popup.showPopover();
         list.focus({ preventScroll: true });
         highlight(selectedIndex);
@@ -146,25 +154,26 @@ export function initializeSettingsSelects(dialog) {
     const focusout = event => {
         if (popup && event.relatedTarget && !popup.contains(event.relatedTarget)) close();
     };
-    const resized = () => close(true);
+    const dialogClosed = () => close();
     const scrolled = event => {
-        if (popup && event.target === dialog && Math.abs(source.getBoundingClientRect().top - anchorTop) > 1) close();
+        if (event.target === dialog) position();
     };
     document.addEventListener("pointerdown", pointerdown);
     dialog.addEventListener("click", click);
     dialog.addEventListener("keydown", keydown);
     dialog.addEventListener("focusout", focusout);
-    dialog.addEventListener("close", resized);
+    dialog.addEventListener("close", dialogClosed);
     dialog.addEventListener("scroll", scrolled);
-    window.addEventListener("resize", resized);
+    window.addEventListener("resize", position);
     return () => {
         close();
         document.removeEventListener("pointerdown", pointerdown);
         dialog.removeEventListener("click", click);
         dialog.removeEventListener("keydown", keydown);
         dialog.removeEventListener("focusout", focusout);
-        dialog.removeEventListener("close", resized);
+        dialog.removeEventListener("close", dialogClosed);
         dialog.removeEventListener("scroll", scrolled);
-        window.removeEventListener("resize", resized);
+        window.removeEventListener("resize", position);
+        resize.disconnect();
     };
 }
