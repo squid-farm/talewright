@@ -146,6 +146,14 @@ class Desktop:
             raise RuntimeError("No window belongs to the Photino process")
         return window
 
+    def window_active(self):
+        frame = self.find(role="frame")
+        return frame is not None and frame.getState().contains(pyatspi.STATE_ACTIVE)
+
+    def activate_window(self):
+        subprocess.run(["wmctrl", "-ia", self.window_id()], check=True)
+        self.wait(self.window_active, "native player window becomes active")
+
     def cancel(self, signum):
         if not self.child_window:
             raise RuntimeError("Cancellation verification requires a child-window launcher")
@@ -274,13 +282,17 @@ def serve(args):
                 elif command == "click":
                     app.click(**arguments)
                 elif command == "activate":
+                    app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
+                    app.activate_window()
                     node = app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
                     if not node.queryComponent().grabFocus():
                         raise RuntimeError(f"Could not focus keyboard activation target: {arguments['name']}")
                     app.wait(lambda: (target := app.find(name=arguments["name"])) is not None
-                             and target.getState().contains(pyatspi.STATE_FOCUSED),
-                             f"keyboard activation target receives focus: {arguments['name']}")
+                             and target.getState().contains(pyatspi.STATE_FOCUSED) and app.window_active(),
+                             f"keyboard activation target and window receive focus: {arguments['name']}")
                     app.key("Space")
+                elif command == "activate-window":
+                    app.activate_window()
                 elif command == "scroll":
                     node = app.wait(lambda: app.find(**arguments), "scroll accessibility target into view")
                     if not node.queryComponent().scrollTo(pyatspi.SCROLL_ANYWHERE):
