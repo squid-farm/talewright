@@ -275,7 +275,11 @@ def serve(args):
                     app.click(**arguments)
                 elif command == "activate":
                     node = app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
-                    node.queryComponent().grabFocus()
+                    if not node.queryComponent().grabFocus():
+                        raise RuntimeError(f"Could not focus keyboard activation target: {arguments['name']}")
+                    app.wait(lambda: (target := app.find(name=arguments["name"])) is not None
+                             and target.getState().contains(pyatspi.STATE_FOCUSED),
+                             f"keyboard activation target receives focus: {arguments['name']}")
                     app.key("Space")
                 elif command == "scroll":
                     node = app.wait(lambda: app.find(**arguments), "scroll accessibility target into view")
