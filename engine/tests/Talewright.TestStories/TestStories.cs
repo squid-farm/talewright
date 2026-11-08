@@ -7,12 +7,16 @@ public static class TestStories
     public static ManifestFaker DefaultManifest(
         string id = "player-test",
         string randomness = "off",
-        bool? creationName = null)
+        bool? creationName = null,
+        bool? characterSheet = null,
+        IReadOnlyDictionary<string, bool>? characterSheetSections = null)
     {
         var manifest = new ManifestFaker(id, "Player Test", "start", 42)
         {
             Randomness = randomness,
             CreationName = creationName,
+            CharacterSheet = characterSheet,
+            CharacterSheetSections = characterSheetSections,
             BaseRuleset = "rpg",
         };
         manifest.Character("player", "Mara", "Burns",

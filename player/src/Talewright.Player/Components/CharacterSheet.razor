@@ -1,13 +1,14 @@
 @* Character sheet generated entirely from ruleset metadata: whatever stats a story's ruleset defines are shown,
-   grouped by category. Nothing here knows about "strength" or "hit points". *@
+   grouped by category. Nothing here knows about "strength" or "hit points". The author's visibility settings only
+   choose what is shown; hidden sections keep working in play. *@
 
 <aside class="tw-sheet" aria-label="Character sheet">
-    @if (Ruleset.Stats.Count > 0 || CharacterId == EntityId.Player && State.World.Factions.Count > 0)
+    @if (ShowsStats || ShowsStanding)
     {
         <h2>@Character.FullName</h2>
     }
 
-    @foreach (var group in Ruleset.Stats.GroupBy(s => s.Category))
+    @foreach (var group in VisibleStats.GroupBy(s => s.Category))
     {
         var stats = group.Where(s => group.Key != StatCategory.Skill || State.GetStat(CharacterId, s.Id) > 0).ToList();
         if (stats.Count == 0)
@@ -33,7 +34,7 @@
         </dl>
     }
 
-    @if (State.World.Items.Count > 0)
+    @if (ShowsInventory)
     {
         var inventory = State.GetInventory(CharacterId).Where(i => i.Value > 0).ToList();
         <h3>Inventory</h3>
@@ -52,7 +53,7 @@
         }
     }
 
-    @if (CharacterId == EntityId.Player && State.World.Factions.Count > 0)
+    @if (ShowsStanding)
     {
         <h3>Standing</h3>
         <dl class="tw-stats">
@@ -74,6 +75,32 @@
     /// <summary>Whose sheet to show; defaults to the player.</summary>
     [Parameter]
     public EntityId CharacterId { get; set; } = EntityId.Player;
+
+    /// <summary>Sections the author allows; defaults to every declared section.</summary>
+    [Parameter]
+    public CharacterSheetVisibility Visibility { get; set; } = CharacterSheetVisibility.Shown;
+
+    /// <summary>Whether a sheet for <paramref name="character"/> has any section to show.</summary>
+    public static bool HasSections(WorldDefinition world, CharacterSheetVisibility visibility, EntityId character) =>
+        ShowsStatsFor(world, visibility) || ShowsInventoryFor(world, visibility) ||
+        ShowsStandingFor(world, visibility, character);
+
+    private static bool ShowsStatsFor(WorldDefinition world, CharacterSheetVisibility visibility) =>
+        visibility.Stats && world.Ruleset.Stats.Count > 0;
+
+    private static bool ShowsInventoryFor(WorldDefinition world, CharacterSheetVisibility visibility) =>
+        visibility.Inventory && world.Items.Count > 0;
+
+    private static bool ShowsStandingFor(WorldDefinition world, CharacterSheetVisibility visibility, EntityId character) =>
+        visibility.Standing && character == EntityId.Player && world.Factions.Count > 0;
+
+    private bool ShowsStats => ShowsStatsFor(State.World, Visibility);
+
+    private IEnumerable<StatDefinition> VisibleStats => ShowsStats ? Ruleset.Stats : [];
+
+    private bool ShowsInventory => ShowsInventoryFor(State.World, Visibility);
+
+    private bool ShowsStanding => ShowsStandingFor(State.World, Visibility, CharacterId);
 
     private Ruleset Ruleset => State.World.Ruleset;
 

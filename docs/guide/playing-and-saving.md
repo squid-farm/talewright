@@ -12,7 +12,8 @@ The web player, the desktop player and published games all share the same screen
 - **Notes** appear inline when something happens to the player: skill check rolls, stat and standing
   changes, XP gained.
 - **The character sheet** shows the player's stats, skills (only those above 0), inventory and faction
-  standings. Stats boosted by an item show the bonus.
+  standings. Stats boosted by an item show the bonus. A story shows only the sections it uses, and its
+  author can hide some or all of the sheet.
 
 ![Skill check results and stat changes in the story](../images/skill-checks.png)
 

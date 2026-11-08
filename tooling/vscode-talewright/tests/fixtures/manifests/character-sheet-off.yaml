@@ -1,0 +1,10 @@
+game:
+  id: character-sheet-off
+  title: Character sheet off
+  start: beginning
+  character-sheet: false
+characters:
+  player:
+    first-name: Ada
+items:
+  coin: {}

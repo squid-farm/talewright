@@ -24,6 +24,8 @@ public sealed class StoryDefinition
     public string? ReplayCompatibilityId { get; init; }
     public bool UndoEnabled { get; init; } = true;
     public bool AutosaveEnabled { get; init; } = true;
+    /// <summary>Character sheet sections the author allows; presentation only.</summary>
+    public CharacterSheetVisibility CharacterSheet { get; init; } = CharacterSheetVisibility.Shown;
     public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }

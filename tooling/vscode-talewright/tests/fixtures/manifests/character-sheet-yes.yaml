@@ -1,0 +1,8 @@
+game:
+  id: character-sheet-yes
+  title: Character sheet value
+  start: beginning
+  character-sheet: yes
+characters:
+  player:
+    first-name: Ada

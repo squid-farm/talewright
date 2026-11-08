@@ -170,6 +170,22 @@ public sealed class StoryHoverTests
         Assert.Contains(name, hover.PlainText);
     }
 
+    [Theory]
+    [InlineData("charac|ter-sheet", "Which character sheet sections players see")]
+    [InlineData("inven|tory", "items, their modifiers and conditions")]
+    [InlineData("stan|ding", "standing changes and tier conditions still work")]
+    public void Character_sheet_help_comes_from_the_manifest_schema(string marked, string description)
+    {
+        var yaml = Manifest.Replace("  ruleset: rpg", "  ruleset: rpg\n  character-sheet: {inventory: false, standing: false}");
+        var name = marked.Replace("|", "");
+        var index = yaml.IndexOf(name, yaml.IndexOf("character-sheet", StringComparison.Ordinal), StringComparison.Ordinal)
+            + marked.IndexOf('|');
+        var analysis = Source("=== first\n-> END", yaml);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, Position(StorySource.ManifestFileName, yaml[..index])));
+        Assert.Contains(description, hover.PlainText);
+        Assert.Contains(name, hover.PlainText);
+    }
+
     [Fact]
     public void Trigger_save_help_comes_from_the_manifest_schema()
     {

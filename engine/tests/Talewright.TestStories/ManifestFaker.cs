@@ -53,6 +53,10 @@ public sealed class ManifestFaker
     public string? Randomness { get; init; }
     public bool? Undo { get; init; }
     public bool? Autosave { get; init; }
+    /// <summary>Writes <c>character-sheet: true|false</c>; takes precedence over <see cref="CharacterSheetSections"/>.</summary>
+    public bool? CharacterSheet { get; init; }
+    /// <summary>Writes a <c>character-sheet</c> mapping of section names to true or false.</summary>
+    public IReadOnlyDictionary<string, bool>? CharacterSheetSections { get; init; }
     public bool? CreationName { get; init; }
 
     internal void IncludeItemsSection() => IncludeSection(Section.Items);
@@ -294,6 +298,19 @@ public sealed class ManifestFaker
         if (Autosave is not null)
         {
             Add(game, "autosave", Autosave.Value);
+        }
+        if (CharacterSheet is not null)
+        {
+            Add(game, "character-sheet", CharacterSheet.Value);
+        }
+        else if (CharacterSheetSections is not null)
+        {
+            var sheet = Mapping();
+            foreach (var (section, shown) in CharacterSheetSections)
+            {
+                Add(sheet, section, shown);
+            }
+            Add(game, "character-sheet", sheet);
         }
 
         if (CreationName is not null || _creationPronouns is not null || _creationStats.Count > 0 || _creationPresets.Count > 0)

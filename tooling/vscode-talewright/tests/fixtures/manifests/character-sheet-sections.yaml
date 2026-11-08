@@ -1,0 +1,12 @@
+game:
+  id: character-sheet-sections
+  title: Character sheet sections
+  start: beginning
+  character-sheet: { inventory: false, standing: "false", stats: true }
+characters:
+  player:
+    first-name: Ada
+items:
+  coin: {}
+factions:
+  guild: {}

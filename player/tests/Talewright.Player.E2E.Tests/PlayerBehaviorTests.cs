@@ -199,6 +199,32 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Author_hidden_sheet_leaves_no_sheet_and_keeps_item_gameplay()
+    {
+        var id = "sheet-off-" + Guid.NewGuid().ToString("N");
+        await Upload(TestStories.Gates with { Id = id, Yaml = TestStories.DefaultManifest(id, characterSheet: false).Build() });
+        await AssertHiddenSheet();
+        await Choose("Collect supplies");
+        await Choose("Continue");
+        await Observe(new(null, "Inventory: ready."));
+        await AssertState(state => Assert.Contains("Use the rope", state.Choices));
+        await AssertHiddenSheet();
+
+        await Driver.ResizeAsync(520, 900);
+        await AssertHiddenSheet();
+
+        async Task AssertHiddenSheet() => await AssertState(state =>
+        {
+            Assert.True(state.PassageVisible);
+            Assert.Empty(state.Sheet);
+            if (!PlayerTarget.IsDesktop)
+            {
+                Assert.True(state.TranscriptFullWidth);
+            }
+        });
+    }
+
+    [Fact]
     [Trait("Host", "Linux")]
     public async Task Story_without_sheet_keeps_transcript_visible_at_wide_and_narrow_desktop_widths()
     {

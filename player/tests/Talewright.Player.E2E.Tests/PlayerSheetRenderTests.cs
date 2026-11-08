@@ -69,6 +69,61 @@ public sealed class PlayerSheetRenderTests
         Assert.DoesNotContain("tw-columns--full", html);
     }
 
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(null, "stats,inventory,standing")]
+    public async Task Author_can_hide_the_whole_sheet_without_leaving_layout_space(bool? sheet, string? hidden)
+    {
+        var html = await RenderPlayerAsync(GatesWithSheet(sheet, hidden));
+
+        Assert.DoesNotContain("aria-label=\"Character sheet\"", html);
+        Assert.Contains("class=\"tw-columns tw-columns--full\"", html);
+        Assert.Contains("class=\"tw-transcript\"", html);
+    }
+
+    [Theory]
+    [InlineData("stats", "<h2>Mara Burns</h2>", new[] { "Inventory", "Standing" })]
+    [InlineData("inventory", "<h2>Mara Burns</h2>", new[] { "Attributes", "Standing" })]
+    [InlineData("standing", "<h2>Mara Burns</h2>", new[] { "Attributes", "Inventory" })]
+    [InlineData("stats,standing", null, new[] { "Inventory" })]
+    public async Task Author_can_hide_individual_sheet_sections(string hidden, string? name, string[] shown)
+    {
+        var html = await RenderPlayerAsync(GatesWithSheet(null, hidden));
+        var sheet = SheetHtml(html);
+
+        if (name is null)
+        {
+            Assert.DoesNotContain("<h2>", sheet);
+        }
+        else
+        {
+            Assert.Contains(name, sheet);
+        }
+        Assert.Equal(shown, Regex.Matches(sheet, "<h3>([^<]+)</h3>").Select(match => match.Groups[1].Value)
+            .Where(heading => heading is "Attributes" or "Inventory" or "Standing"));
+        if (hidden.Contains("stats", StringComparison.Ordinal))
+        {
+            Assert.DoesNotMatch("<h3>(Attributes|Skills|Resources|Progress|Other)</h3>", sheet);
+        }
+        Assert.DoesNotContain("tw-columns--full", html);
+    }
+
+    private static StoryDefinition GatesWithSheet(bool? sheet, string? hidden) =>
+        (TestStories.Gates with
+        {
+            Yaml = TestStories.DefaultManifest(
+                characterSheet: sheet,
+                characterSheetSections: hidden?.Split(',').ToDictionary(section => section, _ => false)).Build(),
+        }).Compile();
+
+    private static string SheetHtml(string html)
+    {
+        var sheetStart = html.IndexOf("<aside class=\"tw-sheet\"", StringComparison.Ordinal);
+        var sheetEnd = html.IndexOf("</aside>", Math.Max(0, sheetStart), StringComparison.Ordinal);
+        Assert.True(sheetStart >= 0 && sheetEnd > sheetStart, html);
+        return html[sheetStart..(sheetEnd + "</aside>".Length)];
+    }
+
     private static async Task<string> RenderPlayerAsync(StoryDefinition story)
     {
         await using var services = new ServiceCollection()

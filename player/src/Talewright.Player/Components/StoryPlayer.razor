@@ -100,7 +100,7 @@
 
         @if (HasCharacterSheet)
         {
-            <CharacterSheet State="_session.State" />
+            <CharacterSheet State="_session.State" Visibility="Story.CharacterSheet" />
         }
     </div>
     }
@@ -195,9 +195,7 @@
     private int _autosaveCheckStartedGeneration = -1;
 
     private bool HasCharacterSheet =>
-        Story.World.Ruleset.Stats.Count > 0 ||
-        Story.World.Items.Count > 0 ||
-        Story.World.Factions.Count > 0;
+        CharacterSheet.HasSections(Story.World, Story.CharacterSheet, EntityId.Player);
 
     protected override void OnParametersSet()
     {
