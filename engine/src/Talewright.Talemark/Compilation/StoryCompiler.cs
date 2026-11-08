@@ -54,7 +54,8 @@ public static class StoryCompiler
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var manifest = StoryYamlReader.Read(source, diagnostics, options, analysis);
+        var statGuidance = new StatDiagnosticGuidance(options);
+        var manifest = StoryYamlReader.Read(source, diagnostics, options, statGuidance, analysis);
         cancellationToken.ThrowIfCancellationRequested();
         if (manifest is null)
         {
@@ -128,6 +129,7 @@ public static class StoryCompiler
             Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,
+            StatGuidance = statGuidance,
             Analysis = analysis,
             ImageSource = source,
         };

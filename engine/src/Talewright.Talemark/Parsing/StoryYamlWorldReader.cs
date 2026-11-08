@@ -12,9 +12,10 @@ using Talewright.Talemark.Diagnostics;
 namespace Talewright.Talemark.Parsing;
 
 /// <summary>Reads world declarations and character-creation configuration.</summary>
-internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
+internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnosticGuidance statGuidance)
 {
     private readonly StoryYamlContext _yaml = yaml;
+    private readonly StatDiagnosticGuidance _statGuidance = statGuidance;
     internal Dictionary<EntityId, SourceLocation> CharacterLocations { get; } = [];
 
     internal CharacterCreation? ReadCreation(YamlNode? node, Ruleset ruleset)
@@ -59,7 +60,8 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
                 var id = new StatId(rawId);
                 if (!ruleset.StatsById.TryGetValue(id, out var definition))
                 {
-                    _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Unknown creation stat '{id}'.", 0);
+                    _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference,
+                        $"Unknown creation stat '{id}'." + _statGuidance.ForMissingStat(id), 0);
                     continue;
                 }
 
@@ -316,7 +318,10 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml)
             var id = new StatId(rawId);
             if (!ruleset.HasStat(id))
             {
-                _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Unknown stat '{id}' (ruleset '{ruleset.Id}'). Add it under ruleset.stats.", 0);
+                var guidance = _statGuidance.ForMissingStat(id);
+                _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference,
+                    $"Unknown stat '{id}' (ruleset '{ruleset.Id}')." +
+                    (guidance.Length > 0 ? guidance : " Add it under ruleset.stats."), 0);
                 continue;
             }
 

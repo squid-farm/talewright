@@ -334,6 +334,7 @@ public static class StoryAnalyzer
                 Scenes = scenes,
                 Predicates = context?.Predicates ?? options.Predicates,
                 Modifiers = context?.Modifiers ?? options.Modifiers,
+                StatGuidance = context?.StatGuidance,
             };
             collector.SymbolContext = currentSymbols;
             var parsedScenes = TaleBinder.Parse(file, syntax, currentSymbols, diagnostics, cancellationToken);
