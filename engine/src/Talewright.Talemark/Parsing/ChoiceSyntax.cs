@@ -156,6 +156,22 @@ internal static class ChoiceSyntax
         return true;
     }
 
+    public static bool TryReadShownWithoutRequirement(string text, int open,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (text[open] != ExpressionVocabulary.OpenParen)
+            return false;
+
+        var index = TextScanning.SkipWhitespace(text, open + 1, cancellationToken);
+        var wordEnd = index + SceneVocabulary.Shown.Length;
+        var end = wordEnd < text.Length &&
+                  text[wordEnd] is ExpressionVocabulary.CloseParen or ExpressionVocabulary.ArgumentSeparator
+            ? wordEnd
+            : text.Length;
+        return TextScanning.IsWordAt(text, index, end, SceneVocabulary.Shown);
+    }
+
     public static int FindTrailingClause(string text, int start, DelimiterScanResult scan, int scanOffset,
         CancellationToken cancellationToken)
     {

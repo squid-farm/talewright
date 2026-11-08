@@ -36,6 +36,8 @@ public sealed class StoryCompletionTests
     [InlineData("@req|", "requires")]
     [InlineData("@requires player:h|", "hp")]
     [InlineData("@requires flag:re|", "ready")]
+    [InlineData("@requires flag:ready, sh|", "shown")]
+    [InlineData("* [Go] (requires flag:ready, sh|) -> END", "shown")]
     [InlineData("@requires var:co|", "coins")]
     [InlineData("@requires faction:gu|", "guild")]
     [InlineData("@requires player has ro|", "rope")]

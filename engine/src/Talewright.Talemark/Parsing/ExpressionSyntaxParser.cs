@@ -499,7 +499,7 @@ internal sealed class ExpressionSyntaxParser
             string? pluralArgument = null;
             if (index < text.Length && text[index] == ExpressionVocabulary.OpenParen)
             {
-                index = SkipSpace(text, index + 1, endOffset);
+                index = TextScanning.SkipWhitespace(text, index + 1, endOffset);
                 if (index >= endOffset || text[index] != TextVocabulary.QuoteMark)
                 {
                     Fail(CompilerDiagnosticCodes.InvalidModifier,
@@ -513,7 +513,7 @@ internal sealed class ExpressionSyntaxParser
                 }
 
                 argument = literal.Value;
-                index = SkipSpace(text, literal.End, endOffset);
+                index = TextScanning.SkipWhitespace(text, literal.End, endOffset);
                 if (name == OneManyTextModifier.ModifierName)
                 {
                     if (index >= endOffset || text[index] != ExpressionVocabulary.ArgumentSeparator)
@@ -523,7 +523,7 @@ internal sealed class ExpressionSyntaxParser
                             index);
                     }
 
-                    index = SkipSpace(text, index + 1, endOffset);
+                    index = TextScanning.SkipWhitespace(text, index + 1, endOffset);
                     if (index >= endOffset || text[index] != TextVocabulary.QuoteMark)
                     {
                         Fail(CompilerDiagnosticCodes.InvalidModifier, "Write the plural (second) argument to '#one-many' in double quotes.", index);
@@ -536,7 +536,7 @@ internal sealed class ExpressionSyntaxParser
                     }
 
                     pluralArgument = literal.Value;
-                    index = SkipSpace(text, literal.End, endOffset);
+                    index = TextScanning.SkipWhitespace(text, literal.End, endOffset);
                 }
 
                 if (index >= endOffset || text[index] != ExpressionVocabulary.CloseParen)
@@ -544,7 +544,7 @@ internal sealed class ExpressionSyntaxParser
                     Fail(CompilerDiagnosticCodes.InvalidModifier, $"Expected ')' after the argument to '#{name}'.", index);
                 }
 
-                index = SkipSpace(text, index + 1, endOffset);
+                index = TextScanning.SkipWhitespace(text, index + 1, endOffset);
                 if (index < endOffset && text[index] != ExpressionVocabulary.ModifierMarker)
                 {
                     Fail(CompilerDiagnosticCodes.InvalidModifier, $"Expected '#' or the end of the substitution after '#{name}(…)'.", index);
@@ -555,12 +555,6 @@ internal sealed class ExpressionSyntaxParser
         }
 
         return calls.ToImmutable();
-    }
-
-    private static int SkipSpace(string text, int index, int endOffset)
-    {
-        while (index < endOffset && char.IsWhiteSpace(text[index])) index++;
-        return index;
     }
 
     private EffectSyntax ParseEffect()

@@ -19,6 +19,7 @@ public enum AuthoringTokenKind
     EndIf,
     Title,
     Requires,
+    Shown,
     Tags,
     Priority,
     Once,

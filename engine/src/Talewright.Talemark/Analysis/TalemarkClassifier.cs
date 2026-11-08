@@ -242,7 +242,7 @@ public static class TalemarkClassifier
                             Add(location, location.Offset(value.Length), TalemarkClassificationKind.String);
                         break;
                     case SceneMetadataKey.Requires:
-                        ClassifyExpression(value, location);
+                        ClassifyRequirement(value.ToString(), location);
                         break;
                     case SceneMetadataKey.Priority:
                     case SceneMetadataKey.HubLimit:
@@ -357,7 +357,7 @@ public static class TalemarkClassifier
                                 AddAt(scene, line, requiresStart + word, SceneVocabulary.Requires.Length,
                                     TalemarkClassificationKind.Keyword);
                         }
-                        ClassifyExpression(syntax.Value(scene, line, clause),
+                        ClassifyRequirement(syntax.Value(scene, line, clause).ToString(),
                             At(scene, line, clause.ValueStart));
                         if (clause.Kind == TaleClauseKind.Requires)
                             AddAt(scene, line, clause.ValueStart + clause.ValueLength, 1,
@@ -387,6 +387,28 @@ public static class TalemarkClassifier
                         ClassifyDifficulty(scene, line, clause);
                         break;
                 }
+            }
+        }
+
+        private void ClassifyRequirement(string value, SourceLocation location)
+        {
+            var parsed = RequirementClauseSyntax.Parse(value, cancellationToken);
+            ClassifyExpression(value.AsSpan(0, parsed.ExpressionLength), location);
+            foreach (var comma in parsed.CommaOffsets)
+                Add(location.Offset(comma), location.Offset(comma + 1), TalemarkClassificationKind.Punctuation);
+            foreach (var shown in parsed.ShownOffsets)
+                Add(location.Offset(shown), location.Offset(shown + SceneVocabulary.Shown.Length),
+                    TalemarkClassificationKind.Keyword);
+            foreach (var slot in parsed.TextSlots)
+            {
+                var quoted = QuotedReaderTextSyntax.Read(SourceText.Single(value, location), slot.QuoteOffset,
+                    slot.End, cancellationToken);
+                Add(location.Offset(slot.QuoteOffset), location.Offset(slot.QuoteOffset + 1),
+                    TalemarkClassificationKind.Punctuation);
+                foreach (var escape in quoted.QuoteEscapes)
+                    Add(location.Offset(escape), location.Offset(escape + 2), TalemarkClassificationKind.Escape);
+                AddInline(quoted.ToSource());
+                Add(location.Offset(slot.End - 1), location.Offset(slot.End), TalemarkClassificationKind.Punctuation);
             }
         }
 

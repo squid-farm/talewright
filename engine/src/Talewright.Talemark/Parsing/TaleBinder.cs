@@ -273,8 +273,10 @@ internal sealed partial class TaleBinder
                 return true;
             case SceneMetadataKey.Requires:
                 var part = Part(syntax);
-                scene.Requires = ExpressionParser.ParseCondition(value, At(part.MetadataValueColumn(syntax)),
-                    _symbols, _diagnostics, At(part.ValueStart));
+                var (requirement, shown) = BindRequirement(value, At(part.MetadataValueColumn(syntax)),
+                    CompilerDiagnosticCodes.InvalidSceneMetadata, authoringLocation: At(part.ValueStart));
+                scene.Requires = requirement;
+                scene.Shown = shown;
                 return true;
             case SceneMetadataKey.Tags:
                 _symbols.Analysis?.Tags(value, At(Part(syntax).MetadataValueColumn(syntax)));
@@ -410,6 +412,7 @@ internal sealed partial class TaleBinder
         IReadOnlyList<TemplateInline>? label = null;
         SourceLocation? labelLocation = null;
         Expr? requires = null;
+        ShownDefinition? shown = null;
         IReadOnlyList<Effect> effects = [];
         DivertTarget? divert = null;
         CheckBranch? check = null;
@@ -451,17 +454,28 @@ internal sealed partial class TaleBinder
                         malformedTextless = true;
                     }
 
-                    var condition = ExpressionParser.ParseCondition(value, location, _symbols, _diagnostics,
-                        highlightUnexpectedTokens: true);
+                    var (condition, parsedShown) = BindRequirement(value, location,
+                        CompilerDiagnosticCodes.MalformedChoice, highlightUnexpectedTokens: true);
                     if (!hasRequires)
+                    {
                         requires = condition;
+                        shown = parsedShown;
+                    }
                     hasRequires = true;
                     break;
                 case TaleClauseKind.UnclosedRequires or TaleClauseKind.UnclosedEffects:
                     var context = clause.Kind == TaleClauseKind.UnclosedRequires
                         ? ExpressionContextKind.Condition
                         : ExpressionContextKind.Effects;
-                    var tokens = _symbols.Analysis?.Expression(context, value, location) ?? Lexer.Tokenize(value);
+                    var parsed = clause.Kind == TaleClauseKind.UnclosedRequires
+                        ? RequirementClauseSyntax.Parse(value, _cancellationToken)
+                        : default;
+                    if (clause.Kind == TaleClauseKind.UnclosedRequires)
+                        _symbols.Analysis?.RequirementSuffix(value, location, parsed);
+                    var expression = clause.Kind == TaleClauseKind.UnclosedRequires
+                        ? value[..parsed.ExpressionLength]
+                        : value;
+                    var tokens = _symbols.Analysis?.Expression(context, expression, location) ?? Lexer.Tokenize(expression);
                     ExpressionParser.ReportStringErrors(tokens, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
                 case TaleClauseKind.InvalidCondition when _symbols.Analysis is not null:
@@ -515,6 +529,7 @@ internal sealed partial class TaleBinder
             Key = $"c{scene.ChoiceCount++}",
             Label = label,
             Requires = requires,
+            Shown = shown,
             Effects = effects,
             Check = check,
             Divert = divert,
@@ -745,6 +760,51 @@ internal sealed partial class TaleBinder
         scene.DroppedMalformedChoice = true;
     }
 
+    private (Expr? Requirement, ShownDefinition? Shown) BindRequirement(string value, SourceLocation location,
+        string diagnosticCode, bool highlightUnexpectedTokens = false, SourceLocation? authoringLocation = null)
+    {
+        var parsed = RequirementClauseSyntax.Parse(value, _cancellationToken);
+        var sourceLocation = authoringLocation ?? location;
+        _symbols.Analysis?.RequirementSuffix(value, sourceLocation, parsed);
+        foreach (var error in parsed.Errors)
+        {
+            var message = error.Kind switch
+            {
+                RequirementClauseErrorKind.ExpectedShown =>
+                    $"Expected '{SceneVocabulary.Shown}' after the requirement comma.",
+                RequirementClauseErrorKind.DuplicateShown =>
+                    $"Duplicate '{SceneVocabulary.Shown}' clause. A requirement accepts it only once.",
+                RequirementClauseErrorKind.MissingTextQuote =>
+                    $"The optional text after '{SceneVocabulary.Shown}' must be a closed double-quoted reader-text string.",
+                RequirementClauseErrorKind.UnexpectedAfterShown =>
+                    $"After '{SceneVocabulary.Shown}', use only an optional double-quoted reader-text string.",
+                _ => throw new ArgumentOutOfRangeException(nameof(error)),
+            };
+            _diagnostics.Error(diagnosticCode, message, sourceLocation.Offset(error.Offset));
+        }
+
+        var requirementText = value[..parsed.ExpressionLength];
+        var requirement = ExpressionParser.ParseCondition(requirementText, location, _symbols, _diagnostics,
+            authoringLocation ?? location, highlightUnexpectedTokens: highlightUnexpectedTokens);
+        if (!parsed.HasShown)
+            return (requirement, null);
+
+        IReadOnlyList<TemplateInline>? text = null;
+        if (parsed.Text is { } slot)
+        {
+            var quoted = QuotedReaderTextSyntax.Read(SourceText.Single(value, sourceLocation), slot.QuoteOffset,
+                slot.End, _cancellationToken);
+            if (quoted.Authored.Length == 0)
+                _diagnostics.Warning(diagnosticCode,
+                    $"An empty '{SceneVocabulary.Shown}' text will display no text while the requirement is false.",
+                    sourceLocation.Offset(slot.QuoteOffset));
+            text = InlineParser.Parse(quoted.ToSource(), _symbols, _diagnostics,
+                cancellationToken: _cancellationToken);
+        }
+
+        return (requirement, new ShownDefinition(text));
+    }
+
     private sealed class Frame(Expr condition, SourceLocation location)
     {
         public Expr Condition { get; } = condition;
@@ -760,6 +820,7 @@ internal sealed partial class TaleBinder
         public SourceLocation Location { get; } = location;
         public string? Title { get; set; }
         public Expr? Requires { get; set; }
+        public ShownDefinition? Shown { get; set; }
         public HashSet<string> Tags { get; } = [];
         public int Priority { get; set; }
         public bool HasExplicitPriority { get; set; }
@@ -780,6 +841,7 @@ internal sealed partial class TaleBinder
             Id = Id,
             Title = Title,
             Requires = Requires,
+            Shown = Shown,
             Tags = Tags,
             Priority = Priority,
             Once = Once,

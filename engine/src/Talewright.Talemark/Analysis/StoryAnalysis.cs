@@ -418,6 +418,27 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
 
+    internal void RequirementSuffix(string text, SourceLocation location, RequirementClauseSyntax? parsed = null)
+    {
+        var syntax = parsed ?? RequirementClauseSyntax.Parse(text);
+        if (!syntax.HasSuffix)
+            return;
+
+        var keywords = new[] { SceneVocabulary.Shown };
+        var details = AuthoringSyntaxVocabulary.KeywordDetails(keywords);
+        if (syntax.SuffixLength == 0)
+        {
+            AddKeywordPoint(location.Offset(syntax.SuffixStart), keywords, details);
+            return;
+        }
+
+        var word = text.Substring(syntax.SuffixStart, syntax.SuffixLength);
+        var start = location.Offset(syntax.SuffixStart);
+        AddSite(new(word, Range(start, word), [], keywords,
+            Enumerable.Range(0, word.Length + 1).Select(start.Offset).ToArray(),
+            KeywordDetails: details));
+    }
+
     internal void HubSelector(string value, SourceLocation location)
     {
         var words = new List<(int Start, int Length)>();

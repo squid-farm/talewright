@@ -326,11 +326,18 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 * [Shove the door] { faction:explorers-guild:standing -= 5 } -> temple.hall
 ```
 
+For a hub scene that should remain visible while unavailable, add `, shown` to its requirement.
+Optional double-quoted reader text replaces the scene title only while that requirement is false:
+
+```tale
+@requires player:dex >= 12, shown "You need more strength or a rope."
+```
+
 | Element                                            | Meaning                                                                                        |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Display title (used for hub choices).                                                          |
-| `@requires expr`                                   | A rule that decides whether a scene is available when using a hub.                             |
+| `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces `@title` while unavailable. |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
 | `@once`                                            | A scene offered by a hub disappears after the player visits it once.                          |
@@ -342,7 +349,7 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
-| `* [label] (requires expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
+| `* [label] (requires expr[, shown ["reader text"]]) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false unless `shown` is present; its optional reader text replaces the label while unavailable. |
 | `* -> target`                                      | Textless choice displayed as **Continue**. It only supports a divert.                           |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
@@ -379,6 +386,10 @@ come before its divert or `skill-check`. Write a choice requirement as `(require
 with whitespace between `requires` and the expression. The older `(requires: expression)` form
 reports TW1011 with a replacement suggestion. An unclosed label reports TW1011 at its opening
 `[`. When there is one clear clause boundary, the diagnostic may suggest where to insert `]`.
+Append `, shown` to a requirement to keep the choice visible while unavailable. Optionally add
+double-quoted reader text to replace the label only while unavailable; it supports substitutions,
+`{if}`, formatting and reader-text escapes. `shown ""` is allowed but warns that the choice will
+have no text. Without `shown`, a false requirement continues to hide the choice.
 
 Omit a choice's label to show **Continue**, including alongside other choices. This shorthand only
 supports a divert; put a conditional textless choice inside a block `{if}`, or add a label to use

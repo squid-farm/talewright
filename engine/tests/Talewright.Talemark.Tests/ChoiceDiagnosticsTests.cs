@@ -408,6 +408,11 @@ public sealed class ChoiceDiagnosticsTests
     {
         using var source = new CancellationTokenSource();
         source.Cancel();
+        var whitespace = new string(' ', 10_000);
+        Assert.Throws<OperationCanceledException>(() =>
+            TextScanning.SkipWhitespace(whitespace, 0, source.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            TextScanning.TrimWhitespaceEnd(whitespace, 0, whitespace.Length, source.Token));
         Assert.Throws<OperationCanceledException>(() =>
             DelimiterScanner.Scan("[unfinished", DelimiterScanMode.ChoiceLabel, cancellationToken: source.Token));
         var scan = DelimiterScanner.Scan("[unfinished", DelimiterScanMode.ChoiceLabel);
@@ -416,5 +421,18 @@ public sealed class ChoiceDiagnosticsTests
         var codeScan = DelimiterScanner.Scan("{", DelimiterScanMode.CodeGroup);
         Assert.Throws<OperationCanceledException>(() =>
             ChoiceSyntax.FindTrailingClause("{", 0, codeScan, 0, source.Token));
+    }
+
+    [Theory]
+    [InlineData("a, b , c", new[] { 1, 5 })]
+    [InlineData("has(\"x, y\"), {a, b}, [c, d], e", new[] { 11, 19, 27 })]
+    [InlineData("a, \"b, c", new[] { 1 })]
+    [InlineData("a, (b, c", new[] { 1 })]
+    [InlineData("no separators", new int[0])]
+    public void Top_level_search_skips_matched_pairs_and_stops_at_unclosed_openers(string text, int[] expected)
+    {
+        var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup);
+
+        Assert.Equal(expected, scan.FindTopLevel(text, ','));
     }
 }

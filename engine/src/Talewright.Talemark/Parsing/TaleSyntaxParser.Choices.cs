@@ -14,7 +14,7 @@ internal static partial class TaleSyntaxParser
         private bool Choice(TaleLineSyntax line, string rest)
         {
             var indent = line.Indent;
-            var pos = SkipSpaces(rest, 0);
+            var pos = TextScanning.SkipWhitespace(rest, 0, _cancellationToken);
             var hasLabel = false;
             if (pos < rest.Length && rest[pos] == SceneVocabulary.OpenBracket)
             {
@@ -27,7 +27,7 @@ internal static partial class TaleSyntaxParser
 
                 Clause(new(TaleClauseKind.Label, indent + 1 + pos, indent + 2 + pos, close - pos - 1));
                 hasLabel = true;
-                pos = SkipSpaces(rest, close + 1);
+                pos = TextScanning.SkipWhitespace(rest, close + 1, _cancellationToken);
             }
 
             var hasDivert = false;
@@ -56,7 +56,14 @@ internal static partial class TaleSyntaxParser
 
                     Clause(new(TaleClauseKind.Requires, column, indent + 1 + valueStart, end - valueStart));
                     hasRequires = true;
-                    pos = SkipSpaces(rest, end + 1);
+                    pos = TextScanning.SkipWhitespace(rest, end + 1, _cancellationToken);
+                }
+                else if (ChoiceSyntax.TryReadShownWithoutRequirement(rest, pos, _cancellationToken))
+                {
+                    Error(line, CompilerDiagnosticCodes.MalformedChoice,
+                        $"'{SceneVocabulary.Shown}' requires a choice requirement, e.g. " +
+                        $"'{SceneVocabulary.ChoiceRequiresExample}, {SceneVocabulary.Shown}'.", column);
+                    return true;
                 }
                 else if (remaining[0] == SceneVocabulary.InlineOpen)
                 {
@@ -73,12 +80,12 @@ internal static partial class TaleSyntaxParser
 
                     Clause(new(TaleClauseKind.Effects, column, column + 1, end - pos - 1));
                     hasEffects = true;
-                    pos = SkipSpaces(rest, end + 1);
+                    pos = TextScanning.SkipWhitespace(rest, end + 1, _cancellationToken);
                 }
                 else if (remaining.StartsWith(SceneVocabulary.Divert, StringComparison.Ordinal))
                 {
                     hasDivert = true;
-                    var targetEnd = SkipSpaces(rest, pos + SceneVocabulary.Divert.Length);
+                    var targetEnd = TextScanning.SkipWhitespace(rest, pos + SceneVocabulary.Divert.Length, _cancellationToken);
                     var checkpoint = _cancellationToken.CanBeCanceled ? new CancellationCheckpoint(_cancellationToken) : null;
                     while (targetEnd < rest.Length && !char.IsWhiteSpace(rest[targetEnd]) &&
                            rest[targetEnd] is not (SceneVocabulary.InlineOpen or ExpressionVocabulary.OpenParen) &&
@@ -91,7 +98,7 @@ internal static partial class TaleSyntaxParser
                     var targetStart = pos + SceneVocabulary.Divert.Length;
                     DivertClause(line, column, column + SceneVocabulary.Divert.Length,
                         rest.AsSpan(targetStart, targetEnd - targetStart));
-                    var trailing = SkipSpaces(rest, targetEnd);
+                    var trailing = TextScanning.SkipWhitespace(rest, targetEnd, _cancellationToken);
                     if (trailing < rest.Length)
                         TrailingChoiceText(line, rest, trailing, indent + 1, afterCheck: false, insideBlock: false);
                     pos = rest.Length;

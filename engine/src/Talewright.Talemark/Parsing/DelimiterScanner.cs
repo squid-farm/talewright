@@ -74,6 +74,41 @@ internal sealed class DelimiterScanResult
         return false;
     }
 
+    /// <summary>
+    /// Offsets of <paramref name="character"/> outside every matched pair, such as separator commas. Text after an
+    /// unclosed or mismatched opener is treated as nested, so nothing past it is returned.
+    /// </summary>
+    public List<int> FindTopLevel(string text, char character, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
+        var limit = text.Length;
+        foreach (var issue in Issues)
+        {
+            if (issue.Issue is DelimiterIssueKind.UnclosedOpener or DelimiterIssueKind.MismatchedOpener)
+                limit = Math.Min(limit, issue.Offset);
+        }
+
+        var found = new List<int>();
+        var pair = 0;
+        for (var index = 0; index < limit; index++)
+        {
+            checkpoint?.Check();
+            while (pair < _pairs.Length && _pairs[pair].OpenOffset < index)
+                pair++;
+            if (pair < _pairs.Length && _pairs[pair].OpenOffset == index)
+            {
+                index = _pairs[pair].CloseOffset;
+                continue;
+            }
+
+            if (text[index] == character)
+                found.Add(index);
+        }
+
+        return found;
+    }
+
     /// <remarks>Linear in the number of pairs; parsing paths should look up by opening offset instead.</remarks>
     public bool TryGetOpen(int closeOffset, out int openOffset)
     {

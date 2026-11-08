@@ -41,6 +41,7 @@ public static class SceneVocabulary
 
     internal const string Title = "title";
     internal const string Requires = "requires";
+    internal const string Shown = "shown";
     internal const string Tags = "tags";
     internal const string Priority = "priority";
     internal const string Once = "once";

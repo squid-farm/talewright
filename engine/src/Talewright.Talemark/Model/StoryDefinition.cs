@@ -125,6 +125,7 @@ public sealed class SceneDefinition : IStorylet
     public required SceneId Id { get; init; }
     public string? Title { get; init; }
     public Expr? Requires { get; init; }
+    public ShownDefinition? Shown { get; init; }
     public IReadOnlySet<string> Tags { get; init; } = new HashSet<string>();
     public int Priority { get; init; }
     public bool Once { get; init; }
@@ -158,7 +159,14 @@ public sealed class ChoiceDefinition
     /// <summary>Authored label, or null for a textless choice. An explicitly empty label remains empty.</summary>
     public required IReadOnlyList<TemplateInline>? Label { get; init; }
     public Expr? Requires { get; init; }
+    public ShownDefinition? Shown { get; init; }
     public IReadOnlyList<Effect> Effects { get; init; } = [];
     public CheckBranch? Check { get; init; }
     public DivertTarget? Divert { get; init; }
 }
+
+/// <summary>
+/// A choice or hub scene to show while its requirement is false. A null text keeps the authored label or title;
+/// an empty text is an explicit empty replacement.
+/// </summary>
+public sealed record ShownDefinition(IReadOnlyList<TemplateInline>? Text);

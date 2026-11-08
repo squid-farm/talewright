@@ -66,6 +66,7 @@
   {"owner":"scene","member":"EndIf","spelling":"/if","line":"{if true}yes{/if}","reference":"{/if}"},
   {"owner":"scene","member":"Title","spelling":"title","line":"@title Sample","reference":"@title text"},
   {"owner":"scene","member":"Requires","spelling":"requires","line":"@requires true","reference":"@requires expr"},
+  {"owner":"scene","member":"Shown","spelling":"shown","line":"@requires true, shown \"Unavailable\"","reference":"@requires player:dex >= 12, shown"},
   {"owner":"scene","member":"Tags","spelling":"tags","line":"@tags camp","reference":"@tags a, b"},
   {"owner":"scene","member":"Priority","spelling":"priority","line":"@priority 1","reference":"@priority n"},
   {"owner":"scene","member":"Once","spelling":"once","line":"@once","reference":"@once"},
