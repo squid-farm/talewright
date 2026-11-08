@@ -64,11 +64,13 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
             ?? throw new InvalidOperationException("Cannot choose without a current passage.");
         try
         {
-            await page.GetByRole(AriaRole.List, new() { Name = "Story choices" })
+            var choice = page.GetByRole(AriaRole.List, new() { Name = "Story choices" })
                 .GetByRole(AriaRole.Button).Filter(new()
                 {
                     HasTextRegex = new System.Text.RegularExpressions.Regex(@"^\s*\d+\.\s*" + System.Text.RegularExpressions.Regex.Escape(label) + @"\s*$"),
-                }).ClickAsync();
+                });
+            await WaitForChoiceMediaAsync(choice);
+            await choice.ClickAsync();
             // A completed mouse click does not mean Blazor has rendered the next passage.
             await page.WaitForFunctionAsync("""
                 previous => {
@@ -82,6 +84,48 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
             await previous.DisposeAsync();
         }
     }
+
+    private async Task WaitForChoiceMediaAsync(ILocator choice)
+    {
+        const string settled = """
+            media => {
+                const image = media.querySelector('img');
+                const failure = media.querySelector('.tw-media-error [role="status"]');
+                return image !== null && (
+                    (image.hidden && failure !== null && failure.checkVisibility()) ||
+                    (image.currentSrc !== '' && image.complete && image.naturalWidth > 0));
+            }
+            """;
+        var button = await choice.ElementHandleAsync()
+            ?? throw new InvalidOperationException("Cannot find the requested story choice.");
+        IReadOnlyList<IElementHandle> media = [];
+        try
+        {
+            media = await page.Locator("[aria-label=\"Story transcript\"]:visible .tw-media").ElementHandlesAsync();
+            foreach (var element in media)
+            {
+                if (!await element.EvaluateAsync<bool>("""
+                    (media, button) => media.checkVisibility() &&
+                        media.closest('[aria-label="Story transcript"]') === button.closest('[aria-label="Story transcript"]') &&
+                        Boolean(media.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+                    """, button))
+                {
+                    continue;
+                }
+
+                if (await element.EvaluateAsync<bool>(settled)) continue;
+                // Trigger viewport-lazy loading before waiting; no-src images report complete.
+                await element.ScrollIntoViewIfNeededAsync();
+                await page.WaitForFunctionAsync(settled, element);
+            }
+        }
+        finally
+        {
+            foreach (var element in media) await element.DisposeAsync();
+            await button.DisposeAsync();
+        }
+    }
+
     public Task PressAsync(string key) => page.Keyboard.PressAsync(key);
     public Task ResizeAsync(int width, int height) => page.SetViewportSizeAsync(width, height);
 
