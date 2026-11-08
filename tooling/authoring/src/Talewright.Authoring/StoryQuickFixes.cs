@@ -10,10 +10,14 @@ public enum StoryQuickFixKind { TextEdit, CreateFile }
 
 public sealed record StoryQuickFix(
     string Title, StoryQuickFixKind Kind, string File, SourceRange Range, string NewText, bool IsPreferred = false);
+public sealed record StoryQuickFixDisabledAction(string Title, string Reason);
 public sealed record StoryQuickFixResult(
     IReadOnlyList<StoryQuickFix> Fixes,
     string? DisabledReason = null,
-    string? Title = null);
+    string? Title = null)
+{
+    public IReadOnlyList<StoryQuickFixDisabledAction> DisabledActions { get; init; } = [];
+}
 
 /// <summary>Creates source-aware quick fixes for common Talemark compiler diagnostics.</summary>
 public static class StoryQuickFixes
@@ -164,12 +168,53 @@ public static class StoryQuickFixes
         if (edit.SuppressAction)
             return new([]);
         if (edit.Edit is not { } textEdit)
-            return new([], edit.Reason ?? $"Cannot safely declare '{stat}' in the root story manifest.", title);
+        {
+            var declaration = new StoryQuickFixResult([],
+                edit.Reason ?? $"Cannot safely declare '{stat}' in the root story manifest.", title);
+            return AddRpgRulesetFix(analysis, stat, manifest, declaration);
+        }
 
-        return new([
+        var declared = new StoryQuickFixResult([
             new(title, StoryQuickFixKind.TextEdit, StorySource.ManifestFileName,
                 textEdit.Range, textEdit.NewText)
         ], Title: title);
+        return AddRpgRulesetFix(analysis, stat, manifest, declared);
+    }
+
+    private const string RpgRulesetId = "rpg";
+
+    private static StoryQuickFixResult AddRpgRulesetFix(
+        StoryAnalysis analysis, string stat, string manifest, StoryQuickFixResult declaration)
+    {
+        if (analysis.BaseRulesetStats.Contains(stat) ||
+            analysis.StatProviderName(stat) != RpgRulesetId)
+            return declaration;
+
+        const string title = "Enable rpg ruleset";
+        var edit = ManifestListEditor.SetRulesetBase(
+            manifest, StorySource.ManifestFileName, RpgRulesetId, stat);
+        if (edit.SuppressAction)
+            return declaration;
+        if (edit.Edit is not { } textEdit)
+        {
+            if (edit.Reason is null)
+                return declaration;
+            return declaration with
+            {
+                DisabledActions = declaration.DisabledActions
+                    .Append(new StoryQuickFixDisabledAction(title, edit.Reason))
+                    .ToArray()
+            };
+        }
+
+        return declaration with
+        {
+            Fixes = [
+                new(title, StoryQuickFixKind.TextEdit, StorySource.ManifestFileName,
+                    textEdit.Range, textEdit.NewText, IsPreferred: true),
+                .. declaration.Fixes
+            ]
+        };
     }
 
     public static StoryQuickFixResult ForCloseNameMatches(StoryAnalysis analysis, Diagnostic diagnostic)

@@ -82,6 +82,7 @@ public sealed class StoryAnalysis
         Substitutions = original.Substitutions;
         _scenes = original._scenes;
         SymbolContext = original.SymbolContext;
+        _statDiagnosticGuidance = original._statDiagnosticGuidance;
         _currentFile = original._currentFile;
         _currentFileSymbols = original._currentFileSymbols;
         _symbolsByIdentity = original._symbolsByIdentity;
@@ -122,6 +123,7 @@ public sealed class StoryAnalysis
             ? new(() => OverlayScenes(snapshot, currentFile!, scenes))
             : new(() => scenes);
         SymbolContext = collector.SymbolContext;
+        _statDiagnosticGuidance = collector.SymbolContext?.StatGuidance;
         BaseRulesetStats = collector.BaseRulesetStats.ToFrozenSet(StringComparer.Ordinal);
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
     }
@@ -133,6 +135,7 @@ public sealed class StoryAnalysis
     private readonly string? _currentFile;
     private readonly IReadOnlyList<AuthoringSymbol> _currentFileSymbols;
     private readonly Lazy<Dictionary<(AuthoringSymbolKind Kind, string Name), AuthoringSymbol[]>> _symbolsByIdentity;
+    private readonly StatDiagnosticGuidance? _statDiagnosticGuidance;
 
     public StorySource Source { get; }
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
@@ -165,6 +168,8 @@ public sealed class StoryAnalysis
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
     public IReadOnlyList<AuthoredScene> Scenes => _scenes.Value;
     internal StorySymbols? SymbolContext { get; }
+    internal string? StatProviderName(string stat) =>
+        _statDiagnosticGuidance?.ProviderNameFor(new StatId(stat));
 
     /// <summary>
     /// Stat IDs the story's base ruleset defines before the story disables or overrides any, so a story stat with one

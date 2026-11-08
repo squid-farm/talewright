@@ -159,6 +159,42 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Rpg_stat_action_is_preferred_and_clears_the_diagnostic_when_applied()
+    {
+        await using var client = new Client();
+        await client.Initialize(capabilities: new
+        {
+            workspace = new { workspaceEdit = new { documentChanges = true } }
+        });
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\ncharacters:\n  player: {first-name: Ada}\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 7);
+        await client.Diagnostics(StorySource.ManifestFileName, 7);
+
+        const string text = "=== start\n~ player:hp += 1\n-> END\n";
+        await client.Open("start.tale", text, 1);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 1),
+            item => item.GetProperty("code").GetString() == "TW2001");
+        var actions = await CodeActions(client, text, [diagnostic]);
+
+        var enable = Assert.Single(actions, action =>
+            action.GetProperty("title").GetString() == "Enable rpg ruleset");
+        var declare = Assert.Single(actions, action =>
+            action.GetProperty("title").GetString() == "Declare stat 'hp'");
+        Assert.True(enable.GetProperty("isPreferred").GetBoolean());
+        Assert.False(declare.GetProperty("isPreferred").GetBoolean());
+        Assert.Equal("TW2001", enable.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        var documentEdit = enable.GetProperty("edit").GetProperty("documentChanges")[0];
+        Assert.Equal(7, documentEdit.GetProperty("textDocument").GetProperty("version").GetInt32());
+        var updatedManifest = ApplyEdit(manifest, documentEdit.GetProperty("edits")[0]);
+
+        await client.Change(StorySource.ManifestFileName, updatedManifest, 8);
+        var updatedDiagnostics = await client.Diagnostics("start.tale", 1);
+        Assert.DoesNotContain(updatedDiagnostics, item => item.GetProperty("code").GetString() == "TW2001");
+        Assert.DoesNotContain(updatedDiagnostics, item =>
+            item.GetProperty("severity").GetInt32() == 1);
+    }
+
+    [Fact]
     public async Task Missing_character_action_edits_the_unsaved_manifest_without_offering_for_properties()
     {
         await using var client = new Client();
@@ -378,5 +414,28 @@ public sealed partial class ServerTests
             context = new { diagnostics }
         });
         return response.GetProperty("result").EnumerateArray().ToArray();
+    }
+
+    private static string ApplyEdit(string text, JsonElement edit)
+    {
+        var range = edit.GetProperty("range");
+        var start = Offset(range.GetProperty("start"));
+        var end = Offset(range.GetProperty("end"));
+        Assert.InRange(start, 0, text.Length);
+        Assert.InRange(end, start, text.Length);
+        return text.Remove(start, end - start).Insert(start, edit.GetProperty("newText").GetString()!);
+
+        int Offset(JsonElement position)
+        {
+            var line = position.GetProperty("line").GetInt32();
+            var character = position.GetProperty("character").GetInt32();
+            var lines = text.ReplaceLineEndings("\n").Split('\n');
+            Assert.InRange(line, 0, lines.Length - 1);
+            Assert.InRange(character, 0, lines[line].Length);
+            var offset = character;
+            for (var index = 0; index < line; index++)
+                offset += lines[index].Length + 1;
+            return offset;
+        }
     }
 }
