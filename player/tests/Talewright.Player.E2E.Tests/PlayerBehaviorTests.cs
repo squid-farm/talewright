@@ -119,7 +119,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
             * -> road
             === road
             The road.
-            * (requires not flag:ready) { set flag:ready; var:visits += 1 } -> start
+            * [Continue] (requires not flag:ready) { set flag:ready; var:visits += 1 } -> start
             * [Stop] -> final
             === final
             The end.

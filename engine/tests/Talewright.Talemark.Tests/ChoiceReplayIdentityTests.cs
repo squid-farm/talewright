@@ -37,6 +37,29 @@ public sealed class ChoiceReplayIdentityTests
     }
 
     [Fact]
+    public void Adding_a_label_to_a_textless_choice_preserves_its_save_identity()
+    {
+        static CompilationResult CompileChoice(string choice) =>
+            StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                ["story.talewright.yaml"] = """
+                    game: { id: replay, title: Replay, start: start }
+                    characters:
+                      player: { first-name: Ada }
+                    """,
+                ["main.tale"] = $"=== start\n{choice}\n=== finish\n-> END",
+            }));
+
+        var original = CompileChoice("* -> finish");
+        var labelled = CompileChoice("* [Continue] -> finish");
+
+        Assert.True(original.Success, string.Join("\n", original.Diagnostics));
+        Assert.True(labelled.Success, string.Join("\n", labelled.Diagnostics));
+        Assert.Equal(original.Story!.Scenes[0].Choices.Single().ReplayIdentity,
+            labelled.Story!.Scenes[0].Choices.Single().ReplayIdentity);
+    }
+
+    [Fact]
     public void Visit_count_effects_have_stable_distinct_replay_identities()
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>

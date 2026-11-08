@@ -343,7 +343,7 @@ Prose paragraph with **strong**, *emphasis* and literal `backticks`.
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires expr) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false.           |
-| `* (requires expr) { effects } -> target`         | Textless choice displayed as **Continue**. The requirement and effects are optional.           |
+| `* -> target`                                      | Textless choice displayed as **Continue**. It only supports a divert.                           |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
@@ -380,17 +380,22 @@ with whitespace between `requires` and the expression. The older `(requires: exp
 reports TW1011 with a replacement suggestion. An unclosed label reports TW1011 at its opening
 `[`. When there is one clear clause boundary, the diagnostic may suggest where to insert `]`.
 
-Omit a choice's label to show **Continue**, including alongside other choices:
+Omit a choice's label to show **Continue**, including alongside other choices. This shorthand only
+supports a divert; put a conditional textless choice inside a block `{if}`, or add a label to use
+`(requires …)` or `{effects}`:
 
 ```tale
 * [Open the door] (requires flag:ready) -> hall
-* (requires flag:ready) { set flag:left } -> garden
+{if flag:ready}
+* -> garden
+{/if}
+* [Continue] (requires flag:ready) { set flag:left } -> garden
 * -> END
 ```
 
-An omitted label needs an explicit `->` destination and cannot be used with a choice skill check.
-An explicitly empty `[]` is not the textless shortcut. **Continue** is currently English for both
-textless choices and automatic scene continuations.
+An omitted label needs an explicit `->` destination and cannot be used with a choice requirement,
+effects or skill check. An explicitly empty `[]` is not the textless shortcut. **Continue** is
+currently English for both textless choices and automatic scene continuations.
 
 A scene-level `->` leaves immediately, showing the prose already rendered with a single **Continue**
 (or as the final frame for `-> END`). Put conditional early exits **before** the choices:
