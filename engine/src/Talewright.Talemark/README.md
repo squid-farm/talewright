@@ -206,7 +206,7 @@ deployment acceptance under #179 stay separate.
 | `Compilation/StoryCompiler.cs` | The pipeline above. |
 | `Compilation/StorySource.cs` | Path → text map. `FromDirectory`, `FromZip(stream)` (strips one wrapping folder), `TaleFiles` (sorted), `ReadTitle()`. |
 | `Compilation/StoryImageResolver.cs` | Safe, path-only image lookup and alt-text defaults; see [Story images](#story-images). |
-| `Compilation/CompilerOptions.cs` | `Predicates` (`@Name`), `Modifiers` (`#mod`), `Rulesets` (name → factory; defaults `generic` and `none`). Also `CompilationResult` (`Story`, `Diagnostics`, `Success`, `Errors`, `Warnings`). |
+| `Compilation/CompilerOptions.cs` | `Predicates` (`@Name`), `Modifiers` (`#mod`), `Rulesets` (name → factory; defaults `rpg` and `none`). Also `CompilationResult` (`Story`, `Diagnostics`, `Success`, `Errors`, `Warnings`). |
 | `Compilation/StoryValidator.cs` | Whole-story structural checks (TW3xxx). Reachability is skipped when there are errors so one bad divert doesn't produce a wall of warnings. |
 | `Parsing/StoryYamlReader.cs` | `story.talewright.yaml` → manifest + world. Unknown keys are errors (TW4006). |
 | `Parsing/TaleSyntaxParser.cs`, `Parsing/TaleSyntax.cs` | Symbol-independent file/scene syntax: line splitting, scene ownership and line kinds with scene-relative spans. |

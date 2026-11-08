@@ -75,7 +75,7 @@ the [full branch verification workflow](docs/developer/nx-ci.md#run-the-full-pip
 | `engine/src/Talewright.Graphs` | Directed graphs and reachability for story analysis |
 | `engine/src/Talewright.Rules` | Conditions, effects, checks, triggers, storylets |
 | `engine/src/Talewright.Narrative` | Templates, grammar, presentation-independent documents |
-| `engine/src/Talewright.Rulesets.Generic` | Default d20 ruleset |
+| `engine/src/Talewright.Rulesets.Generic` | Opt-in d20 RPG ruleset (`ruleset: rpg`) |
 | `engine/src/Talewright.Talemark` | Talemark and `story.talewright.yaml` compiler and diagnostics |
 | `engine/src/Talewright.Runtime` | Story sessions, history, saves, author sessions |
 | `packaging/Talewright` | Packaging shell: ships the seven engine projects above as one NuGet package |

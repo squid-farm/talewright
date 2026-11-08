@@ -321,8 +321,8 @@ For an unknown stat reported by `TW2001`, the Quick Fix menu offers
 human-readable name derived from the ID and the documented schema defaults:
 `category: custom`, `min: 0`, `max: 2147483647`, and `default: 0`. It does not
 guess whether the stat is an attribute or a skill. The action preserves the
-selected `generic` or `none` base, existing disables and stat overrides, and
-expands a shorthand `ruleset: generic` or `ruleset: none` into a mapping when
+selected `rpg` or `none` base, existing disables and stat overrides, and
+expands a shorthand `ruleset: rpg` or `ruleset: none` into a mapping when
 needed. Disabled built-in stats are not reintroduced as custom stats. The edit
 preserves manifest formatting and comments, uses the open manifest buffer, and
 is disabled with a reason when the YAML shape cannot be safely edited.
@@ -482,7 +482,7 @@ validation, diagnostic clearing, completion, hover, and modeline fallback.
 Tokenization tests use
 that editor's built-in Markdown grammar with real TextMate/Oniguruma engines,
 not mocked regex matching. Compiler tests expand every snippet in a minimal
-story with the referenced scenes and default generic ruleset.
+story with the referenced scenes and `ruleset: rpg`.
 Shared YAML fixtures under `tests/fixtures/manifests` run against both the schema
 and `StoryCompiler`; compiler tests assert diagnostics and materialized values
 and defaults, including documented schema/compiler differences.

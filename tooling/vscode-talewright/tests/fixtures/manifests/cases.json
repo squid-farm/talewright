@@ -2,6 +2,8 @@
   { "file": "defaults.yaml", "schemaValid": true, "compilerCodes": [], "autosaveValue": true },
   { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [], "autosaveValue": false },
   { "file": "empty-optional-containers.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "ruleset-rpg-shorthand.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "ruleset-none-shorthand.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "null-optional-containers.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
   { "file": "null-nested-containers.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003", "TW4003"] },
   { "file": "text-variables.yaml", "schemaValid": true, "compilerCodes": [] },

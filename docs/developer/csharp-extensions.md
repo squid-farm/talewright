@@ -13,7 +13,7 @@ claims about a customized game.
 | Package | Use |
 |---|---|
 | `Talewright.Player` | The usual choice. Supplied Blazor UI; brings in `Talewright` automatically. |
-| `Talewright` | Headless engine, compiler, default ruleset and runtime only. For tooling or a replacement frontend. |
+| `Talewright` | Headless engine, compiler, opt-in RPG ruleset and runtime only. For tooling or a replacement frontend. |
 | `Talewright.Cli` | The `talewright` .NET tool. Not a library dependency. |
 
 Both libraries share one version. `Talewright.Player` is a UI library, not a runnable app: your

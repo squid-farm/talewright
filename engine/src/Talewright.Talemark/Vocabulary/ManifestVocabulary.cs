@@ -24,6 +24,7 @@ internal static class ManifestVocabulary
     internal const string Undo = "undo";
     internal const string Autosave = "autosave";
     internal const string Ruleset = "ruleset";
+    internal const string RulesetNone = "none";
     internal const string Creation = "creation";
 
     internal const string When = "when";

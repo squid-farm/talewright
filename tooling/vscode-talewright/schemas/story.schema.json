@@ -52,8 +52,16 @@
           "description": "Optional player character creation choices."
         },
         "ruleset": {
-          "$ref": "#/definitions/ruleset",
-          "description": "Optional ruleset configuration. Defaults to the generic ruleset."
+          "oneOf": [
+            {
+              "$ref": "#/definitions/identifier",
+              "description": "A ruleset name. Built-in rulesets are rpg and none; a C# story project may register another ruleset."
+            },
+            {
+              "$ref": "#/definitions/ruleset"
+            }
+          ],
+          "description": "Optional ruleset configuration. Omit it for no stats or levelling; use rpg for the built-in d20-style RPG stats, skill checks and levelling, or a mapping to adjust a base ruleset."
         }
       },
       "additionalProperties": false
@@ -163,8 +171,8 @@
       "properties": {
         "base": {
           "$ref": "#/definitions/identifier",
-          "default": "generic",
-          "description": "Built-in rulesets include generic and none; a C# story project may register another ruleset."
+          "default": "none",
+          "description": "Built-in rulesets are rpg and none; a C# story project may register another ruleset. Without base, only the stats declared here exist."
         },
         "disable": {
           "type": "array",

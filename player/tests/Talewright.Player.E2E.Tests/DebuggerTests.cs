@@ -610,6 +610,7 @@ public sealed class DebuggerTests
                   id: native-portable
                   title: Portable Native
                   start: scene1
+                  ruleset: rpg
                   creation:
                     name: true
                 flags: [ready]

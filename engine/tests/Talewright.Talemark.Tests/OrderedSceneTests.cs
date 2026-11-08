@@ -9,7 +9,7 @@ public sealed class OrderedSceneTests
     private static CompilationResult Compile(string tale) => StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
     {
         ["story.talewright.yaml"] = """
-            game: {id: order, title: Order, start: start}
+            game: {id: order, title: Order, start: start, ruleset: rpg}
             characters:
               player: {first-name: Ada}
             vars:

@@ -15,7 +15,7 @@ public sealed class MapViewTests
 
     private static string BuildManifest()
     {
-        var manifest = new ManifestFaker("map", "Map test", "start") { Randomness = "off" };
+        var manifest = new ManifestFaker("map", "Map test", "start") { Randomness = "off", BaseRuleset = "rpg" };
         manifest.Flag("ready");
         manifest.Flag("lit");
         manifest.Number("visits", 0);

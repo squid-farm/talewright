@@ -21,6 +21,7 @@ public class StoryHistoryTests
         {
             Version = "1",
             Undo = undo,
+            BaseRuleset = "rpg",
         };
         manifest.Character("player", "Tester", stats: new Dictionary<string, int> { ["athletics"] = 2 });
         if (declareVariables)

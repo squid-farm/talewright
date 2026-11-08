@@ -133,8 +133,8 @@ game:
   seed: 1234 # optional; omitted = random per playthrough
   undo: true # default; false hides Back/Forward without disabling saves
   autosave: true # default; false stops new automatic recovery writes
-  ruleset:
-    base: generic # generic | none
+  ruleset: # optional; omitted = no stats, skill checks or levelling
+    base: rpg # turns on the built-in RPG stats, skill checks and levelling
     disable: [cha] # remove stats from the base ruleset
     stats: # add stats
       - id: courage
@@ -174,6 +174,13 @@ triggers:
     once: true
 ```
 
+RPG mechanics are opt-in. Without `game.ruleset`, a story has no stats, no
+skill-check rule and no levelling; faction tiers still work. `ruleset: rpg` is
+shorthand for `ruleset: { base: rpg }` and turns on the built-in d20-style
+stats, skill checks and levelling. A `ruleset` mapping without `base` declares
+only its own `stats`. An unknown ruleset name is an error (TW4004) that lists
+the available rulesets.
+
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
 This applies to `game.undo`, `game.autosave`, `game.creation.name`, item
@@ -200,11 +207,11 @@ Declaration order does not matter. Unknown, disabled or non-attribute targets ar
 errors, as is using the key on any category other than `skill` (the default
 category is `custom`).
 
-For generic checks, the total is **die roll + skill value +
+For RPG checks, the total is **die roll + skill value +
 floor((governing attribute score - 10) / 2)**. Scores and skill values include
 effective modifiers such as held items. An unlinked skill uses only its skill
 value; omitting the key on a replacement stat leaves that replacement unlinked.
-This does not change the generic formula or allow multiple governing attributes.
+This does not change the RPG formula or allow multiple governing attributes.
 With `randomness: off`, the die result is 10.
 
 Custom pronoun set:
@@ -798,7 +805,7 @@ an entry check continues with the next line. Multiple checks and checks inside b
 are allowed, but all must precede the final choices. Choice-check outcomes always require targets.
 
 Optional actor: `skill-check guide survival dc 10`. Resolution is defined by the ruleset
-(generic: `d20 + attribute modifier + skill rank ≥ DC`). Dice are seeded and recorded as events.
+(`rpg`: `d20 + attribute modifier + skill rank ≥ DC`). Dice are seeded and recorded as events.
 With `randomness: off`, checks are deterministic (`10 + modifiers ≥ DC`).
 
 ## 7. Diagnostics
