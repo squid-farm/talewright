@@ -1,25 +1,3 @@
-const scrollInterrupts = new WeakMap();
-
-export function initialize(transcript) {
-    if (!transcript || scrollInterrupts.has(transcript)) return;
-    const interrupt = () => {
-        // Keep the pressed target under the pointer until the reader releases it. Firefox ignores an instant
-        // scroll to the current position, so step 1px away and back to cancel any smooth scroll in progress.
-        const { scrollX: left, scrollY: top } = window;
-        window.scrollTo({ left, top: top > 0 ? top - 1 : top + 1, behavior: "instant" });
-        window.scrollTo({ left, top, behavior: "instant" });
-    };
-    transcript.addEventListener("pointerdown", interrupt, { capture: true });
-    scrollInterrupts.set(transcript, interrupt);
-}
-
-export function dispose(transcript) {
-    const interrupt = scrollInterrupts.get(transcript);
-    if (!interrupt) return;
-    transcript.removeEventListener("pointerdown", interrupt, { capture: true });
-    scrollInterrupts.delete(transcript);
-}
-
 // Brings the newest frame to the top of the viewport and gives it focus (so screen readers move to it).
 // Plain focus() only scrolls when the element is entirely off-screen, so a frame that starts near the bottom of
 // the window would otherwise stay mostly hidden.
