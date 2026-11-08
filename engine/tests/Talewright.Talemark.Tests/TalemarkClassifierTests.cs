@@ -14,7 +14,7 @@ public sealed class TalemarkClassifierTests
             // preamble comment
             === entry
             @title The Door
-            @requires not flag:ready or player:strength >= 10 and player:strength < 20 and scene:player:visits <= 10 and player has rope and @CanPickLock and true
+            @requires not flag:ready or player:strength >= 10 and player:strength < 20 and scene:player:visits <= 10 and player has rope and @CanPickLock and true, shown "Unavailable: {var:count}"
             @tags crypt, hidden
             @hub crypt or hidden
             @priority 10
@@ -26,7 +26,7 @@ public sealed class TalemarkClassifierTests
             > guide: Hello, {player:name}.
             ~ set flag:ready; var:count += 2; var:count = var:count + 1 * 2 - 3 / 4
             ~ take player key; clear flag:ready
-            * [Open {item:key#the}] (requires player:strength > 0) { give player key } -> unresolved-scene-id
+            * [Open {item:key#the}] (requires player:strength > 0, shown "Need {var:count}") { give player key } -> unresolved-scene-id
             * -> END
             * [Climb] skill-check strength dc 12
               success: -> exit
@@ -55,6 +55,7 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Keyword, "===");
         Has(TalemarkClassificationKind.Keyword, "title");
         Has(TalemarkClassificationKind.Keyword, "requires");
+        Has(TalemarkClassificationKind.Keyword, "shown");
         Has(TalemarkClassificationKind.Keyword, "tags");
         Has(TalemarkClassificationKind.Keyword, "hub");
         Has(TalemarkClassificationKind.Keyword, "priority");

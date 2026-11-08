@@ -50,6 +50,7 @@ vars: { coins: 3 }
 | `@title Camp` | Set the displayed title and hub choice label. |
 | `@tags camp, night` | Tag a scene for hubs. |
 | `@requires flag:met-guide` | Require a condition for a hub to offer the scene. |
+| `@requires flag:met-guide, shown "Ask me about the guide first."` | Keep an unavailable hub scene visible with optional reader text instead of its title. |
 | `@priority 10` / `@once` | Sort higher in hubs / offer only until visited. |
 | `@hub camp` | Offer available scenes tagged `camp`. |
 | `@hub camp and night` / `@hub camp or night` | Match all / any tags; do not mix `and` and `or`. |
@@ -57,6 +58,7 @@ vars: { coins: 3 }
 | `> guide: Hello.` | Dialogue from character `guide`. |
 | `* [Go] -> gate` | Offer a choice and divert to `gate`. |
 | `* [Open] (requires player has key) { take player key } -> gate` | Choice with a condition and effect. |
+| `* [Buy] (requires var:coins >= 3, shown "You need 3 coins.") -> shop` | Keep an unavailable choice visible with optional reader text instead of its label. |
 | `* -> END` | Textless **Continue** choice. |
 | `-> gate` / `-> END` | Divert immediately / finish the story. |
 | `// comment` | Comment line; not shown to players. |

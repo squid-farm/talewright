@@ -58,6 +58,15 @@ choices. It only supports a divert. To use a requirement or effects, give the ch
 ```
 
 The destination is required; write `-> scene.id` or `-> END`.
+To keep a choice visible when its requirement is false, append `, shown`. Optional double-quoted
+reader text replaces the label only while unavailable and supports substitutions and formatting:
+
+```tale
+* [Ramen - 100cr] (requires var:coins >= 100, shown "You need {100 - var:coins} more coins.") -> shop
+```
+
+Without `shown`, a choice whose requirement is false stays hidden. An empty literal `shown ""` is
+allowed but warns that the unavailable choice will have no text.
 
 ## Characters and pronouns
 
@@ -354,7 +363,9 @@ available:
 -> camp
 ```
 
-Every scene tagged `camp` whose `@requires` is true appears as a choice, using its `@title`. `@once`
+Every scene tagged `camp` whose `@requires` is true appears as a choice, using its `@title`. A scene
+can add `, shown "reader text"` to `@requires` to stay visible while unavailable; that reader text
+replaces its title only while the requirement is false. `@once`
 removes it after the first visit, and `@priority` controls the order. You can also match every listed
 tag with `@hub camp and records`, or any listed tag with `@hub night or watch`; use one operator per
 selector. `@hub-limit 3` caps how many choices show.

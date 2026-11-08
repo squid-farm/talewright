@@ -58,6 +58,13 @@ internal static partial class TaleSyntaxParser
                     hasRequires = true;
                     pos = SkipSpaces(rest, end + 1);
                 }
+                else if (ChoiceSyntax.TryReadShownWithoutRequirement(rest, pos, _cancellationToken))
+                {
+                    Error(line, CompilerDiagnosticCodes.MalformedChoice,
+                        $"'{SceneVocabulary.Shown}' requires a choice requirement, e.g. " +
+                        $"'{SceneVocabulary.ChoiceRequiresExample}, {SceneVocabulary.Shown}'.", column);
+                    return true;
+                }
                 else if (remaining[0] == SceneVocabulary.InlineOpen)
                 {
                     if (hasEffects)

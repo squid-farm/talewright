@@ -142,6 +142,7 @@ public static class AuthoringSyntaxVocabulary
         [
             new(AuthoringTokenKind.Title, SceneVocabulary.Title, "Scene title shown to players."),
             new(AuthoringTokenKind.Requires, SceneVocabulary.Requires, "Boolean condition controlling whether this scene is available."),
+            new(AuthoringTokenKind.Shown, SceneVocabulary.Shown, "Shows a choice or hub scene while its requirement is false, optionally replacing its label with reader text."),
             new(AuthoringTokenKind.Tags, SceneVocabulary.Tags, "Comma-separated scene tags."),
             new(AuthoringTokenKind.Priority, SceneVocabulary.Priority, "Integer priority used when selecting an available scene."),
             new(AuthoringTokenKind.Once, SceneVocabulary.Once, "Marks a scene as available only once."),
