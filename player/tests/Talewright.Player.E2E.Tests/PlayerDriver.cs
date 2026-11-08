@@ -23,7 +23,8 @@ public sealed record PlayerObservation(
     bool PassageInWindow,
     bool SheetStacked,
     double WindowWidth,
-    string WindowTitle);
+    string WindowTitle,
+    bool TranscriptFullWidth = false);
 
 public interface IPlayerDriver : IAsyncDisposable
 {
@@ -90,10 +91,12 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
                     .some(button => button.textContent.trim() === 'Play again' && displayed(button)),
                 PassageVisible: active && passage !== null,
                 PassageFocused: active && passage !== null && passage === document.activeElement,
-                PassageInWindow: passageBounds !== null && passageBounds.top >= 0 &&
+                PassageInWindow: passageBounds != null && passageBounds.top >= 0 &&
                     passageBounds.bottom <= innerHeight,
-                SheetStacked: sheetBounds !== null && transcriptBounds !== null &&
+                SheetStacked: sheetBounds != null && transcriptBounds != null &&
                     sheetBounds.top >= transcriptBounds.bottom - 1,
+                TranscriptFullWidth: active && transcript !== null &&
+                    getComputedStyle(transcript.parentElement).gridTemplateColumns.split(' ').length === 1,
                 WindowWidth: innerWidth,
                 WindowTitle: document.title
             };

@@ -327,7 +327,7 @@ public static class TestStories
                 new(null, "Alex's quiet story.", ["Make a friend"], ["Affection", "3"]),
                 new("Make a friend", "Friendship grows.", [], ["Affection", "5"], true)]),
             new("no-stats", "no-stats", [
-                new(null, "A story without statistics.", [], ["Nothing."], true)]),
+                new(null, "A story without statistics.", [], [], true)]),
             new("no-route", "no-route", [
                 new(null, "The story cannot continue from 'start'", [], Ended: true)]),
             new("unicode", "unicode", [
