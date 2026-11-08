@@ -8,13 +8,13 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
-internal sealed record OfferedSceneChoice(ChoiceStep Step, ChoiceView View);
 internal sealed record SceneExecution(IReadOnlyList<RenderedBlock> Blocks,
-    IReadOnlyList<OfferedSceneChoice> Choices, DivertTarget? Target);
+    IReadOnlyList<OfferedChoice> Choices, DivertTarget? Target);
 
 /// <summary>Executes authored steps; StorySession owns entry, transitions, history and presentation.</summary>
 internal sealed class SceneExecutor(StoryDefinition story, EventLog log, TemplateRenderer renderer,
-    Action afterBatch, Action<RuleDecision>? observer, bool rememberEntry)
+    Action afterBatch, Action<RuleDecision>? observer, bool rememberEntry,
+    Action<SceneDefinition, ChoiceStep, List<RenderedBlock>> makeChoice)
 {
     private readonly ReplayIdentityTable _replayIdentities = story.ReplayIdentities;
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _notes = new(StringComparer.Ordinal);
@@ -43,9 +43,9 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             _settled.Clear();
         }
         var blocks = new List<RenderedBlock>();
-        var choices = new List<OfferedSceneChoice>();
+        var choices = new List<OfferedChoice>();
         _replayChoices.Clear();
-        var target = Execute(scene.Steps, blocks, choices, _replayChoices, refresh, out _);
+        var target = Execute(scene, scene.Steps, blocks, choices, _replayChoices, refresh, out _);
         if (!refresh && rememberEntry)
         {
             var lastBatch = _visits.FindLastIndex(id => _notes.ContainsKey(id));
@@ -54,8 +54,8 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         return new(blocks, choices, target);
     }
 
-    private DivertTarget? Execute(IReadOnlyList<SceneStep> steps, List<RenderedBlock> blocks,
-        List<OfferedSceneChoice> choices, List<ChoiceStep> replayChoices, bool refresh,
+    private DivertTarget? Execute(SceneDefinition scene, IReadOnlyList<SceneStep> steps, List<RenderedBlock> blocks,
+        List<OfferedChoice> choices, List<ChoiceStep> replayChoices, bool refresh,
         out DecisionReason stopReason)
     {
         DivertTarget? target = null;
@@ -115,19 +115,21 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                         foreach (var skipped in applies ? branch.Else : branch.Then)
                             Skip(skipped, DecisionReason.ConditionFalse);
                     }
-                    target = Execute(applies ? branch.Then : branch.Else, blocks, choices, replayChoices,
+                    target = Execute(scene, applies ? branch.Then : branch.Else, blocks, choices, replayChoices,
                         refresh, out stopReason);
                     break;
                 case ChoiceStep choice:
                     replayChoices.Add(choice);
-                    var available = Test(choice.Choice.Requires, out var requirement);
-                    Observe(DecisionKind.Choice, step.Id, available ? DecisionOutcome.Offered : DecisionOutcome.Excluded,
+                    var candidate = CreateCandidate(scene, choice);
+                    var offered = ChoiceAvailability.Evaluate(candidate,
+                        new(log.State, story.Predicates), observer is not null, out var requirement);
+                    Observe(DecisionKind.Choice, step.Id, offered is not null ? DecisionOutcome.Offered : DecisionOutcome.Excluded,
                         choice.Choice.Requires is null ? DecisionReason.Unconditional
-                            : available ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse,
+                            : offered is not null ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse,
                         requirement, log.Events.Count);
-                    if (available)
+                    if (offered is not null)
                     {
-                        choices.Add(new(choice, View(choice.Choice)));
+                        choices.Add(offered);
                     }
                     break;
                 case DivertStep divert:
@@ -178,12 +180,15 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     }
 
     public ChoiceView View(ChoiceDefinition choice) =>
-        new(choice.Key, choice.Label is { } label
-            ? renderer.RenderInlines(label, log.State)
-            : ChoiceView.ContinueLabel)
-        {
-            ReplayIdentity = _replayIdentities.For(choice),
-        };
+        ChoiceAvailability.CreateView(choice.Key,
+            () => choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel,
+            _replayIdentities.For(choice));
+
+    private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step) =>
+        new(step.Choice.Key, step.Choice.Requires,
+            () => step.Choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel,
+            notes => makeChoice(scene, step, notes),
+            _replayIdentities.For(step.Choice));
 
     private static void RequireSettled(bool settled)
     {

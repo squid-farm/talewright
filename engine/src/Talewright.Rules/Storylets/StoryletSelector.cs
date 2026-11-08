@@ -53,15 +53,23 @@ public sealed class StoryletTags
 public static class StoryletSelector
 {
     public static bool IsEligible(IStorylet storylet, EvaluationContext context) =>
-        EligibilityExclusion(storylet, context, capture: false, out _) is null;
+        EligibilityExclusion(storylet, context, capture: false, evaluateRequirement: null, out _) is null;
 
-    private static DecisionReason? EligibilityExclusion(IStorylet storylet, EvaluationContext context,
-        bool capture, out ExpressionTrace? trace)
+    private static DecisionReason? EligibilityExclusion<T>(T storylet, EvaluationContext context,
+        bool capture, Func<T, (bool Available, ExpressionTrace? Trace)>? evaluateRequirement,
+        out ExpressionTrace? trace)
+        where T : IStorylet
     {
         trace = null;
         if (storylet.Once && context.State.VisitCount(storylet.Id) > 0)
         {
             return DecisionReason.AlreadyVisited;
+        }
+        if (evaluateRequirement is not null)
+        {
+            var result = evaluateRequirement(storylet);
+            trace = result.Trace;
+            return result.Available ? null : DecisionReason.ConditionFalse;
         }
         return RuleObservation.Test(storylet.Requires, context, capture, out trace) ? null : DecisionReason.ConditionFalse;
     }
@@ -73,6 +81,22 @@ public static class StoryletSelector
 
     public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, StoryletTags tags,
         EvaluationContext context, SceneId? exclude, int? limit, Action<RuleDecision>? observer, int? eventIndex = null)
+        where T : IStorylet =>
+        SelectEligibleCore(storylets, tags, context, exclude, limit, observer, eventIndex, evaluateRequirement: null);
+
+    /// <summary>
+    /// Selects eligible storylets using the caller's requirement evaluation, preserving its expression trace in
+    /// decision observations.
+    /// </summary>
+    public static IReadOnlyList<T> SelectEligible<T>(IEnumerable<T> storylets, StoryletTags tags,
+        EvaluationContext context, SceneId? exclude, int? limit, Action<RuleDecision>? observer, int? eventIndex,
+        Func<T, (bool Available, ExpressionTrace? Trace)> evaluateRequirement)
+        where T : IStorylet =>
+        SelectEligibleCore(storylets, tags, context, exclude, limit, observer, eventIndex, evaluateRequirement);
+
+    private static IReadOnlyList<T> SelectEligibleCore<T>(IEnumerable<T> storylets, StoryletTags tags,
+        EvaluationContext context, SceneId? exclude, int? limit, Action<RuleDecision>? observer, int? eventIndex,
+        Func<T, (bool Available, ExpressionTrace? Trace)>? evaluateRequirement)
         where T : IStorylet
     {
         if (limit is <= 0)
@@ -89,7 +113,7 @@ public static class StoryletSelector
             ExpressionTrace? trace = null;
             if (excluded is null)
             {
-                excluded = EligibilityExclusion(storylet, context, observer is not null, out trace);
+                excluded = EligibilityExclusion(storylet, context, observer is not null, evaluateRequirement, out trace);
             }
             if (excluded is { } reason)
             {
