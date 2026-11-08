@@ -87,6 +87,31 @@ The script publishes a self-contained CLI and native debugger, packages and veri
 the matching VSIX (including the current language server), and force-installs it.
 Rerun the same command after each fix; no version bump or release is needed.
 
+To replace your existing **global .NET tool** instead, keeping the same `talewright`
+path for terminals and VS Code:
+
+```bash
+python3 tooling/install-dev.py --global-tool
+```
+
+This packs the checkout's CLI and debugger locally, smoke-tests the tool in a
+temporary directory, then installs/updates `Talewright.Cli` globally from **only**
+that local package source. Each invocation generates a unique development package
+version to avoid cached code; downgrades from a released version are explicitly
+allowed. No manual version bump or uninstall is required, and no package is published.
+The tool uses the installed .NET 10 runtime, unlike the default self-contained install.
+Its shim remains `~/.dotnet/tools/talewright` (under `DOTNET_CLI_HOME` if set).
+
+Leave `talewright.cli.executablePath` empty for automatic global-tool discovery,
+or retain an existing setting pointing at that global shim. An explicit path to
+another installation or a different `talewright` earlier on PATH still takes
+precedence. `--global-tool` cannot be combined with `--bin-dir`.
+Build, staged-tool smoke and VSIX failures do not update the global CLI; the script
+uses `dotnet tool update` rather than uninstalling it first. To return to a published
+version, run `dotnet tool update --global Talewright.Cli --version VERSION --allow-downgrade`.
+
+#### Default isolated install
+
 The CLI symlink is `~/.local/bin/talewright`. Its files live under
 `${XDG_DATA_HOME:-~/.local/share}/talewright/dev`; successful reruns replace the
 previous development build. An existing non-symlink CLI is never overwritten.
@@ -98,7 +123,7 @@ installers or VSIX packagers concurrently in the same checkout.
 Set **`talewright.cli.executablePath`** in VS Code to the printed CLI path, especially
 if a released/global tool is already on PATH. For terminal use, prepend the printed
 bin directory to PATH or invoke the absolute path. The script does not change
-shell profiles, VS Code settings or an existing .NET global-tool installation.
+shell profiles or VS Code settings; only `--global-tool` changes the global-tool installation.
 Clear any **`talewright.languageServer.command`** development override to use the
 new bundled server, then run **Developer: Reload Window**. Existing native-library
 requirements still apply.

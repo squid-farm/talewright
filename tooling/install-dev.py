@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,17 +37,21 @@ def install(args):
 
     data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
     home = (data_home / "talewright/dev").resolve()
-    bin_dir = args.bin_dir.expanduser().resolve()
+    if args.global_tool:
+        cli_home = Path(os.environ.get("DOTNET_CLI_HOME", Path.home()))
+        bin_dir = (cli_home / ".dotnet/tools").resolve()
+    else:
+        bin_dir = args.bin_dir.expanduser().resolve()
     shim = bin_dir / "talewright"
     current = home / "current"
     previous = None
-    if shim.exists() and not shim.is_symlink():
+    if not args.global_tool and shim.exists() and not shim.is_symlink():
         raise RuntimeError(f"Refusing to replace an existing file: {shim}. Choose --bin-dir.")
-    if current.is_symlink():
+    if not args.global_tool and current.is_symlink():
         previous = current.resolve()
         if previous.parent != home or not previous.name.startswith("build-"):
             raise RuntimeError(f"Refusing to replace an unmanaged installation: {current}")
-    elif current.exists():
+    elif not args.global_tool and current.exists():
         raise RuntimeError(f"Refusing to replace an existing directory: {current}")
 
     env = dict(os.environ, MSBUILDDISABLENODEREUSE="1", TALEWRIGHT_VSIX_TARGET=target)
@@ -60,12 +65,24 @@ def install(args):
     build = Path(tempfile.mkdtemp(prefix="build-", dir=home))
     activated = False
     try:
-        publish = ["dotnet", "publish", "-c", "Release", "-r", rid,
-                   "--self-contained", "true", "-p:PackAsTool=false"]
-        run(publish + [str(ROOT / "tooling/cli/src/Talewright.Cli"), "-o", str(build)], env=env)
-        run(publish + [str(ROOT / "tooling/debugger/src/Talewright.Debugger"),
-                       "-o", str(build / "debug-host")], env=env)
-        run([str(build / "Talewright.Cli"), "--help"], env=env)
+        if args.global_tool:
+            # A fresh identity prevents NuGet from reusing a prior checkout's package.
+            version = f"0.0.0-dev.{uuid.uuid4().hex}"
+            packages = build / "packages"
+            run(["dotnet", "pack", str(ROOT / "tooling/cli/src/Talewright.Cli"),
+                 "-c", "Release", f"-p:Version={version}", "-o", str(packages)], env=env)
+            tool_source = ["--version", version, "--source", str(packages), "--no-http-cache"]
+            staging = build / "tool"
+            run(["dotnet", "tool", "install", "Talewright.Cli", "--tool-path", str(staging)]
+                + tool_source, env=env)
+            run([str(staging / "talewright"), "--help"], env=env)
+        else:
+            publish = ["dotnet", "publish", "-c", "Release", "-r", rid,
+                       "--self-contained", "true", "-p:PackAsTool=false"]
+            run(publish + [str(ROOT / "tooling/cli/src/Talewright.Cli"), "-o", str(build)], env=env)
+            run(publish + [str(ROOT / "tooling/debugger/src/Talewright.Debugger"),
+                           "-o", str(build / "debug-host")], env=env)
+            run([str(build / "Talewright.Cli"), "--help"], env=env)
         run(["npm", "run", "package"], cwd=editor, env=env)
         run(["npm", "run", "test:package"], cwd=editor, env=env)
         name = "talewright.vsix" if target == "linux-x64" else f"talewright-{target}.vsix"
@@ -77,12 +94,16 @@ def install(args):
             code_args += ["--profile", args.profile]
         run(code_args, env=env)
 
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        current.unlink(missing_ok=True)
-        current.symlink_to(build, target_is_directory=True)
-        activated = True
-        shim.unlink(missing_ok=True)
-        shim.symlink_to(current / "Talewright.Cli")
+        if args.global_tool:
+            run(["dotnet", "tool", "update", "Talewright.Cli", "--global", "--allow-downgrade"]
+                + tool_source, env=env)
+        else:
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            current.unlink(missing_ok=True)
+            current.symlink_to(build, target_is_directory=True)
+            activated = True
+            shim.unlink(missing_ok=True)
+            shim.symlink_to(current / "Talewright.Cli")
         run([str(shim), "--help"], env=env)
         if previous and previous.exists():
             shutil.rmtree(previous)
@@ -92,7 +113,11 @@ def install(args):
 
     print(f"\nInstalled development CLI: {shim}")
     print(f"Installed development VSIX: {vsix}")
-    print('In VS Code, set talewright.cli.executablePath to the CLI path above.')
+    if args.global_tool:
+        print("Replaced the global .NET tool; its executable path is unchanged.")
+        print("VS Code can discover it automatically when talewright.cli.executablePath is empty.")
+    else:
+        print('In VS Code, set talewright.cli.executablePath to the CLI path above.')
     print('Clear talewright.languageServer.command to use the newly bundled server.')
     print('Run "Developer: Reload Window" to load the updated extension.')
     if shutil.which("talewright") != str(shim):
@@ -104,8 +129,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--code", default="code", help="VS Code CLI command or path (default: code)")
     parser.add_argument("--profile", help="VS Code profile to install into")
-    parser.add_argument("--bin-dir", type=Path, default=Path.home() / ".local/bin",
-                        help="Directory for the talewright symlink (default: ~/.local/bin)")
+    destination = parser.add_mutually_exclusive_group()
+    destination.add_argument("--bin-dir", type=Path, default=Path.home() / ".local/bin",
+                             help="Directory for the talewright symlink (default: ~/.local/bin)")
+    destination.add_argument("--global-tool", action="store_true",
+                             help="Replace the global .NET tool with a locally packed dev build")
     args = parser.parse_args()
     try:
         install(args)

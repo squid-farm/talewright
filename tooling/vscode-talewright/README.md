@@ -467,7 +467,8 @@ for supported syntax.
 ## Build and test
 
 For an all-in-one local CLI, debugger and VSIX install on Linux/macOS, run
-`python3 tooling/install-dev.py` from the repository root. Rerun after fixes, then
+`python3 tooling/install-dev.py` from the repository root. Add `--global-tool` to
+replace your global CLI without changing its path. Rerun after fixes, then
 reload VS Code. See [local development setup](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md#install-the-current-checkout-for-local-testing)
 for prerequisites and selecting the installed development CLI.
 

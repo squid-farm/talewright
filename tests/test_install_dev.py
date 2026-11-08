@@ -23,7 +23,7 @@ class InstallDevTests(unittest.TestCase):
         self.editor = self.root / "tooling/vscode-talewright"
         self.editor.mkdir(parents=True)
         self.args = argparse.Namespace(code="code-insiders", profile="Dev Profile",
-                                       bin_dir=self.root / "local bin")
+                                       bin_dir=self.root / "local bin", global_tool=False)
         self.commands = []
         self.failure = None
         for patcher in [
@@ -32,6 +32,7 @@ class InstallDevTests(unittest.TestCase):
             patch.object(installer.platform, "machine", return_value="x86_64"),
             patch.object(installer.shutil, "which", return_value="/usr/bin/tool"),
             patch.dict(os.environ, XDG_DATA_HOME=str(self.root / "data"),
+                       DOTNET_CLI_HOME=str(self.root / "dotnet home"),
                        TALEWRIGHT_RELEASE_TAG="v1.0.0"),
             patch.object(installer, "run", side_effect=self.run_command),
         ]:
@@ -52,6 +53,14 @@ class InstallDevTests(unittest.TestCase):
             name = "talewright.vsix" if target == "linux-x64" else f"talewright-{target}.vsix"
             (self.editor / "artifacts").mkdir(exist_ok=True)
             (self.editor / "artifacts" / name).write_text("fresh VSIX")
+        if command[:3] == ["dotnet", "tool", "install"]:
+            directory = Path(command[command.index("--tool-path") + 1])
+            directory.mkdir(parents=True)
+            (directory / "talewright").write_text("staged global tool")
+        if command[:3] == ["dotnet", "tool", "update"]:
+            shim = self.root / "dotnet home/.dotnet/tools/talewright"
+            shim.parent.mkdir(parents=True, exist_ok=True)
+            shim.write_text("fresh global tool")
 
     @property
     def home(self):
@@ -147,6 +156,50 @@ class InstallDevTests(unittest.TestCase):
             path.touch()
         installer.install(self.args)
         self.assertNotIn(["npm", "ci"], [command for command, _ in self.commands])
+
+    def test_global_tool_replaces_at_existing_path_with_unique_local_packages(self):
+        self.args.global_tool = True
+        shim = self.root / "dotnet home/.dotnet/tools/talewright"
+        shim.parent.mkdir(parents=True)
+        shim.write_text("released tool")
+        for _ in range(2):
+            installer.install(self.args)
+            self.assertEqual(shim.read_text(), "fresh global tool")
+            self.assertEqual(list(self.home.glob("build-*")), [])
+        updates = [command for command, _ in self.commands
+                   if command[:3] == ["dotnet", "tool", "update"]]
+        self.assertEqual(len(updates), 2)
+        versions = [command[command.index("--version") + 1] for command in updates]
+        self.assertNotEqual(versions[0], versions[1])
+        for command in updates:
+            self.assertIn("--global", command)
+            self.assertIn("--allow-downgrade", command)
+            self.assertIn("--no-http-cache", command)
+            self.assertIn("--source", command)
+            self.assertNotIn("--add-source", command)
+        self.assertFalse(any("publish" in command for command, _ in self.commands))
+        self.assertFalse(self.args.bin_dir.exists())
+        for update in updates:
+            version = update[update.index("--version") + 1]
+            pack = next(command for command, _ in self.commands if f"-p:Version={version}" in command)
+            self.assertEqual(pack[:2], ["dotnet", "pack"])
+        last = [command for command, _ in self.commands]
+        self.assertLess(last.index(["npm", "run", "test:package"]), last.index(updates[0]))
+
+    def test_global_tool_failures_do_not_uninstall_existing_tool(self):
+        self.args.global_tool = True
+        shim = self.root / "dotnet home/.dotnet/tools/talewright"
+        shim.parent.mkdir(parents=True)
+        for failing in ("pack", "install", "test:package", "--install-extension", "update"):
+            with self.subTest(failing=failing):
+                self.commands.clear()
+                shim.write_text("released tool")
+                self.failure = lambda command: failing in command
+                with self.assertRaises(subprocess.CalledProcessError):
+                    installer.install(self.args)
+                self.assertEqual(shim.read_text(), "released tool")
+                self.assertEqual(list(self.home.glob("build-*")), [])
+                self.assertFalse(any("uninstall" in command for command, _ in self.commands))
 
 
 if __name__ == "__main__":

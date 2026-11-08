@@ -41,7 +41,8 @@ dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostReli
 ```
 
 To install the current checkout's CLI, debugger and VSIX locally without a release,
-run `python3 tooling/install-dev.py` (Linux/macOS). See the
+run `python3 tooling/install-dev.py` (Linux/macOS). Add `--global-tool` to replace
+your global CLI while keeping its executable path. See the
 [local development installer](docs/developer/cli-setup.md#install-the-current-checkout-for-local-testing)
 for prerequisites, editor profiles and selecting the development CLI.
 
