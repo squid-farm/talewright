@@ -22,7 +22,7 @@ public sealed class ManifestNullContainerTests
             ("game.creation", Game + $"  creation: {Marker}\n" + Player, "must be a mapping"),
             ("game.creation.pronouns", Game + $"  creation:\n    pronouns: {Marker}\n" + Player, "must be a list"),
             ("game.creation.stats", Game + $"  creation:\n    stats: {Marker}\n" + Player, "must be a mapping"),
-            ("game.creation.stats.str", Game + $"  creation:\n    stats:\n      str: {Marker}\n" + Player, "must be a list"),
+            ("game.creation.stats.str", Game + $"  ruleset: rpg\n  creation:\n    stats:\n      str: {Marker}\n" + Player, "must be a list"),
             ("game.creation.presets", Game + $"  creation:\n    presets: {Marker}\n" + Player, "must be a mapping"),
             ("game.creation.presets entry", Game + $"  creation:\n    presets:\n      explorer: {Marker}\n" + Player, "must be a mapping"),
             ("game.creation.presets.stats", Game + $"  creation:\n    presets:\n      explorer:\n        stats: {Marker}\n" + Player, "must be a mapping"),

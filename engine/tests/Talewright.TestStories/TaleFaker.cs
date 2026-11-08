@@ -80,7 +80,7 @@ public sealed record TaleCast(string Player, IReadOnlyList<TaleCharacter> Compan
         var manifest = new ManifestFaker(id, id, start, seed)
         {
             Version = "1.0.0",
-            BaseRuleset = "generic",
+            BaseRuleset = "rpg",
         };
         manifest.Flag(Scouted.Id);
         manifest.Flag(Alarm.Id);

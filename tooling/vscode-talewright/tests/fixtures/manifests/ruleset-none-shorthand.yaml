@@ -1,0 +1,10 @@
+game:
+  id: ruleset-none-shorthand
+  title: None shorthand
+  start: beginning
+  ruleset: none
+characters:
+  player:
+    first-name: Ada
+factions:
+  guild: {}

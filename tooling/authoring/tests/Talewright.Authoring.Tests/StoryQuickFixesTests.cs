@@ -297,7 +297,7 @@ public sealed class StoryQuickFixesTests
     }
 
     [Theory]
-    [InlineData("generic")]
+    [InlineData("rpg")]
     [InlineData("none")]
     public void Missing_stat_expands_a_ruleset_shorthand_without_changing_its_base(string baseId)
     {
@@ -377,7 +377,7 @@ public sealed class StoryQuickFixesTests
     [Fact]
     public void Missing_stat_appends_to_existing_block_stats_and_preserves_overrides_comments_and_crlf()
     {
-        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\n  ruleset:\r\n    base: generic\r\n    disable: [cha] # keep disabled stat\r\n    stats:\r\n      - id: grit\r\n        category: custom # keep category\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
+        const string manifest = "game:\r\n  id: quick-fix\r\n  title: Quick Fix\r\n  start: start\r\n  ruleset:\r\n    base: rpg\r\n    disable: [cha] # keep disabled stat\r\n    stats:\r\n      - id: grit\r\n        category: custom # keep category\r\ncharacters:\r\n  player: {first-name: Ada}\r\n";
         const string story = "=== start\r\n~ player:charm += 1\r\n-> END\r\n";
         var analysis = AnalyzeManifest(manifest, story);
         var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");
@@ -437,7 +437,7 @@ public sealed class StoryQuickFixesTests
     [Fact]
     public void Disabled_builtin_stats_do_not_get_redeclared_as_custom_stats()
     {
-        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {base: generic, disable: [str]}\ncharacters:\n  player: {first-name: Ada}\n";
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  ruleset: {base: rpg, disable: [str]}\ncharacters:\n  player: {first-name: Ada}\n";
         const string story = "=== start\n~ player:str += 1\n-> END\n";
         var analysis = AnalyzeManifest(manifest, story);
         var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2001");

@@ -53,7 +53,7 @@ for branching paths and hubs to offer scenes whose requirements are met. The
 | D9 | State model: **event-sourced**. State is a fold over events, enabling event-log reconstruction, rewind, debugging, and scene-visit conditions. Player saves store replay inputs (seed, choice history, cursor, and character selection), not the event log. |
 | D10 | Combat is **out of scope** for early milestones (to be a future module). |
 | D11 | **Predefined protagonist** in M1. The MVP story's player is female. **Pronoun/grammar system** is in scope. |
-| D12 | The core ruleset is **generic, d20-style** (STR/DEX/CON/INT/WIS/CHA plus skills). It ships as a module that can be **disabled or replaced**. |
+| D12 | *Superseded by D20.* The core ruleset is **generic, d20-style** (STR/DEX/CON/INT/WIS/CHA plus skills). It ships as a module that can be **disabled or replaced**. |
 | D13 | M2 delivered saves with format/story identity and explicit rejection of incompatible saves without modifying them. Version-to-version migration is a separate **M8** milestone with explicit migration contracts and old/new fixtures; it is not an M3 requirement. |
 | D14 | The story is **never built into the engine**. Samples live in `samples/` as standalone story folders/projects. |
 | D15 | Distribution: M1 points the player at a folder or zip. M2 delivered `talewright publish`, which **bakes a story into the player** to produce itch.io-ready web and desktop zips. |
@@ -61,6 +61,7 @@ for branching paths and hubs to offer scenes whose requirements are met. The
 | D17 | Authoring tools are **editor-neutral**: CLI, MSBuild, and a C# Language Server Protocol (LSP) server reuse shared Talemark analysis and diagnostics. The VS Code extension is a thin client, not a second semantic implementation. |
 | D18 | Original phase plan: **M2** CLI validation and **M3** shared analysis, linting, and LSP/VS Code intelligence are shipped; **M9** safe autofixes remain planned, lowest priority. Validation checks correctness; lint adds configurable authoring/style advice; autofix never guesses story intent. |
 | D19 | **Production readiness before breadth, not backlog removal.** M2 prioritizes core reliability; M3 focuses on authoring. Preserve previously milestone-scoped features as numbered milestones: M4 media, M5 world simulation, M6 combat, M7 runtime plugins, M8 save migration, M9 autofix. Supporting work is organized as epics with explicit dependencies and acceptance criteria. |
+| D20 | Gameplay systems are off until a story declares or uses them: ready-made RPG stats and levelling with `ruleset`, items with `items`, factions with `factions`, skill checks by writing `skill-check`. There is no separate feature list. Future first-party systems (locations, clocks, combat) follow the same rule. Supersedes D12: the d20-style ruleset is opt-in as `ruleset: rpg`. |
 
 ## 4. Original architecture proposal (historical)
 
@@ -108,7 +109,7 @@ for actual project references, public contracts, and implemented types.
 - **Entity model** (composition, not inheritance): `Entity { EntityId, Kind }` plus typed **components** (Stats, Inventory, Pronouns, Names, Allegiances, Tags, …). The player, NPCs, factions, items and locations are all entities.
 - **Typed keys:** `StatKey<T>`, `EntityId`, `FactionId`, `ItemId`, and so on. These are strongly typed IDs. String names exist only at the authoring boundary.
 - **Stat definitions** come from the **ruleset**: id, value type (int/decimal/bool/enum/text), min/max, default, display name, category, and an optional **derived** formula (a predicate/expression tree).
-- **Ruleset modules:** `RulesetBuilder.Use(GenericRuleset).Remove(Generic.Strength).Add(MyStats.Charm)`. A dating sim drops STR/VIT and adds Charm/Affection. In YAML this is `ruleset: { base: generic, disable: [strength, vitality], add: [...] }`.
+- **Ruleset modules:** `RulesetBuilder.Use(GenericRuleset).Remove(Generic.Strength).Add(MyStats.Charm)`. A dating sim drops STR/VIT and adds Charm/Affection. In YAML this is `ruleset: { base: rpg, disable: [strength, vitality], add: [...] }`.
 - **Levels/XP:** stats plus a level-up rule supplied by the ruleset, not hardcoded.
 - **Inventory:** items are entities. Containment is a relation (owner → item, with quantity), which leaves room later for containers, equipment slots and shops.
 - **Factions and relationships:** `Relationship(from, to, kind, value)`, with reputation tiers defined by the ruleset (hostile … allied). This covers both faction allegiance and NPC affection.
@@ -231,7 +232,7 @@ src/
   Talewright.Core/              RPG engine: entities, stats, inventory, factions, events, state, RNG
   Talewright.Rules/             predicates, evaluator, storylets, modifiers, triggers, skill checks
   Talewright.Narrative/         template AST, document model, renderer, grammar/pronouns
-  Talewright.Rulesets.Generic/  default d20-ish attributes & skills (opt-out)
+  Talewright.Rulesets.Generic/  d20-ish attributes & skills (opt-in as `rpg`, D20)
   Talewright.Talemark/              .tale + story.talewright.yaml compiler (reader-text parser, YamlDotNet), diagnostics
   Talewright.Runtime/           IStorySession facade, command handling, frame production
   Talewright.Player/            Razor Class Library (UI)
@@ -405,7 +406,7 @@ the plan above:
 - **Fall-through diverts:** a choice or check outcome without `-> target` continues at the scene's first matching
   `->`, evaluated *after* its effects. This was not in the original syntax draft; it removes a lot of repetition.
   Superseded by ordered scene execution (#321): every choice and choice-check outcome now needs its own target.
-- **Built-in rulesets:** `generic` and `none` (no stats or checks; tiers only).
+- **Built-in rulesets:** `rpg` (opt-in d20-style stats, checks and levelling; formerly `generic`) and `none` (the default when `ruleset` is omitted: no stats or checks; tiers only). See D20.
 - **Bundled stories** are embedded resources in each host (`stories/<Story>/<path>`), read through
   `IStoryLibrary`. No HTTP manifest. Desktop also takes folders/zips on the command line; both hosts accept a zip
   upload.

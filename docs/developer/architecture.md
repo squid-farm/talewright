@@ -221,8 +221,8 @@ These are load-bearing. Breaking one will break saves, replays, tests or the "de
    re-rolls. Player saves do not persist that log: they store a seed and choice history, then recreate the
    session by replaying the story. `DeterministicDice.Roll(seed, index, sides)` makes that replay reproducible.
 3. **The engine has no built-in stats.** Strength, hit points, levels, reputation tiers, how checks resolve: all
-   come from the `Ruleset`. `Talewright.Core` does not mention "strength" anywhere. The generic d20 set is an
-   opt-out module.
+   come from the `Ruleset`. `Talewright.Core` does not mention "strength" anywhere. The d20 set is an
+   opt-in module (`ruleset: rpg`; see plan D20).
 4. **No string parsing at play time.** Templates and conditions are compiled into typed trees (`Expr`,
    `TemplateInline`, `Effect`). Rendering a frame walks trees; it never parses.
 5. **No reflection or runtime code generation in the engine.** This keeps Blazor WASM trimming safe. Extension
@@ -275,14 +275,16 @@ Folders:
 - **`Randomness/DeterministicDice.cs`**: SplitMix64-based `Roll(seed, index, sides)`. The index is
   `state.RollCount`, which advances with each `DiceRolled` event.
 
-### 3.2 `Talewright.Rulesets.Generic` — the default d20-flavoured ruleset
+### 3.2 `Talewright.Rulesets.Generic` — the opt-in d20-flavoured RPG ruleset
 
 `GenericRuleset.Create()` builds: six attributes (`str dex con int wis cha`, 1–30, default 10), a list of skills
 each governed by an attribute (athletics→STR, perception→WIS, history→INT, survival→WIS …), `hp`, `xp`, `level`,
 the five reputation tiers, `D20SkillCheckRule` (d20 + skill + attribute modifier vs DC; with randomness off it
-"takes 10"), and `ExperienceLevelingRule` (level _n_ needs 100 × _n_ × (_n_ − 1) / 2 XP: 0, 100, 300, 600 …; max 20). It is registered under the name `generic`.
-There is also `none` (no stats, no checks, just the tiers) for stories such as dating sims that want to define
-everything themselves. Both are listed in `CompilerOptions.DefaultRulesets()`.
+"takes 10"), and `ExperienceLevelingRule` (level _n_ needs 100 × _n_ × (_n_ − 1) / 2 XP: 0, 100, 300, 600 …; max 20). It is registered under the name `rpg`;
+the C# names keep `Generic`. A story opts in with `ruleset: rpg` or `ruleset: { base: rpg }`. Without a
+`ruleset`, or with a `ruleset` mapping that has no `base`, a story uses `none` (no stats, no checks, just the
+tiers) plus any stats it declares. Both are listed in `CompilerOptions.DefaultRulesets()`. Unknown names report
+TW4004 and recover with `rpg` so stat references keep resolving.
 
 ### 3.3 `Talewright.Rules` — the rules engine
 
@@ -521,7 +523,8 @@ flowchart LR
    for the shared source/root/member mapping. Image reads enforce the archive expansion budget
    without counting repeated reads as new content; no expanded image cache is retained by the adapter.
 2. **Compile.** `StoryCompiler` reads `story.talewright.yaml`:
-   - `ruleset.base` picks a ruleset factory (`generic`, `none`, or one you registered); `ruleset.disable`
+   - `ruleset` (a name) or `ruleset.base` picks a ruleset factory (`rpg`, `none`, or one you registered;
+     omitted means `none`); `ruleset.disable`
      removes stats; `ruleset.stats` adds or overrides them.
    - `characters`, `items`, `factions`, `flags`, `vars`, `triggers` become the `WorldDefinition` and
      `TriggerDefinition`s.
@@ -640,8 +643,8 @@ This is how the "dating sim doesn't want strength" requirement is met, and where
 
 | I want to…                                        | Today (no code, story.talewright.yaml)                                                              | With C# (`Talewright` / `Talewright.Player` packages)                      |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Remove default stats                              | `game: { ruleset: { base: generic, disable: [str, con] } }`                              | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
-| Start from nothing                                | `game: { ruleset: { base: none } }`                                                      | `new RulesetBuilder("mine")`                                               |
+| Remove RPG stats                                  | `game: { ruleset: { base: rpg, disable: [str, con] } }`                                  | `GenericRuleset.Create().ToBuilder().RemoveStat(...)`                      |
+| Start from nothing                                | omit `game.ruleset`                                                                      | `new RulesetBuilder("mine")`                                               |
 | Add stats (affection, sanity…)                    | `game: { ruleset: { stats: [ { id: affection, name: Affection, category: custom, max: 100 } ] } }` | `builder.AddStat(new StatDefinition(...))`                                 |
 | Change how checks work (2d6, percentile, no dice) | pick a ruleset that has the rule                                                         | implement `ISkillCheckRule`, `WithSkillCheckRule`                          |
 | Change levelling                                  | —                                                                                        | implement `ILevelingRule`                                                  |
@@ -667,7 +670,7 @@ event means touching `GameState.Apply`), and save formats.
 | Question                                   | Look in                                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | Where does a stat's value come from?       | `GameState.GetStat` (base + `IStatModifier`s + held items, clamped)                                           |
-| Why did a skill check pass/fail?           | `D20SkillCheckRule.Resolve` (generic) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
+| Why did a skill check pass/fail?           | `D20SkillCheckRule.Resolve` (`rpg`) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |
@@ -680,13 +683,13 @@ event means touching `GameState.Apply`), and save formats.
 | Where are the styles?                      | `Talewright.Player/wwwroot/talewright.css`                                                                    |
 | How do bundled stories get into the app?   | `EmbeddedResource` in the host `.csproj` + `EmbeddedStoryLibrary`                                             |
 | How does the desktop app take a path?      | `Talewright.Host.Desktop/Program.cs`                                                                          |
-| The default stats/skills list              | `GenericRuleset.Create` and `GenericRuleset.Skills`                                                           |
+| The RPG stats/skills list                  | `GenericRuleset.Create` and `GenericRuleset.Skills`                                                           |
 
 ---
 
 ## 8. Testing
 
-One xUnit test project per engine project, under `engine/tests/` (the generic ruleset is tested in `Talewright.Core.Tests`):
+One xUnit test project per engine project, under `engine/tests/` (the RPG ruleset is tested in `Talewright.Core.Tests`):
 
 | Project                      | What it covers                                                                                                                                                                              |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -80,7 +80,7 @@ Giving a character a value does not declare the skill. See the complete
 | TW3001 | Text before the first scene, or no `.tale` files at all. | Start each file with `=== scene.id`. |
 | TW3002 | Dead end: a scene with no way out. | Add choices, `-> target` or `-> END`. |
 | TW3003 | A choice or choice-check outcome has no explicit target. | Add `-> target` or `-> END` to that choice/outcome. Scene diverts are not fallbacks. Also appears as a side effect of TW2002. |
-| TW3005 | The ruleset has no skill-check rule. | Use the `generic` ruleset, or remove the checks. |
+| TW3005 | The ruleset has no skill-check rule. | Add `ruleset: rpg` to the `game` section, or remove the checks. |
 | TW3007 | The `start` scene doesn't exist. | Fix `game.start:` in `story.talewright.yaml`. |
 | ⚠ TW3008 | A hub has no scenes with its tags. | Tag some scenes, or fix the hub's tag. |
 | ⚠ TW3009 | A scene can never be reached. | Link to it, or remove it. Only shown once there are no errors. |
@@ -100,7 +100,7 @@ story ends there.
 | TW4001 | Invalid YAML. | Check indentation (spaces, not tabs) and colons. |
 | TW4002 | Something required is missing: `story.talewright.yaml` itself, `game.id`, `game.title`, `game.start`, the `player` character, a character's `first-name`, custom pronoun `agreement`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. Custom pronoun sets require `agreement: singular` or `agreement: plural`. |
 | TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers, invalid grammatical number, invalid item `uncountable`, and wrong-category governing-attribute links. | Read the message for the allowed values. Item `name-agreement` must be `singular` or `plural`, and `uncountable` must be `true` or `false`. `governing-attribute` belongs only to `category: skill` and must target `category: attribute`. |
-| TW4004 | Unknown ruleset. | Use `generic` or `none`. |
+| TW4004 | Unknown ruleset. | Use `rpg`, or a ruleset your C# story project registers. |
 | TW4005 | Unknown stat or item in `story.talewright.yaml`, or an unknown/disabled `governing-attribute` target. | Fix the spelling, or declare it under `game.ruleset.stats` / `items`. Governing attributes must resolve to enabled attributes after `disable` and all stat declarations. |
 | TW4006 | Unknown or non-scalar configuration key. | Correct or remove the key; the message lists the expected keys. |
 | TW4007 | A declaration identity is repeated, two triggers have the same id, or more than one configuration file declares `triggers:`. | Remove or rename the duplicate; keep one authored trigger list. Cross-file conflicts name both sources. |

@@ -20,6 +20,7 @@ public sealed class AuthorScenarioTests
         {
             Version = "1.0.0",
             CreationName = true,
+            BaseRuleset = "rpg",
         };
         manifest.CreationPronouns("she", "they");
         manifest.CreationStat("str", 8, 12, 16);

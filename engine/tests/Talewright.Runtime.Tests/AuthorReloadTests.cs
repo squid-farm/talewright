@@ -20,7 +20,7 @@ public sealed class AuthorReloadTests
         bool includeChainFlag = false,
         bool? autosave = null)
     {
-        var manifest = new ManifestFaker("reload", "Reload", "start") { Autosave = autosave };
+        var manifest = new ManifestFaker("reload", "Reload", "start") { Autosave = autosave, BaseRuleset = "rpg" };
         manifest.Flag("ready");
         manifest.Flag("rewarded");
         if (includeChainFlag)

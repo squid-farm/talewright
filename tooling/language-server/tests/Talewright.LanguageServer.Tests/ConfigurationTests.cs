@@ -44,7 +44,7 @@ public sealed partial class ServerTests
         var yaml = Manifest.Replace("  start: start", """
               start: start
               ruleset:
-                base: generic
+                base: rpg
                 disable: [str]
                 stats:
                   - {id: tracking, category: skill, governing-attribute: grit}

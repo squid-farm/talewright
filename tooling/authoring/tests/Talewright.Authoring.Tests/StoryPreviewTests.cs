@@ -15,6 +15,7 @@ public sealed class StoryPreviewTests
           id: preview
           title: Preview
           start: start
+          ruleset: rpg
         characters:
           player: {first-name: Mara, last-name: Burns, pronouns: she}
         vars: {weather: "sunny", coins: 3}

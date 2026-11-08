@@ -13,7 +13,7 @@ public class StorySessionTests
 
     private static string BuildYaml(string randomness = "off")
     {
-        var manifest = new ManifestFaker("test", "Test", "camp", 42) { Randomness = randomness };
+        var manifest = new ManifestFaker("test", "Test", "camp", 42) { Randomness = randomness, BaseRuleset = "rpg" };
         manifest.Character("player", "Mara", "Burns",
             new Dictionary<string, int> { ["dex"] = 14, ["athletics"] = 2 }, "she");
         manifest.Faction("guild", "Explorers' Guild");
@@ -255,6 +255,7 @@ public class StorySessionTests
               title: Test
               start: camp
               randomness: off
+              ruleset: rpg
             characters:
               player: { first-name: Mara, pronouns: she }
             triggers:

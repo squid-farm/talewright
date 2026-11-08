@@ -20,26 +20,24 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
     {
         if (node is null)
         {
-            return Base(_options.Rulesets[Rulesets.Generic.GenericRuleset.Id]());
+            return Base(_options.Rulesets[ManifestVocabulary.RulesetNone]());
+        }
+
+        if (node is YamlScalarNode shorthand && !IsNullLike(shorthand))
+        {
+            return Base(Named(shorthand));
         }
 
         var map = _yaml.Mapping(node, ManifestVocabulary.Ruleset);
         if (map is null)
         {
-            return Base(_options.Rulesets[Rulesets.Generic.GenericRuleset.Id]());
+            return Base(_options.Rulesets[ManifestVocabulary.RulesetNone]());
         }
 
         _yaml.CheckKeys(map, ManifestVocabulary.Base, ManifestVocabulary.Disable, ManifestVocabulary.Stats);
         var baseNode = Get(map, ManifestVocabulary.Base);
-        var baseId = baseNode is null ? Rulesets.Generic.GenericRuleset.Id
-            : _yaml.Identifier(baseNode, "ruleset id") ?? Rulesets.Generic.GenericRuleset.Id;
-        if (!_options.Rulesets.TryGetValue(baseId, out var factory))
-        {
-            _yaml.Error(Get(map, ManifestVocabulary.Base)!, CompilerDiagnosticCodes.UnknownRuleset, $"Unknown ruleset '{baseId}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
-            factory = _options.Rulesets[Rulesets.Generic.GenericRuleset.Id];
-        }
-
-        var baseRuleset = Base(factory());
+        var baseRuleset = Base(baseNode is null ? _options.Rulesets[ManifestVocabulary.RulesetNone]() : Named(baseNode));
+        var baseId = baseRuleset.Id;
         var builder = baseRuleset.ToBuilder();
         var governingAttributes = new Dictionary<StatId, YamlNode>();
         if (Get(map, ManifestVocabulary.Disable) is { } disable)
@@ -135,6 +133,24 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
         }
 
         return ruleset;
+    }
+
+    // YAML null spellings and empty or '~' scalars are missing containers, not ruleset names.
+    private static bool IsNullLike(YamlScalarNode node) =>
+        node.Value is null or "" or "~" ||
+        (node.Style == YamlDotNet.Core.ScalarStyle.Plain && node.Value is "null" or "Null" or "NULL");
+
+    private Ruleset Named(YamlNode node)
+    {
+        // Unknown names recover with the RPG ruleset so stat references keep resolving while the author fixes the name.
+        var id = _yaml.Identifier(node, "ruleset id") ?? Rulesets.Generic.GenericRuleset.Id;
+        if (!_options.Rulesets.TryGetValue(id, out var factory))
+        {
+            _yaml.Error(node, CompilerDiagnosticCodes.UnknownRuleset, $"Unknown ruleset '{id}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
+            factory = _options.Rulesets[Rulesets.Generic.GenericRuleset.Id];
+        }
+
+        return factory();
     }
 
     private Ruleset Base(Ruleset ruleset)

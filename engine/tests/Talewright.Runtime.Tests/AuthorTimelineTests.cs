@@ -18,7 +18,7 @@ public sealed class AuthorTimelineTests
         string factionId = "guild",
         bool includeChainFlag = false)
     {
-        var manifest = new ManifestFaker("timeline", "Timeline", "start") { Undo = false };
+        var manifest = new ManifestFaker("timeline", "Timeline", "start") { Undo = false, BaseRuleset = "rpg" };
         manifest.Flag("ready");
         manifest.Flag("fired");
         if (includeChainFlag)

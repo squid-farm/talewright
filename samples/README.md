@@ -20,7 +20,7 @@ Opening the sample presents **character creation**: editable names, she/they/he
 pronouns, Explorer/Scholar presets and bounded Strength/Courage choices.
 **Start story** keeps the authored Mara defaults. Scholar starts with Lucidity 3;
 solving the journal adds 2 for either preset. Will governs Lucidity using the
-existing generic formula: **die + Lucidity + floor((Will - 10) / 2)**.
+existing RPG formula: **die + Lucidity + floor((Will - 10) / 2)**.
 Scholar starts with Will 14 (+2); Explorer uses Will 10 (+0).
 
 ### Chapter progression and organization
@@ -124,7 +124,7 @@ fingerprint; there is no save migration.
 - `randomness: checks-only` and `undo: true` are active. A fixed `seed` is
   commented in the manifest. In a **copy**, set a seed or `randomness: off`
   for reproducible/take-10 checks; use `undo: false` to hide history controls.
-- `ruleset.base: none` is an alternative to Generic. Custom player pronouns
+- Omitting `ruleset` (no RPG stats or checks) is an alternative to `base: rpg`. Custom player pronouns
   without a picker are another alternative; the guide already uses explicit fields.
 - C# named predicates, custom text modifiers, rulesets and build-time validation
   need a compiled host. See the [C# example](../examples/CSharpStory/README.md);

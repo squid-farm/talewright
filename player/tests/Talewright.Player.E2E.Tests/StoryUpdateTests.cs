@@ -27,6 +27,7 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
         {
             Version = updated ? "2" : "1",
             Randomness = "checks-only",
+            BaseRuleset = "rpg",
         };
         manifest.Character("player", "Mara", "Burns", new Dictionary<string, int> { ["athletics"] = 2 }, "she");
         manifest.Number("rope", 0);

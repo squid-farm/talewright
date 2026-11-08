@@ -10,7 +10,7 @@ No Blazor or Photino dependencies.
 | [Graphs](../../engine/src/Talewright.Graphs/README.md) | Directed graphs and reachability, used for story analysis |
 | [Rules](../../engine/src/Talewright.Rules/README.md) | Conditions, effects, checks, triggers, storylet selection |
 | [Narrative](../../engine/src/Talewright.Narrative/README.md) | Templates, grammar, presentation-independent documents |
-| [Rulesets.Generic](../../engine/src/Talewright.Rulesets.Generic/README.md) | The default, behaviorally replaceable d20 ruleset |
+| [Rulesets.Generic](../../engine/src/Talewright.Rulesets.Generic/README.md) | The opt-in, behaviorally replaceable d20 RPG ruleset (`ruleset: rpg`) |
 | [Talewright.Talemark](../../engine/src/Talewright.Talemark/README.md) | Talemark source loading, compilation, validation, diagnostics |
 | [Runtime](../../engine/src/Talewright.Runtime/README.md) | Story sessions, frames, event narration |
 

@@ -1,7 +1,9 @@
-# Talewright.Rulesets.Generic — the default ruleset
+# Talewright.Rulesets.Generic — the RPG ruleset
 
-A familiar d20-flavoured set of stats and rules, used by stories that say `ruleset: { base: generic }`. It is
-**opt-out**: a story can disable parts of it (`disable: [cha, hp]`) or use `base: none` and define everything.
+A familiar d20-flavoured set of stats and rules. RPG mechanics are **opt-in**: a story turns this ruleset on with
+`ruleset: rpg` (or `ruleset: { base: rpg }`, which can also disable parts of it, such as `disable: [cha, hp]`).
+A story with no `ruleset` has no stats and no levelling rule. The C# names keep `Generic`; the author-facing ID is
+`rpg`.
 
 ## What it defines (`GenericRuleset.Create()`)
 

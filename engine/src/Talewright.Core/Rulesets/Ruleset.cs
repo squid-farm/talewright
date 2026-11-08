@@ -9,7 +9,7 @@ namespace Talewright.Core.Rulesets;
 /// </summary>
 /// <remarks>
 /// Nothing in the engine assumes a particular stat exists. A dating sim can start from
-/// <see cref="Empty"/> or remove <c>str</c>/<c>con</c> from the generic ruleset and add <c>charm</c>.
+/// <see cref="Empty"/> or remove <c>str</c>/<c>con</c> from the RPG ruleset and add <c>charm</c>.
 /// </remarks>
 public sealed class Ruleset
 {

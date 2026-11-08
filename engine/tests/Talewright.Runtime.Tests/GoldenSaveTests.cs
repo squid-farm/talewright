@@ -19,7 +19,7 @@ public class GoldenSaveTests
     public void Lost_relic_quick_save_restores_the_trigger_step()
     {
         var (save, history) = Restore("lost-relic-quick.twsave",
-            "CB20708F97C7936BCF6F1FF4297ED84CF14A423EFF698E7B008E7D64B7E39F83", LostRelic());
+            "02A724FD636FB15AA777895DECA11EFA5806477951802AE394AA04ABFB9ABE5B", LostRelic());
 
         Assert.Equal(11, history.Cursor);
         Assert.False(history.CanForward);
@@ -34,7 +34,7 @@ public class GoldenSaveTests
     public void Lost_relic_named_save_restores_redo_before_the_skill_check()
     {
         var (save, history) = Restore("lost-relic-slot.twsave",
-            "1AC9AEFE1441073766E4BE8D443F0B45F4FBA0CCEE7551C21CDE978DE50080B2", LostRelic());
+            "AB9A595AE5543BCEB7D213EEA6FD4A595C59FEBCC4C3A9A9C9362DAF03A21708", LostRelic());
 
         Assert.Equal(13, history.Cursor);
         Assert.Equal(14, save.Choices.Count);
@@ -53,7 +53,7 @@ public class GoldenSaveTests
     public void Lost_relic_autosave_restores_the_failed_skill_check()
     {
         var (save, history) = Restore("lost-relic-autosave.twsave",
-            "7EF237B98D356537C9BCE23F32EA9B672D3EF7613F33603132B0CE49B4A62F53", LostRelic());
+            "73B7028DBAC0F65ED6A89279796EDBF8AC5D7BD47F4E4AB98FF551B51C3B8CDB", LostRelic());
 
         Assert.Equal(14, history.Cursor);
         Assert.False(history.CanForward);
@@ -68,7 +68,7 @@ public class GoldenSaveTests
         var fixture = Path.Combine(Root, "engine", "tests", "Talewright.Runtime.Tests", "SaveSamples", "golden",
             "lost-relic-trigger.twtrigger");
         var bytes = File.ReadAllBytes(fixture);
-        Assert.Equal("EE21E6CCF1E30649DF9352406683367AAA6CDE9FF54CAA1B468FBAB8ABF311B4",
+        Assert.Equal("0B1E998F9936B89887D32DF8D55D27167F4CF395D57F243843FE28EB7FBF7BB8",
             Convert.ToHexString(SHA256.HashData(bytes)));
 
         var (story, expected) = CreateLostRelicTriggerCheckpoint();

@@ -64,6 +64,7 @@ public sealed partial class ServerTests
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
     {
         await using var client = new Client();
+        DeclareRpg(client);
         var registrations = AuthoringProjectMetadata.Export(CompilerOptions.Default) with
         {
             Predicates = ["IsHero"],
@@ -171,6 +172,7 @@ public sealed partial class ServerTests
     public async Task Applying_protocol_text_edit_preserves_surrounding_syntax(string line, string label, string expected)
     {
         await using var client = new Client();
+        DeclareRpg(client);
         File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "factions: {guild: {name: Guild}}\nitems: {rope: Rope}\n");
         await client.Initialize();
         var marked = "=== start\n" + line;
@@ -199,7 +201,7 @@ public sealed partial class ServerTests
         var marked = list.StartsWith("inventory", StringComparison.Ordinal)
             ? Manifest.Replace("first-name: Ada", "first-name: Ada\n    " + list) + "items: {rope: Rope}\n"
             : Manifest.Replace("  start: start",
-                "  start: start\n  ruleset: {" + list.Replace("\n", "\n    ", StringComparison.Ordinal) + "}\n");
+                "  start: start\n  ruleset: {base: rpg, " + list.Replace("\n", "\n    ", StringComparison.Ordinal) + "}\n");
         await client.Open(StorySource.ManifestFileName, marked.Replace("|", ""), 1);
         var item = Assert.Single(Items(await Completion(client, StorySource.ManifestFileName, marked)), HasLabel(label));
         var range = item.GetProperty("textEdit").GetProperty("range");

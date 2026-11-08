@@ -164,7 +164,7 @@ public sealed class ExpressionSyntaxBindingTests
         var score = new VarId("score");
         var numbers = textVariable ? new Dictionary<VarId, int>() : new Dictionary<VarId, int> { [score] = 0 };
         var text = textVariable ? new Dictionary<VarId, string> { [score] = "" } : new Dictionary<VarId, string>();
-        var world = new WorldDefinition(options.Rulesets["generic"](), [], [], [], [], numbers, text);
+        var world = new WorldDefinition(options.Rulesets["rpg"](), [], [], [], [], numbers, text);
         return new StorySymbols
         {
             World = world,

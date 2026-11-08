@@ -13,7 +13,7 @@ public sealed class ValidationTests : IDisposable
     public ValidationTests()
     {
         Directory.CreateDirectory(_root);
-        var manifest = new ManifestFaker("cli", "CLI", "a") { Version = "1" };
+        var manifest = new ManifestFaker("cli", "CLI", "a") { Version = "1", BaseRuleset = "rpg" };
         manifest.Character("player", "Tester");
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
         File.WriteAllText(Path.Combine(_root, "main.tale"), string.Join('\n',

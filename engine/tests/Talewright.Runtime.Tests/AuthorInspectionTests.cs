@@ -19,7 +19,7 @@ public sealed class AuthorInspectionTests
 
     private static ManifestFaker CreateManifest()
     {
-        var manifest = new ManifestFaker("inspection", "Inspection", "start", 42) { Randomness = "checks-only" };
+        var manifest = new ManifestFaker("inspection", "Inspection", "start", 42) { Randomness = "checks-only", BaseRuleset = "rpg" };
         manifest.Flag("ready");
         manifest.Flag("unused");
         manifest.Number("count", 0);
