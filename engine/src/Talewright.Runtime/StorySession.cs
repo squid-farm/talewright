@@ -102,7 +102,7 @@ public sealed class StorySession : IStorySession
         _beforeEntry = beforeEntry;
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
-        _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry);
+        _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice);
     }
 
     /// <inheritdoc/>
@@ -239,11 +239,8 @@ public sealed class StorySession : IStorySession
                 }
                 else
                 {
-                    selected = new ChoiceView(key,
-                        [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)])
-                    {
-                        ReplayIdentity = identity,
-                    };
+                    selected = ChoiceAvailability.CreateView(key,
+                        () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)], identity);
                     _log.Append(new ChoiceMade(scene.Id, key));
                     Enter(target, []);
                 }
@@ -329,48 +326,53 @@ public sealed class StorySession : IStorySession
                 _log.Events.Count, _log.Events.Count));
     }
 
-    private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> OfferChoices(
-        SceneDefinition scene, IReadOnlyList<OfferedSceneChoice> choices)
+    private List<OfferedChoice> OfferChoices(SceneDefinition scene, IReadOnlyList<OfferedChoice> choices)
     {
-        var offered = new List<(ChoiceView, Action<List<RenderedBlock>>)>();
-        foreach (var choice in choices)
-        {
-            offered.Add((choice.View, notes => MakeChoice(scene, choice.Step, notes)));
-        }
+        var offered = new List<OfferedChoice>(choices);
 
         if (scene.Hub is { } hub)
         {
-            foreach (var storylet in StoryletSelector.SelectEligible(Story.Scenes, hub, Context, scene.Id,
-                scene.HubLimit, _observer, _log.Events.Count))
+            var hubOffers = new Dictionary<SceneId, OfferedChoice>();
+            var storylets = StoryletSelector.SelectEligible(Story.Scenes, hub, Context, scene.Id,
+                scene.HubLimit, _observer, _log.Events.Count, storylet =>
+                {
+                    var key = StoryletKeyPrefix + storylet.Id.Value;
+                    var target = new DivertTarget(storylet.Id);
+                    var candidate = new ChoiceCandidate(key, storylet.Requires,
+                        () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)],
+                        notes =>
+                        {
+                            _log.Append(new ChoiceMade(scene.Id, key));
+                            Enter(target, notes);
+                        },
+                        _replayIdentities.ForDivert(scene.Id, target));
+                    var offer = ChoiceAvailability.Evaluate(candidate, Context, _observer is not null, out var trace);
+                    if (offer is not null)
+                    {
+                        hubOffers.Add(storylet.Id, offer);
+                    }
+                    return (offer is not null, trace);
+                });
+            foreach (var storylet in storylets)
             {
-                var label = new RenderedInline[] { new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None) };
-                var key = StoryletKeyPrefix + storylet.Id.Value;
-                var target = new DivertTarget(storylet.Id);
-                offered.Add((new ChoiceView(key, label)
-                {
-                    ReplayIdentity = _replayIdentities.ForDivert(scene.Id, target),
-                }, notes =>
-                {
-                    _log.Append(new ChoiceMade(scene.Id, key));
-                    Enter(target, notes);
-                }));
+                offered.Add(hubOffers[storylet.Id]);
             }
         }
 
         return offered;
     }
 
-    private List<(ChoiceView View, Action<List<RenderedBlock>> Action)> ContinueTo(
+    private List<OfferedChoice> ContinueTo(
         SceneDefinition source, DivertTarget target)
     {
-        return [(new ChoiceView(ContinueKey, ChoiceView.ContinueLabel)
-        {
-            ReplayIdentity = _replayIdentities.ForDivert(source.Id, target),
-        }, notes =>
-        {
-            _log.Append(new ChoiceMade(source.Id, ContinueKey));
-            Enter(target, notes);
-        })];
+        var candidate = new ChoiceCandidate(ContinueKey, null, () => ChoiceView.ContinueLabel,
+            notes =>
+            {
+                _log.Append(new ChoiceMade(source.Id, ContinueKey));
+                Enter(target, notes);
+            },
+            _replayIdentities.ForDivert(source.Id, target));
+        return [new(candidate, ChoiceAvailability.CreateView(candidate))];
     }
 
     // ---- choosing --------------------------------------------------------------------------------------------------
@@ -430,12 +432,12 @@ public sealed class StorySession : IStorySession
     private IEnumerable<RenderedBlock> NotesSince(int mark) =>
         EventNarrator.Describe(_log.Events.Skip(mark).ToList(), _log.State);
 
-    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, List<(ChoiceView View, Action<List<RenderedBlock>> Action)> choices)
+    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, List<OfferedChoice> choices)
     {
         _actions.Clear();
-        foreach (var (view, action) in choices)
+        foreach (var choice in choices)
         {
-            _actions[view.Key] = (action, view.ReplayIdentity);
+            _actions[choice.Candidate.Key] = (choice.Candidate.Destination, choice.View.ReplayIdentity);
         }
 
         Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks), choices.Select(c => c.View).ToList(), IsEnded: false);

@@ -20,7 +20,7 @@ while (!frame.IsEnded)
 |---|---|
 | `IStorySession.cs` | `Start()`, `Choose(key)`, `Current`, `State` (`IGameStateView`), `Events`, `Seed`, `Story`. |
 | `StorySession.cs` | The loop: entering scenes, building choices, resolving choices. The class doc comment is the spec. |
-| `SceneExecutor.cs` | Source-order step execution, branch decisions, effect batches, checks and inline notes. |
+| `SceneExecutor.cs` | Source-order step execution, branch decisions, effect batches, checks and inline notes; reached choices become candidates for the shared availability path. |
 | `StoryFrame.cs` | `StoryFrame(Scene, Title, Document, Choices, IsEnded)` and `ChoiceView(Key, Label)` (`Label` is rendered inlines; `.Text` gives plain text). |
 | `EventNarrator.cs` | Events → `RenderedNote`s ("Gained: rope", "Hit Points −3 (7)", "Athletics check: 10 +2 = 12 vs DC 12 — success", "Explorers' Guild −20 (now Unfriendly)", "Level 2!"). Other characters' changes are prefixed with their name. |
 
@@ -31,7 +31,8 @@ Full description in [architecture §5](../../../docs/developer/architecture.md#5
 - **Enter scene:** `SceneEntered` → settle visit-trigger consequences → execute ordered steps. Render prose at
   its line; decide each block condition once; apply each effect batch, settle triggers/leveling and insert notes
   there. Checks resolve at their line. A reached divert stops execution with Continue (or a final END frame).
-  Otherwise offer collected choices, followed by eligible hub storylets.
+  Otherwise offer collected choices, followed by eligible hub storylets. Both sources use the same choice-candidate
+  availability and view builder; hub filtering, priority and limits remain source-specific.
 - **Choose:** `ChoiceMade` → choice effect batch → optional check/outcome batch → explicit target.
   `AfterBatch` settles triggers and leveling after each complete batch. `BeforeTransition` clears the old
   continuation and entry boundary. Choice consequences appear at the top of the next frame.

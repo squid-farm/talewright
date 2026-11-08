@@ -45,6 +45,8 @@ already true so they don't fire on load.
 context)` accepts a `StoryletTags` query, including single-tag queries. It selects matching storylets
 whose requirements hold and that aren't spent `Once` storylets, by descending
 priority then declaration order. This is the "hub" mechanism now and the open-world location mechanism later.
+An overload accepts a caller-supplied requirement evaluator when selection must share availability work with
+menu construction; its expression trace is retained in decision observations.
 
 ### Optional execution observation
 
