@@ -707,49 +707,74 @@ internal static class ManifestListEditor
     private static bool MatchesAfterSettingRulesetBase(
         YamlMappingNode original, YamlMappingNode edited, string baseId)
     {
-        var gameKey = new YamlScalarNode(ManifestVocabulary.Game);
-        var rulesetKey = new YamlScalarNode(ManifestVocabulary.Ruleset);
+        if (!TryGetRulesetMappingsPreservingOtherEntries(
+                original, edited, out var originalRuleset, out var editedRuleset))
+            return false;
+
         var baseKey = new YamlScalarNode(ManifestVocabulary.Base);
-        return original.Children.Count == edited.Children.Count &&
-            TryFindEntry(original, gameKey, out var originalGameNode) &&
-            originalGameNode is YamlMappingNode originalGame &&
-            TryFindEntry(edited, gameKey, out var editedGameNode) &&
-            editedGameNode is YamlMappingNode editedGame &&
-            MappingsMatchExcept(original, edited, gameKey) &&
-            originalGame.Children.Count == editedGame.Children.Count &&
-            TryFindEntry(originalGame, rulesetKey, out var originalRulesetNode) &&
-            originalRulesetNode is YamlMappingNode originalRuleset &&
-            TryFindEntry(editedGame, rulesetKey, out var editedRulesetNode) &&
-            editedRulesetNode is YamlMappingNode editedRuleset &&
-            MappingsMatchExcept(originalGame, editedGame, rulesetKey) &&
-            originalRuleset.Children.Count == editedRuleset.Children.Count &&
-            TryFindEntry(editedRuleset, baseKey, out var editedBaseNode) &&
-            editedBaseNode is YamlScalarNode { Value: var value } && value == baseId &&
-            MappingsMatchExcept(originalRuleset, editedRuleset, baseKey);
+        if (originalRuleset.Children.Count != editedRuleset.Children.Count)
+            return false;
+        if (!TryFindEntry(editedRuleset, baseKey, out var editedBaseNode))
+            return false;
+        if (editedBaseNode is not YamlScalarNode editedBase || editedBase.Value != baseId)
+            return false;
+
+        return MappingsMatchExcept(originalRuleset, editedRuleset, baseKey);
     }
 
     private static bool MatchesAfterAddingRulesetBase(
         YamlMappingNode original, YamlMappingNode edited, string baseId)
     {
-        var gameKey = new YamlScalarNode(ManifestVocabulary.Game);
-        var rulesetKey = new YamlScalarNode(ManifestVocabulary.Ruleset);
+        if (!TryGetRulesetMappingsPreservingOtherEntries(
+                original, edited, out var originalRuleset, out var editedRuleset))
+            return false;
+
         var baseKey = new YamlScalarNode(ManifestVocabulary.Base);
-        return original.Children.Count == edited.Children.Count &&
-            TryFindEntry(original, gameKey, out var originalGameNode) &&
-            originalGameNode is YamlMappingNode originalGame &&
-            TryFindEntry(edited, gameKey, out var editedGameNode) &&
-            editedGameNode is YamlMappingNode editedGame &&
-            MappingsMatchExcept(original, edited, gameKey) &&
-            originalGame.Children.Count == editedGame.Children.Count &&
-            TryFindEntry(originalGame, rulesetKey, out var originalRulesetNode) &&
-            originalRulesetNode is YamlMappingNode originalRuleset &&
-            TryFindEntry(editedGame, rulesetKey, out var editedRulesetNode) &&
-            editedRulesetNode is YamlMappingNode editedRuleset &&
-            MappingsMatchExcept(originalGame, editedGame, rulesetKey) &&
-            editedRuleset.Children.Count == originalRuleset.Children.Count + 1 &&
-            TryFindEntry(editedRuleset, baseKey, out var editedBaseNode) &&
-            editedBaseNode is YamlScalarNode { Value: var value } && value == baseId &&
-            MappingsMatchExcept(originalRuleset, editedRuleset, baseKey);
+        if (editedRuleset.Children.Count != originalRuleset.Children.Count + 1)
+            return false;
+        if (!TryFindEntry(editedRuleset, baseKey, out var editedBaseNode))
+            return false;
+        if (editedBaseNode is not YamlScalarNode editedBase || editedBase.Value != baseId)
+            return false;
+
+        return MappingsMatchExcept(originalRuleset, editedRuleset, baseKey);
+    }
+
+    private static bool TryGetRulesetMappingsPreservingOtherEntries(
+        YamlMappingNode original, YamlMappingNode edited,
+        out YamlMappingNode originalRuleset, out YamlMappingNode editedRuleset)
+    {
+        originalRuleset = null!;
+        editedRuleset = null!;
+
+        if (original.Children.Count != edited.Children.Count)
+            return false;
+
+        var gameKey = new YamlScalarNode(ManifestVocabulary.Game);
+        if (!TryFindEntry(original, gameKey, out var originalGameNode) ||
+            originalGameNode is not YamlMappingNode originalGame)
+            return false;
+        if (!TryFindEntry(edited, gameKey, out var editedGameNode) ||
+            editedGameNode is not YamlMappingNode editedGame)
+            return false;
+        if (!MappingsMatchExcept(original, edited, gameKey))
+            return false;
+        if (originalGame.Children.Count != editedGame.Children.Count)
+            return false;
+
+        var rulesetKey = new YamlScalarNode(ManifestVocabulary.Ruleset);
+        if (!TryFindEntry(originalGame, rulesetKey, out var originalRulesetNode) ||
+            originalRulesetNode is not YamlMappingNode originalMapping)
+            return false;
+        if (!TryFindEntry(editedGame, rulesetKey, out var editedRulesetNode) ||
+            editedRulesetNode is not YamlMappingNode editedMapping)
+            return false;
+        if (!MappingsMatchExcept(originalGame, editedGame, rulesetKey))
+            return false;
+
+        originalRuleset = originalMapping;
+        editedRuleset = editedMapping;
+        return true;
     }
 
     private static bool TryFindEntry(YamlMappingNode mapping, YamlNode key, out YamlNode value)
