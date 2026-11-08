@@ -193,6 +193,96 @@ public class StorySessionTests
         Assert.True(first.OfType<DiceRolled>().Select(d => d.Result).Distinct().Count() > 1);
     }
 
+    private static string OwnStatYaml(string randomness) => $$"""
+        game:
+          id: bridge
+          title: Bridge
+          start: bridge
+          randomness: {{randomness}}
+          ruleset:
+            stats:
+              - { id: nerve, name: Nerve }
+        characters:
+          player: { first-name: Ada, stats: { nerve: 3 } }
+        """;
+
+    private static string BridgeTale(int dc) => $"""
+        === bridge
+        * [Cross the rope bridge] skill-check nerve dc {dc}
+          success: -> far-side
+          failure: -> river
+        === far-side
+        -> END
+        === river
+        -> END
+        """;
+
+    [Theory]
+    [InlineData(13, "success", "far-side")]
+    [InlineData(14, "failure", "river")]
+    public void Checks_on_a_story_stat_take_10_without_a_ruleset(int dc, string outcome, string scene)
+    {
+        var story = Compile(BridgeTale(dc), OwnStatYaml("off"));
+        Assert.Equal("none", story.World.Ruleset.Id);
+
+        var session = new StorySession(story);
+        session.Start();
+        var frame = session.Choose("c0");
+
+        // Nerve is a custom stat, so its value (3) is added to the fixed 10.
+        Assert.Equal(new SceneId(scene), frame.Scene);
+        var note = Assert.IsType<RenderedNote>(frame.Document.Blocks[0]);
+        Assert.Equal($"Nerve check: 10 +3 = 13 vs DC {dc} — {outcome}", note.Text);
+        Assert.Empty(session.Events.OfType<DiceRolled>());
+    }
+
+    [Fact]
+    public void Checks_on_a_story_stat_roll_a_d20_plus_its_value_without_a_ruleset()
+    {
+        var story = Compile(BridgeTale(12), OwnStatYaml("checks-only"));
+        var outcomes = new HashSet<bool>();
+
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var session = new StorySession(story, seed: seed);
+            session.Start();
+            var frame = session.Choose("c0");
+
+            var dice = Assert.Single(session.Events.OfType<DiceRolled>());
+            var check = Assert.Single(session.Events.OfType<SkillCheckResolved>());
+            Assert.Equal(20, dice.Sides);
+            Assert.Equal(dice.Result, check.Roll);
+            Assert.Equal(3, check.Modifier);
+            Assert.Equal(dice.Result + 3, check.Total);
+            Assert.Equal(12, check.Difficulty);
+            Assert.Equal(check.Total >= 12, check.Success);
+            Assert.Equal(new SceneId(check.Success ? "far-side" : "river"), frame.Scene);
+            outcomes.Add(check.Success);
+        }
+
+        Assert.Equal([false, true], outcomes.Order());
+    }
+
+    [Fact]
+    public void Stories_without_checks_never_roll_dice_without_a_ruleset()
+    {
+        var story = Compile("""
+            === bridge
+            * [Cross] -> far-side
+            * [Wait] -> bridge
+            === far-side
+            -> END
+            """, OwnStatYaml("checks-only"));
+
+        var session = new StorySession(story, seed: 7);
+        session.Start();
+        session.Choose("c1");
+        session.Choose("c0");
+
+        Assert.Empty(session.Events.OfType<DiceRolled>());
+        Assert.Empty(session.Events.OfType<SkillCheckResolved>());
+    }
+
     [Fact]
     public void Hubs_offer_eligible_storylets_by_priority()
     {

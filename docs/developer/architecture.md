@@ -282,8 +282,8 @@ each governed by an attribute (athletics→STR, perception→WIS, history→INT,
 the five reputation tiers, `D20SkillCheckRule` (d20 + skill + attribute modifier vs DC; with randomness off it
 "takes 10"), and `ExperienceLevelingRule` (level _n_ needs 100 × _n_ × (_n_ − 1) / 2 XP: 0, 100, 300, 600 …; max 20). It is registered under the name `rpg`;
 the C# names keep `Generic`. A story opts in with `ruleset: rpg` or `ruleset: { base: rpg }`. Without a
-`ruleset`, or with a `ruleset` mapping that has no `base`, a story uses `none` (no stats, no checks, just the
-tiers) plus any stats it declares. Both are listed in `CompilerOptions.DefaultRulesets()`. Unknown names report
+`ruleset`, or with a `ruleset` mapping that has no `base`, a story uses `none` (no stats or levelling; just the
+tiers and `D20SkillCheckRule`, so checks work on declared stats) plus any stats it declares. Both are listed in `CompilerOptions.DefaultRulesets()`. Unknown names report
 TW4004 and recover with `rpg` so stat references keep resolving.
 
 ### 3.3 `Talewright.Rules` — the rules engine
@@ -670,7 +670,7 @@ event means touching `GameState.Apply`), and save formats.
 | Question                                   | Look in                                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | Where does a stat's value come from?       | `GameState.GetStat` (base + `IStatModifier`s + held items, clamped)                                           |
-| Why did a skill check pass/fail?           | `D20SkillCheckRule.Resolve` (`rpg`) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
+| Why did a skill check pass/fail?           | `D20SkillCheckRule.Resolve` (`none` and `rpg`) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |

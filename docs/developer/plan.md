@@ -406,7 +406,7 @@ the plan above:
 - **Fall-through diverts:** a choice or check outcome without `-> target` continues at the scene's first matching
   `->`, evaluated *after* its effects. This was not in the original syntax draft; it removes a lot of repetition.
   Superseded by ordered scene execution (#321): every choice and choice-check outcome now needs its own target.
-- **Built-in rulesets:** `rpg` (opt-in d20-style stats, checks and levelling; formerly `generic`) and `none` (the default when `ruleset` is omitted: no stats or checks; tiers only). See D20.
+- **Built-in rulesets:** `rpg` (opt-in d20-style stats, checks and levelling; formerly `generic`) and `none` (the default when `ruleset` is omitted: no stats or levelling; tiers and the d20 check rule, so checks work on declared stats). See D20.
 - **Bundled stories** are embedded resources in each host (`stories/<Story>/<path>`), read through
   `IStoryLibrary`. No HTTP manifest. Desktop also takes folders/zips on the command line; both hosts accept a zip
   upload.

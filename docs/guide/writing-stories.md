@@ -101,8 +101,9 @@ there is no general name/item grammar inference.
 
 ### Turning on RPG rules
 
-A story has no stats, skill checks or levelling until you turn them on. Add `ruleset: rpg` to the
-`game` section to use a familiar d20-style ruleset:
+A story has no stats or levelling until you add them. [Skill checks](#skill-checks) work on any stat
+you declare. Add `ruleset: rpg` to the `game` section to use a familiar d20-style ruleset with
+ready-made stats and levelling:
 
 ```yaml
 game:
@@ -119,7 +120,9 @@ It gives every character these stats:
 | Progression | `xp`, `level` (1–20) |
 
 You can add your own stats (`courage`, `sanity`, ...) or remove ones you don't want. A `ruleset`
-section without `base: rpg` declares only your own stats, with no RPG rules. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml).
+section without `base: rpg` declares only your own stats. They work in skill checks, but there is no
+levelling. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml)
+and [your own stats with skill checks](authoring-recipes.md#your-own-stats-with-skill-checks).
 For a complete declaration and check, see [add a skill for your setting](authoring-recipes.md#add-a-skill-for-your-setting).
 Lost Relic adds Courage (a bounded custom stat) and Lucidity (a bounded skill).
 Scholar starts with Lucidity 3 and Will 14; solving the journal adds 2 Lucidity.
@@ -281,8 +284,18 @@ failure: -> hall
 An entry-check outcome without `->` continues with the next line. An outcome with a target leaves
 immediately. Checks can appear inside block conditions or before later prose, but not after choices.
 
-A check rolls a d20 and adds the skill and its attribute bonus. Another character can make the check:
-`skill-check guide survival dc 10`. Results are shown to the player in the story.
+Checks work on any stat, with or without `ruleset: rpg`. A check rolls a d20, adds a modifier and
+succeeds when the total is at least the DC. The modifier depends on the stat's category:
+
+- `attribute`: `floor((score - 10) / 2)`, so 14 adds +2 and 5 adds −3.
+- Any other category: the stat's value, plus its linked attribute's modifier if it has one. Stats
+  you declare are `custom` unless you say otherwise, so Nerve 3 adds 3. Built-in RPG skills such as
+  `athletics` are linked to an attribute.
+
+For stats on a small scale, keep the default `custom` category; see
+[your own stats with skill checks](authoring-recipes.md#your-own-stats-with-skill-checks).
+Another character can make the check: `skill-check guide survival dc 10`. Results are shown to the
+player in the story. Dice are only rolled for checks.
 
 Want the same rolls every time? Set `seed: 1234` in `story.talewright.yaml`. For no dice at all, set
 `randomness: off`, which treats every roll as a 10.

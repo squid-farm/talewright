@@ -134,8 +134,8 @@ game:
   undo: true # default; false hides Back/Forward without disabling saves
   autosave: true # default; false stops new automatic recovery writes
   character-sheet: true # default; false hides the sheet, { inventory: false } hides sections
-  ruleset: # optional; omitted = no stats, skill checks or levelling
-    base: rpg # turns on the built-in RPG stats, skill checks and levelling
+  ruleset: # optional; omitted = no stats or levelling (skill checks work on declared stats)
+    base: rpg # turns on the built-in RPG stats and levelling
     disable: [cha] # remove stats from the base ruleset
     stats: # add stats
       - id: courage
@@ -175,12 +175,13 @@ triggers:
     once: true
 ```
 
-RPG mechanics are opt-in. Without `game.ruleset`, a story has no stats, no
-skill-check rule and no levelling; faction tiers still work. `ruleset: rpg` is
-shorthand for `ruleset: { base: rpg }` and turns on the built-in d20-style
-stats, skill checks and levelling. A `ruleset` mapping without `base` declares
-only its own `stats`. An unknown ruleset name is an error (TW4004) that lists
-the available rulesets.
+RPG stats are opt-in. Without `game.ruleset`, a story uses the `none` ruleset:
+no stats and no levelling, but faction tiers work and `skill-check` works on
+any stat the story declares (see [skill checks](#6-skill-checks)).
+`ruleset: rpg` is shorthand for `ruleset: { base: rpg }` and turns on the
+built-in d20-style stats and levelling. A `ruleset` mapping without `base`
+declares only its own `stats` on top of `none`. An unknown ruleset name is an
+error (TW4004) that lists the available rulesets.
 
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
@@ -816,9 +817,16 @@ An outcome's effects run there as one batch. An outcome with `->` leaves immedia
 an entry check continues with the next line. Multiple checks and checks inside block conditions
 are allowed, but all must precede the final choices. Choice-check outcomes always require targets.
 
-Optional actor: `skill-check guide survival dc 10`. Resolution is defined by the ruleset
-(`rpg`: `d20 + attribute modifier + skill rank ≥ DC`). Dice are seeded and recorded as events.
-With `randomness: off`, checks are deterministic (`10 + modifiers ≥ DC`).
+Optional actor: `skill-check guide survival dc 10`. Checks work on any declared stat. Both built-in
+rulesets (`none` and `rpg`) resolve them as `d20 + modifier ≥ DC`:
+
+- A stat with `category: attribute` adds `floor((score - 10) / 2)`, so a 0–10 attribute of 5 rolls at −3.
+- Any other stat (`custom`, the default for declared stats, `skill`, `resource` or `progression`)
+  adds its value, plus its `governing-attribute`'s modifier when it has one.
+
+Dice are seeded and recorded as events, and are only rolled for checks.
+With `randomness: off`, checks are deterministic (`10 + modifier ≥ DC`). A ruleset registered from
+C# may define its own check rule; one without a check rule rejects `skill-check` (TW3005).
 
 ## 7. Diagnostics
 
