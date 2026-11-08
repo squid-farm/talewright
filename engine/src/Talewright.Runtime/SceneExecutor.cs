@@ -202,22 +202,19 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     }
 
     public ChoiceView View(ChoiceDefinition choice) =>
-        ChoiceAvailability.CreateView(choice.Key,
-            () => choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel,
-            _replayIdentities.For(choice));
+        ChoiceAvailability.CreateView(choice.Key, LabelSource(choice), _replayIdentities.For(choice));
 
     public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text) =>
         renderer.RenderInlines(text, log.State);
 
-    private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step) =>
-        new(step.Choice.Key, step.Choice.Requires, LabelSource(step.Choice),
-            step.Choice.Shown is { } shown
-                ? shown.Text is { } text
-                    ? () => renderer.RenderInlines(text, log.State)
-                    : LabelSource(step.Choice)
-                : null,
+    private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step)
+    {
+        var label = LabelSource(step.Choice);
+        return new(step.Choice.Key, step.Choice.Requires, label,
+            ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render),
             notes => makeChoice(scene, step, notes),
             _replayIdentities.For(step.Choice));
+    }
 
     private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice) =>
         () => choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel;

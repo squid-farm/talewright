@@ -239,8 +239,7 @@ public sealed class StorySession : IStorySession
                 }
                 else
                 {
-                    selected = ChoiceAvailability.CreateView(key,
-                        () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)], identity);
+                    selected = ChoiceAvailability.CreateView(key, HubLabelSource(storylet), identity);
                     _log.Append(new ChoiceMade(scene.Id, key));
                     Enter(target, []);
                 }
@@ -338,13 +337,9 @@ public sealed class StorySession : IStorySession
                 {
                     var key = StoryletKeyPrefix + storylet.Id.Value;
                     var target = new DivertTarget(storylet.Id);
-                    var candidate = new ChoiceCandidate(key, storylet.Requires,
-                        () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)],
-                        storylet.Shown is { } shown
-                            ? shown.Text is { } text
-                                ? () => _executor.Render(text)
-                                : () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)]
-                            : null,
+                    var label = HubLabelSource(storylet);
+                    var candidate = new ChoiceCandidate(key, storylet.Requires, label,
+                        ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render),
                         notes =>
                         {
                             _log.Append(new ChoiceMade(scene.Id, key));
@@ -366,6 +361,9 @@ public sealed class StorySession : IStorySession
 
         return offered;
     }
+
+    private static Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
+        () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
 
     private List<VisibleChoice> ContinueTo(
         SceneDefinition source, DivertTarget target)

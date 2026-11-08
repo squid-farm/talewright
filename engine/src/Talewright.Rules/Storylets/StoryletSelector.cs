@@ -109,17 +109,21 @@ public static class StoryletSelector
         Func<T, (bool Available, ExpressionTrace? Trace)>? evaluateRequirement)
         where T : IStorylet
     {
-        return Array.AsReadOnly(SelectMenuCore(storylets, tags, context, exclude, limit, observer, eventIndex,
-                evaluateRequirement is null
-                    ? null
-                    : storylet =>
-                    {
-                        var result = evaluateRequirement(storylet);
-                        return (result.Available, ShowWhenUnavailable: false, result.Trace);
-                    })
+        Func<T, (bool Available, bool ShowWhenUnavailable, ExpressionTrace? Trace)>? evaluate = null;
+        if (evaluateRequirement is not null)
+        {
+            evaluate = storylet =>
+            {
+                var result = evaluateRequirement(storylet);
+                return (result.Available, ShowWhenUnavailable: false, result.Trace);
+            };
+        }
+
+        var available = SelectMenuCore(storylets, tags, context, exclude, limit, observer, eventIndex, evaluate)
             .Where(candidate => candidate.IsAvailable)
             .Select(candidate => candidate.Storylet)
-            .ToArray());
+            .ToArray();
+        return Array.AsReadOnly(available);
     }
 
     private static IReadOnlyList<(T Storylet, bool IsAvailable)> SelectMenuCore<T>(
@@ -193,8 +197,19 @@ public static class StoryletSelector
             }
             if (available)
             {
-                var reason = duplicate ? DecisionReason.Duplicate
-                    : limit is { } cap && selected.Count >= cap ? DecisionReason.HubLimit : DecisionReason.PriorityOrder;
+                DecisionReason reason;
+                if (duplicate)
+                {
+                    reason = DecisionReason.Duplicate;
+                }
+                else if (limit is { } cap && selected.Count >= cap)
+                {
+                    reason = DecisionReason.HubLimit;
+                }
+                else
+                {
+                    reason = DecisionReason.PriorityOrder;
+                }
                 var included = reason == DecisionReason.PriorityOrder;
                 if (included)
                 {

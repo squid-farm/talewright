@@ -1,6 +1,8 @@
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
@@ -38,4 +40,25 @@ internal static class ChoiceAvailability
     public static ChoiceView CreateView(string key, Func<IReadOnlyList<RenderedInline>> labelSource,
         ReadOnlyMemory<byte>? replayIdentity) =>
         new(key, labelSource()) { ReplayIdentity = replayIdentity };
+
+    /// <summary>
+    /// The label to show while the requirement is false: the <c>shown</c> text if given, otherwise the normal label.
+    /// Null when there is no <c>shown</c> clause, so the candidate stays hidden.
+    /// </summary>
+    public static Func<IReadOnlyList<RenderedInline>>? ShownLabelSource(ShownDefinition? shown,
+        Func<IReadOnlyList<RenderedInline>> labelSource,
+        Func<IReadOnlyList<TemplateInline>, IReadOnlyList<RenderedInline>> render)
+    {
+        if (shown is null)
+        {
+            return null;
+        }
+
+        if (shown.Text is not { } text)
+        {
+            return labelSource;
+        }
+
+        return () => render(text);
+    }
 }
