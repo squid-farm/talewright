@@ -123,10 +123,31 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     var candidate = CreateCandidate(scene, choice);
                     var offered = ChoiceAvailability.Evaluate(candidate,
                         new(log.State, story.Predicates), observer is not null, out var requirement);
-                    Observe(DecisionKind.Choice, step.Id, offered is not null ? DecisionOutcome.Offered : DecisionOutcome.Excluded,
-                        choice.Choice.Requires is null ? DecisionReason.Unconditional
-                            : offered is not null ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse,
-                        requirement, log.Events.Count);
+                    DecisionOutcome choiceOutcome;
+                    if (offered is not null)
+                    {
+                        choiceOutcome = DecisionOutcome.Offered;
+                    }
+                    else
+                    {
+                        choiceOutcome = DecisionOutcome.Excluded;
+                    }
+
+                    DecisionReason choiceReason;
+                    if (choice.Choice.Requires is null)
+                    {
+                        choiceReason = DecisionReason.Unconditional;
+                    }
+                    else if (offered is not null)
+                    {
+                        choiceReason = DecisionReason.ConditionTrue;
+                    }
+                    else
+                    {
+                        choiceReason = DecisionReason.ConditionFalse;
+                    }
+
+                    Observe(DecisionKind.Choice, step.Id, choiceOutcome, choiceReason, requirement, log.Events.Count);
                     if (offered is not null)
                     {
                         choices.Add(offered);
