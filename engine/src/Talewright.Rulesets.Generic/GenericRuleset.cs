@@ -5,7 +5,7 @@ using Talewright.Core.State;
 namespace Talewright.Rulesets.Generic;
 
 /// <summary>
-/// The default, opt-out ruleset: six d20-style attributes, eighteen skills, hit points, experience and levels,
+/// The built-in RPG ruleset a story opts into with <c>ruleset: rpg</c>: six d20-style attributes, eighteen skills, hit points, experience and levels,
 /// five reputation tiers, d20 skill checks and an XP leveling curve.
 /// </summary>
 /// <remarks>
@@ -14,7 +14,7 @@ namespace Talewright.Rulesets.Generic;
 /// </remarks>
 public static class GenericRuleset
 {
-    public const string Id = "generic";
+    public const string Id = "rpg";
 
     public static readonly StatId Strength = new("str");
     public static readonly StatId Dexterity = new("dex");
@@ -49,7 +49,7 @@ public static class GenericRuleset
         ("persuasion", "Persuasion", Charisma),
     ];
 
-    /// <summary>Builds a fresh copy of the generic ruleset.</summary>
+    /// <summary>Builds a fresh copy of the RPG ruleset.</summary>
     public static Ruleset Create()
     {
         var builder = new RulesetBuilder(Id)

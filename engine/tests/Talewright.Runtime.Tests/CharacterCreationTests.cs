@@ -15,6 +15,7 @@ public sealed class CharacterCreationTests
         var manifest = new ManifestFaker("creation", "Creation", "a")
         {
             CreationName = creation ? true : null,
+            BaseRuleset = "rpg",
         };
         manifest.Character("player", "Default");
         if (creation)

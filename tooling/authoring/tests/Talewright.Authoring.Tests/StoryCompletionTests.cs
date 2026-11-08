@@ -13,6 +13,7 @@ public sealed class StoryCompletionTests
           id: complete
           title: Complete
           start: first
+          ruleset: rpg
         characters:
           player: {first-name: Ada}
           guide: {first-name: Bea}
@@ -271,8 +272,8 @@ public sealed class StoryCompletionTests
     [InlineData("game:\n  start: |", "second")]
     [InlineData("game:\n  start: \"sec|ond\"", "second")]
     [InlineData("game:\n  start: \"\\u0073ec|ond\"", "second")]
-    [InlineData("game:\n  ruleset: {base: gen|}", "generic")]
-    [InlineData("game:\n  ruleset: {disable: [h|]}", "hp")]
+    [InlineData("game:\n  ruleset: {base: rp|}", "rpg")]
+    [InlineData("game:\n  ruleset: {base: rpg, disable: [h|]}", "hp")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    inventory: [ro|]", "rope")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    stats: {h|: 10}", "hp")]
     [InlineData("items:\n  rope:\n    name: Rope\n    modifiers: {h|: 1}", "hp")]
@@ -509,8 +510,8 @@ public sealed class StoryCompletionTests
                     .AddStat(new(new("focus"), "Focus", StatCategory.Custom, 0, 10, 5)).Build()
             }
         };
-        var baseName = disabled == "hp" ? "generic" : "project";
-        var yaml = Manifest.Replace("  start: first", $"  start: first\n  ruleset:\n    base: {baseName}\n    disable: [{disabled}]\n    stats:\n      - id: added\n        min: 0\n        max: 10");
+        var baseName = disabled == "hp" ? "rpg" : "project";
+        var yaml = Manifest.Replace("  start: first\n  ruleset: rpg", $"  start: first\n  ruleset:\n    base: {baseName}\n    disable: [{disabled}]\n    stats:\n      - id: added\n        min: 0\n        max: 10");
         var source = new StorySource(new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n{player:added}\n-> END"
@@ -533,10 +534,10 @@ public sealed class StoryCompletionTests
     [InlineData("\"gr|\"")]
     public void Governing_attribute_completion_uses_only_final_enabled_attributes(string markedValue)
     {
-        var marked = Manifest.Replace("  start: first", """
+        var marked = Manifest.Replace("  start: first\n  ruleset: rpg", """
               start: first
               ruleset:
-                base: generic
+                base: rpg
                 disable: [str]
                 stats:
                   - {id: tracking, category: skill, governing-attribute: VALUE}
@@ -561,10 +562,10 @@ public sealed class StoryCompletionTests
     [InlineData("characters:\n  player: {first-name: Ada, inventory: [ | ]}", "rope", "[ rope ]")]
     [InlineData("characters:\n  player: {first-name: Ada, inventory: [  |]}", "rope", "[  rope]")]
     [InlineData("characters:\n  player: {first-name: Ada, inventory: [\n    |]}", "rope", "    rope]")]
-    [InlineData("ruleset: {disable: [|]}", "hp", "[hp]")]
-    [InlineData("ruleset: {disable: [ | ]}", "hp", "[ hp ]")]
-    [InlineData("ruleset: {disable: [|  ]}", "hp", "[hp  ]")]
-    [InlineData("ruleset: {disable: [\n  |]}", "hp", "  hp]")]
+    [InlineData("ruleset: {base: rpg, disable: [|]}", "hp", "[hp]")]
+    [InlineData("ruleset: {base: rpg, disable: [ | ]}", "hp", "[ hp ]")]
+    [InlineData("ruleset: {base: rpg, disable: [|  ]}", "hp", "[hp  ]")]
+    [InlineData("ruleset: {base: rpg, disable: [\n  |]}", "hp", "  hp]")]
     public void Empty_flow_reference_lists_offer_insertion_edits(string fragment, string label, string expectedList)
     {
         var marked = "game:\n  id: flow\n  title: Flow\n  start: first\n" +
@@ -596,7 +597,7 @@ public sealed class StoryCompletionTests
                     .AddStat(new(new("focus"), "Focus", StatCategory.Custom, 0, 10, 5)).Build()
             }
         };
-        var marked = Manifest.Replace("  start: first",
+        var marked = Manifest.Replace("  start: first\n  ruleset: rpg",
             "  start: first\n  ruleset:\n    base: project\n    disable: [ | ]\n    stats: [{id: added, min: 0, max: 10}]");
         var caret = marked.IndexOf('|');
         var analysis = AuthoringProjectMetadata.Export(options).Analyze(new StorySource(new Dictionary<string, string>

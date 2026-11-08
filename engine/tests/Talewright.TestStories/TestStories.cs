@@ -13,6 +13,7 @@ public static class TestStories
         {
             Randomness = randomness,
             CreationName = creationName,
+            BaseRuleset = "rpg",
         };
         manifest.Character("player", "Mara", "Burns",
             new Dictionary<string, int> { ["athletics"] = 2 }, "she");
@@ -29,7 +30,7 @@ public static class TestStories
 
     public static ManifestFaker ExpressionManifest(string id, string title, string start)
     {
-        var manifest = new ManifestFaker(id, title, start);
+        var manifest = new ManifestFaker(id, title, start) { BaseRuleset = "rpg" };
         manifest.Character("player", "Mara", "Burns", pronouns: "she");
         manifest.Faction("river", "River Guild", 12);
         manifest.Item("lantern", "Lantern");

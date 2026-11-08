@@ -35,6 +35,7 @@ public class CompilerTests
           version: 1.0.0
           start: a
           seed: 42
+          ruleset: rpg
         characters:
           player:
             first-name: Mara
@@ -635,7 +636,7 @@ public class CompilerTests
         Assert.Equal("none", story.World.Ruleset.Id);
         Assert.False(story.World.Ruleset.HasStat(new StatId("str")));
 
-        // No check rule in "none", and unknown generic stats are rejected.
+        // No check rule in "none", and unknown RPG stats are rejected.
         Error("=== a\n* [x] skill-check charm dc 5\n  success: -> END\n  failure: -> END", "TW3005", DatingSim);
         Error("=== a\n{player:str}\n-> END", "TW2001", DatingSim);
 
@@ -644,11 +645,75 @@ public class CompilerTests
               id: t
               title: T
               start: a
-              ruleset: { base: generic, disable: [cha] }
+              ruleset: { base: rpg, disable: [cha] }
             characters:
               player: { first-name: Ann, pronouns: she }
             """;
         Error("=== a\n{player:cha}\n-> END", "TW2001", NoCharisma);
+    }
+
+    [Fact]
+    public void Rpg_mechanics_are_opt_in()
+    {
+        const string NoRuleset = """
+            game:
+              id: t
+              title: T
+              start: a
+            characters:
+              player: { first-name: Ann }
+            factions:
+              guild: { standing: 12 }
+            """;
+        var plain = Ok("=== a\n{if faction:guild:tier == friendly}Welcome.{/if}\n-> END", NoRuleset);
+        Assert.Equal("none", plain.World.Ruleset.Id);
+        Assert.Empty(plain.World.Ruleset.Stats);
+        Assert.Null(plain.World.Ruleset.SkillCheckRule);
+        Assert.Null(plain.World.Ruleset.LevelingRule);
+        Assert.Equal(["hostile", "unfriendly", "neutral", "friendly", "allied"],
+            plain.World.Ruleset.Tiers.Select(tier => tier.Id));
+        Error("=== a\n{player:hp}\n-> END", "TW2001", NoRuleset);
+        Error("=== a\n* [x] skill-check athletics dc 5\n  success: -> END\n  failure: -> END", "TW3005", NoRuleset);
+
+        foreach (var ruleset in new[] { "ruleset: rpg", "ruleset: { base: rpg }" })
+        {
+            var rpg = Ok("=== a\nHP {player:hp}.\n* [x] skill-check athletics dc 5\n  success: -> END\n  failure: -> END",
+                NoRuleset.Replace("start: a", $"start: a\n  {ruleset}"));
+            Assert.Equal("rpg", rpg.World.Ruleset.Id);
+            Assert.NotNull(rpg.World.Ruleset.SkillCheckRule);
+            Assert.NotNull(rpg.World.Ruleset.LevelingRule);
+            Assert.True(rpg.World.Ruleset.HasStat(new StatId("hp")));
+        }
+
+        var none = Ok("=== a\n-> END", NoRuleset.Replace("start: a", "start: a\n  ruleset: none"));
+        Assert.Equal("none", none.World.Ruleset.Id);
+        Assert.Empty(none.World.Ruleset.Stats);
+
+        var declared = NoRuleset.Replace("start: a", "start: a\n  ruleset:\n    stats:\n      - { id: charm, max: 10 }");
+        var custom = Ok("=== a\n{player:charm}\n-> END", declared);
+        Assert.Equal("none", custom.World.Ruleset.Id);
+        Assert.Equal([new StatId("charm")], custom.World.Ruleset.Stats.Select(stat => stat.Id));
+        Assert.Null(custom.World.Ruleset.SkillCheckRule);
+        Error("=== a\n{player:hp}\n-> END", "TW2001", declared);
+    }
+
+    [Theory]
+    [InlineData("ruleset: generic")]
+    [InlineData("ruleset: { base: generic }")]
+    public void Generic_is_not_a_ruleset_name(string ruleset)
+    {
+        var yaml = $$"""
+            game:
+              id: t
+              title: T
+              start: a
+              {{ruleset}}
+            characters:
+              player: { first-name: Ann }
+            """;
+        var error = Error("=== a\n{player:hp}\n-> END", "TW4004", yaml);
+        Assert.Equal("Unknown ruleset 'generic'. Available: rpg, none.", error.Message);
+        Assert.DoesNotContain(Compile("=== a\n{player:hp}\n-> END", yaml).Errors, diagnostic => diagnostic.Code == "TW2001");
     }
 
     [Fact]
@@ -657,7 +722,7 @@ public class CompilerTests
         Assert.False(Compile("=== a\n-> END", "id: x\ntitle: [").Success);
         Error("=== a\n-> END", "TW4002", "id: x\ntitle: X\nstart: a\n");
         Error("=== a\n-> END", "TW4005", Yaml.Replace("inventory: [rope]", "inventory: [sword]"));
-        Error("=== a\n-> END", "TW4004", Yaml.Replace("seed: 42", "seed: 42\n  ruleset: { base: gurps }"));
+        Error("=== a\n-> END", "TW4004", Yaml.Replace("ruleset: rpg", "ruleset: { base: gurps }"));
         Error("=== a\n-> END", "TW4003", Yaml.Replace("pronouns: she", "pronouns: ze"));
     }
 
@@ -674,7 +739,7 @@ public class CompilerTests
                       title: Test
                       start: start
                       ruleset:
-                        base: generic
+                        base: rpg
                         stats:
                           - { id: custom-stat, category: {{spelling}} }
                     characters:
@@ -699,7 +764,7 @@ public class CompilerTests
               title: Test
               start: start
               ruleset:
-                base: generic
+                base: rpg
                 stats:
                   - { id: custom-stat, category: {{keyword}} }
             characters:
@@ -720,7 +785,7 @@ public class CompilerTests
               title: Test
               start: start
               ruleset:
-                base: generic
+                base: rpg
                 stats:
                   - { id: custom-stat, category: unknown }
             characters:
@@ -1240,7 +1305,7 @@ public class CompilerTests
     [Fact]
     public void Dotted_stat_names_remain_valid()
     {
-        var yaml = Yaml.Replace("seed: 42", "seed: 42\n  ruleset:\n    base: generic\n    stats:\n      - { id: pronoun.fluency, default: 3 }");
+        var yaml = Yaml.Replace("ruleset: rpg", "ruleset:\n    base: rpg\n    stats:\n      - { id: pronoun.fluency, default: 3 }");
         var story = Ok("=== a\n{player:pronoun.fluency}\n-> END", yaml);
         Assert.Equal("3", Render(story, story.GetScene(new SceneId("a"))));
     }

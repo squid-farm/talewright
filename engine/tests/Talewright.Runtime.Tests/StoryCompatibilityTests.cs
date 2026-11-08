@@ -395,7 +395,7 @@ public sealed class StoryCompatibilityTests
     public void Initial_evidence_has_a_frozen_encoding()
     {
         var history = new StoryHistory(TestStories.Linear.Compile(), 42);
-        Assert.Equal("03DAEE9310D6DF8136C34ACADD09932D87346013FCEE9CAE22919A047361FD056F",
+        Assert.Equal("03F5D8BB2AD36D3D0A7873A7CDB25D725E0410DE1012E0EBE5E4C17B15224D7EFE",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -407,7 +407,7 @@ public sealed class StoryCompatibilityTests
         history.Choose("c0");
         history.Back();
 
-        Assert.Equal("03D374F459D587E8BB490F7B6EC4AB3AC1E218C278520B53E06D41104D080889CA",
+        Assert.Equal("0329B4D5B051DBCEC68DF050B0C609FEF74208380503F7F580691D0F765C6EAE66",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -507,6 +507,7 @@ public sealed class StoryCompatibilityTests
         {
             Version = version,
             CreationName = true,
+            BaseRuleset = "rpg",
         };
         manifest.Character("player", "Robin", stats: new Dictionary<string, int> { ["athletics"] = 2 });
         manifest.CreationPronouns(allowShe ? ["they", "she"] : ["they"]);

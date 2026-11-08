@@ -18,7 +18,11 @@ public sealed partial class ServerTests
     public ServerTests(ITestOutputHelper output) => _output = output;
 
     private static readonly string Manifest = BuildManifest();
+    private static readonly string RpgManifest = Manifest.Replace("  start: start", "  start: start\n  ruleset: rpg");
     private const string Valid = "=== start\nHello.\n-> END\n";
+
+    private static void DeclareRpg(Client client) =>
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), RpgManifest);
     private const string Invalid = "=== start\nHello.\n* [Missing] -> missing\n";
 
     private static string BuildManifest(

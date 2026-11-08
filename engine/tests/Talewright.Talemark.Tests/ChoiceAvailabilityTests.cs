@@ -9,7 +9,7 @@ public sealed class ChoiceAvailabilityTests
         new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = """
-                game: {id: availability, title: Availability, start: start}
+                game: {id: availability, title: Availability, start: start, ruleset: rpg}
                 characters:
                   player: {first-name: Ada}
                 vars: {gold: 10}

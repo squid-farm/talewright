@@ -20,6 +20,7 @@ public sealed class CharacterCreationTests
                   id: creation
                   title: Creation
                   start: a
+                  ruleset: rpg
                   creation:
                     stats: {hp: [20, 0]}
                     presets:
@@ -50,6 +51,7 @@ public sealed class CharacterCreationTests
                   id: creation
                   title: Creation
                   start: a
+                  ruleset: rpg
                   creation:
                     stats: {str: [8, 12, 16]}
                     presets:

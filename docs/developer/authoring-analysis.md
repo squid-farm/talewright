@@ -44,7 +44,7 @@ If a missing or malformed manifest prevents normal compilation, editor recovery
 still retains image completion slots and lookup diagnostics from the available
 narrative without inventing a repaired manifest.
 
-Recovery does not require a project ruleset named `generic` or invoke project
+Recovery does not require a project ruleset named `rpg` or invoke project
 ruleset factories when the manifest is missing or syntactically invalid. It
 retains dialogue substitutions even when the speaker cannot be resolved, plus
 unfinished choice conditions/effects. Authoring ranges track the original Talemark

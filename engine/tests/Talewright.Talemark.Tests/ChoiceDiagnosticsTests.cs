@@ -7,7 +7,7 @@ namespace Talewright.Talemark.Tests;
 public sealed class ChoiceDiagnosticsTests
 {
     private const string Manifest = """
-        game: {id: choice-diagnostics, title: Choice diagnostics, start: start}
+        game: {id: choice-diagnostics, title: Choice diagnostics, start: start, ruleset: rpg}
         characters:
           player: {first-name: Ada}
         flags: [ready, left]

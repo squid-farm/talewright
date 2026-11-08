@@ -11,6 +11,7 @@ public sealed class StoryHoverTests
           id: hover
           title: Hover
           start: first
+          ruleset: rpg
         characters:
           player: {first-name: Ada}
         items: {rope: Rope}
@@ -95,8 +96,8 @@ public sealed class StoryHoverTests
     public void Governing_attribute_key_hover_explains_category_target_and_formula()
     {
         const string key = "governing-attribute";
-        var yaml = Manifest.Replace("  start: first",
-            $"  start: first\n  ruleset:\n    stats:\n      - {{id: tracking, category: skill, {key}: str}}");
+        var yaml = Manifest.Replace("  ruleset: rpg",
+            $"  ruleset:\n    stats:\n      - {{id: tracking, category: skill, {key}: str}}\n    base: rpg");
         var source = new StorySource(new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n-> END",
@@ -159,7 +160,7 @@ public sealed class StoryHoverTests
     [InlineData("inv|entory", "List of item IDs")]
     public void Manifest_help_comes_from_the_bundled_schema(string marked, string description)
     {
-        var yaml = Manifest.Replace("  start: first", "  start: first\n  ruleset: {disable: []}");
+        var yaml = Manifest.Replace("  ruleset: rpg", "  ruleset: {base: rpg, disable: []}");
         var name = marked.Replace("|", "");
         if (name == "inventory") yaml = yaml.Replace("first-name: Ada", "first-name: Ada, inventory: []");
         var index = yaml.IndexOf(name, StringComparison.Ordinal) + marked.IndexOf('|');
@@ -287,10 +288,10 @@ public sealed class StoryHoverTests
     [Fact]
     public void Ruleset_and_story_ids_have_typed_help()
     {
-        var yaml = Manifest.Replace("  start: first", "  start: first\n  ruleset: {base: generic}");
+        var yaml = Manifest.Replace("  ruleset: rpg", "  ruleset: {base: rpg}");
         var analysis = Source("=== first\n-> END", yaml);
         var id = yaml.IndexOf("hover", StringComparison.Ordinal);
-        var ruleset = yaml.IndexOf("generic", StringComparison.Ordinal);
+        var ruleset = yaml.IndexOf("rpg", StringComparison.Ordinal);
         Assert.Contains("Story", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis,
             Position(StorySource.ManifestFileName, yaml[..id]))).PlainText);
         Assert.Contains("Ruleset", Assert.IsType<AuthoringHover>(StoryHover.Get(analysis,
@@ -303,6 +304,7 @@ public sealed class StoryHoverTests
           title: Hover
           start: first
           ruleset:
+            base: rpg
             stats:
               - {id: grit, name: Grit, category: attribute, min: 1, max: 20, default: 8}
         characters:

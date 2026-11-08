@@ -16,6 +16,7 @@ public sealed class StoryRenameTests
               title: Refs
               start: town.gate
               ruleset:
+                base: rpg
                 stats:
                   - {id: grit, category: attribute}
                   - {id: tracking, category: skill, governing-attribute: grit}
@@ -294,6 +295,7 @@ public sealed class StoryRenameTests
                   ruleset:
                     stats:
                       - {id: str, name: Might, category: attribute}
+                    base: rpg
                 characters:
                   player: {first-name: Ada, stats: {str: 2}}
                 """,

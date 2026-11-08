@@ -230,6 +230,23 @@ public class EditorManifestSchemaTests
                     var defaultPreset = Assert.Single(story.Creation.Presets);
                     Assert.Equal("explorer", defaultPreset.Label);
                     Assert.Empty(defaultPreset.Stats);
+                    AssertNoRpgMechanics(story.World.Ruleset);
+                    Assert.Equal("neutral", story.World.Ruleset.TierFor(0)!.Id);
+                    break;
+                case "empty-optional-containers.yaml":
+                    AssertNoRpgMechanics(story.World.Ruleset);
+                    break;
+                case "ruleset-none-shorthand.yaml":
+                    AssertNoRpgMechanics(story.World.Ruleset);
+                    Assert.Equal("neutral", story.World.Ruleset.TierFor(0)!.Id);
+                    break;
+                case "ruleset-rpg-shorthand.yaml":
+                    Assert.Equal("rpg", story.World.Ruleset.Id);
+                    Assert.True(story.World.Ruleset.HasStat(new StatId("hp")));
+                    Assert.NotNull(story.World.Ruleset.SkillCheckRule);
+                    Assert.NotNull(story.World.Ruleset.LevelingRule);
+                    Assert.Equal(14, player.Stats[new StatId("cha")]);
+                    Assert.Equal(2, player.Stats[new StatId("persuasion")]);
                     break;
                 case "supported-forms.yaml":
                     Assert.Equal("1.2.3", story.Version);
@@ -274,5 +291,14 @@ public class EditorManifestSchemaTests
         }
 
         Assert.Equal(Directory.GetFiles(directory, "*.yaml").Select(Path.GetFileName).Order(), files.Order());
+    }
+
+    private static void AssertNoRpgMechanics(Ruleset ruleset)
+    {
+        Assert.Equal("none", ruleset.Id);
+        Assert.Empty(ruleset.Stats);
+        Assert.Null(ruleset.SkillCheckRule);
+        Assert.Null(ruleset.LevelingRule);
+        Assert.Equal(5, ruleset.Tiers.Count);
     }
 }

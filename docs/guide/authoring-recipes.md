@@ -77,7 +77,7 @@ game:
   title: Through the Asteroids
   start: approach
   ruleset:
-    base: generic
+    base: rpg
     stats:
       - id: piloting
         name: Piloting
@@ -111,10 +111,10 @@ You turn away in time, taking the longer route.
 -> END
 ```
 
-`base: generic` keeps the standard rules and skills, then adds `piloting`.
+`base: rpg` turns on the RPG rules and skills, then adds `piloting`.
 `stats: { piloting: 3 }` gives the player a starting Piloting value of 3; characters without an
 explicit value use the skill's `default`. The check uses the lowercase id `piloting`, not the
-display name `Piloting`. This custom skill has no linked attribute, so the generic rules add its
+display name `Piloting`. This custom skill has no linked attribute, so the RPG rules add its
 skill value to the roll without an attribute bonus. Try both outcomes with the
 [Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
 
@@ -134,7 +134,7 @@ game:
   start: trail
   randomness: off
   ruleset:
-    base: generic
+    base: rpg
     stats:
       - id: grit
         name: Grit
@@ -168,7 +168,7 @@ The trail fades.
 -> END
 ```
 
-The generic check adds **skill value + floor((attribute score - 10) / 2)** to the
+The RPG check adds **skill value + floor((attribute score - 10) / 2)** to the
 die result. Grit 15 contributes `floor(2.5) = 2`, so this check totals
 `10 + 3 + 2 = 15` and succeeds. Grit 9 contributes `-1`, not zero. With
 `governing-attribute` omitted, the total is `10 + 3 = 13` and the check fails.
@@ -181,4 +181,4 @@ The target may appear before or after the skill, but must be an enabled attribut
 after `disable` and all replacements. Unknown, disabled and non-attribute targets
 are errors. The key is not allowed on other stat categories and accepts only one
 attribute, never a list. Inventory modifiers affect the effective values used by
-the unchanged generic formula.
+the unchanged RPG formula.

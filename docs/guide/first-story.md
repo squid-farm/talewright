@@ -25,6 +25,7 @@ game:
   title: The Night Ferry
   version: 0.1.0
   start: dock
+  ruleset: rpg
 
 characters:
   player:
@@ -47,6 +48,7 @@ characters:
 - `game.id` is a short, unique name. Lowercase words joined by hyphens are the recommended style.
   `game.title` is what players see.
 - `game.start` is the scene the story opens on. You'll write it next.
+- `ruleset: rpg` turns on the ready-made RPG rules: stats such as charisma and persuasion, and skill checks.
 - `characters` must include `player`. Every other character gets an id you choose, like `ferryman`.
 - `stats` sets starting values. Stats you leave out use the defaults (10 for attributes like `cha`,
   0 for skills like `persuasion`). See [the full stat list](writing-stories.md#stats-and-skills).

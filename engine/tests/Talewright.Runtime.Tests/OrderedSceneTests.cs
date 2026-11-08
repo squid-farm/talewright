@@ -14,7 +14,7 @@ public sealed class OrderedSceneTests
 
     private static ManifestFaker BuildManifest(bool includeArrived = false)
     {
-        var manifest = new ManifestFaker("order", "Order", "start", 42) { Randomness = "off" };
+        var manifest = new ManifestFaker("order", "Order", "start", 42) { Randomness = "off", BaseRuleset = "rpg" };
         manifest.Character("player", "Ada");
         manifest.Number("gold", 10);
         manifest.Flag("ready");

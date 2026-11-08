@@ -1,0 +1,11 @@
+game:
+  id: ruleset-rpg-shorthand
+  title: RPG shorthand
+  start: beginning
+  ruleset: rpg
+characters:
+  player:
+    first-name: Ada
+    stats:
+      cha: 14
+      persuasion: 2

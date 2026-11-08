@@ -15,7 +15,7 @@ public sealed class DebuggerTests : IDisposable
     public DebuggerTests()
     {
         Directory.CreateDirectory(_root);
-        var manifest = new ManifestFaker("debug", "Debug", "scene1");
+        var manifest = new ManifestFaker("debug", "Debug", "scene1") { BaseRuleset = "rpg" };
         manifest.Flag("ready");
         manifest.Number("count", 0);
         manifest.Item("rope", "Rope");
@@ -46,7 +46,7 @@ public sealed class DebuggerTests : IDisposable
                   start: start
                   randomness: off
                   ruleset:
-                    base: generic
+                    base: rpg
                     stats:
                       - {id: tracking, category: skill, default: 3{{(linked ? ", governing-attribute: grit" : "")}}}
                       - {id: grit, category: attribute, min: 1, max: 30, default: 15}

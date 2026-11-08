@@ -16,6 +16,7 @@ public sealed class StoryReferencesTests
               title: Refs
               start: town.gate
               ruleset:
+                base: rpg
                 stats:
                   - {id: grit, category: attribute}
                   - {id: tracking, category: skill, governing-attribute: grit}

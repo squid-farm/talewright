@@ -716,7 +716,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     if (key is not YamlScalarNode { Value: { } name }) continue;
                     var next = path.Append(name).ToArray();
                     if (next is [ManifestVocabulary.Game, ManifestVocabulary.Start]) ReferenceNode(value, AuthoringSymbolKind.Scene, file: file);
-                    else if (next is [ManifestVocabulary.Game, ManifestVocabulary.Ruleset, ManifestVocabulary.Base]) ReferenceNode(value, AuthoringSymbolKind.Ruleset, file: file);
+                    else if (next is [ManifestVocabulary.Game, ManifestVocabulary.Ruleset, ManifestVocabulary.Base]
+                        || (next is [ManifestVocabulary.Game, ManifestVocabulary.Ruleset] && value is YamlScalarNode))
+                        ReferenceNode(value, AuthoringSymbolKind.Ruleset, file: file);
                     else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]) ReferenceNode(key, AuthoringSymbolKind.Item, file: file);
                     else if (next is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory] && value is YamlSequenceNode)
                         ReferenceNode(value, AuthoringSymbolKind.Item, file: file);
