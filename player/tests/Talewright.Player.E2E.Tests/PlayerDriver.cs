@@ -58,11 +58,30 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
 
     public Task OpenBundledAsync() => page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
     public Task ClickAsync(string name) => page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true }).ClickAsync();
-    public Task ChooseAsync(string label) => page.GetByRole(AriaRole.List, new() { Name = "Story choices" })
-        .GetByRole(AriaRole.Button).Filter(new()
+    public async Task ChooseAsync(string label)
+    {
+        var previous = await page.GetByRole(AriaRole.Region, new() { Name = "Current passage" }).ElementHandleAsync()
+            ?? throw new InvalidOperationException("Cannot choose without a current passage.");
+        try
         {
-            HasTextRegex = new System.Text.RegularExpressions.Regex(@"^\s*\d+\.\s*" + System.Text.RegularExpressions.Regex.Escape(label) + @"\s*$"),
-        }).ClickAsync();
+            await page.GetByRole(AriaRole.List, new() { Name = "Story choices" })
+                .GetByRole(AriaRole.Button).Filter(new()
+                {
+                    HasTextRegex = new System.Text.RegularExpressions.Regex(@"^\s*\d+\.\s*" + System.Text.RegularExpressions.Regex.Escape(label) + @"\s*$"),
+                }).ClickAsync();
+            // A completed mouse click does not mean Blazor has rendered the next passage.
+            await page.WaitForFunctionAsync("""
+                previous => {
+                    const current = document.querySelector('[aria-label="Current passage"]');
+                    return current !== null && current !== previous;
+                }
+                """, previous);
+        }
+        finally
+        {
+            await previous.DisposeAsync();
+        }
+    }
     public Task PressAsync(string key) => page.Keyboard.PressAsync(key);
     public Task ResizeAsync(int width, int height) => page.SetViewportSizeAsync(width, height);
 

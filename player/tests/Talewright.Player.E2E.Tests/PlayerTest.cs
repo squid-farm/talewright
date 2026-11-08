@@ -46,6 +46,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         {
             BaseURL = host.BaseUrl,
             ViewportSize = new ViewportSize { Width = 1280, Height = 900 },
+            ReducedMotion = ReducedMotion.Reduce,
         });
         Context.SetDefaultTimeout(10_000);
         await Context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true, Sources = true });
