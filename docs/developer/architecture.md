@@ -431,7 +431,7 @@ The replacement decision is recorded in [#399](https://github.com/squid-farm/tal
 - `IStorySession`: `Start()`, `Choose(key)`, `Current`, `State`, `Events`, `Seed`, `Story`. The UI's only
   contract.
 - `StorySession`: the engine loop (§5).
-- `StoryFrame(Scene, Title, Document, Choices, IsEnded)` and `ChoiceView(Key, Label)`.
+- `StoryFrame(Scene, Title, Document, Choices, IsEnded)`: `Choices` contains available choices only; `Menu` carries all shown entries in order with stable numbers and availability.
 - `EventNarrator.Describe(events, state)`: turns the events produced by an action into `RenderedNote`s
   ("Athletics check: 10 +2 = 12 vs DC 12 — success", "Gained: rope", "Explorers' Guild −20 (now Unfriendly)",
   "Level 2!"). This is why authors never write "you lost 3 HP" by hand.

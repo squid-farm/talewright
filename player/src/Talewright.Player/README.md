@@ -20,7 +20,7 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
 | `SavedGamesPanel` | Accessible modal Saves dialog, summary list, named-save input, import/export, explicit overwrite and conditional load confirmation; persistence and replay state live in the parent. |
 | `StoryPassage` | One history frame's title, document and chosen-label echo. |
-| `StoryChoices` | Numbered choices, end/replay controls and visible history-limit notice. |
+| `StoryChoices` | Numbered menu, with unavailable choices disabled and visibly marked; end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`, and `MediaView` for resolved images on every narrative surface. |
 | `MediaView` | Viewport-lazy image lease and independent decode/presentation. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |

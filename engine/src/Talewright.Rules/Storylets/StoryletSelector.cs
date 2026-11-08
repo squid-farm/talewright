@@ -94,9 +94,42 @@ public static class StoryletSelector
         where T : IStorylet =>
         SelectEligibleCore(storylets, tags, context, exclude, limit, observer, eventIndex, evaluateRequirement);
 
+    /// <summary>
+    /// Selects available storylets first, then shown-but-unavailable storylets for any remaining limited slots.
+    /// </summary>
+    public static IReadOnlyList<(T Storylet, bool IsAvailable)> SelectMenuCandidates<T>(
+        IEnumerable<T> storylets, StoryletTags tags, EvaluationContext context, SceneId? exclude, int? limit,
+        Action<RuleDecision>? observer, int? eventIndex,
+        Func<T, (bool Available, bool ShowWhenUnavailable, ExpressionTrace? Trace)> evaluateRequirement)
+        where T : IStorylet =>
+        SelectMenuCore(storylets, tags, context, exclude, limit, observer, eventIndex, evaluateRequirement);
+
     private static IReadOnlyList<T> SelectEligibleCore<T>(IEnumerable<T> storylets, StoryletTags tags,
         EvaluationContext context, SceneId? exclude, int? limit, Action<RuleDecision>? observer, int? eventIndex,
         Func<T, (bool Available, ExpressionTrace? Trace)>? evaluateRequirement)
+        where T : IStorylet
+    {
+        Func<T, (bool Available, bool ShowWhenUnavailable, ExpressionTrace? Trace)>? evaluate = null;
+        if (evaluateRequirement is not null)
+        {
+            evaluate = storylet =>
+            {
+                var result = evaluateRequirement(storylet);
+                return (result.Available, ShowWhenUnavailable: false, result.Trace);
+            };
+        }
+
+        var available = SelectMenuCore(storylets, tags, context, exclude, limit, observer, eventIndex, evaluate)
+            .Where(candidate => candidate.IsAvailable)
+            .Select(candidate => candidate.Storylet)
+            .ToArray();
+        return Array.AsReadOnly(available);
+    }
+
+    private static IReadOnlyList<(T Storylet, bool IsAvailable)> SelectMenuCore<T>(
+        IEnumerable<T> storylets, StoryletTags tags, EvaluationContext context, SceneId? exclude, int? limit,
+        Action<RuleDecision>? observer, int? eventIndex,
+        Func<T, (bool Available, bool ShowWhenUnavailable, ExpressionTrace? Trace)>? evaluateRequirement)
         where T : IStorylet
     {
         if (limit is <= 0)
@@ -104,16 +137,36 @@ public static class StoryletSelector
             throw new ArgumentOutOfRangeException(nameof(limit), "A storylet limit must be positive.");
         }
 
-        var eligible = new List<(T Storylet, int Index, ExpressionTrace? Trace)>();
+        var candidates = new List<(T Storylet, int Index, bool IsAvailable, ExpressionTrace? Trace)>();
         var index = 0;
         foreach (var storylet in storylets)
         {
             DecisionReason? excluded = storylet.Id == exclude ? DecisionReason.SelfExcluded
                 : !tags.Matches(storylet.Tags) ? DecisionReason.TagMismatch : null;
             ExpressionTrace? trace = null;
-            if (excluded is null)
+            var available = false;
+            var showWhenUnavailable = false;
+            if (excluded is null && storylet.Once && context.State.VisitCount(storylet.Id) > 0)
             {
-                excluded = EligibilityExclusion(storylet, context, observer is not null, evaluateRequirement, out trace);
+                excluded = DecisionReason.AlreadyVisited;
+            }
+            else if (excluded is null)
+            {
+                if (evaluateRequirement is null)
+                {
+                    available = RuleObservation.Test(storylet.Requires, context, observer is not null, out trace);
+                }
+                else
+                {
+                    var result = evaluateRequirement(storylet);
+                    available = result.Available;
+                    showWhenUnavailable = result.ShowWhenUnavailable;
+                    trace = result.Trace;
+                }
+                if (!available)
+                {
+                    excluded = DecisionReason.ConditionFalse;
+                }
             }
             if (excluded is { } reason)
             {
@@ -121,33 +174,55 @@ public static class StoryletSelector
                     DecisionOutcome.Excluded, reason, trace ?? (storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null),
                     eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
             }
-            else
+
+            if (excluded is null || showWhenUnavailable)
             {
-                eligible.Add((storylet, index, trace));
+                candidates.Add((storylet, index, available, trace));
             }
             index++;
         }
 
-        var selected = new List<T>();
+        var selected = new List<(T Storylet, bool IsAvailable)>();
         var seen = new HashSet<SceneId>();
         var rank = 0;
-        foreach (var (storylet, _, trace) in eligible.OrderByDescending(x => x.Storylet.Priority).ThenBy(x => x.Index))
+        foreach (var (storylet, _, available, trace) in candidates
+                     .OrderByDescending(x => x.IsAvailable)
+                     .ThenByDescending(x => x.Storylet.Priority)
+                     .ThenBy(x => x.Index))
         {
             var duplicate = !seen.Add(storylet.Id);
-            if (!duplicate)
+            if (!duplicate && available)
             {
                 rank++;
             }
-            var reason = duplicate ? DecisionReason.Duplicate
-                : limit is { } cap && selected.Count >= cap ? DecisionReason.HubLimit : DecisionReason.PriorityOrder;
-            var included = reason == DecisionReason.PriorityOrder;
-            if (included)
+            if (available)
             {
-                selected.Add(storylet);
+                DecisionReason reason;
+                if (duplicate)
+                {
+                    reason = DecisionReason.Duplicate;
+                }
+                else if (limit is { } cap && selected.Count >= cap)
+                {
+                    reason = DecisionReason.HubLimit;
+                }
+                else
+                {
+                    reason = DecisionReason.PriorityOrder;
+                }
+                var included = reason == DecisionReason.PriorityOrder;
+                if (included)
+                {
+                    selected.Add((storylet, IsAvailable: true));
+                }
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    included ? DecisionOutcome.Selected : DecisionOutcome.Excluded, reason, trace, eventIndex, eventIndex,
+                    Priority: storylet.Priority, Rank: duplicate ? null : rank, Limit: limit));
             }
-            observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
-                included ? DecisionOutcome.Selected : DecisionOutcome.Excluded, reason, trace, eventIndex, eventIndex,
-                Priority: storylet.Priority, Rank: duplicate ? null : rank, Limit: limit));
+            else if (!duplicate && (limit is null || selected.Count < limit))
+            {
+                selected.Add((storylet, IsAvailable: false));
+            }
         }
         return selected.AsReadOnly();
     }

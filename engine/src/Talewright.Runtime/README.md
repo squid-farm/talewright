@@ -10,9 +10,15 @@ StoryFrame frame = session.Start();
 while (!frame.IsEnded)
 {
     Console.WriteLine(frame.Document.ToPlainText());
+    foreach (var entry in frame.Menu)
+        Console.WriteLine($"{entry.Number}. {entry.Text}{(entry.IsAvailable ? "" : " (unavailable)")}");
+    if (frame.Choices.Count == 0) break;
     frame = session.Choose(frame.Choices[0].Key);
 }
 ```
+
+`Menu` contains every shown entry in display order; `Choices` contains only entries that can be selected now.
+An active frame may have no available choices.
 
 ## Files
 
@@ -21,7 +27,7 @@ while (!frame.IsEnded)
 | `IStorySession.cs` | `Start()`, `Choose(key)`, `Current`, `State` (`IGameStateView`), `Events`, `Seed`, `Story`. |
 | `StorySession.cs` | The loop: entering scenes, building choices, resolving choices. The class doc comment is the spec. |
 | `SceneExecutor.cs` | Source-order step execution, branch decisions, effect batches, checks and inline notes; reached choices become candidates for the shared availability path. |
-| `StoryFrame.cs` | `StoryFrame(Scene, Title, Document, Choices, IsEnded)` and `ChoiceView(Key, Label)` (`Label` is rendered inlines; `.Text` gives plain text). |
+| `StoryFrame.cs` | `StoryFrame(Scene, Title, Document, Choices, IsEnded)`; `Choices` contains available choices, while `Menu` preserves the full numbered menu, including shown-but-unavailable entries. |
 | `EventNarrator.cs` | Events → `RenderedNote`s ("Gained: rope", "Hit Points −3 (7)", "Athletics check: 10 +2 = 12 vs DC 12 — success", "Explorers' Guild −20 (now Unfriendly)", "Level 2!"). Other characters' changes are prefixed with their name. |
 
 ## The loop, briefly

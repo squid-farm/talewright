@@ -40,6 +40,26 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Keyboard_activation_targets_the_requested_player_window()
+    {
+        var archive = await WriteArchive("focus.zip", TestStories.Linear.Zip());
+        await Driver.StartAsync(archive);
+        await Observe(new(null, "First passage"));
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+
+        var artifacts = Path.Combine(
+            Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? Path.GetTempPath(),
+            "focus-other", Guid.NewGuid().ToString("N"));
+        await using var other = new NativePlayerDriver(artifacts);
+        await other.StartAsync();
+        await other.OpenBundledAsync();
+        await other.ActivateWindowAsync();
+
+        await native.ActivateAsync("1. Walk onward");
+        await Observe(new(null, "Second passage text."));
+    }
+
+    [Fact]
     public async Task Settings_dialog_exposes_focused_theme_control_on_desktop()
     {
         await Driver.StartAsync();
