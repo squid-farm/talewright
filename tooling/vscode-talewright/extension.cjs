@@ -3,6 +3,7 @@ const path = require('node:path');
 const { accessSync, constants, readFileSync } = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { registerAuthorActions } = require('./author-actions.cjs');
+const { registerRefactorSaves } = require('./refactor-saves.cjs');
 
 let client;
 
@@ -76,6 +77,7 @@ async function startLanguageServer(context) {
         fileEvents,
       },
       outputChannel,
+      middleware: registerRefactorSaves(context, outputChannel),
     });
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
       if (event.affectsConfiguration('talewright.languageServer')) {
