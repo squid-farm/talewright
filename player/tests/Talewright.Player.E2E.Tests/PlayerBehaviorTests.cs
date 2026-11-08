@@ -9,6 +9,8 @@ namespace Talewright.Player.E2E.Tests;
 
 public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
+    private readonly ITestOutputHelper _output = output;
+
     public static IEnumerable<object[]> Scenarios => TestStories.Scenarios.Select(s => new object[] { s.Id });
 
     [Theory]
@@ -190,12 +192,8 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
             Assert.True(state.TranscriptFullWidth);
         });
 
-        await Driver.ResizeAsync(520, 900);
-        await AssertState(state =>
-        {
-            Assert.Empty(state.Sheet);
-            Assert.True(state.TranscriptFullWidth);
-        });
+        await AssertNoSheetLayoutAtWidth(960);
+        await AssertNoSheetLayoutAtWidth(520);
     }
 
     [Fact]
@@ -235,12 +233,8 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
             Assert.True(state.PassageVisible);
         });
 
-        await Driver.ResizeAsync(520, 900);
-        await AssertState(state =>
-        {
-            Assert.Empty(state.Sheet);
-            Assert.True(state.PassageVisible);
-        });
+        await AssertNoSheetLayoutAtWidth(960);
+        await AssertNoSheetLayoutAtWidth(520);
     }
 
     [Fact]
@@ -461,5 +455,70 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Latest).ToContainTextAsync("Café, 日本語");
         await Expect(Latest.Locator("script")).ToHaveCountAsync(0);
         Assert.False(await Page.EvaluateAsync<bool>("() => window.storyExecuted === true"));
+    }
+
+    // At 960px the layout is wide, but the default reading-width cap does not reduce the transcript.
+    private async Task AssertNoSheetLayoutAtWidth(int width)
+    {
+        await Driver.ResizeAsync(width, 900);
+        await AssertState(state =>
+        {
+            Assert.InRange(state.WindowWidth, width, width + (PlayerTarget.IsDesktop ? 50 : 0));
+            Assert.True(state.PassageVisible);
+            Assert.True(state.PassageInWindow);
+            Assert.Contains("A story without statistics.", state.Passage);
+            Assert.Empty(state.Sheet);
+            if (!PlayerTarget.IsDesktop)
+            {
+                Assert.True(state.TranscriptFullWidth);
+            }
+        });
+
+        if (Driver is NativePlayerDriver native)
+        {
+            var timer = Stopwatch.StartNew();
+            while (true)
+            {
+                var nodes = (await native.SnapshotAsync()).Descendants().ToArray();
+                try
+                {
+                    var window = Assert.Single(nodes, node => node.Role == "frame").Bounds;
+                    Assert.InRange(window.Width, width, width + 50);
+                    Assert.DoesNotContain(nodes, node => node.Name == "Character sheet");
+                    var toolbar = Assert.Single(nodes, node => node.Name == "Player toolbar").Bounds;
+                    var transcript = Assert.Single(nodes, node => node.Name == "Story transcript").Bounds;
+                    AssertTranscriptFillsToolbar(transcript, toolbar);
+                    _output.WriteLine($"Desktop {width}px: window {window}, toolbar {toolbar}, transcript {transcript}");
+                    return;
+                }
+                catch (Xunit.Sdk.XunitException) when (timer.Elapsed < TimeSpan.FromSeconds(15))
+                {
+                    await Task.Delay(100);
+                }
+            }
+        }
+
+        await Expect(Sheet).ToHaveCountAsync(0);
+        var toolbarLocator = Page.GetByRole(AriaRole.Banner, new() { Name = "Player toolbar", Exact = true });
+        var transcriptLocator = Page.GetByRole(AriaRole.Main, new() { Name = "Story transcript", Exact = true });
+        await Expect(toolbarLocator).ToBeVisibleAsync();
+        await Expect(transcriptLocator).ToBeVisibleAsync();
+        await Expect(Latest).ToBeVisibleAsync();
+        var toolbarBox = await toolbarLocator.BoundingBoxAsync();
+        var transcriptBox = await transcriptLocator.BoundingBoxAsync();
+        Assert.NotNull(toolbarBox);
+        Assert.NotNull(transcriptBox);
+        var toolbarBounds = new PlayerBounds(toolbarBox.X, toolbarBox.Y, toolbarBox.Width, toolbarBox.Height);
+        var transcriptBounds = new PlayerBounds(transcriptBox.X, transcriptBox.Y, transcriptBox.Width, transcriptBox.Height);
+        AssertTranscriptFillsToolbar(transcriptBounds, toolbarBounds);
+        _output.WriteLine($"Browser {width}px: toolbar {toolbarBounds}, transcript {transcriptBounds}");
+    }
+
+    private static void AssertTranscriptFillsToolbar(PlayerBounds transcript, PlayerBounds toolbar)
+    {
+        Assert.True(toolbar.Width > 0 && toolbar.Height > 0 && transcript.Width > 0 && transcript.Height > 0,
+            $"Toolbar: {toolbar}; transcript: {transcript}");
+        Assert.InRange(Math.Abs(transcript.X - toolbar.X), 0, 1);
+        Assert.InRange(Math.Abs(transcript.X + transcript.Width - toolbar.X - toolbar.Width), 0, 1);
     }
 }

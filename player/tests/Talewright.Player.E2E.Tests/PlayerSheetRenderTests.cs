@@ -16,7 +16,13 @@ public sealed class PlayerSheetRenderTests
     [Fact]
     public async Task Story_without_sheet_sections_omits_sheet_and_uses_full_transcript_layout()
     {
-        var html = await RenderPlayerAsync(TestStories.NoStats.Compile());
+        var story = TestStories.NoStats.Compile();
+        Assert.Equal(CharacterSheetVisibility.Shown, story.CharacterSheet);
+        Assert.Empty(story.World.Ruleset.Stats);
+        Assert.Empty(story.World.Items);
+        Assert.Empty(story.World.Factions);
+
+        var html = await RenderPlayerAsync(story);
 
         Assert.DoesNotContain("aria-label=\"Character sheet\"", html);
         Assert.Contains("class=\"tw-columns tw-columns--full\"", html);
@@ -39,6 +45,10 @@ public sealed class PlayerSheetRenderTests
             A story with declared items.
             -> END
             """).Compile();
+        Assert.Equal(CharacterSheetVisibility.Shown, story.CharacterSheet);
+        Assert.Empty(story.World.Ruleset.Stats);
+        Assert.Single(story.World.Items);
+        Assert.Empty(story.World.Factions);
 
         var html = await RenderPlayerAsync(story);
         var sheetStart = html.IndexOf("<aside class=\"tw-sheet\"", StringComparison.Ordinal);
