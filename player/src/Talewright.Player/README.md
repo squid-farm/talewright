@@ -27,6 +27,9 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 | `CharacterSheet` | Built from story declarations: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts (including “Nothing.” when declared items are not held), and player faction standings with tier names. `Visibility` (from `StoryDefinition.CharacterSheet`) removes sections the author hid; `HasSections` tells hosts whether any section remains. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
 
+Unavailable choices are native disabled buttons. Assistive technology receives their rendered
+text and “Unavailable” status; Tab skips them, and number keys do not activate choices.
+
 ## Player preferences
 
 The shared player exposes per-device theme, text-size, reading-width (narrow / normal / wide),

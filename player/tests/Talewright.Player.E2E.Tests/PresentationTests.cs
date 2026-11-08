@@ -71,7 +71,13 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Expect(Choices.Nth(1)).ToBeEnabledAsync();
         await Expect(Choices.Nth(1)).ToContainTextAsync("2.");
 
-        await Choose("Proceed");
+        await Expect(Latest).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(Choices.Nth(1)).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("1");
+        await Expect(Choices).ToHaveCountAsync(2);
+        await Expect(Choices.Nth(0)).ToContainTextAsync("(Unavailable)");
+        await Page.Keyboard.PressAsync("Enter");
         await Expect(Latest).ToContainTextAsync("No available actions.");
         await Expect(Choices).ToHaveCountAsync(1);
         await Expect(Choices.First).ToBeDisabledAsync();
