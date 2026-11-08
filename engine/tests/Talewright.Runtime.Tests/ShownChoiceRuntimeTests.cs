@@ -1,3 +1,4 @@
+using Talewright.Rules.Diagnostics;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -103,6 +104,25 @@ public sealed class ShownChoiceRuntimeTests
         var entry = Assert.Single(frame.Menu);
         Assert.Equal(("c0", "Not yet", false), (entry.Key, entry.Text, entry.IsAvailable));
         Assert.Throws<InvalidOperationException>(() => session.Choose("c0"));
+    }
+
+    [Fact]
+    public void Author_decision_reports_a_shown_unavailable_choice_requirement_as_false()
+    {
+        var story = Compile("""
+            === start
+            * [Restricted] (requires false, shown "Not yet") -> END
+            """, """
+            game: {id: shown-runtime, title: Shown runtime, start: start}
+            characters:
+              player: {first-name: Ada}
+            """);
+
+        var session = AuthorSession.Create(story, story.Start, captureDecisions: true);
+
+        var decision = Assert.Single(session.Decisions, entry => entry.Kind == DecisionKind.Choice);
+        Assert.Equal(DecisionOutcome.Offered, decision.Outcome);
+        Assert.Equal(DecisionReason.ConditionFalse, decision.Reason);
     }
 
     [Fact]

@@ -139,7 +139,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     {
                         choiceReason = DecisionReason.Unconditional;
                     }
-                    else if (offered is not null)
+                    else if (offered?.IsAvailable == true)
                     {
                         choiceReason = DecisionReason.ConditionTrue;
                     }

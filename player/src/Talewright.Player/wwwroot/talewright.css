@@ -164,7 +164,8 @@ button { font: inherit; color: inherit; }
 .tw-choices { list-style: none; padding: 0; margin: 1.5rem 0; }
 .tw-choices li, .tw-story-list li { margin: 0.5rem 0; }
 .tw-choice { box-sizing: border-box; display: block; width: 100%; text-align: left; padding: 0.6rem 1rem; background: var(--tw-panel); border: 1px solid var(--tw-border); border-radius: 6px; cursor: pointer; }
-.tw-choice:hover, .tw-choice:focus-visible { border-color: var(--tw-accent); }
+.tw-choice:not(:disabled):hover, .tw-choice:not(:disabled):focus-visible { border-color: var(--tw-accent); }
+.tw-choice:disabled { cursor: not-allowed; }
 .tw-choice-number { color: var(--tw-muted); margin-right: 0.5rem; }
 
 .tw-media { display: inline-block; max-width: 100%; vertical-align: middle; }
