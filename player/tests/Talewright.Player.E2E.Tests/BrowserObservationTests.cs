@@ -6,6 +6,62 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
     [Fact]
+    public async Task Functional_tests_use_reduced_motion_without_changing_player_preferences()
+    {
+        Assert.True(await Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches"));
+        Assert.Equal("system", await Page.Locator("html").GetAttributeAsync("data-tw-reduced-motion"));
+    }
+
+    [Fact]
+    public async Task Choosing_waits_for_the_passage_to_change_when_choice_labels_are_reused()
+    {
+        await Page.SetContentAsync("""
+            <!DOCTYPE html>
+            <main aria-label="Story transcript">
+                <section aria-label="Current passage">First</section>
+                <ol aria-label="Story choices"><li><button>1. Continue</button></li></ol>
+            </main>
+            """);
+        await Page.EvaluateAsync("""
+            () => {
+                let step = 0;
+                document.querySelector('button').onclick = () => {
+                    setTimeout(() => {
+                        const previous = document.querySelector('[aria-label="Current passage"]');
+                        const current = document.createElement('section');
+                        current.setAttribute('aria-label', 'Current passage');
+                        current.textContent = ++step === 1 ? 'Second' : 'Third';
+                        previous.removeAttribute('aria-label');
+                        previous.after(current);
+                    }, 250);
+                };
+            }
+            """);
+
+        await Choose("Continue");
+        Assert.Equal("Second", (await Driver.ObserveAsync()).Passage);
+        await Choose("Continue");
+        Assert.Equal("Third", (await Driver.ObserveAsync()).Passage);
+    }
+
+    [Fact]
+    public async Task Choosing_fails_if_the_click_does_not_advance_the_passage()
+    {
+        await Page.SetContentAsync("""
+            <!DOCTYPE html>
+            <main aria-label="Story transcript">
+                <section aria-label="Current passage">Unchanged</section>
+                <ol aria-label="Story choices"><li><button onclick="this.dataset.clicked = 'true'">1. Continue</button></li></ol>
+            </main>
+            """);
+        Context.SetDefaultTimeout(500);
+
+        await Assert.ThrowsAsync<TimeoutException>(() => Choose("Continue"));
+        Assert.Equal("true", await Page.Locator("button").GetAttributeAsync("data-clicked"));
+        Assert.Equal("Unchanged", (await Driver.ObserveAsync()).Passage);
+    }
+
+    [Fact]
     public async Task Observations_remain_coherent_while_library_is_replaced()
     {
         await Page.SetContentAsync("<div id='view'></div>");
