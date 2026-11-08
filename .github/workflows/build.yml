@@ -156,6 +156,8 @@ jobs:
         rid: [linux-x64, linux-arm64, win-x64, win-arm64, osx-x64, osx-arm64]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -191,10 +193,11 @@ jobs:
       TALEWRIGHT_VSIX_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
           cache-dependency-path: tooling/vscode-talewright/package-lock.json
       - uses: actions/setup-dotnet@v4
         with:
@@ -220,6 +223,8 @@ jobs:
       prerelease: ${{ steps.identity.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Resolve release identity
         id: identity
         run: |
@@ -282,10 +287,11 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
           cache-dependency-path: tooling/vscode-talewright/package-lock.json
       - run: npm ci --prefix tooling/vscode-talewright
       - uses: actions/download-artifact@v4
@@ -319,6 +325,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: talewright-vscode
