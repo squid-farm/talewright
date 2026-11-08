@@ -42,4 +42,16 @@ test('Talemark semantic highlighting is enabled while its TextMate grammar remai
   assert.ok(manifest.contributes.grammars.some(grammar =>
     grammar.language === 'tale' && grammar.scopeName === 'text.tale' &&
     grammar.path === './syntaxes/tale.tmLanguage.json'));
+  const scopes = manifest.contributes.semanticTokenScopes.find(item => item.language === 'tale').scopes;
+  for (const type of manifest.contributes.semanticTokenTypes) {
+    assert.ok(type.description.length > 0, type.id);
+    assert.ok(scopes[type.id]?.length > 0, `${type.id} must have a theme-scope mapping`);
+  }
+  assert.deepEqual(scopes.talemarkScene, ['entity.name.section.tale', 'entity.name.function.tale']);
+  assert.deepEqual(scopes.talemarkDivert, ['keyword.control.divert.tale', 'keyword.control', 'keyword']);
+  assert.deepEqual(scopes.talemarkStructure, ['keyword.control.tale', 'keyword']);
+  assert.deepEqual(scopes.talemarkPunctuation, ['punctuation.section.embedded.tale', 'punctuation']);
+  assert.deepEqual(scopes.talemarkFormatting, ['constant.character.escape.tale', 'constant.character']);
+  assert.deepEqual(scopes.talemarkEscape, ['constant.character.escape.tale', 'constant.character']);
+  assert.deepEqual(scopes.modifier, ['storage.modifier.tale', 'storage']);
 });

@@ -49,7 +49,8 @@ public sealed partial class ServerTests
         Assert.True(capabilities.GetProperty("workspaceSymbolProvider").GetBoolean());
         Assert.Equal(1, initialized.GetProperty("result").GetProperty("capabilities").GetProperty("textDocumentSync").GetProperty("change").GetInt32());
         var semanticTokens = initialized.GetProperty("result").GetProperty("capabilities").GetProperty("semanticTokensProvider");
-        Assert.Equal(["comment", "keyword", "operator", "number", "string", "variable", "namespace", "property", "function", "modifier"],
+        Assert.Equal(["comment", "keyword", "operator", "number", "string", "variable", "namespace", "property", "function", "modifier",
+            "talemarkScene", "talemarkDivert", "talemarkPunctuation", "talemarkFormatting", "talemarkEscape", "talemarkStructure"],
             semanticTokens.GetProperty("legend").GetProperty("tokenTypes").EnumerateArray()
                 .Select(value => value.GetString()!).ToArray());
         Assert.Equal(["declaration"],

@@ -1,0 +1,16 @@
+{
+  "name": "Talemark Sparse Test",
+  "colors": {
+    "editor.background": "#101010",
+    "editor.foreground": "#D4D4D4"
+  },
+  "semanticHighlighting": true,
+  "tokenColors": [
+    {"scope": "entity.name.function", "settings": {"foreground": "#FFD080"}},
+    {"scope": "keyword", "settings": {"foreground": "#80C0FF"}},
+    {"scope": "punctuation", "settings": {"foreground": "#FF80C0"}},
+    {"scope": "constant.character", "settings": {"foreground": "#80FFB0"}},
+    {"scope": "storage", "settings": {"foreground": "#C080FF"}},
+    {"scope": "string", "settings": {"foreground": "#FFC080"}}
+  ]
+}
