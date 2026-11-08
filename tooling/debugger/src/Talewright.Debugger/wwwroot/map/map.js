@@ -124,13 +124,23 @@ window.talewrightMap = (() => {
   }
 
   function palette(host) {
-    const style = getComputedStyle(host);
-    const value = (name, fallback) => style.getPropertyValue(name).trim() || fallback;
-    return {
-      background: value("--tw-bg", "#faf8f3"), text: value("--tw-fg", "#222"), muted: value("--tw-muted", "#6b6558"),
-      panel: value("--tw-panel", "#f0ebe0"), border: value("--tw-border", "#d8cfbd"), accent: value("--tw-accent", "#7a4b1f"),
-      error: value("--tw-error", "#a12020"), warning: value("--tw-warning", "#8a6200"),
+    // Custom properties retain light-dark() rather than a canvas-compatible computed color.
+    const probe = element("span");
+    probe.hidden = true;
+    host.append(probe);
+    const value = (name, fallback) => {
+      probe.style.color = `var(${name}, ${fallback})`;
+      return getComputedStyle(probe).color;
     };
+    try {
+      return {
+        background: value("--tw-bg", "#faf8f3"), text: value("--tw-fg", "#222"), muted: value("--tw-muted", "#6b6558"),
+        panel: value("--tw-panel", "#f0ebe0"), border: value("--tw-border", "#d8cfbd"), accent: value("--tw-accent", "#7a4b1f"),
+        error: value("--tw-error", "#a12020"), warning: value("--tw-warning", "#8a6200"),
+      };
+    } finally {
+      probe.remove();
+    }
   }
 
   const lineColor = line => kindColors[line.kind === "HubOffer" ? "HubOffer" : line.outcome || (line.kind === "Scene" || line.kind === "EntryCheck" ? "Scene" : "Choice")];
