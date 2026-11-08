@@ -895,11 +895,12 @@ and deliberate DCs. A dedicated seeded fixture tests replay; no test retries unt
 
 ## Coverage and boundaries
 
-| Behavior | Runtime/compiler | Three browser engines | Actual Linux Photino |
+| Behavior | Component/runtime/compiler | Three browser engines | Actual Linux Photino |
 | --- | --- | --- | --- |
 | Explicit branching, gates, hubs/once/priority, nested conditional arms | Yes | Shared scenarios | Same shared scenarios |
 | Choice/entry checks, player/NPC, success/failure, effects | Yes | Shared scenarios | Same shared scenarios |
 | Items, modifiers, quantities, faction triggers, progression | Yes | Shared scenarios and exact sheet assertions | Shared visible-state assertions |
+| No declared sheet / empty declared inventory | Component rendering | Landmark absence and transcript bounds at 960px and 520px | AT-SPI landmark absence and transcript bounds at 960px and 520px |
 | Transcript history, restart/replay, library/resume/replacement | Engine state only | Yes | Yes |
 | Strong/emphasis/code/line breaks, speech, non-ASCII, inert HTML/media placeholders | Compiler/renderer | DOM assertions | Rendered text scenarios; not DOM-style assertions |
 | Multi-file/root/wrapped ZIPs and errors/recovery | Yes | Yes | Generated fixtures and native chooser/CLI |

@@ -199,8 +199,9 @@ See the [runtime compatibility policy](../../../engine/src/Talewright.Runtime/RE
 Hosts link `_content/Talewright.Player/talewright.css`. Colours and fonts are CSS variables on `:root`
 (`--tw-bg`, `--tw-fg`, `--tw-muted`, `--tw-accent`, `--tw-panel`, `--tw-border`, `--tw-error`, `--tw-warning`,
 `--tw-font`, `--tw-ui-font`), with a dark palette under `prefers-color-scheme: dark`. Override them in a host
-stylesheet to re-theme. All classes are prefixed `tw-`. Layout is two columns (transcript + sheet) collapsing to
-one below 52rem.
+stylesheet to re-theme. All classes are prefixed `tw-`. When a sheet is present, the layout is two columns
+(transcript + sheet), collapsing to one below 52rem. Without a sheet, the transcript has the only layout
+column at every width; the reading-width setting can still limit its visible width.
 
 ## Not here yet
 
