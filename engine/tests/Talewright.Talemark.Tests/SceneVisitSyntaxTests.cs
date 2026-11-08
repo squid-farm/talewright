@@ -145,7 +145,7 @@ public sealed class SceneVisitSyntaxTests
     [InlineData("@requires not visited( camp-site )\n-> END", "camp-site")]
     [InlineData("@requires visited(temple.hall)\n-> END", "temple.hall")]
     [InlineData("{visited(camp)}\n-> END", "camp")]
-    [InlineData("* (requires visited(camp)) -> END", "camp")]
+    [InlineData("* [Visit] (requires visited(camp)) -> END", "camp")]
     [InlineData("~ player:hp = visited(camp)\n-> END", "camp")]
     public void Former_visited_call_gets_a_replacement_hint(string body, string scene)
     {

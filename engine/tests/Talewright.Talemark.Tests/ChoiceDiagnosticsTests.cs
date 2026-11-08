@@ -28,8 +28,8 @@ public sealed class ChoiceDiagnosticsTests
             === start
             * [Read] (requires flag:ready) { set flag:left } -> END
             * [Shove] { set flag:left } (requires flag:ready) -> END
-            * (requires flag:ready) { set flag:left } -> END
-            * { set flag:left } (requires flag:ready) -> END
+            * [Continue] (requires flag:ready) { set flag:left } -> END
+            * [Continue] { set flag:left } (requires flag:ready) -> END
             * -> END
             """);
 
@@ -125,7 +125,6 @@ public sealed class ChoiceDiagnosticsTests
 
     [Theory]
     [InlineData("* [Go] (requires: flag:ready) -> END")]
-    [InlineData("* (requires: flag:ready) -> END")]
     [InlineData("* [Go] (requires:) -> END")]
     [InlineData("* [Go] (requires : flag:ready) -> END")]
     [InlineData("  * [Go] (requires\t: flag:ready) -> END")]

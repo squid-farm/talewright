@@ -415,6 +415,7 @@ internal sealed partial class TaleBinder
         CheckBranch? check = null;
         var hasRequires = false;
         var hasEffects = false;
+        var malformedTextless = false;
         var clauses = Clauses(syntax);
         for (var index = 0; index < clauses.Length; index++)
         {
@@ -440,6 +441,16 @@ internal sealed partial class TaleBinder
                     ExpressionParser.ReportStringErrors(value, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
                 case TaleClauseKind.Requires:
+                    if (label is null)
+                    {
+                        _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                            "A choice without a label only allows a divert. Wrap it in a `{if ...}` block or add a label, " +
+                            $"e.g. `{SceneVocabulary.ChoiceMarker} [{ChoiceDefinition.ContinueLabelText}] " +
+                            $"{SceneVocabulary.ChoiceRequiresExample} {SceneVocabulary.Divert} target`.",
+                            At(clause.Start), At(clause.ValueStart + clause.ValueLength + 1));
+                        malformedTextless = true;
+                    }
+
                     var condition = ExpressionParser.ParseCondition(value, location, _symbols, _diagnostics,
                         highlightUnexpectedTokens: true);
                     if (!hasRequires)
@@ -457,6 +468,16 @@ internal sealed partial class TaleBinder
                     _symbols.Analysis.Expression(ExpressionContextKind.Condition, value, location);
                     break;
                 case TaleClauseKind.Effects:
+                    if (label is null)
+                    {
+                        _diagnostics.Error(CompilerDiagnosticCodes.MalformedChoice,
+                            "A choice without a label only allows a divert. Add a label, " +
+                            $"e.g. `{SceneVocabulary.ChoiceMarker} [{ChoiceDefinition.ContinueLabelText}] " +
+                            $"{{ effects }} {SceneVocabulary.Divert} target`.",
+                            At(clause.Start), At(clause.ValueStart + clause.ValueLength + 1));
+                        malformedTextless = true;
+                    }
+
                     var parsedEffects = ExpressionParser.ParseEffects(value, location, _symbols, _diagnostics) ?? [];
                     if (!hasEffects)
                         effects = parsedEffects;
@@ -476,7 +497,7 @@ internal sealed partial class TaleBinder
             }
         }
 
-        if (syntax.IsInvalid)
+        if (syntax.IsInvalid || malformedTextless)
         {
             NoteDroppedChoice(scene);
             return;
