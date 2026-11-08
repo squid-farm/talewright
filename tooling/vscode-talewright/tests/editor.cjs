@@ -242,6 +242,26 @@ async function testYamlSchema() {
       (typeof content === 'string' ? content : content.value).includes('scene where play begins'))),
     'Schema hover should show the start field description');
 
+    const withGameLine = valid.replace('  randomness: checks-only\n', '  randomness: checks-only\n  \n');
+    await replaceDocument(document, withGameLine);
+    const gameCompletions = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',
+      document.uri, document.positionAt(withGameLine.indexOf('  \n') + 2));
+    assert.ok(gameCompletions?.items?.some(item => item.label === 'character-sheet'),
+      'Schema key completion should offer the character-sheet game setting');
+
+    const withSheetLine = valid.replace('  randomness: checks-only\n',
+      '  randomness: checks-only\n  character-sheet:\n    stats: false\n    \n');
+    await replaceDocument(document, withSheetLine);
+    const sheetCompletions = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',
+      document.uri, document.positionAt(withSheetLine.indexOf('    \n') + 4));
+    assert.ok(sheetCompletions?.items?.some(item => item.label === 'inventory'),
+      'Schema key completion should offer character-sheet sections');
+    const sheetHovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri,
+      document.positionAt(withSheetLine.indexOf('character-sheet:') + 2));
+    assert.ok(sheetHovers?.some(hover => hover.contents.some(content =>
+      (typeof content === 'string' ? content : content.value).includes('Which character sheet sections'))),
+    'Schema hover should describe the character-sheet setting');
+
     const fallbackSchema = path.join(folder, 'story.schema.json');
     const taleExtension = vscode.extensions.getExtension('squid-farm.talewright');
     assert.ok(taleExtension, 'Talewright VSIX must be installed in the clean editor profile');

@@ -184,6 +184,7 @@ public static class StoryCompiler
                 ? null : $"{ReplayVersion}\n{options.CompatibilityId}",
             UndoEnabled = manifest.UndoEnabled,
             AutosaveEnabled = manifest.AutosaveEnabled,
+            CharacterSheet = manifest.CharacterSheet,
             Creation = manifest.Creation,
             Start = new SceneId(manifest.Start),
             Randomness = manifest.Randomness,

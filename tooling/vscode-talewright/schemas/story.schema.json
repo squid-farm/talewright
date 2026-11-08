@@ -47,6 +47,18 @@
           "default": true,
           "description": "Whether to write automatic recovery saves at the start and after each completed choice. Defaults to true; false stops new automatic writes without deleting existing saves."
         },
+        "character-sheet": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/booleanScalar"
+            },
+            {
+              "$ref": "#/definitions/characterSheet"
+            }
+          ],
+          "default": true,
+          "description": "Which character sheet sections players see. Defaults to true: each section appears when the story declares something for it. false hides the whole sheet; a mapping such as { inventory: false } hides only those sections. Hiding is presentation only: stats, items and standing still work in conditions and effects."
+        },
         "creation": {
           "$ref": "#/definitions/creation",
           "description": "Optional player character creation choices."
@@ -187,6 +199,28 @@
             "$ref": "#/definitions/statDefinition"
           },
           "description": "Additional or replacement stat definitions."
+        }
+      },
+      "additionalProperties": false
+    },
+    "characterSheet": {
+      "type": "object",
+      "description": "Character sheet sections to show or hide. Omitted sections keep the default.",
+      "properties": {
+        "stats": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": true,
+          "description": "Whether the sheet shows stats. false hides them without changing stats, skill checks or levelling."
+        },
+        "inventory": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": true,
+          "description": "Whether the sheet shows the inventory. false hides it; items, their modifiers and conditions such as player has rope still work."
+        },
+        "standing": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": true,
+          "description": "Whether the sheet shows faction standing. false hides it; standing changes and tier conditions still work."
         }
       },
       "additionalProperties": false

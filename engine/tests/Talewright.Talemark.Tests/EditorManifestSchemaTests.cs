@@ -6,6 +6,7 @@ using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Tests;
 
@@ -141,6 +142,19 @@ public class EditorManifestSchemaTests
             }));
             Assert.Equal(expectedCodes, result.Diagnostics.Select(diagnostic => diagnostic.Code).Order().ToArray());
             Assert.Equal(!expectedCodes.Any(code => code is "TW4003" or "TW4006"), result.Success);
+            if (file == "character-sheet-yes.yaml")
+            {
+                Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "TW4003" && diagnostic.Message ==
+                    "character-sheet must be true, false, or a mapping of stats, inventory and standing to true or false.");
+            }
+            if (file == "character-sheet-invalid-sections.yaml")
+            {
+                Assert.Contains(result.Diagnostics, diagnostic =>
+                    diagnostic.Code == "TW4003" && diagnostic.Message == "character-sheet.inventory must be true or false.");
+                Assert.Contains(result.Diagnostics, diagnostic =>
+                    diagnostic.Code == "TW4006" && diagnostic.Message.StartsWith("Unknown key 'badges'", StringComparison.Ordinal)
+                    && diagnostic.Message.EndsWith("Expected one of: stats, inventory, standing.", StringComparison.Ordinal));
+            }
             if (file == "autosave-yes.yaml")
             {
                 Assert.Contains(result.Diagnostics, diagnostic =>
@@ -218,6 +232,7 @@ public class EditorManifestSchemaTests
                     Assert.Equal(RandomnessMode.ChecksOnly, story.Randomness);
                     Assert.Null(story.Seed);
                     Assert.True(story.UndoEnabled);
+                    Assert.Equal(CharacterSheetVisibility.Shown, story.CharacterSheet);
                     Assert.Equal(string.Empty, player.LastName);
                     Assert.Equal(Pronouns.They, player.Pronouns);
                     Assert.Empty(player.Inventory);
@@ -283,6 +298,14 @@ public class EditorManifestSchemaTests
                     var preset = Assert.Single(story.Creation.Presets);
                     Assert.Equal("explorer", preset.Label);
                     Assert.Equal(8, preset.Stats[new StatId("focus")]);
+                    break;
+                case "character-sheet-off.yaml":
+                    Assert.Equal(CharacterSheetVisibility.Hidden, story.CharacterSheet);
+                    Assert.Equal("coin", story.World.Items[new ItemId("coin")].Name);
+                    break;
+                case "character-sheet-sections.yaml":
+                    Assert.Equal(new CharacterSheetVisibility(Stats: true, Inventory: false, Standing: false),
+                        story.CharacterSheet);
                     break;
                 case "faction-shorthand.yaml":
                     Assert.Equal("guild", story.World.Factions[new FactionId("guild")].Name);

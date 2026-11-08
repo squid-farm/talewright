@@ -133,6 +133,7 @@ game:
   seed: 1234 # optional; omitted = random per playthrough
   undo: true # default; false hides Back/Forward without disabling saves
   autosave: true # default; false stops new automatic recovery writes
+  character-sheet: true # default; false hides the sheet, { inventory: false } hides sections
   ruleset: # optional; omitted = no stats, skill checks or levelling
     base: rpg # turns on the built-in RPG stats, skill checks and levelling
     disable: [cha] # remove stats from the base ruleset
@@ -183,8 +184,19 @@ the available rulesets.
 
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
-This applies to `game.undo`, `game.autosave`, `game.creation.name`, item
-`uncountable`, and trigger `once`.
+This applies to `game.undo`, `game.autosave`, `game.character-sheet` and its
+sections, `game.creation.name`, item `uncountable`, and trigger `once`.
+
+`game.character-sheet` controls what the player's character sheet shows. By
+default each section appears when the story declares something for it: stats
+when the ruleset has stats, inventory when the story declares items, and
+standing when it declares factions. `character-sheet: false` hides the whole
+sheet, and the story text takes the full width. A mapping hides only the
+sections set to `false`: `character-sheet: { inventory: false, standing: false }`.
+The sections are `stats`, `inventory` and `standing`; omitted sections keep the
+default, and other keys produce TW4006. Hiding is presentation only: hidden
+stats, items and standing still work in conditions, effects, skill checks and
+item modifiers.
 
 Optional mappings and lists may be omitted. Where empty containers are allowed,
 write `{}` or `[]` explicitly. YAML null values (`null`, `~`, or a key with no

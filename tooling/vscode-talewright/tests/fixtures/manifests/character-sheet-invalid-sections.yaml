@@ -1,0 +1,11 @@
+game:
+  id: character-sheet-invalid-sections
+  title: Character sheet sections
+  start: beginning
+  character-sheet:
+    inventory: no
+    standing:
+    badges: false
+characters:
+  player:
+    first-name: Ada

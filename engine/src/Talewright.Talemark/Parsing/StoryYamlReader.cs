@@ -4,6 +4,7 @@ using Talewright.Rules.Checks;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 using Talewright.Talemark.Vocabulary;
 using YamlDotNet.RepresentationModel;
 using static Talewright.Talemark.Parsing.StoryYamlContext;
@@ -35,7 +36,8 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var game = gameNode is null ? new YamlMappingNode() : _yaml.Mapping(gameNode, ManifestVocabulary.Game) ?? new YamlMappingNode();
         _yaml.CheckKeys(game, ManifestVocabulary.Id, ManifestVocabulary.Title, ManifestVocabulary.Version,
             ManifestVocabulary.Start, ManifestVocabulary.Randomness, ManifestVocabulary.Seed,
-            ManifestVocabulary.Undo, ManifestVocabulary.Autosave, ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
+            ManifestVocabulary.Undo, ManifestVocabulary.Autosave, ManifestVocabulary.CharacterSheet,
+            ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
 
         var ruleset = new StoryYamlRulesetReader(_yaml, _options, _analysis).Read(Get(game, ManifestVocabulary.Ruleset));
         var world = new StoryYamlWorldReader(_yaml);
@@ -87,9 +89,41 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
                 : _yaml.Error(autosave, CompilerDiagnosticCodes.InvalidConfigurationValue, "autosave must be true or false.", true);
         }
 
+        if (Get(game, ManifestVocabulary.CharacterSheet) is { } characterSheet)
+        {
+            manifest.CharacterSheet = ReadCharacterSheet(characterSheet);
+        }
+
         ReadTriggers(Get(root, ManifestVocabulary.Triggers), manifest.Triggers);
         manifest.Creation = world.ReadCreation(Get(game, ManifestVocabulary.Creation), ruleset);
         return manifest;
+    }
+
+    private CharacterSheetVisibility ReadCharacterSheet(YamlNode node)
+    {
+        if (node is YamlScalarNode scalar && bool.TryParse(scalar.Value, out var shown))
+        {
+            return shown ? CharacterSheetVisibility.Shown : CharacterSheetVisibility.Hidden;
+        }
+
+        if (node is not YamlMappingNode map)
+        {
+            return _yaml.Error(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                $"{ManifestVocabulary.CharacterSheet} must be true, false, or a mapping of " +
+                $"{ManifestVocabulary.Stats}, {ManifestVocabulary.Inventory} and {ManifestVocabulary.Standing} to true or false.",
+                CharacterSheetVisibility.Shown);
+        }
+
+        _yaml.CheckKeys(map, ManifestVocabulary.Stats, ManifestVocabulary.Inventory, ManifestVocabulary.Standing);
+        return new CharacterSheetVisibility(
+            Section(ManifestVocabulary.Stats), Section(ManifestVocabulary.Inventory), Section(ManifestVocabulary.Standing));
+
+        bool Section(string key) => Get(map, key) is not { } value
+            ? true
+            : bool.TryParse(Scalar(value), out var sectionShown)
+                ? sectionShown
+                : _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"{ManifestVocabulary.CharacterSheet}.{key} must be true or false.", true);
     }
 
     private void ReadTriggers(YamlNode? node, List<RawTrigger> triggers)

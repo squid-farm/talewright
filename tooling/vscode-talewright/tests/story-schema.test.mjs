@@ -271,6 +271,7 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
     ['root', schema, { game: { id: 'test', title: 'Test', start: 'beginning' }, characters: { player: { 'first-name': 'Ada' } } }],
     ['game', schema.properties.game, { id: 'test', title: 'Test', start: 'beginning' }],
     ['ruleset', schema.definitions.ruleset, {}],
+    ['characterSheet', schema.definitions.characterSheet, {}],
     ['statDefinition', schema.definitions.statDefinition, { id: 'courage' }],
     ['character', schema.definitions.character, { 'first-name': 'Ada' }],
     ['customPronouns', schema.definitions.customPronouns, {

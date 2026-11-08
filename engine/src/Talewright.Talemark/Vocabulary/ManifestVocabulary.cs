@@ -23,6 +23,7 @@ internal static class ManifestVocabulary
     internal const string Seed = "seed";
     internal const string Undo = "undo";
     internal const string Autosave = "autosave";
+    internal const string CharacterSheet = "character-sheet";
     internal const string Ruleset = "ruleset";
     internal const string RulesetNone = "none";
     internal const string Creation = "creation";
@@ -105,7 +106,7 @@ internal static class ManifestVocabulary
     internal static readonly ImmutableArray<string> PropertyKeys =
     [
         Game, Characters, Factions, Items, Flags, Vars, Triggers,
-        Id, Title, Version, Start, Randomness, Seed, Undo, Autosave, Ruleset, Creation,
+        Id, Title, Version, Start, Randomness, Seed, Undo, Autosave, CharacterSheet, Ruleset, Creation,
         When, Do, Once, Save, Base, Disable, Stats, Name, Category, Min, Max, Default, GoverningAttribute,
         FirstName, LastName, Pronouns, Inventory, NameAgreement, Subject, Object, PossessivePronoun, Reflexive,
         Agreement, Determiner, Independent, Uncountable, Modifiers, Standing, Presets, Label,
