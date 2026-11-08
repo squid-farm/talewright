@@ -29,6 +29,27 @@
     "Snippets"
   ],
   "contributes": {
+    "semanticTokenTypes": [
+      { "id": "talemarkScene", "superType": "variable", "description": "Talemark scene declarations and divert targets." },
+      { "id": "talemarkDivert", "superType": "operator", "description": "Talemark divert markers." },
+      { "id": "talemarkPunctuation", "description": "Talemark syntax delimiters and separators." },
+      { "id": "talemarkFormatting", "description": "Talemark paired formatting delimiters." },
+      { "id": "talemarkEscape", "superType": "string", "description": "Talemark reader-text escapes." },
+      { "id": "talemarkStructure", "superType": "operator", "description": "Talemark choice, speech, effect, and skill-check markers." },
+      { "id": "modifier", "description": "Talemark substitution modifiers." }
+    ],
+    "semanticTokenScopes": [{
+      "language": "tale",
+      "scopes": {
+        "talemarkScene": ["entity.name.section.tale", "entity.name.function.tale"],
+        "talemarkDivert": ["keyword.control.divert.tale"],
+        "talemarkPunctuation": ["punctuation.section.embedded.tale"],
+        "talemarkFormatting": ["constant.character.escape.tale"],
+        "talemarkEscape": ["constant.character.escape.tale"],
+        "talemarkStructure": ["keyword.control.tale"],
+        "modifier": ["storage.modifier.tale"]
+      }
+    }],
     "commands": [
       { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
       { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
@@ -132,6 +153,7 @@
     "ajv": "^8.20.0",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.3.2",
+    "ws": "^8.22.1",
     "yaml": "^2.9.1"
   }
 }

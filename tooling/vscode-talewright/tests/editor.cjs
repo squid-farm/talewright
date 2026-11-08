@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const vscode = require('vscode');
+const WebSocket = require('ws');
 
 exports.run = async () => {
   const extension = vscode.extensions.getExtension('squid-farm.talewright');
@@ -368,6 +369,7 @@ async function testLiveDiagnostics() {
     assert.equal(document.isDirty, true, 'Exercise an unsaved overlay');
     await waitForCompiler(document, items => items.length === 0);
     await assertSemanticTokens(document);
+    await assertRenderedColors(document);
     assert.ok((await fs.readFile(file, 'utf8')).includes('missing'), 'Disk must remain invalid');
     const completionEdit = new vscode.WorkspaceEdit();
     completionEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
@@ -580,8 +582,134 @@ async function assertSemanticTokens(document) {
   assert.ok(tokens.some(token => token.type === 'keyword' && token.text === 'if'));
   assert.ok(tokens.some(token => token.type === 'property' && token.text === 'first-name'));
   assert.ok(tokens.some(token => token.type === 'modifier' && token.text === 'upper'));
-  assert.deepEqual(tokens.filter(token => token.type === 'operator' &&
+  assert.deepEqual(tokens.filter(token => token.type === 'talemarkFormatting' &&
     (token.text === '__' || token.text === '**')).map(token => token.text), ['__', '__', '**', '**']);
-  assert.equal(tokens.some(token => token.type === 'operator' && token.text === '*' && token.line === 3), false,
+  assert.equal(tokens.some(token => token.type === 'talemarkFormatting' && token.text === '*' && token.line === 3), false,
     'Compiler classifications must preserve the emphasis boundary rules');
+}
+
+async function assertRenderedColors(document) {
+  const source = [
+    '=== start',
+    '@title The End',
+    'Plain narrative.',
+    '* [Go] -> ending',
+    '{player:first-name#upper}',
+    String.raw`\{literal\} **bold**`,
+    '=== ending',
+    '-> END',
+  ].join('\n');
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), source);
+  assert.equal(await vscode.workspace.applyEdit(edit), true);
+  await waitForCompiler(document, items => items.length === 0);
+  const port = process.env.TALEWRIGHT_RENDERER_PORT;
+  assert.ok(port, 'Rendered-color checks require the isolated editor renderer port');
+  const pagesResponse = await fetch(`http://127.0.0.1:${port}/json/list`);
+  assert.equal(pagesResponse.ok, true);
+  const pages = await pagesResponse.json();
+  const page = pages.find(item => item.type === 'page' && item.url.includes('workbench'));
+  assert.ok(page?.webSocketDebuggerUrl, 'The test editor renderer must be available');
+  const socket = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    socket.addEventListener('open', resolve, { once: true });
+    socket.addEventListener('error', reject, { once: true });
+  });
+  const configuration = vscode.workspace.getConfiguration('workbench');
+  const oldTheme = configuration.inspect('colorTheme').globalValue;
+  const tokenConfiguration = vscode.workspace.getConfiguration('editor');
+  const oldColors = tokenConfiguration.inspect('tokenColorCustomizations').globalValue;
+  const oldHints = tokenConfiguration.inspect('inlayHints.enabled').globalValue;
+  const oldBracketColors = tokenConfiguration.inspect('bracketPairColorization.enabled').globalValue;
+  const availableThemes = vscode.extensions.getExtension('vscode.theme-defaults').packageJSON.contributes.themes;
+  const themes = [
+    ['./themes/dark_plus.json', '#D4D4D4', 'rgb(212, 212, 212)'],
+    ['./themes/light_plus.json', '#000000', 'rgb(0, 0, 0)'],
+  ];
+  if (availableThemes.some(theme => theme.path === './themes/2026-dark.json')) {
+    themes.push(['./themes/2026-dark.json', '#BBBEBF', 'rgb(187, 190, 191)']);
+  }
+  let requestId = 0;
+
+  async function renderedLines() {
+    const id = ++requestId;
+    const result = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        socket.removeEventListener('message', receive);
+        reject(new Error('Timed out inspecting rendered editor colors'));
+      }, 5000);
+      function receive(event) {
+        const message = JSON.parse(event.data);
+        if (message.id !== id) return;
+        clearTimeout(timeout);
+        socket.removeEventListener('message', receive);
+        if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message)));
+        else resolve(message.result.result.value);
+      }
+      socket.addEventListener('message', receive);
+    });
+    socket.send(JSON.stringify({
+      id, method: 'Runtime.evaluate', params: {
+        returnByValue: true,
+        expression: `Array.from(document.querySelectorAll('.monaco-editor .view-line')).map(line =>
+          Array.from(line.querySelectorAll('span')).filter(span => span.children.length === 0).map(span => ({
+            text: span.textContent.replaceAll('\\u00a0', ' '),
+            color: getComputedStyle(span).color
+          })))`,
+      },
+    }));
+    return result;
+  }
+
+  try {
+    await tokenConfiguration.update('inlayHints.enabled', 'off', vscode.ConfigurationTarget.Global);
+    await tokenConfiguration.update('bracketPairColorization.enabled', false, vscode.ConfigurationTarget.Global);
+    for (const [themePath, neutral, expectedProse] of themes) {
+      const theme = availableThemes.find(item => item.path === themePath);
+      assert.ok(theme, `The test editor must include ${themePath}`);
+      await configuration.update('colorTheme', theme.id, vscode.ConfigurationTarget.Global);
+      // Reproduce themes that intentionally render ordinary variables and operators like prose.
+      await tokenConfiguration.update('tokenColorCustomizations', {
+        textMateRules: [{ scope: ['variable.other', 'keyword.operator'], settings: { foreground: neutral } }],
+      }, vscode.ConfigurationTarget.Global);
+      const deadline = Date.now() + 20000;
+      let observed;
+      do {
+        const lines = await renderedLines();
+        function color(lineText, text) {
+          const line = lines.find(parts => parts.map(part => part.text).join('') === lineText);
+          if (!line) return undefined;
+          const offset = lineText.indexOf(text);
+          let start = 0;
+          for (const part of line) {
+            if (offset >= start && offset < start + part.text.length) return part.color;
+            start += part.text.length;
+          }
+        }
+        const prose = color('Plain narrative.', 'Plain');
+        observed = {
+          scene: color('=== start', 'start'),
+          target: color('* [Go] -> ending', 'ending'),
+          divert: color('* [Go] -> ending', '->'),
+          choice: color('* [Go] -> ending', '*'),
+          punctuation: color('* [Go] -> ending', '['),
+          title: color('@title The End', 'The End'),
+          modifier: color('{player:first-name#upper}', 'upper'),
+          escape: color(String.raw`\{literal\} **bold**`, String.raw`\{`),
+          formatting: color(String.raw`\{literal\} **bold**`, '**'),
+        };
+        if (prose === expectedProse && Object.values(observed).every(value => value && value !== prose) &&
+            observed.scene === observed.target) break;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } while (Date.now() < deadline);
+      assert.ok(Date.now() < deadline, `${theme.id}: structural syntax must visibly differ from prose: ${JSON.stringify(observed)}`);
+      console.log(`${theme.id} rendered semantic colors passed: ${JSON.stringify(observed)}`);
+    }
+  } finally {
+    socket.close();
+    await tokenConfiguration.update('tokenColorCustomizations', oldColors, vscode.ConfigurationTarget.Global);
+    await tokenConfiguration.update('inlayHints.enabled', oldHints, vscode.ConfigurationTarget.Global);
+    await tokenConfiguration.update('bracketPairColorization.enabled', oldBracketColors, vscode.ConfigurationTarget.Global);
+    await configuration.update('colorTheme', oldTheme, vscode.ConfigurationTarget.Global);
+  }
 }

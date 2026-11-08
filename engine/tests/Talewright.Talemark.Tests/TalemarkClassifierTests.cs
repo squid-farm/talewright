@@ -76,10 +76,10 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Keyword, "success");
         Has(TalemarkClassificationKind.Keyword, "failure");
         Has(TalemarkClassificationKind.Keyword, "END");
-        Has(TalemarkClassificationKind.Operator, ">");
-        Has(TalemarkClassificationKind.Operator, "~");
-        Has(TalemarkClassificationKind.Operator, "*");
-        Has(TalemarkClassificationKind.Operator, "->");
+        Has(TalemarkClassificationKind.StructuralMarker, ">");
+        Has(TalemarkClassificationKind.StructuralMarker, "~");
+        Has(TalemarkClassificationKind.StructuralMarker, "*");
+        Has(TalemarkClassificationKind.Divert, "->");
         Has(TalemarkClassificationKind.Operator, "+=");
         Has(TalemarkClassificationKind.Operator, "+");
         Has(TalemarkClassificationKind.Operator, "-");
@@ -97,7 +97,7 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Function, "@CanPickLock");
         Has(TalemarkClassificationKind.String, "\"maps/old\"");
         Has(TalemarkClassificationKind.Number, "10");
-        Has(TalemarkClassificationKind.Identifier, "unresolved-scene-id");
+        Has(TalemarkClassificationKind.SceneIdentifier, "unresolved-scene-id");
         Has(TalemarkClassificationKind.Modifier, "upper");
         Has(TalemarkClassificationKind.Modifier, "the");
         Has(TalemarkClassificationKind.Modifier, "one-many");
@@ -105,7 +105,7 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Punctuation, "{");
 
         Assert.Contains(classifications, classification =>
-            classification.Kind == TalemarkClassificationKind.Identifier &&
+            classification.Kind == TalemarkClassificationKind.SceneIdentifier &&
             classification.Modifiers == TalemarkClassificationModifiers.Declaration &&
             TextOf(tale, classification) == "entry");
     }
@@ -224,7 +224,7 @@ public sealed class TalemarkClassifierTests
         var analysis = StoryAnalyzer.Analyze(source);
 
         Assert.Contains(analysis.Classifications, classification =>
-            classification.Kind == TalemarkClassificationKind.Identifier &&
+            classification.Kind == TalemarkClassificationKind.SceneIdentifier &&
             classification.Modifiers == TalemarkClassificationModifiers.Declaration &&
             classification.Range.Start.File == "main.tale");
     }

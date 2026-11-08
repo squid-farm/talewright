@@ -116,10 +116,17 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 |---|---|
 | Parser and diagnostics | Lexer, expression syntax grammar, enclosing delimiters, semantic binding, precise positions, obsolete-form replacement messages. `ExpressionSyntaxParser` owns expression grammar; `ExpressionBinder` owns symbol resolution and type validation. Identify which is affected and explicitly call out unaffected surfaces. Keep parser behavior and the registry in agreement. |
 | Manifest schema | Name rules and any new data shapes; schema/compiler agreement on valid and invalid fixtures. YAML quoting is a separate layer from Talemark quoting. |
-| VS Code semantic tokens and grammar fallback | Compiler-backed semantic tokens provide compiler-accurate coloring. Keep the TextMate grammar lightweight for startup and untrusted workspaces; add a classifier case for new syntax, while a TextMate rule is optional. |
+| VS Code semantic tokens and grammar fallback | Compiler-backed semantic tokens provide compiler-accurate coloring. Preserve syntax categories through the LSP codec and register custom token types with language-scoped theme mappings in the extension manifest; generic variable/operator styles can hide structural syntax. Verify rendered styles as well as token ranges. Keep the TextMate grammar lightweight for startup and untrusted workspaces; add a classifier case for new syntax, while a TextMate rule is optional. |
 | Language server and shared authoring analysis | Semantic tokens, completion, replacement ranges, hover, live diagnostics, partial/incomplete input, finite argument suggestions and default details. Never execute project code merely to offer completion. |
 | Docs and examples | Registry, syntax reference, diagnostics, guides, snippets, shipped samples and test-story fixtures. Label any remaining decided-versus-current gap with its implementation issue. |
 | Runtime/player, when affected | Rendering, state changes, persistence, accessibility and host behavior; avoid claiming a parser-only change supplies them. |
+
+Semantic scene tokens probe the section-name scope first, then the function-name
+scope for themes that do not style sections. Formatting tokens color only paired
+delimiters; the lightweight grammar still supplies bold/italic text styles.
+The installed-editor smoke suite inspects computed foreground colors through an
+isolated, loopback-only renderer debugging port, with bracket colors and inlay
+hints disabled so they cannot mask missing semantic styles.
 
 ### Grammar spellings
 

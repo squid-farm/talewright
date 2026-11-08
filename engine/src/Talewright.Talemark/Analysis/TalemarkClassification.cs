@@ -16,6 +16,9 @@ public enum TalemarkClassificationKind
     Modifier,
     Formatting,
     Escape,
+    SceneIdentifier,
+    Divert,
+    StructuralMarker,
 }
 
 [Flags]

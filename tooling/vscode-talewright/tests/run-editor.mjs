@@ -4,11 +4,19 @@ import { chmod, mkdir, mkdtemp, rm, writeFile, readdir, readFile, access } from 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vscodePath } from './vscode-path.mjs';
+import { createServer } from 'node:net';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 await mkdir(path.join(root, 'artifacts'), { recursive: true });
 const profile = await mkdtemp(path.join(root, 'artifacts/editor-'));
 try {
+  const listener = createServer();
+  await new Promise((resolve, reject) => {
+    listener.once('error', reject);
+    listener.listen(0, '127.0.0.1', resolve);
+  });
+  const rendererPort = listener.address().port;
+  await new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve()));
   await mkdir(path.join(profile, 'user', 'User'), { recursive: true });
   await writeFile(path.join(profile, 'user', 'User', 'settings.json'), JSON.stringify({
     'security.workspace.trust.startupPrompt': 'never',
@@ -50,11 +58,13 @@ try {
         DOTNET_MULTILEVEL_LOOKUP: '0',
         TALEWRIGHT_DOTNET_SENTINEL: dotnetMarker,
         TALEWRIGHT_TEST_UNTRUSTED: String(restricted),
+        TALEWRIGHT_RENDERER_PORT: String(rendererPort),
       },
       launchArgs: [
         ...profileArgs,
         ...(restricted ? [untrusted] : ['--disable-workspace-trust']),
         '--skip-welcome', '--skip-release-notes', '--disable-gpu', '--no-sandbox',
+        `--remote-debugging-port=${rendererPort}`,
       ],
     };
     if (restricted) {
