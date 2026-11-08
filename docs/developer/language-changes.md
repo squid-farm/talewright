@@ -124,6 +124,13 @@ For each surface, implement the change or explicitly explain why it is unaffecte
 Semantic scene tokens probe the section-name scope first, then the function-name
 scope for themes that do not style sections. Formatting tokens color only paired
 delimiters; the lightweight grammar still supplies bold/italic text styles.
+Other custom tokens probe specific scopes before broader equivalents: diverts
+use control keywords then keywords, structural markers use control keywords then
+keywords, delimiters use embedded then general punctuation, formatting/escapes
+use character escapes then character constants, and substitution modifiers use
+storage modifiers then storage. Parent-scope rules can already match a specific
+scope; the lists make fallback intent explicit. The first applicable style wins,
+even when neutral, and theme/user semantic-token rules take precedence.
 The installed-editor smoke suite inspects computed foreground colors through an
 isolated, loopback-only renderer debugging port, with bracket colors and inlay
 hints disabled so they cannot mask missing semantic styles.

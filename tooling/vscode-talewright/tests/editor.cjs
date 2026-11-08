@@ -621,7 +621,11 @@ async function assertRenderedColors(document) {
   const oldColors = tokenConfiguration.inspect('tokenColorCustomizations').globalValue;
   const oldHints = tokenConfiguration.inspect('inlayHints.enabled').globalValue;
   const oldBracketColors = tokenConfiguration.inspect('bracketPairColorization.enabled').globalValue;
-  const availableThemes = vscode.extensions.getExtension('vscode.theme-defaults').packageJSON.contributes.themes;
+  const oldSemanticColors = tokenConfiguration.inspect('semanticTokenColorCustomizations').globalValue;
+  const availableThemes = [
+    ...vscode.extensions.getExtension('vscode.theme-defaults').packageJSON.contributes.themes,
+    ...vscode.extensions.getExtension('squid-farm.talewright-editor-test-host').packageJSON.contributes.themes,
+  ];
   const themes = [
     ['./themes/dark_plus.json', '#D4D4D4', 'rgb(212, 212, 212)'],
     ['./themes/light_plus.json', '#000000', 'rgb(0, 0, 0)'],
@@ -629,6 +633,24 @@ async function assertRenderedColors(document) {
   if (availableThemes.some(theme => theme.path === './themes/2026-dark.json')) {
     themes.push(['./themes/2026-dark.json', '#BBBEBF', 'rgb(187, 190, 191)']);
   }
+  const sparseColors = {
+    scene: 'rgb(255, 208, 128)',
+    target: 'rgb(255, 208, 128)',
+    divert: 'rgb(128, 192, 255)',
+    choice: 'rgb(128, 192, 255)',
+    punctuation: 'rgb(255, 128, 192)',
+    title: 'rgb(255, 192, 128)',
+    modifier: 'rgb(192, 128, 255)',
+    escape: 'rgb(128, 255, 176)',
+    formatting: 'rgb(128, 255, 176)',
+  };
+  themes.push(['./sparse-theme.json', '#D4D4D4', 'rgb(212, 212, 212)', sparseColors]);
+  themes.push([
+    './sparse-theme.json', '#D4D4D4', 'rgb(212, 212, 212)',
+    { ...sparseColors, divert: 'rgb(212, 212, 212)', scene: 'rgb(18, 171, 205)', target: 'rgb(18, 171, 205)' },
+    [{ scope: 'keyword.control.divert.tale', settings: { foreground: '#D4D4D4' } }],
+    { 'talemarkScene:tale': '#12ABCD' },
+  ]);
   let requestId = 0;
 
   async function renderedLines() {
@@ -664,13 +686,19 @@ async function assertRenderedColors(document) {
   try {
     await tokenConfiguration.update('inlayHints.enabled', 'off', vscode.ConfigurationTarget.Global);
     await tokenConfiguration.update('bracketPairColorization.enabled', false, vscode.ConfigurationTarget.Global);
-    for (const [themePath, neutral, expectedProse] of themes) {
+    for (const [themePath, neutral, expectedProse, expectedColors, extraRules = [], semanticRules = {}] of themes) {
       const theme = availableThemes.find(item => item.path === themePath);
       assert.ok(theme, `The test editor must include ${themePath}`);
       await configuration.update('colorTheme', theme.id, vscode.ConfigurationTarget.Global);
       // Reproduce themes that intentionally render ordinary variables and operators like prose.
       await tokenConfiguration.update('tokenColorCustomizations', {
-        textMateRules: [{ scope: ['variable.other', 'keyword.operator'], settings: { foreground: neutral } }],
+        textMateRules: [
+          { scope: ['variable.other', 'keyword.operator'], settings: { foreground: neutral } },
+          ...extraRules,
+        ],
+      }, vscode.ConfigurationTarget.Global);
+      await tokenConfiguration.update('semanticTokenColorCustomizations', {
+        rules: semanticRules,
       }, vscode.ConfigurationTarget.Global);
       const deadline = Date.now() + 20000;
       let observed;
@@ -698,11 +726,14 @@ async function assertRenderedColors(document) {
           escape: color(String.raw`\{literal\} **bold**`, String.raw`\{`),
           formatting: color(String.raw`\{literal\} **bold**`, '**'),
         };
-        if (prose === expectedProse && Object.values(observed).every(value => value && value !== prose) &&
+        const colorsMatch = expectedColors
+          ? Object.entries(expectedColors).every(([role, value]) => observed[role] === value)
+          : Object.values(observed).every(value => value && value !== prose);
+        if (prose === expectedProse && colorsMatch &&
             observed.scene === observed.target) break;
         await new Promise(resolve => setTimeout(resolve, 100));
       } while (Date.now() < deadline);
-      assert.ok(Date.now() < deadline, `${theme.id}: structural syntax must visibly differ from prose: ${JSON.stringify(observed)}`);
+      assert.ok(Date.now() < deadline, `${theme.id}: rendered syntax must match fallback/override policy: ${JSON.stringify(observed)}`);
       console.log(`${theme.id} rendered semantic colors passed: ${JSON.stringify(observed)}`);
     }
   } finally {
@@ -710,6 +741,7 @@ async function assertRenderedColors(document) {
     await tokenConfiguration.update('tokenColorCustomizations', oldColors, vscode.ConfigurationTarget.Global);
     await tokenConfiguration.update('inlayHints.enabled', oldHints, vscode.ConfigurationTarget.Global);
     await tokenConfiguration.update('bracketPairColorization.enabled', oldBracketColors, vscode.ConfigurationTarget.Global);
+    await tokenConfiguration.update('semanticTokenColorCustomizations', oldSemanticColors, vscode.ConfigurationTarget.Global);
     await configuration.update('colorTheme', oldTheme, vscode.ConfigurationTarget.Global);
   }
 }

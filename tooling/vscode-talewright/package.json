@@ -42,12 +42,12 @@
       "language": "tale",
       "scopes": {
         "talemarkScene": ["entity.name.section.tale", "entity.name.function.tale"],
-        "talemarkDivert": ["keyword.control.divert.tale"],
-        "talemarkPunctuation": ["punctuation.section.embedded.tale"],
-        "talemarkFormatting": ["constant.character.escape.tale"],
-        "talemarkEscape": ["constant.character.escape.tale"],
-        "talemarkStructure": ["keyword.control.tale"],
-        "modifier": ["storage.modifier.tale"]
+        "talemarkDivert": ["keyword.control.divert.tale", "keyword.control", "keyword"],
+        "talemarkPunctuation": ["punctuation.section.embedded.tale", "punctuation"],
+        "talemarkFormatting": ["constant.character.escape.tale", "constant.character"],
+        "talemarkEscape": ["constant.character.escape.tale", "constant.character"],
+        "talemarkStructure": ["keyword.control.tale", "keyword"],
+        "modifier": ["storage.modifier.tale", "storage"]
       }
     }],
     "commands": [
