@@ -1,3 +1,5 @@
+import { initializeSettingsSelects } from "../PlayerSettingsSelect.js";
+
 const toolbars = new WeakMap();
 
 export function initialize(bar, toggle, menu, confirmation, settings = null) {
@@ -43,7 +45,7 @@ export function initialize(bar, toggle, menu, confirmation, settings = null) {
         if (event.key !== "Tab") return;
         const controls = [...settings.querySelectorAll(
             "button:not(:disabled), select:not(:disabled), input:not(:disabled)")]
-            .filter(element => element.getClientRects().length);
+            .filter(element => element.getClientRects().length && !element.closest(".tw-settings-options"));
         const index = controls.indexOf(document.activeElement);
         if (index < 0 || (!event.shiftKey && index === controls.length - 1) ||
             (event.shiftKey && index === 0)) {
@@ -56,7 +58,8 @@ export function initialize(bar, toggle, menu, confirmation, settings = null) {
     confirmation.addEventListener("cancel", cancel);
     settings?.addEventListener("cancel", settingsCancel);
     settings?.addEventListener("keydown", settingsKeydown);
-    toolbars.set(bar, { resize, escape, outside, cancel, confirmation, settings, settingsCancel, settingsKeydown,
+    const disposeSettingsSelects = settings ? initializeSettingsSelects(settings) : () => {};
+    toolbars.set(bar, { resize, escape, outside, cancel, confirmation, settings, settingsCancel, settingsKeydown, disposeSettingsSelects,
         cancelResize: () => cancelAnimationFrame(frame) });
 }
 
@@ -97,6 +100,7 @@ export function dispose(bar) {
     state.confirmation.removeEventListener("cancel", state.cancel);
     state.settings?.removeEventListener("cancel", state.settingsCancel);
     state.settings?.removeEventListener("keydown", state.settingsKeydown);
+    state.disposeSettingsSelects();
     document.documentElement.style.removeProperty("--tw-toolbar-offset");
     toolbars.delete(bar);
 }
