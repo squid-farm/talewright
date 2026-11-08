@@ -80,7 +80,7 @@
       "cache": false,
       "inputs": ["default", "^default", "testWorkflow"],
       "options": {
-        "command": "export TALEWRIGHT_STANDALONE=1 TALEWRIGHT_STANDALONE_CREATION=1 TALEWRIGHT_PUBLISHED_CHARACTER=Mara TALEWRIGHT_DESKTOP_EXECUTABLE=\"$PWD/artifacts/standalone-linux/start.sh\"; rm -rf artifacts/standalone-linux artifacts/standalone-linux.zip; dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- publish samples/LostRelic -a --target desktop --output artifacts/standalone-linux.zip && mkdir -p artifacts/test-results && unzip -oq artifacts/standalone-linux.zip -d artifacts/standalone-linux && if test -f artifacts/test-results/linux.trx; then cp artifacts/test-results/linux.trx artifacts/test-results/linux-regression.trx; fi && python3 player/tests/run_e2e.py linux --filter Artifact=Standalone && mv artifacts/test-results/linux.trx artifacts/test-results/linux-standalone.trx"
+        "command": "export TALEWRIGHT_STANDALONE=1 TALEWRIGHT_STANDALONE_CREATION=1 TALEWRIGHT_PUBLISHED_CHARACTER=Mara TALEWRIGHT_DESKTOP_EXECUTABLE=\"$PWD/artifacts/standalone-linux/start.sh\"; rm -rf artifacts/standalone-linux artifacts/standalone-linux.zip; dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- publish samples/LostRelic -a --target desktop --output artifacts/standalone-linux.zip && mkdir -p artifacts/test-results && unzip -oq artifacts/standalone-linux.zip -d artifacts/standalone-linux && if test -f artifacts/test-results/linux.trx; then cp artifacts/test-results/linux.trx artifacts/test-results/linux-regression.trx; fi && python3 player/tests/run_e2e.py linux --jobs 1 --filter Artifact=Standalone && mv artifacts/test-results/linux.trx artifacts/test-results/linux-standalone.trx"
       }
     }
   }

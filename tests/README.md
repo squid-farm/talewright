@@ -574,6 +574,29 @@ python3 player/tests/run_e2e.py web --browser firefox
 python3 player/tests/run_e2e.py web --browser chromium --filter FullyQualifiedName~StoryLoadingTests
 ```
 
+### Tuning local E2E speed and CPU use
+
+Both suites build once, then run the selected tests. Two options control how much of the machine they use:
+
+- `--jobs N` (or `TALEWRIGHT_E2E_JOBS`) starts up to N `dotnet test` processes at once and deals the
+  selected test methods across them round-robin. For `web --browser all`, every browser gets its own set of
+  processes, and at most N of them run at once. For `linux`, each process gets its own Xvfb display, D-Bus and
+  accessibility session, XDG directories and export folders. The default is 1, which is the serial behavior CI uses.
+  With more than one job, reports are named `<browser>-<n>.trx` or `linux-<n>.trx`. Each process's console
+  output goes to a matching `.log` file in `artifacts/test-results/`. The runner prints the log tail for any process that fails.
+- `--threads N` (or `TALEWRIGHT_E2E_THREADS`) sets how many test classes one process runs at once
+  (xUnit `MaxParallelThreads`). The default comes from `xunit.runner.json`, which is 2. Linux processes always run
+  their cases serially.
+
+On a constrained machine, start with `--jobs 2 --threads 1`; raise `--jobs` for faster runs, or lower it if the desktop
+becomes unresponsive. `--shard` still applies first, and `--jobs` then splits that shard. Timing-budget classes
+are serial only within one process, so `--jobs` above 1 can make performance tests noisy. Run those with the default.
+
+```bash
+python3 player/tests/run_e2e.py web --browser all --jobs 3 --threads 1
+TALEWRIGHT_E2E_JOBS=2 ./nx run Talewright.Player.E2E.Tests:e2e-linux
+```
+
 GitHub Actions browser and Linux native UI jobs use a prebuilt versioned GHCR image
 (`ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1`) instead of reinstalling browser/native dependencies
 every run. Those jobs call `.github/docker/ui-tests/verify.py` before test execution to enforce
@@ -813,9 +836,9 @@ coordinate-based clicking is used. Button activation waits for the AT-SPI enable
 not just presence in the accessibility tree. Archive selection invokes the GTK location entry's own accessible
 activation action (rather than sending Enter to the globally focused window) and waits
 for the chooser to close; accepting an AT-SPI action alone does not mean GTK opened the selected file.
-All native cases run serially. App logs, accessibility-tree dumps,
+Native cases run serially within each test process (see `--jobs` above). App logs, accessibility-tree dumps,
 screenshots, and adapter logs are retained under `artifacts/test-results/linux/<case-id>/`.
-Both hosts produce xUnit results in TRX: `artifacts/test-results/linux.trx` for the native run.
+Both hosts produce xUnit results in TRX: `artifacts/test-results/linux.trx` for the native run (`linux-<n>.trx` with `--jobs` above 1).
 The xUnit output associates each result with its evidence directory. Old Python unittest filter names
 are no longer supported; use the same .NET filter syntax shown above.
 
