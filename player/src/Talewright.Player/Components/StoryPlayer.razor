@@ -538,13 +538,13 @@
     private bool TriggerSaveIsCurrent(int generation, int sequence) =>
         !_disposed && generation == _generation && sequence == _triggerSaveSequence;
 
-    private async Task Choose(string key)
+    private async Task Choose(ChoiceView choice)
     {
         if (_session.Cursor >= StoryHistory.MaxChoices)
         {
             return;
         }
-        _session.Choose(key);
+        _session.Choose(choice.Key);
         UpdateDiagnosticContext();
         RequestReveal();
         await QueueTriggerSaveAsync();

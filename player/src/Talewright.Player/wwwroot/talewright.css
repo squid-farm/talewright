@@ -167,6 +167,7 @@ button { font: inherit; color: inherit; }
 .tw-choice:not(:disabled):hover, .tw-choice:not(:disabled):focus-visible { border-color: var(--tw-accent); }
 .tw-choice:disabled { cursor: not-allowed; }
 .tw-choice-number { color: var(--tw-muted); margin-right: 0.5rem; }
+.tw-choice-status { margin-left: 0.5rem; }
 
 .tw-media { display: inline-block; max-width: 100%; vertical-align: middle; }
 .tw-media img { display: block; max-width: 100%; height: auto; min-width: 1px; min-height: 1px; }

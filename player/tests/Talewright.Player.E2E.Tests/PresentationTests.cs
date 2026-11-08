@@ -48,6 +48,41 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Play again" })).ToBeVisibleAsync();
     }
 
+    [Fact]
+    public async Task Shown_unavailable_choices_are_marked_and_available_choices_still_work()
+    {
+        await Upload(new StoryFixture("shown-choices", TestStories.DefaultYaml, """
+            === start
+            * [Restricted] (requires false, shown "Need a key") -> END
+            * [Proceed] -> locked
+
+            === locked
+            No available actions.
+            * [Restricted] (requires false, shown "Still locked") -> END
+            """));
+
+        await Expect(Choices).ToHaveCountAsync(2);
+        await Expect(Choices.Nth(0)).ToBeDisabledAsync();
+        await Expect(Choices.Nth(0)).ToContainTextAsync("1.");
+        await Expect(Choices.Nth(0)).ToContainTextAsync("Need a key");
+        await Expect(Choices.Nth(0)).ToContainTextAsync("(Unavailable)");
+        await Expect(Choices.Nth(0).Locator(".tw-choice-status")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "1. Need a key (Unavailable)", Exact = true })).ToBeDisabledAsync();
+        await Expect(Choices.Nth(1)).ToBeEnabledAsync();
+        await Expect(Choices.Nth(1)).ToContainTextAsync("2.");
+
+        await Choose("Proceed");
+        await Expect(Latest).ToContainTextAsync("No available actions.");
+        await Expect(Choices).ToHaveCountAsync(1);
+        await Expect(Choices.First).ToBeDisabledAsync();
+        await Expect(Choices.First).ToContainTextAsync("Still locked");
+        await Expect(Choices.First).ToContainTextAsync("(Unavailable)");
+        await Expect(Choices.First.Locator(".tw-choice-status")).ToBeVisibleAsync();
+
+        await Driver.ClickAsync("Back");
+        await Expect(Choices.Nth(1)).ToBeEnabledAsync();
+    }
+
     [Theory]
     [InlineData(390, true)]
     [InlineData(831, true)]

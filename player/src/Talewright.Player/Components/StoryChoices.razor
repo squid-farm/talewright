@@ -13,9 +13,13 @@ else
         @foreach (var entry in Current.Menu)
         {
             <li>
-                <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit || !entry.IsAvailable)" @onclick="() => OnChoose.InvokeAsync(entry.Key)">
+                <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit || !entry.IsAvailable)" @onclick="() => Choose(entry.Key)">
                     <span class="tw-choice-number">@(entry.Number).</span>
                     <InlineView Inlines="entry.Label" />
+                    @if (!entry.IsAvailable)
+                    {
+                        <span class="tw-choice-status"> (Unavailable)</span>
+                    }
                 </button>
             </li>
         }
@@ -26,6 +30,9 @@ else
     [Parameter, EditorRequired] public StoryFrame Current { get; set; } = default!;
     [Parameter] public bool Busy { get; set; }
     [Parameter] public bool AtChoiceLimit { get; set; }
-    [Parameter] public EventCallback<string> OnChoose { get; set; }
+    [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
+
+    private Task Choose(string key) =>
+        OnChoose.InvokeAsync(Current.Choices.Single(choice => choice.Key == key));
 }
