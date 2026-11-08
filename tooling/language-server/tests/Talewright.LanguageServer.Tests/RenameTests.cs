@@ -97,7 +97,7 @@ public sealed partial class ServerTests
             DocumentChanges(response).Select(change => (change.Uri, change.Version, change.Edits)).ToArray(),
             new RenameChangeComparer());
         var annotation = response.GetProperty("result").GetProperty("changeAnnotations").GetProperty("talewright.rename");
-        Assert.True(annotation.GetProperty("needsConfirmation").GetBoolean());
+        Assert.False(annotation.GetProperty("needsConfirmation").GetBoolean());
         Assert.Contains("Saves are not migrated", annotation.GetProperty("description").GetString(), StringComparison.Ordinal);
         Assert.Equal(RenameNext, File.ReadAllText(client.PathOf("next.tale")));
 

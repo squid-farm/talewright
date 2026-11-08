@@ -262,7 +262,18 @@ would add a compiler error or lint finding. It's also refused for `END`, the
 `player` character, built-in ruleset stats, a story stat that overrides a
 ruleset stat, and names whose declaration is ambiguous or sits next to an error
 that could hide a reference. Saved games store these names and saves are not
-migrated, so VS Code asks you to confirm before applying the edit.
+migrated. After applying a rename, Talewright shows an informational compatibility
+warning without blocking editing. Press Enter to apply the rename directly, or
+Ctrl+Enter (Cmd+Enter on macOS) in the rename input to preview changes first.
+Keep `editor.rename.enablePreview` enabled to make that optional preview available.
+
+Quick Fixes and Rename Symbol save the documents they actually edit, including
+any earlier unsaved changes in those documents. Unrelated documents are not saved.
+Previewing or cancelling an action does not save anything. Saving does not remove
+the edit's undo history; undoing a refactor leaves the reverted contents unsaved,
+just like an ordinary edit. If a save fails, Talewright reports the affected files;
+the applied edits remain in the editor so you can save them manually. This behavior
+does not depend on `files.autoSave` or `files.refactoring.autoSave`.
 
 Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
 inside the first quoted argument, completion suggests supported files from the

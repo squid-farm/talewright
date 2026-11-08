@@ -897,7 +897,7 @@ public sealed class LanguageServer
             documentChanges,
             changeAnnotations = new Dictionary<string, object>
             {
-                [RenameAnnotation] = new { label = "Rename", needsConfirmation = true, description = result.Warning }
+                [RenameAnnotation] = new { label = "Rename", needsConfirmation = false, description = result.Warning }
             }
         };
     }

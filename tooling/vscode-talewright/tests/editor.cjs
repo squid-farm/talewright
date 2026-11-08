@@ -39,6 +39,8 @@ exports.run = async () => {
     return;
   }
   assert.equal(vscode.workspace.isTrusted, true);
+  await vscode.workspace.getConfiguration('files').update('autoSave', 'off', vscode.ConfigurationTarget.Global);
+  await vscode.workspace.getConfiguration('files').update('refactoring.autoSave', false, vscode.ConfigurationTarget.Global);
   const snippets = JSON.parse(await fs.readFile(path.join(extension.extensionPath, 'snippets/tale.json'), 'utf8'));
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-editor-'));
   try {
@@ -342,6 +344,8 @@ async function testLiveDiagnostics() {
     const appendAction = actions.find(action => action.title === "Create scene 'missing' in this file");
     assert.equal(await vscode.workspace.applyEdit(appendAction.edit), true);
     assert.equal(document.getText(), '=== start\n* [Go] -> missing\n\n=== missing\n');
+    await vscode.commands.executeCommand(appendAction.command.command, ...appendAction.command.arguments);
+    assert.equal(await fs.readFile(file, 'utf8'), document.getText(), 'Same-file scene creation must save');
     await waitForCompiler(document, items => !items.some(item => item.code === 'TW2002'));
 
     const restoreMissing = new vscode.WorkspaceEdit();
@@ -359,6 +363,8 @@ async function testLiveDiagnostics() {
     await vscode.commands.executeCommand(createAction.command.command, ...createAction.command.arguments);
     assert.equal(vscode.window.activeTextEditor.document.uri.fsPath, path.join(folder, 'missing.tale'));
     assert.equal(vscode.window.activeTextEditor.document.getText(), '=== missing\n');
+    assert.equal(await fs.readFile(path.join(folder, 'missing.tale'), 'utf8'), '=== missing\n',
+      'New-file scene creation must save its contents before opening');
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await vscode.window.showTextDocument(document);
 
@@ -502,7 +508,25 @@ async function testLiveDiagnostics() {
     assert.equal(await vscode.workspace.applyEdit(declareFlag.edit), true);
     assert.equal(manifestBuffer.getText(), flagManifest.replace('[ready]', '[ready, missingFlag]'));
     assert.equal(manifestBuffer.isDirty, true, 'The flag quick fix must preserve and edit the unsaved manifest buffer');
+    await vscode.commands.executeCommand(declareFlag.command.command, ...declareFlag.command.arguments);
+    assert.equal(manifestBuffer.isDirty, false, 'The post-apply command must save the affected manifest');
+    assert.equal(await fs.readFile(manifestBuffer.uri.fsPath, 'utf8'), manifestBuffer.getText());
     await waitForCompiler(document, items => !items.some(item => item.code === 'TW2004'));
+    const missingItem = new vscode.WorkspaceEdit();
+    missingItem.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n{item:lostRelic}\n-> END\n');
+    assert.equal(await vscode.workspace.applyEdit(missingItem), true);
+    await waitForCompiler(document, items => items.some(item => item.code === 'TW2001'));
+    const itemDiagnostic = vscode.languages.getDiagnostics(document.uri)
+      .find(item => item.source === 'talewright' && item.code === 'TW2001');
+    const itemEditor = await vscode.window.showTextDocument(document);
+    itemEditor.selection = new vscode.Selection(itemDiagnostic.range.start, itemDiagnostic.range.start);
+    await vscode.commands.executeCommand('editor.action.codeAction', { kind: 'quickfix', apply: 'first' });
+    await waitUntil(() => !manifestBuffer.isDirty && manifestBuffer.getText().includes('lostRelic'),
+      'The native item quick fix must save its YAML edit');
+    assert.equal(await fs.readFile(manifestBuffer.uri.fsPath, 'utf8'), manifestBuffer.getText());
+    assert.ok(manifestBuffer.getText().includes('missingFlag'), 'Earlier manifest edits must survive saving');
+    assert.equal(document.isDirty, true, 'The invoking story buffer must not be saved by a manifest-only fix');
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await vscode.window.showTextDocument(document);
     console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion, source-aware Markdown hover and supporting-file navigation.');
@@ -514,6 +538,7 @@ async function testLiveDiagnostics() {
 
 async function testRename() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-rename-'));
+  const renderer = await openRenderer();
   try {
     const manifestFile = path.join(folder, 'story.talewright.yaml');
     await fs.writeFile(manifestFile, 'game:\n  id: rename\n  title: Rename\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
@@ -532,19 +557,143 @@ async function testRename() {
       ['hall.tale', 'start.tale', 'story.talewright.yaml']);
     assert.ok(entries.every(([, edits]) => edits.every(item => item.newText === 'entry')));
 
-    const plain = new vscode.WorkspaceEdit();
-    for (const [uri, edits] of entries) for (const item of edits) plain.replace(uri, item.range, item.newText);
-    assert.equal(await vscode.workspace.applyEdit(plain), true);
+    assert.equal(await fs.readFile(start.uri.fsPath, 'utf8'), '=== start\n-> hall\n',
+      'Requesting rename edits must not save or apply them');
+    await renameThroughInput(renderer, start, new vscode.Position(0, 5), 'entry');
+    await waitUntil(() => !start.isDirty && start.getText().startsWith('=== entry'), 'Direct rename must save');
     assert.equal(start.getText(), '=== entry\n-> hall\n');
-    assert.equal((await vscode.workspace.openTextDocument(hallFile)).getText(), '=== hall\n-> entry\n');
-    assert.match((await vscode.workspace.openTextDocument(manifestFile)).getText(), /\n  start: entry\n/);
+    let hall = await vscode.workspace.openTextDocument(hallFile);
+    let manifest = await vscode.workspace.openTextDocument(manifestFile);
+    const waitForRenameContents = async name => {
+      await waitUntil(async () => {
+        // Undo/redo can recreate supporting models; don't read a closed document's stale text.
+        hall = await vscode.workspace.openTextDocument(hallFile);
+        manifest = await vscode.workspace.openTextDocument(manifestFile);
+        return start.getText() === `=== ${name}\n-> hall\n` &&
+          hall.getText() === `=== hall\n-> ${name}\n` && manifest.getText().includes(`\n  start: ${name}\n`);
+      }, `Rename must update all affected documents to '${name}' as one workspace edit`);
+    };
+    await waitUntil(() => !hall.isDirty && !manifest.isDirty, 'All cross-file rename edits must be saved');
+    assert.equal(await fs.readFile(hallFile, 'utf8'), '=== hall\n-> entry\n');
+    assert.match(await fs.readFile(manifestFile, 'utf8'), /\n  start: entry\n/);
+    assert.equal(await renderer.evaluate(`!!document.querySelector('.bulk-edit-panel .buttons')`), false,
+      'Enter must not force a preview');
+    await vscode.commands.executeCommand('undo');
+    await waitForRenameContents('start');
+    assert.equal(hall.getText(), '=== hall\n-> start\n');
+    assert.match(manifest.getText(), /\n  start: start\n/);
+    assert.equal(start.isDirty, true, 'Undo must not be automatically saved');
+    assert.equal(await fs.readFile(start.uri.fsPath, 'utf8'), '=== entry\n-> hall\n');
+    await vscode.commands.executeCommand('redo');
+    await waitForRenameContents('entry');
+
+    const unsaved = new vscode.WorkspaceEdit();
+    unsaved.insert(start.uri, start.positionAt(start.getText().length), '\n// Earlier unsaved story edit.\n');
+    assert.equal(await vscode.workspace.applyEdit(unsaved), true);
+    const beforePreview = start.getText();
+    const beforePreviewDisk = await fs.readFile(start.uri.fsPath, 'utf8');
+    await renameThroughInput(renderer, start, new vscode.Position(0, 5), 'previewed', true);
+    await waitUntil(() => renderer.evaluate(`!!document.querySelector('.bulk-edit-panel .buttons .monaco-button')`),
+      'The preview shortcut must open Refactor Preview');
+    assert.equal(start.getText(), beforePreview, 'Preview must not apply edits');
+    assert.equal(start.isDirty, true, 'Preview must not save existing unsaved edits');
+    assert.equal(await fs.readFile(start.uri.fsPath, 'utf8'), beforePreviewDisk);
+    await renderer.evaluate(`Array.from(document.querySelectorAll('.bulk-edit-panel .monaco-button'))
+      .find(button => button.textContent === 'Discard').click()`);
+    assert.equal(start.getText(), beforePreview, 'Discard must not apply edits');
+    assert.equal(start.isDirty, true, 'Discard must not save existing unsaved edits');
+
+    await renameThroughInput(renderer, start, new vscode.Position(0, 5), 'reviewed', true);
+    await waitUntil(() => renderer.evaluate(`!!document.querySelector('.bulk-edit-panel .buttons .monaco-button')`),
+      'A second preview must open');
+    await renderer.evaluate(`Array.from(document.querySelectorAll('.bulk-edit-panel .monaco-button'))
+      .find(button => button.textContent === 'Apply').click()`);
+    await waitUntil(() => !start.isDirty && !hall.isDirty && !manifest.isDirty &&
+      start.getText().startsWith('=== reviewed'), 'Applying preview must save every affected file');
+    assert.equal(await fs.readFile(start.uri.fsPath, 'utf8'), start.getText());
+    assert.equal(await fs.readFile(hallFile, 'utf8'), hall.getText());
+    assert.equal(await fs.readFile(manifestFile, 'utf8'), manifest.getText());
+
+    const earlier = new vscode.WorkspaceEdit();
+    earlier.insert(start.uri, start.positionAt(start.getText().length), '// Unrelated unsaved edit.\n');
+    earlier.replace(manifest.uri, new vscode.Range(2, 9, 2, 15), 'Earlier unsaved title');
+    assert.equal(await vscode.workspace.applyEdit(earlier), true);
+    await renameThroughInput(renderer, manifest, new vscode.Position(1, 7), 'renamedStory');
+    await waitUntil(() => !manifest.isDirty && manifest.getText().includes('renamedStory'),
+      'A single-file identity rename must save without refactoring autosave');
+    assert.match(await fs.readFile(manifestFile, 'utf8'), /Earlier unsaved title/);
+    assert.match(await fs.readFile(manifestFile, 'utf8'), /id: renamedStory/);
+    assert.equal(start.isDirty, true, 'Manifest-only rename must not save an unrelated dirty story buffer');
     await waitForCompiler(start, items => items.length === 0);
-    console.log('Installed VSIX rename smoke passed: cross-file scene rename including the manifest start reference.');
+    console.log('Installed VSIX rename smoke passed: native direct/optional preview, persistence, cancellation and grouped undo.');
   } finally {
+    renderer.close();
     await vscode.commands.executeCommand('workbench.action.files.saveAll');
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     await fs.rm(folder, { recursive: true, force: true });
   }
+}
+
+async function waitUntil(predicate, message) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.fail(message);
+}
+
+async function renameThroughInput(renderer, document, position, name, preview = false) {
+  const editor = await vscode.window.showTextDocument(document);
+  editor.selection = new vscode.Selection(position, position);
+  const operation = vscode.commands.executeCommand('editor.action.rename');
+  await waitUntil(() => renderer.evaluate(`!!document.querySelector('.rename-box input')?.offsetParent`),
+    'Rename input must open');
+  await renderer.evaluate(`(() => {
+    const input = document.querySelector('.rename-box input');
+    input.value = ${JSON.stringify(name)};
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await vscode.commands.executeCommand(preview ? 'acceptRenameInputWithPreview' : 'acceptRenameInput');
+  await operation;
+}
+
+async function openRenderer() {
+  const port = process.env.TALEWRIGHT_RENDERER_PORT;
+  assert.ok(port, 'Editor UI checks require the isolated renderer port');
+  const response = await fetch(`http://127.0.0.1:${port}/json/list`);
+  assert.equal(response.ok, true);
+  const page = (await response.json()).find(item => item.type === 'page' && item.url.includes('workbench'));
+  assert.ok(page?.webSocketDebuggerUrl, 'The test editor renderer must be available');
+  const socket = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    socket.addEventListener('open', resolve, { once: true });
+    socket.addEventListener('error', reject, { once: true });
+  });
+  let requestId = 0;
+  return {
+    close: () => socket.close(),
+    evaluate: expression => {
+      const id = ++requestId;
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          socket.removeEventListener('message', receive);
+          reject(new Error('Timed out inspecting the editor renderer'));
+        }, 5000);
+        function receive(event) {
+          const message = JSON.parse(event.data);
+          if (message.id !== id) return;
+          clearTimeout(timeout);
+          socket.removeEventListener('message', receive);
+          if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message)));
+          else resolve(message.result.result.value);
+        }
+        socket.addEventListener('message', receive);
+        socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { returnByValue: true, expression } }));
+      });
+    },
+  };
 }
 
 async function waitForCompiler(document, predicate) {
@@ -603,18 +752,7 @@ async function assertRenderedColors(document) {
   edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), source);
   assert.equal(await vscode.workspace.applyEdit(edit), true);
   await waitForCompiler(document, items => items.length === 0);
-  const port = process.env.TALEWRIGHT_RENDERER_PORT;
-  assert.ok(port, 'Rendered-color checks require the isolated editor renderer port');
-  const pagesResponse = await fetch(`http://127.0.0.1:${port}/json/list`);
-  assert.equal(pagesResponse.ok, true);
-  const pages = await pagesResponse.json();
-  const page = pages.find(item => item.type === 'page' && item.url.includes('workbench'));
-  assert.ok(page?.webSocketDebuggerUrl, 'The test editor renderer must be available');
-  const socket = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => {
-    socket.addEventListener('open', resolve, { once: true });
-    socket.addEventListener('error', reject, { once: true });
-  });
+  const renderer = await openRenderer();
   const configuration = vscode.workspace.getConfiguration('workbench');
   const oldTheme = configuration.inspect('colorTheme').globalValue;
   const tokenConfiguration = vscode.workspace.getConfiguration('editor');
@@ -651,36 +789,12 @@ async function assertRenderedColors(document) {
     [{ scope: 'keyword.control.divert.tale', settings: { foreground: '#D4D4D4' } }],
     { 'talemarkScene:tale': '#12ABCD' },
   ]);
-  let requestId = 0;
-
   async function renderedLines() {
-    const id = ++requestId;
-    const result = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        socket.removeEventListener('message', receive);
-        reject(new Error('Timed out inspecting rendered editor colors'));
-      }, 5000);
-      function receive(event) {
-        const message = JSON.parse(event.data);
-        if (message.id !== id) return;
-        clearTimeout(timeout);
-        socket.removeEventListener('message', receive);
-        if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message)));
-        else resolve(message.result.result.value);
-      }
-      socket.addEventListener('message', receive);
-    });
-    socket.send(JSON.stringify({
-      id, method: 'Runtime.evaluate', params: {
-        returnByValue: true,
-        expression: `Array.from(document.querySelectorAll('.monaco-editor .view-line')).map(line =>
+    return renderer.evaluate(`Array.from(document.querySelectorAll('.monaco-editor .view-line')).map(line =>
           Array.from(line.querySelectorAll('span')).filter(span => span.children.length === 0).map(span => ({
             text: span.textContent.replaceAll('\\u00a0', ' '),
             color: getComputedStyle(span).color
-          })))`,
-      },
-    }));
-    return result;
+          })))`);
   }
 
   try {
@@ -737,7 +851,7 @@ async function assertRenderedColors(document) {
       console.log(`${theme.id} rendered semantic colors passed: ${JSON.stringify(observed)}`);
     }
   } finally {
-    socket.close();
+    renderer.close();
     await tokenConfiguration.update('tokenColorCustomizations', oldColors, vscode.ConfigurationTarget.Global);
     await tokenConfiguration.update('inlayHints.enabled', oldHints, vscode.ConfigurationTarget.Global);
     await tokenConfiguration.update('bracketPairColorization.enabled', oldBracketColors, vscode.ConfigurationTarget.Global);
