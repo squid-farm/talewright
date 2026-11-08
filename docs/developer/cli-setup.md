@@ -67,6 +67,54 @@ Remove with `dotnet tool uninstall --global Talewright.Cli`.
 
 ## Run from source
 
+### Install the current checkout for local testing
+
+On Linux or macOS (x64/ARM64), run from any directory:
+
+```bash
+python3 /path/to/talewright/tooling/install-dev.py
+# From the repository root:
+python3 tooling/install-dev.py
+```
+
+Requires Python 3.8+, Node.js 22+, npm, `unzip`, the .NET 10 SDK and the VS Code `code`
+command on PATH. The script installs missing extension dependencies with `npm ci`;
+restores and packaging may need network access. It builds the current working tree,
+including uncommitted fixes, without publishing to NuGet, GitHub or the Marketplace.
+Builds run sequentially, with MSBuild node reuse disabled.
+
+The script publishes a self-contained CLI and native debugger, packages and verifies
+the matching VSIX (including the current language server), and force-installs it.
+Rerun the same command after each fix; no version bump or release is needed.
+
+The CLI symlink is `~/.local/bin/talewright`. Its files live under
+`${XDG_DATA_HOME:-~/.local/share}/talewright/dev`; successful reruns replace the
+previous development build. An existing non-symlink CLI is never overwritten.
+Use `--bin-dir /path/to/bin` to choose another symlink directory.
+Build, package-check and VSIX-install failures leave the previous CLI unchanged.
+Close running CLI/debugger processes before reinstalling, and do not run multiple
+installers or VSIX packagers concurrently in the same checkout.
+
+Set **`talewright.cli.executablePath`** in VS Code to the printed CLI path, especially
+if a released/global tool is already on PATH. For terminal use, prepend the printed
+bin directory to PATH or invoke the absolute path. The script does not change
+shell profiles, VS Code settings or an existing .NET global-tool installation.
+Clear any **`talewright.languageServer.command`** development override to use the
+new bundled server, then run **Developer: Reload Window**. Existing native-library
+requirements still apply.
+
+For VS Code Insiders or a named editor profile:
+
+```bash
+python3 tooling/install-dev.py --code code-insiders --profile "Development"
+```
+
+`--code` also accepts an absolute path to the editor CLI. The default installs into
+the editor's default profile. Windows is not supported by this convenience script;
+use the source-build and manual VSIX instructions instead.
+
+### Build and run directly
+
 Source builds are a developer option, not a prerequisite for writing stories.
 Install the .NET 10 SDK and obtain the repository or a release's source archive.
 From the Talewright source directory:

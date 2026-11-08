@@ -40,6 +40,11 @@ dotnet run --project apps/web                            # web player dev server
 dotnet run --project tooling/cli/src/Talewright.Cli -- validate samples/LostRelic   # CLI
 ```
 
+To install the current checkout's CLI, debugger and VSIX locally without a release,
+run `python3 tooling/install-dev.py` (Linux/macOS). See the
+[local development installer](docs/developer/cli-setup.md#install-the-current-checkout-for-local-testing)
+for prerequisites, editor profiles and selecting the development CLI.
+
 The normal test command runs on .NET 10. To compile the five engine test projects and their
 shared fixtures for the oldest runtime, without retargeting the hosts or tooling:
 
