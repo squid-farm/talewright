@@ -133,6 +133,11 @@ contracts and the verification guide. Shared build settings and the
 
 ## Project status
 
+> **The 1.0 preview is delayed.** Testing with real stories has turned up core authoring issues,
+> starting with inventory and choices, that we want to fix before 1.0.0-preview.1. The latest release
+> is 0.5.0. Until the preview ships, Talemark syntax may still change in breaking ways; the
+> compatibility promise above starts with 1.0.0-preview.1.
+
 Talewright is in **preview**. Writing, playing, saving, validating, debugging and publishing all work.
 The VS Code extension includes completion and live errors; story images are supported
 in the web and desktop players. World simulation and combat remain future work.
