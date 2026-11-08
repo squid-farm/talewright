@@ -655,7 +655,8 @@ internal sealed partial class TaleBinder
         if (!_symbols.World.Ruleset.HasStat(skill))
         {
             _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                $"Unknown stat '{skill}' (ruleset '{_symbols.World.Ruleset.Id}').", At(column));
+                $"Unknown stat '{skill}' (ruleset '{_symbols.World.Ruleset.Id}')." +
+                _symbols.StatGuidance?.ForMissingStat(skill), At(column));
             bound = false;
         }
 

@@ -12,18 +12,20 @@ using static Talewright.Talemark.Parsing.StoryYamlContext;
 namespace Talewright.Talemark.Parsing;
 
 /// <summary>Reads assembled story configuration and coordinates its section readers.</summary>
-internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions options, AnalysisCollector? analysis)
+internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions options,
+    StatDiagnosticGuidance statGuidance, AnalysisCollector? analysis)
 {
     private readonly StoryYamlContext _yaml = yaml;
     private readonly CompilerOptions _options = options;
+    private readonly StatDiagnosticGuidance _statGuidance = statGuidance;
     private readonly AnalysisCollector? _analysis = analysis;
 
     public static StoryManifest? Read(StorySource source, DiagnosticBag diagnostics, CompilerOptions options,
-        AnalysisCollector? analysis = null)
+        StatDiagnosticGuidance statGuidance, AnalysisCollector? analysis = null)
     {
         var yaml = new StoryYamlContext(StorySource.ManifestFileName, diagnostics);
         var root = StoryYamlAssembler.Read(source, yaml, analysis);
-        return root is null ? null : new StoryYamlReader(yaml, options, analysis).Read(root);
+        return root is null ? null : new StoryYamlReader(yaml, options, statGuidance, analysis).Read(root);
     }
 
     private StoryManifest Read(YamlMappingNode root)
@@ -39,8 +41,9 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             ManifestVocabulary.Undo, ManifestVocabulary.Autosave, ManifestVocabulary.CharacterSheet,
             ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
 
-        var ruleset = new StoryYamlRulesetReader(_yaml, _options, _analysis).Read(Get(game, ManifestVocabulary.Ruleset));
-        var world = new StoryYamlWorldReader(_yaml);
+        var ruleset = new StoryYamlRulesetReader(_yaml, _options, _statGuidance, _analysis)
+            .Read(Get(game, ManifestVocabulary.Ruleset));
+        var world = new StoryYamlWorldReader(_yaml, _statGuidance);
         var items = world.ReadItems(Get(root, ManifestVocabulary.Items), ruleset);
         var factions = world.ReadFactions(Get(root, ManifestVocabulary.Factions));
         var characters = world.ReadCharacters(Get(root, ManifestVocabulary.Characters), root, ruleset, items);

@@ -392,7 +392,8 @@ internal sealed class ExpressionBinder
         var stat = new StatId(Text(path));
         return _symbols.World.Ruleset.HasStat(stat)
             ? new StatRef(character, stat)
-            : Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown property '{Text(path)}' on '{Text(ns)}'.", path.Start);
+            : Fail<Expr>(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown property '{Text(path)}' on '{Text(ns)}'." + _symbols.StatGuidance?.ForMissingStat(stat), path.Start);
     }
 
     private Expr BindUnary(UnaryExpressionNode unary)
@@ -660,7 +661,9 @@ internal sealed class ExpressionBinder
         var id = new StatId(name);
         if (!_symbols.World.Ruleset.HasStat(id))
         {
-            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown stat '{name}' (not in ruleset '{_symbols.World.Ruleset.Id}').", span.Start);
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown stat '{name}' (not in ruleset '{_symbols.World.Ruleset.Id}')." +
+                _symbols.StatGuidance?.ForMissingStat(id), span.Start);
         }
 
         return id;

@@ -44,7 +44,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 
 | Code | Meaning | Usual fix |
 |---|---|---|
-| TW2001 | Unknown character, stat, item, faction or property. | Fix the spelling, or declare the identifier in `story.talewright.yaml`. Use the documented [pronoun properties](talemark-syntax.md#3-substitutions), including the explicit possessive leaves `:determiner` and `:independent`. |
+| TW2001 | Unknown character, stat, item, faction or property. | Fix the spelling, enable the ruleset that provides the stat, or declare the identifier in `story.talewright.yaml`. Use the documented [pronoun properties](talemark-syntax.md#3-substitutions), including the explicit possessive leaves `:determiner` and `:independent`. |
 | TW2002 | Unknown scene. | Fix the spelling, or add the scene. |
 | TW2003 | Wrong kind of value, e.g. assigning text to a number, comparing text with a number, or arithmetic on text. | Keep each variable's declared type. Text uses `=` and text-to-text `==` / `!=`; numbers retain arithmetic. Declare text with a quoted initial value under `vars:`. |
 | TW2004 | A flag or variable is checked but never set. | Fix the spelling, set it somewhere, or declare it under `flags:` / `vars:`. |
@@ -69,8 +69,27 @@ stores the selected story-root-relative path in each media node, with literal al
 or an alt template. Missing or blank alt on a descriptive image still stores the
 filename fallback; decorative media stores empty alt text.
 
-For an unknown skill, check the id's spelling and its declaration under `game.ruleset.stats`.
-Giving a character a value does not declare the skill. See the complete
+For an unknown stat, check the id's spelling. If a registered ruleset provides it, the diagnostic
+names that ruleset and shows how to select it in `story.talewright.yaml`. For example:
+
+```yaml
+game:
+  ruleset: rpg
+```
+
+If `ruleset` is already a mapping, set `base: rpg` inside it instead, preserving its other entries.
+Replace `rpg` with the registered name shown in the diagnostic for a C#-registered ruleset. If the
+base defines the stat but `ruleset.disable` removed it, remove that id from `disable` or re-declare
+it under `game.ruleset.stats`. To define your own stat, use a `ruleset` mapping with a `stats` list:
+
+```yaml
+game:
+  ruleset:
+    stats:
+      - { id: nerve, name: Nerve }
+```
+
+Giving a character a value does not declare the stat. See the complete
 [custom skill recipe](../guide/authoring-recipes.md#add-a-skill-for-your-setting).
 
 ## TW3xxx: story structure
@@ -101,7 +120,7 @@ story ends there.
 | TW4002 | Something required is missing: `story.talewright.yaml` itself, `game.id`, `game.title`, `game.start`, the `player` character, a character's `first-name`, custom pronoun `agreement`, a stat's `id`, or a trigger's `id`/`when`/`do`. | Add it. Custom pronoun sets require `agreement: singular` or `agreement: plural`. |
 | TW4003 | A value is invalid, e.g. not a number, out of range, or not allowed here. Includes invalid identifiers, invalid grammatical number, invalid item `uncountable`, and wrong-category governing-attribute links. | Read the message for the allowed values. Item `name-agreement` must be `singular` or `plural`, and `uncountable` must be `true` or `false`. `governing-attribute` belongs only to `category: skill` and must target `category: attribute`. |
 | TW4004 | Unknown ruleset. | Use `rpg`, or a ruleset your C# story project registers. |
-| TW4005 | Unknown stat or item in `story.talewright.yaml`, or an unknown/disabled `governing-attribute` target. | Fix the spelling, or declare it under `game.ruleset.stats` / `items`. Governing attributes must resolve to enabled attributes after `disable` and all stat declarations. |
+| TW4005 | Unknown stat or item in `story.talewright.yaml`, or an unknown/disabled `governing-attribute` target. | Fix the spelling, enable the stat's registered ruleset, or declare it under `game.ruleset.stats` / `items`. If `ruleset.disable` names a stat missing from the base, select the ruleset that provides it or remove that entry. Governing attributes must resolve to enabled attributes after `disable` and all stat declarations. |
 | TW4006 | Unknown or non-scalar configuration key. | Correct or remove the key; the message lists the expected keys. |
 | TW4007 | A declaration identity is repeated, two triggers have the same id, or more than one configuration file declares `triggers:`. | Remove or rename the duplicate; keep one authored trigger list. Cross-file conflicts name both sources. |
 

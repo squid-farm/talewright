@@ -15,6 +15,7 @@ internal sealed class StorySymbols
 {
     public AnalysisCollector? Analysis { get; init; }
     public StorySource? ImageSource { get; init; }
+    public StatDiagnosticGuidance? StatGuidance { get; init; }
     public required WorldDefinition World { get; init; }
     public required IReadOnlySet<FlagId> Flags { get; init; }
     public required IReadOnlySet<VarId> Variables { get; init; }

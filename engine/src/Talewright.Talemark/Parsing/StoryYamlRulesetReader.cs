@@ -10,33 +10,35 @@ using Talewright.Talemark.Diagnostics;
 namespace Talewright.Talemark.Parsing;
 
 /// <summary>Reads ruleset configuration before world declarations resolve their stats.</summary>
-internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOptions options, AnalysisCollector? analysis)
+internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOptions options,
+    StatDiagnosticGuidance statGuidance, AnalysisCollector? analysis)
 {
     private readonly StoryYamlContext _yaml = yaml;
     private readonly CompilerOptions _options = options;
+    private readonly StatDiagnosticGuidance _statGuidance = statGuidance;
     private readonly AnalysisCollector? _analysis = analysis;
 
     internal Ruleset Read(YamlNode? node)
     {
         if (node is null)
         {
-            return Base(_options.Rulesets[ManifestVocabulary.RulesetNone]());
+            return Default();
         }
 
         if (node is YamlScalarNode shorthand && !IsNullLike(shorthand))
         {
-            return Base(Named(shorthand));
+            return Named(shorthand);
         }
 
         var map = _yaml.Mapping(node, ManifestVocabulary.Ruleset);
         if (map is null)
         {
-            return Base(_options.Rulesets[ManifestVocabulary.RulesetNone]());
+            return Default();
         }
 
         _yaml.CheckKeys(map, ManifestVocabulary.Base, ManifestVocabulary.Disable, ManifestVocabulary.Stats);
         var baseNode = Get(map, ManifestVocabulary.Base);
-        var baseRuleset = Base(baseNode is null ? _options.Rulesets[ManifestVocabulary.RulesetNone]() : Named(baseNode));
+        var baseRuleset = baseNode is null ? Default() : Named(baseNode);
         var baseId = baseRuleset.Id;
         var builder = baseRuleset.ToBuilder();
         var governingAttributes = new Dictionary<StatId, YamlNode>();
@@ -54,7 +56,9 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                 }
                 else
                 {
-                    _yaml.Error(item, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Cannot disable '{id}': the '{baseId}' ruleset has no such stat.", 0);
+                    _yaml.Error(item, CompilerDiagnosticCodes.UnknownConfigurationReference,
+                        $"Cannot disable '{id}': the '{baseId}' ruleset has no such stat." +
+                        _statGuidance.ForInvalidDisable(id), 0);
                 }
             }
         }
@@ -147,14 +151,19 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
         if (!_options.Rulesets.TryGetValue(id, out var factory))
         {
             _yaml.Error(node, CompilerDiagnosticCodes.UnknownRuleset, $"Unknown ruleset '{id}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
-            factory = _options.Rulesets[Rulesets.Generic.GenericRuleset.Id];
+            id = Rulesets.Generic.GenericRuleset.Id;
+            factory = _options.Rulesets[id];
         }
 
-        return factory();
+        return Base(id, factory);
     }
 
-    private Ruleset Base(Ruleset ruleset)
+    private Ruleset Default() => Base(ManifestVocabulary.RulesetNone, _options.Rulesets[ManifestVocabulary.RulesetNone]);
+
+    private Ruleset Base(string name, Func<Ruleset> factory)
     {
+        var ruleset = factory();
+        _statGuidance.SetBase(name, factory, ruleset);
         _analysis?.BaseRuleset(ruleset);
         return ruleset;
     }
