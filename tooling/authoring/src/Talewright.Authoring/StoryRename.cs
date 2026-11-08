@@ -19,7 +19,7 @@ public sealed record StoryRenamePreparation(StoryRenameTarget? Target, string? R
 public sealed record StoryRenameEdit(SourceRange Range, string NewText);
 
 /// <summary>
-/// The edits that rename every occurrence of one identity, with a <see cref="Warning"/> the author should confirm, or
+/// The edits that rename every occurrence of one identity, with an informational <see cref="Warning"/>, or
 /// a <see cref="Refusal"/> and no edits.
 /// </summary>
 public sealed record StoryRenameResult(IReadOnlyList<StoryRenameEdit> Edits, string? Refusal, string? Warning)

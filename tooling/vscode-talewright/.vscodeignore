@@ -8,6 +8,7 @@ package-lock.json
 extension.cjs
 author-actions.cjs
 cli-tools.cjs
+refactor-saves.cjs
 server/**/*.pdb
 server/**/*.xml
 **/project.json
