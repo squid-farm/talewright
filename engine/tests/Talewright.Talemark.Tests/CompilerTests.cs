@@ -670,12 +670,12 @@ public class CompilerTests
         var plain = Ok("=== a\n{if faction:guild:tier == friendly}Welcome.{/if}\n-> END", NoRuleset);
         Assert.Equal("none", plain.World.Ruleset.Id);
         Assert.Empty(plain.World.Ruleset.Stats);
-        Assert.IsType<D20SkillCheckRule>(plain.World.Ruleset.SkillCheckRule);
+        Assert.Null(plain.World.Ruleset.SkillCheckRule);
         Assert.Null(plain.World.Ruleset.LevelingRule);
         Assert.Equal(["hostile", "unfriendly", "neutral", "friendly", "allied"],
             plain.World.Ruleset.Tiers.Select(tier => tier.Id));
         Error("=== a\n{player:hp}\n-> END", "TW2001", NoRuleset);
-        Error("=== a\n* [x] skill-check athletics dc 5\n  success: -> END\n  failure: -> END", "TW2001", NoRuleset);
+        Error("=== a\n* [x] skill-check athletics dc 5\n  success: -> END\n  failure: -> END", "TW3005", NoRuleset);
 
         foreach (var ruleset in new[] { "ruleset: rpg", "ruleset: { base: rpg }" })
         {
@@ -695,7 +695,7 @@ public class CompilerTests
         var custom = Ok("=== a\n{player:charm}\n-> END", declared);
         Assert.Equal("none", custom.World.Ruleset.Id);
         Assert.Equal([new StatId("charm")], custom.World.Ruleset.Stats.Select(stat => stat.Id));
-        Assert.IsType<D20SkillCheckRule>(custom.World.Ruleset.SkillCheckRule);
+        Assert.Null(custom.World.Ruleset.SkillCheckRule);
         Error("=== a\n{player:hp}\n-> END", "TW2001", declared);
     }
 

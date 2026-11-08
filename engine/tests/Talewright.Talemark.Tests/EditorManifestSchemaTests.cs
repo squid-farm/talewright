@@ -4,7 +4,6 @@ using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
-using Talewright.Rulesets.Generic;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
@@ -321,7 +320,7 @@ public class EditorManifestSchemaTests
     {
         Assert.Equal("none", ruleset.Id);
         Assert.Empty(ruleset.Stats);
-        Assert.IsType<D20SkillCheckRule>(ruleset.SkillCheckRule);
+        Assert.Null(ruleset.SkillCheckRule);
         Assert.Null(ruleset.LevelingRule);
         Assert.Equal(5, ruleset.Tiers.Count);
     }
