@@ -795,8 +795,15 @@ parallelism because native windows share one X display, accessibility bus and sa
 Functional browser contexts emulate the OS reduced-motion preference so rapid scripted clicks do not
 race automatic passage scrolling. This does not change the player's stored preferences or default
 behavior; motion-specific presentation and preference tests explicitly select the motion mode they
-exercise. The browser driver's choice helper waits for a different current-passage element after each
-click, not just completion of the mouse action, so consecutive identical labels cannot race a render.
+exercise. Before clicking, the browser driver's choice helper brings media above the requested choice
+in the visible transcript into view and waits for a loaded image with intrinsic dimensions or the
+player's visible image-failure status. This triggers viewport-lazy loading and prevents asynchronous
+image layout changes from moving the choice during a click; a no-source image's `complete` flag alone
+does not establish readiness. Hidden history and media outside that transcript are not awaited.
+Unsettled media times out before the click. Deterministic browser regressions gate image responses and
+cover offscreen lazy loading, explicit failure, hidden history, and media that never settles.
+The helper then waits for a different current-passage element after each click, not just completion of
+the mouse action, so consecutive identical labels cannot race a render.
 Choice, image, save and error assertions remain unchanged; no retries or longer timeouts are used.
 The helper also writes one TRX report per browser. Open traces with the matching Playwright trace viewer
 locally; they can contain story text and should not be uploaded to public trace-viewing services.

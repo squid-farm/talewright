@@ -16,6 +16,12 @@ internal static class SemanticTokenCodec
         "property",
         "function",
         "modifier",
+        "talemarkScene",
+        "talemarkDivert",
+        "talemarkPunctuation",
+        "talemarkFormatting",
+        "talemarkEscape",
+        "talemarkStructure",
     ];
 
     internal static readonly string[] TokenModifiers = ["declaration"];
@@ -71,15 +77,20 @@ internal static class SemanticTokenCodec
     {
         TalemarkClassificationKind.Comment => 0,
         TalemarkClassificationKind.Keyword => 1,
-        TalemarkClassificationKind.Operator or TalemarkClassificationKind.Punctuation or
-            TalemarkClassificationKind.Formatting => 2,
+        TalemarkClassificationKind.Operator => 2,
         TalemarkClassificationKind.Number => 3,
-        TalemarkClassificationKind.String or TalemarkClassificationKind.Escape => 4,
+        TalemarkClassificationKind.String => 4,
         TalemarkClassificationKind.Identifier => 5,
         TalemarkClassificationKind.Namespace => 6,
         TalemarkClassificationKind.Property => 7,
         TalemarkClassificationKind.Function => 8,
         TalemarkClassificationKind.Modifier => 9,
+        TalemarkClassificationKind.SceneIdentifier => 10,
+        TalemarkClassificationKind.Divert => 11,
+        TalemarkClassificationKind.Punctuation => 12,
+        TalemarkClassificationKind.Formatting => 13,
+        TalemarkClassificationKind.Escape => 14,
+        TalemarkClassificationKind.StructuralMarker => 15,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 

@@ -136,7 +136,7 @@ public static class TalemarkClassifier
                 idStart++;
             var idLength = scene.Id.Length;
             if (idLength > 0)
-                Add(scene.Line + 1, idStart, idLength, TalemarkClassificationKind.Identifier,
+                Add(scene.Line + 1, idStart, idLength, TalemarkClassificationKind.SceneIdentifier,
                     TalemarkClassificationModifiers.Declaration);
         }
 
@@ -195,16 +195,16 @@ public static class TalemarkClassifier
                     ClassifySpeech(scene, line, raw);
                     break;
                 case TaleLineKind.Effects:
-                    AddLine(scene.FileLine(line.Line) + 1, line.Indent, 1, TalemarkClassificationKind.Operator);
+                    AddLine(scene.FileLine(line.Line) + 1, line.Indent, 1, TalemarkClassificationKind.StructuralMarker);
                     ClassifyExpression(syntax.Value(scene, line), At(scene, line, scene.Part(line).ValueStart));
                     break;
                 case TaleLineKind.Choice:
-                    AddLine(scene.FileLine(line.Line) + 1, line.Indent, 1, TalemarkClassificationKind.Operator);
+                    AddLine(scene.FileLine(line.Line) + 1, line.Indent, 1, TalemarkClassificationKind.StructuralMarker);
                     ClassifyClauses(scene, line, raw);
                     break;
                 case TaleLineKind.Divert:
                     AddLine(scene.FileLine(line.Line) + 1, line.Indent, SceneVocabulary.Divert.Length,
-                        TalemarkClassificationKind.Operator);
+                        TalemarkClassificationKind.Divert);
                     ClassifyDivertTarget(syntax.Value(scene, line), At(scene, line, scene.Part(line).ValueStart));
                     break;
                 case TaleLineKind.SkillCheckBlock:
@@ -285,7 +285,7 @@ public static class TalemarkClassifier
 
         private void ClassifySpeech(TaleSceneSyntax scene, TaleLineSyntax line, ReadOnlySpan<char> raw)
         {
-            Add(scene.FileLine(line.Line) + 1, line.Indent, 1, TalemarkClassificationKind.Operator);
+            Add(scene.FileLine(line.Line) + 1, line.Indent, 1, TalemarkClassificationKind.StructuralMarker);
             var part = scene.Part(line);
             if (part.HeadLength > 0)
                 Add(scene.FileLine(line.Line) + 1, part.HeadStart, part.HeadLength,
@@ -302,7 +302,7 @@ public static class TalemarkClassifier
         private void ClassifySkillCheckBlock(TaleSceneSyntax scene, TaleLineSyntax line, ReadOnlySpan<char> raw)
         {
             AddLine(scene.FileLine(line.Line) + 1, line.Indent, SceneVocabulary.SkillCheckFence.Length,
-                TalemarkClassificationKind.Operator);
+                TalemarkClassificationKind.StructuralMarker);
             if (!line.IsBareFence)
                 ClassifyClauses(scene, line, raw);
         }
@@ -373,7 +373,7 @@ public static class TalemarkClassifier
                         break;
                     case TaleClauseKind.Divert:
                         AddAt(scene, line, clause.Start, SceneVocabulary.Divert.Length,
-                            TalemarkClassificationKind.Operator);
+                            TalemarkClassificationKind.Divert);
                         ClassifyDivertTarget(syntax.Value(scene, line, clause),
                             At(scene, line, clause.ValueStart));
                         break;
@@ -467,8 +467,8 @@ public static class TalemarkClassifier
         {
             if (target.SequenceEqual(SceneVocabulary.End))
                 Add(location, location.Offset(target.Length), TalemarkClassificationKind.Keyword);
-            else
-                ClassifyIdentifier(target.ToString(), location);
+            else if (!target.IsEmpty)
+                Add(location, location.Offset(target.Length), TalemarkClassificationKind.SceneIdentifier);
         }
 
         private void ClassifyIdentifier(string value, SourceLocation location)
