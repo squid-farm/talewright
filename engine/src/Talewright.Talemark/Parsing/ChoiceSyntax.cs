@@ -163,7 +163,7 @@ internal static class ChoiceSyntax
         if (text[open] != ExpressionVocabulary.OpenParen)
             return false;
 
-        var index = TextScanning.SkipWhitespace(text, open + 1);
+        var index = TextScanning.SkipWhitespace(text, open + 1, cancellationToken);
         var wordEnd = index + SceneVocabulary.Shown.Length;
         var end = wordEnd < text.Length &&
                   text[wordEnd] is ExpressionVocabulary.CloseParen or ExpressionVocabulary.ArgumentSeparator

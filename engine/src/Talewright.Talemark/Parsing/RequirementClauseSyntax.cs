@@ -45,8 +45,8 @@ internal readonly record struct RequirementClauseSyntax(
         {
             checkpoint?.Check();
             var clauseEnd = clauseIndex + 1 < commas.Count ? commas[clauseIndex + 1] : text.Length;
-            var start = TextScanning.SkipWhitespace(text, commas[clauseIndex] + 1, clauseEnd);
-            var end = TextScanning.TrimWhitespaceEnd(text, start, clauseEnd);
+            var start = TextScanning.SkipWhitespace(text, commas[clauseIndex] + 1, clauseEnd, cancellationToken);
+            var end = TextScanning.TrimWhitespaceEnd(text, start, clauseEnd, cancellationToken);
             if (clauseIndex == 0)
             {
                 suffixStart = start;
@@ -64,7 +64,7 @@ internal readonly record struct RequirementClauseSyntax(
                 errors.Add(new(RequirementClauseErrorKind.DuplicateShown, start));
             shownOffsets.Add(start);
 
-            var valueStart = TextScanning.SkipWhitespace(text, start + SceneVocabulary.Shown.Length, end);
+            var valueStart = TextScanning.SkipWhitespace(text, start + SceneVocabulary.Shown.Length, end, cancellationToken);
             if (valueStart == end)
                 continue;
             if (text[valueStart] != TextVocabulary.QuoteMark)
@@ -78,13 +78,13 @@ internal readonly record struct RequirementClauseSyntax(
                 continue;
             }
 
-            var trailing = TextScanning.SkipWhitespace(text, closingQuote + 1, end);
+            var trailing = TextScanning.SkipWhitespace(text, closingQuote + 1, end, cancellationToken);
             if (trailing < end)
                 errors.Add(new(RequirementClauseErrorKind.UnexpectedAfterShown, trailing));
             textSlots.Add(new(valueStart, closingQuote + 1));
         }
 
-        return new(TextScanning.TrimWhitespaceEnd(text, 0, commas[0]), true, suffixStart, suffixLength,
+        return new(TextScanning.TrimWhitespaceEnd(text, 0, commas[0], cancellationToken), true, suffixStart, suffixLength,
             shownOffsets.Count > 0, textSlots.Count > 0 ? textSlots[0] : null, commas, shownOffsets, textSlots,
             errors);
     }

@@ -408,6 +408,11 @@ public sealed class ChoiceDiagnosticsTests
     {
         using var source = new CancellationTokenSource();
         source.Cancel();
+        var whitespace = new string(' ', 10_000);
+        Assert.Throws<OperationCanceledException>(() =>
+            TextScanning.SkipWhitespace(whitespace, 0, source.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            TextScanning.TrimWhitespaceEnd(whitespace, 0, whitespace.Length, source.Token));
         Assert.Throws<OperationCanceledException>(() =>
             DelimiterScanner.Scan("[unfinished", DelimiterScanMode.ChoiceLabel, cancellationToken: source.Token));
         var scan = DelimiterScanner.Scan("[unfinished", DelimiterScanMode.ChoiceLabel);

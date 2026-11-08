@@ -92,7 +92,7 @@ internal static class ImageSyntax
             index = alt.End;
         }
 
-        void SkipSpace() => index = TextScanning.SkipWhitespace(text, index, end);
+        void SkipSpace() => index = TextScanning.SkipWhitespace(text, index, end, cancellationToken);
 
         void Add(int from, int to, TalemarkClassificationKind kind)
         {
@@ -196,7 +196,7 @@ internal static class ImageSyntax
                 Accessibility = accessibility,
             };
 
-        void SkipSpace() => i = TextScanning.SkipWhitespace(text, i, end);
+        void SkipSpace() => i = TextScanning.SkipWhitespace(text, i, end, cancellationToken);
 
         bool ReadString(out string value)
         {
