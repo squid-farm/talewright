@@ -181,9 +181,10 @@ but the filename must still match exactly. Extensionless paths try `.png`, `.jpg
 warning and listing matches if ambiguous. Absolute paths, parent traversal, backslashes, web addresses, empty
 path segments, query strings and fragments are rejected. No files are downloaded.
 
-Missing, empty or whitespace-only alt text warns and uses Humanizer.Core 3.0.10 to turn the filename into
-words, then applies invariant sentence case. For example, `old_map-v2.png` becomes `Old map v2`;
-punctuation-only names become `Image`. Author-written literal alt text is preserved after escape decoding. Alt
+Missing, empty or whitespace-only alt text warns and uses the filename without its extension,
+replacing runs of non-letter, non-digit characters with a space and trimming the result.
+Case and camelCase are preserved: `old_map-v2.png` becomes `old map v2`, and `oldMap.png` becomes
+`oldMap`. Names with no letters or digits become `Image`. Author-written literal alt text is preserved after escape decoding. Alt
 that contains a template is parsed with the prose template language and rendered later. All diagnostics point
 to the reference.
 

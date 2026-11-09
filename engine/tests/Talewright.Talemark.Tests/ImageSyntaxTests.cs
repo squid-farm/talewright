@@ -40,9 +40,9 @@ public sealed class ImageSyntaxTests
         "maps/sector (west), v2", "Joel's map #upper (west)")]
     [InlineData("""{image("a\"b", "He said \"Go\"; \\ remains.")}""", "a\"b", "He said \"Go\"; \\ remains.")]
     [InlineData("""{ image ( "camp" , "A } ] \{ camp" ) }""", "camp", "A } ] { camp")]
-    [InlineData("""{image("camp")}""", "camp", "Camp")]
-    [InlineData("""{image("camp", "")}""", "camp", "Camp")]
-    [InlineData("""{image("camp", "  ")}""", "camp", "Camp")]
+    [InlineData("""{image("camp")}""", "camp", "camp")]
+    [InlineData("""{image("camp", "")}""", "camp", "camp")]
+    [InlineData("""{image("camp", "  ")}""", "camp", "camp")]
     public void Image_calls_produce_resolved_media_with_literal_explicit_alt(string call, string path, string alt)
     {
         var result = Compile($"=== start\n{call}\n-> END");
@@ -75,9 +75,9 @@ public sealed class ImageSyntaxTests
         var choiceLabel = Assert.IsAssignableFrom<IReadOnlyList<TemplateInline>>(scene.Choices[0].Label);
         Assert.Equal(new MediaTemplate("images/coin.png", "A } ] coin"), choiceLabel.OfType<MediaTemplate>().Single());
         var bold = Assert.IsType<StyledTemplate>(Assert.IsType<ParagraphTemplate>(body[2]).Inlines.Single());
-        Assert.Equal(new MediaTemplate("images/bold.png", "Bold"), bold.Children.Single());
+        Assert.Equal(new MediaTemplate("images/bold.png", "bold"), bold.Children.Single());
         var conditional = Assert.IsType<ConditionalInlineTemplate>(Assert.IsType<ParagraphTemplate>(body[3]).Inlines.Single());
-        Assert.Equal(new MediaTemplate("images/conditional.png", "Conditional"), conditional.Then.Single());
+        Assert.Equal(new MediaTemplate("images/conditional.png", "conditional"), conditional.Then.Single());
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class ImageSyntaxTests
         var story = Story("=== start\n`{image(\"camp\")}`\n-> END");
         var paragraph = Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(story.GetScene(new SceneId("start")))[0]);
         Assert.Equal("`", Assert.IsType<TextTemplate>(paragraph.Inlines[0]).Text);
-        Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), paragraph.Inlines[1]);
+        Assert.Equal(new MediaTemplate("images/camp.png", "camp"), paragraph.Inlines[1]);
         Assert.Equal("`", Assert.IsType<TextTemplate>(paragraph.Inlines[2]).Text);
     }
 

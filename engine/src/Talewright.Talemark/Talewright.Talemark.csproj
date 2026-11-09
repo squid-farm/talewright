@@ -9,7 +9,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Humanizer.Core" Version="3.0.10" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 

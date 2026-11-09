@@ -123,19 +123,21 @@ public sealed class StoryImageResolverTests
         AssertError(Source("images/" + path), path, "TW2010", "relative path inside images/");
 
     [Theory]
-    [InlineData("old_map-v2.png", "Old map v2")]
-    [InlineData("map123.png", "Map 123")]
+    [InlineData("old_map-v2.png", "old map v2")]
+    [InlineData("map123.png", "map123")]
     [InlineData("123.png", "123")]
     [InlineData("123_map.png", "123 map")]
-    [InlineData("NASA_map.png", "Nasa map")]
-    [InlineData("HTTPServerMap.png", "Http server map")]
-    [InlineData("NASA.png", "Nasa")]
-    [InlineData("old___map---v2.png", "Old map v2")]
-    [InlineData("old...map.png", "Old map")]
-    [InlineData("nested/oldMap.png", "Old map")]
+    [InlineData("NASA_map.png", "NASA map")]
+    [InlineData("HTTPServerMap.png", "HTTPServerMap")]
+    [InlineData("NASA.png", "NASA")]
+    [InlineData("old___map---v2.png", "old map v2")]
+    [InlineData("old...map.png", "old map")]
+    [InlineData("nested/oldMap.png", "oldMap")]
+    [InlineData("__old_map--.png", "old map")]
+    [InlineData("日本語_地図42.png", "日本語 地図42")]
     [InlineData("!!!.png", "Image")]
     [InlineData("__--.png", "Image")]
-    public void Missing_alt_text_warns_and_generates_exact_sentence_case(string path, string expected)
+    public void Missing_alt_text_warns_and_uses_filename_with_separators_as_spaces(string path, string expected)
     {
         var diagnostics = new DiagnosticBag();
         var result = StoryImageResolver.Resolve(Source("images/" + path), path, null, Location, diagnostics);
@@ -150,8 +152,8 @@ public sealed class StoryImageResolverTests
     {
         var diagnostics = new DiagnosticBag();
         var result = StoryImageResolver.Resolve(Source("images/map.png"), "map", altText, Location, diagnostics);
-        Assert.Equal("Map", result?.AltText);
-        AssertMissingAltWarning(diagnostics, "Map");
+        Assert.Equal("map", result?.AltText);
+        AssertMissingAltWarning(diagnostics, "map");
     }
 
     [Theory]
@@ -181,11 +183,11 @@ public sealed class StoryImageResolverTests
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
             foreach (var (filename, expected) in new[]
             {
-                ("indigo_ISLAND-v2.png", "Indigo island v2"),
-                ("indigoMap.png", "Indigo map"),
-                ("island.png", "Island"),
-                ("NASA_map123.png", "Nasa map123"),
-                ("old___map---v2.png", "Old map v2"),
+                ("indigo_ISLAND-v2.png", "indigo ISLAND v2"),
+                ("indigoMap.png", "indigoMap"),
+                ("island.png", "island"),
+                ("NASA_map123.png", "NASA map123"),
+                ("old___map---v2.png", "old map v2"),
                 ("!!!.png", "Image"),
             })
             {
@@ -209,7 +211,7 @@ public sealed class StoryImageResolverTests
     {
         var diagnostics = new DiagnosticBag();
         var result = StoryImageResolver.Resolve(Source("images/map.webp", "images/map.png"), "map", null, Location, diagnostics);
-        Assert.Equal(new ResolvedStoryImage("images/map.png", "Map"), result);
+        Assert.Equal(new ResolvedStoryImage("images/map.png", "map"), result);
         Assert.Equal(["TW2013", "TW2014"], diagnostics.Items.Select(d => d.Code));
         Assert.All(diagnostics.Items, d =>
         {
