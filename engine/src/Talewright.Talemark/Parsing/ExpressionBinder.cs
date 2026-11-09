@@ -178,6 +178,7 @@ internal sealed class ExpressionBinder
         PlayerVisitedExpressionNode visited => BindPlayerVisited(visited),
         ParenthesizedExpressionNode parenthesized => Bind(parenthesized.Inner),
         ReferenceExpressionNode reference => BindReference(reference),
+        InventoryCountExpressionNode count => BindInventoryCount(count),
         HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
         UnaryExpressionNode unary => BindUnary(unary),
         BinaryExpressionNode binary => BindBinary(binary),
@@ -369,6 +370,22 @@ internal sealed class ExpressionBinder
             : ResolveStat(character, reference.Name, reference.Namespace);
     }
 
+    private Expr BindInventoryCount(InventoryCountExpressionNode reference)
+    {
+        var character = InventoryCharacter(reference.Character);
+        var item = InventoryItem(reference.Item);
+        var property = Text(reference.Property);
+        if (property != ExpressionVocabulary.Count)
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown inventory property '{property}'. Use '{Text(reference.Character)}:" +
+                $"{ExpressionVocabulary.Inventory}:{Text(reference.Item)}:{ExpressionVocabulary.Count}'.",
+                reference.Property);
+        }
+
+        return new InventoryCountRef(character, item);
+    }
+
     private PronounForm ParsePronounForm(string property, string? subMember, ReferenceExpressionNode reference)
     {
         if (property == ExpressionVocabulary.PossessivePronoun)
@@ -523,6 +540,7 @@ internal sealed class ExpressionBinder
         ErrorEffectSyntax => Fail<Effect>(CompilerDiagnosticCodes.InvalidExpression, "Expression is incomplete.", effect.Span.Start),
         SetFlagEffectSyntax setFlag => new SetFlag(new FlagId(Text(setFlag.Flag)), setFlag.Set),
         GiveTakeEffectSyntax giveTake => BindGiveTake(giveTake),
+        InventoryCountAssignmentEffectSyntax assignment => BindInventoryCountAssignment(assignment),
         AssignmentEffectSyntax assignment => BindAssignment(assignment),
         _ => throw new InvalidOperationException($"Unknown effect syntax node '{effect.GetType().Name}'."),
     };
@@ -550,6 +568,24 @@ internal sealed class ExpressionBinder
         return effect.Give
             ? new GiveItem(character, item, quantity)
             : new TakeItem(character, item, quantity);
+    }
+
+    private Effect BindInventoryCountAssignment(InventoryCountAssignmentEffectSyntax effect)
+    {
+        var character = InventoryCharacter(effect.Character);
+        var item = InventoryItem(effect.Item);
+        if (Text(effect.Property) != ExpressionVocabulary.Count)
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown inventory property '{Text(effect.Property)}'. Use '{Text(effect.Character)}:" +
+                $"{ExpressionVocabulary.Inventory}:{Text(effect.Item)}:{ExpressionVocabulary.Count}'.",
+                effect.Property);
+        }
+
+        Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+            $"Inventory counts are read-only; use 'give {character} {item}' or 'take {character} {item}' to change inventory.",
+            new ExpressionSpan(effect.Character.Start, effect.Property.End - effect.Character.Start));
+        return default!;
     }
 
     private Effect BindAssignment(AssignmentEffectSyntax effect)
@@ -653,6 +689,37 @@ internal sealed class ExpressionBinder
         }
 
         return id;
+    }
+
+    private EntityId InventoryCharacter(ExpressionSpan span)
+    {
+        var name = Text(span);
+        var id = new EntityId(name);
+        if (!_symbols.World.Characters.ContainsKey(id))
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{name}'.", span);
+        }
+
+        return id;
+    }
+
+    private ItemId InventoryItem(ExpressionSpan span)
+    {
+        var name = Text(span);
+        var id = new ItemId(name);
+        if (!_symbols.World.Items.ContainsKey(id))
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown item '{name}'.", span);
+        }
+
+        return id;
+    }
+
+    [DoesNotReturn]
+    private void Fail(string code, string message, ExpressionSpan span)
+    {
+        _diagnostics.Error(code, message, _locate(span.Start), _locate(span.End));
+        throw new BindingException();
     }
 
     private StatId Stat(ExpressionSpan span)

@@ -43,6 +43,8 @@ internal static class ExpressionVocabulary
     internal const string FirstName = "first-name";
     internal const string LastName = "last-name";
     internal const string Name = "name";
+    internal const string Inventory = "inventory";
+    internal const string Count = "count";
     internal const string Pronoun = "pronoun";
     internal const string Tier = "tier";
     internal const string Standing = "standing";

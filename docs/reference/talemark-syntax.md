@@ -710,6 +710,8 @@ or / and / not            boolean logic
 == != < <= > >=           comparison
 + - * /                   integer arithmetic
 player has rope           inventory check (any character id)
+player:inventory:rope:count
+                          quantity of rope held by a character; 0 if not held
 player visited temple.hall
                           whether the player has entered the scene
 temple.hall:player:visits  number of times the player has entered the scene
@@ -722,6 +724,8 @@ hostile … allied          reputation tier names (compare with faction:<id>:tie
 Types are checked at compile time (number, bool, text, tier).
 Only player visits are tracked. Scene visit counts are numeric, including for hubs; `scene` refers
 to the current scene, while `<scene-id>:player:visits` refers to a named scene.
+Inventory counts are numeric, read-only references for any declared character and item. An item
+not held has a count of `0`; use `give` or `take` effects to change inventory.
 Choice history is replay input, not directly queryable in Talemark. There is no general choice or
 event-history query syntax; use flags or variables to track other authored history.
 Use parentheses to group expressions, for example `(true)`.

@@ -15,17 +15,20 @@ public sealed class StoryDivertConditionsTests
     };
 
     private static CompilationResult Compile(string tale)
+        => Compile(tale, Manifest);
+
+    private static CompilationResult Compile(string tale, string manifest)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = Manifest,
+            ["story.talewright.yaml"] = manifest,
             ["main.tale"] = tale,
         }), Options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result;
     }
 
-    private static Expr ParseCondition(string text)
+    private static Expr ParseCondition(string text, string? manifest = null)
     {
         var result = Compile($"""
             === start
@@ -33,7 +36,7 @@ public sealed class StoryDivertConditionsTests
             -> END
             === destination
             -> END
-            """);
+            """, manifest ?? Manifest);
         return result.Story!.Scenes[0].Requires!;
     }
 
@@ -97,7 +100,7 @@ public sealed class StoryDivertConditionsTests
                     ? new UnaryExpr(UnaryOp.Not, block.Condition)
                     : block.Condition)
                 .Concat(divert.ChoiceRequires is { } requires ? [requires] : []);
-            Assert.Equal(expectedParts, divert.Condition.Parts.Select(ParseCondition));
+            Assert.Equal(expectedParts, divert.Condition.Parts.Select(expression => ParseCondition(expression)));
 
             var combined = expectedParts.Skip(1).Aggregate(expectedParts.First(),
                 (left, right) => (Expr)new BinaryExpr(BinaryOp.And, left, right));
@@ -146,19 +149,23 @@ public sealed class StoryDivertConditionsTests
     [Fact]
     public void Every_expression_read_kind_is_reported_once_in_first_occurrence_order()
     {
+        var manifest = TestStories.ExpressionManifest("conditions", "Conditions", "start");
+        manifest.Character("guide", "Tomas", pronouns: "he");
+        manifest.Item("invitation", "Invitation");
         var result = Compile("""
             === start
             @hub offer
             * -> END
             === destination
             @tags offer
-            @requires player:dex >= 10 and faction:river:standing >= 1 and faction:river:tier == faction:river:tier and flag:ready and var:coins > 0 and var:weather == "rain" and player:first-name == "Mara" and player:pronoun:object == "her" and faction:river == "River Guild" and faction:river:name == "River Guild" and item:lantern == "Lantern" and item:lantern:name == "Lantern" and player has lantern and player visited destination and @CanGo and flag:ready
+            @requires player:dex >= 10 and faction:river:standing >= 1 and faction:river:tier == faction:river:tier and flag:ready and var:coins > 0 and var:weather == "rain" and player:first-name == "Mara" and player:pronoun:object == "her" and faction:river == "River Guild" and faction:river:name == "River Guild" and item:lantern == "Lantern" and item:lantern:name == "Lantern" and player has lantern and guide:inventory:invitation:count >= 2 and player visited destination and @CanGo and flag:ready
             @once
             -> END
-            """);
+            """, manifest.Build());
 
         var offer = Assert.Single(StoryDiverts.From(result.Story!).HubOffers);
-        Assert.Equal(result.Story!.GetScene(offer.Scene).Requires, ParseCondition(Assert.Single(offer.Condition.Parts)));
+        Assert.Equal(result.Story!.GetScene(offer.Scene).Requires,
+            ParseCondition(Assert.Single(offer.Condition.Parts), manifest.Build()));
         Assert.Equal(
             [
                 (StoryStateReadKind.Stat, "player:dex"),
@@ -172,6 +179,7 @@ public sealed class StoryDivertConditionsTests
                 (StoryStateReadKind.FactionName, "faction:river"),
                 (StoryStateReadKind.ItemName, "item:lantern"),
                 (StoryStateReadKind.ItemsHeld, "player has lantern"),
+                (StoryStateReadKind.InventoryCount, "guide:inventory:invitation:count"),
                 (StoryStateReadKind.VisitedScene, "player visited destination"),
                 (StoryStateReadKind.NamedPredicate, "@CanGo"),
             ],

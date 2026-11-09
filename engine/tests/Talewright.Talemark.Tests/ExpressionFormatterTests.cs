@@ -70,6 +70,7 @@ public class ExpressionFormatterTests
     [InlineData("player visited a", "player visited a")]
     [InlineData("scene:player:visits", "scene:player:visits")]
     [InlineData("a:player:visits", "a:player:visits")]
+    [InlineData("player:inventory:lantern:count", "player:inventory:lantern:count")]
     [InlineData("@CanGo", "@CanGo")]
     [InlineData("@_Can.Open-door", "@_Can.Open-door")]
     [InlineData("faction:river:tier >= friendly", "faction:river:tier >= friendly")]
@@ -189,7 +190,8 @@ public class ExpressionFormatterTests
             "1", "true", "\"text\"", "friendly", "player:dex", "faction:river", "faction:river:standing",
             "faction:river:tier",
             "flag:ready", "var:coins", "var:weather", "player:name", "player:pronoun", "faction:river:name",
-            "item:lantern", "player has lantern", "player visited a", "scene:player:visits", "@CanGo", "not true", "1 + 2",
+            "item:lantern", "player has lantern", "player visited a", "scene:player:visits",
+            "player:inventory:lantern:count", "@CanGo", "not true", "1 + 2",
         ];
         var covered = representatives.Select(source => Parse(source).GetType()).ToHashSet();
         var nodes = typeof(Expr).Assembly.GetTypes().Where(type => type.IsSubclassOf(typeof(Expr)) && !type.IsAbstract);

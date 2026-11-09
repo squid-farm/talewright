@@ -59,6 +59,8 @@ public sealed class ChoiceReplayIdentityEncodingTests
         { "visited", new Visited(new SceneId("cave")), """["visited","cave"]""" },
         { "current scene visits", new SceneVisitCountRef(null), """["scene-visit-count-ref",null]""" },
         { "scene visits", new SceneVisitCountRef(new SceneId("cave")), """["scene-visit-count-ref","cave"]""" },
+        { "inventory count", new InventoryCountRef(Player, Torch),
+            """["inventory-count-ref","player","torch"]""" },
         { "predicate", new NamedPredicate("is-night"), """["predicate","is-night"]""" },
         { "unary", new UnaryExpr(UnaryOp.Negate, new VarRef(Gold)), """["unary","Negate",["variable-ref","gold"]]""" },
         { "binary", new BinaryExpr(BinaryOp.GreaterOrEqual, new StatRef(Player, Hp), new NumberLiteral(3)),

@@ -18,6 +18,8 @@
   {"owner":"expression","member":"FirstName","spelling":"first-name","line":"{player:first-name}","reference":"player:first-name"},
   {"owner":"expression","member":"LastName","spelling":"last-name","line":"{player:last-name}","reference":"player:last-name"},
   {"owner":"expression","member":"Name","spelling":"name","line":"{player:name}","reference":"player:name"},
+  {"owner":"expression","member":"Inventory","spelling":"inventory","line":"{player:inventory:rope:count}","reference":"player:inventory:rope:count"},
+  {"owner":"expression","member":"Count","spelling":"count","line":"{player:inventory:rope:count}","reference":"player:inventory:rope:count"},
   {"owner":"expression","member":"Pronoun","spelling":"pronoun","line":"{player:pronoun}","reference":"player:pronoun"},
   {"owner":"expression","member":"Tier","spelling":"tier","line":"{faction:guild:tier}","reference":"faction:<id>:tier"},
   {"owner":"expression","member":"Standing","spelling":"standing","line":"{faction:guild:standing}","reference":"faction:<id>:standing"},
