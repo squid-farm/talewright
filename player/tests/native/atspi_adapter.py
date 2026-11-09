@@ -199,7 +199,7 @@ class Desktop:
     def snapshot(self):
         root = self.root()
         if root is None:
-            return {"name": "", "role": "", "text": "", "focused": False,
+            return {"name": "", "role": "", "text": "", "focused": False, "enabled": False,
                     "bounds": {"x": 0, "y": 0, "width": 0, "height": 0}, "children": []}
 
         def serialize(node, depth=0):
@@ -224,8 +224,10 @@ class Desktop:
                     data = serialize(child, depth + 1)
                     if data is not None:
                         children.append(data)
+            state = node.getState()
             return {"name": normalized(node.name), "role": node.getRoleName(), "text": normalized_lines(content),
-                    "focused": node.getState().contains(pyatspi.STATE_FOCUSED),
+                    "focused": state.contains(pyatspi.STATE_FOCUSED),
+                    "enabled": state.contains(pyatspi.STATE_ENABLED) and state.contains(pyatspi.STATE_SENSITIVE),
                     "bounds": bounds, "children": children}
         return serialize(root)
 

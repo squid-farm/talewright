@@ -40,6 +40,50 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Shown_unavailable_choices_are_exposed_as_disabled_and_skipped_by_keyboard_on_desktop()
+    {
+        await Driver.StartAsync();
+        await Upload(new StoryFixture("shown-choices", TestStories.DefaultYaml, """
+            === start
+            @title First passage
+            The first passage remains here.
+            * [Restricted] (requires false, shown "Need a key") -> END
+            * [Proceed] -> next
+
+            === next
+            No available actions.
+            * [Restricted] (requires false, shown "Still locked") -> END
+            """));
+
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var choices = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Name == "Story choices");
+        var unavailable = Assert.Single(choices.Descendants(),
+            node => node.Role == "push button" && node.Name == "1. Need a key (Unavailable)");
+        Assert.False(unavailable.Enabled);
+        var available = Assert.Single(choices.Descendants(),
+            node => node.Role == "push button" && node.Name == "2. Proceed");
+        Assert.True(available.Enabled);
+
+        await Driver.PressAsync("Tab");
+        Assert.True(Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "push button" && node.Name == "2. Proceed").Focused);
+        await Driver.PressAsync("1");
+        await Task.Delay(1000);
+        await AssertState(state =>
+        {
+            Assert.Contains("The first passage remains here.", state.Passage);
+            Assert.Equal(["Need a key (Unavailable)", "Proceed"], state.Choices);
+        });
+        await Driver.PressAsync("Enter");
+        await AssertState(state => Assert.Contains("No available actions.", state.Passage));
+
+        var onlyUnavailable = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Role == "push button" && node.Name == "1. Still locked (Unavailable)");
+        Assert.False(onlyUnavailable.Enabled);
+    }
+
+    [Fact]
     public async Task Keyboard_activation_targets_the_requested_player_window()
     {
         var archive = await WriteArchive("focus.zip", TestStories.Linear.Zip());

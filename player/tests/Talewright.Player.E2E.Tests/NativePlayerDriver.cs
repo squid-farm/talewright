@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace Talewright.Player.E2E.Tests;
 
 public sealed record AccessibleNode(
-    string Name, string Role, string Text, bool Focused, PlayerBounds Bounds, AccessibleNode[] Children)
+    string Name, string Role, string Text, bool Focused, bool Enabled, PlayerBounds Bounds, AccessibleNode[] Children)
 {
     public IEnumerable<AccessibleNode> Descendants() =>
         new[] { this }.Concat(Children.SelectMany(child => child.Descendants()));
