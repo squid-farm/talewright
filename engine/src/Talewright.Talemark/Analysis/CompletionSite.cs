@@ -27,7 +27,8 @@ internal static class ExpressionCompletion
 
     private static readonly string[] CharacterMemberKeywords = [.. CharacterProperties, Inventory];
     private static readonly string[] NumericCharacterMemberKeywords = [Inventory];
-    private static readonly string[] InventoryItemKeywords = [Count];
+    private static readonly string[] InventoryItemKeywords = [Count, Name];
+    private static readonly string[] NumericInventoryItemKeywords = [Count];
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
         IReadOnlyList<AuthoringSymbol> symbols)
@@ -93,7 +94,9 @@ internal static class ExpressionCompletion
                      HasSymbol(symbols, AuthoringSymbolKind.Character, inventoryCharacter) &&
                      HasSymbol(symbols, AuthoringSymbolKind.Item, item))
             {
-                keywords = InventoryItemKeywords;
+                keywords = kind == ExpressionContextKind.Number
+                    ? NumericInventoryItemKeywords
+                    : InventoryItemKeywords;
             }
             else if (tokenIndex >= 4 &&
                      tokens.Slice(tokenIndex - 4, 4) is [{ Kind: TokenKind.Identifier } inventoryOwner,
@@ -241,6 +244,19 @@ internal static class ExpressionCompletion
             return false;
         var owner = tokens[reference[0]];
         var member = tokens[reference[2]];
+        if (member.Is(Inventory) &&
+            symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && owner.Is(symbol.Name)) &&
+            count >= 5 && tokens[reference[3]].Kind == TokenKind.Colon &&
+            tokens[reference[4]].Kind == TokenKind.Identifier)
+        {
+            var item = tokens[reference[4]];
+            if (symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && item.Is(symbol.Name)))
+            {
+                if (count == 5) return true;
+                return count == 7 && tokens[reference[5]].Kind == TokenKind.Colon &&
+                    tokens[reference[6]].Kind == TokenKind.Identifier && tokens[reference[6]].Is(Name);
+            }
+        }
         if (owner.Is(Item) && count == 3)
             return symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && member.Is(symbol.Name));
         if (!member.Is(Pronoun) ||

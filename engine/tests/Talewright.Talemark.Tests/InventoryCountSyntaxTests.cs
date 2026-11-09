@@ -21,10 +21,10 @@ public sealed class InventoryCountSyntaxTests
         return manifest.Build();
     }
 
-    private static CompilationResult Compile(string tale) =>
+    private static CompilationResult Compile(string tale, string? manifest = null) =>
         StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = Manifest(),
+            [StorySource.ManifestFileName] = manifest ?? Manifest(),
             ["main.tale"] = tale,
         }));
 
@@ -58,6 +58,70 @@ public sealed class InventoryCountSyntaxTests
         Assert.Contains("Reserved names: 0/0.", rendered);
     }
 
+    [Fact]
+    public void Inventory_item_names_use_the_definition_even_when_the_character_holds_none()
+    {
+        var result = Compile("""
+            === start
+            Names: {player:inventory:invitation} / {player:inventory:invitation:name}.
+            Keyword ids: {true:inventory:invitation} / {not:inventory:invitation:name}.
+            -> END
+            """);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var story = result.Story!;
+        var rendered = new TemplateRenderer()
+            .Render(CompilerTests.Templates(story.GetScene(new SceneId("start"))),
+                GameState.CreateInitial(story.World, 1)).ToPlainText();
+
+        Assert.Equal("Names: Invitation / Invitation.\nKeyword ids: Invitation / Invitation.", rendered);
+    }
+
+    [Theory]
+    [InlineData("missing:inventory:invitation", "missing", "Unknown character")]
+    [InlineData("player:inventory:missing", "missing", "Unknown item")]
+    [InlineData("missing:inventory:invitation:name", "missing", "Unknown character")]
+    [InlineData("player:inventory:missing:name", "missing", "Unknown item")]
+    public void Inventory_item_name_references_validate_the_character_and_item(
+        string expression, string token, string message)
+    {
+        var result = Compile($"=== start\n{{{expression}}}\n-> END");
+
+        var diagnostic = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.UnknownNameOrProperty, diagnostic.Code);
+        Assert.Contains(message, diagnostic.Message);
+        AssertRange(diagnostic, $"{{{expression}}}", token);
+    }
+
+    [Fact]
+    public void Inventory_is_reserved_as_a_character_property_even_when_a_custom_stat_uses_that_id()
+    {
+        const string manifest = """
+            game:
+              id: inventory-reservation
+              title: Inventory reservation
+              start: start
+              ruleset:
+                base: rpg
+                stats:
+                  - { id: inventory }
+            characters:
+              player: { first-name: Ada }
+            items:
+              invitation: Invitation
+            """;
+
+        var result = Compile("""
+            === start
+            {player:inventory}
+            -> END
+            """, manifest);
+
+        var diagnostic = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.InvalidExpression, diagnostic.Code);
+        Assert.Contains("inventory namespace requires an item id", diagnostic.Message);
+    }
+
     [Theory]
     [InlineData("missing:inventory:invitation:count", "missing", "Unknown character")]
     [InlineData("player:inventory:missing:count", "missing", "Unknown item")]
@@ -85,6 +149,18 @@ public sealed class InventoryCountSyntaxTests
         Assert.Contains("give player invitation", diagnostic.Message);
         Assert.Contains("take player invitation", diagnostic.Message);
         AssertRange(diagnostic, $"~ {reference} = 2", reference);
+    }
+
+    [Fact]
+    public void Assigning_to_an_inventory_item_name_reports_a_read_only_diagnostic()
+    {
+        const string reference = "player:inventory:invitation:name";
+        var result = Compile($"=== start\n~ {reference} = \"Other\"\n-> END");
+
+        var diagnostic = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.UnknownNameOrProperty, diagnostic.Code);
+        Assert.Contains("display names are read-only", diagnostic.Message);
+        AssertRange(diagnostic, $"~ {reference} = \"Other\"", reference);
     }
 
     private static void AssertRange(Diagnostic diagnostic, string line, string text)

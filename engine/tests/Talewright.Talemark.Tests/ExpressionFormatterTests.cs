@@ -66,6 +66,8 @@ public class ExpressionFormatterTests
     [InlineData("player:pronoun:reflexive", "player:pronoun:reflexive")]
     [InlineData("faction:river:name", "faction:river")]
     [InlineData("item:lantern", "item:lantern")]
+    [InlineData("player:inventory:lantern", "item:lantern")]
+    [InlineData("player:inventory:lantern:name", "item:lantern")]
     [InlineData("player has lantern", "player has lantern")]
     [InlineData("player visited a", "player visited a")]
     [InlineData("scene:player:visits", "scene:player:visits")]

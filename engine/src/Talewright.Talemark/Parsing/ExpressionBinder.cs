@@ -180,6 +180,7 @@ internal sealed class ExpressionBinder
         ParenthesizedExpressionNode parenthesized => Bind(parenthesized.Inner),
         ReferenceExpressionNode reference => BindReference(reference),
         InventoryCountExpressionNode count => BindInventoryCount(count),
+        InventoryItemNameExpressionNode itemName => BindInventoryItemName(itemName),
         HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
         UnaryExpressionNode unary => BindUnary(unary),
         BinaryExpressionNode binary => BindBinary(binary),
@@ -387,6 +388,12 @@ internal sealed class ExpressionBinder
         return new InventoryCountRef(character, item);
     }
 
+    private Expr BindInventoryItemName(InventoryItemNameExpressionNode reference)
+    {
+        _ = InventoryCharacter(reference.Character);
+        return new ItemNameRef(InventoryItem(reference.Item));
+    }
+
     private PronounForm ParsePronounForm(string property, string? subMember, ReferenceExpressionNode reference)
     {
         if (property == ExpressionVocabulary.PossessivePronoun)
@@ -575,7 +582,15 @@ internal sealed class ExpressionBinder
     {
         var character = InventoryCharacter(effect.Character);
         var item = InventoryItem(effect.Item);
-        if (Text(effect.Property) != ExpressionVocabulary.Count)
+        var property = Text(effect.Property);
+        if (property == ExpressionVocabulary.Name)
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                "Item display names are read-only.",
+                new ExpressionSpan(effect.Character.Start, effect.Property.End - effect.Character.Start));
+        }
+
+        if (property != ExpressionVocabulary.Count)
         {
             Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
                 $"Unknown inventory property '{Text(effect.Property)}'. Use '{Text(effect.Character)}:" +
