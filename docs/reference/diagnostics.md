@@ -55,7 +55,7 @@ When you see several errors, fix the first one and check again: one mistake can 
 | TW2011 | Unsupported image format. | Use PNG (`.png`), JPEG (`.jpg` or `.jpeg`), or WebP (`.webp`). |
 | TW2012 | Image file not found. | Put the file in the story's `images/` folder and match its path's case exactly. |
 | ⚠ TW2013 | An extensionless image path matches several files. | Include the extension to choose explicitly. Otherwise the first match wins in `.png`, `.jpg`, `.jpeg`, `.webp` order. |
-| ⚠ TW2014 | Descriptive image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the humanized filename in sentence case, or `Image` if no words remain. Mark an intentionally decorative image with `#decorative` instead. |
+| ⚠ TW2014 | Descriptive image alt text is missing, empty or whitespace-only. | Supply descriptive alt text. The fallback is the filename without its extension, with runs of non-letter, non-digit characters replaced by a space and the result trimmed; case and camelCase are preserved. Names with no letters or digits use `Image`. Mark an intentionally decorative image with `#decorative` instead. |
 | TW2015 | A decorative image also supplies descriptive alt text. | Remove the alt text or remove `#decorative`; an image cannot be both decorative and described. |
 | TW2016 | A choice label contains only decorative images, so it has no accessible name. | Add label text, a substitution, or a descriptive image. Text, substitutions and conditions are trusted to provide the name; the compiler does not check what they render. |
 

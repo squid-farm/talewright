@@ -419,7 +419,7 @@ public sealed class StorySourceTests : IDisposable
             var diagnostics = new DiagnosticBag();
             var location = new SourceLocation("main.tale", 2, 1);
             var result = StoryImageResolver.Resolve(source, "maps/old_map-v2", null, location, diagnostics);
-            Assert.Equal(new ResolvedStoryImage("images/maps/old_map-v2.png", "Old map v2"), result);
+            Assert.Equal(new ResolvedStoryImage("images/maps/old_map-v2.png", "old map v2"), result);
             Assert.Equal(["TW2013", "TW2014"], diagnostics.Items.Select(d => d.Code));
             Assert.All(diagnostics.Items, diagnostic => Assert.Equal(location, diagnostic.Location));
         }

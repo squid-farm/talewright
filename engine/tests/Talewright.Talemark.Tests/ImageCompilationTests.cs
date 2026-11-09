@@ -70,11 +70,11 @@ public sealed class ImageCompilationTests
     }
 
     [Theory]
-    [InlineData("", "old_map-v2", "Old map v2")]
-    [InlineData(", \"\"", "old_map-v2", "Old map v2")]
-    [InlineData(", \"  \"", "old_map-v2", "Old map v2")]
+    [InlineData("", "old_map-v2", "old map v2")]
+    [InlineData(", \"\"", "old_map-v2", "old map v2")]
+    [InlineData(", \"  \"", "old_map-v2", "old map v2")]
     [InlineData("", "---", "Image")]
-    [InlineData("", "room42", "Room 42")]
+    [InlineData("", "room42", "room42")]
     public void Missing_alt_compiles_effective_fallback_and_warns_once(string altArgument, string path, string expected)
     {
         var source = Source($"{{image(\"{path}\"{altArgument})}}", $"images/{path}.png");
