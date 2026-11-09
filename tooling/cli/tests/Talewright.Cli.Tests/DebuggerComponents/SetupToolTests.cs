@@ -60,7 +60,7 @@ public sealed class SetupToolTests : BunitContext
     }
 
     [Fact]
-    public void Character_creation_asks_for_a_character_until_one_is_selected()
+    public async Task Character_creation_asks_for_a_character_until_one_is_selected()
     {
         using var model = ComponentStory.Load(creation: true);
         var clears = 0;
@@ -76,9 +76,12 @@ public sealed class SetupToolTests : BunitContext
         Assert.Equal(1, clears);
 
         var character = new CharacterSelection { FirstName = "Bo", LastName = "", Stats = new Dictionary<string, int> { ["str"] = 12 } };
-        model.SelectCharacter(character);
+        await tool.InvokeAsync(() => creator.OnCreated.InvokeAsync(character));
+
         Assert.Null(model.Error);
-        tool.Render();
+        Assert.Equal(character.FirstName, model.Character!.FirstName);
+        Assert.Equal(character.LastName, model.Character.LastName);
+        Assert.Equal(character.Stats, model.Character.Stats);
 
         Assert.Equal("Character selected. Start the selected scene below.", tool.Find("p[role=status]").TextContent);
         Assert.Equal(model.Character, tool.FindComponent<CharacterCreator>().Instance.InitialSelection);

@@ -67,10 +67,13 @@ public sealed class MapSceneNavigatorTests : BunitContext
     public async Task Navigation_keys_move_focus_between_scenes(string from, string key, string to)
     {
         var navigator = Show(null);
+        var expectedFocus = await ButtonFor(navigator, Scene(to));
+        var previousFocusCount = JSInterop.Invocations.Count;
 
-        Button(navigator, from).KeyDown(new KeyboardEventArgs { Key = key });
+        await Button(navigator, from).KeyDownAsync(new KeyboardEventArgs { Key = key });
 
-        Assert.Equal(await ButtonFor(navigator, Scene(to)), LastFocused());
+        var focus = JSInterop.VerifyFocusAsyncInvoke(previousFocusCount + 1).Last();
+        Assert.Equal(expectedFocus, focus.Arguments[0]);
     }
 
     [Theory]
@@ -97,9 +100,9 @@ public sealed class MapSceneNavigatorTests : BunitContext
         await navigator.InvokeAsync(() => navigator.Instance.FocusSceneAsync("missing"));
         Assert.Empty(JSInterop.Invocations);
 
-        var buttons = new[] { await ButtonFor(navigator, "start"), await ButtonFor(navigator, "road"), await ButtonFor(navigator, "END") };
-        Assert.Equal(3, buttons.Distinct().Count());
-        Assert.Equal(buttons[2], await ButtonFor(navigator, "END"));
+        await AssertFocusScene(navigator, "start", "Start (start)");
+        await AssertFocusScene(navigator, "road", "Road (road)");
+        await AssertFocusScene(navigator, "END", "End");
     }
 
     [Fact]
@@ -109,14 +112,17 @@ public sealed class MapSceneNavigatorTests : BunitContext
         var reloaded = View with { Nodes = [Node("cave", "Cave (cave)"), Node("start", "Start (start)")] };
 
         navigator.Render(parameters => parameters.Add(component => component.View, reloaded));
-        var start = await ButtonFor(navigator, "start");
-        var cave = await ButtonFor(navigator, "cave");
-        Assert.NotEqual(start, cave);
 
-        Button(navigator, "Start (start)").KeyDown(new KeyboardEventArgs { Key = "Home" });
-        Assert.Equal(cave, LastFocused());
-        Button(navigator, "Cave (cave)").KeyDown(new KeyboardEventArgs { Key = "End" });
-        Assert.Equal(start, LastFocused());
+        var expectedCave = await ButtonFor(navigator, "cave");
+        var expectedStart = await ButtonFor(navigator, "start");
+        var previousFocusCount = JSInterop.Invocations.Count;
+        await Button(navigator, "Start (start)").KeyDownAsync(new KeyboardEventArgs { Key = "Home" });
+        Assert.Equal(expectedCave,
+            JSInterop.VerifyFocusAsyncInvoke(previousFocusCount + 1).Last().Arguments[0]);
+
+        await Button(navigator, "Cave (cave)").KeyDownAsync(new KeyboardEventArgs { Key = "End" });
+        Assert.Equal(expectedStart,
+            JSInterop.VerifyFocusAsyncInvoke(previousFocusCount + 2).Last().Arguments[0]);
     }
 
     [Fact]
@@ -140,22 +146,21 @@ public sealed class MapSceneNavigatorTests : BunitContext
     private static AngleSharp.Dom.IElement Button(IRenderedComponent<MapSceneNavigator> navigator, string name) =>
         Buttons(navigator).Single(button => button.TextContent == name);
 
-    // bUnit does not expose which element an ElementReference belongs to, so key navigation is compared with the
-    // element that FocusSceneAsync targets for the expected scene.
-    private async Task<string> ButtonFor(IRenderedComponent<MapSceneNavigator> navigator, string scene)
+    private async Task AssertFocusScene(IRenderedComponent<MapSceneNavigator> navigator, string scene, string buttonText)
     {
         var before = JSInterop.Invocations.Count;
         await navigator.InvokeAsync(() => navigator.Instance.FocusSceneAsync(scene));
-        Assert.Equal(before + 1, JSInterop.Invocations.Count);
-        return LastFocused();
+        var focus = JSInterop.VerifyFocusAsyncInvoke(before + 1).Last().Arguments[0];
+        Assert.Equal(await ButtonFor(navigator, scene), focus);
+        Assert.Contains(buttonText, navigator.FindAll("button").Select(button => button.TextContent));
     }
 
-    private string LastFocused()
+    private async Task<ElementReference> ButtonFor(IRenderedComponent<MapSceneNavigator> navigator, string scene)
     {
-        var focus = JSInterop.VerifyFocusAsyncInvoke(JSInterop.Invocations.Count).Last();
-        var element = Assert.IsType<ElementReference>(focus.Arguments[0]);
-        Assert.False(string.IsNullOrEmpty(element.Id));
-        return element.Id;
+        var before = JSInterop.Invocations.Count;
+        await navigator.InvokeAsync(() => navigator.Instance.FocusSceneAsync(scene));
+        return Assert.IsType<ElementReference>(
+            JSInterop.VerifyFocusAsyncInvoke(before + 1).Last().Arguments[0]);
     }
 
     private static string Scene(string name) => View.Nodes.First(node => !node.Stub && node.Name == name).Id;

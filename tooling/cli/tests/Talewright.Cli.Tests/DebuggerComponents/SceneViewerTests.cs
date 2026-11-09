@@ -67,7 +67,9 @@ public sealed class SceneViewerTests : BunitContext
 
         Assert.Equal($"This synthetic run reached the {StoryHistory.MaxChoices}-command limit. Start a fresh scene playtest to continue.",
             viewer.Find("p[role=alert]").TextContent);
-        Assert.All(viewer.FindAll("ol[aria-label='Story choices'] button"), button => Assert.True(button.HasAttribute("disabled")));
+        var choices = viewer.FindAll("ol[aria-label='Story choices'] button");
+        Assert.Equal(["1. Explore", "2. Wait"], choices.Select(button => Text(button.TextContent)));
+        Assert.All(choices, button => Assert.True(button.HasAttribute("disabled")));
     }
 
     private static string Text(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

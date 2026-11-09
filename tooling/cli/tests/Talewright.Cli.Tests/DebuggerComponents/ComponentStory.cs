@@ -55,7 +55,9 @@ internal static class ComponentStory
 
     public static Dictionary<string, string> Files(bool creation = false) => new()
     {
-        [StorySource.ManifestFileName] = creation ? Yaml.Replace("  ruleset: {base: rpg}\n", Creation) : Yaml,
+        [StorySource.ManifestFileName] = creation
+            ? Yaml.Replace("  ruleset: {base: rpg}", Creation.TrimEnd(), StringComparison.Ordinal)
+            : Yaml,
         ["main.tale"] = Tale,
     };
 

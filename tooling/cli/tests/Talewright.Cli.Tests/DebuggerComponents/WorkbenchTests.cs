@@ -1,3 +1,4 @@
+using System.Reflection;
 using AngleSharp.Dom;
 using Bunit;
 using Microsoft.AspNetCore.Components;
@@ -121,21 +122,21 @@ public sealed class WorkbenchTests : BunitContext
 
         await Tab(workbench, "play-tab").KeyDownAsync(new KeyboardEventArgs { Key = "ArrowRight" });
         AssertSelected(workbench, map: true);
-        var mapTab = JSInterop.VerifyFocusAsyncInvoke().Arguments[0];
+        AssertFocus(workbench, 1, "map-tab");
 
         await Tab(workbench, "map-tab").KeyDownAsync(new KeyboardEventArgs { Key = "ArrowLeft" });
         AssertSelected(workbench, map: false);
-        var playTab = JSInterop.VerifyFocusAsyncInvoke(2)[1].Arguments[0];
-        Assert.NotEqual(mapTab, playTab);
+        AssertFocus(workbench, 2, "play-tab");
 
         await Tab(workbench, "play-tab").KeyDownAsync(new KeyboardEventArgs { Key = "End" });
         AssertSelected(workbench, map: true);
+        AssertFocus(workbench, 3, "map-tab");
         await Tab(workbench, "map-tab").KeyDownAsync(new KeyboardEventArgs { Key = "End" });
         AssertSelected(workbench, map: true);
+        AssertFocus(workbench, 4, "map-tab");
         await Tab(workbench, "map-tab").KeyDownAsync(new KeyboardEventArgs { Key = "Home" });
         AssertSelected(workbench, map: false);
-        var focuses = JSInterop.VerifyFocusAsyncInvoke(5);
-        Assert.Equal([mapTab, playTab, mapTab, mapTab, playTab], focuses.Select(focus => focus.Arguments[0]));
+        AssertFocus(workbench, 5, "play-tab");
 
         await Tab(workbench, "play-tab").KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
         await Tab(workbench, "play-tab").KeyDownAsync(new KeyboardEventArgs { Key = "ArrowDown" });
@@ -220,6 +221,15 @@ public sealed class WorkbenchTests : BunitContext
         Assert.Equal(map ? "-1" : "0", Tab(workbench, "play-tab").GetAttribute("tabindex"));
         Assert.Equal(map ? "0" : "-1", Tab(workbench, "map-tab").GetAttribute("tabindex"));
         Assert.Equal(map, workbench.Find("#play-panel").HasAttribute("hidden"));
+    }
+
+    private void AssertFocus(IRenderedComponent<Workbench> workbench, int count, string tabId)
+    {
+        var fieldName = tabId == "map-tab" ? "_mapTab" : "_playTab";
+        var reference = Assert.IsType<ElementReference>(
+            typeof(Workbench).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(workbench.Instance));
+        Assert.Equal(reference, JSInterop.VerifyFocusAsyncInvoke(count).Last().Arguments[0]);
     }
 
     private static IElement Choice(IRenderedComponent<Workbench> workbench, string text) =>
