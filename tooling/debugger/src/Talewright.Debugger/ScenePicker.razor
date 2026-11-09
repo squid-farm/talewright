@@ -3,11 +3,12 @@
 <ul aria-label="Matching scenes">
     @foreach (var scene in Model.FindScenes(_sceneSearch).Take(50))
     {
-        <li><button type="button" @onclick="() => Model.Target = scene.Id.Value">Select @scene.Id @scene.Title</button></li>
+        <li><button type="button" @onclick="() => OnSelect.InvokeAsync(scene.Id.Value)">Select @scene.Id @scene.Title</button></li>
     }
 </ul>
 
 @code {
     [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
     private string _sceneSearch = "";
 }

@@ -8,6 +8,7 @@ window.talewrightMap = (() => {
   const AREA_PADDING = 40;
   const DETAIL_ZOOM = 0.35;
   const SANS = `system-ui, "DejaVu Sans", sans-serif`;
+  const SCENE_NAVIGATION_KEYS = new Set(["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"]);
   const kindColors = { Scene: "#57606a", Choice: "#0969da", Success: "#1a7f37", Failure: "#cf222e", HubOffer: "#8250df" };
 
   let elk = null;
@@ -158,6 +159,11 @@ window.talewrightMap = (() => {
     });
     canvas.addEventListener("mousemove", event => hover(state, event));
     canvas.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+    // MapSceneNavigator moves focus in .NET, but only a synchronous listener can stop these keys scrolling the page.
+    host.addEventListener("keydown", event => {
+      if (SCENE_NAVIGATION_KEYS.has(event.key) && event.target.closest?.(".map-scenes"))
+        event.preventDefault();
+    });
     return state;
   }
 

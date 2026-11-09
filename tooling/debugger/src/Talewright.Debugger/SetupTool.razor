@@ -1,6 +1,6 @@
 <section aria-label="Scene setup">
     <h2>Scene setup</h2>
-    <ScenePicker Model="Model" />
+    <ScenePicker Model="Model" OnSelect="SelectTarget" />
     <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
     <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
     @if (Story.Creation is not null)
@@ -18,4 +18,6 @@
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
     [Parameter] public EventCallback OnStart { get; set; }
     [Parameter] public EventCallback OnClearCharacter { get; set; }
+
+    private void SelectTarget(string sceneId) => Model.Target = sceneId;
 }
