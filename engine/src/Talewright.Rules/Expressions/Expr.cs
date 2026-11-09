@@ -136,6 +136,12 @@ public sealed record SceneVisitCountRef(SceneId? Scene) : Expr
     public override ExprType Type => ExprType.Number;
 }
 
+/// <summary><c>player:inventory:rope:count</c>: quantity of an item held by a character.</summary>
+public sealed record InventoryCountRef(EntityId Character, ItemId Item) : Expr
+{
+    public override ExprType Type => ExprType.Number;
+}
+
 /// <summary><c>@CanPickLock</c>: a predicate registered from C# in <see cref="NamedPredicateRegistry"/>.</summary>
 public sealed record NamedPredicate(string Name) : Expr
 {

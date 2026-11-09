@@ -164,6 +164,14 @@ internal sealed class ExpressionSyntaxParser
         TokenAt(position + 3).Kind == TokenKind.Colon &&
         TokenAt(position + 4) is { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Visits };
 
+    private bool IsInventoryCountReference(int position) =>
+        TokenAt(position + 1).Kind == TokenKind.Colon &&
+        TokenAt(position + 2) is { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Inventory } &&
+        TokenAt(position + 3).Kind == TokenKind.Colon &&
+        TokenAt(position + 4).Kind == TokenKind.Identifier &&
+        TokenAt(position + 5).Kind == TokenKind.Colon &&
+        TokenAt(position + 6).Kind == TokenKind.Identifier;
+
     private void ExpectEnd()
     {
         var token = Peek;
@@ -248,7 +256,8 @@ internal sealed class ExpressionSyntaxParser
 
     private ExpressionNode ParseNot()
     {
-        if (IsKeyword(ExpressionVocabulary.Not) && !IsVisitCountReference(_position))
+        if (IsKeyword(ExpressionVocabulary.Not) && !IsVisitCountReference(_position) &&
+            !IsInventoryCountReference(_position))
         {
             var op = Next();
             var operand = ParseNested(op, ParseNot);
@@ -406,9 +415,11 @@ internal sealed class ExpressionSyntaxParser
                 token.Offset, token.Length);
         }
 
-        if (token.Is(ExpressionVocabulary.True) && !IsVisitCountReference(_position - 1))
+        if (token.Is(ExpressionVocabulary.True) && !IsVisitCountReference(_position - 1) &&
+            !IsInventoryCountReference(_position - 1))
             return new BooleanExpressionNode(true, Span(token));
-        if (token.Is(ExpressionVocabulary.False) && !IsVisitCountReference(_position - 1))
+        if (token.Is(ExpressionVocabulary.False) && !IsVisitCountReference(_position - 1) &&
+            !IsInventoryCountReference(_position - 1))
             return new BooleanExpressionNode(false, Span(token));
         if (IsKeyword(ExpressionVocabulary.Visited))
         {
@@ -428,6 +439,14 @@ internal sealed class ExpressionSyntaxParser
             {
                 Next();
                 member = Expect(TokenKind.Identifier, $"a property after '{token.Text}:{name.Text}:'");
+                if (name.Is(ExpressionVocabulary.Inventory) && Peek.Kind == TokenKind.Colon)
+                {
+                    Next();
+                    var property = Expect(TokenKind.Identifier, "an inventory property");
+                    return new InventoryCountExpressionNode(Span(token), Span(member.Value), Span(property),
+                        new(token.Offset, property.Offset + property.Length - token.Offset));
+                }
+
                 if (name.Is(ExpressionVocabulary.Pronoun) && member.Value.Is(ExpressionVocabulary.PossessivePronoun))
                 {
                     Expect(TokenKind.Colon, $"':' after '{ExpressionVocabulary.PossessivePronoun}'");
@@ -559,6 +578,9 @@ internal sealed class ExpressionSyntaxParser
 
     private EffectSyntax ParseEffect()
     {
+        if (IsInventoryCountReference(_position))
+            return ParseInventoryCountAssignment();
+
         var first = Expect(TokenKind.Identifier, "an effect");
         if (first.Is(ExpressionVocabulary.Set) || first.Is(ExpressionVocabulary.Clear))
         {
@@ -614,5 +636,33 @@ internal sealed class ExpressionSyntaxParser
         var amount = ParseSum();
         return new AssignmentEffectSyntax(ExpressionVocabulary.Namespace(first.Text), Span(first), Span(target),
             member is null ? null : Span(member.Value), kind, amount, new(first.Offset, amount.Span.End - first.Offset));
+    }
+
+    private EffectSyntax ParseInventoryCountAssignment()
+    {
+        var character = Next();
+        Expect(TokenKind.Colon, "':'");
+        Expect(TokenKind.Identifier, ExpressionVocabulary.Inventory);
+        Expect(TokenKind.Colon, "':'");
+        var item = Expect(TokenKind.Identifier, "an item id");
+        Expect(TokenKind.Colon, "':'");
+        var property = Expect(TokenKind.Identifier, "an inventory property");
+        var op = Next();
+        var assignment = op.Kind switch
+        {
+            TokenKind.Assign => AssignOp.Set,
+            TokenKind.PlusAssign => AssignOp.Add,
+            TokenKind.MinusAssign => AssignOp.Subtract,
+            _ => (AssignOp?)null,
+        };
+        if (assignment is not { } kind)
+        {
+            Fail(CompilerDiagnosticCodes.MalformedEffect, $"Expected '=', '+=' or '-=' but found '{op.Text}'.", op.Offset);
+            return default!;
+        }
+
+        var amount = ParseSum();
+        return new InventoryCountAssignmentEffectSyntax(Span(character), Span(item), Span(property), kind, amount,
+            new(character.Offset, amount.Span.End - character.Offset));
     }
 }

@@ -47,6 +47,9 @@ public enum StoryStateReadKind
 
     /// <summary>A named C# predicate, such as <c>@CanGo</c>.</summary>
     NamedPredicate,
+
+    /// <summary>An item quantity, such as <c>player:inventory:rope:count</c>.</summary>
+    InventoryCount,
 }
 
 /// <summary>Preview. One distinct reference to story state used by a condition.</summary>
@@ -125,6 +128,7 @@ public sealed class StoryCondition
                 FlagRef value => Create(StoryStateReadKind.Flag, value),
                 VarRef value => Create(StoryStateReadKind.NumberVariable, value),
                 SceneVisitCountRef value => Create(StoryStateReadKind.SceneVisitCount, value),
+                InventoryCountRef value => Create(StoryStateReadKind.InventoryCount, value),
                 TextVarRef value => Create(StoryStateReadKind.TextVariable, value),
                 NameRef value => Create(StoryStateReadKind.CharacterName, value),
                 PronounRef value => Create(StoryStateReadKind.CharacterPronoun, value),

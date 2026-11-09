@@ -385,6 +385,11 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue("scene-visit-count-ref");
                 writer.WriteStringValue(value.Scene?.Value);
                 break;
+            case InventoryCountRef value:
+                writer.WriteStringValue("inventory-count-ref");
+                writer.WriteStringValue(value.Character.Value);
+                writer.WriteStringValue(value.Item.Value);
+                break;
             case NamedPredicate value:
                 writer.WriteStringValue("predicate");
                 writer.WriteStringValue(value.Name);
