@@ -1,6 +1,4 @@
 using System.Text.RegularExpressions;
-using System.Globalization;
-using Humanizer;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 
@@ -85,19 +83,9 @@ public static partial class StoryImageResolver
 
     private static string FallbackAltText(string path)
     {
-        var previousCulture = CultureInfo.CurrentCulture;
-        try
-        {
-            // Humanize has no culture overload and uses the current culture when splitting camel case.
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            var name = System.IO.Path.GetFileNameWithoutExtension(path);
-            var words = Separators().Replace(name.Humanize(), " ").Trim().ToLowerInvariant();
-            return words.Length == 0 ? "Image" : char.ToUpperInvariant(words[0]) + words[1..];
-        }
-        finally
-        {
-            CultureInfo.CurrentCulture = previousCulture;
-        }
+        var name = System.IO.Path.GetFileNameWithoutExtension(path);
+        var words = Separators().Replace(name, " ").Trim();
+        return words.Length == 0 ? "Image" : words;
     }
 
     [GeneratedRegex(@"[^\p{L}\p{Nd}]+", RegexOptions.CultureInvariant)]

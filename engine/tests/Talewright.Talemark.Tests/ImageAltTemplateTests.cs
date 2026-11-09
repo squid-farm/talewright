@@ -103,7 +103,7 @@ public sealed class ImageAltTemplateTests
         Assert.Equal("TW2014", warning.Code);
         var media = Assert.IsType<MediaTemplate>(Assert.Single(
             Assert.IsType<ParagraphTemplate>(CompilerTests.Templates(result.Story!.GetScene(new SceneId("gate")))[0]).Inlines));
-        Assert.Equal(new MediaTemplate("images/old_map-v2.png", "Old map v2"), media);
+        Assert.Equal(new MediaTemplate("images/old_map-v2.png", "old map v2"), media);
         Assert.Null(media.AltTemplate);
     }
 
