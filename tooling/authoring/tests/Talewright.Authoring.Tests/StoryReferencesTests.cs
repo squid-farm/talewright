@@ -127,6 +127,33 @@ public sealed class StoryReferencesTests
     }
 
     [Fact]
+    public void Inventory_item_name_forms_index_character_and_item_references()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: {id: inventory-name-refs, title: Inventory names, start: start}
+                characters: {player: {first-name: Ada}}
+                items: {rope: Rope}
+                """,
+            ["main.tale"] = """
+                === start
+                {player:inventory:rope} {player:inventory:rope:name}
+                -> END
+                """,
+        });
+
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        Assert.DoesNotContain(analysis.Diagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Equal(2, analysis.Names.Occurrences(AuthoringSymbolKind.Character, "player")
+            .Count(occurrence => !occurrence.IsDeclaration));
+        Assert.Equal(2, analysis.Names.Occurrences(AuthoringSymbolKind.Item, "rope")
+            .Count(occurrence => !occurrence.IsDeclaration));
+    }
+
+    [Fact]
     public void Dotted_scene_references_span_diverts_outcomes_visits_and_the_start_scene()
     {
         AssertReferences("town.gate",

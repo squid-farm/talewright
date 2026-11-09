@@ -89,7 +89,7 @@ underscores, and single dots or hyphens between words; start with a letter or un
 "look inside" another value.
 Scene IDs cannot match character IDs, and `scene` is reserved for the current-scene visit-count
 reference. `inventory` is reserved as an item ID because it names the inventory in
-`player:inventory:rope:count`.
+`player:inventory:rope` and `player:inventory:rope:count`.
 Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser restriction.
 The naming lint rules TWL001/TWL002 check that style only if you enable them; they do not make an
 otherwise valid name illegal.
@@ -477,12 +477,17 @@ editor's soft wrapping for display instead.
 | `faction:<id>:standing`                                                                     | Player standing with the faction (number) |
 | `faction:<id>:tier`                                                                         | Standing tier name (`friendly`, …)        |
 | `faction:<id>:name`, `item:<id>`, `item:<id>:name`                                         | Display names                             |
+| `character:inventory:item`, `character:inventory:item:name`                               | The item's display name, even when not held |
 | `var:<id>`, `flag:<id>`                                                                     | Story variables / flags                   |
 
 Every property separator is `:`. For example, use `faction:explorers-guild:standing` and
 `faction:explorers-guild:tier`. Dots within an ID remain part of that name. Bare faction
 references show the faction name; use `:standing` for a number and `:tier` for a reputation tier.
 `faction:<id>:name` and `item:<id>:name` are explicit display-name forms.
+`character:inventory:<item>` and `character:inventory:<item>:name` are equivalent item-name
+references. They read the shared item definition, whether or not that character holds the item;
+after a character ID, `inventory` is reserved for this namespace rather than a character property.
+The bare `character:inventory` namespace has no printable value.
 For these terms, see the [glossary](glossary.md).
 
 **Migration.** Bare `faction:<id>` used to render the numeric standing; it now renders the

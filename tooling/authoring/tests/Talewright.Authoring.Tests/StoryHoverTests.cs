@@ -71,11 +71,16 @@ public sealed class StoryHoverTests
     }
 
     [Theory]
+    [InlineData("{player:inventory:fir|st-name}", "Item", "first-name")]
+    [InlineData("{guide:inventory:fir|st-name:name}", "Item", "first-name")]
     [InlineData("{player:inventory:fir|st-name:count}", "Item", "first-name")]
     [InlineData("{guide:inventory:fir|st-name:count}", "Item", "first-name")]
+    [InlineData("{player:inventory:first-name:na|me}", "Character, faction or item display name", "name")]
+    [InlineData("{player:inventory:rope#one-|many(\"is\", \"are\")}", "item name-agreement", "one-many")]
+    [InlineData("{player:inventory:rope:name#one-|many(\"is\", \"are\")}", "item name-agreement", "one-many")]
     [InlineData("{player:inv|entory:first-name:count}", "held state", "inventory")]
     [InlineData("{guide:inventory:first-name:co|unt}", "numeric quantity", "count")]
-    public void Inventory_count_references_hover_as_their_bound_item_and_properties(
+    public void Inventory_references_hover_as_their_bound_item_and_properties(
         string marked, string expected, string token)
     {
         var (analysis, position) = Analyze("=== first\n" + marked);

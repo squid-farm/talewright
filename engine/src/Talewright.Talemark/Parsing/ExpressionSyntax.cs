@@ -35,6 +35,9 @@ internal sealed record ReferenceExpressionNode(ReferenceNamespace Kind, Expressi
 internal sealed record InventoryCountExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Property, ExpressionSpan Span) : ExpressionNode(Span);
 
+internal sealed record InventoryItemNameExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
+    ExpressionSpan Span) : ExpressionNode(Span);
+
 internal sealed record HasItemExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Span) : ExpressionNode(Span);
 

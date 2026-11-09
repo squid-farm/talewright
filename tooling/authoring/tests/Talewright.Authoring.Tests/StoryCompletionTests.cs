@@ -82,7 +82,10 @@ public sealed class StoryCompletionTests
     [InlineData("{if player:pro| == \"she\"}Yes{/if}", "pronoun")]
     [InlineData("{player:first-name# cap|", "capitalize")]
     [InlineData("{item:ro|}", "rope")]
+    [InlineData("{player:inventory:rope#one-|}", "one-many")]
+    [InlineData("{player:inventory:rope:name#one-|}", "one-many")]
     [InlineData("{player:inventory:first-name:|}", "count")]
+    [InlineData("{player:inventory:first-name:na|me}", "name")]
     [InlineData("{if guide:inventory:first-name:co| > 0}Yes{/if}", "count")]
     [InlineData("~ give player rope guide:inventory:first-name:|", "count")]
     [InlineData("{ima|", "image(")]
@@ -122,6 +125,19 @@ public sealed class StoryCompletionTests
 
         Assert.Equal(["first-name", "rope"], completions.Select(item => item.Label));
         Assert.All(completions, item => Assert.Equal(item.Label, item.NewText));
+    }
+
+    [Theory]
+    [InlineData("{player:inventory:rope:|}")]
+    [InlineData("{guide:inventory:first-name:|}")]
+    public void Inventory_item_property_completion_offers_name_and_count(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var labels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+
+        Assert.Contains("name", labels);
+        Assert.Contains("count", labels);
     }
 
     [Fact]

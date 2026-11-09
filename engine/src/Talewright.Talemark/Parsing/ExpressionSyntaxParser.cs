@@ -164,11 +164,14 @@ internal sealed class ExpressionSyntaxParser
         TokenAt(position + 3).Kind == TokenKind.Colon &&
         TokenAt(position + 4) is { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Visits };
 
-    private bool IsInventoryCountReference(int position) =>
+    private bool IsInventoryItemReference(int position) =>
         TokenAt(position + 1).Kind == TokenKind.Colon &&
         TokenAt(position + 2) is { Kind: TokenKind.Identifier, Text: ExpressionVocabulary.Inventory } &&
         TokenAt(position + 3).Kind == TokenKind.Colon &&
-        TokenAt(position + 4).Kind == TokenKind.Identifier &&
+        TokenAt(position + 4).Kind == TokenKind.Identifier;
+
+    private bool IsInventoryCountReference(int position) =>
+        IsInventoryItemReference(position) &&
         TokenAt(position + 5).Kind == TokenKind.Colon &&
         TokenAt(position + 6).Kind == TokenKind.Identifier;
 
@@ -257,7 +260,7 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseNot()
     {
         if (IsKeyword(ExpressionVocabulary.Not) && !IsVisitCountReference(_position) &&
-            !IsInventoryCountReference(_position))
+            !IsInventoryItemReference(_position))
         {
             var op = Next();
             var operand = ParseNested(op, ParseNot);
@@ -416,10 +419,10 @@ internal sealed class ExpressionSyntaxParser
         }
 
         if (token.Is(ExpressionVocabulary.True) && !IsVisitCountReference(_position - 1) &&
-            !IsInventoryCountReference(_position - 1))
+            !IsInventoryItemReference(_position - 1))
             return new BooleanExpressionNode(true, Span(token));
         if (token.Is(ExpressionVocabulary.False) && !IsVisitCountReference(_position - 1) &&
-            !IsInventoryCountReference(_position - 1))
+            !IsInventoryItemReference(_position - 1))
             return new BooleanExpressionNode(false, Span(token));
         if (IsKeyword(ExpressionVocabulary.Visited))
         {
@@ -433,20 +436,41 @@ internal sealed class ExpressionSyntaxParser
         {
             Next();
             var name = Expect(TokenKind.Identifier, $"a name after '{token.Text}:'");
+            if (ExpressionVocabulary.Namespace(token.Text) == ReferenceNamespace.Character &&
+                name.Is(ExpressionVocabulary.Inventory))
+            {
+                if (Peek.Kind != TokenKind.Colon)
+                {
+                    Fail(CompilerDiagnosticCodes.InvalidExpression,
+                        "The inventory namespace requires an item id; use '<character>:inventory:<item>'.",
+                        name.Offset, name.Length);
+                }
+
+                Next();
+                var item = Expect(TokenKind.Identifier, "an item id after the inventory namespace");
+                if (Peek.Kind == TokenKind.Colon)
+                {
+                    Next();
+                    var property = Expect(TokenKind.Identifier, "an inventory property");
+                    var span = new ExpressionSpan(token.Offset, property.Offset + property.Length - token.Offset);
+                    if (property.Is(ExpressionVocabulary.Name))
+                    {
+                        return new InventoryItemNameExpressionNode(Span(token), Span(item), span);
+                    }
+
+                    return new InventoryCountExpressionNode(Span(token), Span(item), Span(property), span);
+                }
+
+                return new InventoryItemNameExpressionNode(Span(token), Span(item),
+                    new(token.Offset, item.Offset + item.Length - token.Offset));
+            }
+
             Token? member = null;
             Token? subMember = null;
             if (Peek.Kind == TokenKind.Colon)
             {
                 Next();
                 member = Expect(TokenKind.Identifier, $"a property after '{token.Text}:{name.Text}:'");
-                if (name.Is(ExpressionVocabulary.Inventory) && Peek.Kind == TokenKind.Colon)
-                {
-                    Next();
-                    var property = Expect(TokenKind.Identifier, "an inventory property");
-                    return new InventoryCountExpressionNode(Span(token), Span(member.Value), Span(property),
-                        new(token.Offset, property.Offset + property.Length - token.Offset));
-                }
-
                 if (name.Is(ExpressionVocabulary.Pronoun) && member.Value.Is(ExpressionVocabulary.PossessivePronoun))
                 {
                     Expect(TokenKind.Colon, $"':' after '{ExpressionVocabulary.PossessivePronoun}'");
