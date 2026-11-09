@@ -50,6 +50,34 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Inventory_references_highlight_the_namespace_item_and_count_roles()
+    {
+        const string tale = """
+            === start
+            {player:inventory:first-name:count}
+            {guide:inventory:first-name:count}
+            -> END
+            """;
+        await using var client = new Client();
+        var initialized = await client.Initialize();
+        await client.Open("start.tale", tale, 1);
+        var response = await client.Request("textDocument/semanticTokens/full", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") }
+        });
+        var data = response.GetProperty("result").GetProperty("data")
+            .EnumerateArray().Select(value => value.GetInt32()).ToArray();
+        var legend = initialized.GetProperty("result").GetProperty("capabilities")
+            .GetProperty("semanticTokensProvider").GetProperty("legend").GetProperty("tokenTypes")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+        var tokens = Decode(data, legend, tale);
+
+        Assert.Equal(2, tokens.Count(token => token.Text == "inventory" && token.Type == "keyword"));
+        Assert.Equal(2, tokens.Count(token => token.Text == "first-name" && token.Type == "variable"));
+        Assert.Equal(2, tokens.Count(token => token.Text == "count" && token.Type == "property"));
+    }
+
+    [Fact]
     public async Task Full_semantic_tokens_match_classifier_ranges_in_utf16_delta_encoding()
     {
         const string tale = """

@@ -24,12 +24,13 @@ public sealed class StoryRenameTests
               player:
                 first-name: Ada
                 stats: {grit: 2, tracking: 1}
-                inventory: [rope]
+                inventory: [rope, first-name]
             factions:
               guild: {name: Guild}
             items:
               rope: {name: Rope, modifiers: {grit: 1}}
               'lamp': Lamp
+              first-name: Token
             flags: [gate]
             vars: {gate: 0, coins: 3}
             """,
@@ -38,7 +39,7 @@ public sealed class StoryRenameTests
             characters:
               guide:
                 first-name: Bea
-                inventory: ["lamp"]
+                inventory: ["lamp", first-name]
             triggers:
               - id: rich
                 when: var:coins > 5
@@ -49,8 +50,10 @@ public sealed class StoryRenameTests
             @title The Gate
             @tags gate, town
             > guide: The gate opens for {player:first-name}. You carry {var:coins} coins.
+            You have {player:inventory:first-name:count} tokens.
+            {if guide:inventory:first-name:count >= 2}The guide has several.{/if}
             {if flag:gate}The gate is open.{/if} Count {var:gate}.
-            ~ set flag:gate; var:coins += 1; give guide rope
+            ~ set flag:gate; var:coins += 1; give guide rope guide:inventory:first-name:count
             * [Go] (requires player has rope and player:grit >= 1 and player:str >= 0) -> gate
             * [Climb] skill-check tracking dc 10
               success: -> town.square
@@ -137,6 +140,7 @@ public sealed class StoryRenameTests
     [InlineData(Supporting, "  |guide:", "mentor")]
     [InlineData(StorySource.ManifestFileName, "{id: |grit", "nerve")]
     [InlineData(StorySource.ManifestFileName, "  |rope: {name", "cord")]
+    [InlineData("town.tale", "{player:inventory:|first-name:count}", "label")]
     [InlineData(StorySource.ManifestFileName, "  |guild:", "union")]
     [InlineData(StorySource.ManifestFileName, "flags: [|gate]", "gate_open")]
     [InlineData(StorySource.ManifestFileName, "|coins: 3", "gold")]
@@ -206,12 +210,12 @@ public sealed class StoryRenameTests
     [Fact]
     public void Yaml_quoting_and_comments_are_preserved()
     {
-        var result = Rename(Supporting, "inventory: [\"|lamp\"]", "lantern");
+        var result = Rename(Supporting, "inventory: [\"|lamp\", first-name]", "lantern");
 
         Assert.Null(result.Refusal);
         var files = Apply(Story, result.Edits);
         Assert.Contains("  'lantern': Lamp", files[StorySource.ManifestFileName], StringComparison.Ordinal);
-        Assert.Equal(Story.Files[Supporting].Replace("[\"lamp\"]", "[\"lantern\"]", StringComparison.Ordinal), files[Supporting]);
+        Assert.Equal(Story.Files[Supporting].Replace("[\"lamp\", first-name]", "[\"lantern\", first-name]", StringComparison.Ordinal), files[Supporting]);
         Assert.Contains("lamp and grit", files["gate.tale"], StringComparison.Ordinal);
     }
 
@@ -370,7 +374,7 @@ public sealed class StoryRenameTests
         var result = Rename(StorySource.ManifestFileName, "{id: |grit", "first-name");
 
         Assert.Empty(result.Edits);
-        Assert.Contains("would introduce TW2003 at town.tale:7:", result.Refusal, StringComparison.Ordinal);
+        Assert.Contains("would introduce TW2003 at town.tale:9:", result.Refusal, StringComparison.Ordinal);
     }
 
     [Fact]

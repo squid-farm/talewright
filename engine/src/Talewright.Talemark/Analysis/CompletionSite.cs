@@ -81,6 +81,24 @@ internal static class ExpressionCompletion
                 keywords = [.. PossessiveProperties];
                 details = PossessivePropertyDetails;
             }
+            else if (tokenIndex >= 6 &&
+                     tokens.Slice(tokenIndex - 6, 6) is [{ Kind: TokenKind.Identifier } inventoryCharacter,
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: Inventory },
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier } item,
+                         { Kind: TokenKind.Colon }] &&
+                     symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && inventoryCharacter.Is(symbol.Name)) &&
+                     symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Item && item.Is(symbol.Name)))
+            {
+                keywords = [Count];
+            }
+            else if (tokenIndex >= 4 &&
+                     tokens.Slice(tokenIndex - 4, 4) is [{ Kind: TokenKind.Identifier } inventoryOwner,
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: Inventory },
+                         { Kind: TokenKind.Colon }] &&
+                     symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Character && inventoryOwner.Is(symbol.Name)))
+            {
+                kinds = [AuthoringSymbolKind.Item];
+            }
             else if (start > 0 && text[start - 1] == PredicateMarker)
             {
                 if (kind == ExpressionContextKind.Condition) kinds = [AuthoringSymbolKind.Predicate];
@@ -135,7 +153,7 @@ internal static class ExpressionCompletion
                         _ => []
                     };
                     if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
-                        keywords = [.. CharacterProperties];
+                        keywords = [.. CharacterProperties, Inventory];
                     if (symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Scene && ns.Is(symbol.Name)))
                         keywords = [.. keywords, PlayerPrefix];
                 }

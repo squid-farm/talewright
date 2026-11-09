@@ -65,6 +65,10 @@ public static class TalemarkClassifier
     {
         if (previousWasHash)
             return TalemarkClassificationKind.Modifier;
+        if (IsInventoryNamespace(tokens, index))
+            return TalemarkClassificationKind.Keyword;
+        if (IsInventoryItem(tokens, index))
+            return TalemarkClassificationKind.Identifier;
         if (index + 1 < tokens.Count && tokens[index + 1].Kind == TokenKind.Colon)
             return TalemarkClassificationKind.Namespace;
         if (index > 0 && tokens[index - 1].Kind == TokenKind.Colon)
@@ -92,6 +96,20 @@ public static class TalemarkClassifier
             return TalemarkClassificationKind.Keyword;
         return TalemarkClassificationKind.Identifier;
     }
+
+    private static bool IsInventoryNamespace(TokenBuffer tokens, int index) =>
+        index >= 2 && index + 1 < tokens.Count &&
+        tokens[index - 2].Kind == TokenKind.Identifier &&
+        tokens[index - 1].Kind == TokenKind.Colon &&
+        tokens[index].Is(ExpressionVocabulary.Inventory) &&
+        tokens[index + 1].Kind == TokenKind.Colon;
+
+    private static bool IsInventoryItem(TokenBuffer tokens, int index) =>
+        index >= 4 &&
+        tokens[index - 4].Kind == TokenKind.Identifier &&
+        tokens[index - 3].Kind == TokenKind.Colon &&
+        tokens[index - 2].Is(ExpressionVocabulary.Inventory) &&
+        tokens[index - 1].Kind == TokenKind.Colon;
 
     private sealed class Classifier(string file, TaleFileSyntax syntax, CancellationToken cancellationToken)
     {

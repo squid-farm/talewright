@@ -19,6 +19,7 @@ public sealed class StoryCompletionTests
           guide: {first-name: Bea}
         items:
           rope: {name: Rope}
+          first-name: Token
         factions:
           guild: {name: Guild}
         flags: [ready, door-open]
@@ -81,6 +82,9 @@ public sealed class StoryCompletionTests
     [InlineData("{if player:pro| == \"she\"}Yes{/if}", "pronoun")]
     [InlineData("{player:first-name# cap|", "capitalize")]
     [InlineData("{item:ro|}", "rope")]
+    [InlineData("{player:inventory:first-name:|}", "count")]
+    [InlineData("{if guide:inventory:first-name:co| > 0}Yes{/if}", "count")]
+    [InlineData("~ give player rope guide:inventory:first-name:|", "count")]
     [InlineData("{ima|", "image(")]
     [InlineData("@requires item:ro| == \"Rope\"", "rope")]
     [InlineData("~ give player rope |", "var:")]
@@ -90,6 +94,19 @@ public sealed class StoryCompletionTests
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
+    }
+
+    [Theory]
+    [InlineData("{player:inventory:|}")]
+    [InlineData("{guide:inventory:|}")]
+    public void Inventory_item_completion_uses_the_declared_item_ids(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var completions = StoryCompletion.Complete(analysis, position);
+
+        Assert.Equal(["first-name", "rope"], completions.Select(item => item.Label));
+        Assert.All(completions, item => Assert.Equal(item.Label, item.NewText));
     }
 
     [Fact]

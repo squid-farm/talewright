@@ -802,7 +802,8 @@ including braces, commas and `#`, remains text. See the
 
 Separate effects with `;` on a `~` line or inside a choice/outcome's `{ }`.
 Triggers and leveling settle after the whole batch, before the next line. For example,
-`~ var:gold -= 10; var:gold += 7` never exposes the temporary zero to triggers.
+if a character holds 10 credits, `~ take player credits 10; give player credits 7`
+never exposes the temporary zero count to triggers.
 Writing those effects on two `~` lines creates two batches instead.
 
 ```
