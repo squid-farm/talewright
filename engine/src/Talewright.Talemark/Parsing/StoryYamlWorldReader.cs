@@ -148,6 +148,14 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         {
             var rawId = _yaml.Identifier(key, "item id");
             if (rawId is null) continue;
+            // Item counts are read as character:inventory:item:count, where an item named inventory is ambiguous.
+            if (rawId == ExpressionVocabulary.Inventory)
+            {
+                _yaml.Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"Item id '{rawId}' is reserved.", _yaml.At(key));
+                continue;
+            }
+
             var id = new ItemId(rawId);
             var name = id.Value;
             var modifiers = new Dictionary<StatId, int>();

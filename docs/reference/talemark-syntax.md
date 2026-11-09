@@ -88,7 +88,8 @@ underscores, and single dots or hyphens between words; start with a letter or un
 `temple.entrance` and `hidden-door` are valid names. A dot groups words in a name; it does not mean
 "look inside" another value.
 Scene IDs cannot match character IDs, and `scene` is reserved for the current-scene visit-count
-reference.
+reference. `inventory` is reserved as an item ID because it names the inventory in
+`player:inventory:rope:count`.
 Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser restriction.
 The naming lint rules TWL001/TWL002 check that style only if you enable them; they do not make an
 otherwise valid name illegal.
