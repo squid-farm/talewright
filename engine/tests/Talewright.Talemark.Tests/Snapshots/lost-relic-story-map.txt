@@ -113,14 +113,14 @@ divert|dream.watcher-choice/step:115:1/failure|dream.watcher-choice|dream.watche
 divert|dream.watcher-choice/step:118:1|dream.watcher-choice|dream.eye-mark|Choice|-|4|player:courage >= 6|reads=player:courage
 divert|dream.watcher-choice/step:119:1|dream.watcher-choice|dream.wake|Choice|-|5||reads=
 divert|dream.watcher-failed/step:126:1|dream.watcher-failed|dream.watcher-choice|Scene|-|0||reads=
-divert|dream.eye-mark/step:137:1|dream.eye-mark|dream.hub|Scene|-|0||reads=
-divert|dream.archivist/step:157:1|dream.archivist|dream.hub|Choice|-|0|faction:explorers-guild:tier >= neutral|reads=faction:explorers-guild:tier
-divert|dream.archivist/step:158:1|dream.archivist|dream.hub|Choice|-|1||reads=
-divert|dream.hands/step:172:1|dream.hands|dream.hub|Choice|-|0||reads=
-divert|dream.hands/step:173:1|dream.hands|dream.wake|Choice|-|1||reads=
-divert|dream.sleeper/step:199:1|dream.sleeper|dream.passage|Choice|-|0||reads=
-divert|dream.passage/step:208:1|dream.passage|temple.hall|Scene|-|0||reads=
-divert|dream.wake/step:216:1|dream.wake|temple.door|Scene|-|0||reads=
+divert|dream.eye-mark/step:136:1|dream.eye-mark|dream.hub|Scene|-|0||reads=
+divert|dream.archivist/step:156:1|dream.archivist|dream.hub|Choice|-|0|faction:explorers-guild:tier >= neutral|reads=faction:explorers-guild:tier
+divert|dream.archivist/step:157:1|dream.archivist|dream.hub|Choice|-|1||reads=
+divert|dream.hands/step:171:1|dream.hands|dream.hub|Choice|-|0||reads=
+divert|dream.hands/step:172:1|dream.hands|dream.wake|Choice|-|1||reads=
+divert|dream.sleeper/step:198:1|dream.sleeper|dream.passage|Choice|-|0||reads=
+divert|dream.passage/step:207:1|dream.passage|temple.hall|Scene|-|0||reads=
+divert|dream.wake/step:215:1|dream.wake|temple.door|Scene|-|0||reads=
 hub-offer|camp.hub/hub:camp.supplies|camp.hub|camp.supplies|any(camp)||once=true|reads=
 hub-offer|camp.hub/hub:camp.register|camp.hub|camp.register|any(camp)||once=true|reads=
 hub-offer|camp.hub/hub:camp.guide|camp.hub|camp.guide|any(camp)||once=true|reads=
@@ -135,5 +135,5 @@ hub-offer|dream.hub/hub:dream.ines|dream.hub|dream.ines|all(dream,keeper)||once=
 hub-offer|dream.hub/hub:dream.spiral|dream.hub|dream.spiral|all(dream,keeper)||once=true|reads=
 hub-offer|dream.hub/hub:dream.watcher|dream.hub|dream.watcher|all(dream,keeper)|player has glyph-mark|once=true|reads=player has glyph-mark
 hub-offer|dream.hub/hub:dream.archivist|dream.hub|dream.archivist|all(dream,keeper)||once=true|reads=
-hub-offer|dream.hub/hub:dream.hands|dream.hub|dream.hands|all(dream,keeper)|player visited dream.eye-mark and var:marks == 2|once=true|reads=player visited dream.eye-mark,var:marks
-hub-offer|dream.hub/hub:dream.sleeper|dream.hub|dream.sleeper|all(dream,keeper)|var:marks == 3 and flag:all-marks and player has glyph-mark|once=true|reads=var:marks,flag:all-marks,player has glyph-mark
+hub-offer|dream.hub/hub:dream.hands|dream.hub|dream.hands|all(dream,keeper)|player visited dream.eye-mark and player:inventory:glyph-mark:count == 2|once=true|reads=player visited dream.eye-mark,player:inventory:glyph-mark:count
+hub-offer|dream.hub/hub:dream.sleeper|dream.hub|dream.sleeper|all(dream,keeper)|player:inventory:glyph-mark:count == 3 and flag:all-marks and player has glyph-mark|once=true|reads=player:inventory:glyph-mark:count,flag:all-marks,player has glyph-mark

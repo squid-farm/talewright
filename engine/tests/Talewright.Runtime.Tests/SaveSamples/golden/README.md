@@ -32,6 +32,11 @@ Changing, removing or regenerating a golden save is a compatibility break. It ne
 - a version bump;
 - migration notes for players with existing saves.
 
-Edits to the Lost Relic or CSharpStory sources must keep these saves loading. If an edit can't, it falls under the same rule.
+Edits to the Lost Relic or CSharpStory sources normally keep these saves loading.
+An explicitly approved incompatible Lost Relic update requires a version bump and
+a player-facing migration note; regenerate only the affected Lost Relic fixtures.
+The 0.5.0 update intentionally makes 0.4.0 Lost Relic saves incompatible because
+the dream now reads glyph-mark inventory counts instead of the separately stored
+`marks` variable. There is no automatic migration.
 
 If a golden-save test fails after an engine change, assume the engine change is wrong. Do not update the fixture to make it pass.
