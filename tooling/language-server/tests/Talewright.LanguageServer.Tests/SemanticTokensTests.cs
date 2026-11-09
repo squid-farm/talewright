@@ -77,6 +77,38 @@ public sealed partial class ServerTests
         Assert.Equal(2, tokens.Count(token => token.Text == "count" && token.Type == "property"));
     }
 
+    [Theory]
+    [InlineData("item")]
+    [InlineData("flag")]
+    [InlineData("var")]
+    [InlineData("faction")]
+    [InlineData("scene")]
+    public async Task Inventory_count_stays_a_property_when_the_item_id_is_a_reference_prefix(string itemId)
+    {
+        var tale = $$"""
+            === start
+            {player:inventory:{{itemId}}:count}
+            -> END
+            """;
+        await using var client = new Client();
+        var initialized = await client.Initialize();
+        await client.Open("start.tale", tale, 1);
+        var response = await client.Request("textDocument/semanticTokens/full", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") }
+        });
+        var data = response.GetProperty("result").GetProperty("data")
+            .EnumerateArray().Select(value => value.GetInt32()).ToArray();
+        var legend = initialized.GetProperty("result").GetProperty("capabilities")
+            .GetProperty("semanticTokensProvider").GetProperty("legend").GetProperty("tokenTypes")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+        var tokens = Decode(data, legend, tale);
+
+        Assert.Contains(tokens, token => token.Text == "inventory" && token.Type == "keyword");
+        Assert.Contains(tokens, token => token.Text == itemId && token.Type == "variable");
+        Assert.Contains(tokens, token => token.Text == "count" && token.Type == "property");
+    }
+
     [Fact]
     public async Task Full_semantic_tokens_match_classifier_ranges_in_utf16_delta_encoding()
     {

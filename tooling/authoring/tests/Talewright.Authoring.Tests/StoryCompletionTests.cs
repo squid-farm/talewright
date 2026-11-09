@@ -97,6 +97,21 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("::: skill-check athletics dc player:|")]
+    [InlineData("::: skill-check athletics dc guide:|")]
+    public void Numeric_character_reference_completion_offers_inventory_but_not_text_properties(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var labels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+
+        Assert.Contains("inventory", labels);
+        Assert.Contains("hp", labels);
+        Assert.DoesNotContain("first-name", labels);
+        Assert.DoesNotContain("pronoun", labels);
+    }
+
+    [Theory]
     [InlineData("{player:inventory:|}")]
     [InlineData("{guide:inventory:|}")]
     public void Inventory_item_completion_uses_the_declared_item_ids(string marked)
