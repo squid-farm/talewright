@@ -141,6 +141,17 @@ public sealed class StoryCompletionTests
     }
 
     [Fact]
+    public void Numeric_inventory_item_property_completion_offers_count_but_not_name()
+    {
+        var (analysis, position) = Analyze("=== first\n::: skill-check athletics dc player:inventory:rope:|");
+
+        var labels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+
+        Assert.Contains("count", labels);
+        Assert.DoesNotContain("name", labels);
+    }
+
+    [Fact]
     public void Hub_selector_completes_and_hovers_sentence_operators()
     {
         var (analysis, position) = Analyze("=== first\n@hub camp a|nd night");

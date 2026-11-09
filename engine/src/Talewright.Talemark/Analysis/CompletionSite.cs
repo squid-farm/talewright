@@ -28,6 +28,7 @@ internal static class ExpressionCompletion
     private static readonly string[] CharacterMemberKeywords = [.. CharacterProperties, Inventory];
     private static readonly string[] NumericCharacterMemberKeywords = [Inventory];
     private static readonly string[] InventoryItemKeywords = [Count, Name];
+    private static readonly string[] NumericInventoryItemKeywords = [Count];
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
         IReadOnlyList<AuthoringSymbol> symbols)
@@ -93,7 +94,9 @@ internal static class ExpressionCompletion
                      HasSymbol(symbols, AuthoringSymbolKind.Character, inventoryCharacter) &&
                      HasSymbol(symbols, AuthoringSymbolKind.Item, item))
             {
-                keywords = InventoryItemKeywords;
+                keywords = kind == ExpressionContextKind.Number
+                    ? NumericInventoryItemKeywords
+                    : InventoryItemKeywords;
             }
             else if (tokenIndex >= 4 &&
                      tokens.Slice(tokenIndex - 4, 4) is [{ Kind: TokenKind.Identifier } inventoryOwner,
