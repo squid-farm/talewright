@@ -1,0 +1,22 @@
+<section aria-label="Branch explanations">
+    <h2>Branch explanations</h2>
+    <p>Historical results at recorded event offsets, not reevaluations of current state. Null results are not evaluated. Scene-step decisions include their source location.</p>
+    <label>Filter decisions <input aria-label="Filter decisions" @bind="_decisionFilter" @bind:event="oninput" /></label>
+    <label>Decision kind <select aria-label="Decision kind" @bind="_kind">
+        <option value="">All</option>
+        @foreach (var kind in Enum.GetValues<DecisionKind>()) { <option value="@kind">@kind</option> }
+    </select></label>
+    @if (!Inspection.DecisionsCaptured)
+    {
+        <p>Decision recording unavailable for this run.</p>
+    }
+    <p>Showing the most recent 100 matching decisions. Filter by subject or scene ID.</p>
+    <DecisionList Inspection="Inspection" Filter="@_decisionFilter" Kind="SelectedKind" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AuthorInspection Inspection { get; set; } = null!;
+    private string _decisionFilter = "";
+    private string _kind = "";
+    private DecisionKind? SelectedKind => Enum.TryParse<DecisionKind>(_kind, out var kind) ? kind : null;
+}

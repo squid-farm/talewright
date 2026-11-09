@@ -9,7 +9,22 @@
 {
     <p role="alert" class="tw-error">@_error</p>
 }
-<div class="story-map" @ref="_host"></div>
+<div class="story-map" @ref="_host">
+    <MapToolbar Status="@_mapStatus" OnFit="FitMap" />
+    <div class="map-surface">
+        <canvas @ref="_canvas" aria-hidden="true"></canvas>
+        <div class="map-tooltip" @ref="_tooltip" aria-hidden="true" hidden></div>
+    </div>
+    @if (_view is not null)
+    {
+        <MapSceneNavigator @ref="_sceneNavigator" View="_view" SelectedNodeId="@_selectedNodeId"
+                           OnFocus="FocusScene" OnBlur="BlurScene" />
+        <MapSceneDetails View="_view" SelectedNodeId="@_selectedNodeId"
+                         OnHighlight="HighlightLine" OnSelectScene="SelectDetailTarget"
+                         OnFocusedItemRemoved="FocusSelectedScene" />
+    }
+    <MapRoute Run="@_run" />
+</div>
 @if (_previewError is not null)
 {
     <p role="alert" class="tw-error">@_previewError</p>
@@ -52,13 +67,19 @@
     [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
 
     private ElementReference _host;
+    private ElementReference _canvas;
+    private ElementReference _tooltip;
     private StoryDefinition? _rendered;
     private MapView? _view;
+    private MapRunView? _run;
     private AuthorInspection? _renderedInspection;
     private DotNetObjectReference<MapTab>? _reference;
+    private MapSceneNavigator? _sceneNavigator;
+    private string? _selectedNodeId;
     private SceneId? _selectedScene;
     private MapScenePreview? _preview;
     private string? _error;
+    private string _mapStatus = "Laying out the map…";
     private string? _previewError;
     private string? _pendingExportPath;
     private string? _pendingExportFormat;
@@ -72,8 +93,10 @@
         {
             _mapReady = false;
             _view = MapView.Build(Story);
-            if (_selectedScene is { } selected && !Story.Scenes.Any(scene => scene.Id == selected))
+            if (_selectedNodeId is { } selected && selected != "END"
+                && !Story.Scenes.Any(scene => scene.Id.Value == selected))
             {
+                _selectedNodeId = null;
                 _selectedScene = null;
                 _preview = null;
                 _previewError = null;
@@ -82,6 +105,7 @@
 
         if (_selectedScene is { } sceneId)
             BuildPreview(sceneId);
+        _run = Session is null || _view is null ? null : MapRunView.Build(Story, _view, Session);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -93,8 +117,8 @@
             _renderedInspection = Inspection;
             try
             {
-                await JS.InvokeVoidAsync("talewrightMap.render", _host, _view,
-                    Session is null ? null : MapRunView.Build(Story, _view, Session), _reference);
+                await JS.InvokeVoidAsync("talewrightMap.render", _host, _canvas, _tooltip, _view, _run,
+                    _selectedNodeId, _reference);
                 _error = null;
                 _mapReady = true;
                 StateHasChanged();
@@ -112,8 +136,7 @@
         _renderedInspection = Inspection;
         try
         {
-            await JS.InvokeVoidAsync("talewrightMap.updateRun", _host,
-                Session is null ? null : MapRunView.Build(Story, _view, Session));
+            await JS.InvokeVoidAsync("talewrightMap.updateRun", _host, _run);
         }
         catch (JSException ex)
         {
@@ -174,21 +197,74 @@
     }
 
     [JSInvokable]
-    public Task SelectScene(string scene)
+    public Task SelectScene(string scene) => SelectNode(scene);
+
+    [JSInvokable]
+    public Task SetMapStatus(string status)
     {
+        _mapStatus = status;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SelectNode(string scene)
+    {
+        _selectedNodeId = scene;
         if (scene == "END")
         {
             _selectedScene = null;
             _preview = null;
             _previewError = null;
-            return InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged);
+            return;
         }
 
         var definition = Story.Scenes.SingleOrDefault(candidate => candidate.Id.Value == scene)
             ?? throw new ArgumentException($"Unknown scene '{scene}'.", nameof(scene));
         _selectedScene = definition.Id;
         BuildPreview(definition.Id);
-        return InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task FocusScene(string scene)
+    {
+        await SelectNode(scene);
+        await InvokeMapAsync("talewrightMap.setFocused", scene, "The focused map scene could not be updated");
+    }
+
+    private Task BlurScene(string scene) =>
+        InvokeMapAsync("talewrightMap.clearFocused", scene, "The focused map scene could not be updated");
+
+    private Task HighlightLine(string? line) =>
+        InvokeMapAsync("talewrightMap.highlight", line, "The highlighted map line could not be updated");
+
+    private async Task SelectDetailTarget(string scene)
+    {
+        if (_sceneNavigator is null)
+            throw new InvalidOperationException("The map scene navigator is not available.");
+        await _sceneNavigator.FocusSceneAsync(scene);
+    }
+
+    private Task FocusSelectedScene() =>
+        _selectedNodeId is { } scene && _sceneNavigator is not null
+            ? _sceneNavigator.FocusSceneAsync(scene)
+            : Task.CompletedTask;
+
+    private Task FitMap() => InvokeMapAsync("talewrightMap.fit", null, "The map could not be fitted");
+
+    private async Task InvokeMapAsync(string identifier, object? argument, string error)
+    {
+        try
+        {
+            if (argument is null)
+                await JS.InvokeVoidAsync(identifier, _host);
+            else
+                await JS.InvokeVoidAsync(identifier, _host, argument);
+        }
+        catch (JSException ex)
+        {
+            _error = $"{error}: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private void BuildPreview(SceneId scene)

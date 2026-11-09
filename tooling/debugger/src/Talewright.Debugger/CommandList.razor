@@ -1,0 +1,36 @@
+<details>
+    <summary>Command history and consequences</summary>
+    <ol>
+        @for (var i = 0; i < Session.Commands.Count; i++)
+        {
+            var index = i;
+            <li>
+                @(Session.Commands[index] switch
+                {
+                    AuthorChoice choice => $"Choice: {choice.Key}",
+                    AuthorEdit => "Live edit batch",
+                    AuthorJump jump => $"Preserve-state jump: {jump.Target} (eligibility bypassed)",
+                    _ => "Unsupported command",
+                }) @(index < Session.Cursor ? "(applied)" : "(redo)")
+                @if (index < Session.Results.Count)
+                {
+                    var result = Session.Results[index];
+                    <ul>
+                        @foreach (var change in result.Changes)
+                        {
+                            <li>@change.Field: @change.Before to @change.After (actual after cascades)</li>
+                        }
+                        @foreach (var item in result.Events)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                }
+            </li>
+        }
+    </ol>
+</details>
+
+@code {
+    [Parameter, EditorRequired] public AuthorSession Session { get; set; } = null!;
+}
