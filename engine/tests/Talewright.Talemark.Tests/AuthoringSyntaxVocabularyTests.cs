@@ -72,6 +72,8 @@ public sealed class AuthoringSyntaxVocabularyTests
             (AuthoringTokenKind.Item, $"{modifier}{TextModifierRegistry.ThisName}"),
             (AuthoringTokenKind.Item, $"{modifier}{TextModifierRegistry.ThatName}"),
             (AuthoringTokenKind.Item, $"{modifier}{TextModifierRegistry.PossessiveName}"),
+            (AuthoringTokenKind.Inventory, $"{ExpressionVocabulary.Player}:{ExpressionVocabulary.Inventory}:item:{ExpressionVocabulary.Count}"),
+            (AuthoringTokenKind.Count, $"{ExpressionVocabulary.Player}:{ExpressionVocabulary.Inventory}:item:{ExpressionVocabulary.Count}"),
             (AuthoringTokenKind.Image, $"{ExpressionVocabulary.ImageCall}{quote}path{quote}"),
             (AuthoringTokenKind.Set, $"{ExpressionVocabulary.Set} {ExpressionVocabulary.FlagPrefix}id"),
             (AuthoringTokenKind.Pronoun, $"{separator}{ExpressionVocabulary.PossessivePronoun}{separator}{ExpressionVocabulary.Determiner}"),

@@ -158,7 +158,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
     {
         var source = await new EmbeddedStoryLibrary(typeof(SaveHistoryTests).Assembly).LoadAsync("LostRelic");
         var files = source.Files.ToDictionary();
-        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.4.0", "version: 0.3.0");
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.5.0", "version: 0.3.0");
         var result = StoryCompiler.Compile(new StorySource(files, source.ImagePaths));
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var old = result.Story!;

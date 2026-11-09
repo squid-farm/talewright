@@ -24,12 +24,13 @@ public sealed class StoryReferencesTests
               player:
                 first-name: Ada
                 stats: {grit: 2, tracking: 1}
-                inventory: [rope]
+                inventory: [rope, first-name]
             factions:
               guild: {name: Guild}
             items:
               rope: {name: Rope, modifiers: {grit: 1}}
               'lamp': Lamp
+              first-name: Token
             flags: [gate]
             vars: {gate: 0, coins: 3}
             """,
@@ -37,7 +38,7 @@ public sealed class StoryReferencesTests
             characters:
               guide:
                 first-name: Bea
-                inventory: ["lamp"]
+                inventory: ["lamp", first-name]
             triggers:
               - id: rich
                 when: var:coins > 5
@@ -48,8 +49,10 @@ public sealed class StoryReferencesTests
             @title The Gate
             @tags gate, town
             > guide: The gate opens for {player:first-name}. You carry {var:coins} coins.
+            You have {player:inventory:first-name:count} tokens.
+            {if guide:inventory:first-name:count >= 2}The guide has several.{/if}
             {if flag:gate}The gate is open.{/if} Count {var:gate}.
-            ~ set flag:gate; var:coins += 1; give guide rope
+            ~ set flag:gate; var:coins += 1; give guide rope guide:inventory:first-name:count
             * [Go] (requires player has rope and player:grit >= 1) -> gate
             * [Climb] skill-check tracking dc 10
               success: -> town.square
@@ -124,6 +127,33 @@ public sealed class StoryReferencesTests
     }
 
     [Fact]
+    public void Inventory_item_name_forms_index_character_and_item_references()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: {id: inventory-name-refs, title: Inventory names, start: start}
+                characters: {player: {first-name: Ada}}
+                items: {rope: Rope}
+                """,
+            ["main.tale"] = """
+                === start
+                {player:inventory:rope} {player:inventory:rope:name}
+                -> END
+                """,
+        });
+
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        Assert.DoesNotContain(analysis.Diagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Equal(2, analysis.Names.Occurrences(AuthoringSymbolKind.Character, "player")
+            .Count(occurrence => !occurrence.IsDeclaration));
+        Assert.Equal(2, analysis.Names.Occurrences(AuthoringSymbolKind.Item, "rope")
+            .Count(occurrence => !occurrence.IsDeclaration));
+    }
+
+    [Fact]
     public void Dotted_scene_references_span_diverts_outcomes_visits_and_the_start_scene()
     {
         AssertReferences("town.gate",
@@ -179,17 +209,23 @@ public sealed class StoryReferencesTests
     {
         AssertReferences("guide",
             [(Supporting, "  |guide:")],
-            [("town.tale", "> |guide:"), ("town.tale", "give |guide rope"), ("gate.tale", "skill-check |guide grit")]);
+            [
+                ("town.tale", "> |guide:"), ("town.tale", "give |guide rope"),
+                ("town.tale", "{if |guide:inventory:first-name:count"),
+                ("town.tale", "give guide rope |guide:inventory:first-name:count"),
+                ("gate.tale", "skill-check |guide grit"),
+            ]);
         AssertReferences("player",
             [(StorySource.ManifestFileName, "  |player:")],
             [
-                ("town.tale", "{|player:first-name}"), ("town.tale", "(requires |player has rope"),
+                ("town.tale", "{|player:first-name}"), ("town.tale", "You have {|player:inventory:first-name:count}"),
+                ("town.tale", "(requires |player has rope"),
                 ("town.tale", "and |player:grit"), ("gate.tale", "{if |player visited"),
             ]);
         AssertReferences("rope",
             [(StorySource.ManifestFileName, "  |rope: {name")],
             [
-                (StorySource.ManifestFileName, "inventory: [|rope]"), ("town.tale", "player has |rope"),
+                (StorySource.ManifestFileName, "inventory: [|rope, first-name]"), ("town.tale", "player has |rope"),
                 ("town.tale", "give guide |rope"),
             ]);
         AssertReferences("guild",
@@ -209,11 +245,25 @@ public sealed class StoryReferencesTests
     }
 
     [Fact]
+    public void Inventory_count_references_bind_the_character_and_colliding_item_id()
+    {
+        AssertReferences("first-name",
+            [(StorySource.ManifestFileName, "  |first-name: Token")],
+            [
+                (StorySource.ManifestFileName, "inventory: [rope, |first-name]"),
+                (Supporting, "inventory: [\"lamp\", |first-name]"),
+                ("town.tale", "{player:inventory:|first-name:count}"),
+                ("town.tale", "{if guide:inventory:|first-name:count >= 2}"),
+                ("town.tale", "give guide rope guide:inventory:|first-name:count"),
+            ]);
+    }
+
+    [Fact]
     public void Quoted_yaml_names_keep_exact_ranges()
     {
         AssertReferences("lamp",
             [(StorySource.ManifestFileName, "  '|lamp': Lamp")],
-            [(Supporting, "inventory: [\"|lamp\"]")]);
+            [(Supporting, "inventory: [\"|lamp\", first-name]")]);
     }
 
     [Fact]

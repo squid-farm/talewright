@@ -16,7 +16,8 @@ import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import Gdk, GdkPixbuf, GLib
+gi.require_version("GdkX11", "3.0")
+from gi.repository import Gdk, GdkPixbuf, GdkX11, GLib
 import pyatspi
 
 
@@ -145,6 +146,33 @@ class Desktop:
         if window is None:
             raise RuntimeError("No window belongs to the Photino process")
         return window
+
+    def resize(self, width, height):
+        window_id = self.window_id()
+        subprocess.run(["wmctrl", "-ir", window_id, "-e", f"0,-1,-1,{width},{height}"], check=True)
+        window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), int(window_id, 16))
+        self.wait(lambda: tuple(window.get_geometry())[2:] == (width, height),
+                  f"native window reaches {width}x{height}")
+
+        # wmctrl returns before WebKit reflows, so wait until consecutive accessible geometry reads agree.
+        def geometry():
+            root = self.root()
+            if root is None:
+                return None
+            extents = []
+            for node in nodes(root):
+                try:
+                    extents.append(tuple(node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)))
+                except NotImplementedError:
+                    pass
+            return extents
+        previous = None
+
+        def settled():
+            nonlocal previous
+            current, previous = previous, geometry()
+            return current is not None and current == previous
+        self.wait(settled, f"native layout settles at {width}x{height}")
 
     def window_active(self):
         frame = self.find(role="frame")
@@ -316,8 +344,7 @@ def serve(args):
                 elif command == "key":
                     app.key(**arguments)
                 elif command == "resize":
-                    subprocess.run(["wmctrl", "-ir", app.window_id(), "-e",
-                                    f"0,-1,-1,{arguments['width']},{arguments['height']}"], check=True)
+                    app.resize(arguments["width"], arguments["height"])
                 elif command == "close-window":
                     subprocess.run(["wmctrl", "-ic", app.window_id()], check=True)
                     result = app.process.wait(timeout=20)

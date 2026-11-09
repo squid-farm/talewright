@@ -1,0 +1,7 @@
+<label>Player save file path (read only) <input aria-label="Player save file path" @bind="Model.PlayerSavePath" /></label>
+<button type="button" @onclick="OnImport">Fork compatible player save</button>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter] public EventCallback OnImport { get; set; }
+}

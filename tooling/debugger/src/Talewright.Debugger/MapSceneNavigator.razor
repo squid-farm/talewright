@@ -1,0 +1,57 @@
+<div class="map-scenes visually-hidden" role="group"
+     aria-label="Scenes on the map. Use the arrow keys to move between scenes, and Home or End for the first or last.">
+    @for (var index = 0; index < _nodes.Length; index++)
+    {
+        var buttonIndex = index;
+        var node = _nodes[buttonIndex];
+        <button @key="node.Id" @ref="_buttons[node.Id]" type="button" tabindex="@(IsTabStop(buttonIndex) ? 0 : -1)"
+                @onfocus="() => OnFocus.InvokeAsync(node.Id)" @onblur="() => OnBlur.InvokeAsync(node.Id)"
+                @onkeydown="args => MoveFocus(args, buttonIndex)">@node.Name</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public MapView View { get; set; } = null!;
+    [Parameter] public string? SelectedNodeId { get; set; }
+    [Parameter] public EventCallback<string> OnFocus { get; set; }
+    [Parameter] public EventCallback<string> OnBlur { get; set; }
+
+    private MapNode[] _nodes = [];
+    // Keyed by scene: Blazor captures a reference only when its keyed button is first inserted, not when it moves.
+    private readonly Dictionary<string, ElementReference> _buttons = [];
+    private int _tabStopIndex;
+
+    protected override void OnParametersSet()
+    {
+        _nodes = View.Nodes.Where(node => !node.Stub).ToArray();
+        foreach (var removed in _buttons.Keys.Except(_nodes.Select(node => node.Id)).ToArray())
+            _buttons.Remove(removed);
+        _tabStopIndex = Array.FindIndex(_nodes, node => node.Id == SelectedNodeId);
+        if (_tabStopIndex < 0 && _nodes.Length > 0)
+            _tabStopIndex = 0;
+    }
+
+    public async Task FocusSceneAsync(string sceneId)
+    {
+        if (_buttons.TryGetValue(sceneId, out var button))
+            await button.FocusAsync();
+    }
+
+    private bool IsTabStop(int index) => index == _tabStopIndex;
+
+    private async Task MoveFocus(KeyboardEventArgs args, int current)
+    {
+        if (_nodes.Length == 0)
+            return;
+        var next = args.Key switch
+        {
+            "ArrowRight" or "ArrowDown" => Math.Min(current + 1, _nodes.Length - 1),
+            "ArrowLeft" or "ArrowUp" => Math.Max(current - 1, 0),
+            "Home" => 0,
+            "End" => _nodes.Length - 1,
+            _ => current,
+        };
+        if (next != current || args.Key is "Home" or "End")
+            await _buttons[_nodes[next].Id].FocusAsync();
+    }
+}

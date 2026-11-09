@@ -1,0 +1,9 @@
+<div class="map-toolbar">
+    <button type="button" @onclick="OnFit">Fit map</button>
+    <p class="map-status" role="status">@Status</p>
+</div>
+
+@code {
+    [Parameter] public string Status { get; set; } = "Laying out the map…";
+    [Parameter] public EventCallback OnFit { get; set; }
+}

@@ -4,6 +4,7 @@ using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Tests;
 
@@ -112,5 +113,15 @@ public class ItemGrammarTests
             Assert.False(TextModifierRegistry.IsBuiltIn(new DelegateTextModifier(name, (text, _) => text)));
         }
         Assert.True(TextModifierRegistry.IsBuiltIn(new OneManyTextModifier("is", "are")));
+    }
+
+    [Fact]
+    public void Inventory_is_a_reserved_item_id()
+    {
+        var result = Compile("Hello.", Manifest + "\n  inventory: inventory");
+
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.InvalidConfigurationValue, error.Code);
+        Assert.Equal("Item id 'inventory' is reserved.", error.Message);
     }
 }

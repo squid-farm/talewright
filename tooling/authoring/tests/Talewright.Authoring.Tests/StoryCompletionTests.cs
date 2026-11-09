@@ -19,6 +19,7 @@ public sealed class StoryCompletionTests
           guide: {first-name: Bea}
         items:
           rope: {name: Rope}
+          first-name: Token
         factions:
           guild: {name: Guild}
         flags: [ready, door-open]
@@ -81,6 +82,12 @@ public sealed class StoryCompletionTests
     [InlineData("{if player:pro| == \"she\"}Yes{/if}", "pronoun")]
     [InlineData("{player:first-name# cap|", "capitalize")]
     [InlineData("{item:ro|}", "rope")]
+    [InlineData("{player:inventory:rope#one-|}", "one-many")]
+    [InlineData("{player:inventory:rope:name#one-|}", "one-many")]
+    [InlineData("{player:inventory:first-name:|}", "count")]
+    [InlineData("{player:inventory:first-name:na|me}", "name")]
+    [InlineData("{if guide:inventory:first-name:co| > 0}Yes{/if}", "count")]
+    [InlineData("~ give player rope guide:inventory:first-name:|", "count")]
     [InlineData("{ima|", "image(")]
     [InlineData("@requires item:ro| == \"Rope\"", "rope")]
     [InlineData("~ give player rope |", "var:")]
@@ -90,6 +97,58 @@ public sealed class StoryCompletionTests
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
+    }
+
+    [Theory]
+    [InlineData("::: skill-check athletics dc player:|")]
+    [InlineData("::: skill-check athletics dc guide:|")]
+    public void Numeric_character_reference_completion_offers_inventory_but_not_text_properties(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var labels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+
+        Assert.Contains("inventory", labels);
+        Assert.Contains("hp", labels);
+        Assert.DoesNotContain("first-name", labels);
+        Assert.DoesNotContain("pronoun", labels);
+    }
+
+    [Theory]
+    [InlineData("{player:inventory:|}")]
+    [InlineData("{guide:inventory:|}")]
+    public void Inventory_item_completion_uses_the_declared_item_ids(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var completions = StoryCompletion.Complete(analysis, position);
+
+        Assert.Equal(["first-name", "rope"], completions.Select(item => item.Label));
+        Assert.All(completions, item => Assert.Equal(item.Label, item.NewText));
+    }
+
+    [Theory]
+    [InlineData("{player:inventory:rope:|}")]
+    [InlineData("{guide:inventory:first-name:|}")]
+    public void Inventory_item_property_completion_offers_name_and_count(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var labels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+
+        Assert.Contains("name", labels);
+        Assert.Contains("count", labels);
+    }
+
+    [Fact]
+    public void Numeric_inventory_item_property_completion_offers_count_but_not_name()
+    {
+        var (analysis, position) = Analyze("=== first\n::: skill-check athletics dc player:inventory:rope:|");
+
+        var labels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+
+        Assert.Contains("count", labels);
+        Assert.DoesNotContain("name", labels);
     }
 
     [Fact]

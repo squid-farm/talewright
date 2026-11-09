@@ -15,6 +15,9 @@ public sealed partial class ServerTests
     [InlineData("{item:ro|pe}", "Item", "rope")]
     [InlineData("{faction:gu|ild:name}", "Faction", "guild")]
     [InlineData("{item:rope:na|me}", "Character, faction or item display name", "name")]
+    [InlineData("{player:inventory:fir|st-name:count}", "Item", "first-name")]
+    [InlineData("{player:inv|entory:first-name:count}", "held state", "inventory")]
+    [InlineData("{player:inventory:first-name:co|unt}", "numeric quantity", "count")]
     [InlineData("{faction:guild:sta|nding}", "Numeric player standing", "standing")]
     [InlineData("@requires @IsH|ero", "Predicate", "IsHero")]
     [InlineData("{player:first-name#cus|tom}", "Modifier", "custom")]
@@ -28,7 +31,7 @@ public sealed partial class ServerTests
         var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["IsHero"], Modifiers = ["custom"], BuiltInModifiers = [] };
         File.WriteAllText(client.PathOf("project.authoring.json"), metadata.ToJson());
         File.AppendAllText(client.PathOf(StorySource.ManifestFileName),
-            "flags: [ready]\nvars: {coins: 1}\nitems: {rope: Rope}\nfactions: {guild: {name: Guild}}\n");
+            "flags: [ready]\nvars: {coins: 1}\nitems: {rope: Rope, first-name: Token}\nfactions: {guild: {name: Guild}}\n");
         var initialized = await client.Initialize(new { metadataPath = "project.authoring.json" });
         Assert.True(initialized.GetProperty("result").GetProperty("capabilities").GetProperty("hoverProvider").GetBoolean());
         marked = "=== start\n" + marked;

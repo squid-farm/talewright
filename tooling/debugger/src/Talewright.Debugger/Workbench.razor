@@ -43,121 +43,21 @@
     <div role="@(Model.Story is null ? null : "tabpanel")" id="play-panel" aria-labelledby="play-tab" hidden="@_mapSelected">
     @if (Model.Story is { } story)
     {
-        <section aria-label="Portable author scenarios">
-            <h2>Portable author scenarios</h2>
-            <p>Synthetic .twscenario replay recipes, not player saves. Exact import verifies accepted source, extensions and engine/tool compatibility, including redo. Failed imports keep the active run.</p>
-            <label>Scenario file path <input aria-label="Scenario file path" @bind="Model.ScenarioPath" /></label>
-            <label><input type="checkbox" @bind="Model.ConfirmOverwrite" /> Confirm replacement of existing scenario file on next export</label>
-            <button type="button" disabled="@(Model.Session is null)" @onclick="Model.ExportScenario">Export synthetic scenario</button>
-            <button type="button" @onclick="Model.ImportScenario">Import exact scenario</button>
-            <p>Adoption is explicit and creates a new synthetic scenario against accepted source, not a migration. It revalidates the full timeline and reports replay differences. Engine/extensions and story ID must still match. Import never rewrites the original file.</p>
-            <button type="button" @onclick="Model.AdoptScenario">Adopt scenario to accepted source</button>
-            <label>Player save file path (read only) <input aria-label="Player save file path" @bind="Model.PlayerSavePath" /></label>
-            <button type="button" @onclick="Model.ImportPlayerSave">Fork compatible player save</button>
-            @if (Model.ScenarioStatus is { } scenarioStatus)
-            {
-                <p role="status">@scenarioStatus</p>
-            }
-        </section>
-        <section aria-label="Scene setup">
-            <h2>Scene setup</h2>
-            <label>Search scenes <input aria-label="Search scenes" @bind="_sceneSearch" @bind:event="oninput" /></label>
-            <p>@Model.FindScenes(_sceneSearch).Count() matching scenes. Showing up to 50; narrow the search or enter an exact ID.</p>
-            <ul aria-label="Matching scenes">
-                @foreach (var scene in Model.FindScenes(_sceneSearch).Take(50))
-                {
-                    <li><button type="button" @onclick="() => Model.Target = scene.Id.Value">Select @scene.Id @scene.Title</button></li>
-                }
-            </ul>
-            <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
-            <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
-            @if (story.Creation is not null)
-            {
-                <CharacterCreator @key="Model.CreationRevision" Story="story" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" />
-                <button type="button" @onclick="Model.ClearCharacter">Clear character selection</button>
-                <p role="status">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
-            }
-            <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" Texts="Model.Texts" />
-            <button type="button" @onclick="Start">Start selected scene</button>
-        </section>
+        <ScenarioTransfer Model="Model" OnExport="Model.ExportScenario" OnImport="Model.ImportScenario"
+                          OnAdopt="Model.AdoptScenario" OnPlayerSaveImport="Model.ImportPlayerSave" />
+        <SetupTool Model="Model" Story="story" OnStart="Start" OnClearCharacter="Model.ClearCharacter" />
     }
     @if (Model.Session is { } session && Model.Inspection is { } inspection)
     {
         <section aria-label="Synthetic playtest">
             <h2>Synthetic playtest</h2>
             <p role="status">Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: @inspection.Seed. Rolls: @inspection.RollCount.</p>
-            <section aria-label="Author timeline">
-                <h3>Author timeline</h3>
-                <p>Position @session.Cursor / @session.Commands.Count. Setup and character are the origin; new commands discard redo. Author navigation ignores player undo policy.</p>
-                <button type="button" disabled="@(!session.CanBack)" @onclick="Model.Back">Back command</button>
-                <button type="button" disabled="@(!session.CanForward)" @onclick="Model.Forward">Forward command</button>
-                <details>
-                    <summary>Command history and consequences</summary>
-                    <ol>
-                        @for (var i = 0; i < session.Commands.Count; i++)
-                        {
-                            var index = i;
-                            <li>
-                                @(session.Commands[index] switch
-                                {
-                                    AuthorChoice choice => $"Choice: {choice.Key}",
-                                    AuthorEdit => "Live edit batch",
-                                    AuthorJump jump => $"Preserve-state jump: {jump.Target} (eligibility bypassed)",
-                                    _ => "Unsupported command",
-                                }) @(index < session.Cursor ? "(applied)" : "(redo)")
-                                @if (index < session.Results.Count)
-                                {
-                                    var result = session.Results[index];
-                                    <ul>
-                                        @foreach (var change in result.Changes)
-                                        {
-                                            <li>@change.Field: @change.Before to @change.After (actual after cascades)</li>
-                                        }
-                                        @foreach (var item in result.Events)
-                                        {
-                                            <li>@item</li>
-                                        }
-                                    </ul>
-                                }
-                            </li>
-                        }
-                    </ol>
-                </details>
-            </section>
-            <section aria-label="Live state editing">
-                <h3>Live state editing</h3>
-                <p>One validated batch, followed by normal triggers and leveling. No scene re-entry or entry-check reroll. After success, fields show actual values and enabled edits are cleared. Consequences appear in command history.</p>
-                <SetupFields Numbers="Model.EditNumbers" Flags="Model.EditFlags" Texts="Model.EditTexts" Title="Live edit values" Prefix="live" />
-                <button type="button" disabled="@session.Current.IsEnded" @onclick="Model.ApplyEdits">Apply live edit batch</button>
-                <p>Preserve-state jump uses the Target scene ID above, bypasses eligibility, and enters once with existing state, visits, fired triggers and dice. Start selected scene instead creates a fresh world using setup.</p>
-                <button type="button" disabled="@session.Current.IsEnded" @onclick="Model.JumpPreservingState">Jump retaining state</button>
-                @if (session.Current.IsEnded)
-                {
-                    <p>Ended runs cannot be edited or jumped retaining state. Go Back, or use Start selected scene for a fresh-world jump.</p>
-                }
-            </section>
-            <details>
-                <summary>Initialization before target entry</summary>
-                <p>Setup applies before trigger priming. Base stats may be clamped; inspect actual initialization events below. Scene entry effects are separate.</p>
-                <ul>
-                    @foreach (var item in session.Events.TakeWhile(e => e is not Talewright.Core.Events.SceneEntered))
-                    {
-                        <li>@item</li>
-                    }
-                </ul>
-            </details>
-            <section aria-label="Current passage" tabindex="0">
-                <h3>@session.Current.Scene @session.Current.Title</h3>
-                <DocumentView Document="session.Current.Document" />
-            </section>
-            @{ var atLimit = session.Cursor >= StoryHistory.MaxChoices; }
-            @if (atLimit && !session.Current.IsEnded)
-            {
-                <p role="alert">This synthetic run reached the @StoryHistory.MaxChoices-command limit. Start a fresh scene playtest to continue.</p>
-            }
-            <StoryChoices Current="session.Current" OnChoose="Choose" OnRestart="Start" Busy="@(atLimit && !session.Current.IsEnded)" />
-            <SourceView Source="Model.CurrentSource" Pending="Model.SourcePending"
-                        Rejected="Model.SourceRejected" RestartRequired="Model.RestartRequired" />
+            <TimelineTool Session="session" OnBack="Model.Back" OnForward="Model.Forward" />
+            <LiveEditTool Model="Model" Session="session" OnApplyEdits="Model.ApplyEdits"
+                          OnJumpPreservingState="Model.JumpPreservingState" />
+            <InitializationEvents Session="session" />
+            <SceneViewer Session="session" OnChoose="Choose" OnRestart="Start" />
+            <SourceTool Model="Model" />
             <InspectionPanel Inspection="inspection" />
         </section>
     }
@@ -173,7 +73,6 @@
 </CascadingValue>
 
 @code {
-    private string _sceneSearch = "";
     private StoryReloadWatcher _watcher = null!;
     protected override async Task OnInitializedAsync()
     {

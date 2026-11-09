@@ -1,0 +1,100 @@
+@{
+    var selectedNode = SelectedNode;
+    var diverts = selectedNode?.Items.Where(item => !item.HubOffer).ToArray() ?? [];
+    var offers = selectedNode?.Items.Where(item => item.HubOffer).ToArray() ?? [];
+}
+<section class="map-details" aria-label="Scene details">
+    @if (selectedNode is null)
+    {
+        <p>Select a scene to list its diverts and hub offers.</p>
+    }
+    else
+    {
+        <h3>@selectedNode.Name</h3>
+        <h4>Diverts: @diverts.Length</h4>
+        @if (diverts.Length > 0)
+        {
+            <ul aria-label="Diverts">
+                @foreach (var item in diverts)
+                {
+                    <li @key="item.Id">
+                        <button class="map-item" type="button" @onfocus="() => Focus(item)" @onblur="() => Blur(item)"
+                                @onmouseenter="() => Highlight(item)" @onmouseleave="() => Leave(item)"
+                                @onclick="() => OnSelectScene.InvokeAsync(item.Target)">@item.Name</button>
+                    </li>
+                }
+            </ul>
+        }
+        @if (selectedNode.Hub || offers.Length > 0)
+        {
+            <h4>Hub offers: @offers.Length</h4>
+            @if (offers.Length > 0)
+            {
+                <ul aria-label="Hub offers">
+                    @foreach (var item in offers)
+                    {
+                        <li @key="item.Id">
+                            <button class="map-item" type="button" @onfocus="() => Focus(item)" @onblur="() => Blur(item)"
+                                    @onmouseenter="() => Highlight(item)" @onmouseleave="() => Leave(item)"
+                                    @onclick="() => OnSelectScene.InvokeAsync(item.Target)">@item.Name</button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public MapView View { get; set; } = null!;
+    [Parameter] public string? SelectedNodeId { get; set; }
+    [Parameter] public EventCallback<string?> OnHighlight { get; set; }
+    [Parameter] public EventCallback<string> OnSelectScene { get; set; }
+    [Parameter] public EventCallback OnFocusedItemRemoved { get; set; }
+
+    private MapNode? SelectedNode => View.Nodes.FirstOrDefault(node => node.Id == SelectedNodeId);
+    private string? _focusedItemId;
+    private string? _highlightedLine;
+    private bool _restoreSceneFocus;
+
+    protected override void OnParametersSet()
+    {
+        var items = SelectedNode?.Items;
+        _restoreSceneFocus = _focusedItemId is { } focusedItemId
+            && (items is null || !items.Any(item => item.Id == focusedItemId));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_restoreSceneFocus)
+            return;
+
+        _restoreSceneFocus = false;
+        _focusedItemId = null;
+        await OnFocusedItemRemoved.InvokeAsync();
+    }
+
+    private Task Focus(MapItem item)
+    {
+        _focusedItemId = item.Id;
+        return SetHighlight(item.Line);
+    }
+
+    private Task Blur(MapItem item)
+    {
+        if (_focusedItemId == item.Id)
+            _focusedItemId = null;
+        return SetHighlight(null);
+    }
+
+    private Task Highlight(MapItem item) => SetHighlight(item.Line);
+
+    private Task Leave(MapItem item) =>
+        _focusedItemId != item.Id && _highlightedLine == item.Line ? SetHighlight(null) : Task.CompletedTask;
+
+    private Task SetHighlight(string? line)
+    {
+        _highlightedLine = line;
+        return OnHighlight.InvokeAsync(line);
+    }
+}

@@ -83,6 +83,10 @@ test('inventory quantities must be nonnegative integers', () => {
   assertInvalid(validateManifest, manifest(-1), 'negative inventory quantity', 'minimum');
 });
 
+test('inventory is not a valid item ID', () => {
+  assertInvalid(validateManifest, { items: { inventory: 'Inventory' } }, 'reserved inventory item ID', 'not');
+});
+
 test('item grammar has explicit enum/boolean values and independent defaults', () => {
   const item = compileSubschema(schema.definitions.itemValue);
   for (const value of ['sword', {}, { name: 'armor', uncountable: true },

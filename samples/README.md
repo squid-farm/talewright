@@ -34,7 +34,7 @@ Scholar starts with Will 14 (+2); Explorer uses Will 10 (+0).
 
 `story.talewright.yaml` holds the game/rules, player, Tomas, trail items, guild
 and all triggers, including `dream-ready`. `dream/dream.talewright.yaml` holds
-the six dream characters, glyph item, `marks`/`sum` variables and dream promise
+the six dream characters, glyph item, `sum` variable and dream promise
 flag; `dream/dream.tale` holds their scenes. The four chapter files and
 `images/` complete the sample.
 Folders do not add scope or prefixes: the chapter scene IDs are authored explicitly.
@@ -76,7 +76,7 @@ split settings, how global IDs work and why triggers stay together.
 | Custom pronouns and watchword responses | The Spiral uses xe/xem with singular agreement; current, changed, retired and unrecorded watchwords produce distinct responses |
 | NPC check and alternate player checks | The Watcher uses it/its; its Perception roll changes prose, then player Lucidity, Stealth or Courage >=6 gets past; failed checks allow another attempt or waking |
 | Plural agreement and NPC inventory transfers | The Hands use plural name agreement and they; each keeper gives one glyph, then the Hands take one as the exit price after the Sleeper |
-| Counted glyphs, mirrored variable and trigger gate | `glyph-mark` inventory and `marks` stay equal; root `dream-ready` fires at 3; all 3 must be held to approach the Sleeper, 2 remain after paying |
+| Counted glyphs and trigger gate | `player:inventory:glyph-mark:count` shows and checks held marks; root `dream-ready` fires at 3; all 3 must be held to approach the Sleeper, 2 remain after paying |
 | Faction gate, standing changes, tier prose | The Archivist's friendly/neutral/hostile prose; promise requires neutral or better (+5), refusal costs 10 standing |
 | Lucidity tiers and visited ending state | The Sleeper uses <2 / 2–4 / >=5 prose; `player visited dream.sleeper`, promise, Lucidity and guild standing change the altar and all three endings |
 | State-dependent artwork | `dream.sleeper` selects exactly one low/middle/high Lucidity illustration alongside its prose; descriptive alt text reflects what is visible |
@@ -112,12 +112,11 @@ split settings, how global IDs work and why triggers stay together.
 8. Close/reopen and load a save. Publish the folder as a story ZIP, standalone
    web site or desktop game; creation remains part of each build.
 
-Version **`0.4.0`** restructures the sample and intentionally rejects older
-sample saves, including `0.3.0`. Incompatible loads report an error visibly
-without replacing the active playthrough or saved bytes. There is no migration.
-The dream addition retains version `0.4.0`; its changed content fingerprint also
-rejects pre-dream `0.4.0` saves visibly. Artwork updates also change the content
-fingerprint; there is no save migration.
+Version **`0.5.0`** replaces the dream's mirrored `marks` variable with the
+count of glyph marks in the player's inventory. Saves from `0.4.0` are
+incompatible and cannot be migrated; start a new playthrough. Incompatible
+loads report an error without replacing the active playthrough or saved bytes.
+Artwork updates also change the content fingerprint; there is no save migration.
 
 ### Features that cannot all be enabled in one story
 

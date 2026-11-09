@@ -5,7 +5,7 @@
 game:
   id: lost-relic
   title: The Lost Relic
-  version: 0.4.0
+  version: 0.5.0
   start: camp.arrival
   randomness: checks-only # dice are rolled only for skill-check directives
   # seed: 1234            # uncomment for the same rolls every playthrough
@@ -105,6 +105,6 @@ triggers:
     do: var:bell-count += 1
     once: false # fires again only after the condition becomes false, then true
   - id: dream-ready
-    when: var:marks == 3
+    when: player:inventory:glyph-mark:count == 3
     do: set flag:all-marks
     once: true

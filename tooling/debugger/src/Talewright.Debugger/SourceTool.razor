@@ -1,0 +1,6 @@
+<SourceView Source="Model.CurrentSource" Pending="Model.SourcePending"
+            Rejected="Model.SourceRejected" RestartRequired="Model.RestartRequired" />
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+}

@@ -1,0 +1,34 @@
+<section class="map-route" aria-label="Current run route">
+    <h3>Current run route</h3>
+    @if (Run is null)
+    {
+        <p>Start a synthetic playtest to show its route.</p>
+    }
+    else
+    {
+        @if (Run.StartedMidStory)
+        {
+            <p>Started at mid-story scene @Run.StartScene from Scene setup.</p>
+        }
+        @if (Run.Steps.Count == 0)
+        {
+            <p>No scenes have been entered.</p>
+        }
+        else
+        {
+            <ol>
+                @foreach (var step in Run.Steps)
+                {
+                    var text = step.TakenItemName is { } takenItemName
+                        ? $"{takenItemName} to {step.Scene}"
+                        : step.Order == 1 ? $"Started at {step.Scene}" : step.Scene;
+                    <li>@text</li>
+                }
+            </ol>
+        }
+    }
+</section>
+
+@code {
+    [Parameter] public MapRunView? Run { get; set; }
+}

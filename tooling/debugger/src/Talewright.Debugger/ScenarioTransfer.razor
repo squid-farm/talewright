@@ -1,0 +1,23 @@
+<section aria-label="Portable author scenarios">
+    <h2>Portable author scenarios</h2>
+    <p>Synthetic .twscenario replay recipes, not player saves. Exact import verifies accepted source, extensions and engine/tool compatibility, including redo. Failed imports keep the active run.</p>
+    <label>Scenario file path <input aria-label="Scenario file path" @bind="Model.ScenarioPath" /></label>
+    <label><input type="checkbox" @bind="Model.ConfirmOverwrite" /> Confirm replacement of existing scenario file on next export</label>
+    <button type="button" disabled="@(Model.Session is null)" @onclick="OnExport">Export synthetic scenario</button>
+    <button type="button" @onclick="OnImport">Import exact scenario</button>
+    <p>Adoption is explicit and creates a new synthetic scenario against accepted source, not a migration. It revalidates the full timeline and reports replay differences. Engine/extensions and story ID must still match. Import never rewrites the original file.</p>
+    <button type="button" @onclick="OnAdopt">Adopt scenario to accepted source</button>
+    <PlayerSaveFork Model="Model" OnImport="OnPlayerSaveImport" />
+    @if (Model.ScenarioStatus is { } scenarioStatus)
+    {
+        <p role="status">@scenarioStatus</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter] public EventCallback OnExport { get; set; }
+    [Parameter] public EventCallback OnImport { get; set; }
+    [Parameter] public EventCallback OnAdopt { get; set; }
+    [Parameter] public EventCallback OnPlayerSaveImport { get; set; }
+}

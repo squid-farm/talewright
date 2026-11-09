@@ -35,6 +35,5 @@ items:
   glyph-mark: { name: glyph mark }
 
 vars:
-  marks: 0 # Mirror held glyph-mark count until item-count expressions are supported (#202).
   sum: 0
 flags: [dream-promise]
