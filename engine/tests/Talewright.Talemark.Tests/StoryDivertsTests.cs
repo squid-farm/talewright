@@ -160,6 +160,50 @@ public sealed class StoryDivertsTests
     }
 
     [Fact]
+    public void Diverts_and_hub_offers_carry_shown_definitions()
+    {
+        var result = Compile("""
+            === start
+            @hub shop
+            * [Shown] (requires false, shown "Not yet") -> END
+            * [Plain] -> END
+            * [Check] (requires false, shown "Not ready") skill-check athletics dc 10
+              success: -> END
+              failure: -> END
+
+            === shown-offer
+            @tags shop
+            @requires false, shown "Need a key"
+            -> END
+
+            === plain-offer
+            @tags shop
+            @requires false
+            -> END
+
+            === direct
+            -> END
+            """);
+
+        var story = result.Story!;
+        var map = StoryDiverts.From(story);
+        var diverts = map.Diverts;
+        var shownChoice = Assert.Single(diverts, divert => divert.ChoiceKey == "c0");
+        Assert.Same(story.Scenes[0].Choices[0].Shown, shownChoice.ChoiceShown);
+        Assert.Null(Assert.Single(diverts, divert => divert.ChoiceKey == "c1").ChoiceShown);
+        Assert.Null(Assert.Single(diverts, divert => divert.From.Value == "direct").ChoiceShown);
+
+        var checkDiverts = diverts.Where(divert => divert.ChoiceKey == "c2").ToArray();
+        Assert.Equal(2, checkDiverts.Length);
+        Assert.All(checkDiverts, divert => Assert.Same(story.Scenes[0].Choices[2].Shown, divert.ChoiceShown));
+
+        var offers = map.HubOffers;
+        Assert.Same(story.GetScene(new("shown-offer")).Shown,
+            Assert.Single(offers, offer => offer.Scene.Value == "shown-offer").Shown);
+        Assert.Null(Assert.Single(offers, offer => offer.Scene.Value == "plain-offer").Shown);
+    }
+
+    [Fact]
     public void Divert_ids_are_unique_in_every_sample_story()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);

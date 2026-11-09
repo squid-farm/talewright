@@ -45,6 +45,7 @@ public sealed record DivertBlockCondition(Expr Condition, bool InElse);
 /// <param name="ChoiceKey">The choice key (<c>c0</c>, <c>c1</c>…) for a choice or choice skill check divert.</param>
 /// <param name="ChoiceLabel">The choice's label template, or null for a textless choice or a non-choice divert.</param>
 /// <param name="ChoiceRequires">The choice's <c>requires</c>, as compiled.</param>
+/// <param name="ChoiceShown">The choice's <c>shown</c> definition, or null for a non-choice divert or a choice without <c>shown</c>.</param>
 /// <param name="BlockConditions">Enclosing block <c>{if}</c>s, outermost first.</param>
 /// <param name="Condition">The formatted condition and state reads for this divert.</param>
 public sealed record StoryDivert(
@@ -59,6 +60,7 @@ public sealed record StoryDivert(
     string? ChoiceKey,
     IReadOnlyList<TemplateInline>? ChoiceLabel,
     Expr? ChoiceRequires,
+    ShownDefinition? ChoiceShown,
     IReadOnlyList<DivertBlockCondition> BlockConditions,
     StoryCondition Condition);
 
@@ -71,6 +73,7 @@ public sealed record StoryDivert(
 /// <param name="Scene">The offered scene.</param>
 /// <param name="Tags">The hub's tag query.</param>
 /// <param name="Condition">The offered scene's formatted <c>@requires</c> and state reads.</param>
+/// <param name="Shown">The offered scene's <c>shown</c> definition, or null when it has none.</param>
 /// <param name="Once">Whether the offered scene has <c>@once</c>.</param>
 public sealed record HubOffer(
     string Id,
@@ -78,6 +81,7 @@ public sealed record HubOffer(
     SceneId Scene,
     StoryletTags Tags,
     StoryCondition Condition,
+    ShownDefinition? Shown,
     bool Once);
 
 /// <summary>
@@ -138,7 +142,7 @@ public sealed class StoryDiverts
                     conditionsByScene.Add(offered, condition);
                 }
                 hubOffers.Add(new HubOffer($"{scene.Id.Value}/hub:{offered.Value}", scene.Id, offered, hub,
-                    condition, offeredScene.Once));
+                    condition, offeredScene.Shown, offeredScene.Once));
             }
         }
 

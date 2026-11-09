@@ -1,4 +1,5 @@
 using Talewright.Rules.Diagnostics;
+using Talewright.Rules.Expressions;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -123,6 +124,64 @@ public sealed class ShownChoiceRuntimeTests
         var decision = Assert.Single(session.Decisions, entry => entry.Kind == DecisionKind.Choice);
         Assert.Equal(DecisionOutcome.Offered, decision.Outcome);
         Assert.Equal(DecisionReason.ConditionFalse, decision.Reason);
+    }
+
+    [Fact]
+    public void Hub_decisions_distinguish_shown_unavailable_offers_and_apply_the_limit()
+    {
+        var story = Compile("""
+            === hub
+            @hub shop
+            @hub-limit 2
+            * [Leave] -> END
+
+            === available
+            @tags shop
+            @priority 10
+            -> END
+
+            === hidden
+            @tags shop
+            @priority 100
+            @requires false
+            -> END
+
+            === shown-selected
+            @tags shop
+            @priority 9
+            @requires false, shown "Not yet"
+            -> END
+
+            === shown-limited
+            @tags shop
+            @priority 8
+            @requires false, shown "Later"
+            -> END
+            """);
+
+        var session = AuthorSession.Create(story, story.Start, captureDecisions: true, seed: 42);
+        var allDecisions = session.Decisions.Where(decision => decision.Kind == DecisionKind.Storylet).ToArray();
+        Assert.Equal(DecisionReason.SelfExcluded, Assert.Single(allDecisions, decision => decision.Subject == "hub").Reason);
+        var decisions = allDecisions.Where(decision => decision.Subject != "hub").ToArray();
+
+        Assert.Equal(4, decisions.Length);
+        var available = Assert.Single(decisions, decision => decision.Subject == "available");
+        Assert.Equal((DecisionOutcome.Selected, DecisionReason.PriorityOrder), (available.Outcome, available.Reason));
+        Assert.Equal((10, 1, 2), (available.Priority, available.Rank, available.Limit));
+
+        var hidden = Assert.Single(decisions, decision => decision.Subject == "hidden");
+        Assert.Equal((DecisionOutcome.Excluded, DecisionReason.ConditionFalse), (hidden.Outcome, hidden.Reason));
+        Assert.Equal((100, 2), (hidden.Priority, hidden.Limit));
+
+        var shownSelected = Assert.Single(decisions, decision => decision.Subject == "shown-selected");
+        Assert.Equal((DecisionOutcome.Offered, DecisionReason.ConditionFalse), (shownSelected.Outcome, shownSelected.Reason));
+        Assert.False(Assert.IsType<ExpressionTrace>(shownSelected.Expression).Result?.Bool);
+        Assert.Equal((9, 2), (shownSelected.Priority, shownSelected.Limit));
+
+        var shownLimited = Assert.Single(decisions, decision => decision.Subject == "shown-limited");
+        Assert.Equal((DecisionOutcome.Excluded, DecisionReason.HubLimit), (shownLimited.Outcome, shownLimited.Reason));
+        Assert.False(Assert.IsType<ExpressionTrace>(shownLimited.Expression).Result?.Bool);
+        Assert.Equal((8, 2), (shownLimited.Priority, shownLimited.Limit));
     }
 
     [Fact]

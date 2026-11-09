@@ -132,7 +132,9 @@ public static class SceneSteps
                 conditionsByStep.Add(line.Step.Id, condition);
             }
             return new StoryDivert(id, scene.Id, line.Target, line.Kind, line.Outcome, line.Step.Id, line.Step.Source,
-                order, choice?.Key, choice?.Label, choice?.Requires, line.Blocks, condition);
+                order, choice?.Key, choice?.Label, choice?.Requires,
+                line.Kind is DivertKind.Choice or DivertKind.ChoiceSkillCheck ? choice?.Shown : null,
+                line.Blocks, condition);
         });
     }
 

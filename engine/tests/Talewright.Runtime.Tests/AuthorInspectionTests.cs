@@ -246,6 +246,30 @@ public sealed class AuthorInspectionTests
     }
 
     [Fact]
+    public void Selector_records_shown_unavailable_duplicates_once()
+    {
+        var story = Compile("=== start\n-> END");
+        var predicates = new NamedPredicateRegistry();
+        var context = new EvaluationContext(GameState.CreateInitial(story.World, 42), predicates);
+        static SceneDefinition Candidate() => new()
+        {
+            Id = new("duplicate"), Tags = new HashSet<string> { "hub" },
+        };
+        var decisions = new List<RuleDecision>();
+
+        var selected = StoryletSelector.SelectMenuCandidates(
+            [Candidate(), Candidate()], new StoryletTags(["hub"]), context, exclude: null, limit: 1,
+            decisions.Add, eventIndex: 0, _ => (Available: false, ShowWhenUnavailable: true, Trace: null));
+
+        var selectedCandidate = Assert.Single(selected);
+        Assert.Equal(("duplicate", false), (selectedCandidate.Storylet.Id.Value, selectedCandidate.IsAvailable));
+        Assert.Equal(
+            [(DecisionOutcome.Offered, DecisionReason.ConditionFalse), (DecisionOutcome.Excluded, DecisionReason.Duplicate)],
+            decisions.Select(decision => (decision.Outcome, decision.Reason)));
+        Assert.All(decisions, decision => Assert.Equal(1, decision.Limit));
+    }
+
+    [Fact]
     public void Diverts_stop_at_first_match_and_do_not_apply_storylet_requires_to_explicit_targets()
     {
         var neverCalls = 0;
