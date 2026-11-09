@@ -73,10 +73,11 @@ internal sealed class ExpressionBinder
                 ITextModifier modifier;
                 if (call.Name == OneManyTextModifier.ModifierName)
                 {
-                    if (value is not (PronounRef or ItemNameRef) || call.Argument is null || call.PluralArgument is null)
+                    if (value.Type != ExprType.Number && value is not (PronounRef or ItemNameRef) ||
+                        call.Argument is null || call.PluralArgument is null)
                     {
                         binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
-                            "Use '#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on pronoun or item-name references only.",
+                            "Use '#one-many(\"singular\", \"plural\")': two quoted strings, singular first, on a number, pronoun, or item-name reference.",
                             call.Offset);
                     }
 
