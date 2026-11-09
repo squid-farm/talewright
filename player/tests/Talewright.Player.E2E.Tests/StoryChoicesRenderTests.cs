@@ -27,6 +27,8 @@ public sealed class StoryChoicesRenderTests
 
         var buttons = Buttons(await Render(frame));
         Assert.Equal(2, buttons.Length);
+        Assert.Contains("data-tw-choice=\"blocked\"", buttons[0].Groups["attributes"].Value);
+        Assert.Contains("data-tw-choice=\"available\"", buttons[1].Groups["attributes"].Value);
         Assert.Contains("disabled", buttons[0].Groups["attributes"].Value);
         Assert.DoesNotContain("disabled", buttons[1].Groups["attributes"].Value);
         Assert.Contains("1.", buttons[0].Groups["body"].Value);
@@ -46,6 +48,7 @@ public sealed class StoryChoicesRenderTests
         };
 
         var button = Assert.Single(Buttons(await Render(frame)));
+        Assert.Contains("data-tw-choice=\"blocked\"", button.Groups["attributes"].Value);
         Assert.Contains("disabled", button.Groups["attributes"].Value);
         Assert.Contains("1.", button.Groups["body"].Value);
         Assert.Contains("Not yet", button.Groups["body"].Value);

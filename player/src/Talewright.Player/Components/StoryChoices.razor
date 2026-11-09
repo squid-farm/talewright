@@ -13,7 +13,8 @@ else
         @foreach (var entry in Current.Menu)
         {
             <li>
-                <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit || !entry.IsAvailable)" @onclick="() => Choose(entry.Key)">
+                <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit || !entry.IsAvailable)"
+                        data-tw-choice="@entry.Key" @onclick="() => Choose(entry.Key)">
                     <span class="tw-choice-number">@(entry.Number).</span>
                     <InlineView Inlines="entry.Label" />
                     @if (!entry.IsAvailable)

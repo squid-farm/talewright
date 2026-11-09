@@ -78,31 +78,10 @@
     {
         <TranscriptHistory @key="_session" Frames="_historyFrames" OnClose="CloseHistory" />
     }
-    <div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@_showHistory">
-        <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="_transcriptElement">
-            @{ var transcript = _transcript; }
-            @for (var i = Math.Max(0, transcript.Count - TranscriptPresentation.PassageWindow); i < transcript.Count; i++)
-            {
-                var entry = transcript[i];
-                var isLatest = i == transcript.Count - 1;
-                <section @key="(_session, i)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
-                         aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
-                    <StoryPassage Entry="entry" />
-                </section>
-            }
-
-            @if (_session.Current is { } current)
-            {
-                <StoryChoices Current="current" Busy="_busy" AtChoiceLimit="@(_session.Cursor >= StoryHistory.MaxChoices)"
-                              OnChoose="Choose" OnRestart="Restart" />
-            }
-        </main>
-
-        @if (HasCharacterSheet)
-        {
-            <CharacterSheet State="_session.State" Visibility="Story.CharacterSheet" />
-        }
-    </div>
+    <StoryStage @ref="_storyStage" Story="Story" Passages="_transcript"
+                PassageWindow="@TranscriptPresentation.PassageWindow" Current="_session.Current" State="_session.State"
+                Identity="_session" Busy="_busy" AtChoiceLimit="@(_session.Cursor >= StoryHistory.MaxChoices)"
+                Hidden="_showHistory" OnChoose="Choose" OnRestart="Restart" />
     }
 </div>
 
@@ -152,7 +131,8 @@
     public byte[]? RejectedAutosaveData { get; set; }
 
     private IReadOnlyList<HistoryFrame> _transcript => _session.Transcript;
-    private ElementReference _transcriptElement;
+    private StoryStage? _storyStage;
+    private ElementReference TranscriptElement => _storyStage?.TranscriptElement ?? default;
     private StoryHistory _session = default!;
     private StoryDefinition? _startedStory;
     private bool _focusLatest;
@@ -193,9 +173,6 @@
     private int _autosaveSequence;
     private Task _autosaveTail = Task.CompletedTask;
     private int _autosaveCheckStartedGeneration = -1;
-
-    private bool HasCharacterSheet =>
-        CharacterSheet.HasSections(Story.World, Story.CharacterSheet, EntityId.Player);
 
     protected override void OnParametersSet()
     {
@@ -875,7 +852,7 @@
         {
             _restoreReadingPosition = false;
             _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-            await _module.InvokeVoidAsync("restoreReadingPosition", _transcriptElement);
+            await _module.InvokeVoidAsync("restoreReadingPosition", TranscriptElement);
         }
         if (_focusLatest && Visible && !_showHistory && _autosaveCheckComplete && !_resumePrompt && _autosaveStartupError is null)
         {
@@ -886,7 +863,7 @@
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-                await _module.InvokeVoidAsync("revealLatest", _transcriptElement, _transcript.Count == 1, preserveExistingFocus);
+                await _module.InvokeVoidAsync("revealLatest", TranscriptElement, _transcript.Count == 1, preserveExistingFocus);
             }
 
             catch (JSException)
@@ -911,7 +888,7 @@
             return;
         }
         _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-        await _module.InvokeVoidAsync("captureReadingPosition", _transcriptElement);
+        await _module.InvokeVoidAsync("captureReadingPosition", TranscriptElement);
         _historyFrames = _transcript;
         _showHistory = true;
     }
@@ -928,7 +905,7 @@
     {
         try
         {
-            await _transcriptElement.FocusAsync();
+            await TranscriptElement.FocusAsync();
         }
         catch (Exception ex) when (ex is InvalidOperationException or JSException)
         {
