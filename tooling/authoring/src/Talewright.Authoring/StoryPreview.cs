@@ -100,7 +100,7 @@ public static class StoryPreview
         VarRef reference => analysis.Tokens.Any(token =>
             token.ManifestPath is { Count: 2 } path &&
             path[0] == ManifestVocabulary.Vars && path[1] == reference.Variable.Value),
-        StatRef or InventoryCountRef => true,
+        StatRef or StandingRef or SceneVisitCountRef or InventoryCountRef => true,
         UnaryExpr { Op: UnaryOp.Negate } unary => HasNumericDefault(unary.Operand, analysis),
         BinaryExpr { Op: BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide } binary =>
             HasNumericDefault(binary.Left, analysis) && HasNumericDefault(binary.Right, analysis),

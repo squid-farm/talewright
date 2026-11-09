@@ -173,6 +173,26 @@ public sealed class StoryPreviewTests
     }
 
     [Fact]
+    public void Numeric_one_many_previews_include_standing_and_scene_visit_defaults()
+    {
+        var source = Source("""
+            === start
+            {faction:guild:standing#one-many("one", "many")}
+            {scene:player:visits#one-many("one", "many")}
+            {scene:player:visits + faction:guild:standing#one-many("one", "many")}
+            -> END
+            """, Manifest + "\nfactions:\n  guild: {name: Guild, standing: 1}\n");
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var previews = StoryPreview.Get(analysis, "main.tale");
+
+        Assert.Equal(["one", "many", "one"], previews.Select(preview => preview.Value));
+        Assert.Equal(["1", "0", "1"], previews.Select(preview => preview.Steps[0].Value));
+        Assert.All(previews, preview => Assert.Null(preview.UnavailableReason));
+    }
+
+    [Fact]
     public async Task Unsaved_supporting_character_changes_and_close_update_defaults_without_mutating_sources()
     {
         var source = Source("=== start\n{player:name} {player:pronoun:object}", Manifest[..Manifest.IndexOf("characters:", StringComparison.Ordinal)]);
