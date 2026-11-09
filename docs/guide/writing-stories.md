@@ -32,9 +32,9 @@ Each line sees only the changes above it. Put an effect before the prose that sh
 
 ```tale
 === counter
-Before: {var:coins}.
-~ var:coins += 1
-After: {var:coins}.
+Before: {var:turns}.
+~ var:turns += 1
+After: {var:turns}.
 * [Again] -> counter
 * -> END
 ```
@@ -62,7 +62,7 @@ To keep a choice visible when its requirement is false, append `, shown`. Option
 reader text replaces the label only while unavailable and supports substitutions and formatting:
 
 ```tale
-* [Ramen - 100cr] (requires var:coins >= 100, shown "You need {100 - var:coins} more coins.") -> shop
+* [Ramen - 100cr] (requires player:inventory:credits:count >= 100, shown "You need {100 - player:inventory:credits:count} more credits.") -> shop
 ```
 
 Without `shown`, a choice whose requirement is false stays hidden. An empty literal `shown ""` is
@@ -204,6 +204,42 @@ gives "Those pants are expensive." `#a` produces "some pants" or "some armor";
 The defaults are singular agreement and countable names, independent of inventory
 quantity. Copying an item's name into a text variable copies text only.
 See the [item-name grammar table](../reference/talemark-syntax.md#item-name-grammar).
+
+### Read and spend item counts
+
+Use `{player:inventory:credits:count}` in prose, arithmetic and conditions to read the
+quantity held by any character. It returns 0 when the character holds none and is
+read-only; change the inventory with `give` and `take` instead of maintaining a
+second variable for the same items.
+
+Declare credits, debt and goods as separate items. Both credits and debt are
+nonnegative quantities:
+
+```yaml
+items:
+  credits: {name: credits}
+  debt: {name: debt}
+  udon: {name: udon}
+characters:
+  player:
+    first-name: Ada
+    inventory: {credits: 75}
+```
+
+Guard a purchase so it cannot spend more credits than the player holds:
+
+```tale
+* [Udon - 50cr] (requires player:inventory:credits:count >= 50, shown "You need 50 credits.") { take player credits 50; give player udon } -> shop
+```
+
+For a 100,000-credit purchase, offer full payment or let the player pay what they
+have and record the rest as positive debt. The guards keep the debt quantity positive;
+effects run in order, and the later `take` sees the state left by the earlier `give`:
+
+```tale
+* [Pay in full] (requires player:inventory:credits:count >= 100000) { take player credits 100000 } -> loan.paid
+* [Pay what you have and owe the rest] (requires player:inventory:credits:count < 100000) { give player debt 100000 - player:inventory:credits:count; take player credits 100000 } -> loan.promised
+```
 
 ## Variables and flags
 

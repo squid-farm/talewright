@@ -14,7 +14,8 @@ public sealed class StoryHoverTests
           ruleset: rpg
         characters:
           player: {first-name: Ada}
-        items: {rope: Rope}
+          guide: {first-name: Bea}
+        items: {rope: Rope, first-name: Token}
         factions: {guild: {name: Guild}}
         flags: [ready]
         vars: {coins: 1}
@@ -69,11 +70,27 @@ public sealed class StoryHoverTests
         Assert.Equal(token, line[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }
 
+    [Theory]
+    [InlineData("{player:inventory:fir|st-name:count}", "Item", "first-name")]
+    [InlineData("{guide:inventory:fir|st-name:count}", "Item", "first-name")]
+    [InlineData("{player:inv|entory:first-name:count}", "held state", "inventory")]
+    [InlineData("{guide:inventory:first-name:co|unt}", "numeric quantity", "count")]
+    public void Inventory_count_references_hover_as_their_bound_item_and_properties(
+        string marked, string expected, string token)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
+
+        Assert.Contains(expected, hover.PlainText);
+        var line = analysis.Source.Files["main.tale"].Split('\n')[1];
+        Assert.Equal(token, line[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
+    }
+
     [Fact]
     public void Item_grammar_keys_explain_defaults_and_quantity_independence()
     {
-        var yaml = Manifest.Replace("items: {rope: Rope}",
-            "items:\n  rope: {name: Rope, name-agreement: plural, uncountable: false}");
+        var yaml = Manifest.Replace("items: {rope: Rope, first-name: Token}",
+            "items:\n  rope: {name: Rope, name-agreement: plural, uncountable: false}\n  first-name: Token");
         var source = new StorySource(new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = yaml, ["main.tale"] = "=== first\n-> END",

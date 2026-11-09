@@ -102,7 +102,11 @@
       "type": "object",
       "description": "Items keyed by story-specific IDs.",
       "propertyNames": {
-        "$ref": "#/definitions/identifier"
+        "allOf": [
+          { "$ref": "#/definitions/identifier" },
+          { "not": { "const": "inventory" } }
+        ],
+        "description": "Item IDs cannot be 'inventory'; it is reserved as the inventory namespace in item-count expressions."
       },
       "additionalProperties": {
         "$ref": "#/definitions/itemValue"

@@ -16,14 +16,15 @@ game:
   start: camp
   ruleset: rpg # built-in stats and levelling
 characters:
-  player: { first-name: Alex }
+  player: { first-name: Alex, inventory: {credits: 3} }
   guide: { first-name: Sam }
 items:
   key: { name: brass key }
+  credits: { name: credits }
 factions:
   guild: { name: Explorers, standing: 0 }
 flags: [met-guide]
-vars: { coins: 3 }
+vars: { weather: "sunny" }
 ```
 
 `story.tale`:
@@ -33,12 +34,13 @@ vars: { coins: 3 }
 @title Camp
 
 > guide: Welcome, {player:first-name}.
-~ set flag:met-guide; var:coins += 1
+~ set flag:met-guide; give player credits
 * [Ask about the key] (requires flag:met-guide) -> gate
 * [Leave] -> END
 
 === gate
 {item:key#the#capitalize} lies ahead.
+You have {player:inventory:credits:count} credits.
 -> END
 ```
 
@@ -58,7 +60,7 @@ vars: { coins: 3 }
 | `> guide: Hello.` | Dialogue from character `guide`. |
 | `* [Go] -> gate` | Offer a choice and divert to `gate`. |
 | `* [Open] (requires player has key) { take player key } -> gate` | Choice with a condition and effect. |
-| `* [Buy] (requires var:coins >= 3, shown "You need 3 coins.") -> shop` | Keep an unavailable choice visible with optional reader text instead of its label. |
+| `* [Buy] (requires player:inventory:credits:count >= 3, shown "You need 3 credits.") { take player credits 3 } -> shop` | Keep an unavailable choice visible with optional reader text instead of its label. |
 | `* -> END` | Textless **Continue** choice. |
 | `-> gate` / `-> END` | Divert immediately / finish the story. |
 | `// comment` | Comment line; not shown to players. |
@@ -79,8 +81,9 @@ choices, choice-only conditions, comments or blank lines.
 | `{player:pronoun:possessive-pronoun:determiner}` / `{player:pronoun:possessive-pronoun:independent}` | Possessives such as **their** / **theirs**. |
 | `{player:hp}` | Effective character stat. |
 | `{item:key}` / `{faction:guild}` | Item / faction display name. |
+| `{player:inventory:credits:count}` | Quantity held by a character; 0 when not held. |
 | `{faction:guild:standing}` / `{faction:guild:tier}` | Numeric standing / named tier. |
-| `{var:coins}` / `{flag:met-guide}` | Variable / flag value. |
+| `{var:weather}` / `{flag:met-guide}` | Variable / flag value. |
 | `{scene:player:visits}` / `{camp:player:visits}` | Player visits to the current / named scene. |
 | `{player:inventory:arrow:count}` | Number of arrows held by the player. |
 | `{item:key#the#capitalize}` | Chain text manipulators: **The brass key**. |
@@ -99,15 +102,15 @@ Line breaks render as written; backticks are ordinary text.
 |---|---|
 | `flag:met-guide` / `not flag:met-guide` | Test a flag / its opposite. |
 | `player has key` / `player visited camp` | Test inventory / whether the player visited a scene. |
-| `var:coins >= 3 and faction:guild:tier == friendly` | Combine conditions with `and`, `or`, `not`. |
+| `player:inventory:credits:count >= 3 and faction:guild:tier == friendly` | Combine conditions with `and`, `or`, `not`. |
 | `==` `!=` `<` `<=` `>` `>=` | Comparisons. |
 | `+` `-` `*` `/` | Integer arithmetic; put spaces around subtraction. |
 | `{if flag:met-guide}Hello.{else}Who are you?{/if}` | Inline condition; the markers also work on separate lines. |
 | `~ set flag:met-guide` / `~ clear flag:met-guide` | Set / clear a flag. |
 | `~ give player key 2` / `~ take player key` | Give / take items. |
-| `~ var:coins += 1` / `~ var:weather = "rain"` | Change a number / set text. |
+| `~ give player credits` / `~ var:weather = "rain"` | Change inventory / set text. |
 | `~ player:hp -= 2` / `~ faction:guild:standing += 5` | Change a stat / faction standing. |
-| `~ set flag:met-guide; var:coins += 1` | Run effects as one batch. |
+| `~ set flag:met-guide; give player credits` | Run effects as one batch. |
 
 Variables are numbers or text; their first declaration or assignment fixes the type. Conditions
 must be boolean, not numbers.

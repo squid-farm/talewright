@@ -48,7 +48,6 @@ public partial class LostRelicTests
 
     private static void AssertMarks(StoryHistory history, int expected)
     {
-        Assert.Equal(expected, history.State.GetVariable(new("marks")));
         Assert.Equal(expected, history.State.GetItemCount(EntityId.Player, new("glyph-mark")));
     }
 

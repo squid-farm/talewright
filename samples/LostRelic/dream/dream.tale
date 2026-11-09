@@ -15,7 +15,7 @@ A woman sits at a table laid for eight, counting cups.
 @hub dream and keeper
 @hub-limit 2
 
-The keepers wait around the table. Glyph marks held: **{var:marks}**.
+The keepers wait around the table. Glyph marks held: **{player:inventory:glyph-mark:count}**.
 Three will let you approach the shape sleeping beneath it.
 
 * [Wake before going further] -> dream.wake
@@ -69,7 +69,7 @@ You recognize the explorer from {guide:first-name#possessive} story.
 
 {spiral:pronoun#capitalize} opens {spiral:pronoun:possessive-pronoun:determiner} palm.
 
-* [Accept the spiral mark] { take spiral glyph-mark; give player glyph-mark; var:marks += 1 } -> dream.hub
+* [Accept the spiral mark] { take spiral glyph-mark; give player glyph-mark } -> dream.hub
 
 === dream.watcher
 @title Face the Watcher
@@ -130,7 +130,6 @@ The hall stretches away. You gather yourself before trying another way.
 
 ~ take watcher glyph-mark
 ~ give player glyph-mark
-~ var:marks += 1
 
 {watcher:first-name#capitalize} lowers its gaze. A second glyph mark rests in your palm.
 
@@ -160,7 +159,7 @@ The hall stretches away. You gather yourself before trying another way.
 === dream.hands
 @title Ask the Hands for passage
 @tags dream,keeper
-@requires player visited dream.eye-mark and var:marks == 2
+@requires player visited dream.eye-mark and player:inventory:glyph-mark:count == 2
 @priority 0
 @once
 
@@ -169,13 +168,13 @@ The hall stretches away. You gather yourself before trying another way.
 
 > hands: Three to reach the Sleeper. One to us when you leave. That is our price.
 
-* [Accept the hand mark and the price] { take hands glyph-mark; give player glyph-mark; var:marks += 1 } -> dream.hub
+* [Accept the hand mark and the price] { take hands glyph-mark; give player glyph-mark } -> dream.hub
 * [Refuse and wake] -> dream.wake
 
 === dream.sleeper
 @title Approach the Sleeper
 @tags dream,keeper
-@requires var:marks == 3 and flag:all-marks and player has glyph-mark
+@requires player:inventory:glyph-mark:count == 3 and flag:all-marks and player has glyph-mark
 @priority -10
 @once
 
@@ -196,13 +195,13 @@ You cannot hold the shape in mind. Only its hunger remains when you look away.
 {/if}
 {/if}
 
-* [Pay the Hands and return to the temple] { take player glyph-mark; give hands glyph-mark; var:marks -= 1; set flag:dream-opened; player:xp += 50 } -> dream.passage
+* [Pay the Hands and return to the temple] { take player glyph-mark; give hands glyph-mark; set flag:dream-opened; player:xp += 50 } -> dream.passage
 
 === dream.passage
 @title The Price of Waking
 
 {hands:first-name#capitalize} close around the mark. Their price is paid.
-You keep **{var:marks}** marks and the memory of what sleeps inside.
+You keep **{player:inventory:glyph-mark:count}** marks and the memory of what sleeps inside.
 The stone door opens beneath your hand.
 
 -> temple.hall

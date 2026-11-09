@@ -44,7 +44,7 @@ public sealed class EmbeddedStoryLibraryTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Empty(result.Diagnostics);
         Assert.Equal("Tomas Okafor", result.Story!.World.Characters[new("guide")].FullName);
-        Assert.Equal("0.4.0", result.Story.Version);
+        Assert.Equal("0.5.0", result.Story.Version);
         Assert.Equal(8, result.Story.World.Characters.Count);
         Assert.Contains(result.Story.Scenes, scene => scene.Id.Value == "dream.sleeper");
         Assert.Contains(await library.ListAsync(), story => story.Id == "LostRelic");
