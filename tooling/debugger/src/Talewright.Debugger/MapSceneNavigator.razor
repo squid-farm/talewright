@@ -4,7 +4,7 @@
     {
         var buttonIndex = index;
         var node = _nodes[buttonIndex];
-        <button @key="node.Id" @ref="_buttons[buttonIndex]" type="button" tabindex="@(IsTabStop(buttonIndex) ? 0 : -1)"
+        <button @key="node.Id" @ref="_buttons[node.Id]" type="button" tabindex="@(IsTabStop(buttonIndex) ? 0 : -1)"
                 @onfocus="() => OnFocus.InvokeAsync(node.Id)" @onblur="() => OnBlur.InvokeAsync(node.Id)"
                 @onkeydown="args => MoveFocus(args, buttonIndex)">@node.Name</button>
     }
@@ -17,14 +17,15 @@
     [Parameter] public EventCallback<string> OnBlur { get; set; }
 
     private MapNode[] _nodes = [];
-    private ElementReference[] _buttons = [];
+    // Keyed by scene: Blazor captures a reference only when its keyed button is first inserted, not when it moves.
+    private readonly Dictionary<string, ElementReference> _buttons = [];
     private int _tabStopIndex;
 
     protected override void OnParametersSet()
     {
         _nodes = View.Nodes.Where(node => !node.Stub).ToArray();
-        if (_buttons.Length != _nodes.Length)
-            _buttons = new ElementReference[_nodes.Length];
+        foreach (var removed in _buttons.Keys.Except(_nodes.Select(node => node.Id)).ToArray())
+            _buttons.Remove(removed);
         _tabStopIndex = Array.FindIndex(_nodes, node => node.Id == SelectedNodeId);
         if (_tabStopIndex < 0 && _nodes.Length > 0)
             _tabStopIndex = 0;
@@ -32,9 +33,8 @@
 
     public async Task FocusSceneAsync(string sceneId)
     {
-        var index = Array.FindIndex(_nodes, node => node.Id == sceneId);
-        if (index >= 0)
-            await _buttons[index].FocusAsync();
+        if (_buttons.TryGetValue(sceneId, out var button))
+            await button.FocusAsync();
     }
 
     private bool IsTabStop(int index) => index == _tabStopIndex;
@@ -52,6 +52,6 @@
             _ => current,
         };
         if (next != current || args.Key is "Home" or "End")
-            await _buttons[next].FocusAsync();
+            await _buttons[_nodes[next].Id].FocusAsync();
     }
 }
