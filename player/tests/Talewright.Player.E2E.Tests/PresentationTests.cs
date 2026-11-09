@@ -53,6 +53,7 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
     {
         await Upload(new StoryFixture("shown-choices", TestStories.DefaultYaml, """
             === start
+            The first passage remains here.
             * [Restricted] (requires false, shown "Need a key") -> END
             * [Proceed] -> locked
 
@@ -71,10 +72,13 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Expect(Choices.Nth(1)).ToBeEnabledAsync();
         await Expect(Choices.Nth(1)).ToContainTextAsync("2.");
 
+        await Expect(Latest).ToContainTextAsync("The first passage remains here.");
         await Expect(Latest).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Choices.Nth(1)).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("1");
+        await Page.WaitForTimeoutAsync(1000);
+        await Expect(Latest).ToContainTextAsync("The first passage remains here.");
         await Expect(Choices).ToHaveCountAsync(2);
         await Expect(Choices.Nth(0)).ToContainTextAsync("(Unavailable)");
         await Page.Keyboard.PressAsync("Enter");

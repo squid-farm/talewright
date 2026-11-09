@@ -46,6 +46,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Upload(new StoryFixture("shown-choices", TestStories.DefaultYaml, """
             === start
             @title First passage
+            The first passage remains here.
             * [Restricted] (requires false, shown "Need a key") -> END
             * [Proceed] -> next
 
@@ -68,7 +69,12 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         Assert.True(Assert.Single((await native.SnapshotAsync()).Descendants(),
             node => node.Role == "push button" && node.Name == "2. Proceed").Focused);
         await Driver.PressAsync("1");
-        await AssertState(state => Assert.Contains("First passage", state.Passage));
+        await Task.Delay(1000);
+        await AssertState(state =>
+        {
+            Assert.Contains("The first passage remains here.", state.Passage);
+            Assert.Equal(["Need a key (Unavailable)", "Proceed"], state.Choices);
+        });
         await Driver.PressAsync("Enter");
         await AssertState(state => Assert.Contains("No available actions.", state.Passage));
 
