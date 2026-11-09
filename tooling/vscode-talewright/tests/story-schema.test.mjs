@@ -72,6 +72,17 @@ test('player declarations may be in the root or a supporting configuration file'
   assertValid(validateManifest, { items: { coin: 'Coin' } }, 'item fragment');
 });
 
+test('inventory quantities must be nonnegative integers', () => {
+  const manifest = quantity => ({
+    game: { id: 'inventory-quantity', title: 'Inventory quantity', start: 'beginning' },
+    characters: { player: { 'first-name': 'Ada', inventory: { coin: quantity } } },
+  });
+
+  assertValid(validateManifest, manifest(0), 'zero inventory quantity');
+  assertValid(validateManifest, manifest(3), 'positive inventory quantity');
+  assertInvalid(validateManifest, manifest(-1), 'negative inventory quantity', 'minimum');
+});
+
 test('item grammar has explicit enum/boolean values and independent defaults', () => {
   const item = compileSubschema(schema.definitions.itemValue);
   for (const value of ['sword', {}, { name: 'armor', uncountable: true },

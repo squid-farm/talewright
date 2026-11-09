@@ -151,7 +151,7 @@ characters:
     last-name: Burns
     pronouns: she # she | he | they | it, or a custom set (see below)
     stats: { dex: 14, athletics: 2 }
-    inventory: [rope, torch] # or { torch: 3 }
+    inventory: [rope, torch] # or { torch: 3 }; quantities are nonnegative (0 means not held)
   guide:
     first-name: Tomas
     pronouns: he

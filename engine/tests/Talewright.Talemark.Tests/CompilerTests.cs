@@ -182,6 +182,31 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Negative_starting_inventory_quantity_is_reported_at_the_value_and_prevents_story_compilation()
+    {
+        var yaml = Yaml.Replace("inventory: [rope]", "inventory: { rope: -50 }", StringComparison.Ordinal);
+        var result = Compile("=== a\n-> END", yaml);
+
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.InvalidConfigurationValue, error.Code);
+        Assert.Contains("rope", error.Message);
+        Assert.Contains("player", error.Message);
+        AssertYamlKeyLocation(error, yaml, "-50");
+        Assert.Null(result.Story);
+    }
+
+    [Fact]
+    public void Zero_starting_inventory_quantity_is_allowed()
+    {
+        var yaml = Yaml.Replace("inventory: [rope]", "inventory: { rope: 0 }", StringComparison.Ordinal);
+
+        var story = Ok("=== a\n-> END", yaml);
+
+        Assert.Equal(0, story.World.Characters[EntityId.Player].Inventory.GetValueOrDefault(new ItemId("rope")));
+    }
+
+    [Fact]
     public void Parses_scene_metadata()
     {
         var story = Ok("""
