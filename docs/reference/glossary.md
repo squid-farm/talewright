@@ -19,7 +19,7 @@ For the design rules behind new syntax, see the
 | visit count | The number of times the player has entered a scene. `scene:player:visits` counts entries into the current scene. The count increases on entry, before the scene's text runs. | `camp:player:visits` |
 | choice | An option offered to the reader, on a line starting with `*`. | `* [Go home] -> END` |
 | divert | `->`: moving to another scene, or ending the story with `-> END`. | `-> forest` |
-| id | An author-chosen name, unique within its kind. Scene ids cannot match character ids, and `scene` is reserved. | `temple.entrance` |
+| id | An author-chosen name, unique within its kind. Scene ids cannot match character ids, `scene` is reserved, and `inventory` cannot be an item id. | `temple.entrance` |
 
 ## Rules and state
 

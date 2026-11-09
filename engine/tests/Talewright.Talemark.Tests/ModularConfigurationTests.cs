@@ -252,7 +252,7 @@ public sealed class ModularConfigurationTests
         {
             "characters: {ines: {first-name: Other}}",
             "items: {glyph-mark: Other}",
-            "vars: {marks: 2}",
+            "vars: {sum: 2}",
             "triggers: []",
         })
         {

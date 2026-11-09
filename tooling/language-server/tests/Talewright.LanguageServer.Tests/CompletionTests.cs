@@ -60,6 +60,8 @@ public sealed partial class ServerTests
     [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
     [InlineData("{if (player:pronoun:ob| == \"them\")}yes{/if}", "object")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
+    [InlineData("{player:inventory:|}", "first-name")]
+    [InlineData("{player:inventory:first-name:|}", "count")]
     [InlineData("{player:first-name#cus|", "custom")]
     public async Task Completion_categories_use_the_same_stdio_contract(string line, string expected)
     {
@@ -72,7 +74,7 @@ public sealed partial class ServerTests
         };
         File.WriteAllText(client.PathOf("project.authoring.json"), registrations.ToJson());
         File.AppendAllText(client.PathOf("story.talewright.yaml"),
-            "flags: [ready, door-open]\nvars: {coins: 1}\nitems:\n  rope: {name: Rope}\nfactions:\n  guild: {name: Guild}\n");
+            "flags: [ready, door-open]\nvars: {coins: 1}\nitems:\n  rope: {name: Rope}\n  first-name: Token\nfactions:\n  guild: {name: Guild}\n");
         var initialized = await client.Initialize(new { metadataPath = "project.authoring.json" });
         Assert.False(initialized.GetProperty("result").GetProperty("capabilities").GetProperty("completionProvider")
             .GetProperty("resolveProvider").GetBoolean());

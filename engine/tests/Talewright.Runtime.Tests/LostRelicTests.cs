@@ -78,7 +78,7 @@ public partial class LostRelicTests
             foreach (var line in source.Files["chapters/" + file].Split('\n').Where(line => line.StartsWith("=== ")))
                 Assert.StartsWith(prefix, line[4..].Trim());
         }
-        Assert.Equal("0.4.0", Story().Version);
+        Assert.Equal("0.5.0", Story().Version);
         Assert.Contains(Story().Scenes, scene => scene.Id.Value == "dream.hub");
     }
 
@@ -367,7 +367,7 @@ public partial class LostRelicTests
     {
         var source = Source();
         var files = source.Files.ToDictionary();
-        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.4.0", "version: 0.3.0");
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.5.0", "version: 0.3.0");
         var older = StoryCompiler.Compile(new StorySource(files, source.ImagePaths)).Story!;
         var oldHistory = new StoryHistory(older, 42, older.Creation!.Default(older.World.Characters[EntityId.Player]));
         var bytes = oldHistory.Save();

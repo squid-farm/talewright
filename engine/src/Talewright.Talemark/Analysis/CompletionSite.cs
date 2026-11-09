@@ -25,6 +25,10 @@ internal static class ExpressionCompletion
     private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails =
         AuthoringSyntaxVocabulary.KeywordDetails(Determiner, Independent);
 
+    private static readonly string[] CharacterMemberKeywords = [.. CharacterProperties, Inventory];
+    private static readonly string[] NumericCharacterMemberKeywords = [Inventory];
+    private static readonly string[] InventoryItemKeywords = [Count];
+
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
         IReadOnlyList<AuthoringSymbol> symbols)
     {
@@ -81,6 +85,24 @@ internal static class ExpressionCompletion
                 keywords = [.. PossessiveProperties];
                 details = PossessivePropertyDetails;
             }
+            else if (tokenIndex >= 6 &&
+                     tokens.Slice(tokenIndex - 6, 6) is [{ Kind: TokenKind.Identifier } inventoryCharacter,
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: Inventory },
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier } item,
+                         { Kind: TokenKind.Colon }] &&
+                     HasSymbol(symbols, AuthoringSymbolKind.Character, inventoryCharacter) &&
+                     HasSymbol(symbols, AuthoringSymbolKind.Item, item))
+            {
+                keywords = InventoryItemKeywords;
+            }
+            else if (tokenIndex >= 4 &&
+                     tokens.Slice(tokenIndex - 4, 4) is [{ Kind: TokenKind.Identifier } inventoryOwner,
+                         { Kind: TokenKind.Colon }, { Kind: TokenKind.Identifier, Text: Inventory },
+                         { Kind: TokenKind.Colon }] &&
+                     HasSymbol(symbols, AuthoringSymbolKind.Character, inventoryOwner))
+            {
+                kinds = [AuthoringSymbolKind.Item];
+            }
             else if (start > 0 && text[start - 1] == PredicateMarker)
             {
                 if (kind == ExpressionContextKind.Condition) kinds = [AuthoringSymbolKind.Predicate];
@@ -134,8 +156,8 @@ internal static class ExpressionCompletion
                             => [AuthoringSymbolKind.Stat],
                         _ => []
                     };
-                    if (kind != ExpressionContextKind.Number && kinds.Contains(AuthoringSymbolKind.Stat))
-                        keywords = [.. CharacterProperties];
+                    if (kinds.Contains(AuthoringSymbolKind.Stat))
+                        keywords = kind == ExpressionContextKind.Number ? NumericCharacterMemberKeywords : CharacterMemberKeywords;
                     if (symbols.Any(symbol => symbol.Kind == AuthoringSymbolKind.Scene && ns.Is(symbol.Name)))
                         keywords = [.. keywords, PlayerPrefix];
                 }
@@ -192,6 +214,13 @@ internal static class ExpressionCompletion
                 Enumerable.Range(start, end - start + 1).Select(index => map(index, 0).Start).ToArray(),
                 end < text.Length && text[end] is Separator or OpenParen ? text[end] : null, null, details);
         }
+    }
+
+    private static bool HasSymbol(IReadOnlyList<AuthoringSymbol> symbols, AuthoringSymbolKind kind, Token token)
+    {
+        for (var index = 0; index < symbols.Count; index++)
+            if (symbols[index].Kind == kind && token.Is(symbols[index].Name)) return true;
+        return false;
     }
 
     private static bool IsAgreementReference(TokenBuffer tokens, IReadOnlyList<AuthoringSymbol> symbols)

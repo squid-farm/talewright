@@ -60,6 +60,8 @@ public enum AuthoringTokenKind
     FirstName,
     LastName,
     Name,
+    Inventory,
+    Count,
     Standing,
     Tier,
     Pronoun,
