@@ -1,0 +1,47 @@
+@using Talewright.Core.State
+
+<div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@Hidden">
+    <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="TranscriptElement">
+        @{ var passages = Passages; }
+        @for (var i = Math.Max(0, passages.Count - PassageWindow); i < passages.Count; i++)
+        {
+            var entry = passages[i];
+            var isLatest = i == passages.Count - 1;
+            <section @key="(Identity, i)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
+                     data-tw-scene="@entry.Frame.Scene?.Value"
+                     aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
+                <StoryPassage Entry="entry" />
+            </section>
+        }
+
+        @if (Current is { } current)
+        {
+            <StoryChoices Current="current" Busy="Busy" AtChoiceLimit="AtChoiceLimit"
+                          OnChoose="OnChoose" OnRestart="OnRestart" />
+        }
+    </main>
+
+    @if (HasCharacterSheet)
+    {
+        <CharacterSheet State="State" Visibility="Story.CharacterSheet" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<HistoryFrame> Passages { get; set; } = [];
+    [Parameter, EditorRequired] public int PassageWindow { get; set; }
+    [Parameter] public StoryFrame? Current { get; set; }
+    [Parameter, EditorRequired] public IGameStateView State { get; set; } = default!;
+    [Parameter, EditorRequired] public object Identity { get; set; } = default!;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool AtChoiceLimit { get; set; }
+    [Parameter] public bool Hidden { get; set; }
+    [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
+    [Parameter] public EventCallback OnRestart { get; set; }
+
+    public ElementReference TranscriptElement { get; private set; }
+
+    private bool HasCharacterSheet =>
+        CharacterSheet.HasSections(Story.World, Story.CharacterSheet, EntityId.Player);
+}
