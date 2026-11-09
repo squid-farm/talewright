@@ -14,7 +14,9 @@ See [registry setup](../../../docs/developer/csharp-extensions.md).
 
 | Component | Job |
 |---|---|
-| `TalewrightApp` | Root. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
+| `ReaderPresentation` | Initializes `PlayerPreferencesStore`, then renders its child content with a `PlayerDiagnostics` cascade. Hosts can use it around reader surfaces so preferences and diagnostics are shared consistently. An optional `Diagnostics` parameter preserves a host-owned report instance. |
+| `ReaderSettingsDialog` | Standalone player Settings dialog. `OpenAsync(returnFocus)` opens it and restores focus to the supplied element when it closes. |
+| `TalewrightApp` | Root. Uses `ReaderPresentation` for preference initialization and the diagnostics cascade. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Shows a character sheet only when the story declares stats, items or factions that the author's `game.character-sheet` setting doesn't hide, and gives the transcript the full layout column when no sheet is needed. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
 | `DiagnosticReport` | Accessible, inspectable session report and optional download control; available even when no story opens. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library is omitted when no exit callback is supplied. |
@@ -37,9 +39,10 @@ line-spacing (compact / normal / relaxed), reduced-motion (system / reduce) and 
 visibility settings in the toolbar's More actions menu. `PlayerPreferencesStore` owns the
 versioned preferences record and persists it in browser storage, shared across stories. Hidden
 mechanical notes are removed from both the display and accessibility tree without changing story
-events. Hosts register the store as a scoped service; web hosts should load
+events. Hosts register the store as a scoped service; use `ReaderPresentation` around reader surfaces to
+initialize it before rendering and cascade diagnostics. Web hosts should load
 `PlayerPreferencesBootstrap.js` before the player stylesheet to apply saved preferences before
-first paint. The desktop host initializes the same store before rendering the player.
+first paint; `ReaderPresentation` initializes the store for both web and desktop reader surfaces.
 
 Settings dropdowns open an in-page accessible listbox so option text and row padding scale with
 the text-size preference, including on desktop hosts whose operating-system popup menus do
@@ -63,7 +66,8 @@ libraries. The compiler's source and pure renderer never own image I/O or resour
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
-Register `PlayerPreferencesStore` as a scoped service in hosts that render `TalewrightApp`.
+Register `PlayerPreferencesStore` as a scoped service in hosts that render `TalewrightApp` or
+`ReaderPresentation`.
 
 ### Player diagnostics
 

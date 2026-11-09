@@ -83,6 +83,18 @@ public sealed class ExpressionSyntaxBindingTests
             offset => new SourceLocation("main.tale", 1, offset + 1)));
     }
 
+    [Fact]
+    public void One_many_still_reports_tw2006_for_unsupported_text_targets()
+    {
+        const string text = """var:score#one-many("singular", "plural")""";
+        var diagnostics = new DiagnosticBag();
+        var syntax = ExpressionSyntaxParser.ParseSubstitution(Lexer.Tokenize(text), text.Length, Locate, diagnostics);
+
+        Assert.False(syntax.HasErrors);
+        Assert.Null(ExpressionBinder.Bind(syntax, Symbols(textVariable: true), diagnostics, Locate));
+        Assert.Equal("TW2006", Assert.Single(diagnostics.Items).Code);
+    }
+
     [Theory]
     [InlineData("1 + 2", "(Add 1 2)")]
     [InlineData("3 - 2", "(Subtract 3 2)")]

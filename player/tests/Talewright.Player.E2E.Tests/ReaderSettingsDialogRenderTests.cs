@@ -9,10 +9,10 @@ using Talewright.Player.Preferences;
 
 namespace Talewright.Player.E2E.Tests;
 
-public sealed class PlayerToolbarRenderTests
+public sealed class ReaderSettingsDialogRenderTests
 {
     [Fact]
-    public async Task Settings_keep_existing_controls_before_reading_preferences()
+    public async Task Reader_settings_dialog_contains_all_six_preference_controls()
     {
         await using var services = new ServiceCollection()
             .AddLogging()
@@ -22,11 +22,7 @@ public sealed class PlayerToolbarRenderTests
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         var html = await renderer.Dispatcher.InvokeAsync(async () =>
         {
-            var parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
-            {
-                [nameof(PlayerToolbar.Title)] = "Test story",
-            });
-            var component = await renderer.RenderComponentAsync<PlayerToolbar>(parameters);
+            var component = await renderer.RenderComponentAsync<ReaderSettingsDialog>(ParameterView.Empty);
             return component.ToHtmlString();
         });
 
@@ -34,7 +30,7 @@ public sealed class PlayerToolbarRenderTests
         Assert.True(start >= 0);
         var end = html.IndexOf("</dialog>", start, StringComparison.Ordinal);
         Assert.True(end > start);
-        var controls = Regex.Matches(html[start..end], @"<(?:select|input|button)\b[^>]*>")
+        var controls = Regex.Matches(html[start..end], @"<(?:select|input)\b[^>]*>")
             .Cast<Match>()
             .Select(match => match.Value)
             .ToArray();
@@ -45,8 +41,8 @@ public sealed class PlayerToolbarRenderTests
             control => Assert.Contains("type=\"checkbox\"", control),
             control => Assert.Contains("id=\"tw-reading-width\"", control),
             control => Assert.Contains("id=\"tw-line-spacing\"", control),
-            control => Assert.Contains("id=\"tw-reduced-motion\"", control),
-            control => Assert.Contains("class=\"tw-choice\"", control));
+            control => Assert.Contains("id=\"tw-reduced-motion\"", control));
+        Assert.Contains("Close settings", html);
     }
 
     [Fact]
@@ -60,11 +56,7 @@ public sealed class PlayerToolbarRenderTests
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         var html = await renderer.Dispatcher.InvokeAsync(async () =>
         {
-            var parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
-            {
-                [nameof(PlayerToolbar.Title)] = "Test story",
-            });
-            var component = await renderer.RenderComponentAsync<PlayerToolbar>(parameters);
+            var component = await renderer.RenderComponentAsync<ReaderSettingsDialog>(ParameterView.Empty);
             return component.ToHtmlString();
         });
 
