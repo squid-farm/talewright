@@ -1,6 +1,5 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 
 <header class="tw-bar" aria-label="Player toolbar" @ref="_bar">
     <h1>@Title</h1>
@@ -24,7 +23,7 @@
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
                     disabled="@(Busy || ReadingHistory || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
-                <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="OpenSettings">Settings</button>
+                <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory || !_settingsReady)" @onclick="OpenSettings">Settings</button>
                 <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
                 {
@@ -40,57 +39,7 @@
     }
 </header>
 
-<dialog class="tw-settings" aria-labelledby="tw-settings-heading" @ref="_settings">
-    <h2 id="tw-settings-heading">Settings</h2>
-    <label for="tw-theme">Theme</label>
-    <select id="tw-theme" value="@_theme" @onchange="ChangeTheme">
-        <option value="@PlayerTheme.System">System</option>
-        <option value="@PlayerTheme.Light">Light</option>
-        <option value="@PlayerTheme.Dark">Dark</option>
-    </select>
-    <label for="tw-text-size">Text size</label>
-    <select id="tw-text-size" value="@_textSizePercent" @onchange="ChangeTextSize">
-        @foreach (var textSize in PlayerPreferences.SupportedTextSizes)
-        {
-            <option value="@textSize">@textSize%</option>
-        }
-    </select>
-    <label class="tw-settings-toggle">
-        <input type="checkbox" checked="@_hideMechanicalNotes" @onchange="ChangeHideMechanicalNotes" />
-        Hide mechanical notes
-    </label>
-    <label for="tw-reading-width">Reading width</label>
-    <select id="tw-reading-width" value="@ReadingWidthValue(_readingWidth)" @onchange="ChangeReadingWidth">
-        @foreach (var readingWidth in PlayerPreferences.SupportedReadingWidths)
-        {
-            <option value="@ReadingWidthValue(readingWidth)">@readingWidth</option>
-        }
-    </select>
-    <label for="tw-line-spacing">Line spacing</label>
-    <select id="tw-line-spacing" value="@LineSpacingValue(_lineSpacing)" @onchange="ChangeLineSpacing">
-        @foreach (var lineSpacing in PlayerPreferences.SupportedLineSpacings)
-        {
-            <option value="@LineSpacingValue(lineSpacing)">@lineSpacing</option>
-        }
-    </select>
-    <label for="tw-reduced-motion">Reduced motion</label>
-    <select id="tw-reduced-motion" value="@ReducedMotionValue(_reducedMotion)" @onchange="ChangeReducedMotion">
-        @foreach (var reducedMotion in PlayerPreferences.SupportedReducedMotions)
-        {
-            <option value="@ReducedMotionValue(reducedMotion)">
-                @(reducedMotion == PlayerReducedMotion.System ? "System" : "Reduce")
-            </option>
-        }
-    </select>
-    @if (Preferences.Warning is not null)
-    {
-        <p class="tw-error" role="status">@Preferences.Warning</p>
-    }
-    <div class="tw-settings-actions">
-        <button type="button" class="tw-choice" @onclick="CloseSettings">Close settings</button>
-    </div>
-    <BuildIdentity />
-</dialog>
+<ReaderSettingsDialog @ref="_settingsDialog" OnReady="SettingsReady" />
 
 <dialog class="tw-confirm" aria-label="Restart story?" @ref="_confirmation">
     <h2>Restart story?</h2>
@@ -119,27 +68,13 @@
     [Parameter] public bool ReadingHistory { get; set; }
     [Parameter] public EventCallback OnHistory { get; set; }
 
-    private ElementReference _bar, _toggle, _menu, _settings, _confirmation;
+    private ElementReference _bar, _toggle, _menu, _confirmation;
+    private ReaderSettingsDialog _settingsDialog = default!;
     private IJSObjectReference? _module;
     private bool _menuOpen;
     private bool _initialized;
+    private bool _settingsReady;
     private bool _focusMenu;
-    private PlayerTheme _theme = PlayerTheme.System;
-    private int _textSizePercent = PlayerPreferences.DefaultTextSizePercent;
-    private PlayerReadingWidth _readingWidth = PlayerReadingWidth.Normal;
-    private PlayerLineSpacing _lineSpacing = PlayerLineSpacing.Normal;
-    private PlayerReducedMotion _reducedMotion = PlayerReducedMotion.System;
-    private bool _hideMechanicalNotes;
-
-    protected override void OnInitialized()
-    {
-        _theme = Preferences.Current.Theme;
-        _textSizePercent = Preferences.Current.TextSizePercent;
-        _readingWidth = Preferences.Current.ReadingWidth;
-        _lineSpacing = Preferences.Current.LineSpacing;
-        _reducedMotion = Preferences.Current.ReducedMotion;
-        _hideMechanicalNotes = Preferences.Current.HideMechanicalNotes;
-    }
 
     protected override void OnParametersSet()
     {
@@ -155,7 +90,7 @@
         if (firstRender)
         {
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/PlayerToolbar.razor.js");
-            await _module.InvokeVoidAsync("initialize", _bar, _toggle, _menu, _confirmation, _settings);
+            await _module.InvokeVoidAsync("initialize", _bar, _toggle, _menu, _confirmation);
             _initialized = true;
             StateHasChanged();
         }
@@ -181,110 +116,14 @@
     private async Task OpenSettings()
     {
         _menuOpen = false;
-        await _module!.InvokeVoidAsync("openSettings", _menu, _settings);
+        await _settingsDialog.OpenAsync(_toggle);
     }
 
-    private async Task CloseSettings() =>
-        await _module!.InvokeVoidAsync("closeSettings", _settings, _toggle);
-
-    private async Task ChangeTheme(ChangeEventArgs args)
+    private Task SettingsReady()
     {
-        if (!Enum.TryParse<PlayerTheme>(args.Value?.ToString(), out var theme) || !Enum.IsDefined(theme))
-        {
-            throw new InvalidOperationException($"Unknown theme selection '{args.Value}'.");
-        }
-
-        await Preferences.SetThemeAsync(theme);
-        _theme = theme;
+        _settingsReady = true;
+        return Task.CompletedTask;
     }
-
-    private async Task ChangeTextSize(ChangeEventArgs args)
-    {
-        if (!int.TryParse(args.Value?.ToString(), out var textSizePercent)
-            || !PlayerPreferences.IsSupportedTextSize(textSizePercent))
-        {
-            throw new InvalidOperationException($"Unknown text size selection '{args.Value}'.");
-        }
-
-        await Preferences.SetTextSizeAsync(textSizePercent);
-        _textSizePercent = textSizePercent;
-    }
-
-    private async Task ChangeHideMechanicalNotes(ChangeEventArgs args)
-    {
-        if (args.Value is not bool hide)
-        {
-            throw new InvalidOperationException("Hide mechanical notes must be a checkbox value.");
-        }
-
-        await Preferences.SetHideMechanicalNotesAsync(hide);
-        _hideMechanicalNotes = hide;
-    }
-
-    private async Task ChangeReadingWidth(ChangeEventArgs args)
-    {
-        var readingWidth = args.Value?.ToString() switch
-        {
-            "narrow" => PlayerReadingWidth.Narrow,
-            "normal" => PlayerReadingWidth.Normal,
-            "wide" => PlayerReadingWidth.Wide,
-            _ => throw new InvalidOperationException($"Unknown reading width selection '{args.Value}'."),
-        };
-
-        await Preferences.SetReadingWidthAsync(readingWidth);
-        _readingWidth = readingWidth;
-    }
-
-    private async Task ChangeLineSpacing(ChangeEventArgs args)
-    {
-        var lineSpacing = args.Value?.ToString() switch
-        {
-            "compact" => PlayerLineSpacing.Compact,
-            "normal" => PlayerLineSpacing.Normal,
-            "relaxed" => PlayerLineSpacing.Relaxed,
-            _ => throw new InvalidOperationException($"Unknown line spacing selection '{args.Value}'."),
-        };
-
-        await Preferences.SetLineSpacingAsync(lineSpacing);
-        _lineSpacing = lineSpacing;
-    }
-
-    private async Task ChangeReducedMotion(ChangeEventArgs args)
-    {
-        var reducedMotion = args.Value?.ToString() switch
-        {
-            "system" => PlayerReducedMotion.System,
-            "reduce" => PlayerReducedMotion.Reduce,
-            _ => throw new InvalidOperationException($"Unknown reduced-motion selection '{args.Value}'."),
-        };
-
-        await Preferences.SetReducedMotionAsync(reducedMotion);
-        _reducedMotion = reducedMotion;
-    }
-
-    private static string ReadingWidthValue(PlayerReadingWidth readingWidth) => readingWidth switch
-    {
-        PlayerReadingWidth.Narrow => "narrow",
-        PlayerReadingWidth.Normal => "normal",
-        PlayerReadingWidth.Wide => "wide",
-        _ => throw new ArgumentOutOfRangeException(nameof(readingWidth), readingWidth, "Unknown player reading width."),
-    };
-
-    private static string LineSpacingValue(PlayerLineSpacing lineSpacing) => lineSpacing switch
-    {
-        PlayerLineSpacing.Compact => "compact",
-        PlayerLineSpacing.Normal => "normal",
-        PlayerLineSpacing.Relaxed => "relaxed",
-        _ => throw new ArgumentOutOfRangeException(nameof(lineSpacing), lineSpacing, "Unknown player line spacing."),
-    };
-
-    private static string ReducedMotionValue(PlayerReducedMotion reducedMotion) => reducedMotion switch
-    {
-        PlayerReducedMotion.System => "system",
-        PlayerReducedMotion.Reduce => "reduce",
-        _ => throw new ArgumentOutOfRangeException(nameof(reducedMotion), reducedMotion,
-            "Unknown player reduced-motion preference."),
-    };
 
     private async Task CancelRestart() =>
         await _module!.InvokeVoidAsync("closeConfirmation", _confirmation, _toggle);

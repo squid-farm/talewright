@@ -1,0 +1,33 @@
+@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
+@inject IServiceProvider Services
+@using Microsoft.Extensions.DependencyInjection
+@using Talewright.Player.Diagnostics
+
+@if (!_preferencesReady)
+{
+    <div class="tw-app" aria-busy="true"></div>
+}
+else
+{
+    <CascadingValue Value="Report" IsFixed="true">
+        @ChildContent
+    </CascadingValue>
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public PlayerDiagnostics? Diagnostics { get; set; }
+
+    private bool _preferencesReady;
+    private readonly PlayerDiagnostics _fallbackReport = new();
+    private PlayerDiagnostics Report => Diagnostics ?? Services.GetService<PlayerDiagnostics>() ?? _fallbackReport;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Preferences.InitializeAsync();
+        _preferencesReady = true;
+    }
+}
