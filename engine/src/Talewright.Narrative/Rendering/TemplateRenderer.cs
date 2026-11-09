@@ -117,14 +117,18 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
 
     private string Substitute(SubstitutionTemplate substitution, EvaluationContext context)
     {
-        var text = ExpressionEvaluator.Evaluate(substitution.Value, context).ToString();
+        var evaluated = ExpressionEvaluator.Evaluate(substitution.Value, context);
+        var text = evaluated.ToString();
         var item = substitution.Value is ItemNameRef itemName ? context.State.World.Items[itemName.Item] : null;
         var isPlural = item is not null
             ? item.NameAgreement == GrammaticalNumber.Plural
             : substitution.Value is PronounRef pronoun
                 ? context.State.GetCharacterDefinition(pronoun.Character).Pronouns.Agreement == GrammaticalNumber.Plural
                 : substitution.IsPlural;
-        var modifierContext = new ModifierContext(grammar, isPlural, item?.Uncountable ?? false);
+        var modifierContext = new ModifierContext(grammar, isPlural, item?.Uncountable ?? false)
+        {
+            NumberValue = evaluated.Type == ExprType.Number ? evaluated.Number : null,
+        };
         foreach (var modifier in substitution.Modifiers)
         {
             text = modifier.Apply(text, modifierContext);

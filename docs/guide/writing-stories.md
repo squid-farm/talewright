@@ -103,6 +103,9 @@ For wording that changes with a character's chosen pronouns, supply both forms:
 The first form is singular agreement; the second is plural agreement, including
 singular they. This selector also works on item names using their declared grammar,
 not on character names or arbitrary text.
+For quantity-dependent wording, apply it to the count expression:
+`{player:inventory:arrow:count} {player:inventory:arrow:count#one-many("arrow remains", "arrows remain")}.`
+The first wording is selected only when the number is exactly 1.
 Scene titles are literal text, so use neutral titles such as "Ask your guide
 about the temple"; put `{guide:first-name}` in prose and choice labels instead.
 For recurring item names, use `{item:relic}` rather than repeating the display

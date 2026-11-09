@@ -533,35 +533,47 @@ These are ordinary text expressions, usable in comparisons and text assignments:
 
 `#possessive` is a text transformation, not a way to select stored pronoun data.
 
-**Pronoun agreement.** Supply two wordings with `#one-many("singular", "plural")`:
+**Singular and plural wording.** Supply two wordings with
+`#one-many("singular", "plural")`:
 
 ```tale
 {player:pronoun#capitalize} {player:pronoun#one-many("has", "have")} to admit it.
 {guide:pronoun#one-many("was", "were")#capitalize} it worth the journey?
 ```
 
-The first quoted string is selected for singular agreement; the second for plural
-agreement. Selection reads the character's effective pronouns at render time,
-including the player's character-creation choice. Built-in `she`, `he` and `it`
-select the first string; `they` selects the second, including singular they.
-Custom sets use their required `agreement` setting.
+On a number-valued expression, the first string is selected only when the value
+is exactly `1`; every other value selects the second. This works with inventory
+counts, stats, number variables and arithmetic:
 
-The selector outputs only the chosen text, not the pronoun. Both strings are
+```tale
+{player:inventory:arrow:count} {player:inventory:arrow:count#one-many("arrow remains", "arrows remain")}.
+{var:coins - 1#one-many("coin remains", "coins remain")}.
+```
+
+Current Talemark numbers are integers. On a pronoun reference, selection reads
+the character's effective pronouns at render time, including the player's
+character-creation choice. Built-in `she`, `he` and `it` select the first string;
+`they` selects the second, including singular they. Custom sets use their required
+`agreement` setting. On an item-name reference, selection uses its
+`name-agreement`, not inventory quantity.
+
+The selector outputs only the chosen text, not the input value. Both strings are
 required (empty strings are allowed); authors control the wording, including
 nonstandard grammar. Other text manipulators can follow it, as with `#capitalize`.
 Inside these quoted arguments, `\"` means a quote and `\\` means a backslash.
 Other backslash escapes are errors. Commas, apostrophes, braces and `#` inside a quoted string are text.
 
-In VS Code, hover a selector to see which wording the story's default pronouns choose:
+In VS Code, hover a selector to see which wording its default value or agreement chooses:
 
 ![A hover on #one-many("has", "have") showing the input "she", the selected result "has" and a description of the agreement selector](../images/vscode-hover-substitution.png)
 
-The selector accepts **pronoun and item-name references only**. Item references use
-their `name-agreement`, as described below. Character names, text variables,
-population and item quantities never select a branch. Unsupported
-targets, missing arguments and extra arguments produce TW2006; an unclosed quote
-can leave the substitution unclosed (TW1004). This adds no general multi-argument
-manipulator support or grammar inference.
+The selector accepts **number-valued expressions, pronoun references and
+item-name references**. Number expressions choose the first string only at
+exactly `1`; pronouns use effective agreement and item names use their declared
+`name-agreement`. Character names, text variables and other non-number values
+are unsupported. Unsupported targets, missing arguments and extra arguments
+produce TW2006; an unclosed quote can leave the substitution unclosed (TW1004).
+This adds no general multi-argument manipulator support or grammar inference.
 
 ### Item-name grammar
 
@@ -599,10 +611,12 @@ armor still takes "this" and "is". `#possessive` also respects name agreement:
 
 The original item reference retains its grammar throughout a manipulator chain:
 `{item:pants#upper#one-many("is", "are")}` still gives "are". Inventory quantity
-does not matter: one unit of pants remains plural; five swords do not change
-the singular displayed name. Assigning `~ var:word = item:pants` copies only the
-text "pants", not item identity or grammar. `{var:word#that}` therefore gives
-"that pants", and `#one-many` on that variable is invalid.
+does not matter to an item-name reference: one unit of pants remains plural;
+five swords do not change the singular displayed name. Use an inventory count
+reference when wording should depend on quantity. Assigning
+`~ var:word = item:pants` copies only the text "pants", not item identity or
+grammar. `{var:word#that}` therefore gives "that pants", and `#one-many` on that
+text variable is invalid.
 
 Choose helpers explicitly. They do not infer context, inflect nouns, count items,
 or add pair/suit/unit wording. Author exceptional phrasing directly; `#a` retains

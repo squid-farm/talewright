@@ -85,14 +85,16 @@ choices, choice-only conditions, comments or blank lines.
 | `{faction:guild:standing}` / `{faction:guild:tier}` | Numeric standing / named tier. |
 | `{var:weather}` / `{flag:met-guide}` | Variable / flag value. |
 | `{scene:player:visits}` / `{camp:player:visits}` | Player visits to the current / named scene. |
+| `{player:inventory:arrow:count}` | Number of arrows held by the player. |
 | `{item:key#the#capitalize}` | Chain text manipulators: **The brass key**. |
-| `{player:pronoun#one-many("is", "are")}` | Select singular / plural wording. |
+| `{player:inventory:arrow:count#one-many("arrow", "arrows")}` | Select wording from a number (first string only for exactly 1). |
+| `{player:pronoun#one-many("is", "are")}` | Select wording from pronoun agreement. |
 | `{player:first-name#bold}` | Format a substitution. |
 
 Other manipulators: `#upper`, `#lower`, `#possessive`, `#a`, `#this`, `#that`, `#italic`.
-Put text manipulators before `#bold` or `#italic`. `#one-many` selects text for a pronoun or item
-name; it does not print that name. Image paths are relative to `images/`. Line breaks render as
-written; backticks are ordinary text.
+Put text manipulators before `#bold` or `#italic`. `#one-many` selects text for a number,
+pronoun or item name; it does not print that name. Image paths are relative to `images/`.
+Line breaks render as written; backticks are ordinary text.
 
 ## Conditions and effects
 

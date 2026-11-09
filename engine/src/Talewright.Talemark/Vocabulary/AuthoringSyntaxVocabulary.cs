@@ -208,7 +208,7 @@ public static class AuthoringSyntaxVocabulary
             new(AuthoringTokenKind.Reflexive, ExpressionVocabulary.ReflexiveForm, "Pronoun form: reflexive, such as herself or themselves.", DirectiveHelp: false),
             new(AuthoringTokenKind.Determiner, ExpressionVocabulary.Determiner, "Possessive determiner before a noun, such as her or their.", DirectiveHelp: false),
             new(AuthoringTokenKind.Independent, ExpressionVocabulary.Independent, "Independent possessive that stands alone, such as hers or theirs.", DirectiveHelp: false),
-            new(AuthoringTokenKind.OneMany, OneManyTextModifier.ModifierName, $"Agreement selector: {oneMany}. Selects from effective pronoun agreement (including singular they) or item name-agreement, never inventory quantity or uncountable.", DirectiveHelp: false),
+            new(AuthoringTokenKind.OneMany, OneManyTextModifier.ModifierName, $"Selector: {oneMany}. For number expressions, selects the first string only when the value is exactly 1; otherwise the second. Pronoun references use effective pronoun agreement (including singular they), and item-name references use item name-agreement.", DirectiveHelp: false),
         ];
     }
 }

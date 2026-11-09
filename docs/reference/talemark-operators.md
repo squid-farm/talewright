@@ -141,7 +141,7 @@ New callables follow this guideline. Existing exceptions are listed below rather
 | `@Name` | Expression predicate; boolean. | None. | Expressions. | Registered by a C# story project. |
 | `#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, `#possessive` | Text manipulator; text. | None. | End of a substitution. | Chain left to right before any formatting manipulator. |
 | `#bold`, `#italic` | Text manipulator; formatted text with a `TextStyle`. | None. | End of a substitution. | Lowered to the same `StyledTemplate` model as prose formatting; can follow text manipulators and each other, but not be followed by text manipulators. |
-| `#one-many("singular", "plural")` | Text manipulator; text. | Two literal-text arguments, both required. | Pronoun and item-name references. | Only multi-argument manipulator. |
+| `#one-many("singular", "plural")` | Text manipulator; text. | Two literal-text arguments, both required. | Number-valued expressions, pronoun and item-name references. | Only multi-argument manipulator. |
 | `image("path", "alt")` | Inline construct; media. | Literal-text path, required; reader-text alt, optional. | The whole content of a `{ }` in reader text. | Not an expression; no `#` chaining. |
 | `tag and tag [and tag…]` | Hub intersection; all listed tags. | Two or more distinct tags. | `@hub` only. | Do not mix with `or`. |
 | `tag or tag [or tag…]` | Hub union; at least one listed tag. | Two or more distinct tags. | `@hub` only. | Do not mix with `and`. |
@@ -263,15 +263,18 @@ Each manipulator validates its own supported values and reports a clear diagnost
 This shape is a contract for future manipulators, not permission to pass extra arguments to today's ones.
 
 Pronoun forms are properties, not manipulators; for example,
-`{player:pronoun:possessive-pronoun:independent}` gives *hers*. The agreement selector
-`{player:pronoun#one-many("has", "have")}` requires exactly two quoted strings,
-singular first and plural second. It returns the authored text selected by the
-effective pronoun set's `agreement` at render time; singular they uses plural
-agreement. On an item-name reference, `{item:pants#one-many("is", "are")}` selects
-from item `name-agreement` instead. Neither case uses groups, population, counts
-or `uncountable`. Character names and text variables are not selector targets.
-Empty strings are allowed. Following text manipulators operate on the selected
-text, for example `#one-many("has", "have")#capitalize`.
+`{player:pronoun:possessive-pronoun:independent}` gives *hers*. The selector
+`#one-many("singular", "plural")` requires exactly two quoted strings, singular
+first and plural second. A number-valued expression selects the first string only
+when its evaluated value is exactly `1`; every other value selects the second.
+This includes inventory counts, stats, number variables and arithmetic. Current
+Talemark numbers are integers. Pronoun references select from the effective
+pronoun set's `agreement` at render time; singular they uses plural agreement.
+On an item-name reference, `{item:pants#one-many("is", "are")}` selects from
+item `name-agreement` instead. Character names, text variables and other
+non-number values are not selector targets. Empty strings are allowed. Following
+text manipulators operate on the selected text, for example
+`#one-many("has", "have")#capitalize`.
 This is dedicated two-string selector support, not generalized multi-argument parsing.
 Other built-in manipulators take no arguments:
 `#capitalize`, `#upper`, `#lower`, `#a`, `#the`, `#this`, `#that`, and the generic text `#possessive`.
@@ -286,8 +289,9 @@ See the [pronoun forms table](talemark-syntax.md#3-substitutions).
 Completion offers `subject`, `object`, `possessive-pronoun` and `reflexive` after
 `character:pronoun:`, then `determiner` and `independent` after
 `character:pronoun:possessive-pronoun:`. Both possessive properties are explicit; neither is a default.
-Completion and hover offer `one-many` on pronoun and item-name references only, with its fixed
-argument order. Its strings are author text, not finite argument suggestions.
+Completion currently offers `one-many` on pronoun and item-name references; the
+same selector is valid after number-valued expressions. Its strings are author
+text, not finite argument suggestions.
 Wrong targets, missing strings and extra arguments produce TW2006.
 
 ### Image syntax decision
@@ -511,11 +515,11 @@ The language server uses the shared authoring completion provider.
 |---|---|
 | `:` access, `.` within names, shared story-name characters | Implemented in [#191](https://github.com/squid-farm/talewright/issues/191). |
 | Pronoun forms as text-valued properties | Implemented in [#332](https://github.com/squid-farm/talewright/issues/332), replacing the earlier #190 syntax without compatibility machinery. |
-| `#one-many("singular", "plural")` | Pronoun selection implemented in [#192](https://github.com/squid-farm/talewright/issues/192); item-name selection in [#308](https://github.com/squid-farm/talewright/issues/308). Uses effective pronoun `agreement` or item `name-agreement`, never quantity. |
+| `#one-many("singular", "plural")` | Pronoun selection implemented in [#192](https://github.com/squid-farm/talewright/issues/192), item-name selection in [#308](https://github.com/squid-farm/talewright/issues/308), and numeric selection in [#647](https://github.com/squid-farm/talewright/issues/647). Numbers select the first string only at exactly 1; pronouns use effective `agreement`, and item names use `name-agreement`. |
 | Item `name-agreement` / `uncountable`, `#a` / `#the` / `#this` / `#that` | Implemented in [#308](https://github.com/squid-farm/talewright/issues/308); explicit helpers retain original-reference grammar through chains, with no object-copy semantics. |
 | Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
 | `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/manipulator strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Reader text uses the broader punctuation-escape rule in [#404](https://github.com/squid-farm/talewright/issues/404). |
-| Comma-separated multi-argument manipulators | Only the pronoun/item-name `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future manipulator work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
+| Comma-separated multi-argument manipulators | Only the `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future manipulator work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
 | New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
 | Formatting beyond bold and italic | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new manipulator here. |
 | [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399). Bounded scanner implemented in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal and remaining delimiter-caller migration were completed in [#402](https://github.com/squid-farm/talewright/issues/402) and [#403](https://github.com/squid-farm/talewright/issues/403). |
