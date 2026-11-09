@@ -1,0 +1,13 @@
+<label>Search scenes <input aria-label="Search scenes" @bind="_sceneSearch" @bind:event="oninput" /></label>
+<p>@Model.FindScenes(_sceneSearch).Count() matching scenes. Showing up to 50; narrow the search or enter an exact ID.</p>
+<ul aria-label="Matching scenes">
+    @foreach (var scene in Model.FindScenes(_sceneSearch).Take(50))
+    {
+        <li><button type="button" @onclick="() => Model.Target = scene.Id.Value">Select @scene.Id @scene.Title</button></li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    private string _sceneSearch = "";
+}

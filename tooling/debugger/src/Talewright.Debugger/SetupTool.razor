@@ -1,0 +1,21 @@
+<section aria-label="Scene setup">
+    <h2>Scene setup</h2>
+    <ScenePicker Model="Model" />
+    <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
+    <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
+    @if (Story.Creation is not null)
+    {
+        <CharacterCreator @key="Model.CreationRevision" Story="Story" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" />
+        <button type="button" @onclick="OnClearCharacter">Clear character selection</button>
+        <p role="status">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
+    }
+    <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" Texts="Model.Texts" />
+    <button type="button" @onclick="OnStart">Start selected scene</button>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+    [Parameter] public EventCallback OnStart { get; set; }
+    [Parameter] public EventCallback OnClearCharacter { get; set; }
+}

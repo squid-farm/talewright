@@ -13,13 +13,6 @@ window.talewrightMap = (() => {
   let elk = null;
   const layoutEngine = () => elk || (elk = new ELK({ workerUrl: "map/vendor/elk-worker.min.js" }));
 
-  function element(tag, className, text) {
-    const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
-
   function nodeSize(node) {
     if (node.end) return { width: 90, height: 34 };
     if (node.stub) return { width: Math.min(NODE_WIDTH, 24 + node.text[0].length * 7), height: 28 };
@@ -123,11 +116,9 @@ window.talewrightMap = (() => {
     return { boxes, lines, unreachable, width, height };
   }
 
-  function palette(host) {
+  function palette(probe) {
     // Custom properties retain light-dark() rather than a canvas-compatible computed color.
-    const probe = element("span");
-    probe.hidden = true;
-    host.append(probe);
+    const previousColor = probe.style.color;
     const value = (name, fallback) => {
       probe.style.color = `var(${name}, ${fallback})`;
       return getComputedStyle(probe).color;
@@ -139,47 +130,18 @@ window.talewrightMap = (() => {
         error: value("--tw-error", "#a12020"), warning: value("--tw-warning", "#8a6200"),
       };
     } finally {
-      probe.remove();
+      probe.style.color = previousColor;
     }
   }
 
   const lineColor = line => kindColors[line.kind === "HubOffer" ? "HubOffer" : line.outcome || (line.kind === "Scene" || line.kind === "EntryCheck" ? "Scene" : "Choice")];
   const lineDash = line => line.kind === "HubOffer" ? [6, 4] : line.kind === "EntryCheck" ? [5, 3] : [];
 
-  function create(host) {
-    host.replaceChildren();
-    const toolbar = element("div", "map-toolbar");
-    const fitButton = element("button", null, "Fit map");
-    fitButton.type = "button";
-    const status = element("p", "map-status", "Laying out the map…");
-    status.setAttribute("role", "status");
-    toolbar.append(fitButton, status);
-
-    const surface = element("div", "map-surface");
-    const canvas = element("canvas");
-    canvas.setAttribute("aria-hidden", "true");
-    const tooltip = element("div", "map-tooltip");
-    tooltip.setAttribute("aria-hidden", "true");
-    tooltip.hidden = true;
-    surface.append(canvas, tooltip);
-
-    const scenes = element("div", "visually-hidden");
-    scenes.setAttribute("role", "group");
-    scenes.setAttribute("aria-label", "Scenes on the map. Use the arrow keys to move between scenes, and Home or End for the first or last.");
-
-    const details = element("section", "map-details");
-    details.setAttribute("aria-label", "Scene details");
-    details.append(element("p", null, "Select a scene to list its diverts and hub offers."));
-
-    const route = element("section", "map-route");
-    route.setAttribute("aria-label", "Current run route");
-
-    host.append(toolbar, surface, scenes, details, route);
-
+  function create(host, canvas, tooltip) {
     const state = {
-      host, canvas, context: canvas.getContext("2d"), surface, tooltip, status, scenes, details, route,
-      view: null, laid: null, colors: palette(host), transform: d3.zoomIdentity, fitted: false, queued: false,
-      selected: null, focused: null, highlighted: null, buttons: new Map(), generation: 0,
+      host, canvas, context: canvas.getContext("2d"), tooltip,
+      view: null, laid: null, colors: palette(tooltip), transform: d3.zoomIdentity, fitted: false, queued: false,
+      selected: null, focused: null, highlighted: null, generation: 0,
       run: null, routeVisits: new Map(), routeLines: new Map(), dotnet: null, summary: "",
     };
 
@@ -190,14 +152,17 @@ window.talewrightMap = (() => {
     state.selection = d3.select(canvas).call(state.zoom).on("dblclick.zoom", null);
 
     new ResizeObserver(() => resize(state)).observe(canvas);
-    fitButton.addEventListener("click", () => fit(state));
     canvas.addEventListener("click", event => {
       const node = nodeAt(state, event);
-      if (node) select(state, node.stub ? node.id.slice(5) : node.id, false);
+      if (node) select(state, node.stub ? node.id.slice(5) : node.id);
     });
     canvas.addEventListener("mousemove", event => hover(state, event));
-    canvas.addEventListener("mouseleave", () => { state.tooltip.hidden = true; });
+    canvas.addEventListener("mouseleave", () => { tooltip.hidden = true; });
     return state;
+  }
+
+  function reportStatus(state, text) {
+    return state.dotnet?.invokeMethodAsync("SetMapStatus", text);
   }
 
   function resize(state) {
@@ -525,7 +490,11 @@ window.talewrightMap = (() => {
     canvas.style.cursor = node ? "pointer" : line ? "help" : "grab";
     const lines = node ? [node.name] : line ? line.items : [];
     if (!lines.length) { tooltip.hidden = true; return; }
-    tooltip.replaceChildren(...lines.map(value => element("div", null, value)));
+    tooltip.replaceChildren(...lines.map(value => {
+      const description = document.createElement("div");
+      description.textContent = value;
+      return description;
+    }));
     tooltip.hidden = false;
     const left = Math.min(event.offsetX + 14, canvas.clientWidth - tooltip.offsetWidth - 4);
     const top = event.offsetY + 18 + tooltip.offsetHeight > canvas.clientHeight ? event.offsetY - tooltip.offsetHeight - 8 : event.offsetY + 18;
@@ -550,54 +519,27 @@ window.talewrightMap = (() => {
       .scale(scale));
   }
 
-  function select(state, id, moveFocus) {
-    const button = state.buttons.get(id);
-    if (!button) return;
-    for (const other of state.buttons.values()) other.tabIndex = other === button ? 0 : -1;
-    if (moveFocus) {
-      button.focus();
-      return;
-    }
+  function select(state, id) {
+    if (!state.nodes.has(id)) return;
     state.selected = id;
     state.highlighted = null;
-    showDetails(state, state.nodes.get(id));
     state.dotnet?.invokeMethodAsync("SelectScene", id).catch(error => {
       console.error("Could not update the selected scene preview.", error);
-      state.status.textContent = "The selected scene preview could not be updated.";
+      reportStatus(state, "The selected scene preview could not be updated.")
+        ?.catch(statusError => console.error("Could not update map status.", statusError));
     });
     redraw(state);
   }
 
-  function renderRun(state) {
-    const { route, run } = state;
-    const heading = element("h3", null, "Current run route");
-    if (!run) {
-      route.replaceChildren(heading, element("p", null, "Start a synthetic playtest to show its route."));
-      state.status.textContent = state.summary;
-      return;
-    }
-
-    const content = [heading];
-    if (run.startedMidStory)
-      content.push(element("p", null, `Started at mid-story scene ${run.startScene} from Scene setup.`));
-    const list = element("ol");
-    for (const step of run.steps) {
-      const text = step.takenItemName
-        ? `${step.takenItemName} to ${step.scene}`
-        : step.order === 1 ? `Started at ${step.scene}` : step.scene;
-      list.append(element("li", null, text));
-    }
-    if (run.steps.length) content.push(list);
-    else content.push(element("p", null, "No scenes have been entered."));
-    route.replaceChildren(...content);
-
+  function statusText(state, run) {
+    if (!run) return state.summary;
     const start = run.startedMidStory ? ` Started at mid-story scene ${run.startScene} from Scene setup.` : "";
     const current = run.currentScene ? ` Current scene: ${run.currentScene}.` : "";
     const ended = run.isEnded ? " The playtest has ended." : "";
-    state.status.textContent = `${state.summary}${start}${current}${ended}`;
+    return `${state.summary}${start}${current}${ended}`;
   }
 
-  function updateRun(host, run) {
+  async function updateRun(host, run) {
     const state = host.talewrightMap;
     if (!state) throw new Error("The story map has not been rendered.");
     state.run = run;
@@ -615,89 +557,23 @@ window.talewrightMap = (() => {
         state.routeLines.set(step.lineId, orders);
       }
     }
-    renderRun(state);
+    await reportStatus(state, statusText(state, run));
     redraw(state);
   }
 
-  function itemButton(state, item) {
-    const button = element("button", "map-item", item.name);
-    button.type = "button";
-    button.dataset.item = item.id;
-    button.addEventListener("focus", () => { state.highlighted = item.line; redraw(state); });
-    button.addEventListener("mouseenter", () => { state.highlighted = item.line; redraw(state); });
-    const clear = () => {
-      if (state.highlighted === item.line && document.activeElement !== button) { state.highlighted = null; redraw(state); }
-    };
-    button.addEventListener("mouseleave", clear);
-    button.addEventListener("blur", () => { state.highlighted = null; redraw(state); });
-    button.addEventListener("click", () => select(state, item.target, true));
-    const entry = element("li");
-    entry.append(button);
-    return entry;
-  }
-
-  function showDetails(state, node) {
-    const { details } = state;
-    const heading = element("h3", null, node.name);
-    const diverts = node.items.filter(item => !item.hubOffer);
-    const offers = node.items.filter(item => item.hubOffer);
-    const list = (title, items) => {
-      const section = [element("h4", null, `${title}: ${items.length}`)];
-      if (items.length) {
-        const ul = element("ul");
-        ul.setAttribute("aria-label", title);
-        ul.append(...items.map(item => itemButton(state, item)));
-        section.push(ul);
-      }
-      return section;
-    };
-    details.replaceChildren(heading, ...list("Diverts", diverts), ...(node.hub || offers.length ? list("Hub offers", offers) : []));
-  }
-
-  function buildSceneButtons(state) {
-    const focusedId = state.scenes.contains(document.activeElement) ? document.activeElement.dataset.id : null;
-    const nodes = state.view.nodes.filter(node => !node.stub);
-    const buttons = nodes.map((node, index) => {
-      const button = element("button", null, node.name);
-      button.type = "button";
-      button.dataset.id = node.id;
-      button.tabIndex = -1;
-      button.addEventListener("focus", () => {
-        state.focused = node.id;
-        select(state, node.id, false);
-        center(state, node.id, Math.max(state.transform.k, 0.8));
-      });
-      button.addEventListener("blur", () => { state.focused = null; redraw(state); });
-      button.addEventListener("keydown", event => {
-        let next;
-        if (event.key === "ArrowRight" || event.key === "ArrowDown") next = Math.min(index + 1, buttons.length - 1);
-        else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = Math.max(index - 1, 0);
-        else if (event.key === "Home") next = 0;
-        else if (event.key === "End") next = buttons.length - 1;
-        else return;
-        event.preventDefault();
-        buttons[next].focus();
-      });
-      return button;
-    });
-    state.scenes.replaceChildren(...buttons);
-    state.buttons = new Map(buttons.map(button => [button.dataset.id, button]));
-    const current = state.buttons.get(state.selected) || buttons[0];
-    if (current) current.tabIndex = 0;
-    if (focusedId && state.buttons.has(focusedId)) state.buttons.get(focusedId).focus();
-  }
-
-  // Renders a MapView from MapTab.razor. Called again with the new view whenever the debugger reloads the story.
-  async function render(host, view, run, dotnet) {
-    const state = host.talewrightMap || (host.talewrightMap = create(host));
+  // Renders map data from MapTab.razor; all accessible controls are owned by Razor.
+  async function render(host, canvas, tooltip, view, run, selected, dotnet) {
+    const state = host.talewrightMap || (host.talewrightMap = create(host, canvas, tooltip));
     const generation = ++state.generation;
     state.dotnet = dotnet;
-    state.status.textContent = "Laying out the map…";
+    if (selected) state.selected = selected;
+    await reportStatus(state, "Laying out the map…");
     let laid;
     try {
       laid = await layout(view);
     } catch (error) {
-      if (generation === state.generation) state.status.textContent = `The map could not be laid out: ${error.message || error}`;
+      if (generation === state.generation)
+        await reportStatus(state, `The map could not be laid out: ${error.message || error}`);
       throw error;
     }
     if (generation !== state.generation) return;
@@ -708,16 +584,7 @@ window.talewrightMap = (() => {
     state.groupSizes = new Map(view.groups.map(group => [group.id, view.nodes.filter(node => node.group === group.id).length]));
     state.highlighted = null;
     if (!state.nodes.has(state.selected)) state.selected = null;
-    const activeElement = document.activeElement;
-    const focusedItemId = state.details.contains(activeElement) ? activeElement.dataset.item : null;
-    buildSceneButtons(state);
-    if (state.selected) showDetails(state, state.nodes.get(state.selected));
-    else state.details.replaceChildren(element("p", null, "Select a scene to list its diverts and hub offers."));
-    if (focusedItemId) {
-      const replacement = Array.from(state.details.querySelectorAll("button[data-item]"))
-        .find(button => button.dataset.item === focusedItemId);
-      (replacement || state.buttons.get(state.selected) || state.buttons.values().next().value)?.focus();
-    }
+    if (!state.nodes.has(state.focused)) state.focused = null;
     const scenes = view.nodes.filter(node => !node.end && !node.stub).length;
     const diverts = view.nodes.reduce((sum, node) => sum + node.items.filter(item => !item.hubOffer).length, 0);
     const offers = view.nodes.reduce((sum, node) => sum + node.items.length, 0) - diverts;
@@ -725,9 +592,43 @@ window.talewrightMap = (() => {
     state.summary = `${count(scenes, "scene", "scenes")}, ${count(diverts, "divert", "diverts")}, ` +
       `${count(offers, "hub offer", "hub offers")}, ${view.unreachableScenes} unreachable.`;
     if (!state.fitted) fit(state);
-    updateRun(host, run);
+    await updateRun(host, run);
     redraw(state);
   }
 
-  return { render, updateRun, exportMap };
+  function setFocused(host, id) {
+    const state = host.talewrightMap;
+    if (!state) return;
+    state.focused = id;
+    state.selected = id;
+    state.highlighted = null;
+    if (state.nodes?.has(id))
+      center(state, id, Math.max(state.transform.k, 0.8));
+    redraw(state);
+  }
+
+  function clearFocused(host, id) {
+    const state = host.talewrightMap;
+    if (state?.focused !== id) return;
+    state.focused = null;
+    redraw(state);
+  }
+
+  function highlight(host, line) {
+    const state = host.talewrightMap;
+    if (!state) return;
+    state.highlighted = line;
+    redraw(state);
+  }
+
+  function fitHost(host) {
+    const state = host.talewrightMap;
+    if (state) fit(state);
+  }
+
+  return {
+    render, updateRun, exportMap,
+    select: (host, id) => select(host.talewrightMap, id),
+    setFocused, clearFocused, highlight, fit: fitHost,
+  };
 })();
