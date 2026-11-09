@@ -23,7 +23,7 @@
             <button type="button" class="tw-link" aria-expanded="@(_menuOpen ? "true" : "false")"
                     disabled="@(Busy || ReadingHistory || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
-                <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="OpenSettings">Settings</button>
+                <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory || !_settingsReady)" @onclick="OpenSettings">Settings</button>
                 <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
                 {
@@ -39,7 +39,7 @@
     }
 </header>
 
-<ReaderSettingsDialog @ref="_settingsDialog" />
+<ReaderSettingsDialog @ref="_settingsDialog" OnReady="SettingsReady" />
 
 <dialog class="tw-confirm" aria-label="Restart story?" @ref="_confirmation">
     <h2>Restart story?</h2>
@@ -73,6 +73,7 @@
     private IJSObjectReference? _module;
     private bool _menuOpen;
     private bool _initialized;
+    private bool _settingsReady;
     private bool _focusMenu;
 
     protected override void OnParametersSet()
@@ -116,6 +117,12 @@
     {
         _menuOpen = false;
         await _settingsDialog.OpenAsync(_toggle);
+    }
+
+    private Task SettingsReady()
+    {
+        _settingsReady = true;
+        return Task.CompletedTask;
     }
 
     private async Task CancelRestart() =>

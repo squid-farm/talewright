@@ -98,6 +98,42 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
 
     [Fact]
     [Trait("Host", "Browser")]
+    public async Task Settings_stays_disabled_until_its_module_is_initialized()
+    {
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.RouteAsync("**/ReaderSettingsDialog.razor.js", async route =>
+        {
+            requested.SetResult();
+            await release.Task;
+            await route.ContinueAsync();
+        });
+        try
+        {
+            await Upload(TestStories.Linear);
+            await requested.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await AssertState(state => Assert.True(state.PassageFocused));
+
+            var toggle = Page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
+            await Expect(toggle).ToBeEnabledAsync();
+            await toggle.ClickAsync();
+            var settings = Page.GetByRole(AriaRole.Button, new() { Name = "Settings", Exact = true });
+            await Expect(settings).ToBeDisabledAsync();
+
+            release.SetResult();
+            await Expect(settings).ToBeEnabledAsync();
+            await settings.ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Settings" })).ToBeVisibleAsync();
+            await Expect(Page.Locator("#tw-theme")).ToBeFocusedAsync();
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
     public async Task Save_refresh_does_not_pull_focus_back_into_open_disclosure()
     {
         await Upload(TestStories.Linear);

@@ -55,6 +55,9 @@
 </dialog>
 
 @code {
+    [Parameter]
+    public EventCallback OnReady { get; set; }
+
     private ElementReference _dialog;
     private IJSObjectReference? _module;
     private ElementReference? _returnFocus;
@@ -82,6 +85,7 @@
             _module = await JS.InvokeAsync<IJSObjectReference>(
                 "import", "./_content/Talewright.Player/Components/ReaderSettingsDialog.razor.js");
             await _module.InvokeVoidAsync("initialize", _dialog);
+            await OnReady.InvokeAsync();
         }
     }
 
