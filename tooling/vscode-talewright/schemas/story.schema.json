@@ -152,6 +152,16 @@
       "minimum": -2147483648,
       "maximum": 2147483647
     },
+    "inventoryQuantity": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/integer"
+        },
+        {
+          "minimum": 0
+        }
+      ]
+    },
     "booleanScalar": {
       "description": "Use YAML true or false. Quoted 'true' and 'false' are also accepted; yes, no, and other values are invalid.",
       "oneOf": [
@@ -367,9 +377,9 @@
             "$ref": "#/definitions/identifier"
           },
           "additionalProperties": {
-            "$ref": "#/definitions/integer"
+            "$ref": "#/definitions/inventoryQuantity"
           },
-          "description": "Item IDs mapped to quantities."
+          "description": "Item IDs mapped to nonnegative quantities; zero means the item is not held."
         }
       ]
     },

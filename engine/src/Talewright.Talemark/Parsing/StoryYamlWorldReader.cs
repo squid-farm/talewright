@@ -236,7 +236,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             var lastName = Scalar(Get(body, ManifestVocabulary.LastName)) ?? string.Empty;
             var pronouns = ReadPronouns(Get(body, ManifestVocabulary.Pronouns));
             var stats = ReadStatMap(Get(body, ManifestVocabulary.Stats), ruleset);
-            var inventory = ReadInventory(Get(body, ManifestVocabulary.Inventory), items);
+            var inventory = ReadInventory(Get(body, ManifestVocabulary.Inventory), items, characterId);
             var nameAgreement = Get(body, ManifestVocabulary.NameAgreement) is { } number
                 ? ReadGrammaticalNumber(number, ManifestVocabulary.NameAgreement)
                 : GrammaticalNumber.Singular;
@@ -331,7 +331,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return stats;
     }
 
-    private Dictionary<ItemId, int> ReadInventory(YamlNode? node, Dictionary<ItemId, ItemDefinition> items)
+    private Dictionary<ItemId, int> ReadInventory(YamlNode? node, Dictionary<ItemId, ItemDefinition> items, EntityId character)
     {
         var inventory = new Dictionary<ItemId, int>();
         if (node is null)
@@ -339,14 +339,14 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             return inventory;
         }
 
-        IEnumerable<(YamlNode Key, int Quantity)> entries = node switch
+        IEnumerable<(YamlNode Key, YamlNode? QuantityNode, int Quantity)> entries = node switch
         {
-            YamlSequenceNode seq => seq.Children.Select(c => (c, 1)),
-            YamlMappingNode map => map.Children.Select(c => (c.Key, _yaml.Int(c.Value) ?? 1)),
-            _ => _yaml.Error<IEnumerable<(YamlNode, int)>>(node, CompilerDiagnosticCodes.InvalidConfigurationValue, "inventory must be a list of item ids or a map of item id to quantity.", []),
+            YamlSequenceNode seq => seq.Children.Select(c => (c, (YamlNode?)null, 1)),
+            YamlMappingNode map => map.Children.Select(c => (c.Key, (YamlNode?)c.Value, _yaml.Int(c.Value) ?? 1)),
+            _ => _yaml.Error<IEnumerable<(YamlNode, YamlNode?, int)>>(node, CompilerDiagnosticCodes.InvalidConfigurationValue, "inventory must be a list of item ids or a map of item id to quantity.", []),
         };
 
-        foreach (var (key, quantity) in entries)
+        foreach (var (key, quantityNode, quantity) in entries)
         {
             var rawId = _yaml.Identifier(key, "item id");
             if (rawId is null) continue;
@@ -357,7 +357,14 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                 continue;
             }
 
-            inventory[id] = inventory.GetValueOrDefault(id) + quantity;
+            var startingQuantity = quantity;
+            if (quantityNode is not null && quantity < 0)
+            {
+                startingQuantity = _yaml.Error(quantityNode, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"Starting inventory quantity for item '{id}' on character '{character}' must be non-negative.", 0);
+            }
+
+            inventory[id] = inventory.GetValueOrDefault(id) + startingQuantity;
         }
 
         return inventory;
