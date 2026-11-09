@@ -2,8 +2,11 @@ using Talewright.Narrative.Grammar;
 
 namespace Talewright.Narrative.Templates;
 
-/// <summary>Grammar of the original substitution value, retained throughout the modifier chain.</summary>
-public sealed record ModifierContext(IGrammar Grammar, bool IsPlural, bool IsUncountable = false);
+/// <summary>Original grammatical agreement and number input for the modifier chain.</summary>
+public sealed record ModifierContext(IGrammar Grammar, bool IsPlural, bool IsUncountable = false)
+{
+    public int? NumberValue { get; init; }
+}
 
 /// <summary>The output kind used when validating a chain of text modifiers.</summary>
 public enum TextModifierValueKind
@@ -46,7 +49,11 @@ public sealed record OneManyTextModifier(string Singular, string Plural) : IText
 
     public string Name => ModifierName;
 
-    public string Apply(string text, ModifierContext context) => context.IsPlural ? Plural : Singular;
+    public string Apply(string text, ModifierContext context)
+    {
+        var isPlural = context.NumberValue is { } number ? number != 1 : context.IsPlural;
+        return isPlural ? Plural : Singular;
+    }
 }
 
 internal sealed class FormattingTextModifier(string name, TextStyle style) : ITextModifier

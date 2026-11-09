@@ -119,6 +119,50 @@ public sealed class FormattingManipulatorTests
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf("#bold", StringComparison.Ordinal) + 1), error.Location);
     }
 
+    [Fact]
+    public void One_many_selects_from_numeric_expressions_without_changing_name_agreement()
+    {
+        const string manifest = """
+            game:
+              id: numeric-one-many
+              title: Numeric one-many
+              start: start
+              ruleset: rpg
+            characters:
+              player:
+                first-name: Ada
+                stats: {hp: 1}
+                inventory: {arrow: 2}
+            vars: {coins: 2}
+            items: {arrow: Arrow}
+            """;
+        const string tale = """
+            === start
+            {0#one-many("one", "many")}
+            {1#one-many("one", "many")}
+            {2#one-many("one", "many")}
+            {-1#one-many("one", "many")}
+            {1 + 1#one-many("one", "many")}
+            {var:coins#one-many("one", "many")}
+            {player:hp#one-many("one", "many")}
+            {player:inventory:arrow:count#one-many("one", "many")}
+            {item:arrow#one-many("one", "many")}
+            -> END
+            """;
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = tale,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var state = GameState.CreateInitial(result.Story!.World, 1);
+        var rendered = new TemplateRenderer()
+            .Render(CompilerTests.Templates(result.Story.GetScene(new SceneId("start"))), state)
+            .ToPlainText();
+        Assert.Equal("many\none\nmany\nmany\nmany\nmany\none\nmany\none", rendered);
+    }
+
     private static (IReadOnlyList<TextStyle> Styles, SubstitutionTemplate Substitution) StyledSubstitution(
         ParagraphTemplate paragraph)
     {

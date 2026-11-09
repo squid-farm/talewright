@@ -152,6 +152,47 @@ public sealed class StoryPreviewTests
     }
 
     [Fact]
+    public void Numeric_one_many_hovers_show_the_selected_default_wording()
+    {
+        var analysis = StoryAnalyzer.Analyze(Source("""
+            === start
+            {player:inventory:rope:count#one-many("rope remains", "ropes remain")}
+            {var:coins + 1#one-many("one", "many")}
+            {player:hp#one-many("one", "many")}
+            -> END
+            """));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var previews = StoryPreview.Get(analysis, "main.tale");
+        Assert.Equal(["ropes remain", "many", "many"], previews.Select(preview => preview.Value));
+        Assert.Equal(["0", "4", "10"], previews.Select(preview => preview.Steps[0].Value));
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 5)));
+        Assert.Contains("Result: \"ropes remain\" (default)", hover.PlainText);
+        Assert.Contains("Input: \"0\"", hover.PlainText);
+        Assert.Contains("#one-many: \"ropes remain\"", hover.PlainText);
+    }
+
+    [Fact]
+    public void Numeric_one_many_previews_include_standing_and_scene_visit_defaults()
+    {
+        var source = Source("""
+            === start
+            {faction:guild:standing#one-many("one", "many")}
+            {scene:player:visits#one-many("one", "many")}
+            {scene:player:visits + faction:guild:standing#one-many("one", "many")}
+            -> END
+            """, Manifest + "\nfactions:\n  guild: {name: Guild, standing: 1}\n");
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var previews = StoryPreview.Get(analysis, "main.tale");
+
+        Assert.Equal(["one", "many", "one"], previews.Select(preview => preview.Value));
+        Assert.Equal(["1", "0", "1"], previews.Select(preview => preview.Steps[0].Value));
+        Assert.All(previews, preview => Assert.Null(preview.UnavailableReason));
+    }
+
+    [Fact]
     public async Task Unsaved_supporting_character_changes_and_close_update_defaults_without_mutating_sources()
     {
         var source = Source("=== start\n{player:name} {player:pronoun:object}", Manifest[..Manifest.IndexOf("characters:", StringComparison.Ordinal)]);

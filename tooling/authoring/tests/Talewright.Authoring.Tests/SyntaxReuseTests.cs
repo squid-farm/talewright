@@ -244,6 +244,18 @@ public sealed class SyntaxReuseTests
     [Fact]
     public async Task Repeated_edits_keep_only_live_syntax_and_obsolete_snapshots_are_collectible()
     {
+        var (obsolete, oldAnalysis) = await CreateObsoleteSyntaxReferences();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.All(obsolete, reference => Assert.False(reference.TryGetTarget(out _)));
+        Assert.False(oldAnalysis.TryGetTarget(out _));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task<(List<WeakReference<TaleFileSyntax>> Obsolete, WeakReference<StoryAnalysis> OldAnalysis)>
+        CreateObsoleteSyntaxReferences()
+    {
         var workspace = new StoryWorkspace(Source());
         await workspace.AnalyzeAsync(TimeSpan.Zero);
         var oldAnalysis = AnalysisReference(workspace);
@@ -258,11 +270,7 @@ public sealed class SyntaxReuseTests
         }
         workspace.UpdateFile("a.tale", null);
         Assert.Single(workspace.Syntax);
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-        Assert.All(obsolete, reference => Assert.False(reference.TryGetTarget(out _)));
-        Assert.False(oldAnalysis.TryGetTarget(out _));
+        return (obsolete, oldAnalysis);
     }
 
     [Fact]
