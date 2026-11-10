@@ -67,14 +67,18 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task Opens_the_players_reader_settings_dialog()
+    public async Task Initializes_reader_settings_before_use_without_a_mounted_reader()
     {
         var workbench = Show();
         workbench.WaitForAssertion(() => Assert.False(Button(workbench, "Reader settings").HasAttribute("disabled")));
+        Assert.Empty(workbench.FindAll("[aria-label='Current passage']"));
 
         await Button(workbench, "Reader settings").ClickAsync(new MouseEventArgs());
+        var dialog = workbench.FindComponent<Talewright.Player.Components.ReaderSettingsDialog>();
+        await dialog.Find("#tw-theme").ChangeAsync(new ChangeEventArgs { Value = "Dark" });
 
         Assert.Single(_settingsModule.Invocations["open"]);
+        Assert.Equal("Dark", dialog.Find("#tw-theme").GetAttribute("value"));
     }
 
     [Fact]

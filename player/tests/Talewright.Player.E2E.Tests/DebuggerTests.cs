@@ -863,8 +863,17 @@ public sealed class DebuggerTests
             await using var driver = new NativePlayerDriver(artifacts, executable);
             await driver.StartAsync(root);
             await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Reader settings");
+            var snapshot = await WaitFor(driver, "Close settings");
+            Assert.DoesNotContain("Story transcript", snapshot.Content);
+            var dialog = Assert.Single(snapshot.Descendants(),
+                node => node.Role == "dialog" && node.Name == "Settings");
+            Assert.Contains(dialog.Descendants(),
+                node => node.Role == "push button" && node.Name == "Close settings");
+            await driver.ClickAsync("Close settings");
+
             await driver.ClickAsync("Start selected scene");
-            var snapshot = await WaitFor(driver, "Story transcript", "Current passage", "Story choices", "Continue");
+            snapshot = await WaitFor(driver, "Story transcript", "Current passage", "Story choices", "Continue");
 
             Assert.Contains(snapshot.Descendants(), node => node.Name == "Story transcript");
             Assert.Contains(snapshot.Descendants(), node => node.Name == "Current passage");
@@ -874,7 +883,7 @@ public sealed class DebuggerTests
 
             await driver.ClickAsync("Reader settings");
             snapshot = await WaitFor(driver, "Close settings");
-            var dialog = Assert.Single(snapshot.Descendants(),
+            dialog = Assert.Single(snapshot.Descendants(),
                 node => node.Role == "dialog" && node.Name == "Settings");
             Assert.Contains(dialog.Descendants(),
                 node => node.Role == "push button" && node.Name == "Close settings");
