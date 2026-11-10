@@ -8,7 +8,6 @@ using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
-using Talewright.Rules.Storylets;
 using Talewright.Rules.Triggers;
 using Talewright.Talemark.Model;
 
@@ -154,12 +153,13 @@ public sealed class StorySession : IStorySession
         {
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
         }
-        var choices = execution.Target is null ? OfferChoices(scene, execution.Choices) : ContinueTo(scene, execution.Target);
-        if (choices.Count == 0)
+        var choices = execution.Target is null ? execution.Choices : ContinueTo(scene, execution.Target);
+        var menu = BuildMenu(scene, choices, includeHubOffers: execution.Target is null);
+        if (menu.Choices.Count == 0)
         {
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
         }
-        Present(scene, blocks, choices);
+        Present(scene, blocks, menu);
     }
 
     internal void JumpAuthor(SceneId target)
@@ -298,15 +298,16 @@ public sealed class StorySession : IStorySession
         if (execution.Target is { } next)
         {
             SkipHub(scene);
-            return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks, ContinueTo(scene, next));
+            return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks,
+                BuildMenu(scene, ContinueTo(scene, next), includeHubOffers: false));
         }
-        var choices = OfferChoices(scene, execution.Choices);
-        if (choices.Count == 0)
+        var menu = BuildMenu(scene, execution.Choices);
+        if (menu.Choices.Count == 0)
         {
             blocks.Add(new RenderedNote(NoteKind.Info, $"The story cannot continue from '{scene.Id}': no choice or divert applies here."));
             return EndStory(blocks, scene);
         }
-        return Present(scene, blocks, choices);
+        return Present(scene, blocks, menu);
     }
 
     private void BeforeTransition()
@@ -325,41 +326,24 @@ public sealed class StorySession : IStorySession
                 _log.Events.Count, _log.Events.Count));
     }
 
-    private List<VisibleChoice> OfferChoices(SceneDefinition scene, IReadOnlyList<VisibleChoice> choices)
+    private StoryMenu BuildMenu(SceneDefinition scene, IReadOnlyList<VisibleChoice> choices,
+        bool includeHubOffers = true) =>
+        StoryMenuBuilder.Build(Story, scene, choices, Context,
+            storylet => CreateHubCandidate(scene, storylet), _observer, _log.Events.Count, includeHubOffers);
+
+    private ChoiceCandidate CreateHubCandidate(SceneDefinition scene, SceneDefinition storylet)
     {
-        var offered = new List<VisibleChoice>(choices);
-
-        if (scene.Hub is { } hub)
-        {
-            var hubOffers = new Dictionary<SceneId, VisibleChoice>();
-            var storylets = StoryletSelector.SelectMenuCandidates(Story.Scenes, hub, Context, scene.Id,
-                scene.HubLimit, _observer, _log.Events.Count, storylet =>
-                {
-                    var key = StoryletKeyPrefix + storylet.Id.Value;
-                    var target = new DivertTarget(storylet.Id);
-                    var label = HubLabelSource(storylet);
-                    var candidate = new ChoiceCandidate(key, storylet.Requires, label,
-                        ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render),
-                        notes =>
-                        {
-                            _log.Append(new ChoiceMade(scene.Id, key));
-                            Enter(target, notes);
-                        },
-                        _replayIdentities.ForDivert(scene.Id, target));
-                    var offer = ChoiceAvailability.Evaluate(candidate, Context, _observer is not null, out var trace);
-                    if (offer is not null)
-                    {
-                        hubOffers.Add(storylet.Id, offer);
-                    }
-                    return (offer?.IsAvailable ?? false, offer is { IsAvailable: false }, trace);
-                });
-            foreach (var storylet in storylets)
+        var key = StoryletKeyPrefix + storylet.Id.Value;
+        var target = new DivertTarget(storylet.Id);
+        var label = HubLabelSource(storylet);
+        return new ChoiceCandidate(key, storylet.Requires, label,
+            ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render),
+            notes =>
             {
-                offered.Add(hubOffers[storylet.Storylet.Id]);
-            }
-        }
-
-        return offered;
+                _log.Append(new ChoiceMade(scene.Id, key));
+                Enter(target, notes);
+            },
+            _replayIdentities.ForDivert(scene.Id, target));
     }
 
     private static Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
@@ -435,21 +419,18 @@ public sealed class StorySession : IStorySession
     private IEnumerable<RenderedBlock> NotesSince(int mark) =>
         EventNarrator.Describe(_log.Events.Skip(mark).ToList(), _log.State);
 
-    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, List<VisibleChoice> choices)
+    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, StoryMenu menu)
     {
         _actions.Clear();
-        foreach (var choice in choices.Where(choice => choice.IsAvailable))
+        foreach (var choice in menu.Choices.Where(choice => choice.IsAvailable))
         {
             _actions[choice.Candidate.Key] = (choice.Candidate.Destination, choice.View.ReplayIdentity);
         }
 
-        var menu = choices.Select((choice, index) =>
-            new ChoiceMenuEntry(index + 1, choice.View.Key, choice.View.Label, choice.IsAvailable)).ToArray();
-        var availableChoices = choices.Where(choice => choice.IsAvailable).Select(choice => choice.View).ToArray();
         Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks),
-            Array.AsReadOnly(availableChoices), IsEnded: false)
+            menu.AvailableChoices, IsEnded: false)
         {
-            Menu = Array.AsReadOnly(menu),
+            Menu = menu.Entries,
         };
         return Current;
     }

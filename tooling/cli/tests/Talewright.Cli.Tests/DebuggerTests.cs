@@ -178,17 +178,17 @@ public sealed class DebuggerTests : IDisposable
         var scene = new SceneId("scene1");
 
         var defaultPreview = MapScenePreviewBuilder.Build(story, scene, model.PreviewState, usesCurrentRunState: false);
-        Assert.Equal(["Wait"], defaultPreview.Choices.Select(choice => choice.Text));
+        Assert.Equal(["Wait"], defaultPreview.Frame.Menu.Select(choice => choice.Text));
 
         var ready = Assert.Single(model.Flags);
         ready.Enabled = true;
         ready.Value = true;
         var setupPreview = MapScenePreviewBuilder.Build(story, scene, model.PreviewState, usesCurrentRunState: false);
-        Assert.Equal(["Prepared", "Wait"], setupPreview.Choices.Select(choice => choice.Text));
+        Assert.Equal(["Prepared", "Wait"], setupPreview.Frame.Menu.Select(choice => choice.Text));
 
         model.Start();
         var currentPreview = MapScenePreviewBuilder.Build(story, scene, model.PreviewState, usesCurrentRunState: true);
-        Assert.Equal(["Prepared", "Wait"], currentPreview.Choices.Select(choice => choice.Text));
+        Assert.Equal(["Prepared", "Wait"], currentPreview.Frame.Menu.Select(choice => choice.Text));
         Assert.True(currentPreview.UsesCurrentRunState);
     }
 
