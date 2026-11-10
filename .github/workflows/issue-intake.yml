@@ -5,10 +5,12 @@ on:
     types: [opened]
 
 permissions:
-  issues: write
+  contents: read
 
 jobs:
   triage:
+    permissions:
+      issues: write
     if: >-
       ${{ !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association)
           && !contains(github.event.issue.labels.*.name, 'status:triage') }}

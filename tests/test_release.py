@@ -428,6 +428,7 @@ class PublicationSafeguardTests(unittest.TestCase):
         ("build.yml", "publish-nuget"): {"id-token"},
         ("build.yml", "github-release"): {"contents"},
         ("performance.yml", "publish-results"): {"contents"},
+        ("issue-intake.yml", "triage"): {"issues"},
         ("publish-nuget.yml", "publish"): {"id-token"},
         ("publish-samples.yml", "deploy"): {"pages", "id-token"},
         ("publish-ui-test-image.yml", "publish"): {"packages"},
@@ -539,7 +540,7 @@ class PublicationSafeguardTests(unittest.TestCase):
         self.assertEqual({"build"}, self.dependencies(pages, "deploy"))
         self.assertEqual("github-pages", deploy["environment"]["name"])
 
-    def test_write_permissions_are_limited_to_known_publication_jobs(self):
+    def test_write_permissions_are_limited_to_known_jobs(self):
         actual = {}
         for name, workflow in self.workflows.items():
             self.assertEqual({"contents": "read"}, workflow.get("permissions"), name)
