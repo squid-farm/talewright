@@ -43,6 +43,7 @@ if [[ "$rid" == win-* ]]; then extension=.exe; fi
 for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension" \
   Talewright.Cli.deps.json Talewright.Cli.runtimeconfig.json \
   debug-host/Talewright.Debugger.runtimeconfig.json debug-host/debug-assets/index.html \
+  debug-host/debug-assets/Talewright.Debugger.styles.css \
   debug-host/debug-assets/map/map.js debug-host/debug-assets/map/vendor/THIRD-PARTY-NOTICES.md \
   debug-host/debug-assets/map/vendor/d3-zoom.bundle.min.js \
   debug-host/debug-assets/map/vendor/elk-api.js debug-host/debug-assets/map/vendor/elk-worker.min.js \
@@ -71,12 +72,17 @@ for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension
   debug-assets/map/vendor/licenses/d3-transition.txt \
   debug-assets/map/vendor/licenses/d3-zoom.txt \
   publish-assets/standalone/desktop/App.razor publish-assets/desktop/THIRD-PARTY-NOTICES.txt \
-  publish-assets/player/talewright.css; do
+  publish-assets/player/talewright.css \
+  debug-host/publish-assets/player/talewright.css \
+  debug-host/publish-assets/player/Preferences/PlayerPreferences.js \
+  debug-host/publish-assets/player/Components/ReaderSettingsDialog.razor.js \
+  debug-host/publish-assets/player/Components/MediaView.razor.js; do
   test -s "$output/$file" || { echo "Missing CLI archive asset: $file" >&2; exit 1; }
 done
 for file in player-assets/player.html debug-host/player-assets/player.html \
   publish-assets/player/Preferences/PlayerPreferencesBootstrap.js \
   publish-assets/player/Preferences/PlayerPreferences.js \
+  publish-assets/player/Components/ReaderSettingsDialog.razor.js \
   publish-assets/player/Components/MediaView.razor.js \
   publish-assets/player/Components/PlayerToolbar.razor.js \
   publish-assets/player/Components/SavedGamesPanel.razor.js \

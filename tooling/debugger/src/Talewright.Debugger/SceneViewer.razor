@@ -1,16 +1,14 @@
-<section aria-label="Current passage" tabindex="0">
-    <h3>@Session.Current.Scene @Session.Current.Title</h3>
-    <DocumentView Document="Session.Current.Document" />
-</section>
-@if (AtLimit && !Session.Current.IsEnded)
-{
-    <p role="alert">This synthetic run reached the @StoryHistory.MaxChoices-command limit. Start a fresh scene playtest to continue.</p>
-}
-<StoryChoices Current="Session.Current" OnChoose="OnChoose" OnRestart="OnRestart" Busy="@(AtLimit && !Session.Current.IsEnded)" />
+<h3 class="debugger-scene-heading">@Session.Current.Scene @Session.Current.Title</h3>
+<ReaderPresentation>
+    <StoryStage Story="Session.Story" Passages="Passages" PassageWindow="1" Current="Session.Current"
+                State="Session.State" Identity="Session" AtChoiceLimit="AtLimit" Busy="false"
+                OnChoose="OnChoose" OnRestart="OnRestart" />
+</ReaderPresentation>
 
 @code {
     [Parameter, EditorRequired] public AuthorSession Session { get; set; } = null!;
     [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
     private bool AtLimit => Session.Cursor >= StoryHistory.MaxChoices;
+    private IReadOnlyList<HistoryFrame> Passages => [new(Session.Current)];
 }

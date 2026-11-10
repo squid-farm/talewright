@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -148,7 +149,58 @@ class RepositoryLayoutTests(unittest.TestCase):
                 self.assertTrue({f"{assembly}.csproj", "App.razor", "Program.cs"} <= templates)
 
 
+class DebuggerIsolationTests(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+    DEBUGGER = ROOT / "tooling/debugger/src/Talewright.Debugger"
+
+    def test_debugger_renders_scenes_through_the_player_components(self):
+        forbidden_components = re.compile(r"<\s*(?:DocumentView|StoryChoices|StoryPassage|CharacterSheet)\b")
+        for component in self.DEBUGGER.rglob("*.razor"):
+            with self.subTest(component=component.relative_to(self.ROOT)):
+                self.assertNotRegex(component.read_text(), forbidden_components)
+
+        for name in ("SceneViewer.razor", "MapTab.razor"):
+            with self.subTest(component=name):
+                source = (self.DEBUGGER / name).read_text()
+                self.assertIn("<ReaderPresentation>", source)
+                self.assertIn("<StoryStage ", source)
+
+        self.assertIn("<ReaderSettingsDialog ", (self.DEBUGGER / "Workbench.razor").read_text())
+        self.assertFalse(any(self.DEBUGGER.rglob("ReaderSettingsDialog.razor")))
+
+    def test_debugger_styles_are_isolated_and_never_target_player_classes(self):
+        stylesheets = [
+            path for path in self.DEBUGGER.rglob("*.css")
+            if not {"bin", "obj"} & set(path.relative_to(self.DEBUGGER).parts)
+        ]
+        for stylesheet in stylesheets:
+            source = stylesheet.read_text()
+            with self.subTest(stylesheet=stylesheet.relative_to(self.ROOT)):
+                self.assertNotIn("::deep", source)
+                self.assertNotRegex(source, r"\.tw-[A-Za-z0-9_-]+")
+
+        global_styles = (self.DEBUGGER / "wwwroot/debugger.css").read_text()
+        selectors = re.findall(r"([^{}]+)\{[^{}]*\}", global_styles)
+        for group in selectors:
+            for selector in group.split(","):
+                with self.subTest(selector=selector.strip()):
+                    self.assertIn(selector.strip(), {"html", "body", "app"})
+
+
 class PackageBoundaryTests(unittest.TestCase):
+    def test_native_cli_archive_checks_debugger_player_assets(self):
+        script = (Path(__file__).resolve().parents[1] / ".github/scripts/package_cli.sh").read_text()
+        for asset in (
+            "debug-host/debug-assets/Talewright.Debugger.styles.css",
+            "debug-host/publish-assets/player/talewright.css",
+            "debug-host/publish-assets/player/Preferences/PlayerPreferences.js",
+            "debug-host/publish-assets/player/Components/ReaderSettingsDialog.razor.js",
+            "debug-host/publish-assets/player/Components/MediaView.razor.js",
+            "publish-assets/player/Components/ReaderSettingsDialog.razor.js",
+        ):
+            with self.subTest(asset=asset):
+                self.assertIn(asset, script)
+
     def test_engine_consumer_restores_each_framework_before_building(self):
         class EngineConsumerChecked(Exception):
             pass
@@ -214,7 +266,7 @@ class PackageBoundaryTests(unittest.TestCase):
                              "Talewright.Debugger.dll",
                              "debug-assets/index.html",
                              "debug-assets/debugger.css",
-                             "debug-assets/_content/Talewright.Player/talewright.css",
+                             "debug-assets/Talewright.Debugger.styles.css",
                              *MAP_ASSETS,
                              "publish-assets/web/Talewright.Host.Web.csproj",
                              "publish-assets/web/BuildIdentity.targets",
@@ -388,7 +440,9 @@ class PackageBoundaryTests(unittest.TestCase):
         prefix = "tools/net10.0/any/"
         required = ["Talewright.Debugger.dll", "debug-assets/index.html",
                     "debug-assets/debugger.css",
-                    "debug-assets/_content/Talewright.Player/talewright.css", *MAP_ASSETS]
+                    "debug-assets/Talewright.Debugger.styles.css",
+                    *PLAYER_ASSETS,
+                    *MAP_ASSETS]
         assets = len(required)
         for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
             extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"

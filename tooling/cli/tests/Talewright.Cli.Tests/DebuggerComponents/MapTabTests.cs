@@ -4,15 +4,21 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Talewright.Debugger;
+using Talewright.Player.Preferences;
 
 namespace Talewright.Cli.Tests.DebuggerComponents;
 
-public sealed class MapTabTests : BunitContext
+public sealed class MapTabTests : BunitContext, IAsyncLifetime
 {
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+    async Task IAsyncLifetime.DisposeAsync() => await base.DisposeAsync();
+
     public MapTabTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<MapExportDialog>();
+        JSInterop.SetupModule("./_content/Talewright.Player/Preferences/PlayerPreferences.js");
+        Services.AddScoped<PlayerPreferencesStore>();
     }
 
     [Fact]
@@ -100,7 +106,9 @@ public sealed class MapTabTests : BunitContext
         Assert.Equal("Scene preview: Cave", preview.QuerySelector("h3")!.TextContent);
         Assert.Contains("using the current playtest state.", preview.TextContent);
         Assert.Contains("The cave.", preview.TextContent);
-        Assert.Equal(["1. Return", "2. Leave"], preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
+        var choices = preview.QuerySelectorAll("ol[aria-label='Story choices'] button");
+        Assert.Equal(["1. Return", "2. Leave"], choices.Select(item => Text(item.TextContent)));
+        Assert.All(choices, button => Assert.True(button.HasAttribute("disabled")));
 
         SceneButton(map, "cave").Blur();
 
@@ -121,7 +129,8 @@ public sealed class MapTabTests : BunitContext
         Assert.Equal("Scene preview: Great Hall", preview.QuerySelector("h3")!.TextContent);
         Assert.Contains("using scene setup values.", preview.TextContent);
         Assert.Contains("Count 0.", preview.TextContent);
-        Assert.Equal(["1. Explore", "2. Wait"], preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
+        Assert.Equal(["1. Explore", "2. Wait"],
+            preview.QuerySelectorAll("ol[aria-label='Story choices'] button").Select(item => Text(item.TextContent)));
     }
 
     [Fact]
@@ -142,8 +151,9 @@ public sealed class MapTabTests : BunitContext
         SceneButton(map, "hall").Focus();
 
         var preview = map.Find("section[aria-label='Scene preview']");
-        Assert.Equal(["1. Not ready (unavailable)", "2. Wait"],
-            preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
+        var choices = preview.QuerySelectorAll("ol[aria-label='Story choices'] button");
+        Assert.Equal(["1. Not ready (Unavailable)", "2. Wait"], choices.Select(item => Text(item.TextContent)));
+        Assert.All(choices, button => Assert.True(button.HasAttribute("disabled")));
     }
 
     [Fact]
@@ -315,4 +325,7 @@ public sealed class MapTabTests : BunitContext
 
     private static IElement Button(IRenderedComponent<MapTab> map, string text) =>
         map.FindAll("button").Single(button => button.TextContent == text);
+
+    private static string Text(string value) =>
+        string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }

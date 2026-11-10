@@ -1,0 +1,4 @@
+section { margin: 1rem 0; border: 1px solid var(--tw-muted); padding: 1rem; }
+button, input { font: inherit; padding: .35rem; }
+button { color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); }
+:focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }

@@ -840,6 +840,51 @@ public sealed class DebuggerTests
         }
     }
 
+    [Fact]
+    public async Task Native_debugger_uses_player_story_regions_and_opens_reader_settings()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-debugger-player-view-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-player-view", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: debugger-player-view\n  title: Debugger Player View\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                The shared player passage.
+                * [Continue] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Story transcript", "Current passage", "Story choices", "Continue");
+
+            Assert.Contains(snapshot.Descendants(), node => node.Name == "Story transcript");
+            Assert.Contains(snapshot.Descendants(), node => node.Name == "Current passage");
+            var choices = Assert.Single(snapshot.Descendants(), node => node.Name == "Story choices");
+            Assert.Contains(choices.Descendants(),
+                node => node.Role == "push button" && node.Name.Contains("Continue", StringComparison.Ordinal));
+
+            await driver.ClickAsync("Reader settings");
+            snapshot = await WaitFor(driver, "Close settings");
+            var dialog = Assert.Single(snapshot.Descendants(),
+                node => node.Role == "dialog" && node.Name == "Settings");
+            Assert.Contains(dialog.Descendants(),
+                node => node.Role == "push button" && node.Name == "Close settings");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, params string[] texts)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));

@@ -53,10 +53,10 @@ public sealed partial class ExpressionViewTests
     {
         var html = await Render<InspectionPanel>(new() { [nameof(InspectionPanel.Inspection)] = Start().Inspection });
 
-        Assert.Contains($"<code>{Html(Compound)}</code>", html);
-        Assert.Contains("<code>@Brave</code>", html);
+        AssertCode(html, Compound);
+        AssertCode(html, "@Brave");
         Assert.Contains("(opaque C# predicate; internals unavailable)", html);
-        Assert.Contains($"<code>{Html("flag:ready and player has lantern")}</code>", html);
+        AssertCode(html, "flag:ready and player has lantern");
         Assert.DoesNotContain("BinaryExpr", html);
         Assert.DoesNotContain("HasItem", html);
         Assert.DoesNotContain("NamedPredicate", html);
@@ -97,7 +97,7 @@ public sealed partial class ExpressionViewTests
             decision.Rank is null && decision.Limit is null);
 
         var html = await Render<InspectionPanel>(new() { [nameof(InspectionPanel.Inspection)] = model.Inspection });
-        var details = Regex.Matches(html, @"<p>Events (?<details>.*?)</p>", RegexOptions.Singleline);
+        var details = Regex.Matches(html, @"<p\b[^>]*>Events (?<details>.*?)</p>", RegexOptions.Singleline);
         Assert.Equal(decisions.Count, details.Count);
         for (var i = 0; i < decisions.Count; i++)
         {
@@ -217,17 +217,20 @@ public sealed partial class ExpressionViewTests
         var depth = 0;
         foreach (Match match in NodePattern().Matches(html))
         {
-            if (match.Value == "<ul>") depth++;
+            if (match.Value.StartsWith("<ul", StringComparison.Ordinal)) depth++;
             else if (match.Value == "</ul>") depth--;
             else nodes.Add((depth, WebUtility.HtmlDecode(match.Groups["text"].Value), WebUtility.HtmlDecode(match.Groups["result"].Value)));
         }
         return nodes;
     }
 
-    [GeneratedRegex(@"<ul>|</ul>|<li><code>(?<text>[^<]*)</code>:\s*<strong>(?<result>[^<]*)</strong>")]
+    [GeneratedRegex(@"<ul\b[^>]*>|</ul>|<li\b[^>]*><code\b[^>]*>(?<text>[^<]*)</code>:\s*<strong\b[^>]*>(?<result>[^<]*)</strong>")]
     private static partial Regex NodePattern();
 
     private static string Html(string text) => System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text);
+
+    private static void AssertCode(string html, string text) =>
+        Assert.Matches($"<code\\b[^>]*>{Regex.Escape(Html(text))}</code>", html);
 
     private static Task<string> RenderTrace(ExpressionTrace trace) => Render<RootList>(new() { [nameof(RootList.Trace)] = trace });
 

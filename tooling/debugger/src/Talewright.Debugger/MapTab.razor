@@ -34,21 +34,10 @@
     <section class="map-preview" aria-label="Scene preview">
         <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
         <p>Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
-        <DocumentView Document="preview.Frame.Document" />
-        <h4>Available choices in this preview</h4>
-        @if (preview.Frame.Menu.Count == 0)
-        {
-            <p>No choices are available in this preview.</p>
-        }
-        else
-        {
-            <ul>
-                @foreach (var choice in preview.Frame.Menu)
-                {
-                    <li>@choice.Number. @choice.Text@if (!choice.IsAvailable) { <span> (unavailable)</span> }</li>
-                }
-            </ul>
-        }
+        <ReaderPresentation>
+            <StoryStage Story="Story" Passages="PreviewPassages" PassageWindow="1" Current="preview.Frame"
+                        State="PreviewState" Identity="preview.Frame" Busy="true" />
+        </ReaderPresentation>
     </section>
 }
 <div class="map-export-controls" aria-label="Export story map">
@@ -65,6 +54,9 @@
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
     [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
+    private IReadOnlyList<HistoryFrame> PreviewPassages => _preview is { } preview
+        ? [new(preview.Frame)]
+        : [];
 
     private ElementReference _host;
     private ElementReference _canvas;

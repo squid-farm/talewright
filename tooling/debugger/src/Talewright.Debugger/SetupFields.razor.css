@@ -1,0 +1,6 @@
+details { margin: .6rem 0; padding: .4rem; border: 1px solid var(--tw-muted); }
+summary { cursor: pointer; }
+label { display: inline-block; margin: .4rem; }
+input, select { font: inherit; padding: .35rem; }
+.setup-row { display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 55rem; }
+:focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }

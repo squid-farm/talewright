@@ -9,7 +9,29 @@
     <ProjectReference Include="../../../../player/src/Talewright.Player/Talewright.Player.csproj" />
     <ProjectReference Include="../../../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
     <Content Update="wwwroot/**" TargetPath="debug-assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../../../player/src/Talewright.Player/wwwroot/talewright.css" Link="debug-assets/_content/Talewright.Player/talewright.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(IntermediateOutputPath)scopedcss/bundle/$(PackageId).styles.css" TargetPath="debug-assets/$(PackageId).styles.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="PlayerAssets/player.html" Link="player-assets/player.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="CopyPlayerAssetsToDebuggerOutput" AfterTargets="Build">
+    <MakeDir Directories="$(OutputPath)publish-assets/player/Preferences;$(OutputPath)publish-assets/player/Components" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/wwwroot/talewright.css"
+          DestinationFiles="$(OutputPath)publish-assets/player/talewright.css" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/wwwroot/Preferences/PlayerPreferences.js"
+          DestinationFiles="$(OutputPath)publish-assets/player/Preferences/PlayerPreferences.js" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/Components/ReaderSettingsDialog.razor.js"
+          DestinationFiles="$(OutputPath)publish-assets/player/Components/ReaderSettingsDialog.razor.js" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/Components/MediaView.razor.js"
+          DestinationFiles="$(OutputPath)publish-assets/player/Components/MediaView.razor.js" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyPlayerAssetsToDebuggerPublishOutput" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)publish-assets/player/Preferences;$(PublishDir)publish-assets/player/Components" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/wwwroot/talewright.css"
+          DestinationFiles="$(PublishDir)publish-assets/player/talewright.css" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/wwwroot/Preferences/PlayerPreferences.js"
+          DestinationFiles="$(PublishDir)publish-assets/player/Preferences/PlayerPreferences.js" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/Components/ReaderSettingsDialog.razor.js"
+          DestinationFiles="$(PublishDir)publish-assets/player/Components/ReaderSettingsDialog.razor.js" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="../../../../player/src/Talewright.Player/Components/MediaView.razor.js"
+          DestinationFiles="$(PublishDir)publish-assets/player/Components/MediaView.razor.js" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
