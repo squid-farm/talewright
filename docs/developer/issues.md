@@ -48,6 +48,15 @@ gh project field-list 1 --owner squid-farm
   from the others instead of copying it.
 - Keep the project's *Priority* field consistent with the `priority:` label (or the bug's severity).
 
+## Triage
+
+New issues from outside the team get `status:triage` automatically and appear in the project's
+*Triage* view, not *Backlog* or *Current work*. Team members and repository collaborators don't
+need to label their own issues, whether they use GitHub or the API.
+
+Review the report before treating it as work to pick up. If we're keeping it, clarify the scope
+and remove `status:triage` so it appears in *Backlog*. Otherwise, close it with a short explanation.
+
 ## Epics
 
 Epics are parent issues with the `epic` label. They group related work across milestones; an issue
