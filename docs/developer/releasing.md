@@ -17,11 +17,12 @@ Publishing consumes that run's `nuget-packages` and `talewright-vscode` artifact
 
 ## Preview compatibility notice
 
-Use this prepared copy in preview release notes and tester announcements. It matches the README banner
-and the generated release notes. This copy does not authorize publishing a release or contacting
-testers; the project lead controls both.
+Use this text in 1.0 preview release notes and tester announcements. The first paragraph matches the
+notice that `.github/scripts/github_release.py` adds to generated release notes; keep them in step.
+The compatibility promise starts with 1.0.0-preview.1, which has not shipped yet. The project lead
+decides when to publish a release and when to contact testers.
 
-> **1.0 preview: stories and saves are stable.** From 1.0.0-preview.1, Talemark syntax, story files
+> **1.0 preview: what stays stable.** From 1.0.0-preview.1, Talemark syntax, story files
 > and saves made by a preview will keep working in later 1.x releases. We will break this only to fix
 > a severe defect, such as a security or data-loss bug, and will announce it in advance, with an error
 > that names the replacement and migration notes. Tooling, debugger scenario files and C# extension
@@ -32,8 +33,8 @@ testers; the project lead controls both.
 > not share private story content without permission.
 
 The browser and Linux Photino jobs in **Tests** and **Real-file performance** run inside the versioned
-public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/update procedure is documented in
-[UI test container image](ui-test-image.md).
+public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). See
+[UI test container image](ui-test-image.md) for how to publish and update it.
 
 ## Repository settings
 
@@ -48,14 +49,12 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
    approval. Without that explicit forwarding, the secret resolves to an empty string in the
    reusable workflow. Do not use blanket secret inheritance or add a long-lived NuGet API key.
    Approve the publishing deployments only after reviewing the validated tag/run.
-3. For the UI test image package, keep GHCR visibility public so fork PRs can pull it without credentials.
-   The first publish may default to private, so confirm and adjust package visibility explicitly.
-4. After confirming the emitted context on a PR, require **CI verification** rather than conditional
-   leaf jobs. The Nx-aware aggregate rejects failures, cancellations, and unexpected skips while
+3. Keep the UI test image package public on GHCR so fork PRs can pull it without credentials.
+   A newly created package may default to private.
+4. Make **CI verification** the required status check, not the conditional leaf jobs. The Nx-aware aggregate rejects failures, cancellations, and unexpected skips while
    permitting legitimately unselected jobs. See [Nx CI orchestration](nx-ci.md).
-5. **Account-side correction required:** change the nuget.org Trusted Publishing policy's workflow
-   filename from **`build.yml` to `publish-nuget.yml`**, keeping repository owner `squid-farm`,
-   repository `talewright`, and environment `release`. Enter the filename only, not a path.
+5. The nuget.org Trusted Publishing policy uses workflow filename **`publish-nuget.yml`** (filename
+   only, not a path), repository owner `squid-farm`, repository `talewright`, and environment `release`.
    NuGet validates the OIDC **`job_workflow_ref`**, which identifies the **called reusable workflow**,
    not the top-level caller (`build.yml`). See the
    [NuGet claim validator](https://github.com/NuGet/NuGetGallery/blob/c25bab040e19d24593fc0c298a0cedb51bf57dcb/src/NuGetGallery.Services/Authentication/Federated/GitHubTokenPolicyValidator.cs)
@@ -69,7 +68,7 @@ public GHCR UI image (`ghcr.io/squid-farm/talewright-ui-tests:*`). Publish/updat
 
 ## All-in-one extension packages
 
-The existing editor `package-check` target now publishes a self-contained Linux x64 language
+The editor `package-check` target publishes a self-contained Linux x64 language
 server into the VSIX before running package checks; `editor-smoke` installs **that VSIX** and
 uses the default bundled executable. It checks diagnostics, completion, hover and navigation
 with external `dotnet` blocked and runtime lookup disabled, plus a real restricted-workspace
@@ -90,9 +89,9 @@ metadata cannot satisfy the gate. Publication does not rebuild packages and ther
 Supported environments and development overrides are documented in the
 [extension README](../../tooling/vscode-talewright/README.md).
 
-After publication, verify the live `squid-farm.talewright` listing, clean supported-environment
-installation, platform compatibility filtering and a subsequent version update before declaring
-#234 complete. Automated offline validation does not establish a live listing or live update.
+Automated offline validation can't check the live Marketplace. After publishing, check the
+`squid-farm.talewright` listing, a clean install, platform filtering and updating from the previous
+version by hand.
 
 ## Release identities
 
@@ -117,7 +116,7 @@ installation, platform compatibility filtering and a subsequent version update b
 | `v0.1.0` | `0.1.0` | `0.1.999` | stable |
 | `v0.1.1-preview.1` | `0.1.1-preview.1` | `0.1.1001` | prerelease |
 
-The editor's existing package target stamps the mapped version and prerelease flag **before**
+The editor's package target stamps the mapped version and prerelease flag **before**
 package/installed-editor validation and artifact upload. It restores the source manifest afterward.
 Publication never rebuilds or repackages the VSIXs. Marketplace publishing iterates all six
 verified files with the same mapped version and channel, retaining `--skip-duplicate` so a retry
@@ -126,20 +125,20 @@ can resume after partial platform publication. GitHub Releases attaches Linux x6
 The original `talewright-vscode` CI artifact holds Linux x64; `talewright-vscode-TARGET`
 artifacts hold provisional targets. The release gate, Marketplace job and GitHub release job
 all download and verify the full set.
-Ordinary main/PR/manual packaging is unchanged;
-ordinary NuGet CI builds remain unpublished `0.0.0-ci.RUN_NUMBER`.
+Main, PR and manual builds don't stamp a release version; their NuGet packages are unpublished
+`0.0.0-ci.RUN_NUMBER` builds.
 
-## Cutting the first preview
+## Cutting a release
 
-After this pipeline and its bundled-server delivery are reviewed/merged, and the NuGet policy is
-corrected, tag the exact reviewed `main` commit:
+Tag the exact reviewed `main` commit. Replace `VERSION` with the new version, such as
+`0.6.0-preview.1`:
 
 ```bash
 git switch main
 git pull --ff-only origin main
-python3 .github/scripts/package_version.py --tag v0.1.0-preview.1 --release-json
-git tag v0.1.0-preview.1
-git push origin v0.1.0-preview.1
+python3 .github/scripts/package_version.py --tag vVERSION --release-json
+git tag vVERSION
+git push origin vVERSION
 gh run list --workflow build.yml --event push --limit 5
 # Select the run for this tag:
 gh run watch RUN_ID --exit-status
@@ -151,11 +150,8 @@ never publishes, even when run against a tag.
 
 ## Releases, retries and author downloads
 
-- A rerun uses the original tag's workflow definitions, not fixes subsequently merged to `main`.
-  The `v0.1.0-preview.1` run failed before NuGet authentication because its reusable-workflow call
-  did not forward `NUGET_USER`; Marketplace publication succeeded independently. Rerunning that
-  unchanged tag will not pick up the forwarding fix. After merging the correction, cut a new
-  reviewed preview tag (for example `v0.1.0-preview.2`); do not move the already-published tag.
+- A rerun uses the original tag's workflow definitions, not fixes merged to `main` afterwards. If a
+  workflow bug breaks a release, merge the fix and cut a new preview tag; don't move the old one.
 - Publication is not atomic. NuGet pushes `Talewright`, `Talewright.Player`, `Talewright.Cli`, then
   `Talewright.LanguageServer`; Marketplace can run in parallel. The separate NuGet language-server
   tool is never a dependency of shipped games.
@@ -173,23 +169,22 @@ never publishes, even when run against a tag.
 - GitHub supplies versioned **Source code (zip)** and **Source code (tar.gz)** archives automatically.
   Use the [releases list](https://github.com/squid-farm/talewright/releases) to find previews:
   `/releases/latest` excludes prereleases and may be empty before a stable release.
-  Generated notes include an author/source-install explanation and the 1.0 preview compatibility
-  statement from the README banner: stories and saves made by a preview keep working in later 1.x
-  releases. A release containing an approved breaking change must add its migration notes.
+  Generated notes include an author/source-install explanation and the
+  [compatibility notice](#preview-compatibility-notice). A release containing an approved breaking
+  change must add its migration notes.
 - **Never move or reuse a release tag.** Fix mistakes with a new version. Version-tag runs are not
   cancelled by newer CI runs. If artifacts expire before a retry, rerun full validation on the
   unchanged tag; never substitute locally built artifacts.
-- Version tags additionally build self-contained CLI/debugger archives for the six existing RIDs.
-  The existing release gate requires their build/asset checks and six SHA-256 files; the GitHub job
+- Version tags also build self-contained CLI/debugger archives for six RIDs. The release gate requires their build/asset checks and six SHA-256 files; the GitHub job
   attaches those archives/checksums alongside the VSIXs without rebuilding them after approval.
   See the [author setup guide](../guide/cli-installation.md) for download instructions and
   [technical CLI setup](cli-setup.md) for per-command prerequisites and verification limits.
   Cross-building Windows/macOS/ARM does not verify execution on those platforms.
-- Player release downloads, installers, package managers and Open VSX remain separate follow-ups.
+- Player downloads, installers, package managers and Open VSX are not part of the release yet.
 
 ## Offline validation
 
-The existing `talewright-ci-tests:ci-check` target includes `tests/test_release.py`, covering
+The `talewright-ci-tests:ci-check` target includes `tests/test_release.py`, covering
 version boundaries/order/collisions, the complete six-platform VSIX set, native architecture,
 identity/channel/bundling, and release API retry/error cases without network publication. It also
 parses the workflows to check publication safeguards: tag-only publication behind full verification,
@@ -200,11 +195,11 @@ NuGet OIDC sign-in to nuget.org, and no `pull_request_target` triggers:
 ./nx run talewright-ci-tests:ci-check
 cd tooling/vscode-talewright
 npm ci
-TALEWRIGHT_RELEASE_TAG=v0.1.0-preview.1 npm run package
-TALEWRIGHT_RELEASE_TAG=v0.1.0-preview.1 npm run test:package
+TALEWRIGHT_RELEASE_TAG=v0.5.0-preview.1 npm run package
+TALEWRIGHT_RELEASE_TAG=v0.5.0-preview.1 npm run test:package
 # Repeat package/test:package with TALEWRIGHT_VSIX_TARGET set to each provisional target.
 # Once all six packages exist:
-python3 ../../.github/scripts/verify_release_vsix.py artifacts v0.1.0-preview.1 --all
+python3 ../../.github/scripts/verify_release_vsix.py artifacts v0.5.0-preview.1 --all
 ```
 
 Run `xvfb-run -a npm run test:editor` after packaging to check the installed all-in-one client/server

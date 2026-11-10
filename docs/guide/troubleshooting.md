@@ -15,7 +15,7 @@ top level or inside a single folder.
 - Live checks only run in a trusted folder. If VS Code shows **Restricted Mode** in the bottom-left
   corner, select it and choose **Trust**. Checking starts straight away.
 - Open **View > Output** and choose **Talewright Language Server** from the list to see why the
-  live checker did not start. Only Linux x64 is runtime-tested; please report failures on other systems.
+  live checker didn't start.
 - **Talewright: Validate Story** in the Command Palette uses the separate CLI, not the live checker.
   Run **Talewright: Set Up CLI** first if VS Code says the CLI is missing.
 
@@ -32,33 +32,34 @@ scenes haven't already been visited. `validate` warns (`TW3008`) when no scene h
 
 ## My old save won't load
 
-Try opening it with the original story revision and a compatible player. V1 updates can load a save
-only when its starting state and complete recorded gameplay path still match; a prose or label change
-may work, but changed starting values or outcomes do not. Saves without replay evidence have no
-cross-revision compatibility guarantee. A failed load leaves the save and current game untouched.
-See [saves](playing-and-saving.md#updating-a-story-with-existing-saves).
+The story or Talewright has probably changed since the save was made. Rewording prose usually
+doesn't matter, but changing starting values or the outcome of choices already made does. Open the
+save with the version of the story that made it. A failed load never changes the save or your
+current game. See [updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves).
 
 ## My saves disappeared (web)
 
-Web saves live in your browser for that site. Clearing browsing data, private windows and switching
-browsers or devices all lose them. Export a save file before clearing data or moving devices, then
-import it into the same story on the other player. See
-[backing up and moving saves](playing-and-saving.md#backing-up-and-moving-saves). If no backup exists,
-cleared browser saves cannot be recovered by the player.
+Web saves live in your browser, for that website only. Clearing browsing data, using a private
+window, or switching browsers or devices all lose them, and they can't be recovered. Export a save
+file before clearing data or moving devices, then import it into the same story on the other player.
+See [backing up and moving saves](playing-and-saving.md#backing-up-and-moving-saves).
 
-## The desktop player or debugger won't start on Linux
+## The desktop player or debugger won't start
 
 Install WebKitGTK 4.1 and libnotify using the
 [Linux desktop setup commands](getting-started.md#linux-desktop-setup). You also need a graphical
-desktop session (X11 or Wayland); the debugger cannot open from a remote terminal or SSH session
-without one. Published Linux games need the same libraries but do not check for them before launch.
-The browser player and published web games do not need them.
+desktop (X11 or Wayland); these windows can't open from a remote terminal or SSH session. Published
+Linux games need the same libraries. The browser player doesn't.
+
+On Windows, the Author Debugger and desktop games need **Microsoft Edge WebView2**, which is built
+into Windows 11 and up-to-date Windows 10.
 
 ## The debugger says it can't watch your story folder
 
-The debugger watches your story folder so it can reload your saved edits automatically. Every editor
-window and file-watching tool uses some of a limited system allowance, so with several open, the
-debugger may not get one. Automatic reload pauses, but your current playtest keeps running.
+The debugger watches your story folder so it can reload your edits automatically. Your computer
+only allows a limited number of these watchers, and every editor window and similar tool uses some.
+With several open, the debugger may not get one. Automatic reload pauses, but your current playtest
+keeps running.
 
 Close other editor windows or file-watching tools, then select **Rescan / retry watcher**. **Restart
 from source** also retries, and starts a fresh run with your latest edits. The original system message
@@ -89,27 +90,22 @@ available when a story fails to open, including in a published game. Review the 
 **Download diagnostic report** if you want to attach it to a bug report. Nothing is uploaded
 automatically.
 
-The report includes the player version and commit, host and available platform information, story
-and scene IDs when available, and up to 100 recent warnings and errors with their operation and a
-safe cause. Development builds may show `dev` for the version or `unknown` for the commit.
-Compiler diagnostics include their codes. The report does not include story text, save contents,
-full paths, URLs or exception messages. IDs can still be identifying, so check the report before
-sharing it. The buffer belongs to the current player session and is cleared when the player is
-restarted; it cannot recover details after every process crash.
+The report lists the player version, your system, the story and scene IDs, and recent warnings and
+errors. It doesn't include your story text, saves or file paths, but IDs such as scene names can
+still say something about your story, so read it before sharing. It only covers the current session:
+restarting the player clears it.
 
-For a CLI problem, copy the command and its terminal output, including any errors. For an editor
-problem, open **View > Output**, choose **Talewright Language Server**, and copy the relevant output.
-Review terminal and editor output before sharing: unlike the player report, they may contain paths,
-story text or other private information. Reproduction steps are often helpful, and a separately
-shared minimal story or save may be needed to reproduce some problems.
+For a CLI problem, copy the command and everything it printed. For an editor problem, open
+**View > Output**, choose **Talewright Language Server**, and copy the relevant lines. Read these
+before sharing: they can contain file paths and story text.
 
 ## Still stuck?
 
 [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
 Include your operating system, the Talewright version, what you tried, and the exact error message.
-In the web or desktop player, copy the line that starts with "Talewright" from the bottom of the
-library page or the **Settings** dialog, for example `Talewright 1.0.0 · commit 1a2b3c4 · built 2026-01-31`.
-A published game shows the version of the player it was built with. `dev` means a local or
-development build rather than a release.
-A GitHub account is required. Don't include private story files or personal information.
-If useful, you can attach a small example that shows the problem, but story files are optional.
+To find the version in the web or desktop player, copy the line that starts with "Talewright" from
+the bottom of the library page or the **Settings** dialog, for example
+`Talewright 0.5.0-preview.1 · commit 1a2b3c4 · built 2026-01-31`.
+A published game shows the version it was built with.
+You'll need a GitHub account. Don't include private story files or personal information; a small
+example that shows the problem helps, but is optional.

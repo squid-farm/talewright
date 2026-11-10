@@ -1,11 +1,11 @@
 # Organizing your story
 
 Start small. You can keep all your story settings and characters in one file,
-then split them up when scrolling starts to get in the way. Neither layout gives
-your story extra features: choose whichever is easier to write.
-To keep a name or short recurring text consistent across branches, use a character substitution
-or text variable rather than copying the value into every passage.
-See [names and recurring text](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
+then split them up when scrolling starts to get in the way. Both layouts work
+the same way: choose whichever is easier to write.
+
+To keep a name or other recurring text the same everywhere, see
+[names and recurring text](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
 
 ## A small story: two files
 
@@ -150,8 +150,8 @@ triggers:
     once: true
 ```
 
-Only one file may contain `triggers:`. You can move the whole list to a supporting
-file, but don't split it across files or use filenames to try to control the order.
+Only one file may contain `triggers:`. If you do move the whole list to another
+settings file, don't split it across files: file names don't control the order.
 
 ## After moving files
 
@@ -178,22 +178,16 @@ LostRelic/
   images/
 ```
 
-The root holds the game/rules, player, Tomas, trail items, guild and all triggers,
-including the dream's three-mark trigger. The dream settings hold the six
-characters, glyph item, variables and promise flag beside their scenes.
-Camp introduces conversations, supplies and the register; the trail adds checks
-and an optional night watch; the temple brings routes together; endings show
-their consequences. Scene prefixes (`camp.`, `trail.`, `temple.`, `ending.`)
-match that organization because the author wrote them, not because folders
-create a namespace.
+The root settings file holds the game rules, the player, the guide Tomas, the
+trail items, the guild and every trigger. The optional dream route keeps its own
+characters, item, variables and flag in `dream/dream.talewright.yaml`, next to its
+scenes.
 
-The optional dream route in the temple uses this supporting configuration, but
-its folder creates no private scope: camp can refer to `{ines:name}`, and the
-dream can refer to `{guide:first-name}`. Duplicate IDs across either file are
-errors, not replacement declarations. Keep all triggers in the root rather than
-adding another `triggers:` list under `dream/`. The split ferry example above
-uses the same rules. Do not copy Tomas into another file while leaving his root
-declaration in place.
-See the [sample feature map](../../samples/README.md#feature-map) for exact locations.
+The same rules as the ferry example apply. The `dream/` folder doesn't make its
+names private: camp scenes can still mention `{ines:name}`, and the dream can
+mention `{guide:first-name}`. The scene names start with `camp.`, `trail.`,
+`temple.` and `ending.` because the author chose them that way, not because of
+the folders. See the [sample feature map](../../samples/README.md#feature-map)
+to find each feature.
 
 For all available settings, see the [syntax reference](../reference/talemark-syntax.md#1-storytalewrightyaml).

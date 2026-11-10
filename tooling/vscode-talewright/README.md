@@ -1,8 +1,7 @@
 # Talemark for VS Code
 
-Write Talewright stories in **Talemark** (`.tale` files), insert common story structures, and get
-schema support, shared semantic completion/hover, and live compiler diagnostics without
-running your story.
+Write Talewright stories in **Talemark** (`.tale` files) with syntax highlighting, snippets, story-aware
+completion and hover, live compiler diagnostics, rename and quick fixes, without running your story.
 
 [Author cheat sheet: Talemark syntax and VS Code shortcuts](https://github.com/squid-farm/talewright/blob/main/docs/guide/cheat-sheet.md).
 
@@ -10,75 +9,52 @@ running your story.
 
 ## Install
 
-**Optional:** You do not need this extension to write a story. A plain-text editor
-and the browser player are enough. Each platform-specific VSIX includes a compatible self-contained
-language server: no separate Talewright tool, .NET SDK/runtime, server-path setting or build is needed.
-The extension is available on the Marketplace.
+You don't need this extension to write a story: a plain-text editor and the browser player are enough.
+The extension makes writing easier. It needs VS Code 1.100 or later.
 
-Use VS Code 1.100 or later on a matching extension host.
-
-**Provisional platform support:** Linux x64 is runtime-tested on Ubuntu 24.04 and Linux Mint 22.3.
-Windows x64/ARM64, macOS Intel/Apple Silicon and Linux ARM64 packages are cross-built and inspected,
-but installed-editor execution on those platforms is not yet verified. They are offered
-provisionally, not with the same validation guarantee as Linux x64. Please report platform-specific
-failures, including your OS, architecture and **Talewright Language Server** output.
-
-1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-   from the VS Code Marketplace. It provides the YAML editor features used by the schema.
+1. Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
+   It provides the YAML editor features used by the story settings schema.
 2. Install **Talewright** by **squid-farm** from
    [the Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright).
-   For a preview, choose **Switch to Pre-Release Version**.
-   The Marketplace selects the package matching your extension host automatically.
-   As a download-and-install alternative, obtain the matching platform VSIX from
-   [GitHub Releases](https://github.com/squid-farm/talewright/releases) or the
-   **talewright-vscode** (Linux x64) or **talewright-vscode-TARGET** artifact of a successful
-   tagged **Build** run. Contributors can build it below.
-3. If you downloaded a VSIX, open **Extensions**, choose **... > Install from VSIX...**, and
-   select the file. Marketplace installations do not need this step. Reload VS Code if prompted.
-4. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
-   The language ID remains `tale`.
-5. Trust the story folder to enable live compiler diagnostics and story-aware completion/hover.
-   The extension launches its bundled server using stdio; it never downloads tools, builds a story
-   project, discovers assemblies or executes story-project code automatically.
-   Leave `talewright.languageServer.command` empty for normal installation.
-   Configure `talewright.languageServer.command`/`args` only for a development override, or set
-   `talewright.languageServer.enabled` to `false` for schema/syntax-only use.
-   Reload the window after changing settings. Launch errors appear in the
-   **Talewright Language Server** output channel. Untrusted workspaces never
-   launch a process; the server starts as soon as you trust the folder, without a reload.
+   For a preview, choose **Switch to Pre-Release Version**. The Marketplace picks the package for your
+   platform automatically. You can also download the matching `.vsix` from
+   [GitHub Releases](https://github.com/squid-farm/talewright/releases) and use
+   **Extensions > ... > Install from VSIX...**.
+3. Open a `.tale` file. The language indicator at the bottom should say **Talemark**.
+4. Trust the story folder to turn on live diagnostics and story-aware completion and hover.
 
-This package identifier is `squid-farm.talewright`.
+Each package includes its own self-contained Talewright language server, so you don't need .NET, the
+`talewright` CLI or any build step for editing. The extension starts the bundled server only in trusted
+workspaces. It never downloads tools, builds a story project or runs story-project code. Server errors
+appear in the **Talewright Language Server** output channel.
+
+**Provisional platform support:** only Linux x64 is tested in an installed editor (on Ubuntu 24.04 and
+Linux Mint 22.3). The Windows, macOS and Linux ARM64 packages are built and inspected, but not yet
+run in a real editor, so they are offered provisionally. If something fails on your platform, please
+[open an issue](https://github.com/squid-farm/talewright/issues) with your OS, architecture and the
+**Talewright Language Server** output.
 
 | VSIX target | Extension host | Validation |
 |---|---|---|
-| `linux-x64` | Linux Intel/AMD 64-bit | Installed-editor/runtime tested |
-| `linux-arm64` | Linux ARM64 | Provisional; package inspection only |
-| `win32-x64` | Windows Intel/AMD 64-bit | Provisional; package inspection only |
-| `win32-arm64` | Windows ARM64 | Provisional; package inspection only |
-| `darwin-x64` | macOS Intel | Provisional; package inspection only |
-| `darwin-arm64` | macOS Apple Silicon | Provisional; package inspection only |
+| `linux-x64` | Linux Intel/AMD 64-bit | Tested in an installed editor |
+| `linux-arm64` | Linux ARM64 | Provisional |
+| `win32-x64` | Windows Intel/AMD 64-bit | Provisional |
+| `win32-arm64` | Windows ARM64 | Provisional |
+| `darwin-x64` | macOS Intel | Provisional |
+| `darwin-arm64` | macOS Apple Silicon | Provisional |
 
-Alpine/musl, 32-bit hosts, browser-hosted VS Code and universal fallback packages are not supplied.
-Remote development needs a matching remote extension-host package, not the local UI's package.
-Self-contained .NET removes the runtime installation requirement, not the operating system's
-native library requirements. Provisional hosts still need a
-[.NET 10-supported OS](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)
-and VS Code's system prerequisites.
+Alpine/musl, 32-bit, browser-hosted VS Code and universal packages are not supplied. For remote
+development, the package must match the remote extension host. The bundled server still needs the
+operating system libraries .NET 10 relies on: see
+[.NET 10 supported OS versions](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)
+and [VS Code's requirements](https://code.visualstudio.com/docs/supporting/requirements). On Ubuntu
+24.04 these are `libc6`, `libgcc-s1`, `libstdc++6`, `libicu74`, `libssl3t64` and `zlib1g`.
 
-### Supported Linux environment
+### Language server settings
 
-The CI packaging and installed-editor checks run on **Ubuntu 24.04 x64**; local installed-editor
-checks also run on Linux Mint 22.3 (Ubuntu 24.04-based). This is not a claim of support for every
-Linux distribution. The bundled .NET runtime still requires OS libraries:
-`libc6`, `libgcc-s1`, `libstdc++6`, `libicu74`, `libssl3t64` and `zlib1g` on Ubuntu 24.04,
-in addition to [VS Code's native Linux prerequisites](https://code.visualstudio.com/docs/supporting/requirements).
-Install missing system libraries with your distribution's package manager. No .NET installation
-is required. Missing executable/runtime/system-library failures produce a notification and details in
-**Talewright Language Server** output; no external-server fallback is attempted.
-
-### Development server override
-
-To run a local server build instead of the bundled version:
+Leave `talewright.languageServer.command` empty to use the bundled server. Set
+`talewright.languageServer.enabled` to `false` for highlighting and schema checks only. To try a
+local server build instead:
 
 ```json
 {
@@ -87,91 +63,172 @@ To run a local server build instead of the bundled version:
 }
 ```
 
-Only this override requires your own matching runtime/server. Clear the command and restore args to
-`["--stdio"]` to return to the bundled server. Reload VS Code after changing settings or granting
-workspace trust. See [server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
+Reload the window after changing these settings. To return to the bundled server, clear the command
+and set args back to `["--stdio"]`. See
+[server setup and other editors](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md).
 
-## CLI actions (separate CLI installation required)
+## Write a scene
 
-The Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**) provides **Talewright: New Story**,
-**Talewright: Validate Story**, **Talewright: Publish Story ZIP**, **Talewright: Open Author Debugger**, and
-**Talewright: Run Story**. Validation, publishing, debugging, and play run the existing `talewright` CLI
-in a visible, interactive task terminal. New Story invokes `talewright new` directly. The bundled
-language server provides live editor help; it is **not**
-the CLI and does not include the native player or debugger.
+Type a prefix, then pick its suggestion (or run **Insert Snippet**). Tab moves between placeholders.
 
-**New Story** uses the sole empty workspace folder directly, or asks you to choose a folder. If another
-workspace is open, you can open the created story in the current window or a new one. On success, the
-extension opens `story.tale`; CLI errors, including the refusal to overwrite an existing story, are shown
-without modification.
+| Prefix | Inserts |
+|---|---|
+| `tale-scene` | Scene header, prose and a divert |
+| `tale-choice` | Choice label and target |
+| `tale-if` | Conditional prose, alternate branch and closing marker |
+| `tale-choice-check` | Choice skill check with success/failure outcomes |
+| `tale-check` | Entry skill check block with both outcomes |
+| `tale-image` | An `{image("path", "alt text")}` call |
 
-Run **Talewright: Set Up CLI**, install the CLI separately and put `talewright` on PATH, or set `talewright.cli.executablePath`
-to its absolute executable path (paths with spaces are supported). No source builds, downloads
-or installation run automatically. **Run Story also requires the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)**; the extension checks for it and does not install it.
+Replace scene IDs and other placeholders with your story's own names. **Toggle Line Comment** adds and
+removes `//` comments. Talemark turns off automatic quote and bracket closing so prose and literal
+braces are comfortable to type; you can change that in your settings.
+
+Highlighting distinguishes scene headers, metadata, speech, effects, conditions, choices,
+substitutions, checks, bold and italic text, escapes and image calls. Markdown images are marked as
+invalid. Colors describe syntax, not whether your story compiles. An unfinished template or emphasis
+stops at the end of its line, so it doesn't color the rest of the story.
+
+Inside `image("`, completion suggests supported files from the story's `images/` folder, including
+subfolders. Paths are case-sensitive. Adding, renaming or deleting images refreshes suggestions and
+diagnostics without reopening the story.
+
+### Find and rename
+
+- **Go to Symbol in Editor** (`Ctrl+Shift+O`, `Cmd+Shift+O` on macOS) lists the scenes in the file;
+  **Go to Symbol in Workspace** (`Ctrl+T` / `Cmd+T`) searches scenes by ID or `@title`.
+- **Find All References** (`Shift+Alt+F12`, `Shift+Option+F12` on macOS) lists every place the story
+  names a scene, character, item, faction, flag, variable, story-declared stat, tag, trigger ID or the
+  story ID, in `.tale` and `*.talewright.yaml` files. Each kind of name is matched separately, prose is
+  never matched, and unsaved edits are included. Built-in ruleset stats, keywords and names from custom
+  C# code aren't listed.
+- **Rename Symbol** (`F2`) renames one of those names everywhere in the story, including unsaved files.
+  Only the name changes; prose, YAML quoting, comments and filenames are left alone. The rename is
+  refused, with a reason, if the new name is invalid, already taken, or would cause a compiler error
+  or lint finding. It's also refused for `END`, `player`, built-in ruleset stats, and names near an
+  error that could hide a reference. Saved games store these names and aren't migrated, so Talewright
+  shows a reminder after a rename. Press Ctrl+Enter (Cmd+Enter) in the rename box to preview changes.
+
+Quick fixes and renames save the files they change (including earlier unsaved edits in those files)
+and nothing else. Undo still works. If a save fails, the edits stay in the editor for you to save.
+
+### Quick fixes
+
+- **Missing scene** (`TW2002`): create the scene at the end of this file, or in a new
+  `<scene-id>.tale` file next to it.
+- **Undeclared flag** (`TW2004`): declare it in the root manifest's `flags`.
+- **Unknown character, item or faction** (`TW2001`): declare it in the root manifest.
+- **Unknown stat** (`TW2001`): enable the `rpg` ruleset when it provides that stat, or declare a custom
+  stat under `game.ruleset.stats` (`category: custom`, `min: 0`, `max: 2147483647`, `default: 0`).
+- **Variable read but never set** (`TW2004`): declare it under `vars` as a number (`0`) or text (`""`),
+  depending on how it's used. If the use doesn't decide, both are offered.
+
+Manifest edits keep your YAML formatting and comments and use the open manifest, including unsaved
+changes. When the manifest can't be edited safely, the fix is shown disabled with a reason.
+
+## Story settings files
+
+The root manifest is `story.talewright.yaml`. Other `*.talewright.yaml` files in subfolders hold more
+declarations for the same story; a nested file named `story.talewright.yaml` is an error. With Red Hat
+YAML installed, every `*.talewright.yaml` file gets the bundled schema: structure checks, key completion
+and field descriptions. The schema doesn't know your story's names; the language server does, and
+checks the manifest, supporting files and `.tale` files together. Use
+`talewright validate <story-folder>` to check from the command line.
+
+The schema is listed in [SchemaStore](https://www.schemastore.org/), so other editors that use its
+catalog pick it up for `*.talewright.yaml` automatically. Otherwise, add this line at the top of
+`story.talewright.yaml`:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json
+```
+
+or point `$schema` at a local copy of [`schemas/story.schema.json`](schemas/story.schema.json). The `main`
+URL always describes the current manifest format; to pin it, replace `main` with the release tag for
+your Talewright version. The extension always uses its bundled copy.
+
+The schema checks structure and the canonical YAML forms. The compiler is the authority on story
+names, custom rulesets, integer bounds and Talemark expressions, and it accepts a few YAML spellings
+the schema doesn't; use the forms in the examples for consistent feedback. For example, faction values
+must be mappings (`guild: {name: Guild}`). Unknown keys are errors in both (`TW4006`).
+
+Under `vars`, the initial value fixes the type: an integer or quoted text (including `""` and `"12"`).
+Talemark assignments such as `~ var:weather = "stormy"` also create variables. Completion and hover
+show each variable's type, including unsaved changes.
+
+## Completion, hover and previews
+
+Press **Ctrl+Space** in a divert (`-> dest`), speaker, metadata line, condition or substitution for
+story-aware suggestions: scenes, characters, stats, items, factions, flags, variables, predicates and
+modifiers. It also completes story values such as `start: "dest"` in the manifest. Plain prose gets no
+story suggestions. See [semantic completion](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#semantic-completion)
+for details.
+
+Hover a name for its kind and declaration. Directives and expressions also show syntax help, and
+manifest keys show the schema's descriptions. See
+[source-aware hover](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#source-aware-hover).
+
+Substitutions show grey inline previews of their text: `{player:name#upper}` shows `"MARA BURNS"` for
+an authored name of Mara Burns. Previews cover character names, pronouns, `#one-many`, item and faction
+names, literal values and declared variable defaults, in prose, dialogue and choice labels.
+
+![A hover card for {item:relic#the} showing the result "the Relic of Ysh", each manipulator step, the item's stat modifiers and its declaration](https://raw.githubusercontent.com/squid-farm/talewright/main/docs/images/vscode-hover.png)
+
+Hover a substitution to see each manipulator step. Previews use the **default** authored values, not
+values from a playthrough: effects, triggers, character creation and assignments aren't run. Anything
+that depends on gameplay, and custom C# manipulators, show no guessed result. **Talewright: Toggle
+Substitution Preview Hints** turns the previews on and off. They never change your files.
+
+Stories with custom C# registrations need exported project metadata for completion and checks; see
+[project metadata](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#client-contract-and-workspace-behavior).
+The extension never executes that code.
+
+## CLI actions
+
+These commands use the separately installed `talewright` CLI. The bundled language server is not the
+CLI. Find them in the Command Palette (**Ctrl+Shift+P**):
+
+- **Talewright: New Story** creates a starter story in an empty folder (or one you choose) and opens
+  `story.tale`. It never overwrites an existing story.
+- **Talewright: Validate Story** runs `talewright validate`.
+- **Talewright: Publish Story ZIP** asks for a destination and runs `talewright publish`. This makes a
+  story ZIP for a Talewright player, not a standalone game. If the file exists, answer the replace
+  question in the terminal; the extension never adds `--force`.
+- **Talewright: Open Author Debugger** runs `talewright debug` and opens the native Author Debugger
+  (not VS Code's debugger).
+- **Talewright: Play From This Scene** (also the **Play from here** code lens above each scene, and the
+  editor context menu) opens the Author Debugger at that scene. Turn off the code lens with
+  `talewright.codeLens.playFromScene`.
+- **Talewright: Run Story** runs `talewright run` to play from the start in the native player. It
+  needs the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0); the extension checks
+  but never installs it.
+
+Actions use the story containing the active file, the only story in the workspace, or ask you to choose.
+They need a trusted workspace and offer to save unsaved story files first. Output and errors stay in
+the task terminal; close the debugger or player with **Tasks: Terminate Task**. The debugger and player
+need a desktop and the platform webview: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.
+See the [CLI reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/cli.md).
+
+### Set up the CLI
+
+Run **Talewright: Set Up CLI**, put `talewright` on your PATH, or set `talewright.cli.executablePath`
+to the executable. Setup only runs when you ask; opening a story never installs anything.
+
+- An existing configured executable, `talewright` on PATH, or the .NET global tool is used as is.
+- With the .NET 10 SDK, setup offers to install the CLI version that matches this extension:
+  `dotnet tool install --global Talewright.Cli --version VERSION --source https://api.nuget.org/v3/index.json`,
+  in a visible terminal, after you approve it.
+- Without the SDK, setup opens the matching [GitHub release](https://github.com/squid-farm/talewright/releases)
+  so you can download the standalone CLI. Extract the whole archive, then use **Select Executable**.
+
+The extension never installs the SDK, changes PATH, elevates permissions or updates an existing tool.
 See the [author setup guide](https://github.com/squid-farm/talewright/blob/main/docs/guide/cli-installation.md)
-for download instructions and [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md)
-for system requirements and source builds.
+and [technical setup notes](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md).
 
-### Guided CLI setup
+### Tasks
 
-Setup runs only when invoked, or when you choose **Set Up CLI** after a missing-CLI action.
-Opening a story never installs or prompts for tools. A trusted workspace is required.
-
-- A configured executable, `talewright` on PATH, or the global shim in `~/.dotnet/tools`
-  (`%USERPROFILE%\.dotnet\tools` on Windows) is used unchanged, without upgrading.
-  A broken explicit path is an error, not permission to use another tool.
-- With a stable .NET 10 SDK, setup recommends the global tool, checks nuget.org for the
-  exact compatible version recorded in this VSIX's bundled build metadata, then asks for explicit
-  installation approval. Tagged builds use the NuGet/tag version, not the numeric VSIX version;
-  setup never selects an arbitrary latest preview.
-  The visible **Install CLI** task runs `dotnet tool install --global Talewright.Cli --version
-  VERSION --source https://api.nuget.org/v3/index.json`. Cancellation/failure is not success;
-  inspect the task terminal and explicitly choose **Use standalone instead** if wanted.
-  Setup never installs the SDK, elevates, changes profiles/PATH or updates an existing tool.
-- Without a compatible SDK, setup offers a portable download or executable selection, not
-  a known-invalid tool installation. It checks that the pinned GitHub release has an archive
-  **and checksum** for your host before opening its page. Extract the entire archive and use
-  **Select Executable** to configure `Talewright.Cli` (`.exe` on Windows). No binary is downloaded,
-  extracted, stored or updated by the extension.
-- **Neither public acquisition path is available until publication.** Missing versions/assets,
-  feed/network failures and permission errors are reported explicitly. No guessed download link
-  or automatic fallback is used. **Select Existing Executable** also supports local source builds.
-
-The bundled platform-specific language server works independently of this setup. CLI portability does
-not remove native debugger webview prerequisites or the SDK requirement for standalone-game output.
-
-### Run CLI actions
-
-Open the story folder in VS Code. Actions prefer the active file's containing story, use the only
-story in the workspace otherwise, or ask you to choose. Nested `story.talewright.yaml` manifests
-remain errors inside the parent story, not separate selectable stories. Dirty documents inside
-the chosen story must be saved with your approval; cancellation or a failed save starts nothing.
-Untrusted workspaces cannot run CLI actions or custom executables. CLI output and exit status
-remain in the task terminal; a started task is not a success notification.
-
-- **Validate Story** runs `talewright validate <story>`, using the CLI's compiler diagnostics.
-- **Publish Story ZIP** asks for a ZIP destination, then runs
-  `talewright publish <story> --output <file.zip>`. This contains story files for a Talewright
-  player, **not** a standalone website or desktop game. The terminal asks whether to replace an
-  existing ZIP; answer there. The extension never adds `--force`.
-- **Open Author Debugger** runs `talewright debug <story>`. This opens the native Author Debugger,
-  not VS Code breakpoints, a debug adapter, or F5 support. The task stays running while the window
-  is open; use **Tasks: Terminate Task** to stop it. A graphical desktop and platform webview
-  prerequisites are required: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.
-  Linux x64 is the installed-extension verification platform; other hosts are not verified here.
-  See [CLI/debugger prerequisites](https://github.com/squid-farm/talewright/blob/main/docs/reference/cli.md).
-- **Play From This Scene** is available from the Command Palette and the editor context menu when
-  the cursor is inside a scene. The **Play from here** code lens above each scene launches
-  `talewright debug <story> --scene <scene-id>` in the native Author Debugger. Code lenses are
-  enabled by default and can be disabled with `talewright.codeLens.playFromScene`. The command
-  saves dirty story documents with your approval and does not start normal play automatically.
-- **Run Story** runs `talewright run <story>` in the native player from the story's configured
-  start. It requires the .NET 10 Runtime and the separately installed CLI; missing prerequisites
-  are reported with setup guidance, never installed automatically. The task stays alive while play
-  is open; use **Tasks: Terminate Task** to close the player.
-
-For repeated play or debugging, manually add these tasks to your workspace's `.vscode/tasks.json`;
-the extension never creates or edits that file:
+To rerun play or debugging quickly, add tasks to `.vscode/tasks.json` yourself (the extension never
+edits it) and start them with **Tasks: Run Task**:
 
 ```json
 {
@@ -199,295 +256,28 @@ the extension never creates or edits that file:
 }
 ```
 
-For a reusable scene-specific debugger task, add the optional `scene` property to a `debug`
-task. It is not supported with `run`.
-
-`story` is relative to that workspace folder (or an absolute canonical story-root path within the
-workspace). Tasks in a multi-root `.code-workspace` file are also supported: a relative `story`
-must identify exactly one canonical story root across the open folders. If it matches more than
-one, use an absolute path to disambiguate. Global/user tasks are not supported.
-Run it using **Tasks: Run Task**. The same trust, CLI and save checks apply.
-
-## Write a scene
-
-Type a prefix, then select its suggestion using **Insert Snippet** in the Command
-Palette (or enable **Editor: Tab Completion** for prefix-plus-Tab expansion).
-Use Tab to move between placeholders.
-
-| Prefix | Inserts |
-|---|---|
-| `tale-scene` | Scene header, prose, and a divert |
-| `tale-choice` | Choice label and target |
-| `tale-if` | Conditional prose, alternate branch, and closing marker |
-| `tale-choice-check` | Choice skill check with success/failure outcomes |
-| `tale-check` | Entry skill check block with both outcomes |
-
-Replace scene IDs and other placeholders with your story's actual declarations.
-Use **Toggle Line Comment** to add/remove `//` comments.
-Brackets can be matched, but Talemark editing defaults disable automatic quote/bracket closing:
-ordinary prose and literal braces should remain comfortable to type. You can
-override these language-specific defaults in your VS Code settings.
-
-The grammar distinguishes scene headers, metadata, speech, effects, conditions,
-choices, substitutions, and checks. It also highlights bold and italic text,
-escapes and `{image("path", "alt text")}` calls. Markdown images are highlighted as invalid
-and reported as unexpected reader-text syntax. These colors describe syntax, not whether
-your story compiles. The renderer still determines what appears during play;
-images are currently placeholders, not image rendering support.
-Use **Go to Symbol in Editor** (`Ctrl+Shift+O` on Windows/Linux, `Cmd+Shift+O` on macOS)
-to browse scenes in the current file, or **Go to Symbol in Workspace** (`Ctrl+T` /
-`Cmd+T`) to search scenes across workspace stories by scene ID or `@title`.
-
-Use **Find All References** (`Shift+Alt+F12` on Windows/Linux, `Shift+Option+F12` on
-macOS) on a name in a `.tale` file or a `*.talewright.yaml` file to list every
-place the story names it. It works from a use or from the declaration and covers
-scenes, characters, items, factions, flags, variables, story-declared stats,
-tags, trigger IDs and the story ID. Tags are found in `@tags` lists and in
-`@hub tag`, `@hub a and b` and `@hub a or b` lines. A trigger ID or the story ID
-is named only where it's declared, so it's listed only when declarations are
-included. Each kind of name is matched separately: a scene, a flag and a tag
-can share a spelling without mixing. Prose is never matched, and each story in
-a multi-story workspace is searched on its own. Built-in ruleset stats,
-keywords, predicates, modifiers and names from custom C# rulesets aren't
-listed. Results include unsaved edits; while the story is still being analyzed
-after an edit, the request waits for that analysis rather than returning old
-locations.
-
-Use **Rename Symbol** (`F2`) on any of those names to rename every occurrence
-across the story's `.tale` files and `*.talewright.yaml` files, including unsaved
-buffers. Only the name changes: prose, YAML quoting and comments are untouched,
-and a scene file keeps its filename. The rename is refused with an explanation
-when the new name isn't valid, is already used by a name of the same kind, or
-would add a compiler error or lint finding. It's also refused for `END`, the
-`player` character, built-in ruleset stats, a story stat that overrides a
-ruleset stat, and names whose declaration is ambiguous or sits next to an error
-that could hide a reference. Saved games store these names and saves are not
-migrated. After applying a rename, Talewright shows an informational compatibility
-warning without blocking editing. Press Enter to apply the rename directly, or
-Ctrl+Enter (Cmd+Enter on macOS) in the rename input to preview changes first.
-Keep `editor.rename.enablePreview` enabled to make that optional preview available.
-
-Quick Fixes and Rename Symbol save the documents they actually edit, including
-any earlier unsaved changes in those documents. Unrelated documents are not saved.
-Previewing or cancelling an action does not save anything. Saving does not remove
-the edit's undo history; undoing a refactor leaves the reverted contents unsaved,
-just like an ordinary edit. If a save fails, Talewright reports the affected files;
-the applied edits remain in the editor so you can save them manually. This behavior
-does not depend on `files.autoSave` or `files.refactoring.autoSave`.
-
-Use the `tale-image` snippet or complete `image(` inside a template. Hover describes the arguments;
-inside the first quoted argument, completion suggests supported files from the
-story's `images/` folder, including nested folders. Paths are case-sensitive.
-Completion replaces the path content and escapes embedded quotes, leaving alt
-text alone. It also works in unfinished calls, choice labels and dialogue.
-Adding, renaming or deleting image files refreshes suggestions and image lookup
-diagnostics without reopening the story. These editor checks use file paths, not
-image bytes. Compilation and `talewright validate` use the same lookup diagnostics;
-player rendering remains separate work.
-
-Incomplete templates and emphasis recover at line boundaries so an unfinished
-edit does not color the rest of the story. A `*` or `_` with no closing
-delimiter later on the line stays plain text. Highlighting of formatting that
-spans multiple lines, and some ambiguous delimiter runs, is consequently approximate.
-
-## Story configuration support
-
-Every story's root manifest is named `story.talewright.yaml` at the story root.
-Supporting declarations may live in other `*.talewright.yaml` files in story
-subfolders; they are part of the containing story. The basename
-`story.talewright.yaml` is reserved for its single root manifest; a nested file
-with that name produces a compiler error, not a separate story or fragment.
-With Red Hat YAML installed, the extension associates every `*.talewright.yaml`
-file with the bundled JSON Schema. It validates file structure, offers known keys,
-and shows field descriptions without requiring a supporting file to repeat
-whole-story settings. It does not know story-specific IDs or whether a referenced
-scene, stat, item, or faction exists. The optional language server analyzes the
-root manifest, supporting files, and `.tale` files as one story, including unsaved
-edits, and supplies reference completion, hover, go-to-definition into the
-declaring file, Find All References, and compiler checks; use `talewright validate <story-folder>` for
-command-line validation.
-
-For a `TW2002` missing-scene diagnostic in a `.tale` file, the Quick Fix menu offers
-**Create scene in this file** (appending a scene header at the end) and
-**Create scene in a new file** (creating and opening an adjacent `<scene-id>.tale`
-file). The new-file action is not offered when that file already exists.
-
-For an undeclared flag reported by `TW2004`, the Quick Fix menu offers
-**Declare flag `<id>`**. It appends the declaration to the root manifest's
-`flags` list without reserializing YAML, preserving existing comments and
-formatting and using an open manifest buffer (including unsaved edits). When
-the manifest cannot be edited safely, the action is disabled with a reason.
-
-For a `TW2001` unknown character, item, or faction reference in a `.tale` file,
-the Quick Fix menu offers **Declare character `<id>`**, **Declare item `<id>`**,
-or **Declare faction `<id>`** in the root manifest. Character and item
-declarations use a readable name derived from the ID; factions start with their
-default name and standing. These edits preserve the manifest's YAML formatting
-and comments and use the open manifest buffer. No declaration action is offered
-for `player`, existing declarations, or unknown properties. Unsupported
-manifest shapes produce a disabled action with a reason.
-
-For an unknown stat reported by `TW2001`, **Enable rpg ruleset** is the preferred
-Quick Fix when the registered `rpg` ruleset provides that stat. It adds
-`ruleset: rpg` when no ruleset is configured, or sets `base: rpg` when the
-existing ruleset mapping has no base or uses `base: none`, preserving its
-`disable` and `stats` entries. Unsupported or unsafe manifest shapes disable
-this action with a reason. If another registered ruleset provides the stat,
-the RPG action is not offered.
-
-**Declare stat `<id>`** remains available under `game.ruleset.stats`. Its
-scaffold uses a human-readable name derived from the ID and the documented
-schema defaults: `category: custom`, `min: 0`, `max: 2147483647`, and
-`default: 0`. It does not guess whether the stat is an attribute or a skill.
-The action preserves the selected `rpg` or `none` base, existing disables and
-stat overrides, and expands a shorthand `ruleset: rpg` or `ruleset: none` into
-a mapping when needed. Disabled built-in stats are not reintroduced as custom
-stats. The edit preserves manifest formatting and comments, uses the open
-manifest buffer, and is disabled with a reason when the YAML shape cannot be
-safely edited.
-
-For a variable that `TW2004` reports as read but never assigned or declared,
-the Quick Fix menu offers to declare it under the root manifest's `vars`. Numeric
-uses (arithmetic, ordered comparisons, item quantities, or comparing with a
-number) offer **Declare variable `<id>` as a number**, which adds `<id>: 0`.
-Text uses (comparing with or assigning to text) offer
-**Declare variable `<id>` as text**, which adds `<id>: ""`. When the usage does
-not decide the type, such as a plain `{var:<id>}` substitution, both actions are
-offered. Like other declarations, the edit preserves YAML formatting and
-comments, uses the open manifest buffer, and is disabled with a reason when the
-manifest cannot be edited safely.
-
-Editors that don't use the SchemaStore catalog can use the same schema with this
-modeline at the top of `story.talewright.yaml`:
-
-```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json
-```
-
-Or point `$schema` to a local copy of
-[`schemas/story.schema.json`](schemas/story.schema.json). SchemaStore discovery
-is tracked separately and is not required for either option.
-
-### Schema distribution and compatibility
-
-The canonical schema is maintained in this repository and bundled in the VSIX.
-Its public `main` URL above is the rolling schema for the current manifest format.
-SchemaStore registration
-([SchemaStore/schemastore#6539](https://github.com/SchemaStore/schemastore/pull/6539))
-uses that same URL with the `*.talewright.yaml` file pattern; it does not
-maintain a second copy of the schema, so the schema file must not move. Submission alone does not mean
-automatic discovery is available: SchemaStore must accept and publish the entry,
-and an editor may need to refresh its catalog.
-
-The rolling schema follows the current manifest format. From 1.0.0-preview.1, manifest changes
-are additive, so story files written for a preview keep validating. To pin validation, replace `main` in the modeline URL with the
-commit or release tag matching your Talewright version, or use a local copy.
-The VSIX always uses its bundled schema, independent of catalog/network access.
-
-After SchemaStore accepts the submission, verify discovery in another
-SchemaStore-capable YAML editor with no Talewright extension or schema modeline:
-open `story.talewright.yaml`, request root-key completion, introduce an unknown key, and
-remove it to check diagnostics clear. Until that verification is recorded, use
-the explicit modeline or local-file fallback rather than assume auto-discovery.
-
-The schema reflects structural key/type rules and editor-friendly canonical YAML
-forms. The compiler remains authoritative for story-specific references, custom
-ruleset registration, integer bounds and Talemark expressions. YAML tooling can also
-report structural errors differently from compiler diagnostics. The reader
-currently accepts some scalar spellings or YAML forms beyond the schema's
-documented canonical values; use the forms in the examples for portable feedback.
-For example, faction values must be mappings (`guild: {name: Guild}`): the
-compiler silently ignores a scalar faction display name. Unknown keys are errors
-in both schema validation and the compiler (`TW4006`). Creation preset IDs must contain a
-non-whitespace character and be no longer than 80 characters.
-
-Under `vars`, integers and quoted text (including `""` and `"12"`) are supported.
-The initial value fixes the variable's type. Completion and hover identify
-`integer` or `text` from compiler analysis, including unsaved manifest changes.
-Live compiler diagnostics reject incompatible assignments and numeric operations
-on text. Use quoted YAML text values for consistent compiler/schema feedback.
-Talemark assignments can also introduce variables: `~ var:weather = "stormy"`.
-Completion and hover use the same story-wide inference as validation, including
-forward references, assignment chains and unsaved files. Incomplete or unresolved
-declarations retain symbols marked `unresolved`, not a guessed integer type.
-
-## Substitution previews
-
-Talemark substitutions show editor-only inlay hints with their final text after built-in
-manipulators: `{player:name#upper}` shows `"MARA BURNS"` for an authored name of Mara Burns.
-Character names, all pronoun forms (including independent possessives), `#one-many`,
-item/faction names, constant literals (text, numbers, booleans, and reputation tiers),
-and explicitly declared variable defaults are supported.
-Hints also work in dialogue, choice labels, and styled or multiline prose.
-
-![A hover card for {item:relic#the} showing the result "the Relic of Ysh", each manipulator step, the item's stat modifiers and its declaration](https://raw.githubusercontent.com/squid-farm/talewright/main/docs/images/vscode-hover.png)
-
-Hover a substitution for its result marked **default**, intermediate manipulator results,
-and existing symbol/syntax help. Hover a character for its authored name and pronoun
-forms; an item, stat, faction or scene for its authored details (for example an item's
-stat modifiers and starting holders, or a scene's title and tags).
-These are examples using authored defaults, **not current gameplay values**; entry effects,
-triggers, character creation choices, and assignments are not executed or inferred.
-Unsaved story configuration changes update previews across files.
-
-Use **Talewright: Toggle Substitution Preview Hints** to switch hints on/off immediately.
-This changes VS Code's language-specific `editor.inlayHints.enabled` setting for Talemark.
-Hints never insert text or change saved stories. Long hints are abbreviated to at most
-40 UTF-16 code units; hover shows the full result with whitespace/control characters escaped.
-Unknown/incomplete substitutions have no hints. Gameplay-dependent expressions and custom
-manipulators have no guessed results; their hover explains the limitation.
-
-Project metadata exports now identify engine-owned built-ins so these can be previewed
-without executing custom registrations. Older metadata still loads, but manipulators remain
-unavailable for preview until it is explicitly re-exported. Overrides of built-in names are
-treated as custom manipulators, not executed.
+`story` is relative to the workspace folder, or an absolute path inside it. In a multi-root workspace a
+relative `story` must match exactly one story. `scene` works only with `debug`. User-level tasks are not
+supported.
 
 ## Not included
 
-- Signature help, lint, formatting, or runtime debugging.
-- Implicit project builds/assembly execution, gameplay, network service, or telemetry.
+- Signature help, formatting, or VS Code breakpoint debugging (use the Author Debugger).
+- Building projects, running story code, network services or telemetry.
 
-The language server uses only shared compiler/authoring analysis. Custom C#
-registrations require explicitly exported data-only metadata; see
-[project metadata](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#client-contract-and-workspace-behavior).
-
-Use **Ctrl+Space** in a divert (`-> dest`), speech character, metadata directive,
-condition, or substitution to request story-aware completion. The shared server
-offers scene, character, stat, item, faction, flag, variable, predicate, and
-modifier references from unsaved whole-story analysis. It also completes
-story-specific values such as manifest `start: "dest"` without replacing quotes.
-Ordinary prose receives no semantic story suggestions; VS Code can still show
-its own word/snippet suggestions. YAML must be parseable, and required custom
-metadata must be available. See the
-[capabilities and manual walkthrough](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#semantic-completion)
-for supported slots, exact replacement behavior, and limitations.
-
-Hover a known reference or declaration for its kind/type and authored declaration
-context. Scene directives and expressions also show syntax help; manifest keys use
-the bundled schema's descriptions. Unsaved edits are included. Unknown/partial
-symbols and ordinary prose return no semantic hover, and required missing custom
-metadata is reported explicitly. Authored text is displayed as code, not active
-Markdown links or HTML. No runtime values or C# signatures are invented. See the
-[hover walkthrough](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#source-aware-hover)
-for a beginner-friendly check in VS Code and other LSP clients.
-
-Keep using `talewright validate <story-folder>` for correctness checks. See the
-[Talemark reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/talemark-syntax.md)
+The editor helps you write; use `talewright validate <story-folder>` as the final correctness check.
+See the [Talemark reference](https://github.com/squid-farm/talewright/blob/main/docs/reference/talemark-syntax.md)
 for supported syntax.
 
 ## Build and test
 
-For an all-in-one local CLI, debugger and VSIX install on Linux/macOS, run
-`python3 tooling/install-dev.py` from the repository root. Add `--global-tool` to
-replace your global CLI without changing its path. Rerun after fixes, then
-reload VS Code. See [local development setup](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md#install-the-current-checkout-for-local-testing)
-for prerequisites and selecting the installed development CLI.
+These steps are for contributors. For a one-step local install of the CLI, debugger and VSIX on
+Linux/macOS, run `python3 tooling/install-dev.py` from the repository root (add `--global-tool` to
+replace your global CLI). See
+[local development setup](https://github.com/squid-farm/talewright/blob/main/docs/developer/cli-setup.md#install-the-current-checkout-for-local-testing).
 
-Contributors packaging on Linux x64 need Node.js 22 or later, npm, the .NET 10 SDK, Python 3 and `unzip` for package
-inspection. Linux editor smoke tests need a display (or `xvfb-run`) and the normal
-VS Code native prerequisites.
-
-From this directory:
+Packaging needs Node.js 22+, npm, the .NET 10 SDK, Python 3 and `unzip`. Editor smoke tests need a
+display (or `xvfb-run`). From this directory:
 
 ```bash
 npm ci
@@ -499,75 +289,18 @@ npm run test:editor
 # On a headless Linux machine, use: xvfb-run -a npm run test:editor
 ```
 
-Tests download VS Code 1.100.3 into the ignored `.vscode-test` directory unless
-`VSCODE_EXECUTABLE_PATH` points to an existing editor executable (for example,
-`/usr/share/code/code`, not the `bin/code` CLI wrapper). The isolated editor smoke
-also installs the Red Hat YAML extension from the Marketplace and tests schema
-validation, diagnostic clearing, completion, hover, and modeline fallback.
-Tokenization tests use
-that editor's built-in Markdown grammar with real TextMate/Oniguruma engines,
-not mocked regex matching. Compiler tests expand every snippet in a minimal
-story with the referenced scenes and `ruleset: rpg`.
-Shared YAML fixtures under `tests/fixtures/manifests` run against both the schema
-and `StoryCompiler`; compiler tests assert diagnostics and materialized values
-and defaults, including documented schema/compiler differences.
+- `npm run package` builds `artifacts/talewright.vsix` for Linux x64, with the self-contained server and
+  license notices. Set `TALEWRIGHT_VSIX_TARGET` (for example `win32-arm64`) for both `package` and
+  `test:package` to build another target as `artifacts/talewright-TARGET.vsix`. Don't package targets
+  concurrently in one checkout, and repackage Linux x64 before running the editor smoke.
+- `npm run test:package` checks the package contents, native architecture and runtime configuration.
+  Cross-target checks are inspections, not native execution tests.
+- `npm run test:editor` installs the VSIX into a temporary, isolated VS Code 1.100.3 profile (downloaded
+  into `.vscode-test`, or set `VSCODE_EXECUTABLE_PATH`). It checks file association, snippets, typing,
+  comments, the YAML schema, and live diagnostics from the bundled server, and that the server doesn't
+  start in an untrusted workspace. It never touches your normal profile.
+- When you update a shipped server dependency, review its license text in `tests/server-notices.txt`.
 
-`npm run package` bundles the repository MPL-2.0 license and produces
-`artifacts/talewright.vsix`, with Linux x64 target metadata, the bundled client and a matching
-self-contained server/runtime plus .NET license/notices. It runs `dotnet publish` for the
-language server within the existing package target, never a story project.
-To cross-package another target on the same build host, set `TALEWRIGHT_VSIX_TARGET` for both
-commands, for example:
-
-```bash
-TALEWRIGHT_VSIX_TARGET=win32-arm64 npm run package
-TALEWRIGHT_VSIX_TARGET=win32-arm64 npm run test:package
-```
-
-Non-Linux-x64 output is `artifacts/talewright-TARGET.vsix`. The target names are those in the
-table above; Windows maps to .NET `win-*`, macOS to `osx-*`. Each invocation replaces the
-staged server, so do not package targets concurrently in the same checkout. Cross-package checks
-inspect PE/ELF/Mach-O architecture and runtime assets; they are not native execution tests.
-Repackage the default Linux x64 target before running the Linux installed-editor smoke.
-Pinned dependency license texts in `tests/server-notices.txt` are included in the VSIX notices;
-updating a shipped server dependency requires reviewing/updating its corresponding notice.
-`npm run test:package` verifies client assets, server/runtime files, native architecture,
-executable permissions, target metadata and the self-contained runtime configuration.
-`npm run test:editor` installs that VSIX into a temporary isolated profile,
-verifies file association, actual snippet expansion/Tab navigation, prose typing
-and comment toggling, then exercises compiler diagnostics and clearing on an
-unsaved edit using the installed bundled server, with an external `dotnet` sentinel and runtime
-lookup disabled. A separate restricted-mode pass in the same runner proves that the bundled
-server does not start in an untrusted workspace. The runner
-removes the profile. It does not install anything into your normal VS Code
-profile. Run packaging first.
-
-## Beginner-friendly manual test plan
-
-1. Install the VSIX in a new VS Code profile with no other language extensions.
-   Open a sample `.tale` file and confirm the language indicator says **Talemark**.
-2. Compare a scene header, `@requires`, `> guide:`, a `~` effect, a choice, and a
-   `::: skill-check` against ordinary prose. They should be distinguishable.
-3. Try `*emphasis*`, `**strong**`, literal backticks, a link, and an image
-   placeholder. Confirm a line beginning `*emphasis*` is not styled as a choice.
-4. Write `\{literal\}` and toggle a line comment. Literal braces should not start
-   a template, and `//` should comment the whole line.
-5. Use **Insert Snippet** to insert each of the five snippets. Tab through its
-   fields and replace the example IDs. Validate a complete story with the CLI;
-   referenced targets must exist.
-6. Leave a template, quote, choice label, or emphasis unfinished, then add a new
-   `=== next.scene` line. The new header should recover its normal color.
-7. Type prose containing apostrophes and braces. Check that no unexpected closing
-   characters are inserted. Try different light/dark themes; exact colors depend
-   on the theme.
-8. Open `story.talewright.yaml` with Red Hat YAML installed. Confirm key completion,
-   descriptions, unknown-key and wrong-type diagnostics. Remove a problem and
-   confirm its diagnostic clears. Try the modeline in another YAML language
-   server if available. The extension must not launch a CLI, debugger, or story
-   session.
-
-The automated installed-VSIX smoke covers Talemark file association, the five default
-snippet expansions and placeholder navigation, prose typing, and comment
-toggling. Automated package tests also verify the bundled schema and YAML
-contribution. They do not substitute for manually checking Red Hat YAML
-completion/diagnostics, visual/theme checks, or testing every operating system.
+Automated tests don't replace a quick manual look: in a fresh profile, open a sample story, check
+highlighting against prose in light and dark themes, insert each snippet, type prose with apostrophes
+and braces, and check completion and diagnostics in `story.talewright.yaml`.

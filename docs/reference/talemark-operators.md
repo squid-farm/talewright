@@ -1,17 +1,13 @@
 # Talemark operator registry
 
 Talemark is the language inside `.tale` files. This is the authoritative list of its markers and
-operators, after the property and pronoun changes in
-[#191](https://github.com/squid-farm/talewright/issues/191) and
-[#190](https://github.com/squid-farm/talewright/issues/190).
-See the [syntax reference](talemark-syntax.md) for complete stories, the [glossary](glossary.md) for
+operators. See the [syntax reference](talemark-syntax.md) for complete stories, the [glossary](glossary.md) for
 terms, and the
 [syntax principles](../developer/language-changes.md#syntax-principles) and
 [language-change checklist](../developer/language-changes.md) before proposing new syntax.
 
-**Status matters.** Unless marked **decided, not implemented**, examples below describe the current
-compiler. This documentation does not add syntax. The [implementation status](#implementation-status)
-section separates decisions from features you can use today.
+Everything on this page describes what the compiler accepts today. Changes that are planned but not
+built yet are listed separately under [planned changes](#planned-changes).
 
 ## Names and values
 
@@ -48,16 +44,13 @@ Inside double-quoted strings, `\"` means a literal double quote and `\\` means a
 backslash. Expression strings, manipulator arguments and image paths accept only those two escapes.
 In reader text, a backslash before any ASCII punctuation or symbol quotes that character, so
 `\{` and `\}` show literal braces; a backslash before letters, digits, whitespace or non-ASCII
-characters remains visible. Image alt text uses this reader-text rule. These rules do not introduce
-a quoted choice-label spelling or a new formatting feature.
+characters remains visible. Image alt text uses this reader-text rule.
 
-Write `"C:\\stories"` for the text `C:\stories`. A single backslash inside a Talemark string
-must now be doubled, including in stories written before escape decoding was implemented.
-Malformed expression strings report TW1001; manipulator arguments report TW2006. An unclosed
-enclosing brace can additionally produce TW1004. Existing scene
-titles, dialogue and choice labels still use their current unquoted forms:
-`@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`.
-Do not add quotes to those forms expecting them to be removed.
+Write `"C:\\stories"` for the text `C:\stories`: a literal backslash inside a Talemark string
+is always doubled. Malformed expression strings report TW1001; manipulator arguments report TW2006. An unclosed
+enclosing brace can additionally produce TW1004. Scene titles, dialogue and choice labels are not
+quoted: `@title The door`, `> guide: Hello.`, `* [Open the door] -> hall`. Quotes added to those
+forms are shown to the reader as part of the text.
 Image calls use `{image("path", "alt text")}`. The path is a literal string. Alt text uses the
 same reader-text grammar as prose. Both arguments decode `\"` and `\\`; other path escapes produce
 TW1014, while unknown letter escapes in alt text remain literal. A nested `{image(...)}` in alt
@@ -100,15 +93,14 @@ decides how that input is read. Quotes only delimit an argument; they do not dec
 | Reader text | The [reader-text grammar](#reader-text-grammar): formatting and inline constructs. | A text-unit boundary, or double quotes when inside other syntax. | Reader-text escapes, plus `\"` when quoted. | Prose, speech text, choice labels, image alt text, and the optional text in a `shown` clause. |
 | Plain line text | The rest of the line, trimmed. No substitutions or formatting. | End of line. | None. | `@title`. |
 
-Decided in [#189](https://github.com/squid-farm/talewright/issues/189): reader text inside syntax
-uses double quotes. Speech and choice labels have not moved to quotes yet; that work belongs to
-[#184](https://github.com/squid-farm/talewright/issues/184).
+Reader text that sits inside other syntax, such as a `shown` clause or image alt text, uses double
+quotes. Speech and choice labels keep their unquoted forms.
 
 ### Callable construct contract
 
 A *callable* is any named construct that takes arguments or works like a method: predicates,
 text manipulators, the image constructor, `@hub` groups, effect commands and check clauses.
-Each callable documents the following in this registry before it ships:
+Each callable is documented in this registry with:
 
 1. **Family and result**: which family it belongs to, and the value, text, media or state change
    it produces.
@@ -130,7 +122,7 @@ constructors) use `name(arg, arg)`. Arguments are separated by commas. Text argu
 double-quoted, and names are bare. Whitespace is allowed around `(`, `,` and `)`. A callable with
 no arguments omits the parentheses, as in `#capitalize` or `@CanPickLock`. Effects are statements,
 not calls: they keep the word-command shape `verb target [value]`. Clauses keep their label words.
-New callables follow this guideline. Existing exceptions are listed below rather than changed silently.
+New callables follow this guideline. Existing exceptions are listed below.
 
 | Callable | Family and result | Arguments (slot kind) | Contexts | Notes |
 |---|---|---|---|---|
@@ -150,18 +142,16 @@ New callables follow this guideline. Existing exceptions are listed below rather
 | `give`/`take character item [n]` | Effect. | Character name, item name, optional number expression (default 1). | Effects. | Space-separated arguments. |
 | `skill-check [actor] skill dc n` | Clause. | Optional character name, skill name, number expression. | Choices and `:::` blocks. | Keyword sequence. |
 
-Known inconsistencies, recorded for follow-up rather than changed here:
+Known inconsistencies (see [planned changes](#planned-changes)):
 
 - Boolean queries have three spellings: a sentence (`player visited camp`), an infix word (`player has rope`)
-  and a sigil (`@CanPickLock`). Any unification belongs to [#184](https://github.com/squid-farm/talewright/issues/184).
+  and a sigil (`@CanPickLock`).
 - Hub selectors use sentence forms without grouping; `and` and `or` are reserved tag names.
 - Tags are not story names. `@tags` accepts spaces inside a tag, such as `@tags north gate`
   giving one tag. A tag operand in `@hub` cannot contain whitespace, parentheses or commas; spaces
-  separate tags and the `and`/`or` selector words. Aligning tag rules belongs to #184.
-- Manipulator names are scanned up to `#` or `(` instead of with the shared name rules. Registration
-  and extensibility belong to [#193](https://github.com/squid-farm/talewright/issues/193).
-- General multi-argument manipulators are not implemented; only `#one-many` takes arguments
-  (#184, #193).
+  separate tags and the `and`/`or` selector words.
+- Manipulator names are scanned up to `#` or `(` instead of with the shared name rules.
+- Only `#one-many` takes arguments; there is no general multi-argument manipulator support.
 
 ## Structural markers
 
@@ -211,7 +201,7 @@ using the quoted-text rules when it is inside syntax.
 | `(` `)` | Group an expression; also bound manipulator arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 manipulator; TW1011 choice; TW1006 hub. |
 | `"` | Bound text literals, manipulator string arguments and image arguments. All decode `\"` and `\\`; no single-quoted Talemark string form. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed manipulator; TW1014 malformed image; TW1004 enclosing brace not found. |
 | `\` | Escape a quote or backslash inside literal strings, or ASCII punctuation and symbols in reader text. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |
-| `,` | Separate metadata tags, hub arguments and image arguments today; decided separator for multiple double-quoted manipulator arguments. Each manipulator defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; TW2006 for manipulator arguments. `#one-many` is the only manipulator that takes multiple arguments; general multi-argument support is not implemented. |
+| `,` | Separate metadata tags, hub arguments, image arguments and manipulator arguments. Each manipulator defines its own values. | Structural | `{image("camp", "The camp")}` | TW1014 invalid image; TW1006 invalid hub; TW2006 for manipulator arguments. `#one-many` is the only manipulator that takes multiple arguments; general multi-argument support is not implemented. |
 | Unary `-` | Negate one number. | 2 | `{var:coins + -3}` | TW2003 non-number; TW1002 oversized literal. |
 | `*` `/` | Integer multiplication and division; two numbers. A slash also appears in `{/if}` and `//` comments, with structural meanings. | 3 | `{var:coins / 2}` | TW2003 non-numbers; TW1001 missing operand. |
 | `+` `-` | Integer addition and subtraction; two numbers. Space subtraction away from names. | 4 | `{var:coins - 1}` | TW2003 non-numbers; TW1001 missing operand; TW2004 if an unintended hyphenated variable is undeclared. |
@@ -259,10 +249,10 @@ is not obvious. Expressions allow at most 256 nested groups and prefix operators
 
 ### Manipulator arguments
 
-The general decided shape is `#name("first", "second")`: commas separate double-quoted arguments.
-Argument values belong to the manipulator; they are not globally reserved names.
+Manipulator arguments use the shape `#name("first", "second")`: commas separate double-quoted
+arguments. Argument values belong to the manipulator; they are not globally reserved names.
 Each manipulator validates its own supported values and reports a clear diagnostic for invalid ones.
-This shape is a contract for future manipulators, not permission to pass extra arguments to today's ones.
+Today only `#one-many` takes arguments; passing arguments to any other manipulator is an error.
 
 Pronoun forms are properties, not manipulators; for example,
 `{player:pronoun:possessive-pronoun:independent}` gives *hers*. The selector
@@ -296,32 +286,24 @@ same selector is valid after number-valued expressions. Its strings are author
 text, not finite argument suggestions.
 Wrong targets, missing strings and extra arguments produce TW2006.
 
-### Image syntax decision
+### Image syntax
 
-The approved form is `{image("path", "alt text")}`, with optional alt text, in every
+Images use `{image("path", "alt text")}`, with optional alt text, in every
 narrative-template context. The path stays literal. Alt text is rendered with the prose template
-language where the image appears; under the approved [reader-text grammar](#reader-text-grammar)
+language where the image appears; under the [reader-text grammar](#reader-text-grammar)
 it is always reader text. It constructs media; it is not an expression function returning text.
 The value is the media node, with no arithmetic precedence or `#` chaining. Its strings decode
 `\"` and `\\` once. Alt text also treats `\{` and `\}` as literal braces. Quoted paths can contain
 filename punctuation without becoming story identifiers.
-Existing `{image:name}` character access is unchanged.
+`{image:name}` still means the `name` property of a character called `image`.
+There is no `@image` directive, and the Markdown `![alt](path)` form is rejected (TW1015).
+Images can appear anywhere reader text can, except inside alt text; plain-text fields such as
+`@title` do not accept them.
 
-The alternatives considered for [#197](https://github.com/squid-farm/talewright/issues/197) were
-`@image(path | "alt")`, `@image("path", "alt")`, a line-only `@image` directive, a colon form and
-`#image`. Braces give narrative insertion an explicit boundary without a new distinction between
-scene metadata and image content. Commas follow the argument convention instead of adding `|`.
-The line-only form unnecessarily limits authoring; `:` already means access, and `#` returns text,
-not media. Markdown images remain rejected, rather than supported as a second spelling.
-Image placement is not restricted for presentation preferences; authors control their content.
-Plain-string fields are a separate model boundary, not an image-specific prohibition.
-
-## Prose formatting and legacy images
+## Prose formatting and Markdown images
 
 These formatting delimiters use Talemark's
 [reader-text grammar](#reader-text-grammar) below, not a general Markdown parser.
-Broader typography and presentation remain in
-[#200](https://github.com/squid-farm/talewright/issues/200).
 
 | Marker | Meaning, arguments and context | Binding and escaping | Canonical example | Diagnostics |
 |---|---|---|---|---|
@@ -333,7 +315,7 @@ Broader typography and presentation remain in
 
 ## Reader-text grammar
 
-**Implemented.** CommonMark is not the specification. Anything not listed here is literal text.
+CommonMark is not the specification. Anything not listed here is literal text.
 The [parser rationale](../developer/architecture.md#reader-text-parser-rationale) explains why
 Talemark owns this grammar.
 
@@ -412,9 +394,8 @@ clear later clause boundary; quotes in the label remain typography.
 
 `{` opens an inline construct, which ends at its matching `}`. Nested braces and quoted strings
 inside it are skipped. Within a paragraph the construct may span lines, and newlines count as
-whitespace. That preserves current multiline conditions and arguments. Talemark adds no
-continuation character and no single-line rule; the broader multiline policy is deliberately
-left open.
+whitespace, so multiline conditions and arguments work. Talemark has no line-continuation
+character.
 
 - An unclosed `{` reports one TW1004 at the brace. The rest of the text unit is literal text, and
   editor analysis still analyzes the partial expression.
@@ -452,54 +433,53 @@ the opening `!` and reports unexpected reader-text syntax.
 Alt text always uses this grammar, whether or not it contains `{`. The reader sees plain text:
 formatting is dropped, and backticks remain ordinary text. Its escapes are `\"` plus the
 reader-text punctuation rule; unknown letter escapes remain literal. A nested `{image(...)}` still
-reports TW1014. Missing-alt warnings are decided from the authored alt, as today.
+reports TW1014. Missing-alt warnings are decided from the authored alt, not the rendered text.
 
 ### Example corpus
 
-This 38-example corpus is the implementation contract for #401. *Current* is the Markdig behavior
-measured before #401; a ⏎ marks a line break in the source. `[I: ...]` is emphasis, `[B: ...]` is
-strong and `[C: ...]` is code.
+These examples show how the grammar reads tricky input; the compiler's tests cover each one.
+A ⏎ marks a line break in the source. `[I: ...]` is emphasis and `[B: ...]` is strong.
 
-| # | Input | Current | Approved |
-|---|---|---|---|
-| 1 | `Lost line` ⏎ `---` | The paragraph disappears (setext heading). | `Lost line` ⏎ `---` |
-| 2 | `Lost line` ⏎ `-` | The paragraph disappears. | `Lost line` ⏎ `-` |
-| 3 | `[Inventory]: empty` | Disappears (reference definition). | Literal. |
-| 4 | `[the inn][1] is here` | `the inn][1] is here` | Literal. |
-| 5 | `[Go](https://example.org) now` | `Go now` | Literal. |
-| 6 | `&amp; &copy; &#65;` | `& © A` | Literal. |
-| 7 | `<b>tag</b>`, `https://example.org` | Literal. | Literal. |
-| 8 | `# Not heading`, `- not list`, `1. not list` | Literal. | Literal. |
-| 9 | `2*3*4 and snake_case_name` | `2[I: 3]4 and snake_case_name` | Literal. |
-| 10 | `word*inner*word` | `word[I: inner]word` | Literal. |
-| 11 | `***both***` | Bold italic `both`. | Literal; write `**_both_**`. |
-| 12 | `**bold *italic* bold**` | `[B: bold [I: italic] bold]` | Same. |
-| 13 | `*a **b* c**` | `[I: a b c]` | `*a [B: b* c]` |
-| 14 | `**unclosed and *also` | Literal. | Literal. |
-| 15 | `_under_ and __strong__` | `[I: under] and [B: strong]` | Same. |
-| 16 | ``` `code {player:first-name} **x**` ``` | `[C: code Ada **x**]` | `` `code Ada [B: x]` `` |
-| 17 | ``` `a \{b\} c` ``` | `[C: a \{b\} c]` | `` `a {b} c` `` |
-| 18 | ```` `` a`b `` ```` | ``` [C: a`b] ``` | ```` `` a`b `` ```` |
-| 19 | `\* \_ \[ \] \{ \} \\` | `* _ [ ] { } \` | Same. |
-| 20 | `\. \# \> \& \a` | `. # > & \a` | `. # > & \a` |
-| 21 | `line one\` ⏎ `line two` | Hard break. | TW1017; remove `\` and the authored newline remains. |
-| 22 | `She said "hi" (quietly) [aside]` | Literal. | Same. |
-| 23 | `* [Open [the] door] -> END` | Label `Open [the] door`. | Same. |
-| 24 | `* [Open [door] -> END` | TW1011. | Same. |
-| 25 | `* [Say "hi" (quietly)] -> END` | Label `Say "hi" (quietly)`. | Same. |
-| 26 | `* [Open \] door] -> END` | Label `Open ] door`. | Same. |
-| 27 | `Hello {player:first-name` | TW1004. | Same; the rest is literal. |
-| 28 | `Close } stray` | Literal. | Same. |
-| 29 | `{if true}**a{else}b**{/if}` | TW1005. | Same. |
-| 30 | `{if flag:a and` ⏎ `flag:b}Both.{/if}` | Works. | Same. |
-| 31 | `{image("portrait", "**The guide**")}` | Alt `**The guide**`. | Alt `The guide`. |
-| 32 | `{image("portrait", "**{guide:first-name}**")}` | Alt `Bea`. | Same. |
-| 33 | ``` {image("portrait", "`code` and \\ slash")} ``` | Alt ``` `code` and \ slash ```. | Alt ``` `code` and \ slash ```. |
-| 34 | `{image("portrait", "a \* b")}` | TW1014. | Alt `a * b`. |
-| 35 | `![A torch](torch)` | TW1015. | Same. |
-| 36 | `![a [b]](p)` | TW1015. | Literal. |
-| 37 | `![a\]](p)` | TW1015. | Literal. |
-| 38 | `![a](p(q))` | TW1015. | Literal. |
+| # | Input | Result |
+|---|---|---|
+| 1 | `Lost line` ⏎ `---` | `Lost line` ⏎ `---` |
+| 2 | `Lost line` ⏎ `-` | `Lost line` ⏎ `-` |
+| 3 | `[Inventory]: empty` | Literal. |
+| 4 | `[the inn][1] is here` | Literal. |
+| 5 | `[Go](https://example.org) now` | Literal. |
+| 6 | `&amp; &copy; &#65;` | Literal. |
+| 7 | `<b>tag</b>`, `https://example.org` | Literal. |
+| 8 | `# Not heading`, `- not list`, `1. not list` | Literal. |
+| 9 | `2*3*4 and snake_case_name` | Literal. |
+| 10 | `word*inner*word` | Literal. |
+| 11 | `***both***` | Literal; write `**_both_**`. |
+| 12 | `**bold *italic* bold**` | `[B: bold [I: italic] bold]` |
+| 13 | `*a **b* c**` | `*a [B: b* c]` |
+| 14 | `**unclosed and *also` | Literal. |
+| 15 | `_under_ and __strong__` | `[I: under] and [B: strong]` |
+| 16 | ``` `code {player:first-name} **x**` ``` | `` `code Ada [B: x]` `` |
+| 17 | ``` `a \{b\} c` ``` | `` `a {b} c` `` |
+| 18 | ```` `` a`b `` ```` | ```` `` a`b `` ```` |
+| 19 | `\* \_ \[ \] \{ \} \\` | `* _ [ ] { } \` |
+| 20 | `\. \# \> \& \a` | `. # > & \a` |
+| 21 | `line one\` ⏎ `line two` | TW1017; remove `\` and the authored newline remains. |
+| 22 | `She said "hi" (quietly) [aside]` | Literal. |
+| 23 | `* [Open [the] door] -> END` | Label `Open [the] door`. |
+| 24 | `* [Open [door] -> END` | TW1011. |
+| 25 | `* [Say "hi" (quietly)] -> END` | Label `Say "hi" (quietly)`. |
+| 26 | `* [Open \] door] -> END` | Label `Open ] door`. |
+| 27 | `Hello {player:first-name` | TW1004; the rest is literal. |
+| 28 | `Close } stray` | Literal. |
+| 29 | `{if true}**a{else}b**{/if}` | TW1005. |
+| 30 | `{if flag:a and` ⏎ `flag:b}Both.{/if}` | Works. |
+| 31 | `{image("portrait", "**The guide**")}` | Alt `The guide`. |
+| 32 | `{image("portrait", "**{guide:first-name}**")}` | Alt `Bea`. |
+| 33 | ``` {image("portrait", "`code` and \\ slash")} ``` | Alt ``` `code` and \ slash ```. |
+| 34 | `{image("portrait", "a \* b")}` | Alt `a * b`. |
+| 35 | `![A torch](torch)` | TW1015. |
+| 36 | `![a [b]](p)` | Literal. |
+| 37 | `![a\]](p)` | Literal. |
+| 38 | `![a](p(q))` | Literal. |
 
 ## Dotted-prefix completion
 
@@ -508,30 +488,25 @@ With items `weapon.knife`, `weapon.sword` and `rope`, `{item:weapon.` offers onl
 `weapon.*` items. The dot is part of the replacement range, not a traversal into another object.
 The same prefix filtering applies to scene targets, character references, stats, factions, flags
 and variables in their recognized positions.
-It does not imply completion in prose, a new declaration, or inside an arbitrary quoted string.
-The language server uses the shared authoring completion provider.
+This filtering applies only in recognized reference positions, not in plain prose, new declarations
+or arbitrary quoted strings.
 
-## Implementation status
+## Not Talemark syntax
 
-| Rule or feature | Current implementation and next owner |
-|---|---|
-| `:` access, `.` within names, shared story-name characters | Implemented in [#191](https://github.com/squid-farm/talewright/issues/191). |
-| Pronoun forms as text-valued properties | Implemented in [#332](https://github.com/squid-farm/talewright/issues/332), replacing the earlier #190 syntax without compatibility machinery. |
-| `#one-many("singular", "plural")` | Pronoun selection implemented in [#192](https://github.com/squid-farm/talewright/issues/192), item-name selection in [#308](https://github.com/squid-farm/talewright/issues/308), and numeric selection in [#647](https://github.com/squid-farm/talewright/issues/647). Numbers select the first string only at exactly 1; pronouns use effective `agreement`, and item names use `name-agreement`. |
-| Item `name-agreement` / `uncountable`, `#a` / `#the` / `#this` / `#that` | Implemented in [#308](https://github.com/squid-farm/talewright/issues/308); explicit helpers retain original-reference grammar through chains, with no object-copy semantics. |
-| `character:inventory:item` / `:name` | Item-name shorthand and explicit form implemented in [#644](https://github.com/squid-farm/talewright/issues/644); both lower to `ItemNameRef`, and editor completion/hover cover the item and `name` property. |
-| Double quotes around reader text inside syntax | Decided in [#189](https://github.com/squid-farm/talewright/issues/189); not applied to current titles, dialogue or choice labels. Implementation work belongs under [#184](https://github.com/squid-farm/talewright/issues/184); this docs-only PR does not invent replacements for those forms. |
-| `\"` and `\\` inside quotes | Implemented for image paths and alt in [#197](https://github.com/squid-farm/talewright/issues/197), and expression/manipulator strings in [#352](https://github.com/squid-farm/talewright/issues/352). Enclosing delimiters respect escaped quotes. Reader text uses the broader punctuation-escape rule in [#404](https://github.com/squid-farm/talewright/issues/404). |
-| Comma-separated multi-argument manipulators | Only the `#one-many` selector accepts exactly two strings. General multi-argument support is not implemented. Future manipulator work belongs under [#184](https://github.com/squid-farm/talewright/issues/184), with extensibility in [#193](https://github.com/squid-farm/talewright/issues/193). |
-| New image syntax | `{image("path", "alt")}` works across narrative-template contexts. Alt is optional. It uses the same template language as prose ([#330](https://github.com/squid-farm/talewright/issues/330)), rendered with the state where the image appears, and cannot contain a nested image. Quoted paths stay literal asset strings, not story identifiers. Shared lookup checks paths in compilation, validation and editor analysis; editor completion refreshes with file changes. The shared renderer displays images in folder stories, ZIP uploads and published web/desktop games. See [images](talemark-syntax.md#images) and [image diagnostics](diagnostics.md#tw2xxx-names-and-types) for paths, formats, failure behavior and limits. |
-| Formatting beyond bold and italic | Design decision in [#200](https://github.com/squid-farm/talewright/issues/200), not an accepted `#heading` or other new manipulator here. |
-| [Reader-text grammar](#reader-text-grammar) | Approved in [#399](https://github.com/squid-farm/talewright/issues/399). Bounded scanner implemented in [#400](https://github.com/squid-farm/talewright/issues/400); Markdig replaced, with corpus and silent-loss regression tests, in [#401](https://github.com/squid-farm/talewright/issues/401). Production package removal and remaining delimiter-caller migration were completed in [#402](https://github.com/squid-farm/talewright/issues/402) and [#403](https://github.com/squid-farm/talewright/issues/403). |
-| Alt text always reader text | Approved in [#399](https://github.com/squid-farm/talewright/issues/399); implemented in [#401](https://github.com/squid-farm/talewright/issues/401). |
-| `character:inventory:item:count` | Runtime and expression support implemented in [#626](https://github.com/squid-farm/talewright/issues/626); editor completion, hover, highlighting, references and authoring examples implemented in [#627](https://github.com/squid-farm/talewright/issues/627). |
-| Choice clauses | Both orders remain accepted; [#384](https://github.com/squid-farm/talewright/issues/384) diagnoses duplicate, incomplete and misplaced clauses. |
-| Line-directive escape | A leading backslash before ASCII punctuation is reader text, not a directive; it uses the same escape rule as prose ([#404](https://github.com/squid-farm/talewright/issues/404)). |
-| [Callable construct contract](#callable-construct-contract) | Documentation contract for new callables. Existing inconsistencies are recorded for [#184](https://github.com/squid-farm/talewright/issues/184) and [#193](https://github.com/squid-farm/talewright/issues/193); no syntax changed. |
-| Checkpoints/autosaves | No Talemark syntax. Autosave is configured in the manifest, and a trigger with `save: true` keeps a checkpoint ([#54](https://github.com/squid-farm/talewright/issues/54), [#484](https://github.com/squid-farm/talewright/issues/484)); see [Writing stories](../guide/writing-stories.md). `@once` means hub eligibility, not a checkpoint policy. No checkpoint marker is reserved by this document. |
+Checkpoints and autosaves have no Talemark syntax. Autosave is configured in the manifest, and a
+trigger with `save: true` keeps a checkpoint; see [Writing stories](../guide/writing-stories.md).
+`@once` controls hub eligibility, not saving.
 
-Unimplemented contracts need scoped implementation issues agreed with the project manager before coding.
-This registry records the gaps; it does not silently expand #197 or change the tracker.
+## Planned changes
+
+These are tracked but not built. Until they ship, the rules above are the whole language.
+
+- Syntax consistency ([#184](https://github.com/squid-farm/talewright/issues/184)): whether speech and
+  choice labels move to quoted reader text, one spelling for boolean queries, aligned tag
+  rules, and further manipulators.
+- Typed, extensible manipulators, including registration and shared name rules for manipulator names
+  ([#193](https://github.com/squid-farm/talewright/issues/193)).
+- Formatting beyond bold and italic ([#200](https://github.com/squid-farm/talewright/issues/200)).
+
+New syntax follows the [language-change checklist](../developer/language-changes.md) and needs a scoped
+issue before implementation.

@@ -4,10 +4,9 @@ A tour of writing stories in **Talemark**, with a short example for each feature
 The [Talemark syntax reference](../reference/talemark-syntax.md)
 has every rule and option.
 
-For highlighting, suggestions and live checks on Linux x64, install the
-[Talewright extension](../../tooling/vscode-talewright/README.md).
-Use **Talewright: Validate Story** after CLI setup, or check a ZIP in the browser player.
-See [Getting started](getting-started.md) for both paths.
+For highlighting, suggestions and live checks as you type, use VS Code with the
+[Talewright extension](../../tooling/vscode-talewright/README.md). See
+[Getting started](getting-started.md) to set up your editor and check your story.
 
 ## Organizing your files
 
@@ -16,15 +15,10 @@ See [Getting started](getting-started.md) for both paths.
   joined by hyphens are the recommended style, not the only accepted spelling.
 - Lines starting with `//` are comments that players never see.
 
-The [Lost Relic sample](../../samples/LostRelic) uses four progressive chapter
-files: camp, trail, temple and endings. The player, guide, trail items, guild and
-all triggers stay in the root settings. The optional temple dream keeps its six
-characters and glyph settings beside its scenes in `dream/`. Those names remain
-global; duplicate IDs across settings files are errors. Its optional night camp
-and dream put advanced hubs and effects on the journey, not in a separate workshop.
-Keep settings together while your story is small, or split related characters and
-items into smaller files as it grows. See [Organizing your story](organizing-your-story.md)
-for two complete layouts.
+Keep your settings in `story.talewright.yaml` while your story is small, and split related
+characters and items into smaller files as it grows.
+[Organizing your story](organizing-your-story.md) shows both layouts, and how the
+[Lost Relic sample](../../samples/LostRelic) is arranged.
 
 ## Scenes run top to bottom
 
@@ -106,11 +100,10 @@ not on character names or arbitrary text.
 For quantity-dependent wording, apply it to the count expression:
 `{player:inventory:arrow:count} {player:inventory:arrow:count#one-many("arrow remains", "arrows remain")}.`
 The first wording is selected only when the number is exactly 1.
-Scene titles are literal text, so use neutral titles such as "Ask your guide
-about the temple"; put `{guide:first-name}` in prose and choice labels instead.
-For recurring item names, use `{item:relic}` rather than repeating the display
-name in every passage. Authors still supply verb forms and surrounding wording;
-there is no general name/item grammar inference.
+Scene titles are plain text and can't use substitutions, so use neutral titles such as "Ask your
+guide about the temple"; put `{guide:first-name}` in prose and choice labels instead.
+For recurring item names, use `{item:relic}` rather than repeating the display name in every
+passage. Talewright doesn't work out other verb forms for you; write them with `#one-many`.
 
 ## Stats and skills
 
@@ -139,12 +132,9 @@ section without `base: rpg` declares only your own stats. They work in skill che
 levelling. See [`ruleset` in story.talewright.yaml](../reference/talemark-syntax.md#1-storytalewrightyaml)
 and [your own stats with skill checks](authoring-recipes.md#your-own-stats-with-skill-checks).
 For a complete declaration and check, see [add a skill for your setting](authoring-recipes.md#add-a-skill-for-your-setting).
-Lost Relic adds Courage (a bounded custom stat) and Lucidity (a bounded skill).
-Scholar starts with Lucidity 3 and Will 14; solving the journal adds 2 Lucidity.
-Lucidity uses `governing-attribute: will`: a fixed roll of 10 plus Lucidity 5 and
-Will's +2 modifier totals 17 in the dream check. See
-[link a skill to a custom attribute](authoring-recipes.md#link-a-skill-to-a-custom-attribute)
-for the optional `governing-attribute` setting.
+A skill can also draw on an attribute you declare; see
+[link a skill to a custom attribute](authoring-recipes.md#link-a-skill-to-a-custom-attribute).
+The Lost Relic sample adds a custom Courage stat and a Lucidity skill linked to a Will attribute.
 
 Change stats with effects: `~ player:hp -= 2` on its own line where the change should happen, or
 `{ player:xp += 50 }` on a choice. Values stay within their minimum and maximum.
@@ -300,13 +290,9 @@ Standing is a number. Its tier name is what players see and what you'll usually 
 | `friendly` | 10 to 49 |
 | `allied` | 50 or higher |
 
-Standing has no upper or lower limit; these tiers just label the ranges. Every story has them,
-with or without RPG rules, and they can't be changed in `story.talewright.yaml` yet. The built-in tiers are ready to use as
-they are; you do not need to change them to write or publish a story.
-
-> **For developers:** Changing the tiers requires a
-> [custom C# ruleset](../developer/csharp-extensions.md). This is optional and is not part of the
-> no-code authoring path.
+Standing has no upper or lower limit; the tiers just name the ranges. Every story has them, with
+or without RPG rules, and you can't change them in `story.talewright.yaml`. (A programmer can change
+them with a [custom C# ruleset](../developer/csharp-extensions.md), but you never need to.)
 
 ```tale
 * [Shove the door] { faction:explorers-guild:standing -= 10 } -> hall
@@ -474,18 +460,13 @@ then `.webp`, and warns if several files match.
 The check does not inspect whether the image's contents can actually be displayed, so play the
 story to check the artwork as well.
 
-For state-dependent artwork, put image calls inside ordinary conditions.
-Lost Relic's `dream.sleeper` uses Lucidity to show one of three views of the
-same place: obscured below 2, partially visible from 2 through 4, and clear at 5
-or higher. The image and prose use the same condition, and each variant's alt
-text describes only what that view reveals. Its dream-hall illustration appears
-once on arrival rather than repeating on every hub visit.
+To change artwork with the game state, put image calls inside ordinary conditions. For example,
+the Lost Relic's `dream.sleeper` scene shows one of three views of the same place depending on the
+player's Lucidity, each with its own alt text.
 
-Images load as they approach the visible part of the story and fit the available width.
-An image that fails to load shows its alt text and an error rather than stopping the story.
-Use reasonably sized artwork for your readers' devices; see
-[artwork and hosting size](sharing-your-story.md#artwork-and-hosting-size) before sharing.
-The old Markdown form `![description](path)` is not supported.
+Images fit the width of the window. One that fails to load shows its alt text and an error, and the
+story carries on. Markdown's `![description](path)` image syntax doesn't work in Talemark.
+Before sharing, see [artwork and hosting size](sharing-your-story.md#artwork-and-hosting-size).
 See [image syntax](../reference/talemark-syntax.md#images) for the complete rules.
 
 ## Other options

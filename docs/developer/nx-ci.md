@@ -8,9 +8,8 @@ Non-.NET contracts are declared in their nearest `project.json`.
 All targets are uncached by default. In particular, browser/native E2E, packaging checks, and
 editor tests run their existing commands and are not restored from Nx cache.
 
-The [dependency-download reuse experiment](nx-dependency-reuse.md) records repeated local
-cold/warm measurements and historical Actions runner-minute estimates. Its initial result keeps
-existing editor npm caching but does not justify adding new download caches.
+Only the editor's npm dependencies and VS Code test download are cached between runs; measurements showed that further dependency
+download caches would not pay for themselves (see [dependency-download reuse](nx-dependency-reuse.md)).
 
 ## Local setup and selection
 
@@ -39,7 +38,7 @@ Pull requests always run the complete lightweight `checks` group: every workspac
 and `budget` task, regardless of what changed. Build, unit, browser, Linux desktop and editor groups keep
 Nx affected selection. Selection merges a `run-many --all` graph for the check targets into the affected
 graph before routing, so check prerequisites stay with Nx and affected `build:release` tasks already
-built by a check are not duplicated. Full verification is unchanged.
+built by a check are not duplicated.
 
 ## Actions summaries
 
@@ -47,8 +46,7 @@ Selection appends a GitHub Actions job summary with full versus affected mode, a
 and the selected projects/targets grouped by environment. An empty graph is explicitly reported as
 no impact. A conservative workspace fallback is identified from the Nx graph, not from a second
 changed-path classifier. Each environment row shows its scope: **Full**, **Affected**, or **Complete**
-for pull-request checks. The plan JSON and selection outputs keep their original shape; the uploaded
-`nx-ci-plan` artifact also contains `selection.json`, which records the same per-environment scopes.
+for pull-request checks. The uploaded `nx-ci-plan` artifact contains the plan JSON and `selection.json`, which records the same per-environment scopes.
 
 Each work job reports the router's target batches after execution, including Nx prerequisites:
 projects, outcome, and monotonic elapsed seconds. These are **batch**, not per-project timings;
@@ -60,7 +58,7 @@ include the browser name, and sharded E2E records end in `-<index>-of-<count>`. 
 zero-duration successes. Job summaries run with `always()` so ordinary failures and interruptions
 can still be described. A forced runner termination can prevent the final summary step from running;
 the aggregate job summary also exposes missing/cancelled/unexpectedly skipped job outcomes.
-It cannot reconstruct missing batch timings. Existing fail-closed gates remain authoritative.
+It cannot reconstruct missing batch timings; the fail-closed gates still decide the result.
 
 E2E task output is streamed into the job log as it runs. If an E2E or unit batch fails, its job
 summary reads the fresh TRX reports and lists failed test names with the first line of each assertion,
@@ -123,8 +121,8 @@ Projects already covered by test/package contracts retain those contracts rather
 | `talewright-workspace` fallback | Unowned/root and newly introduced paths select broad verification rather than silently producing no tasks. No-op targets depend on the real projects, so broad selection uses the same commands without running duplicate solution tests. `docs/` is a more-specific project and receives documentation checks. |
 
 Shared inputs include the SDK, build props, solution, NuGet configuration, and Nx configuration.
-Those changes conservatively affect verification targets. `.github/` files are no longer blanket
-shared inputs. Nx filters the explicit no-impact paths in `.nxignore` before affected computation.
+Those changes conservatively affect verification targets. `.github/` files are not shared inputs;
+they follow the [CI-infrastructure matrix](#ci-infrastructure-change-matrix). Nx filters the explicit no-impact paths in `.nxignore` before affected computation.
 Changing `.nxignore` itself retains conservative verification. The graph selection
 tests exercise editor-only, snippet, rules/compiler, UI, runtime/save, CLI/publish, shared/unknown,
 and documentation-only changes, and assert build prerequisite edges. Changes to shared test runners
@@ -178,10 +176,10 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
 | `tests / checks` | Every CI/selection regression test, documentation-link check, performance-report Python test, and bounded performance budget on every PR, plus any affected leaf compilation. |
 
-“Regular” browser/native coverage excludes `RealCorpus`, just as before this change. PR E2E is not
+“Regular” browser/native coverage excludes `RealCorpus`. PR E2E is not
 reduced to a tiny smoke subset when core changes are affected: the full regular regression matrix is
-intentional. Gigantic/real-corpus measurements remain in the separate performance workflow with its
-existing longer timeouts and schedule.
+intentional. Gigantic/real-corpus measurements run in the separate performance workflow, with longer timeouts
+and its own schedule.
 
 Both reusable Tests verification and the Build **CI verification** aggregate run with `if: always()`.
 They require successful selection, success for every selected job, and `skipped` only for explicitly
@@ -203,19 +201,15 @@ Node 22/npm come from the image; non-root execution requires writable checkout, 
 npm home, and NuGet home directories. Image files select CI contracts and retain the independent
 candidate-image validation described above.
 
-The repository ruleset was inspected during implementation: its required-status-check list was empty.
-This change preserves `build`, `unit`, `browser`, `linux-desktop`, and editor `syntax` job IDs, but editor
-now runs as a reusable job inside Tests, so its displayed check context changes. After a first PR run
-confirms the emitted contexts, maintainers should add **CI verification** to the ruleset's required
-status checks rather than requiring `build`, conditional Tests leaf checks, or the nested
-`tests / verification` check. Keep that top-level name stable. No repository protection settings
-are changed by this PR.
+In the repository ruleset, require only **CI verification**, not `build`, the conditional Tests
+leaf checks or the nested `tests / verification` check. Keep that top-level name stable.
 
 ## Full verification
 
 Pushes to `main`, release tags, Build manual dispatches, and the weekly Build schedule always use
 `run-many`, bypassing affected selection. Standalone Tests manual dispatches also generate a full
-verification plan. A release still uses the existing publication approvals and package version logic.
+verification plan. Releases add the publication approvals and package versioning described in
+[Releasing and CI](releasing.md).
 
 ### Run the full pipeline on a branch without deploying
 
@@ -275,6 +269,4 @@ installation, not UI libraries.
 The suite deliberately does not assert workflow YAML text, summary wording, or Nx's own task ordering:
 those are verified by real workflow runs and by Nx itself, and freezing them only made edits expensive.
 
-Shared workflow ownership was cleared with the M2 CI session before wiring these jobs. Container/image
-provisioning is deliberately separate: any future image reference belongs in shared inputs, and
-browser/native caching must remain disabled without independently proven input/output correctness.
+Browser/native caching stays disabled unless its inputs and outputs are proven correct.

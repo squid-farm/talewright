@@ -10,7 +10,8 @@ For people extending Talewright in C# or working on the engine itself. Writing s
 | [C# extensions and packages](csharp-extensions.md) | Which NuGet package to use, registry setup, extension examples |
 | [Distribution and runtime safety](../reference/safety.md) | Framework contracts, executable-extension boundaries and focused follow-up gaps |
 | [Shared authoring analysis](authoring-analysis.md) | Partial symbols, source ranges, unsaved workspaces, and explicit project metadata |
-| [Plan and roadmap](plan.md) | Decisions, milestones and their dependencies |
+| [Design decisions](plan.md) | The principles and decisions behind how Talewright is built |
+| [Roadmap](../roadmap.md) | Where the project is headed |
 | [Issue tracking](issues.md) | Full claim/status workflow for people and agents |
 | [Releasing and CI](releasing.md) | Workflows, GitHub Pages, version tags, package publication |
 | [CLI setup details](cli-setup.md) | Download verification, system dependencies, .NET tools and source builds |

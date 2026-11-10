@@ -1,6 +1,6 @@
 # Performance
 
-The initial Release benchmark compiles **10,000 generated scenes** with substitutions,
+The Release benchmark compiles **10,000 generated scenes** with substitutions,
 effects and choices, and restores **10,000-choice histories**:
 
 | Operation | Median | Observed p95 |
@@ -25,35 +25,19 @@ stories or maximum file/byte limits. Compile and restore allocated approximately
 118 MiB and 81 MiB respectively; those are managed allocations, not peak memory.
 Compilation p95 reached 878 ms during a separate run under concurrent build load.
 
-See [methodology, reproduction commands and recorded results](../../tests/README.md#reproducible-performance-budgets).
+See [methodology and reproduction commands](../../tests/README.md#reproducible-performance-budgets).
 That section also describes the realistic story benchmark, which compiles a generated story with branches,
 hubs, loops, conditions and endings; the corpus tiers above are single-path rings that measure size and limits.
 
-## First GitHub-hosted real-file baseline
+## GitHub-hosted real-file measurements
 
-The first successful [Real-file performance workflow run](https://github.com/squid-farm/talewright/actions/runs/39902796074)
-completed on 2026-10-23. Its BenchmarkDotNet suite measured 106 cases, including generated file-count,
-byte-volume, scene-count, and history-depth corpora. Two representative
-independent-dimension results are:
-
-| Operation | Mean | p95 | Managed allocations per operation |
-|---|---:|---:|---:|
-| Load and compile generated 10,000-scene corpus from disk | 398.3 ms | 418.5 ms | 719.87 MB |
-| Restore generated 10,000-choice history | 132.2 ms | 139.8 ms | 91.73 MB |
-
-These are results from one GitHub-hosted `ubuntu-24.04` run (.NET 10.0.13,
-Ubuntu 24.04.5, four-core AMD EPYC 7763 runner), with five warmups and thirty
-measured iterations per BenchmarkDotNet case. Runner power and filesystem cache
-are uncontrolled. Managed allocations are not peak or retained memory, and a
-single hosted run is a recorded baseline—not a performance guarantee or budget.
-
-The browser and Linux Photino integration jobs passed, and all three publication
-workloads completed. See the [full run report](https://github.com/squid-farm/talewright/blob/performance-results/reports/39902796074-1.md)
-for all 106 benchmark cases, player observations, publication timings and runner
-metadata, or browse the [durable performance history](https://github.com/squid-farm/talewright/blob/performance-results/index.md).
-The full deterministic corpus, BenchmarkDotNet output and integration evidence
-are available as [GitHub Actions artifacts](https://github.com/squid-farm/talewright/actions/runs/39902796074)
-(retained for 30 days).
+The [Real-file performance workflow](../../.github/workflows/performance.yml) runs a BenchmarkDotNet
+suite on a GitHub-hosted `ubuntu-24.04` runner. It covers generated file-count, byte-volume,
+scene-count and history-depth corpora, plus browser, Linux Photino and publication workloads.
+Each run's report, with runner metadata, is kept in the
+[durable performance history](https://github.com/squid-farm/talewright/blob/performance-results/index.md).
+Runner power and filesystem cache are uncontrolled, so a single hosted run is a baseline, not a
+guarantee or budget. Managed allocations are not peak or retained memory.
 
 See the [performance scorecard](performance-scorecard.md) for a cross-host view
 of browser observations, fixed-byte file-layout measurements, end-cursor versus
@@ -61,7 +45,7 @@ redo-prefix restore, metric limitations, and the status of proposed budgets.
 
 ## File syntax reuse and edit diagnostics
 
-The #409 measurement uses the deterministic 20-chapter realistic corpus:
+This measurement uses the deterministic 20-chapter realistic corpus:
 22 text files (21 `.tale`), 709,952 UTF-8 source bytes including configuration.
 Each warm edit parses one file and rebinds/validates the entire story.
 
@@ -104,13 +88,12 @@ in-process LSP framing, workspace, linting and publication pipeline, not a mocke
 analyzer or an analyzer-only latency. An internal opt-in observer exposes stage
 timings to the harness; no telemetry is emitted by the normal server.
 
-**The 50 ms edit-to-diagnostics target is missed, and that is accepted for
-now.** File reuse removes repeated parsing, but whole-story analysis alone
+**The 50 ms edit-to-diagnostics target is missed, and that is accepted.** File reuse removes repeated parsing, but whole-story analysis alone
 remains over budget. The fixed 150 ms quiet window is deliberate: it coalesces
 edits arriving less than 150 ms apart into one analysis instead of starting
 whole-story work per keystroke. Adaptive or shorter windows are deferred until
-authors report on real editing experience. The report does not enable per-scene
-reuse (#411) or claim that #392's latency target is satisfied.
+authors report on real editing experience. Reusing unchanged scenes, rather than whole files, is
+tracked in [#411](https://github.com/squid-farm/talewright/issues/411).
 
 The measured workload waits for publication between edits, so each sample is
 one isolated edit plus the full quiet window. Tests cover burst coalescing,
@@ -118,7 +101,7 @@ cancellation of running analysis, paced edits and latest-only publication.
 
 ## Current-text completion and hover
 
-The #410 Release harness publishes a warm story-wide snapshot, then sends a
+The Release harness publishes a warm story-wide snapshot, then sends a
 current-buffer edit before each framed in-process LSP completion or hover
 request. The edited file contains one scene; the catalog scenes are spread over
 files of at most 100 scenes. It reports seven samples after three warmups, with
@@ -142,6 +125,6 @@ process-wide counter, including server-thread allocations; they are neither
 retained memory nor peak memory. Completion allocations still grow with the
 story-wide symbol count (about 76 KB per request at 1,000 scene symbols and
 about 518 KB at 10,000), while hover stays roughly flat. That growth is a
-known target for later optimization. The deterministic concurrency tests
+known optimization target. The deterministic concurrency tests
 separately verify that these requests do not start or await whole-story
 analysis while the current buffer is being edited.

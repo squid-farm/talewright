@@ -2,9 +2,9 @@
 
 In this tutorial you'll build *The Night Ferry*: a three-scene story with dialogue, an item, a skill
 check and text that changes depending on what the player did. It takes about fifteen minutes. You
-need a text editor. Follow [Getting started](getting-started.md) to set up VS Code with the
-Talewright extension on Linux x64, or use another plain-text editor. Both paths can play the story
-in the [web player](https://play.trytalewright.com/).
+need a text editor: VS Code with the Talewright extension (see [Getting started](getting-started.md))
+or any plain-text editor. Either way, you can play the story in the
+[web player](https://play.trytalewright.com/).
 
 > **Want a quick playable starting point?** With the [CLI installed](cli-installation.md), run
 > `talewright new night-ferry --title "The Night Ferry"` to create a complete, valid starter story.
@@ -81,16 +81,13 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 
 ## 3. Check it and fix your first error
 
-Save both files before checking. In VS Code, live diagnostics appear while you write; open
-**View > Problems** to see them together. For a check of the saved story, run
-**Talewright: Validate Story** from the Command Palette (**View > Command Palette**, or
-**Ctrl+Shift+P**).
-If the CLI is missing, choose **Set Up CLI** and follow the
-[setup guide](cli-installation.md). The language server is already included with the extension,
-but these commands use the separate CLI.
+Save both files. In VS Code, mistakes are underlined as you type; open **View > Problems** to see
+them all together. To check the saved story, run **Talewright: Validate Story** from the Command
+Palette (**View > Command Palette**, or **Ctrl+Shift+P**). If VS Code says the CLI is missing,
+choose **Set Up CLI** and follow the [setup guide](cli-installation.md).
 
-The choice you wrote points at a scene that does not exist yet. This is intentional for this step:
-you will see how to find and fix it. You can use either of the alternatives below for the same check.
+The choice you wrote points at a scene that doesn't exist yet. That's on purpose: this step shows
+you how to find and fix a mistake. If you're not using VS Code, either of these does the same check.
 
 ### Check in the web player (no install)
 
@@ -100,8 +97,8 @@ the web player. It checks the story and shows errors instead of opening a story 
 
 ### Or, check from a terminal
 
-With the [story tools installed](cli-installation.md), check the folder's full location.
-For example, from the extracted tools folder on Windows:
+With the [story tools installed](cli-installation.md), give the tool your story folder's full
+location. For example, from the unpacked tools folder on Windows:
 
 ```powershell
 .\Talewright.Cli.exe validate "C:\Users\<your user>\Documents\night-ferry"
@@ -116,7 +113,7 @@ every problem with its file, line and column, so you can go straight to it:
 
 ```text
 story.tale:8:34: error TW2002: Unknown scene 'crossing'.
-story.tale:1:1: error TW3003: Scene 'dock' has a choice or check outcome without '-> target', ...
+story.tale:8:1: error TW3003: Every choice and each choice skill-check outcome needs its own '-> target' or '-> END'. ...
 Validation failed.
 ```
 
@@ -138,19 +135,17 @@ The boat slides into the dark.
 A `->` line on its own moves on to that scene. When a scene has no choices, the player gets a
 **Continue** button, or **The End** when it leads to `END`.
 
-Check again with the same method. The command-line tool prints `Validation succeeded.` when there are
-no errors; in the web player, the story opens when it passes its checks.
+Check again the same way. The command-line tool prints `Validation succeeded.` when there are
+no errors; the web player opens the story once it passes its checks.
 
-Now play it. In VS Code, run **Talewright: Publish Story ZIP**, choose a destination outside the
-story folder, and open the result in the web player using **Open a story file**. This command
-makes story files for a player, not a separate website or app. Alternatively, zip the folder
-yourself using the steps below.
+Now play it. In VS Code, run **Talewright: Run Story** to play it in its own window. Or run
+**Talewright: Publish Story ZIP**, save the ZIP somewhere outside the story folder, and open it in
+the web player with **Open a story file**. Without VS Code, zip the folder yourself using the steps
+below.
 
-After each edit, save, check, make a fresh ZIP and open it again in the player.
-The browser does not edit your story or automatically reload changes.
-For testing a particular scene instead of playing from the beginning, use
-**Talewright: Open Author Debugger** after CLI setup. It opens a separate window and may need
-extra system components; see [testing your story](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
+The web player doesn't notice your edits: after each change, save, make a fresh ZIP and open it
+again. To test one scene without playing from the beginning, use the
+[Author Debugger](testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
 
 ### No desktop tools? Use the web player
 
@@ -164,10 +159,7 @@ Open the [web player](https://play.trytalewright.com/), choose **Open a story fi
 `night-ferry.zip`. The player runs the same checks, so the story won't open while there are errors.
 Instead, you'll see the same list of problems:
 
-![The web player listing story errors](../images/errors.png)
-
-> This screenshot shows two other common mistakes: an item that was never declared in `story.talewright.yaml`,
-> and a misspelled stat.
+![The web player listing the unknown scene 'crossing' error for night-ferry.zip](../images/errors.png)
 
 After each change, re-zip the folder, go back to the library and open it again.
 
@@ -213,7 +205,7 @@ The boat slides into the dark.
 Check the story again, then play both routes. The character sheet on the right updates as Ada spends her coin, and
 skill check results appear in the story as they happen.
 
-![The Night Ferry running in the web player](../images/first-story.png)
+![The Night Ferry's dock scene in the web player, with Ada's character sheet beside it](../images/first-story.png)
 
 ## The finished story
 

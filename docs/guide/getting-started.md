@@ -1,18 +1,18 @@
 # Getting started
 
-Talewright stories are folders of text files. Write in **Talemark**, check your changes, then
-play the story and share it. We recommend VS Code with the Talewright extension for writing help.
-You can also use any plain-text editor and the browser player. If a term is unfamiliar, see the
-[glossary](../reference/glossary.md).
+A Talewright story is a folder of plain-text files. You write it in **Talemark**, check it for
+mistakes, play it, and share it. We recommend VS Code with the Talewright extension, which helps
+as you type, but any plain-text editor and the browser player work too. If a term is unfamiliar,
+see the [glossary](../reference/glossary.md).
 
 ## 1. Set up your story folder
 
 **Fastest start:** if you have the [CLI installed](cli-installation.md), run `talewright new my-story`
-in a terminal. It creates a valid, playable starter story; open the new folder in your editor. See the
-[CLI reference](../reference/cli.md#new) for options.
+in a terminal. It creates a small story that's ready to play; open the new folder in your editor.
+See the [CLI reference](../reference/cli.md#new) for options.
 
-Or, create a story folder manually. Each story lives in its own folder. Make one now, somewhere easy
-to find, such as **Documents > talewright > my-story**. Start with two files inside it:
+Or make the folder yourself. Each story lives in its own folder. Make one somewhere easy to find,
+such as **Documents > talewright > my-story**, with two files inside:
 
 ```text
 my-story/
@@ -22,50 +22,46 @@ my-story/
 
 - **`story.talewright.yaml`** is your story's settings file, also called the **manifest**. It holds
   the title, the starting scene, the characters, items and rules. Every story has exactly one.
-  It is written in **YAML**, a simple text format of `name: value` lines where indentation shows
-  what belongs to what. The name must end in `.talewright.yaml`.
+  It is written in **YAML**, a simple format of `name: value` lines where indentation shows
+  what belongs to what.
 - **`.tale` files** hold the story itself: scenes, prose, dialogue and choices, written in
   **Talemark**. Start with one `story.tale`. As your story grows, you can add more `.tale` files
   and subfolders; Talewright reads all of them.
 
-Both are plain text files, so any text editor can open them. Make sure your editor does not add
-`.txt` to the end of the name. [Your first story](first-story.md) gives you the complete starting
-text for both files.
+Make sure your editor doesn't add `.txt` to the end of either name.
+[Your first story](first-story.md) gives you the text to put in both files.
 
 ## 2. Set up your editor
-
-The Talewright extension is runtime-tested on **Linux computers with Intel or AMD 64-bit processors
-(Linux x64)**, using Ubuntu 24.04 and Linux Mint 22.3. Packages for Windows x64/ARM64,
-Mac (Intel and Apple Silicon) and Linux ARM64 are also available with **provisional support**:
-they are built and inspected, but have not yet been verified running in the installed editor on
-those systems. Please report platform-specific failures. The Marketplace chooses the matching
-package automatically, including for a remote extension host.
-Browser-hosted VS Code and Alpine Linux are not supported; use a plain-text editor and the browser
-player instead.
 
 1. Install [VS Code](https://code.visualstudio.com/).
 2. In **Extensions**, install **Talewright** by **squid-farm** from
    [the Marketplace](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright).
-   Choose **Switch to Pre-Release Version** for preview releases.
+   Choose **Switch to Pre-Release Version** to get preview releases.
 3. Install [YAML by Red Hat](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-   for help with the story settings file.
-4. Open your story folder using **File > Open Folder**.
+   for help with the settings file.
+4. Open your story folder with **File > Open Folder**.
 5. When VS Code asks whether you trust the authors of the files in this folder, choose
-   **Yes, I trust the authors** if it is your own story or you trust its source. Live checks only
-   run in trusted folders. Open a `.tale` file; the language indicator in the bottom-right corner
-   should say **Talemark**.
+   **Yes, I trust the authors** if it's your own story or you trust where it came from. Live checks
+   only run in trusted folders. Open a `.tale` file; the bottom-right corner should say **Talemark**.
 
-The extension highlights your writing, suggests story names and reports mistakes as you edit.
+> **Which computers?** Talewright is tested on Linux computers with Intel or AMD processors.
+> Downloads for Windows, Mac and Linux ARM are available too, but haven't been tried on those
+> computers yet. If something doesn't work on yours, please
+> [tell us](troubleshooting.md#still-stuck). Browser-based VS Code and Alpine Linux aren't
+> supported; use a plain-text editor and the browser player instead.
+
+The extension highlights your writing, suggests names from your story and points out mistakes as
+you type. Nothing else needs installing for this.
 
 ![A Talemark scene in VS Code, with grey previews such as "Mara" and "a sputtering torch" after each substitution](../images/vscode-editor.png)
 
-Grey previews after each `{...}` substitution show the text players will see with the story's
-default values. Hover a substitution to see each step of how its text was produced, plus details
-such as an item's stat modifiers and where it is declared:
+Grey previews after each `{...}` substitution show the text players will see, using your story's
+starting values. Hover over a substitution to see how its text was produced, plus details such as
+an item's stat bonuses and where it is declared:
 
 ![A hover card for {item:relic#the} showing the result "the Relic of Ysh", the item's stat modifiers and its declaration in story.talewright.yaml](../images/vscode-hover.png)
 
-Start typing a scene, item or other story name to get suggestions from your own story:
+Start typing a scene, item or other name to get suggestions from your own story:
 
 ![Scene suggestions such as trail.river and trail.night after typing "-> tr" in a choice](../images/vscode-completion.png)
 
@@ -73,56 +69,47 @@ Mistakes are underlined as you type and listed in the **Problems** panel with th
 
 ![An unknown item named lantern underlined in red, with the error also listed in the Problems panel](../images/vscode-diagnostics.png)
 
-Its live-checking tool, called the **language server**, is included: you do not need to install
-.NET or build Talewright. Save your changes before checking or playing the files on disk.
-The [extension guide](../../tooling/vscode-talewright/README.md) includes a download-and-install
-alternative and system requirements.
+The [extension guide](../../tooling/vscode-talewright/README.md) has more detail, including how to
+install the extension from a download.
 
 ### Finding the Command Palette
 
 Talewright's actions live in VS Code's **Command Palette**, a search box for every command. Open it
-from the menu with **View > Command Palette**, or press **Ctrl+Shift+P** (**Cmd+Shift+P** on Mac).
-A box appears at the top of the window. Type `Talewright` to list the Talewright actions, then
-choose one.
+with **View > Command Palette**, or press **Ctrl+Shift+P** (**Cmd+Shift+P** on Mac). A box appears
+at the top of the window. Type `Talewright` to list the Talewright actions, then choose one.
 
 ![The Command Palette filtered to Talewright, listing Open Author Debugger, Publish Story ZIP, Set Up CLI, Toggle Substitution Preview Hints and Validate Story](../images/vscode-commands.png)
 
 ## 3. Get the story-checking tools (CLI)
 
-The **Talewright CLI** checks your saved story, makes story ZIPs to share and opens the
-**Author Debugger** to test individual scenes. It is a separate download from the extension.
+The **Talewright CLI** checks your saved story, plays it, makes story ZIPs to share and opens the
+**Author Debugger** so you can test any scene. It is a separate download from the extension.
 
-- **In VS Code:** open the Command Palette and run **Talewright: Set Up CLI**. It uses an existing
-  installation when available. Otherwise, it offers a portable download or, when the required .NET
-  tools are installed, asks for approval to install the CLI. Nothing is installed just by opening
-  a story.
-- **Without VS Code:** download it from
-  **[Talewright downloads](https://github.com/squid-farm/talewright/releases)**: open the newest
-  release, expand **Assets** and pick the `talewright-cli-` file for your computer.
-  [Get the story-checking tools](cli-installation.md) explains each step.
+- **In VS Code:** open the Command Palette and run **Talewright: Set Up CLI**. It uses the CLI if
+  you already have it. Otherwise it offers a download, or asks before installing the CLI if you have
+  the .NET tools. Nothing is installed just by opening a story.
+- **Without VS Code:** [Get the story-checking tools](cli-installation.md) walks you through the
+  download step by step.
 
-Windows, Mac and Linux downloads exist; only Linux x64 execution has been verified so far.
-The native **Author Debugger** also needs your computer's web-viewing components. Making a separate
-website or desktop game still requires the .NET 10 SDK.
+Once it's set up, the Command Palette offers:
 
-After setup, the Command Palette offers:
+- **Talewright: Validate Story** to check your saved files.
+- **Talewright: Run Story** to play the story from the beginning in its own window.
+- **Talewright: Open Author Debugger** to jump to any scene and test choices and game state.
+- **Talewright: Publish Story ZIP** to save a story file you can share.
 
-- **Talewright: Validate Story** to check saved files.
-- **Talewright: Publish Story ZIP** to choose where to save story files for a player.
-- **Talewright: Open Author Debugger** to jump to a scene and test choices and state.
-
-These are not a Play button or VS Code's F5 debugger. To play from the beginning, open a story
-ZIP in the browser player. The Author Debugger is a separate testing window.
+**Run Story** needs the [.NET 10 Runtime](#which-net-version-do-i-need). The Author Debugger and
+Run Story open separate windows; they aren't VS Code's F5 debugger. On Linux they need the
+[desktop setup](#linux-desktop-setup) below.
 
 ## Linux desktop setup
 
-The desktop player, Author Debugger and published Linux desktop games need **WebKitGTK 4.1**,
-the `libnotify` library and a graphical desktop session (X11 or Wayland). They use your system's
-libraries; Talewright does not install them for you. Published games do not currently check for
-missing libraries before launch.
+On Linux, the desktop player, the Author Debugger and published desktop games need two system
+libraries, **WebKitGTK 4.1** and **libnotify**, and a graphical desktop (X11 or Wayland).
+Talewright doesn't install these for you, and published games don't check for them before they
+start.
 
-Open a terminal and run the command for your distribution. It may ask for your administrator
-password:
+Open a terminal and run the command for your system. It may ask for your password:
 
 **Debian, Ubuntu and Linux Mint:**
 
@@ -142,41 +129,40 @@ sudo dnf install webkit2gtk4.1 libnotify
 sudo pacman -S webkit2gtk-4.1 libnotify
 ```
 
-Package names and availability can vary between distribution releases. On another distribution,
-look for packages providing `libwebkit2gtk-4.1.so.0` and `libnotify.so.4`. WebKitGTK 4.1 is the
-GTK 3/libsoup 3 API; a WebKitGTK 4.0 or GTK 4 package is not a substitute. Linux x64 is the only
-desktop target runtime-tested so far; the Fedora and Arch commands use their package names but
-have not been runtime-tested by Talewright.
+On other systems, look for packages that provide `libwebkit2gtk-4.1.so.0` and `libnotify.so.4`.
+A WebKitGTK 4.0 or GTK 4 package won't work instead.
 
-The [web player](https://play.trytalewright.com/) and published web games use your browser instead
-and do not need these desktop libraries.
+The [web player](https://play.trytalewright.com/) and published web games run in your browser and
+don't need these libraries.
 
 ## Which .NET version do I need?
 
-| What you are doing | .NET requirement |
-|---|---|
-| Writing with the VS Code extension or playing in a browser | No .NET installation. |
-| Using the portable CLI download, including its Author Debugger | No separate .NET installation; the download includes its runtime. The debugger still needs the desktop libraries above on Linux. |
-| Installing the CLI as a .NET tool | The .NET 10 SDK to install it, and the .NET 10 runtime to run it. The SDK includes that runtime. |
-| Building from source or publishing a standalone web or desktop game | The .NET 10 SDK, version 10.0.100 or later in the 10.0 series. Publishing also needs internet access to obtain build dependencies. |
-| Playing a published desktop game | No separate .NET installation; the game includes its .NET runtime. Linux still needs the desktop libraries above. |
+Most authors don't need .NET at all.
 
-If you need the SDK, install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0),
-not just the runtime. To see what is already installed, run:
+| What you are doing | What you need |
+|---|---|
+| Writing with the VS Code extension, or playing in a browser | Nothing extra. |
+| Using the CLI download, including the Author Debugger | Nothing extra; the download includes what it needs. |
+| **Talewright: Run Story** in VS Code | The .NET 10 Runtime. |
+| Installing the CLI as a .NET tool | The .NET 10 SDK. |
+| Making a standalone website or desktop game | The .NET 10 SDK (10.0.100 or later) and an internet connection. |
+| Playing a published desktop game | Nothing extra; the game includes what it needs. |
+
+If you need the SDK, install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0);
+it includes the runtime. To see what's already installed, run:
 
 ```bash
 dotnet --list-sdks
 dotnet --list-runtimes
 ```
 
-Look for a `10.0.x` SDK and a `Microsoft.NETCore.App 10.0.x` runtime where required. If `dotnet`
-is not found, it may not be installed or may not be on your PATH; the browser player and portable
-downloads still work without it.
+Look for a `10.0.x` SDK or a `Microsoft.NETCore.App 10.0.x` runtime. If `dotnet` isn't found, it
+isn't installed (or isn't on your PATH).
 
 ## Use another editor and the browser player
 
-Any editor that saves plain text works. On Mac, use TextEdit's plain-text mode.
-Write your story, save the files, zip the story folder and open the
+Any editor that saves plain text works. On a Mac, use TextEdit's plain-text mode. Write your story,
+save the files, zip the story folder and open the
 **[Talewright web player](https://play.trytalewright.com/)**.
 
 ![The story library in the web player](../images/library.png)
@@ -184,12 +170,11 @@ Write your story, save the files, zip the story folder and open the
 - Pick **The Lost Relic** to try a sample.
 - Choose **Open a story file** to check and play your own ZIP.
 
-The player reads the ZIP on your computer; it does not upload it or edit your source files.
-After making changes, create a fresh ZIP and open it again. It does not automatically refresh
-from your editor. See the [ZIP instructions](first-story.md#no-desktop-tools-use-the-web-player).
+The player reads the ZIP on your computer; it doesn't upload it or change your files. It also
+doesn't notice later edits: after a change, make a fresh ZIP and open it again. See the
+[ZIP instructions](first-story.md#no-desktop-tools-use-the-web-player).
 
-Send that same ZIP to friends to play in the browser. It contains your story, not a separate
-website or app. A ready-to-use general-purpose desktop player is not included in the CLI download.
+You can send that same ZIP to friends to play in their browser.
 
 ## Next
 

@@ -21,7 +21,7 @@ exit with code 2 before opening a window. `--help` prints usage.
 
 Linux needs WebKitGTK 4.1 and libnotify; see the
 [Linux desktop setup commands](../../docs/guide/getting-started.md#linux-desktop-setup).
-Manual saves use per-user local application data under `Talewright/saves` (normally
+Saves use per-user local application data under `Talewright/saves` (normally
 `$XDG_DATA_HOME/Talewright/saves`, or `~/.local/share/Talewright/saves` on Linux).
 Slot replacement is explicit and atomic; incompatible/corrupt loads leave the current playthrough intact.
 Export uses a native save dialog with the story-and-save filename prefilled.
@@ -43,7 +43,7 @@ ZIP with a single story baked in, no samples, and no Library navigation during c
 This policy is built into published hosts, not inferred from auto-start or a launcher flag.
 An optional `--runtime win-x64` cross-publishes;
 see the [CLI reference](../../docs/reference/cli.md#publish) for targets and verification limits.
-`TalewrightIncludeSamples=false` disables development sample embedding in custom builds.
+Set `TalewrightIncludeSamples=false` to leave the samples out of a custom development build.
 
 ## Native regression tests
 
@@ -54,8 +54,6 @@ python3 player/tests/run_e2e.py linux           # shared story scenarios plus de
 
 The browser tests' C#/xUnit project drives this real Photino host through a thin AT-SPI adapter in an
 isolated Xvfb/D-Bus session. Scenarios and assertions are in C#; Python only bridges native actions.
-Linux is automated; Windows is manual for now.
-
-Playwright can't attach to Photino's WebKitGTK view. Windows WebView2 supports Playwright over CDP, and
-macOS WKWebView needs a separate native approach. See [testing guidance](../../tests/README.md) for
-prerequisites, coverage and expansion options.
+Only Linux is automated; Windows is checked by hand. Playwright can't attach to Photino's
+WebKitGTK view, which is why the Linux suite uses AT-SPI. See [testing guidance](../../tests/README.md)
+for prerequisites and coverage.

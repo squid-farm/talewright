@@ -1,14 +1,12 @@
 # Talewright.Player — the shared Blazor UI
 
 A Razor Class Library containing the whole user interface. Both hosts render a single component,
-`<TalewrightApp />`, so desktop and web are identical. Its source dependency remains
-`Talewright.Runtime`; its NuGet dependency is the `Talewright` packaging shell.
-It uses the Runtime namespace and the read-only `IGameStateView`,
-not engine implementation internals.
+`<TalewrightApp />`, so desktop and web are identical. In source it depends on
+`Talewright.Runtime`; as a NuGet package it depends on `Talewright`, so installing `Talewright.Player`
+brings in the engine too. It uses the Runtime API and the read-only `IGameStateView`, not engine internals.
 
-For C# customization, installing only `Talewright.Player` restores the engine automatically.
-This is a Razor UI library, not an executable host. Ordinary story authors need neither package.
-See [registry setup](../../../docs/developer/csharp-extensions.md).
+This is a Razor UI library for building your own host with C# extensions, not an executable app.
+Story authors don't need it. See [C# extensions and packages](../../../docs/developer/csharp-extensions.md).
 
 ## Components (`Components/`)
 
@@ -56,8 +54,8 @@ preference; stories cannot set or override it.
 
 `IStoryLibrary` has `ListAsync()` → `StoryEntry(Id, Title, Origin)` and `LoadAsync(id)` → `StorySource`.
 `OpenAsync(id)` additionally returns a disposable `LoadedStory` with optional `StoryImages`.
-Its default implementation wraps `LoadAsync` without image support, preserving custom/text-only
-libraries. The compiler's source and pure renderer never own image I/O or resources.
+Its default implementation wraps `LoadAsync` without image support, so text-only custom
+libraries keep working. The compiler's source and pure renderer never own image I/O or resources.
 
 | Implementation | Used by | Notes |
 |---|---|---|
@@ -74,7 +72,7 @@ Register `PlayerPreferencesStore` as a scoped service in hosts that render `Tale
 Register a scoped `PlayerDiagnostics` to share the session's report with preferences, and register
 `IDiagnosticReportExporter` as `BrowserDiagnosticReportExporter` on web or as a
 `LocalDiagnosticReportExporter` with a native path chooser on desktop. `NativeSaveFileDialog.ChooseReportAsync`
-provides a text-file chooser for desktop hosts. Without these registrations, existing hosts still render:
+provides a text-file chooser for desktop hosts. Without these registrations, hosts still render:
 the root keeps a local report and explicitly indicates that download is unavailable. Direct
 `StoryPlayer` or media consumers can cascade a `PlayerDiagnostics` instance to capture their failures.
 The report keeps the latest 100 warnings and errors and excludes exception messages, paths, story text
@@ -101,8 +99,8 @@ loaded before compilation, while image HTTP streams open only when an occurrence
 its existing viewport-lazy lease. Every content URL carries its own hash: a text-only update
 leaves image URLs unchanged, and changed images have new URLs. Failed text/index requests
 surface as story-open errors; failed image requests preserve narrative and effective alt.
-Host-owned HTTP clients outlive individual loaded stories. Development-host samples remain
-embedded and unchanged. See the author guide's
+Host-owned HTTP clients outlive individual loaded stories. Development hosts embed the samples
+instead. See the author guide's
 [artwork and hosting size](../../../docs/guide/sharing-your-story.md#artwork-and-hosting-size)
 for the advisory source estimate and final web-payload measurement.
 Static hosts must serve the story's `.tale` and `.yaml` files as well as JSON and supported
@@ -130,8 +128,8 @@ There is no all-story read or global durable cache. Streams are disposed after t
 observers, cancellation and receivers belong to occurrences. Owner teardown invalidates
 entries and awaits asynchronous browser URL cleanup. Sharing removes duplicate transfers/data;
 it does not bound distinct images retained by history or guarantee one decoded bitmap.
-No eviction, unique-image budget, or history virtualization is introduced. No filesystem browser URL, remote
-fetch/fallback, or new author file-size limit is introduced.
+There is no eviction, unique-image budget or history virtualization. Images are never exposed as
+filesystem browser URLs or fetched from remote addresses.
 
 ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even
 when loading fails. A loaded story retains one parsed archive, not expanded image copies.
@@ -215,18 +213,15 @@ stylesheet to re-theme. All classes are prefixed `tw-`. When a sheet is present,
 (transcript + sheet), collapsing to one below 52rem. Without a sheet, the transcript has the only layout
 column at every width; the reading-width setting can still limit its visible width.
 
-## Not here yet
-
-- Generated published-host image adapters and deployment behavior (#179).
-- Reader settings such as text size and a theme picker (unscheduled).
-- Story and host theming beyond CSS variables ([#13](https://github.com/squid-farm/talewright/issues/13)).
+Story- and host-supplied themes beyond these CSS variables are tracked in
+[#13](https://github.com/squid-farm/talewright/issues/13).
 
 ## Character creation
 
 An opt-in manifest `creation` section opens the shared accessible creation form
 before play: names, allowed pronouns, presets and bounded ruleset stat choices.
-Invalid input shows an alert and cannot start a session. Fixed protagonists retain
-the existing direct-start behavior. Restart keeps the active character, including
+Invalid input shows an alert and cannot start a session. Stories with a fixed
+protagonist start directly. Restart keeps the active character, including
 one restored from a save. Library reopening offers creation anew; loading a save
 then replaces that selection with the saved character.
 Custom hosts may pass `StoryPlayer.Character` with a validated selection.

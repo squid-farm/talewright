@@ -2,7 +2,7 @@
 
 `Talewright.LanguageServer` is a separate development-only .NET tool in
 `tooling/language-server`. It references `Talewright.Authoring`; game libraries
-and the existing CLI never reference the server. It runs one long-lived process,
+and the CLI never reference the server. It runs one long-lived process,
 using JSON-RPC/LSP 3.17 `Content-Length` framing over stdin/stdout. Stdout is
 protocol-only; process failures go to stderr. No TCP listener, telemetry, project
 build, assembly discovery, or gameplay execution is involved.
@@ -14,7 +14,7 @@ installation does **not** require .NET or a separate tool. See the
 [extension README](../../tooling/vscode-talewright/README.md) for supported system libraries.
 
 Other editors and explicit development overrides can use the separate .NET tool, which requires
-the .NET 10 runtime. Public release packages are published to nuget.org. Install a matching release:
+the .NET 10 runtime. Install the release that matches your extension from nuget.org:
 
 ```sh
 dotnet tool install --global Talewright.LanguageServer --version <version>
@@ -402,13 +402,12 @@ watch events recreate the workspace and retain overlays. See
 Do not configure a project DLL as metadata: no build target, assembly, ruleset
 factory, or arbitrary C# code is automatically run.
 
-The shared Talemark-aware lint rules and configuration API are implemented in #150.
-The language server uses the same `talewright.lint.json` configuration and shared
-rule implementation on each current analysis snapshot. Lint findings preserve
+The language server runs the same Talemark-aware lint rules and `talewright.lint.json`
+configuration as `talewright lint` on each current analysis snapshot. Lint findings preserve
 their source ranges; compiler diagnostics are published once. Invalid lint
 configuration is reported on the configuration file as `TWLSP004` while compiler
 analysis continues, and correcting the file clears that diagnostic without
-restarting the server. LSP integration and CLI parity are tracked in #151.
+restarting the server.
 
 ## Neovim (another LSP client)
 
@@ -461,8 +460,7 @@ superseded versions, metadata failures/recovery, and exact saved-input diagnosti
 parity with the CLI. Completion tests cover every symbol category, irrelevant
 contexts, incomplete input, UTF-16/CRLF and escaped YAML ranges, versioned
 overlays, cross-file additions/changes/deletions, and metadata failure/recovery.
-The installed-VSIX smoke preserves the existing syntax/snippet/schema checks
-and exercises unsaved Talemark and canonical manifest completion alongside diagnostics.
+The installed-VSIX smoke covers the syntax/snippet/schema checks and exercises unsaved Talemark and canonical manifest completion alongside diagnostics.
 Hover tests cover all symbol categories, syntax/schema descriptions, exact
 UTF-16/CRLF/escaped YAML ranges, unknown and incomplete input, current overlays,
 cross-file changes/deletions, Markdown/plaintext negotiation, and metadata
@@ -490,12 +488,3 @@ for unsaved references, and Neovim requests the same hover directly.
    and confirm an explicit unavailable error instead of invented registrations.
    Neovim clients can request the same `textDocument/completion` method or use
    the headless smoke above; no VS Code extension is needed.
-
-Verified on Linux on 2026-10-23: stdio integration tests against both the build
-and an installed local NuGet tool; the installed VSIX in an isolated VS Code
-1.100.3 profile; and the headless Neovim 0.11.5 smoke above. Both editors received
-compiler diagnostics and cleared them after an unsaved fix; completion was also
-verified in both editors, including unsaved Talemark token replacement and canonical
-manifest values in the installed VSIX. Source-aware hover with declaration context
-and exact ranges was also verified in both editors. This is local test
-evidence, not a claim that the package has already been released.

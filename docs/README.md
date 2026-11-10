@@ -1,25 +1,22 @@
 # Talewright documentation
 
-Write in **Talemark**, the story-authoring language that powers Talewright stories.
-Keep scenes in `.tale` files and define your characters and rules in `story.talewright.yaml`.
-
-Talewright is inspired by the great storytelling tools available to the community.
-See [our inspirations](inspirations.md).
+Talewright stories are written in **Talemark**. Scenes, dialogue and choices go in `.tale` files; your
+characters and rules go in `story.talewright.yaml`.
 
 ## Writing stories
 
-New here? Play the [web player](https://play.trytalewright.com/), then follow
+New here? Play a story in the [web player](https://play.trytalewright.com/), then follow
 **[Your first story](guide/first-story.md)**.
 
 | Guide | |
 |---|---|
-| [Getting started](guide/getting-started.md) | Play in the browser; install the desktop tools |
+| [Getting started](guide/getting-started.md) | Play in the browser and set up your writing tools |
 | [Your first story](guide/first-story.md) | A complete story, step by step |
-| [Author cheat sheet](guide/cheat-sheet.md) | Talemark syntax and VS Code shortcuts |
-| [Writing stories](guide/writing-stories.md) | Characters, stats, items, factions, checks, hubs, conditions |
-| [Playing and saving](guide/playing-and-saving.md) | The player screen, saves, Back/Forward |
-| [Testing your story](guide/testing-your-story.md) | Validation and the Author Debugger |
-| [Sharing your story](guide/sharing-your-story.md) | Story files, web games, desktop games |
+| [Author cheat sheet](guide/cheat-sheet.md) | Talemark at a glance, plus VS Code shortcuts |
+| [Writing stories](guide/writing-stories.md) | Characters, stats, items, factions, checks, hubs and conditions |
+| [Playing and saving](guide/playing-and-saving.md) | The player screen, saves, Back and Forward |
+| [Testing your story](guide/testing-your-story.md) | Checking for mistakes and using the Author Debugger |
+| [Sharing your story](guide/sharing-your-story.md) | Story files, web games and desktop games |
 | [Troubleshooting](guide/troubleshooting.md) | Common problems |
 
 ## Reference
@@ -29,13 +26,14 @@ New here? Play the [web player](https://play.trytalewright.com/), then follow
 | [Talemark syntax](reference/talemark-syntax.md) | Every `story.talewright.yaml` field and Talemark directive |
 | [Glossary](reference/glossary.md) | What each Talemark and Talewright term means |
 | [Error codes](reference/diagnostics.md) | What each `TWxxxx` code means and how to fix it |
-| [CLI](reference/cli.md) | `validate`, `lint`, `run`, `debug` and `publish` options, output and limits |
-| [Distribution and runtime safety](reference/safety.md) | Framework boundaries, author/player responsibilities and current limitations |
-| [Sample stories](../samples/README.md) | *The Lost Relic* and which features it demonstrates |
+| [CLI](reference/cli.md) | Every `talewright` command and option |
+| [Distribution and runtime safety](reference/safety.md) | What Talewright protects against, and what's up to you |
+| [Sample stories](../samples/README.md) | *The Lost Relic* and what it demonstrates |
 
-## Developers
+## More
 
-Extending Talewright in C# or contributing to the engine: see the **[developer docs](developer/README.md)**
-and **[CONTRIBUTING](../CONTRIBUTING.md)**.
-
-Thanks to everyone in the [hall of fame](hall-of-fame.md) who helped make Talewright better.
+- [Where Talewright is headed](roadmap.md)
+- [Inspirations](inspirations.md), and when another tool might suit your story better
+- [Developer docs](developer/README.md) and [Contributing](../CONTRIBUTING.md), for extending Talewright in
+  C# or working on the engine
+- The [hall of fame](hall-of-fame.md), for everyone who helped make Talewright better

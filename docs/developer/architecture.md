@@ -1,8 +1,9 @@
 # Architecture
 
 This is the guided tour of the code: what each project does, how a click becomes text on screen, where the
-extension points are, and where to look when something breaks. [The plan](plan.md) records decisions and the
-roadmap; this document records _what is actually built_ and the rationale behind it. The
+extension points are, and where to look when something breaks. The [design decisions](plan.md) record past
+decisions and the [roadmap](../roadmap.md) says where the project is headed; this document records _what is actually
+built_ and the rationale behind it. The
 [Talemark syntax reference](../reference/talemark-syntax.md) is the authoritative reference for the story language.
 
 Contents:
@@ -24,8 +25,8 @@ Contents:
 Talewright is a **storylet engine** sitting on an **event-sourced RPG state**. A story is a set of _scenes_. Each
 scene has prose (a template), optional requirements, effects, skill checks, choices and diverts. Nothing about
 "which scene comes next" is hard-wired into the engine: scenes say where to go (`-> scene`, "rails"), or a hub scene
-offers every storylet whose requirements currently hold ("hubs"). The same mechanism will later drive
-open-world locations.
+offers every storylet whose requirements currently hold ("hubs"). Nothing assumes linear flow, so the same
+mechanism can later drive open-world locations.
 
 ### System overview
 
@@ -222,7 +223,7 @@ These are load-bearing. Breaking one will break saves, replays, tests or the "de
    session by replaying the story. `DeterministicDice.Roll(seed, index, sides)` makes that replay reproducible.
 3. **The engine has no built-in stats.** Strength, hit points, levels, reputation tiers, how checks resolve: all
    come from the `Ruleset`. `Talewright.Core` does not mention "strength" anywhere. The d20 set is an
-   opt-in module (`ruleset: rpg`; see plan D20).
+   opt-in module (`ruleset: rpg`; see decision D20 in the [design decisions](plan.md)).
 4. **No string parsing at play time.** Templates and conditions are compiled into typed trees (`Expr`,
    `TemplateInline`, `Effect`). Rendering a frame walks trees; it never parses.
 5. **No reflection or runtime code generation in the engine.** This keeps Blazor WASM trimming safe. Extension
@@ -268,7 +269,7 @@ Folders:
   - `GameState`: the projection. `CreateInitial(world, seed)` + `Apply(event)`. `GetStat` = base stat + every
     `IStatModifier` + held items' modifiers, clamped to the stat's bounds.
   - `EventLog`: owns a `GameState` and the event list. `Append`, `AppendRange`, `Replay(world, seed, events)`,
-    `Truncate(count)` (for future undo), and an `Appended` event.
+    `Truncate(count)` (unused by Back/Forward, which replays instead), and an `Appended` event.
   - `StateChanges`: helpers that _compute_ the events for a change (`AdjustStat`, `GiveItem`, `SetStanding`,
     `CheckLevel` …). They clamp values and return nothing if nothing changes. Use these rather than building
     events by hand.
@@ -335,8 +336,8 @@ TW4004 and recover with `rpg` so stat references keep resolving.
 ### 3.5 `Talewright.Talemark` — the compiler
 
 Talemark is the story language; Talewright is the engine, player and tooling brand.
-See [compiler identity migration](csharp-extensions.md#compiler-identity-migration) for assembly/API
-naming and the unchanged `.tale` extension and editor identities.
+See [compiler assembly name](csharp-extensions.md#compiler-assembly-name) for how the assembly, API names,
+`.tale` extension and editor identities relate.
 
 Entry point: `StoryCompiler.Compile(StorySource, CompilerOptions?) → CompilationResult(Story?, Diagnostics)`.
 
@@ -413,18 +414,16 @@ at story load, including in WebAssembly, so parser cost is load-time cost; see [
 
 #### Reader-text parser rationale
 
-Talemark owns a small reader-text grammar rather than inheriting CommonMark behavior. The earlier
-Markdig integration silently lost prose that looked like setext headings, reference definitions or
-links, and applied formatting and entity decoding that Talemark had not specified. Masking story
-constructs, mapping source positions and bounding cancellation also required extra library plumbing.
-The replacement recognizes only documented Talemark constructs and preserves unsupported forms as
-literal text.
+Talemark owns a small reader-text grammar rather than using a Markdown library. A CommonMark parser
+silently loses prose that looks like setext headings, reference definitions or links, and applies
+formatting and entity decoding that Talemark doesn't specify. Masking story constructs, mapping source
+positions and bounding cancellation would also need extra plumbing. The grammar recognizes only
+documented Talemark constructs and keeps anything else as literal text.
 
 Substitution-capable text uses the same reader grammar, including image alt text even when it has
 no substitution. An argument's slot determines whether it is a name, expression, literal text or
 reader text; quotation marks only delimit it. The current rules and before/after examples live in
 the [reader-text grammar](../reference/talemark-operators.md#reader-text-grammar).
-The replacement decision is recorded in [#399](https://github.com/squid-farm/talewright/issues/399).
 
 ### 3.6 `Talewright.Runtime` — the orchestrator
 
@@ -468,7 +467,8 @@ The replacement decision is recorded in [#399](https://github.com/squid-farm/tal
 - `Library/StoryImages.cs`: loaded-story-side lazy folder/embedded resource access and generation lifetime.
   Uses the compiler's safe image catalogue, with symbolic-link rechecks for live folder opens. Discovery
   never loads image bytes; `StorySource` and `TemplateRenderer` remain free of I/O ownership.
-  Built-in hosts explicitly opt into embedded images; generated hosts do not yet enable that adapter.
+  Built-in hosts explicitly opt into embedded images. Published web games load images over HTTP through
+  `PublishedStoryLibrary`, and published desktop games read them from the story folder.
   The folder debugger replaces this capability only on accepted refresh, including image-content edits.
 - `wwwroot/talewright.css`: all player styles, driven by CSS variables (`--tw-bg`, `--tw-accent`…), with a dark
   mode via `prefers-color-scheme`. Hosts link it as `_content/Talewright.Player/talewright.css`.
@@ -624,16 +624,16 @@ use outcome identities for replay compatibility.
 
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
-format/story versions, source/extension fingerprint, outcome identities and replay evidence. V1
-compatibility checks the full recorded path, including redo, against an updated story. Unknown,
+format/story versions, source/extension fingerprint, outcome identities and replay evidence. The
+compatibility check replays the full recorded path, including redo, against an updated story. Unknown,
 corrupt or incompatible saves are rejected without rewriting the original.
 Event sourcing alone does not provide compatibility with changed stories or event schemas.
 Restore verifies replay into a replacement session before adopting it; failure leaves the active
 session untouched. This is a replay compatibility boundary, not general state migration.
 Saves use a compressed, positional binary format (MessagePack arrays plus zlib);
 see [Save format](save-format.md) for the array-key rules and limits. Fixed-protagonist
-stories omit the character. From 1.0.0-preview.1, replay contracts are frozen: saves made by a preview
-keep loading under the [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
+stories omit the character. Once 1.0.0-preview.1 ships, replay contracts are frozen and saves made by a
+preview must keep loading; see the [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
 
 ---
 
@@ -716,14 +716,13 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 
 ## 9. Known limitations and seams left for later
 
-- **No approved cross-revision save path.** Same-path verification is a prototype pending tester
-  evidence and explicit contract approval; broader format and story migration remains M8.
+- **No save migration.** A save loads into an edited story only when replay evidence proves gameplay is
+  unchanged (see [save compatibility](save-format.md#compatibility)). There is no general state or format migration.
 - **Bounded creation only.** Author-approved values/presets, not unrestricted point-buy or custom
   player-entered pronoun sets. Reopening a creation story requires completing creation before loading a slot.
-- **Media adapters.** Native folder player/debugger and built-in embedded samples display images.
-  ZIP/upload access uses a retained archive owner with lazy bounded reads; generated published-host adapters,
-  static-subpath/deployment behavior and remaining warning acceptance remain #179. Those sources show an explicit unavailable
-  image state, not silent disappearance. Existing #242 export staging is reused, not replaced.
+- **Media loading.** Images are read lazily from the story folder, embedded resources, an opened ZIP (with
+  bounded reads) or the published web index. An image that can't be loaded shows an explicit unavailable
+  state; it never silently disappears.
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.
 - **One language.** `EnglishGrammar` only; the `IGrammar` seam is there.
