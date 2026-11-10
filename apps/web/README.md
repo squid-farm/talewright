@@ -14,8 +14,8 @@ dotnet run --project apps/web          # dev server, prints the URL
 For a standalone game with exactly one story and relative URLs:
 `talewright publish story-folder -a --target web --output game.zip`.
 The ZIP's `version.json` identifies the player bundled with the CLI. See the
-[CLI reference](../../docs/reference/cli.md#publish). Development hosts retain samples by default;
-`TalewrightIncludeSamples=false` disables them in custom builds.
+[CLI reference](../../docs/reference/cli.md#publish). Development builds include the samples;
+set `TalewrightIncludeSamples=false` to leave them out of a custom build.
 
 ```bash
 dotnet publish apps/web -c Release -o out/web
@@ -58,7 +58,7 @@ The [deployment-path test](../../tests/README.md#ci-and-deployment-checks) cover
 | `Talewright.Host.Web.csproj` | Blazor WASM SDK; embeds `samples/**` like the desktop host. |
 
 Players can open their own stories with the "Open a story file" button (a `.zip` of a story folder).
-Manual saves use IndexedDB scoped to the current origin. Storage/quota/read/write failures are displayed
+Saves use IndexedDB scoped to the current origin. Storage/quota/read/write failures are displayed
 in the player; no localStorage fallback or automatic overwrite is used. Clearing site data removes saves.
 
 ## Regression tests

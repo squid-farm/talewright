@@ -29,8 +29,9 @@ or existing external contracts.
 
 Update the reader, diagnostics, schema, editor support, documentation, examples
 and tests together. Test the new spelling and ensure the rejected spelling is
-diagnosed rather than accepted as an alias. Pre-alpha changes do not need
-compatibility aliases or migrations.
+diagnosed rather than accepted as an alias. Until 1.0.0-preview.1 ships, renames
+don't need compatibility aliases or migrations. After that, author-facing renames
+follow the [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
 
 If an issue or proposed implementation conflicts with these conventions, flag
 the mismatch and agree on the spelling before coding. Record approved

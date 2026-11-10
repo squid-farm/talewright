@@ -32,8 +32,9 @@ the current game state. The supplied web and desktop players share those rules, 
 and Back/Forward history. This combination may suit stories where RPG mechanics and
 revisitable, state-dependent content are central.
 
-Talewright is in **1.0 preview**: stories and saves made by a preview keep working in later 1.x
-releases. Tooling, debugger scenario files and C# extension APIs may still change before 1.0.
+Talewright is an early preview. The story format can still change between releases. Starting with
+1.0.0-preview.1, stories and saves will keep working across 1.x releases. See
+[where Talewright is headed](roadmap.md).
 
 ## When another tool may be a better fit
 

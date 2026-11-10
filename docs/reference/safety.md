@@ -5,10 +5,10 @@ not a content-review or certification service. A successful compile, publication
 or play session does not establish that a game is harmless, authentic or suitable
 for a particular reader.
 
-This policy describes the framework **as provided**, not a new sandbox or a claim
-that every current implementation meets every responsibility below. The
-[implementation comparison](#implementation-comparison-and-follow-up-work) records
-known limitations. Defects in Talewright remain Talewright's responsibility.
+This policy describes the framework **as provided**. It is not a sandbox, and
+not every part of Talewright meets every responsibility below yet; the
+[current safeguards and known limits](#current-safeguards-and-known-limits) section
+says where. Defects in Talewright remain Talewright's responsibility.
 
 ## What are you opening?
 
@@ -22,7 +22,7 @@ known limitations. Defects in Talewright remain Talewright's responsibility.
 Talemark data and image references do not provide a general-purpose plugin
 installation mechanism. Registered C# predicates, effects, rulesets, story
 libraries, JavaScript and replacement frontends cross into executable-extension
-territory. This policy does not design a plugin or mod system.
+territory. Talewright has no plugin or mod system.
 
 ## Responsibilities
 
@@ -83,31 +83,23 @@ bounded total CPU or memory, or safety of developer-customized programs.
 Published content hashes are cache-version identifiers, not signatures or proof
 that a distributor is trusted.
 
-## Implementation comparison and follow-up work
+## Current safeguards and known limits
 
-This comparison is against main `5a01392`, after #178, #196 and #260. It records
-existing contracts and gaps; it does not authorize safeguard changes. Follow-up
-candidates below need their own scope and acceptance evidence before implementation.
+Each row links to the code that implements the operation, and to its tests where they exist.
 
-| Operation and evidence | Current behavior | Limitation or focused follow-up candidate |
+| Operation and evidence | Current behavior | Known limits |
 |---|---|---|
-| [Folder and ZIP source loading](../../engine/src/Talewright.Talemark/Compilation/StorySource.cs) | Folders reject encountered symbolic links and nesting beyond 64 levels, without authored-size ceilings. ZIPs validate raw member paths before root selection; text loading enforces 1,000 source files, 5 MiB per file and 50 MiB total through actual reads. | ZIP text limits do not bound archive metadata, unrelated members, image bytes, parser work or decoded memory. Evaluate metadata/discovery work separately, without reintroducing a total-game budget. |
-| [Browser upload and story adoption](../../player/src/Talewright.Player/Components/TalewrightApp.razor) | The default 20 MiB compressed upload limit precedes buffering into a seekable stream. Failed candidates are disposed; successful compilation replaces the accepted story. | The host can configure the upload limit. It is not a decompression or memory guarantee. Source loading and compilation are synchronous and do not accept a cancellation token; scope cancellable adoption work separately. |
-| [Retained ZIP images](../../player/src/Talewright.Player/Library/ArchiveStoryImages.cs) and [regressions](../../player/tests/Talewright.Player.E2E.Tests/ArchiveImageTests.cs) | Image entries are opened lazily; reads are serialized in at most 64 KiB chunks, check cancellation and reject actual bytes beyond the declared entry length. Owners release archive/input resources. | A legitimately large declaration is accepted. There is no combined text/image budget, decoded-pixel budget or total-memory guarantee. Define decoder/transfer failure expectations and adversarial image tests before choosing any new resource restriction. |
-| [Folder image access and shared leases](../../player/src/Talewright.Player/Library/StoryImages.cs) | Access is catalogue-based, checks path components for links, shares transfers between occurrences and cancels/releases resources when leases retire. | Attribute checks followed by file opens are not an atomic filesystem boundary against concurrent replacement. Clarify the supported concurrent-mutation model and test any future hardening without claiming a filesystem sandbox. |
-| [Published HTTP stories](../../player/src/Talewright.Player/Library/PublishedStoryLibrary.cs) | Index paths and hash formats are validated, content URLs are segment-escaped, text is fetched before compilation and image requests are lazy. Failures are surfaced. | HTTP responses and images have no Talewright-wide byte or decode budget. Hashes are used in URLs, not verified against response bytes. Do not describe cache versioning as integrity verification; any integrity feature needs a separately defined purpose and trust model. |
-| [Publication](../../tooling/cli/src/Talewright.Cli/PublishCommand.cs) and [regressions](../../tooling/cli/tests/Talewright.Cli.Tests/PublishTests.cs) | Output is staged before replacement, with explicit archive/build failures and split-output rollback. There are no generated-output size ceilings. Interactive refusal cancels publication. | The command receives but does not propagate its cancellation token into build/archive work. Add cooperative cancellation and tests proving good output survives interruption. Split replacement is not a crash-atomic transaction; do not promise recovery from arbitrary process termination. |
-| [Saves](../../engine/src/Talewright.Runtime/StoryHistory.cs) and [desktop save storage](../../engine/src/Talewright.Runtime/Saves/FileSaveStore.cs) | Save import/replay has separate byte/command validation; desktop save names are encoded within a selected root and writes use a same-directory temporary file before replacement. | Save/replay safeguards are not story-size limits or protection for arbitrary host code. Preserve their independent tests when changing persistence. |
+| [Folder and ZIP source loading](../../engine/src/Talewright.Talemark/Compilation/StorySource.cs) | Folders reject encountered symbolic links and nesting beyond 64 levels, without authored-size ceilings. ZIPs validate raw member paths before root selection; text loading enforces 1,000 source files, 5 MiB per file and 50 MiB total through actual reads. | ZIP text limits do not bound archive metadata, unrelated members, image bytes, parser work or decoded memory. |
+| [Browser upload and story adoption](../../player/src/Talewright.Player/Components/TalewrightApp.razor) | The default 20 MiB compressed upload limit precedes buffering into a seekable stream. Failed candidates are disposed; successful compilation replaces the accepted story. | The host can configure the upload limit. It is not a decompression or memory guarantee. Source loading and compilation are synchronous and cannot be cancelled. |
+| [Retained ZIP images](../../player/src/Talewright.Player/Library/ArchiveStoryImages.cs) and [regressions](../../player/tests/Talewright.Player.E2E.Tests/ArchiveImageTests.cs) | Image entries are opened lazily; reads are serialized in at most 64 KiB chunks, check cancellation and reject actual bytes beyond the declared entry length. Owners release archive/input resources. | A legitimately large declaration is accepted. There is no combined text/image budget, decoded-pixel budget or total-memory guarantee. |
+| [Folder image access and shared leases](../../player/src/Talewright.Player/Library/StoryImages.cs) | Access is catalogue-based, checks path components for links, shares transfers between occurrences and cancels/releases resources when leases retire. | Attribute checks followed by file opens are not an atomic filesystem boundary against concurrent replacement, and this is not a filesystem sandbox. |
+| [Published HTTP stories](../../player/src/Talewright.Player/Library/PublishedStoryLibrary.cs) | Index paths and hash formats are validated, content URLs are segment-escaped, text is fetched before compilation and image requests are lazy. Failures are surfaced. | HTTP responses and images have no Talewright-wide byte or decode budget. Hashes are used in URLs, not verified against response bytes: cache versioning is not integrity verification. |
+| [Publication](../../tooling/cli/src/Talewright.Cli/PublishCommand.cs) and [regressions](../../tooling/cli/tests/Talewright.Cli.Tests/PublishTests.cs) | Output is staged before replacement, with explicit archive/build failures and split-output rollback. There are no generated-output size ceilings. Interactive refusal cancels publication. | The command does not pass its cancellation token into build/archive work, so those steps cannot be cancelled cooperatively. Split replacement is not a crash-atomic transaction; there is no recovery guarantee after arbitrary process termination. |
+| [Saves](../../engine/src/Talewright.Runtime/StoryHistory.cs) and [desktop save storage](../../engine/src/Talewright.Runtime/Saves/FileSaveStore.cs) | Save import/replay has separate byte/command validation; desktop save names are encoded within a selected root and writes use a same-directory temporary file before replacement. | Save/replay safeguards are not story-size limits or protection for arbitrary host code. |
 | [Trigger evaluation](../../engine/src/Talewright.Rules/Triggers/TriggerEngine.cs) | Cascades stop with an explicit error if still eligible after 32 passes. | This bounds cascade passes, not the cost of each predicate, all runtime work or custom C# execution. No host-process isolation is supplied. |
 
-For #178, distinguish compressed storage, expanded text, streamed image bytes and
-decoder allocations; retain path validation, disposal and visible deferred failure.
-For #196, removing authored-folder ceilings must not be described as trusting
-folders, and retained ZIP text bounds must not be called an archive-wide budget.
-For #260, publication freedom does not change player import rules or host limits.
-
-The smallest follow-up slices are cancellable source/adoption operations,
-cancellable publication with output-preservation tests, archive-discovery resource
-handling, and image transfer/decode resource handling. Each should establish
-measurable operation-specific failure behavior first. No thresholds, new framework,
-reader override UI or blanket removal of existing defenses is approved here.
+When changing these safeguards, keep the measurements separate: compressed storage, expanded
+text, streamed image bytes and decoder allocations are different limits. Removing authored-folder
+ceilings does not mean folders are trusted, ZIP text bounds are not an archive-wide budget, and
+publishing large games does not change the player's import rules or host limits. Any new restriction
+should name the operation it protects and its failure behavior before a threshold is chosen.

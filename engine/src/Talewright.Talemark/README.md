@@ -2,9 +2,8 @@
 
 Turns a story folder (`story.talewright.yaml` + any number of `.tale` files) into a typed `StoryDefinition`, or a list of
 diagnostics with file, line and column. This is the **only** project that parses text, and it runs once per load.
-The compiler's assembly and namespace are `Talewright.Talemark`; it ships inside the aggregate
-`Talewright` package, not as a separately published package. See the
-[C# migration note](../../../docs/developer/csharp-extensions.md#compiler-identity-migration).
+The compiler's assembly and namespace are `Talewright.Talemark`; it ships inside the
+`Talewright` package, not as a separate package (see [C# extensions and packages](../../../docs/developer/csharp-extensions.md)).
 The syntax itself is specified in the [Talemark syntax reference](../../../docs/reference/talemark-syntax.md).
 
 ```csharp
@@ -18,13 +17,11 @@ if (!result.Success)
 var session = new StorySession(result.Story!);
 ```
 
-The root `story.talewright.yaml` keeps core settings under `game:`; world declarations remain at the root.
-Folder loading has no authored file-count, per-file or total-text ceiling. It still rejects
-symbolic links inside the story and paths deeper than 64 directories. ZIP text loading retains
-its separate defenses: at most 1,000 source files, 5 MiB per file and 50 MiB total expanded text,
-enforced while reading actual bytes. These archive-text bounds do not include images.
-The retained image owner enforces declared entry sizes during lazy reads, without a combined
-text/image budget. Neither source kind is certified or trusted.
+The root `story.talewright.yaml` keeps core settings under `game:`; world declarations sit at the root.
+Folder loading has no file-count or size limit, but rejects symbolic links inside the story and paths
+deeper than 64 directories. ZIP loading limits text to 1,000 source files, 5 MiB per file and 50 MiB
+in total, checked against the bytes actually read. Images are not counted toward those limits; each
+image read stops at its declared entry size. Neither source kind is trusted.
 The root manifest, supporting `.talewright.yaml` fragments and `.tale` files are loaded as text;
 images have a separate path catalogue. Unrelated files are not published as story content.
 
@@ -39,7 +36,7 @@ images have a separate path catalogue. Unrelated files are not published as stor
 3. **Declare.** `TaleDeclarations` walks every file's syntax for scene ids and actual effect blocks (`~` lines,
    choice effect clauses and attached outcome effects); the expression lexer collects assignment targets from
    those blocks and manifest effects. Comments, prose and choice labels do not declare flags/vars. Forward
-   references across files remain supported.
+   references across files are allowed.
 4. **Bind.** `TaleBinder` binds each file's syntax line by line (files in path order). Prose goes through `InlineParser`;
    conditions, substitutions and effects through `ExpressionParser`. `SceneDefinition.Steps` preserves source
    order, effect batches and nested conditions. Every step has a deterministic source-position ID and half-open
@@ -108,9 +105,10 @@ already-parsed syntax, including manifest-recovery snapshots. Ordinary analysis 
 unused classification pass. Diagnostic-only copies share the cached result. For directly cancellable file
 classification, use `TalemarkClassifier.Classify(file, text, cancellationToken)`.
 
-Step IDs remain `step:<line>:<column>` file positions, created during binding. Saves store only the seed and
-choice keys, so step IDs are runtime and tooling identities (executor caches, author inspection, debugger map
-matching). Edit-stable IDs are evaluated separately in #492.
+Step IDs are `step:<line>:<column>` file positions, created during binding, so they change when lines move.
+Saves don't store them; they are runtime and tooling identities (executor caches, author inspection,
+debugger map matching). Edit-stable IDs are being evaluated in
+[#492](https://github.com/squid-farm/talewright/issues/492).
 
 ## Accepted source provenance
 
@@ -123,12 +121,11 @@ belong to the preceding scene; a terminal newline creates an empty final line. L
 Errors produce no accepted map. Manually constructed results/C# story models may also have no map;
 consumers must report absent provenance, not infer it from IDs or reparse source independently.
 The map stays outside `StoryDefinition` and does not affect fingerprints, runtime execution or saves.
-This is a narrow reusable scene-provenance seam, not the partial-symbol/overlay analysis API in #29
-and remains separate from the step-level execution spans carried by `SceneDefinition.Steps`.
+It is separate from the step-level spans carried by `SceneDefinition.Steps`.
 
 ## Diverts and hub offers (Preview)
 
-Preview: these types may change before v1. `StoryDiverts.From(story)` lists every divert (`->`) and hub offer
+Preview: these types may still change. `StoryDiverts.From(story)` lists every divert (`->`) and hub offer
 in a compiled story, so tools don't walk scene steps themselves. It uses the same reachable-steps walk as
 `SceneSteps.Targets`: lines that can never run (TW3012) produce no divert, and a conditional divert is listed
 whatever its condition.
@@ -192,15 +189,10 @@ to the reference.
 
 Ordinary compilation, `talewright validate` and editor analysis use this resolver for well-formed image calls.
 Compiled `MediaTemplate` nodes store the selected story-root-relative path and either that literal alt or the
-alt template. Editor completion also reuses the resolver's supported safe-path catalogue. Lookup diagnostics
-point to the path's authored opening quote, and malformed calls receive only parser diagnostics. This adds no
-image rendering, byte decoding or image size checks.
-
-Bundled web/desktop samples include image resources so their source catalogue remains complete.
-`EmbeddedStoryLibrary` records image resource names without opening their streams. Existing exports copy
-actual safe, supported image files into story ZIPs and embed staged files under `stories/Published/` in
-standalone hosts, preserving the same catalogue and lookup after export. Image rendering and the remaining
-deployment acceptance under #179 stay separate.
+alt template. Editor completion also reuses the resolver's safe-path catalogue. Lookup diagnostics
+point to the path's authored opening quote, and malformed calls receive only parser diagnostics. The
+resolver never reads image bytes or checks image sizes; loading and displaying images is the Player's job
+(see [Talewright.Player](../../../player/src/Talewright.Player/README.md#image-host-coverage-and-ownership)).
 
 ## Files
 

@@ -4,15 +4,15 @@ Talewright checks your whole story every time it loads, so most mistakes show up
 There are three ways to test, from quickest to most thorough.
 
 In VS Code, use **Talewright: Validate Story** and **Talewright: Open Author Debugger** from the
-Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**). Run **Talewright: Set Up CLI** if needed; the extension's live diagnostics and the
-CLI are separate. See [tool setup](cli-installation.md) for portable downloads and prerequisites.
-The examples below use `talewright`, the .NET-tool command. From a portable tools folder, use
-`.\Talewright.Cli.exe` on Windows or `./Talewright.Cli` on Mac/Linux instead, and quote story paths
-that contain spaces.
+Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**). If VS Code says the CLI is
+missing, run **Talewright: Set Up CLI** or see [Get the story-checking tools](cli-installation.md).
+The commands below are written as `talewright`. If you use the downloaded tools instead, type
+`.\Talewright.Cli.exe` on Windows or `./Talewright.Cli` on Mac/Linux, and put quotation marks
+around story paths that contain spaces.
 
 ## 1. Open it in a player
 
-Make a story ZIP using **Talewright: Publish Story ZIP** or your file manager, then open it in the
+Make a story ZIP with **Talewright: Publish Story ZIP** or your file manager, then open it in the
 [web player](https://play.trytalewright.com/). If there are errors, you'll see a list instead of the
 story. Each line gives the file, line and column, an error code and a description:
 
@@ -20,9 +20,11 @@ story. Each line gives the file, line and column, an error code and a descriptio
 intro.tale:4:41  TW2001  Unknown item 'lantern'.
 ```
 
-Look up any code in the [error code reference](../reference/diagnostics.md).
-After changing source files, save, make a fresh ZIP and open it again; browser play does not refresh
-automatically. If you already use a desktop player, it can also open a story folder.
+Look up any code in the [error code reference](../reference/diagnostics.md). After a change, save,
+make a fresh ZIP and open it again; the web player doesn't notice edits by itself.
+
+In VS Code, **Talewright: Run Story** (or `talewright run my-story`) plays your story folder
+directly, with no ZIP needed.
 
 ## 2. Check it from the command line
 
@@ -30,215 +32,132 @@ automatically. If you already use a desktop player, it can also open a story fol
 talewright validate my-story
 ```
 
-This runs exactly the same checks as the players, without opening a window, and prints
+This runs the same checks as the players, without opening a window, and prints
 `Validation succeeded.` or the list of problems. It also reports **warnings**: things that aren't
-errors but are probably mistakes, like a scene that can never be reached. Warnings don't stop the story
-from running. Add `--warnings-as-errors` if you want to be strict about them.
+errors but are probably mistakes, like a scene that can never be reached. Warnings don't stop the
+story from running. Add `--warnings-as-errors` if you want to be strict about them.
 
-Validation finds broken links, unknown names, type mistakes (like comparing a stat to a word) and
+Validation finds broken diverts, unknown names, type mistakes (like comparing a stat to a word) and
 scenes with no way out. It can't play every possible path for you, so you still need to playtest.
 
 ## 3. Jump to any scene with the Author Debugger
 
-Playing from the start to reach scene forty gets old fast. The Author Debugger opens any scene directly,
-with whatever game state you need:
+Playing from the start to reach scene forty gets old fast. The Author Debugger opens any scene
+directly, with whatever game state you need:
 
 ```bash
 talewright debug my-story
 ```
 
-You can preselect a scene from the CLI with `--scene`; the debugger still waits for you to set up
-the seed, character and prerequisite overrides, then click **Start selected scene**:
+To preselect a scene, add `--scene`. You still set up the scene before starting it:
 
 ```bash
 talewright debug my-story --scene temple.altar
 ```
 
-The scene ID is checked before the window opens when the story compiles. If the story has compiler
-errors, the debugger opens to show them and selects the requested scene after it becomes available.
+In VS Code, **Talewright: Play From This Scene** (or the **Play from here** link above each scene)
+does the same for the scene your cursor is in. The debugger opens in its own window; on Linux it
+needs the [desktop setup](getting-started.md#linux-desktop-setup).
 
-The editor action opens this same native testing window, not a VS Code debug adapter or F5 session.
-The portable CLI includes the debugger, but its window still needs the system components listed
-in the [setup guide](cli-installation.md#if-something-goes-wrong).
-
-1. **Search scenes** by id or title and pick one.
+1. **Search scenes** by ID or title and pick one.
 2. Optionally set a **seed** (for repeatable dice) and create the player character.
-3. Under **Prerequisite overrides**, set only what the scene needs: flags, variables, stats, items or
-   faction standing.
+3. Under **Prerequisite overrides**, set only what the scene needs: flags, variables, stats, items
+   or faction standing.
 4. Click **Start selected scene** and play from there.
 
 ![The Author Debugger playing The Lost Relic's temple.altar scene directly, showing its artwork and opening text](../images/author-debugger-scene.jpg)
 
-The **State inspection** panel shows the current stats, inventory, flags and variables, the events that
-led there, and **Branch explanations**: why each condition passed or failed.
+The **State inspection** panel shows the current stats, inventory, flags and variables, the events
+that led there, and **Branch explanations**: why each condition passed or failed.
+
+Starting at a scene skips everything before it, so earlier scenes count as unvisited. If a scene
+checks `player visited ...`, start at an earlier scene and play forward, or use
+**Jump retaining state** (below) to keep the visits you've built up.
 
 ### See the source being tested
 
-**Accepted Talemark source** shows the complete source file in read-only, 100-line windows with line
-numbers. It follows the current scene when you choose, jump, or use Back/Forward. Use
-**Previous source lines** / **Next source lines** to browse the file and **Go to current scene source**
-to return to the scene declaration. These controls reset the source viewport to the top of the
-requested window, even when returning to the window already selected.
+**Accepted Talemark source** shows the source file of the scene you're on, with the scene's lines
+highlighted. It follows you as you choose, jump or go Back and Forward. Use
+**Previous source lines** / **Next source lines** to browse, and **Go to current scene source** to
+return to the scene. This view is read-only, and shows the version of your story the debugger is
+running, which may be behind unsaved or rejected edits.
 
 ![Accepted Talemark source with the temple.altar scene's lines highlighted, starting at its === declaration on line 44](../images/author-debugger-source.png)
 
-The marked range runs from the `===` declaration through the line before the next scene (or the end
-of that file), including intervening comments and blank lines. It describes the scene's source, **not**
-the statement currently executing. Line endings count consistently; a final newline leaves an empty
-last line.
-
-The text belongs to the accepted compilation running in the workbench, not a fresh disk read.
-Pending, rejected or restart-required disk changes are labeled; they cannot replace this view until
-adopted successfully. When no compiler mapping is available (for example, a C#-defined scene), the
-viewer explains that instead of guessing a file. Source viewing is debugger-only and cannot edit files.
-
 ### Explore and export the story map
 
-The **Map** tab lays out every scene, divert and hub offer from the last successful compilation. Select a
-scene to see its diverts and hub offers, or follow a choice to its target. The map separates scenes
-unreachable from the start by following diverts and hub offers; it does not decide whether a condition
-can be met. The preview shows prose and eligible choices without running entry effects or skill checks.
+The **Map** tab lays out every scene, divert and hub offer. Select a scene to see where it leads and
+a preview of its text and choices. The map also marks scenes that can't be reached from the start.
+It follows diverts and hubs, but doesn't check whether their conditions can ever be met.
 
-During a synthetic playtest, visited scenes and taken diverts or hub offers are highlighted in route order.
-The map updates when you choose, jump, or move Back and Forward. Use **Export SVG** or **Export PNG** to
-save the full map with that current route presentation to a path you choose. Exports use the same drawing
-primitives as the on-screen map; SVG stays sharp at any scale.
-
-PNG export is capped at 8192 pixels per side and 16,777,216 total pixels (64 MiB of RGBA pixels), so a very
-large map fails before allocating its pixel canvas. The error recommends SVG for a full-resolution image.
-The map's layout and zoom libraries are bundled with the debugger, so it works without network access;
-their license notices are included in the debugger distribution.
+While you play in the debugger, the scenes you've visited and the choices you've taken are
+highlighted in order. Use **Export SVG** or **Export PNG** to save the whole map. SVG stays sharp at
+any size; a very large map may be too big for PNG, and the debugger will suggest SVG instead.
 
 ![The Lost Relic's full story map, with the route from camp.arrival through camp.hub to trail.river highlighted](../images/author-debugger-map.png)
 
 ### Change state without starting over
 
-Open **Live edit values**, enable the fields you want to change, and click **Apply live edit batch**.
-You can change declared flags, integer or text variables, faction standing, and every character's base stats
-and inventory. Quantities are absolute; zero removes an item. Stats use normal bounds.
-The whole batch is applied together, then normal triggers and leveling run. The edit happens at the
-passage's current point, after its lines ran. Everything up to the passage's last `~` effect line or
-entry check keeps what was shown and decided: text, `{if}` branches, effect notes and the check's
-continuation. Later text, `{if}` conditions, `->` diverts and choices refresh with the edited values,
-without repeating entry effects, visits or entry-check dice. If refreshing would reach an effect or
-check that did not run, the edit is rejected; use fresh-world prerequisite overrides instead.
+Open **Live edit values**, turn on the fields you want to change, and click
+**Apply live edit batch**. You can change flags, variables (numbers or text), faction standing, and
+every character's stats and inventory. Item quantities are the new totals; zero removes an item.
+Normal triggers and leveling run afterwards. **Command history and consequences** shows what changed,
+including any triggers that fired.
 
-**Command history and consequences** shows before/actual-after values (including clamping), trigger
-firings and all other resulting events. Fields reset to actual values after success. Invalid edits
-leave the run and your draft unchanged. If an edit would leave no live continuation, use fresh-world
-prerequisite overrides instead.
+The edit applies to the passage you're on. Text and effects that already ran stay as they were;
+the rest of the passage, including its choices, updates to match. If that isn't possible, the edit
+is rejected and nothing changes; use **Start selected scene** with prerequisite overrides instead.
 
-To move elsewhere without losing accumulated state, set **Target scene ID** and click **Jump retaining
-state**. This bypasses scene eligibility and enters the target once, keeping visits, trigger history
-and dice position. **Start selected scene** instead discards progress and creates a fresh world using
-prerequisite overrides.
+To move elsewhere without losing your progress, set **Target scene ID** and click
+**Jump retaining state**. This goes straight to that scene, keeping visits, trigger history and
+dice. **Start selected scene**, by contrast, throws progress away and starts fresh.
 
-Use **Back command** and **Forward command** across choices, edit batches and jumps. A successful new
-command after Back discards redo. This author-only navigation works even when the story disables
-player undo. Ended runs cannot be edited or jumped retaining state: go Back or start a fresh scene.
-None of these operations prove that the resulting state is reachable through ordinary play.
+**Back command** and **Forward command** step through choices, edits and jumps, even if your story
+turns off Back and Forward for players. Doing something new after going back discards the steps
+you went back over. Remember that edited states may not be reachable in real play.
 
-### Inspect and override text variables
-
-Both manifest-declared text and text introduced by Talemark assignments appear under
-**Text variables** in prerequisite overrides and live edits. Enter literal text without
-surrounding quotes. To set empty text, enable the override and leave its field empty;
-disabling the override instead keeps the normal initial/current value. Numeric-looking
-text such as `12` stays text, and whitespace and non-ASCII characters are preserved.
-
-State inspection labels variables as **integer** or **text**. Text is shown as a quoted,
-escaped literal so `""`, line breaks, quotes and backslashes are unambiguous. This is a
-display representation, not new Talemark escape syntax. Setup values of the wrong type
-fail explicitly and leave the active run unchanged.
-
-Scenario exports include typed text setup and live edits. Import replays text changes,
-including pending redo, before adopting the candidate. Existing integer-only recipes
-without text fields remain supported. A text variable's type cannot change during play;
-source edits changing a declaration's type require restart and revalidation of overrides.
+Text variables appear as text, in quotes, so you can tell an empty value from a missing one.
+Type text without quotes. To set empty text, turn the override on and leave the field empty.
 
 ### Editing while you test
 
-Leave the debugger open while you write. When you save a `.tale` file, it recompiles and reloads the
-scene you're on, keeping the state you'd built up to reach it. You stay where you are.
+Leave the debugger open while you write. When you save a `.tale` file, it reloads the scene you're
+on and keeps the state you built up to reach it.
 
-Some changes can't be applied safely in place, for example editing a scene the player already passed
-through, changing Talemark-inferred flags/variables, removing a target, or reloading a run that ended
-without entering a new scene. Any change to `story.talewright.yaml`, even a comment, also needs a restart.
-A file-watcher failure requires a restart because source changes may have been missed.
-In those cases the debugger asks you to click
-**Restart from source**. You don't have to set anything up again: it keeps your selected scene, seed,
-overrides and character, and tells you about any that no longer exist in the story so you can fix them.
-Correct or disable invalid overrides (or clear the character), then restart. The current run is only
-discarded after the new source and retained setup validate successfully.
+Some changes can't be applied in place: editing a scene you've already passed through, removing a
+scene you're heading to, or any change to `story.talewright.yaml`, even a comment. Then the debugger
+asks you to click **Restart from source**. You don't have to set everything up again: it keeps your
+selected scene, seed, overrides and character, and tells you about any that no longer exist so you
+can fix them.
 
-Failed compilations and runtime errors keep the last good run visible and mark the source as stale.
-**Rescan / retry watcher** retries compilation and rearms a failed watcher without bypassing restart
-requirements. C# extensions are not hot-reloaded; rebuild and restart them. If the debugger can't watch
-your story folder at all, see [Troubleshooting](troubleshooting.md#the-debugger-says-it-cant-watch-your-story-folder).
-
-Reload reconstructs the state before the current scene entry and enters once, so changes to its entry
-effects or checks may deliberately change their results. It replaces the current passage and rebuilds
-branch explanations, not a transcript of earlier passages.
-
-Applied edit and jump commands are kept during compatible reloads. If you have pending redo after
-going Back, automatic reload pauses rather than silently dropping commands. Go Forward to the end
-and click **Rescan / retry watcher**, or deliberately start a fresh scene.
-
-### Good to know
-
-- The debugger never writes player saves. It reads one only when you explicitly fork it (below).
-- Starting at a scene skips everything before it, so earlier scenes have zero visits, and there's
-  no arbitrary visit-count override. If a scene checks `player visited ...` or a visit count, start at the earlier scene and
-  play forward or use **Jump retaining state** to keep the visits you have accumulated.
-- It needs a desktop environment (on Linux, WebKitGTK 4.1).
+If a change has errors, the debugger keeps running your last good version and marks it out of date.
+Fix the error and save again, or click **Rescan / retry watcher**. If you went Back and have steps
+to go Forward to, automatic reload waits: go Forward to the end and click
+**Rescan / retry watcher**, or start the scene again. If the debugger can't watch your story folder
+at all, see [Troubleshooting](troubleshooting.md#the-debugger-says-it-cant-watch-your-story-folder).
 
 ### Share and restore a debugging scenario
 
-**Portable author scenarios** exports a synthetic `.twscenario` replay recipe: accepted story
-ID/version/fingerprint, extension and engine/tool compatibility, character, seed, starting scene,
-prerequisite overrides, choices, live edits, jumps and the timeline cursor (including redo).
-It does **not** export arbitrary state, events, source code or extensions. Share the matching story
-source separately and use the same tool version.
-Scenario files are a testing tool and are not covered by the 1.0 compatibility freeze: before 1.0, an
-older recipe can become unsupported. Your stories and player saves are unaffected.
+You can save a debugging session as a `.twscenario` file and open it again later, or give it to
+someone with the same version of your story. It records your character, seed, starting scene,
+overrides, choices, edits and jumps, not your story itself.
 
-1. Set **Scenario file path** to an absolute path outside your story and player-save folders.
-   The initial suggestion is in your local application's `Talewright/author-scenarios` directory,
-   separate from `Talewright/saves`.
-2. Click **Export synthetic scenario**. Existing files are not replaced unless you enable
-   **Confirm replacement of existing scenario file on next export**. Confirmation is consumed by
-   the next export attempt. Successful writes use a temporary file and atomic replacement.
-   If a symbolic link in the export path or protected story/save folders contains `..` in its target,
-   export is rejected; use direct paths without those links.
-3. In another debugger process, open the matching story, enter that path, and click
-   **Import exact scenario**. You do not need to recreate the character or start a scene first.
-   The entire timeline, including redo, must replay successfully before the active run is replaced.
-   Back/Forward and accepted-source viewing then work normally.
+1. Set **Scenario file path** to a location outside your story folder.
+2. Click **Export synthetic scenario**. To replace an existing file, first turn on
+   **Confirm replacement of existing scenario file on next export**.
+3. Later, open the same story in the debugger, enter that path and click **Import exact scenario**.
 
-Exact import rejects mismatched source or compatibility, malformed files and changed replay evidence.
-It uses the **accepted compilation**, even when newer disk edits are pending/rejected.
-If source intentionally changed, **Adopt scenario to accepted source** is a separate, explicit
-operation. It revalidates every declared ID and command, reports identity and current/full-timeline
-state/event/dice/presentation differences, and creates a new synthetic run. This is **not a migration
-guarantee**: positional choice keys may now mean something else. Review all differences and export
-under a new path to preserve the original. Story ID, engine/tool and extension compatibility must
-still match; adoption cannot load arbitrary extensions or bypass those requirements.
+If you've changed the story since, exact import is refused. **Adopt scenario to accepted source**
+replays it on your current story instead and lists anything that now turns out differently.
+Choices are matched by position, so check the result carefully, and export it under a new name.
 
-For an existing game, put its ordinary save's path in **Player save file path (read only)** and click
-**Fork compatible player save**. This first uses the normal save compatibility and restore policy,
-then copies its character, seed, choices and cursor into an independent author timeline. Your original
-save is never modified; subsequent author exports must use `.twscenario`, not a player slot.
-This accepts files, not browser IndexedDB slots; it does not add a browser-save download UI.
+To start from a player's save, enter its path in **Player save file path (read only)** and click
+**Fork compatible player save**. The save itself is never changed, and the debugger never writes
+player saves.
 
-Imports are bounded to 2 MiB, 10,000 commands, 10,000 fields per setup/edit batch and 512 characters per
-ID/key/compatibility identity. Numbers must be signed 32-bit integers (seed: unsigned 64-bit); character
-options and all IDs must be legal for the accepted story. Unknown versions, fields, commands, duplicate
-JSON members and invalid redo are rejected explicitly. Failed imports preserve the active run and
-input file. These recipes are editable diagnostic data, **not authenticated proof of normal play**.
+Scenario files are a testing aid. A later version of Talewright may not open older ones.
 
-New to the debugger? Follow the [hands-on debugger test plan](debugger-test-plan.md), including a
-small copyable story, expected values, rollback checks and save isolation.
-Performance evidence and its limitations are recorded in the [performance notes](../developer/performance.md);
-scenario replay has no new responsiveness guarantee.
+New to the debugger? The [hands-on debugger test plan](debugger-test-plan.md) walks through every
+feature with a small story and the results to expect.
 
 Full details: [CLI reference: debug](../reference/cli.md#debug).

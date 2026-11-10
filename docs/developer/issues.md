@@ -1,38 +1,35 @@
 # Issue tracking
 
-**[GitHub Issues](https://github.com/squid-farm/talewright/issues) is the live source of truth.**
-The former local board has been migrated, including descriptions, acceptance criteria, historical
-resolutions, priorities, and original FR/BUG identifiers. Do not maintain a parallel status board here.
-This document is a stable migration index, not a snapshot of current issue state.
+[GitHub Issues](https://github.com/squid-farm/talewright/issues) is the backlog and the only place
+that records issue status. Don't keep a parallel status list in the repository.
 
-- [Development Project](https://github.com/orgs/squid-farm/projects/1): backlog, current work, bugs, milestone planning, and epics.
-- [Milestones](https://github.com/squid-farm/talewright/milestones): M0-M9 release targets.
-- [Roadmap](plan.md): architecture, sequencing, and release criteria; issue links carry live execution details.
+- [Development project](https://github.com/orgs/squid-farm/projects/1): status, priority and current work.
+- [Milestones](https://github.com/squid-farm/talewright/milestones): which issues belong to which release.
+- [Roadmap](../roadmap.md): where the project is headed, in plain language.
 
-## Working with issues (humans and bots)
+## Working on an issue
 
-1. Read the issue, parent/sub-issues, and native blocking dependencies. Preserve existing scope and
-   acceptance criteria; exploratory/deferred ideas are not automatically approved work.
-2. Before coding, check assignees, linked PRs, recent claim comments, and Project status. Assign yourself
-   and leave a claim comment naming your session/agent identifier, branch, worktree, and implementation
-   slice. Multiple agents may share one GitHub account, so the assignee alone is not evidence of ownership.
-   Assignment and Project status are not atomic locks; stop and coordinate if another worker has already
-   claimed the task.
-3. Use an isolated branch/worktree. Move actionable, unblocked work from Backlog to Ready; move claimed
-   work to In progress and completed implementations to In review with test evidence and a linked PR.
-   Read back the assignee and Project status before editing; a claim comment does not update either.
-   For explicitly local-only work, record the commit and test evidence and identify the missing PR/merge
-   step rather than implying a PR exists. Leave partially implemented issues In progress.
-4. Use `Closes #N` only for a fully resolved issue. For partial work or epic progress, use `Refs #N`.
-   Do not close a parent epic merely because one child is complete. Verify closure and Project state.
-5. Put requirement/status changes and new tasks in GitHub. Keep repository architecture/specification docs
-   aligned with implemented behavior, and update roadmap issue links when scope changes.
+These steps apply to people and coding agents alike.
 
-Project Priority is initialized from priority labels (or bug severity); keep them consistent during triage.
-The Project starts private to the organization. The CLI/API supports the configured views and filters;
-custom milestone grouping/sorting can be adjusted in the GitHub UI. Built-in Project workflows handle
-supported status transitions, but adding an unrelated new issue to the repository does not guarantee it
-is added to the Project. Add it explicitly, or as a sub-issue of an epic already in the Project.
+1. **Read first.** Read the issue, its parent and sub-issues, and anything blocking it. Keep the
+   existing scope and acceptance criteria. Ideas marked `status:idea` or `status:deferred` are not
+   approved work.
+2. **Check nobody else has it.** Look at assignees, linked PRs, recent comments and the project
+   status. Several agents can share one GitHub account, so an assignee alone doesn't prove who is
+   working on it. If someone else has claimed it, stop and coordinate.
+3. **Claim it.** Assign yourself and leave a comment naming your session or agent, branch, worktree
+   and the part you're implementing. Then move the issue to *In progress* and read back the assignee
+   and status; a comment doesn't change either.
+4. **Work in isolation.** Use its own branch, ideally in a separate `git worktree`.
+5. **Open a PR.** Use `Closes #N` only when the PR fully resolves the issue. Use `Refs #N` for
+   partial work or progress on an epic. Move the issue to *In review* with test evidence. Leave
+   partly done issues *In progress*. For work that is explicitly local-only, record the commit and
+   test evidence and say that the PR step is still missing.
+6. **Keep GitHub current.** Put scope changes and new tasks in GitHub. Keep the architecture and
+   specification docs in this folder in line with what the code actually does.
+
+Adding an issue to the repository doesn't always add it to the project. Add it explicitly, or make
+it a sub-issue of an epic that is already in the project.
 
 ```bash
 gh issue list --repo squid-farm/talewright --state open --limit 100
@@ -41,83 +38,18 @@ gh project item-add 1 --owner squid-farm --url https://github.com/squid-farm/tal
 gh project field-list 1 --owner squid-farm
 ```
 
-For new bugs include severity, reproduction, expected/actual behavior, and regression coverage.
-For features include scope, boundaries, acceptance criteria, dependencies, and an appropriate milestone
-or parent epic. Use native blockers/sub-issues where appropriate; cross-cutting epic references should
-link to the same issue, not duplicate it. New issues use GitHub numbers; do not allocate more local FR IDs.
+## Writing an issue
 
-## Legacy bugs
-
-Fixed bugs were imported as closed issues, retaining their original resolution references.
-
-| Legacy ID | GitHub issue | Summary |
-|---|---|---|
-| BUG-001 | [#1](https://github.com/squid-farm/talewright/issues/1) | Invalid stat ranges |
-| BUG-002 | [#2](https://github.com/squid-farm/talewright/issues/2) | Level-dependent trigger reevaluation |
-| BUG-003 | [#3](https://github.com/squid-farm/talewright/issues/3) | Duplicate trigger IDs |
-| BUG-004 | [#4](https://github.com/squid-farm/talewright/issues/4) | Expanded ZIP limits |
-| BUG-005 | [#5](https://github.com/squid-farm/talewright/issues/5) | Trigger cascade limit |
-| BUG-006 | [#6](https://github.com/squid-farm/talewright/issues/6) | Arithmetic overflow |
-| BUG-007 | [#7](https://github.com/squid-farm/talewright/issues/7) | Mutable ruleset collections |
-| BUG-008 | [#8](https://github.com/squid-farm/talewright/issues/8) | Comments auto-declare flags/variables |
-
-## Legacy feature requests
-
-| Legacy ID | GitHub issue | Summary |
-|---|---|---|
-| FR-001 | [#9](https://github.com/squid-farm/talewright/issues/9) | NPC character sheets |
-| FR-002 | [#10](https://github.com/squid-farm/talewright/issues/10) | NPC relationships |
-| FR-003 | [#11](https://github.com/squid-farm/talewright/issues/11) | Split story configuration |
-| FR-004 | [#12](https://github.com/squid-farm/talewright/issues/12) | Story window/tab title |
-| FR-005 | [#13](https://github.com/squid-farm/talewright/issues/13) | Theming |
-| FR-006 | [#14](https://github.com/squid-farm/talewright/issues/14) | Host JavaScript |
-| FR-007 | [#15](https://github.com/squid-farm/talewright/issues/15) | Publish without samples |
-| FR-008 | [#16](https://github.com/squid-farm/talewright/issues/16) | Grammar libraries |
-| FR-009 | [#17](https://github.com/squid-farm/talewright/issues/17) | Active modifier display |
-| FR-010 | [#18](https://github.com/squid-farm/talewright/issues/18) | Configurable sheet sections |
-| FR-011 | [#19](https://github.com/squid-farm/talewright/issues/19) | End-screen content |
-| FR-012 | [#20](https://github.com/squid-farm/talewright/issues/20) | Alternative skill model |
-| FR-013 | [#21](https://github.com/squid-farm/talewright/issues/21) | Runtime refactoring |
-| FR-014 | [#22](https://github.com/squid-farm/talewright/issues/22) | YAML reader refactoring |
-| FR-015 | [#23](https://github.com/squid-farm/talewright/issues/23) | Transcript/conversation flow |
-| FR-016 | [#24](https://github.com/squid-farm/talewright/issues/24) | Speaker colors |
-| FR-017 | [#25](https://github.com/squid-farm/talewright/issues/25) | Hide mechanical notes |
-| FR-018 | [#26](https://github.com/squid-farm/talewright/issues/26) | Precompiled story bundles |
-| FR-019 | [#27](https://github.com/squid-farm/talewright/issues/27) | Back/forward history |
-| FR-020 | [#28](https://github.com/squid-farm/talewright/issues/28) | CLI validation |
-| FR-021 | [#29](https://github.com/squid-farm/talewright/issues/29) | Shared partial analysis |
-| FR-022 | [#30](https://github.com/squid-farm/talewright/issues/30) | CLI lint |
-| FR-023 | [#31](https://github.com/squid-farm/talewright/issues/31) | LSP and VS Code |
-| FR-024 | [#32](https://github.com/squid-farm/talewright/issues/32) | Safe autofixes |
-| FR-025 | [#33](https://github.com/squid-farm/talewright/issues/33) | Production-readiness gates |
-| FR-026 | [#34](https://github.com/squid-farm/talewright/issues/34) | Save compatibility safeguards |
-| FR-027 | [#35](https://github.com/squid-farm/talewright/issues/35) | Images/media |
-| FR-028 | [#36](https://github.com/squid-farm/talewright/issues/36) | World simulation |
-| FR-029 | [#37](https://github.com/squid-farm/talewright/issues/37) | Combat |
-| FR-030 | [#38](https://github.com/squid-farm/talewright/issues/38) | Runtime plugins |
-| FR-031 | [#39](https://github.com/squid-farm/talewright/issues/39) | Save migration |
-
-## Additional roadmap deliverables
-
-These M2 items previously existed only in the roadmap. Their IDs were assigned during migration.
-
-| Migration ID | GitHub issue | Summary |
-|---|---|---|
-| FR-032 | [#40](https://github.com/squid-farm/talewright/issues/40) | Desktop/web save stores and player flows |
-| FR-033 | [#41](https://github.com/squid-farm/talewright/issues/41) | Standalone publishing |
-| FR-034 | [#42](https://github.com/squid-farm/talewright/issues/42) | C# packages and MSBuild |
-| FR-035 | [#43](https://github.com/squid-farm/talewright/issues/43) | Character creation |
-| FR-036 | [#44](https://github.com/squid-farm/talewright/issues/44) | Richer hubs/storylets |
+- **Bugs:** severity label (`severity:S1` to `severity:S3`), steps to reproduce, expected and actual
+  behaviour, and the regression test you expect.
+- **Features:** scope, what is out of scope, acceptance criteria, dependencies, and a milestone or
+  parent epic.
+- Use GitHub's native blocking links and sub-issues. If an issue touches several epics, link to it
+  from the others instead of copying it.
+- Keep the project's *Priority* field consistent with the `priority:` label (or the bug's severity).
 
 ## Epics
 
-Native sub-issues have one parent. Cross-cutting membership is retained as related links in epic bodies.
-
-| Epic | GitHub parent issue |
-|---|---|
-| Core reliability and release | [#45](https://github.com/squid-farm/talewright/issues/45) |
-| Scalable authoring and content organization | [#46](https://github.com/squid-farm/talewright/issues/46) |
-| Player presentation and accessibility | [#47](https://github.com/squid-farm/talewright/issues/47) |
-| Ruleset and narrative expressiveness | [#48](https://github.com/squid-farm/talewright/issues/48) |
-| Distribution and extensibility | [#49](https://github.com/squid-farm/talewright/issues/49) |
-| Session lifecycle and compatibility | [#50](https://github.com/squid-farm/talewright/issues/50) |
+Epics are parent issues with the `epic` label. They group related work across milestones; an issue
+has one native parent, and epics link to related issues elsewhere. Don't close an epic because one
+child is done. See the [open epics](https://github.com/squid-farm/talewright/issues?q=is%3Aissue+is%3Aopen+label%3Aepic).

@@ -6,8 +6,7 @@ the read-only `IGameStateView` from Core, writing changes back only as events th
 Everything here operates on **typed trees** built by the compiler. Nothing parses strings, nothing uses reflection.
 
 Integer expression arithmetic and assignment effects saturate at `int.MinValue`/`int.MaxValue` rather than
-wrapping. Stat assignments are then clamped to their ruleset bounds. Division by zero retains its existing
-result of zero; negating `int.MinValue` or dividing it by `-1` saturates to `int.MaxValue`.
+wrapping. Stat assignments are then clamped to their ruleset bounds. Division by zero gives zero; negating `int.MinValue` or dividing it by `-1` saturates to `int.MaxValue`.
 
 ## Folders
 
@@ -44,7 +43,7 @@ already true so they don't fire on load.
 `StoryletSelector.cs`: `IStorylet` (Id, Requires, Tags, Priority, Once). `SelectEligible(storylets, tags,
 context)` accepts a `StoryletTags` query, including single-tag queries. It selects matching storylets
 whose requirements hold and that aren't spent `Once` storylets, by descending
-priority then declaration order. This is the "hub" mechanism now and the open-world location mechanism later.
+priority then declaration order. This is the mechanism behind hubs.
 An overload accepts a caller-supplied requirement evaluator when selection must share availability work with
 menu construction; its expression trace is retained in decision observations.
 
@@ -59,7 +58,7 @@ The normal evaluator path does not allocate trace trees.
 `Diagnostics/RuleDecision.cs` defines structured outcomes/reasons shared with
 author tooling. Observing overloads of `StoryletSelector.SelectEligible`,
 `SkillCheckResolver.Resolve` and `TriggerEngine` accept an
-`Action<RuleDecision>`. Their existing overloads remain available. The selector
+`Action<RuleDecision>`. The selector
 reports self/tag/once/condition exclusions and stable ranked selections,
 duplicates and hub limits; it uses the same eligibility helper as `IsEligible`.
 Check records link difficulty evaluation to actual dice/check result events.

@@ -1,11 +1,11 @@
 # Get the story-checking tools
 
-Talewright has an optional tool that checks your story for mistakes, plays a story folder, and makes
-a ZIP file to share with friends. It also opens the **Author Debugger**, a window where you can jump
-to a scene and try different choices without playing from the beginning.
+Talewright has an optional tool that checks your story for mistakes, plays it, and makes a ZIP
+file to share with friends. It also opens the **Author Debugger**, a window where you can jump to
+any scene and try different choices without playing from the beginning.
 
-The command-line tool, or **CLI**, runs commands you enter in a terminal.
-The tool works with any text editor; VS Code is optional.
+It's a command-line tool, or **CLI**: you type commands into a terminal window. It works with any
+text editor; you don't need VS Code.
 
 **You can skip this setup.** Write your story in a text editor, zip its folder, and open the ZIP in
 the [web player](https://play.trytalewright.com/). It checks your story when you open it.
@@ -13,8 +13,8 @@ After making changes, make a fresh ZIP and open it again.
 
 ## 1. Find the download for your computer
 
-Open [Talewright downloads](https://github.com/squid-farm/talewright/releases) and choose a release.
-A release marked **Pre-release** is an early version: some things may not work yet.
+Open [Talewright downloads](https://github.com/squid-farm/talewright/releases) and choose the newest
+release. Releases marked **Pre-release** are early previews, so expect some rough edges.
 Open its **Assets** list to see the files you can download.
 
 Look for a file whose name starts with **`talewright-cli-`**. The rest of the name includes the
@@ -33,13 +33,11 @@ Not sure which you have? On Windows, open **Settings > System > About** and look
 On a Mac, open the Apple menu and choose **About This Mac**. On Linux, look in your system's
 **About** settings for the processor information.
 
-**If there is no `talewright-cli-` file, the tools are not available in that release.**
-The first preview release did not include these downloads. **Source code (zip)** is not the
-ready-to-use tool; you do not need to download it. Use the web player for now.
+You don't need **Source code (zip)**; it isn't the ready-to-use tool.
 
-These are early downloads. They have been tried on Ubuntu 24.04 Linux computers with Intel or AMD
-processors. The Windows, Mac and ARM downloads have been built, but have not yet been tried on
-those computers. Linux downloads do not work on Alpine Linux.
+The tools are tested on Linux computers with Intel or AMD processors. The Windows, Mac and ARM
+downloads haven't been tried on those computers yet, so please tell us if something goes wrong.
+The Linux downloads don't work on Alpine Linux.
 
 ## 2. Unpack the download
 
@@ -120,34 +118,34 @@ Keep the quotation marks around the path.
 The tool reports mistakes with the file and line to look at. Start with the first message, fix it
 in your text editor, save the file, and run the same instruction again.
 
-You can use `run` instead of `validate` to play the story from its beginning, or `debug` to open the
-Author Debugger. Both windows may need extra computer setup; checking your story does not require
-opening either window.
+Use `run` instead of `validate` to play the story from the beginning, or `debug` to open the
+Author Debugger. These open a window and may need some extra setup on your computer (see
+**If something goes wrong** below). Checking your story doesn't open a window.
 
 ### If you use VS Code
 
-The Talewright extension's writing help and these tools are separate. Installing the extension
-does not install the CLI.
+Installing the Talewright extension doesn't install these tools.
 
-With the Talewright extension installed, open your story folder and run **Talewright: Set Up CLI**
-from the Command Palette. It uses an existing installation when available. Otherwise, it offers
-a download for your computer or, if the required .NET tools are installed, asks for approval to
-install the CLI. Nothing is installed just by opening your story.
+Open your story folder and run **Talewright: Set Up CLI** from the Command Palette. It uses the
+tools if you already have them. Otherwise it offers a download for your computer, or asks before
+installing them if you have the .NET tools. Nothing is installed just by opening your story.
 
 For a download you have already unpacked, choose **Select Existing Executable** and select
 `Talewright.Cli.exe` or `Talewright.Cli` from that folder. You can also enter its full location in
 **Settings > Talewright CLI Executable Path**. Then use the Command Palette:
 
 - **Talewright: Validate Story** checks for mistakes.
+- **Talewright: Run Story** plays the story from the beginning. It also needs the
+  [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
 - **Talewright: Publish Story ZIP** lets you choose where to save a ZIP for the web player.
 - **Talewright: Open Author Debugger** opens the testing window.
 
 ## If something goes wrong
 
 - **No download for your computer?** You can continue writing and testing stories with the web player.
-- **Setup says a version or download is unavailable?** That version has not been published yet.
-  You can select an existing installation or use the web player. Setup will not install a different
-  version or switch installation methods without your choice.
+- **Setup says a version or download is unavailable?** That version hasn't been published yet.
+  Select a copy you've already downloaded, or use the web player. Setup won't install a different
+  version without asking.
 - **The tool cannot find your story?** Give it the folder containing `story.talewright.yaml`,
   not the `.tale` file or the ZIP. Keep quotation marks around the folder's location.
 - **The tool will not open, or mentions a missing library?** Your computer may need an extra
@@ -159,9 +157,8 @@ For a download you have already unpacked, choose **Select Existing Executable** 
   [WebKitGTK and libnotify](getting-started.md#linux-desktop-setup). You can still check and share
   your story without the debugger.
 
-Checking a story and making a story ZIP do **not** require installing .NET developer tools.
-Making a separate website or desktop game requires the .NET 10 SDK; a ZIP for the web player is
-the simpler way to share. See [which .NET version you need](getting-started.md#which-net-version-do-i-need).
+Checking a story and making a story ZIP don't need .NET. Making a separate website or desktop game
+does; see [which .NET version you need](getting-started.md#which-net-version-do-i-need).
 
 Still stuck? [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
 Include your operating system, the Talewright version, what you tried, and the exact error message.

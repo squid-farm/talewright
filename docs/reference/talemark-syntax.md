@@ -76,12 +76,14 @@ optional developer feature; see [C# extensions](../developer/csharp-extensions.m
 
 ## Compatibility
 
-Talemark and the engine are versioned together. From 1.0.0-preview.1, Talemark syntax, story files
-and saves made by a preview keep working in later 1.x releases. Syntax is changed or removed only to
-fix a severe defect, such as a security or data-loss bug, with advance notice, an error that shows the
-replacement, and a migration note. New syntax may arrive in any release, but only if existing stories
-compile the same way: syntax that reserves a character or word existing prose may already use counts
-as a change, not an addition.
+Talemark and the engine are versioned together. Talewright is still in early preview, so the
+story format can change between releases until 1.0.0-preview.1 ships.
+
+Starting with 1.0.0-preview.1, Talemark syntax, story files and saves will keep working in later 1.x
+releases. Syntax will be changed or removed only to fix a severe defect, such as a security or
+data-loss bug, with advance notice, an error that shows the replacement, and a migration note. New
+syntax may arrive in any release, but only if existing stories compile the same way: syntax that
+reserves a character or word existing prose may already use counts as a change, not an addition.
 
 Identifiers are names for scenes, characters, items and other story parts. Use letters, numbers,
 underscores, and single dots or hyphens between words; start with a letter or underscore. For example,
@@ -258,12 +260,9 @@ Neither field says how many people a character represents. Singular-agreement
 pronouns can describe one or more people; plural agreement is not a population
 count. Group identity and composition are not modeled by these settings.
 
-**Breaking pre-alpha change:** both the old pronoun-set `plural` key and the
-character-root `plural` key are errors, even alongside the new fields. Replace
-the pronoun setting with an explicit `agreement: singular|plural` and the
-character setting with `name-agreement: singular|plural`, choosing each for its
-grammar rather than population. There are no aliases, automatic migration,
-fallback or precedence rules for old settings.
+There is no `plural` key on pronoun sets or characters; it is reported as an error. Use
+`agreement` on the pronoun set and `name-agreement` on the character, choosing each for its
+grammar rather than how many people the character represents.
 
 ### Optional character creation
 
@@ -384,8 +383,8 @@ requirements and enclosing conditions are evaluated when reached; choice effects
 
 Each choice can have at most one requirement and one effect block, in either order. Both must
 come before its divert or `skill-check`. Write a choice requirement as `(requires expression)`,
-with whitespace between `requires` and the expression. The older `(requires: expression)` form
-reports TW1011 with a replacement suggestion. An unclosed label reports TW1011 at its opening
+with whitespace between `requires` and the expression. Writing `(requires: expression)` with a
+colon reports TW1011 with a replacement suggestion. An unclosed label reports TW1011 at its opening
 `[`. When there is one clear clause boundary, the diagnostic may suggest where to insert `]`.
 Append `, shown` to a requirement to keep the choice visible while unavailable. Optionally add
 double-quoted reader text to replace the label only while unavailable; it supports substitutions,
@@ -489,10 +488,6 @@ references. They read the shared item definition, whether or not that character 
 after a character ID, `inventory` is reserved for this namespace rather than a character property.
 The bare `character:inventory` namespace has no printable value.
 For these terms, see the [glossary](glossary.md).
-
-**Migration.** Bare `faction:<id>` used to render the numeric standing; it now renders the
-faction name without a diagnostic. Replace numeric uses with `faction:<id>:standing`, and
-comparisons to reputation tiers with `faction:<id>:tier`.
 
 Any character id can replace `player`.
 
@@ -720,8 +715,7 @@ Desktop publications use the adjacent story folder. Keep the complete published 
 See [sharing and artwork guidance](../guide/sharing-your-story.md#artwork-and-hosting-size) for
 hosting-size warnings and platform verification limits.
 
-The `![alt](path)` form is an unexpected reader-text syntax error.
-The proposed `@image(...)` form was not shipped and is not supported.
+The Markdown `![alt](path)` form is not supported and reports TW1015.
 
 ## 4. Expressions
 
@@ -814,7 +808,7 @@ Talemark strings decode `\"` and `\\` exactly once:
 ```
 
 Those values contain ordinary quotes and a single backslash. Spell every literal backslash
-as `\\`, including when updating older stories. Other escapes such as `\n` are errors;
+as `\\`. Other escapes such as `\n` are errors;
 this does not change YAML quoting or ordinary dialogue. Punctuation inside the quotes,
 including braces, commas and `#`, remains text. See the
 [operator registry](talemark-operators.md#reader-text-quotes-and-escapes) and runnable

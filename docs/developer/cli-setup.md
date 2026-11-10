@@ -5,8 +5,8 @@ This page covers verification, system dependencies, alternate installation and s
 
 ## Portable downloads and verification
 
-Use the [releases list](https://github.com/squid-farm/talewright/releases), including prereleases.
-An existing release does not imply CLI assets exist. Look for
+Use the [releases list](https://github.com/squid-farm/talewright/releases); current releases are
+marked as prereleases. Look for
 `talewright-cli-VERSION-RUNTIME.zip` (Windows) or `.tar.gz` (macOS/Linux), plus its `.sha256` file.
 Supported build targets are `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64` and
 `linux-arm64`. Linux requires glibc; Alpine/musl is not supported.
@@ -50,14 +50,15 @@ not silently redirected to another tool.
 
 ## Alternative: .NET tool
 
-With the .NET 10 SDK installed, and only after the selected version is published to nuget.org:
+With the .NET 10 SDK installed:
 
 ```bash
 dotnet tool install --global Talewright.Cli --version VERSION
 talewright --help
 ```
 
-Replace `VERSION` with an exact compatible published version; do not assume any preview exists.
+Replace `VERSION` with a version published on
+[nuget.org](https://www.nuget.org/packages/Talewright.Cli), such as `0.5.0-preview.1`.
 The global tool requires the matching installed .NET runtime and the native debugging prerequisites.
 If PATH has not refreshed, the global shim is normally at `~/.dotnet/tools/talewright`
 (`%USERPROFILE%\.dotnet\tools\talewright.exe` on Windows). Use/select that absolute path.

@@ -172,9 +172,17 @@ With the Talewright extension installed. Keys can be customized; on macOS, funct
 `tale-choice`, `tale-if`, `tale-image`, `tale-choice-check` or `tale-check`. `Tab` moves between
 fields; prefix-plus-`Tab` needs VS Code's optional Tab Completion setting.
 
-**Talewright commands:** The extension assigns no default shortcuts. In the Command Palette,
-prefix these with `Talewright:`: `New Story`, `Validate Story`, `Run Story`, `Open Author Debugger`,
-`Play From This Scene` and `Publish Story ZIP` require a separately installed CLI. `Set Up CLI`
-and `Toggle Substitution Preview Hints` are also available. `Play From This Scene` requires the
-cursor in a scene. `Run Story` also needs the .NET 10 runtime. `F5` does not launch the Author
-Debugger.
+**Talewright commands:** type `Talewright` in the Command Palette. They have no shortcuts.
+
+| Command | Does |
+|---|---|
+| **New Story** | Create a starter story. |
+| **Validate Story** | Check the saved story for mistakes. |
+| **Run Story** | Play from the beginning (also needs the .NET 10 Runtime). |
+| **Open Author Debugger** | Test any scene with the state you choose. |
+| **Play From This Scene** | Open the Author Debugger at the scene your cursor is in. |
+| **Publish Story ZIP** | Save a story file to share. |
+| **Set Up CLI** | Find or download the CLI that the commands above need. |
+| **Toggle Substitution Preview Hints** | Show or hide the grey previews after `{...}`. |
+
+`F5` doesn't open the Author Debugger.

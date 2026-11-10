@@ -1,6 +1,6 @@
 # Language-change checklist
 
-Use this checklist when proposing any Talemark syntax, including checkpoints, images or formatting.
+Use this checklist when proposing any Talemark syntax, including images or formatting.
 The [operator registry](../reference/talemark-operators.md) is the source of truth for existing
 meanings and the difference between implemented and decided syntax.
 
@@ -54,27 +54,21 @@ meanings and the difference between implemented and decided syntax.
    into core Talemark once real stories show they're worth it.
 5. **Shorthand only for very common formatting.** Shorthand is syntax sugar: lower it to the same
    canonical model as the corresponding `#` manipulator. Everything else is a `#` manipulator
-   ([#193](https://github.com/squid-farm/talewright/issues/193),
-   [#496](https://github.com/squid-farm/talewright/issues/496)).
+   ([#193](https://github.com/squid-farm/talewright/issues/193)).
 6. **Displaying something never changes the world.** Manipulators change how a value is written or
    displayed; effects change the world. Displaying a value never performs or repeats an effect.
 7. **A bare reference names the thing; properties give values** (`thing:property`).
 8. **Conditions are true or false.** Numbers are never conditions.
 9. **One spelling per meaning.** A keyword used in several places is spelled the same everywhere,
-   such as `@requires` and `(requires …)` ([#494](https://github.com/squid-farm/talewright/issues/494)).
-10. **Talemark is not Markdown.** Markdown-derived forms survive only if authors use them
-    ([#497](https://github.com/squid-farm/talewright/issues/497)). Text renders as it sits in the file.
-11. **Use the glossary's terms** in diagnostics, docs and hover text
-    ([#500](https://github.com/squid-farm/talewright/issues/500)).
-12. **Existing stories keep working.** New syntax is additive and leaves existing stories and saves
+   such as `@requires` and `(requires …)`.
+10. **Talemark is not Markdown.** Markdown-derived forms survive only if authors use them.
+    Text renders as it sits in the file.
+11. **Use the [glossary's](../reference/glossary.md) terms** in diagnostics, docs and hover text.
+12. **Existing stories keep working** (from 1.0.0-preview.1). New syntax is additive and leaves existing stories and saves
     unchanged. A breaking change is reserved for severe defects; its old form produces an error that
     shows the replacement, with migration notes. Any change that silently alters rendering is called
     out in the release notes.
-13. **Sugar and defaults are different contracts.** Sugar is another spelling of the same meaning
-    and compiles to the canonical model. A default is omitted author input that stays absent in the
-    model until the boundary that owns its behavior supplies a value. For example, bold shorthand
-    lowers to the same style model as `#bold`; a textless choice keeps its label absent and displays
-    **Continue** at runtime ([#496](https://github.com/squid-farm/talewright/issues/496)).
+13. **Sugar and defaults are different contracts.** See [Sugar and defaults](#sugar-and-defaults).
 
 Proposals that conflict with a principle must name it and say why it should be broken.
 
@@ -202,8 +196,3 @@ Complementary tests enforce these boundaries:
   its parser support exists.
 - [ ] Include the issue, decisions, rejected alternatives, migration examples and exact validation
   evidence in one small PR, then stop for review.
-
-For [checkpoint syntax (#54)](https://github.com/squid-farm/talewright/issues/54), first decide
-whether the operation is scene metadata or an executable effect. Reuse the corresponding marker
-only if that meaning fits. Define timing and first-encounter behavior separately from `@once`,
-which already controls storylet eligibility. Do not reserve a new checkpoint sigil before that review.
