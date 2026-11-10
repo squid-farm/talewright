@@ -21,6 +21,11 @@ How it's built:
   to UI fields and inspection snapshots. The workbench reuses Player rendering and creation components,
   has its own `debug-assets` root, and never writes player save storage. Explicit file imports
   restore a normal save before forking into isolated author history.
+- **Workspace.** `DebuggerWorkspace` keeps the scene or map in the main view, with a resizable inspector
+  and bottom tool tabs for setup, state, source, branches, timeline, events and problems. Split sizes and
+  collapsed panes persist in `localStorage` under `talewright.debugger.layout`. Inspect mode captures
+  scene-viewer clicks and focused-choice keys so selection does not advance the playtest; toggle it from
+  the toolbar or with Ctrl+Shift+C, and press Esc to exit.
 - **Reader presentation.** The scene view and map preview use Player's `ReaderPresentation` and
   `StoryStage`, so their rendering and choices match the player. Reader settings are the player's
   settings and apply at the root of the debugger window.

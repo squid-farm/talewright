@@ -1,8 +1,0 @@
-.author-workbench { max-width: 88rem; margin: auto; padding: 1.5rem; }
-.debugger-header { display: flex; align-items: center; justify-content: space-between; }
-section { margin: 1rem 0; border: 1px solid var(--tw-muted); padding: 1rem; }
-button, input, select { font: inherit; padding: .35rem; }
-button { color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); }
-:focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }
-.workbench-tabs { display: flex; gap: .3rem; border-bottom: 1px solid var(--tw-border); }
-.workbench-tabs [role="tab"][aria-selected="true"] { border-bottom: 3px solid var(--tw-accent); font-weight: bold; }

@@ -46,5 +46,5 @@ public sealed class AccessibleNodeTests
     }
 
     private static AccessibleNode Node(string name, string role, string text, params AccessibleNode[] children) =>
-        new(name, role, text, false, true, new(0, 0, 0, 0), children);
+        new(name, role, text, false, true, false, new(0, 0, 0, 0), children);
 }

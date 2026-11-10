@@ -1,0 +1,69 @@
+@using Talewright.Core.Events
+@using Talewright.Rules.Diagnostics
+@using Talewright.Runtime
+@using Talewright.Talemark.Formatting
+@using Talewright.Talemark.Model
+
+<section class="choice-inspector" aria-label="Choice inspector">
+    <h2>Choice @ChoiceKey</h2>
+    <dl>
+        <dt>Choice key</dt><dd>@ChoiceKey</dd>
+        <dt>Label</dt><dd>@(Choice?.Text ?? "Choice is not currently available")</dd>
+        <dt>Target or targets</dt><dd>@Targets</dd>
+        <dt>Chosen in this run</dt><dd>@(WasChosen ? "Yes" : "No")</dd>
+        <dt>Latest decision</dt>
+        <dd>@(LatestDecision is { } decision ? $"{decision.Outcome} ({decision.Reason})" : "No recorded decision")</dd>
+    </dl>
+    <h3>requires</h3>
+    @if (Requirement is null)
+    {
+        <p>None</p>
+    }
+    else if (LatestDecision?.Expression is { } trace)
+    {
+        <ul><ExpressionView Trace="trace" /></ul>
+    }
+    else
+    {
+        <p>@ExpressionFormatter.Format(Requirement)</p>
+        <p>Not evaluated in this run.</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+    [Parameter, EditorRequired] public SceneDefinition Scene { get; set; } = null!;
+    [Parameter, EditorRequired] public string ChoiceKey { get; set; } = "";
+    [Parameter] public ChoiceView? Choice { get; set; }
+    [Parameter] public AuthorSession? Session { get; set; }
+    [Parameter] public AuthorInspection? Inspection { get; set; }
+
+    private ChoiceDefinition? Definition => Scene.Choices.FirstOrDefault(choice => choice.Key == ChoiceKey);
+    private SceneDefinition? HubTarget => ChoiceKey.StartsWith(StorySession.StoryletKeyPrefix, StringComparison.Ordinal)
+        ? Story.GetScene(new SceneId(ChoiceKey[StorySession.StoryletKeyPrefix.Length..]))
+        : null;
+    private Expr? Requirement => Definition?.Requires ?? HubTarget?.Requires;
+    private string Targets
+    {
+        get
+        {
+            if (HubTarget is { } hub)
+                return hub.Id.Value;
+            var choice = Definition ?? throw new InvalidOperationException($"Choice '{ChoiceKey}' is not in scene '{Scene.Id}'.");
+            if (choice.Check is { } check)
+                return $"success: {check.Success.Divert?.ToString() ?? "continue"}; failure: {check.Failure.Divert?.ToString() ?? "continue"}";
+            return choice.Divert?.ToString() ?? "continue";
+        }
+    }
+
+    private string? StepId => Definition is null ? null : SceneSteps.Walk(Scene.Steps).OfType<ChoiceStep>()
+        .Single(step => step.Choice.Key == ChoiceKey).Id;
+
+    private RuleDecision? LatestDecision => Inspection?.Decisions.LastOrDefault(decision =>
+        decision.Scene == Scene.Id && (Definition is not null
+            ? decision.Kind == DecisionKind.Choice && decision.Subject == StepId
+            : decision.Kind == DecisionKind.Storylet && decision.Subject == HubTarget?.Id.Value));
+
+    private bool WasChosen => Inspection?.Events.OfType<ChoiceMade>()
+        .Any(item => item.Scene == Scene.Id && item.ChoiceKey == ChoiceKey) == true;
+}

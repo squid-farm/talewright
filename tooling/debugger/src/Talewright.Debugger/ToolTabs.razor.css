@@ -1,0 +1,31 @@
+.debugger-tools {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.tool-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.tool-tabs button {
+    white-space: nowrap;
+}
+
+.tool-tabs [aria-selected="true"] {
+    border-bottom: 3px solid var(--tw-accent);
+    font-weight: bold;
+}
+
+[role="tabpanel"] {
+    overflow: auto;
+    padding: .5rem 1rem;
+}
+
+section[role="tabpanel"] {
+    flex: 1 1 auto;
+    min-height: 0;
+}

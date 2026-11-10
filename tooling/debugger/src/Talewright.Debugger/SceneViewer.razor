@@ -1,14 +1,59 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<section class="debugger-scene-viewer" aria-label="Scene viewer">
 <h3 class="debugger-scene-heading">@Session.Current.Scene @Session.Current.Title</h3>
-<ReaderPresentation>
-    <StoryStage Story="Session.Story" Passages="Passages" PassageWindow="1" Current="Session.Current"
-                State="Session.State" Identity="Session" AtChoiceLimit="AtLimit" Busy="false"
-                OnChoose="OnChoose" OnRestart="OnRestart" />
-</ReaderPresentation>
+<div class="scene-stage" data-tw-scene="@Session.Current.Scene?.Value" @ref="_stage">
+    <ReaderPresentation>
+        <StoryStage Story="Session.Story" Passages="Passages" PassageWindow="1" Current="Session.Current"
+                    State="Session.State" Identity="Session" AtChoiceLimit="AtLimit" Busy="false"
+                    OnChoose="OnChoose" OnRestart="OnRestart" />
+    </ReaderPresentation>
+    <div class="inspect-overlay" aria-hidden="true" hidden></div>
+</div>
+</section>
 
 @code {
     [Parameter, EditorRequired] public AuthorSession Session { get; set; } = null!;
     [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
+    [Parameter] public bool InspectMode { get; set; }
+    [Parameter] public EventCallback<InspectorSelection> OnInspectSelection { get; set; }
+    [Parameter] public EventCallback<bool> OnInspectModeChanged { get; set; }
+    private ElementReference _stage;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<SceneViewer>? _reference;
+    private int? _inspectorId;
     private bool AtLimit => Session.Cursor >= StoryHistory.MaxChoices;
     private IReadOnlyList<HistoryFrame> Passages => [new(Session.Current)];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./debugger/workspace.js");
+        if (_inspectorId is null)
+        {
+            _reference = DotNetObjectReference.Create(this);
+            _inspectorId = await _module.InvokeAsync<int>("attachInspector", _stage, _reference);
+        }
+        await _module.InvokeVoidAsync("setInspectMode", InspectMode);
+    }
+
+    [JSInvokable]
+    public Task Select(string scene, string? choiceKey) =>
+        OnInspectSelection.InvokeAsync(new InspectorSelection(new(scene), choiceKey));
+
+    [JSInvokable]
+    public Task InspectModeChanged(bool enabled) => OnInspectModeChanged.InvokeAsync(enabled);
+
+    public async ValueTask DisposeAsync()
+    {
+        _reference?.Dispose();
+        if (_module is not null)
+        {
+            if (_inspectorId is { } id)
+                await _module.InvokeVoidAsync("detachInspector", id);
+            await _module.DisposeAsync();
+        }
+    }
 }

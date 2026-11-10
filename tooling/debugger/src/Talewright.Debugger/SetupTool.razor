@@ -1,5 +1,10 @@
 <section aria-label="Scene setup">
     <h2>Scene setup</h2>
+    <details>
+        <summary>How this works</summary>
+        <p>Start selected scene creates a fresh synthetic world from the setup values below. Jump retaining state enters the target scene with the current run's state, visits, triggers and dice.</p>
+        <p>Seed is empty to use the story seed or a generated seed. Setup values are applied before the selected scene is entered.</p>
+    </details>
     <ScenePicker Model="Model" OnSelect="SelectTarget" />
     <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
     <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
@@ -11,6 +16,10 @@
     }
     <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" Texts="Model.Texts" />
     <button type="button" @onclick="OnStart">Start selected scene</button>
+    @if (Model.Session is { } session)
+    {
+        <button type="button" disabled="@session.Current.IsEnded" @onclick="OnJumpPreservingState">Jump retaining state</button>
+    }
 </section>
 
 @code {
@@ -18,6 +27,7 @@
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
     [Parameter] public EventCallback OnStart { get; set; }
     [Parameter] public EventCallback OnClearCharacter { get; set; }
+    [Parameter] public EventCallback OnJumpPreservingState { get; set; }
 
     private void SelectTarget(string sceneId) => Model.Target = sceneId;
 }

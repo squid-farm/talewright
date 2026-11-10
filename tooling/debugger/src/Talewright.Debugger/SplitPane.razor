@@ -1,0 +1,77 @@
+@using Microsoft.JSInterop
+@using System.Globalization
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div @ref="_container" class="split-pane @(Orientation == "Horizontal" ? "split-horizontal" : "split-vertical")"
+     style="--split-size:@($"{Size.ToString(CultureInfo.InvariantCulture)}%")">
+    <div class="split-first">@FirstPane</div>
+    @if (!Collapsed)
+    {
+        <div class="split-separator" role="separator" aria-orientation="@(Orientation == "Horizontal" ? "vertical" : "horizontal")"
+             aria-label="@Name" aria-valuenow="@Math.Round(Size)" aria-valuemin="20" aria-valuemax="80"
+             tabindex="0" @ref="_separator" @onkeydown="ResizeByKeyboard"></div>
+        <div class="split-second">@SecondPane</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter, EditorRequired] public string Orientation { get; set; } = "Horizontal";
+    [Parameter] public double Size { get; set; } = 70;
+    [Parameter] public bool Collapsed { get; set; }
+    [Parameter] public EventCallback<double> OnSizeChanged { get; set; }
+    [Parameter] public RenderFragment? FirstPane { get; set; }
+    [Parameter] public RenderFragment? SecondPane { get; set; }
+
+    private ElementReference _container;
+    private ElementReference _separator;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<SplitPane>? _reference;
+    private int? _splitterId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Collapsed && _splitterId is { } existingId)
+        {
+            await _module!.InvokeVoidAsync("detachSplitter", existingId);
+            _splitterId = null;
+        }
+        if (Collapsed || _splitterId is not null)
+            return;
+        _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./debugger/workspace.js");
+        _reference ??= DotNetObjectReference.Create(this);
+        _splitterId = await _module.InvokeAsync<int>("attachSplitter", _container, _separator, _reference,
+            Orientation == "Vertical");
+    }
+
+    [JSInvokable]
+    public Task SetSize(double size) => OnSizeChanged.InvokeAsync(Math.Clamp(size, 20, 80));
+
+    private Task ResizeByKeyboard(KeyboardEventArgs args)
+    {
+        var step = args.ShiftKey ? 10 : 2;
+        var direction = Orientation == "Horizontal"
+            ? args.Key switch { "ArrowLeft" => -1, "ArrowRight" => 1, _ => 0 }
+            : args.Key switch { "ArrowUp" => -1, "ArrowDown" => 1, _ => 0 };
+        var size = args.Key switch
+        {
+            "Home" => 20,
+            "End" => 80,
+            _ when direction != 0 => Math.Clamp(Size + step * direction, 20, 80),
+            _ => Size,
+        };
+        return size == Size ? Task.CompletedTask : SetSize(size);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _reference?.Dispose();
+        if (_module is not null)
+        {
+            if (_splitterId is { } id)
+                await _module.InvokeVoidAsync("detachSplitter", id);
+            await _module.DisposeAsync();
+        }
+    }
+}

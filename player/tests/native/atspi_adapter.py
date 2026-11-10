@@ -127,6 +127,10 @@ class Desktop:
         if actions.nActions == 0 or not actions.doAction(0):
             raise RuntimeError(f"Control does not support activation: {query}")
 
+    def click_at(self, x, y):
+        self.activate_window()
+        pyatspi.Registry.generateMouseEvent(x, y, "b1c")
+
     def key(self, key, event=pyatspi.KEY_PRESSRELEASE):
         key = {"Enter": "Return", "Space": "space"}.get(key, key)
         found, entries = Gdk.Keymap.get_for_display(Gdk.Display.get_default()).get_entries_for_keyval(
@@ -227,7 +231,7 @@ class Desktop:
     def snapshot(self):
         root = self.root()
         if root is None:
-            return {"name": "", "role": "", "text": "", "focused": False, "enabled": False,
+            return {"name": "", "role": "", "text": "", "focused": False, "enabled": False, "pressed": False,
                     "bounds": {"x": 0, "y": 0, "width": 0, "height": 0}, "children": []}
 
         def serialize(node, depth=0):
@@ -256,6 +260,7 @@ class Desktop:
             return {"name": normalized(node.name), "role": node.getRoleName(), "text": normalized_lines(content),
                     "focused": state.contains(pyatspi.STATE_FOCUSED),
                     "enabled": state.contains(pyatspi.STATE_ENABLED) and state.contains(pyatspi.STATE_SENSITIVE),
+                    "pressed": state.contains(pyatspi.STATE_PRESSED),
                     "bounds": bounds, "children": children}
         return serialize(root)
 
@@ -311,6 +316,8 @@ def serve(args):
                     result = list(image.get_pixels()[:3])
                 elif command == "click":
                     app.click(**arguments)
+                elif command == "click-at":
+                    app.click_at(arguments["x"], arguments["y"])
                 elif command == "activate":
                     app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
                     app.activate_window()
