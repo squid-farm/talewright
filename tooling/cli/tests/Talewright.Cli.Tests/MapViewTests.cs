@@ -299,8 +299,8 @@ public sealed class MapViewTests
         var initial = GameState.CreateInitial(story.World, 42);
         var startPreview = MapScenePreviewBuilder.Build(story, start, initial, usesCurrentRunState: false);
 
-        Assert.Contains("Waiting 0.", startPreview.Document.ToPlainText());
-        Assert.Equal(["Wait"], startPreview.Choices.Select(choice => choice.Text));
+        Assert.Contains("Waiting 0.", startPreview.Frame.Document.ToPlainText());
+        Assert.Equal(["Wait"], startPreview.Frame.Menu.Select(choice => choice.Text));
         Assert.False(startPreview.UsesCurrentRunState);
 
         var session = AuthorSession.Create(story, start, captureDecisions: true,
@@ -311,8 +311,8 @@ public sealed class MapViewTests
             }, seed: 42);
         var currentPreview = MapScenePreviewBuilder.Build(story, start, session.State, usesCurrentRunState: true);
 
-        Assert.Contains("Ready 3.", currentPreview.Document.ToPlainText());
-        Assert.Equal(["Prepared 3", "Wait"], currentPreview.Choices.Select(choice => choice.Text));
+        Assert.Contains("Ready 3.", currentPreview.Frame.Document.ToPlainText());
+        Assert.Equal(["Prepared 3", "Wait"], currentPreview.Frame.Menu.Select(choice => choice.Text));
         Assert.True(currentPreview.UsesCurrentRunState);
     }
 }

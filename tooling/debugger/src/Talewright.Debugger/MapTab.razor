@@ -34,18 +34,18 @@
     <section class="map-preview" aria-label="Scene preview">
         <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
         <p>Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
-        <DocumentView Document="preview.Document" />
+        <DocumentView Document="preview.Frame.Document" />
         <h4>Available choices in this preview</h4>
-        @if (preview.Choices.Count == 0)
+        @if (preview.Frame.Menu.Count == 0)
         {
             <p>No choices are available in this preview.</p>
         }
         else
         {
             <ul>
-                @foreach (var choice in preview.Choices)
+                @foreach (var choice in preview.Frame.Menu)
                 {
-                    <li>@choice.Text</li>
+                    <li>@choice.Number. @choice.Text@if (!choice.IsAvailable) { <span> (unavailable)</span> }</li>
                 }
             </ul>
         }

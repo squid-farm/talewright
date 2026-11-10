@@ -100,7 +100,7 @@ public sealed class MapTabTests : BunitContext
         Assert.Equal("Scene preview: Cave", preview.QuerySelector("h3")!.TextContent);
         Assert.Contains("using the current playtest state.", preview.TextContent);
         Assert.Contains("The cave.", preview.TextContent);
-        Assert.Equal(["Return", "Leave"], preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
+        Assert.Equal(["1. Return", "2. Leave"], preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
 
         SceneButton(map, "cave").Blur();
 
@@ -121,7 +121,29 @@ public sealed class MapTabTests : BunitContext
         Assert.Equal("Scene preview: Great Hall", preview.QuerySelector("h3")!.TextContent);
         Assert.Contains("using scene setup values.", preview.TextContent);
         Assert.Contains("Count 0.", preview.TextContent);
-        Assert.Equal(["Explore", "Wait"], preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
+        Assert.Equal(["1. Explore", "2. Wait"], preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
+    }
+
+    [Fact]
+    public void Preview_lists_shown_but_unavailable_choices()
+    {
+        var files = ComponentStory.Files();
+        files["main.tale"] = """
+            === hall
+            @title Great Hall
+            * [Restricted] (requires false, shown "Not ready") -> cave
+            * [Wait] -> hall
+            === cave
+            * [Leave] -> END
+            """;
+        using var model = ComponentStory.Load(files);
+        var map = Show(model);
+
+        SceneButton(map, "hall").Focus();
+
+        var preview = map.Find("section[aria-label='Scene preview']");
+        Assert.Equal(["1. Not ready (unavailable)", "2. Wait"],
+            preview.QuerySelectorAll("ul > li").Select(item => item.TextContent));
     }
 
     [Fact]
