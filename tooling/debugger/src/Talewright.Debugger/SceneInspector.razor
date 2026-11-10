@@ -1,0 +1,58 @@
+@using Talewright.Rules.Diagnostics
+@using Talewright.Runtime
+@using Talewright.Talemark.Compilation
+@using Talewright.Talemark.Formatting
+@using Talewright.Talemark.Model
+
+<section class="scene-inspector" aria-label="Scene inspector">
+    <h2>@(Scene.Title ?? Scene.Id.Value)</h2>
+    <dl>
+        <dt>Scene ID</dt><dd>@Scene.Id</dd>
+        <dt>Title</dt><dd>@(Scene.Title ?? "None")</dd>
+        <dt>Source</dt>
+        <dd>
+            @if (SourceMap?.Scenes.TryGetValue(Scene.Id, out var range) == true)
+            {
+                <span>@range.File lines @range.StartLine–@range.EndLine</span>
+            }
+            else
+            {
+                <span>Source location unavailable</span>
+            }
+        </dd>
+        <dt>Tags</dt><dd>@(Scene.Tags.Count == 0 ? "None" : string.Join(", ", Scene.Tags.Order(StringComparer.Ordinal)))</dd>
+        <dt>Hub tags</dt><dd>@HubTags</dd>
+        <dt>@@hub-limit</dt><dd>@(Scene.HubLimit?.ToString() ?? "None")</dd>
+        <dt>@@once</dt><dd>@(Scene.Once ? "Yes" : "No")</dd>
+        <dt>Visit count</dt>
+        <dd>@(Inspection?.Scenes.FirstOrDefault(item => item.Id == Scene.Id)?.Visits ?? 0)</dd>
+    </dl>
+    <h3>@@requires</h3>
+    @if (Scene.Requires is null)
+    {
+        <p>None</p>
+    }
+    else if (LatestRequirement?.Expression is { } trace)
+    {
+        <ul><ExpressionView Trace="trace" /></ul>
+    }
+    else
+    {
+        <p>@ExpressionFormatter.Format(Scene.Requires)</p>
+        <p>Not evaluated in this run.</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SceneDefinition Scene { get; set; } = null!;
+    [Parameter] public StorySourceMap? SourceMap { get; set; }
+    [Parameter] public AuthorSession? Session { get; set; }
+    [Parameter] public AuthorInspection? Inspection { get; set; }
+
+    private RuleDecision? LatestRequirement => Inspection?.Decisions.LastOrDefault(decision =>
+        decision.Kind == DecisionKind.Storylet &&
+        decision.Subject == Scene.Id.Value && decision.Expression is not null);
+    private string HubTags => Scene.Hub is { } hub
+        ? $"{(hub.MatchAll ? "all " : "any ")}{string.Join(", ", hub.Tags.Select(tag => $"#{tag}"))}"
+        : "None";
+}

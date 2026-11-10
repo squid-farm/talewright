@@ -1,0 +1,34 @@
+@using Talewright.Runtime
+@using Talewright.Talemark.Compilation
+@using Talewright.Talemark.Model
+
+<aside class="inspector-pane" aria-label="Inspector">
+    @if (Story is null || Selection is null)
+    {
+        <p>Start a scene to inspect its details.</p>
+    }
+    else
+    {
+        var scene = Story.GetScene(Selection.Scene);
+        if (Selection.ChoiceKey is { } choiceKey)
+        {
+            var choice = Session?.Current.Scene == Selection.Scene
+                ? Session.Current.Choices.FirstOrDefault(item => item.Key == choiceKey)
+                : null;
+            <ChoiceInspector Story="Story" Scene="scene" ChoiceKey="@choiceKey" Choice="choice"
+                             Session="Session" Inspection="Inspection" />
+        }
+        else
+        {
+            <SceneInspector Scene="scene" SourceMap="SourceMap" Session="Session" Inspection="Inspection" />
+        }
+    }
+</aside>
+
+@code {
+    [Parameter] public StoryDefinition? Story { get; set; }
+    [Parameter] public InspectorSelection? Selection { get; set; }
+    [Parameter] public AuthorSession? Session { get; set; }
+    [Parameter] public AuthorInspection? Inspection { get; set; }
+    [Parameter] public StorySourceMap? SourceMap { get; set; }
+}

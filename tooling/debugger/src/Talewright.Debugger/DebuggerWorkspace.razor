@@ -1,0 +1,371 @@
+@using Microsoft.JSInterop
+@using Talewright.Core.Identity
+@using Talewright.Core.State
+@using Talewright.Runtime
+@using Talewright.Talemark.Model
+@inject IJSRuntime JS
+@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
+@implements IAsyncDisposable
+
+<main class="debugger-workspace">
+    <DebuggerToolbar Model="Model" Story="Model.Story" Session="Model.Session" InspectMode="_inspectMode"
+                     InspectorVisible="@(!_inspectorCollapsed)" ToolsVisible="@(!_toolsCollapsed)"
+                     MapSelected="_mapSelected" MapOpened="_mapOpened" SettingsReady="_settingsReady"
+                     OnSelectMainView="SelectMainView" OnBack="Model.Back" OnForward="Model.Forward"
+                     OnRestartScene="Model.Start" OnToggleInspect="ToggleInspect"
+                     OnToggleInspector="ToggleInspector" OnToggleTools="ToggleTools"
+                     OnOpenReaderSettings="OpenReaderSettings" OnOpenScenarios="() => OpenFileDialog(FileDialog.Scenarios)"
+                     OnOpenPlayerSave="() => OpenFileDialog(FileDialog.PlayerSave)"
+                     OnRescan="OnRescan" OnRestart="OnRestart" OnShowProblems="ShowProblems" />
+    <StatusLine Model="Model" />
+    <SplitPane Name="Resize tools" Orientation="Vertical" Size="_mainHeight"
+               Collapsed="_toolsCollapsed" OnSizeChanged="SetMainHeight">
+        <FirstPane>
+            <SplitPane Name="Resize inspector" Orientation="Horizontal" Size="_viewerWidth"
+                       Collapsed="_inspectorCollapsed" OnSizeChanged="SetViewerWidth">
+                <FirstPane>
+                    <div class="main-view">
+                        @if (Model.Story is { } story)
+                        {
+                            <div id="play-panel" role="tabpanel" aria-labelledby="play-tab" hidden="@_mapSelected">
+                                @if (Model.Session is { } session)
+                                {
+                                    <SceneViewer Session="session" InspectMode="_inspectMode"
+                                                 OnChoose="Choose" OnRestart="Model.Start"
+                                                 OnInspectSelection="SelectInspectTarget"
+                                                 OnInspectModeChanged="InspectModeChanged" />
+                                }
+                                else
+                                {
+                                    <p class="empty-viewer">Start a scene from Setup to begin a synthetic playtest.</p>
+                                }
+                            </div>
+                            @if (_mapOpened)
+                            {
+                                <div id="map-panel" role="tabpanel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
+                                    <MapTab Story="story" Session="Model.Session" Inspection="Model.Inspection"
+                                            PreviewState="Model.PreviewState" />
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="empty-viewer">Loading story source…</p>
+                        }
+                    </div>
+                </FirstPane>
+                <SecondPane>
+                    <InspectorPane Story="Model.Story" Selection="_selection" Session="Model.Session"
+                                   Inspection="Model.Inspection" SourceMap="Model.AcceptedSourceMap" />
+                </SecondPane>
+            </SplitPane>
+        </FirstPane>
+        <SecondPane>
+            <ToolTabs Selected="@_selectedTool" SelectedChanged="SelectTool"
+                      Setup="SetupPanel" State="StatePanel" Source="SourcePanel"
+                      Branches="BranchesPanel" Timeline="TimelinePanel" Events="EventsPanel"
+                      Problems="ProblemsPanel" />
+        </SecondPane>
+    </SplitPane>
+    @if (_settingsMounted)
+    {
+        <ReaderSettingsDialog @ref="_settingsDialog" OnReady="SettingsReady" />
+    }
+    @if (_fileDialog is { } dialog)
+    {
+        <div class="debugger-dialog-backdrop">
+            <section role="dialog" aria-modal="true" aria-label="@(dialog == FileDialog.Scenarios ? "Portable author scenarios" : "Read player save")"
+                     class="debugger-dialog">
+                <button type="button" class="dialog-close" @onclick="CloseFileDialog">Close</button>
+                @if (dialog == FileDialog.Scenarios)
+                {
+                    <ScenarioTransfer Model="Model" OnExport="Model.ExportScenario" OnImport="Model.ImportScenario"
+                                      OnAdopt="Model.AdoptScenario" IncludePlayerSaveFork="false" />
+                }
+                else
+                {
+                    <PlayerSaveFork Model="Model" OnImport="Model.ImportPlayerSave" />
+                }
+            </section>
+        </div>
+    }
+</main>
+
+@code {
+    private enum FileDialog { Scenarios, PlayerSave }
+    private FileDialog? _fileDialog;
+    private bool _settingsMounted;
+    private bool _settingsReady;
+    private bool _inspectMode;
+    private bool _inspectorCollapsed;
+    private bool _toolsCollapsed;
+    private bool _mapSelected;
+    private bool _mapOpened;
+    private string _selectedTool = "Setup";
+    private double _viewerWidth = 70;
+    private double _mainHeight = 68;
+    private InspectorSelection? _selection;
+    private AuthorSession? _lastSession;
+    private StoryFrame? _lastFrame;
+    private StoryDefinition? _lastSelectionStory;
+    private ReaderSettingsDialog _settingsDialog = default!;
+    private IJSObjectReference? _layoutModule;
+    private DotNetObjectReference<DebuggerWorkspace>? _reference;
+    private MapView? _routeMap;
+    private StoryDefinition? _routeStory;
+
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter] public EventCallback OnRescan { get; set; }
+    [Parameter] public EventCallback OnRestart { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Preferences.InitializeAsync();
+        _settingsMounted = true;
+    }
+
+    protected override void OnParametersSet()
+    {
+        SyncSelection();
+        if (!ReferenceEquals(_routeStory, Model.Story))
+        {
+            _routeStory = Model.Story;
+            _routeMap = Model.Story is { } story ? MapView.Build(story) : null;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (SyncSelection())
+            StateHasChanged();
+
+        if (_layoutModule is null)
+        {
+            _layoutModule = await JS.InvokeAsync<IJSObjectReference>("import", "./debugger/workspace.js");
+            _reference = DotNetObjectReference.Create(this);
+            var layout = await _layoutModule.InvokeAsync<WorkspaceLayout>("loadLayout");
+            if (layout.HasStoredLayout)
+            {
+                _viewerWidth = layout.ViewerWidth;
+                _mainHeight = layout.MainHeight;
+                _inspectorCollapsed = layout.InspectorCollapsed;
+                _toolsCollapsed = layout.ToolsCollapsed;
+            }
+            else
+            {
+                _inspectorCollapsed = layout.WindowWidth < 1100;
+            }
+            StateHasChanged();
+        }
+
+        await _layoutModule.InvokeVoidAsync("setInspectMode", _inspectMode);
+    }
+
+    private bool SyncSelection()
+    {
+        var session = Model.Session;
+        var frame = session?.Current;
+        var story = Model.Story;
+        if (ReferenceEquals(_lastSession, session) && ReferenceEquals(_lastFrame, frame) &&
+            ReferenceEquals(_lastSelectionStory, story))
+        {
+            return false;
+        }
+
+        _selection = frame?.Scene is { } scene ? new InspectorSelection(scene) : null;
+        _lastSession = session;
+        _lastFrame = frame;
+        _lastSelectionStory = story;
+        return true;
+    }
+
+    private RenderFragment SetupPanel => @<div>
+        @if (Model.Story is { } story)
+        {
+            <SetupTool Model="Model" Story="story" OnStart="Model.Start" OnClearCharacter="Model.ClearCharacter"
+                       OnJumpPreservingState="Model.JumpPreservingState" />
+        }
+        else
+        {
+            <p>Loading story setup…</p>
+        }
+    </div>;
+
+    private RenderFragment StatePanel => @<div>
+        @if (Model.Inspection is { } inspection && Model.Session is { } session)
+        {
+            <StateTable Inspection="inspection" />
+            <LiveEditTool Model="Model" Session="session" OnApplyEdits="Model.ApplyEdits" />
+        }
+        else
+        {
+            <p>Start a scene to inspect state or apply live edits.</p>
+        }
+    </div>;
+
+    private RenderFragment SourcePanel => @<div><SourceTool Model="Model" /></div>;
+
+    private RenderFragment BranchesPanel => @<div>
+        @if (Model.Inspection is { } inspection)
+        {
+            <BranchesTool Inspection="inspection" />
+        }
+        else
+        {
+            <p>Start a scene to inspect branch decisions.</p>
+        }
+    </div>;
+
+    private RenderFragment TimelinePanel => @<div>
+        @if (Model.Session is { } session && Model.Inspection is { } inspection)
+        {
+            <section aria-label="Synthetic playtest">
+                <h2>Synthetic playtest</h2>
+                <p role="status">Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: @inspection.Seed. Rolls: @inspection.RollCount.</p>
+                <TimelineTool Session="session" OnBack="Model.Back" OnForward="Model.Forward" />
+                <InitializationEvents Session="session" />
+                <MapRoute Run="CurrentRun" />
+            </section>
+        }
+        else
+        {
+            <p>Start a scene to view its synthetic timeline.</p>
+        }
+    </div>;
+
+    private RenderFragment EventsPanel => @<div>
+        @if (Model.Inspection is { } inspection)
+        {
+            <EventLog Inspection="inspection" />
+        }
+        else
+        {
+            <p>Start a scene to view its event log.</p>
+        }
+    </div>;
+
+    private RenderFragment ProblemsPanel => @<div>
+        <DiagnosticList Diagnostics="Model.Diagnostics" />
+        @if (Model.SourceRejected)
+        {
+            <p role="status">Source not adopted. Displayed story and playtest, if any, use the last successful compilation.</p>
+        }
+        @if (Model.RestartRequired)
+        {
+            <p role="status">Restart required. The last good compiled story/run is still displayed. Correct or disable incompatible setup before restarting.</p>
+        }
+    </div>;
+
+    private MapRunView? CurrentRun => Model.Story is { } story && Model.Session is { } session && _routeMap is { } map
+        ? MapRunView.Build(story, map, session)
+        : null;
+
+    private Task SettingsReady()
+    {
+        _settingsReady = true;
+        return Task.CompletedTask;
+    }
+
+    private Task OpenReaderSettings()
+    {
+        _settingsMounted = true;
+        return _settingsDialog.OpenAsync();
+    }
+
+    private void SelectMainView(bool map)
+    {
+        _mapSelected = map;
+        _mapOpened |= map;
+    }
+
+    private Task SelectTool(string tab)
+    {
+        _selectedTool = tab;
+        return Task.CompletedTask;
+    }
+
+    private Task ShowProblems()
+    {
+        _selectedTool = "Problems";
+        if (!_toolsCollapsed)
+            return Task.CompletedTask;
+        _toolsCollapsed = false;
+        return SaveLayout();
+    }
+
+    private void OpenFileDialog(FileDialog dialog) => _fileDialog = dialog;
+    private void CloseFileDialog() => _fileDialog = null;
+
+    private async Task ToggleInspect()
+    {
+        _inspectMode = !_inspectMode;
+        if (_layoutModule is not null)
+            await _layoutModule.InvokeVoidAsync("setInspectMode", _inspectMode);
+    }
+
+    private Task ToggleInspector()
+    {
+        _inspectorCollapsed = !_inspectorCollapsed;
+        return SaveLayout();
+    }
+
+    private Task ToggleTools()
+    {
+        _toolsCollapsed = !_toolsCollapsed;
+        return SaveLayout();
+    }
+
+    private async Task SetViewerWidth(double size)
+    {
+        _viewerWidth = size;
+        await SaveLayout();
+    }
+
+    private async Task SetMainHeight(double size)
+    {
+        _mainHeight = size;
+        await SaveLayout();
+    }
+
+    private Task SaveLayout() => _layoutModule is null
+        ? Task.CompletedTask
+        : _layoutModule.InvokeVoidAsync("saveLayout", new WorkspaceLayout(
+            _viewerWidth, _mainHeight, _inspectorCollapsed, _toolsCollapsed, 0, true)).AsTask();
+
+    private void Choose(ChoiceView choice)
+    {
+        _inspectMode = false;
+        Model.Choose(choice.Key);
+    }
+
+    private Task SelectInspectTarget(InspectorSelection selection)
+    {
+        _selection = selection;
+        _inspectMode = false;
+        return Task.CompletedTask;
+    }
+
+    public Task InspectModeChanged(bool enabled)
+    {
+        _inspectMode = enabled;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _reference?.Dispose();
+        if (_layoutModule is not null)
+        {
+            await _layoutModule.InvokeVoidAsync("setInspectMode", false);
+            await _layoutModule.DisposeAsync();
+        }
+    }
+
+    public sealed record WorkspaceLayout(
+        double ViewerWidth,
+        double MainHeight,
+        bool InspectorCollapsed,
+        bool ToolsCollapsed,
+        int WindowWidth,
+        bool HasStoredLayout);
+}

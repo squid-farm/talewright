@@ -1,13 +1,14 @@
 <section aria-label="Live state editing">
     <h3>Live state editing</h3>
-    <p>One validated batch, followed by normal triggers and leveling. No scene re-entry or entry-check reroll. After success, fields show actual values and enabled edits are cleared. Consequences appear in command history.</p>
+    <details>
+        <summary>How live editing works</summary>
+        <p>One validated batch, followed by normal triggers and leveling. No scene re-entry or entry-check reroll. After success, fields show actual values and enabled edits are cleared. Consequences appear in command history.</p>
+    </details>
     <SetupFields Numbers="Model.EditNumbers" Flags="Model.EditFlags" Texts="Model.EditTexts" Title="Live edit values" Prefix="live" />
     <button type="button" disabled="@Session.Current.IsEnded" @onclick="OnApplyEdits">Apply live edit batch</button>
-    <p>Preserve-state jump uses the Target scene ID above, bypasses eligibility, and enters once with existing state, visits, fired triggers and dice. Start selected scene instead creates a fresh world using setup.</p>
-    <button type="button" disabled="@Session.Current.IsEnded" @onclick="OnJumpPreservingState">Jump retaining state</button>
     @if (Session.Current.IsEnded)
     {
-        <p>Ended runs cannot be edited or jumped retaining state. Go Back, or use Start selected scene for a fresh-world jump.</p>
+        <p>Ended runs cannot be edited. Go Back, or use Start selected scene for a fresh-world jump.</p>
     }
 </section>
 
@@ -15,5 +16,4 @@
     [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
     [Parameter, EditorRequired] public AuthorSession Session { get; set; } = null!;
     [Parameter] public EventCallback OnApplyEdits { get; set; }
-    [Parameter] public EventCallback OnJumpPreservingState { get; set; }
 }

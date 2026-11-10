@@ -1,109 +1,24 @@
 @inject WorkbenchModel Model
-@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 @implements IAsyncDisposable
 
 <CascadingValue Value="Model.Images">
-<main class="author-workbench">
-    <header class="debugger-header">
-        <h1>Talewright Author Debugger</h1>
-        <button type="button" disabled="@(!_settingsReady)" @onclick="OpenReaderSettings">Reader settings</button>
-    </header>
-    @if (_preferencesReady)
-    {
-        <ReaderSettingsDialog @ref="_settingsDialog" OnReady="SettingsReady" />
-    }
-    <p>@Model.Root</p>
-    <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
-    <p>Saved Talemark changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
-    <button type="button" @onclick="Rescan">Rescan / retry watcher</button>
-    <button type="button" @onclick="Restart">Restart from source</button>
-    @if (Model.RestartRequired)
-    {
-        <p role="status">Restart required. The last good compiled story/run is still displayed. Correct or disable incompatible setup before restarting.</p>
-    }
-    @if (Model.ReloadStatus is { } status)
-    {
-        <p role="status">@status</p>
-    }
-    <DiagnosticList Diagnostics="Model.Diagnostics" />
-    @if (Model.RequestedSceneNotice is { } requestedSceneNotice)
-    {
-        <p role="status">@requestedSceneNotice</p>
-    }
-    @if (Model.SourceRejected)
-    {
-        <p role="status">Source not adopted. Displayed story and playtest, if any, use the last successful compilation.</p>
-    }
-    @if (Model.Error is not null)
-    {
-        <p role="alert" class="tw-error">@Model.Error</p>
-    }
-    @if (Model.Story is { } shownStory)
-    {
-        <h2>@shownStory.Title</h2>
-        <div role="tablist" aria-label="Workbench views" class="workbench-tabs">
-            <button type="button" role="tab" id="play-tab" aria-controls="play-panel" aria-selected="@(_mapSelected ? "false" : "true")"
-                    tabindex="@(_mapSelected ? -1 : 0)" @ref="_playTab" @onclick="() => SelectTab(false)" @onkeydown="TabKey">Play</button>
-            <button type="button" role="tab" id="map-tab" aria-controls="@(_mapOpened ? "map-panel" : null)" aria-selected="@(_mapSelected ? "true" : "false")"
-                    tabindex="@(_mapSelected ? 0 : -1)" @ref="_mapTab" @onclick="() => SelectTab(true)" @onkeydown="TabKey">Map</button>
-        </div>
-    }
-    <div role="@(Model.Story is null ? null : "tabpanel")" id="play-panel" aria-labelledby="play-tab" hidden="@_mapSelected">
-    @if (Model.Story is { } story)
-    {
-        <ScenarioTransfer Model="Model" OnExport="Model.ExportScenario" OnImport="Model.ImportScenario"
-                          OnAdopt="Model.AdoptScenario" OnPlayerSaveImport="Model.ImportPlayerSave" />
-        <SetupTool Model="Model" Story="story" OnStart="Start" OnClearCharacter="Model.ClearCharacter" />
-    }
-    @if (Model.Session is { } session && Model.Inspection is { } inspection)
-    {
-        <section aria-label="Synthetic playtest">
-            <h2>Synthetic playtest</h2>
-            <p role="status">Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: @inspection.Seed. Rolls: @inspection.RollCount.</p>
-            <TimelineTool Session="session" OnBack="Model.Back" OnForward="Model.Forward" />
-            <LiveEditTool Model="Model" Session="session" OnApplyEdits="Model.ApplyEdits"
-                          OnJumpPreservingState="Model.JumpPreservingState" />
-            <InitializationEvents Session="session" />
-            <SceneViewer Session="session" OnChoose="Choose" OnRestart="Start" />
-            <SourceTool Model="Model" />
-            <InspectionPanel Inspection="inspection" />
-        </section>
-    }
-    </div>
-    @if (Model.Story is { } mapStory && _mapOpened)
-    {
-        <div role="tabpanel" id="map-panel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
-            <MapTab Story="mapStory" Session="Model.Session" Inspection="Model.Inspection"
-                    PreviewState="Model.PreviewState" />
-        </div>
-    }
-</main>
+    <DebuggerWorkspace Model="Model" OnRescan="Rescan" OnRestart="Restart" />
 </CascadingValue>
 
 @code {
     private StoryReloadWatcher _watcher = null!;
-    private ReaderSettingsDialog _settingsDialog = default!;
-    private bool _preferencesReady;
-    private bool _settingsReady;
-
-    private Task SettingsReady()
-    {
-        _settingsReady = true;
-        return Task.CompletedTask;
-    }
-
-    private Task OpenReaderSettings() => _settingsDialog.OpenAsync();
 
     protected override async Task OnInitializedAsync()
     {
-        await Preferences.InitializeAsync();
-        _preferencesReady = true;
         _watcher = new(Model, action => InvokeAsync(action), StateHasChanged);
         await _watcher.RescanAsync(restart: true);
     }
+
     private Task Rescan() => _watcher.RescanAsync();
-    protected override Task OnAfterRenderAsync(bool firstRender) => Model.DrainImagesAsync();
     private Task Restart() => _watcher.RescanAsync(restart: true);
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => Model.DrainImagesAsync();
+
     public async ValueTask DisposeAsync()
     {
         await _watcher.DisposeAsync();
@@ -111,23 +26,4 @@
         if (Model.Images is not null) await Model.Images.DisposeAsync();
         await Model.DrainImagesAsync();
     }
-    private bool _mapSelected;
-    private bool _mapOpened;
-    private ElementReference _playTab;
-    private ElementReference _mapTab;
-    private void SelectTab(bool map)
-    {
-        _mapSelected = map;
-        _mapOpened |= map;
-    }
-    private async Task TabKey(KeyboardEventArgs e)
-    {
-        if (e.Key is not ("ArrowLeft" or "ArrowRight" or "Home" or "End"))
-            return;
-        SelectTab(e.Key switch { "Home" => false, "End" => true, _ => !_mapSelected });
-        StateHasChanged();
-        await (_mapSelected ? _mapTab : _playTab).FocusAsync();
-    }
-    private void Start() => Model.Start();
-    private void Choose(ChoiceView choice) => Model.Choose(choice.Key);
 }

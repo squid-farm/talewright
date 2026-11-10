@@ -46,16 +46,16 @@ public sealed class DebuggerTests
             Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Map");
             Assert.DoesNotContain("Scenes on the map", snapshot.Content);
 
-            await driver.ActivateAsync("Play");
+            await driver.ClickToggleAsync("Tools");
+            await driver.ActivateAsync("Scene");
             await driver.PressAsync("Right");
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 1 hub offer, 1 unreachable.");
-            Assert.DoesNotContain("Scene setup", snapshot.Content);
             Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export SVG");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export PNG");
             Assert.Equal("Map", Focused(snapshot).Name);
+            Assert.DoesNotContain("Scene setup", snapshot.Content);
 
-            await driver.PressAsync("Tab");
-            await driver.PressAsync("Tab");
+            await driver.ActivateAsync("The gate (start), start");
             snapshot = await WaitFor(driver, "Diverts: 2");
             Assert.Equal("The gate (start), start", Focused(snapshot).Name);
             Assert.Contains("Divert to camp, if flag:ready, main.tale line 4", snapshot.Content);
@@ -111,9 +111,11 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 0 hub offers, 2 unreachable.");
             Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
 
-            await driver.ActivateAsync("Play");
+            await driver.ClickToggleAsync("Tools");
+            await driver.ActivateAsync("Scene");
             snapshot = await WaitFor(driver, "Scene setup");
-            Assert.DoesNotContain("Scenes on the map", snapshot.Content);
+            Assert.DoesNotContain(snapshot.Descendants(),
+                node => node.Role == "group" && node.Name.StartsWith("Scenes on the map.", StringComparison.Ordinal));
         }
         finally
         {
@@ -151,14 +153,13 @@ public sealed class DebuggerTests
             await WaitFor(driver, "Scene setup");
             await driver.ActivateAsync("Map");
             await WaitFor(driver, "2 scenes, 2 diverts, 0 hub offers, 0 unreachable.");
-            await driver.PressAsync("Tab");
-            await driver.PressAsync("Tab");
+            await driver.ActivateAsync("The gate (start), start");
             var snapshot = await WaitFor(driver, "Diverts: 1");
             Assert.Contains("Scene preview: The gate", snapshot.Content);
             Assert.Contains("Preview only, using scene setup values.", snapshot.Content);
             Assert.Contains("Visits 0.", snapshot.Content);
 
-            await driver.ActivateAsync("Play");
+            await driver.ActivateAsync("Scene");
             await driver.ClickAsync("Start selected scene");
             await WaitFor(driver, "Visits 1.");
             await driver.ActivateAsync("Map");
@@ -167,7 +168,7 @@ public sealed class DebuggerTests
             Assert.Contains("Visits 1.", snapshot.Content);
             Assert.Contains("Started at start", snapshot.Content);
 
-            await driver.ActivateAsync("Play");
+            await driver.ActivateAsync("Scene");
             await driver.ChooseAsync("Continue");
             await WaitFor(driver, "The road");
             await driver.ActivateAsync("Map");
@@ -209,12 +210,11 @@ public sealed class DebuggerTests
             await driver.StartAsync(root);
             await WaitFor(driver, "Scene setup");
             await driver.ActivateAsync("Map");
-            await WaitFor(driver, "2 scenes, 2 diverts, 0 hub offers, 0 unreachable.");
-            await driver.PressAsync("Tab");
-            await driver.PressAsync("Tab");
-            await driver.PressAsync("Home");
-            await driver.PressAsync("Right");
-            var snapshot = await WaitFor(driver, "Scene preview: The old scene", "Old scene body.");
+            var snapshot = await WaitFor(driver, "2 scenes, 2 diverts, 0 hub offers, 0 unreachable.");
+            var oldScene = snapshot.Descendants().First(node => node.Role == "push button" &&
+                node.Name.Contains("The old scene", StringComparison.Ordinal));
+            await driver.ActivateAsync(oldScene.Name);
+            snapshot = await WaitFor(driver, "Scene preview: The old scene", "Old scene body.");
 
             await File.WriteAllTextAsync(tale, """
                 === start
@@ -309,9 +309,12 @@ public sealed class DebuggerTests
             await driver.ActivateAsync("Override flag:ready");
             await driver.ActivateAsync("Value flag:ready");
             await driver.ClickAsync("Start selected scene");
-            var snapshot = await WaitFor(driver, "Late scene 1000.");
+            await WaitFor(driver, "Late scene 1000.");
+            await driver.ActivateAsync("Timeline");
+            var snapshot = await WaitFor(driver, "Synthetic history");
             Assert.Contains("Synthetic history", snapshot.Content);
             Assert.Contains("Seed: 42", snapshot.Content);
+            await driver.ActivateAsync("Branches");
             await driver.FillAsync("Filter decisions", "step:4999:1");
             snapshot = await WaitFor(driver, "ConditionTrue");
             Assert.Contains("Offered", snapshot.Content);
@@ -371,9 +374,12 @@ public sealed class DebuggerTests
             var updated = original.Replace("Before reload.", "After reload.").Replace("count += 1", "count += 2");
             await File.WriteAllTextAsync(temp, updated);
             File.Move(temp, tale, overwrite: true);
-            snapshot = await WaitFor(driver, "After reload. Alex.", "Reload boundary: current", "Seed: 42");
+            snapshot = await WaitFor(driver, "After reload. Alex.", "Reload boundary: current");
             Assert.Contains("Reload boundary: current", snapshot.Content);
+            await driver.ActivateAsync("Timeline");
+            snapshot = await WaitFor(driver, "Seed: 42");
             Assert.Contains("Seed: 42", snapshot.Content);
+            await driver.ActivateAsync("State");
             await driver.ActivateAsync("Flags, variables, factions, visits and triggers");
             snapshot = await WaitFor(driver, "var:count (integer) = 2");
             Assert.Contains("current visits: 1", snapshot.Content);
@@ -383,13 +389,18 @@ public sealed class DebuggerTests
             await File.WriteAllTextAsync(tale, updated.Replace("After reload.", "After YAML restart."));
             snapshot = await WaitFor(driver, "Source compiled, but explicit Restart from source is required");
             Assert.DoesNotContain("After YAML restart.", snapshot.Content);
-            await driver.ClickAsync("Restart from source");
-            await WaitFor(driver, "Restarted title");
+            await driver.ClickByNameAsync("Files");
+            await driver.ClickMenuItemAsync("Restart from source");
+            snapshot = await WaitFor(driver, "Source restarted");
+            Assert.DoesNotContain("Restart required.", snapshot.Content);
+            await driver.ActivateAsync("Setup");
             await driver.ClickAsync("Start story");
             await driver.ClickAsync("Start selected scene");
             await driver.ChooseAsync("Go");
-            snapshot = await WaitFor(driver, "After YAML restart. Alex.");
-            Assert.Contains("Seed: 42", snapshot.Content);
+            await WaitFor(driver, "After YAML restart. Alex.");
+            await driver.ActivateAsync("Setup");
+            snapshot = await WaitFor(driver, "Seed (empty uses story/random default)");
+            Assert.Contains("42", Assert.Single(snapshot.Descendants(), node => node.Name == "Seed").Text);
             await File.WriteAllTextAsync(tale, updated.Replace("[Go]", "[Changed positional meaning]")
                 .Replace("After reload.", "Incompatible progress."));
             snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "After YAML restart. Alex.");
@@ -448,20 +459,26 @@ public sealed class DebuggerTests
             await driver.FillAsync("Seed", "42");
             await driver.ClickAsync("Start selected scene");
             await WaitFor(driver, "Live count 1.");
+            await driver.ActivateAsync("State");
             await driver.ActivateAsync("Live edit values");
             await driver.ActivateAsync("Edit flag:ready");
             await driver.ActivateAsync("Edit value flag:ready");
             await driver.ActivateAsync("Edit var:count");
             await driver.FillAsync("Edit value var:count", "7");
             await driver.ClickAsync("Apply live edit batch");
+            await driver.ActivateAsync("Timeline");
             var snapshot = await WaitFor(driver, "Live count 17.", "Position 1 / 1.");
             Assert.Contains("Prepared", snapshot.Content);
+            await driver.ActivateAsync("Timeline");
             await driver.ActivateAsync("Command history and consequences");
             snapshot = await WaitFor(driver, "var:count: 1 to 17", "TriggerFired");
             Assert.Contains("reward", snapshot.Content);
+            await driver.ActivateAsync("Setup");
             await driver.FillAsync("Target scene ID", "target");
             await driver.ClickAsync("Jump retaining state");
+            await driver.ActivateAsync("Timeline");
             await WaitFor(driver, "Target count 19.", "Position 2 / 2.");
+            await driver.ActivateAsync("Timeline");
             await driver.ClickAsync("Back command");
             await WaitFor(driver, "Live count 17.", "Position 1 / 2.");
             await driver.ClickAsync("Forward command");
@@ -503,6 +520,7 @@ public sealed class DebuggerTests
             await driver.StartAsync(root);
             await WaitFor(driver, "Scene setup");
             await driver.ClickAsync("Start selected scene");
+            await driver.ActivateAsync("Source");
             await WaitFor(driver, "Accepted file: first.tale", "lines 2 to 3 (inclusive)", "// FIRST FILE SOURCE");
             await driver.ChooseAsync("Go");
             await WaitFor(driver, "Accepted file: late.tale", "lines 208 to 211 (inclusive)", "// OLD ACCEPTED SOURCE");
@@ -511,9 +529,13 @@ public sealed class DebuggerTests
             Assert.DoesNotContain("// OLD ACCEPTED SOURCE", snapshot.Content);
             await driver.ClickAsync("Go to current scene source");
             await WaitFor(driver, "Showing accepted lines 205 to 211 of 211", "// OLD ACCEPTED SOURCE");
+            await driver.ActivateAsync("Timeline");
             await driver.ClickAsync("Back command");
+            await driver.ActivateAsync("Source");
             await WaitFor(driver, "Accepted file: first.tale", "// FIRST FILE SOURCE");
+            await driver.ActivateAsync("Timeline");
             await driver.ClickAsync("Forward command");
+            await driver.ActivateAsync("Source");
             await WaitFor(driver, "Accepted file: late.tale", "// OLD ACCEPTED SOURCE");
 
             await File.WriteAllTextAsync(latePath, "// inserted line\n" + late.Replace("OLD ACCEPTED SOURCE", "NEW ACCEPTED SOURCE"));
@@ -553,6 +575,7 @@ public sealed class DebuggerTests
             await driver.StartAsync(root);
             await WaitFor(driver, "Scene setup");
             await driver.ClickAsync("Start selected scene");
+            await driver.ActivateAsync("Source");
             await WaitFor(driver, "Showing accepted lines 1 to 100 of 152");
             await driver.ActivateAsync("Read-only accepted source lines");
             await driver.PressAsync("End");
@@ -653,22 +676,30 @@ public sealed class DebuggerTests
                 await driver.FillAsync("Value var:count", "7");
                 await driver.ClickAsync("Start selected scene");
                 await WaitFor(driver, "Before scene1000. Count 7. Robin.");
+                await driver.ActivateAsync("Branches");
                 await driver.FillAsync("Filter decisions", "step:4999:1");
                 await WaitFor(driver, "ConditionTrue", "Offered");
                 source = source.Replace("Before scene1000.", "After scene1000.");
                 await File.WriteAllTextAsync(tale, source);
                 await WaitFor(driver, "After scene1000. Count 7. Robin.", "Reload boundary: scene1000");
+                await driver.ActivateAsync("State");
                 await driver.ActivateAsync("Live edit values");
                 await driver.ActivateAsync("Edit var:count");
                 await driver.FillAsync("Edit value var:count", "19");
                 await driver.ClickAsync("Apply live edit batch");
+                await driver.ActivateAsync("Timeline");
                 await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 1 / 1.");
                 await driver.ChooseAsync("Prepared");
                 await WaitFor(driver, "Check passage.", "Rolls: 1", "Position 2 / 2.");
+                await driver.ActivateAsync("Setup");
                 await driver.ClickAsync("Jump retaining state");
+                await driver.ActivateAsync("Timeline");
                 await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 3 / 3.", "Rolls: 1");
+                await driver.ActivateAsync("Timeline");
                 await driver.ClickAsync("Back command");
                 await WaitFor(driver, "Check passage.", "Position 2 / 3.", "Rolls: 1");
+                await driver.ClickByNameAsync("Files");
+                await driver.ClickMenuItemAsync("Portable author scenarios");
                 await driver.FillAsync("Scenario file path", scenario);
                 await driver.ClickAsync("Export synthetic scenario");
                 await WaitFor(driver, "Synthetic scenario exported:");
@@ -681,13 +712,22 @@ public sealed class DebuggerTests
             {
                 await driver.StartAsync(story);
                 await WaitFor(driver, "Scene setup");
+                await driver.ClickByNameAsync("Files");
+                await driver.ClickMenuItemAsync("Portable author scenarios");
                 await driver.FillAsync("Scenario file path", scenario);
                 await driver.ClickAsync("Import exact scenario");
-                await WaitFor(driver, "Exact synthetic scenario imported", "Check passage.", "Position 2 / 3.", "Rolls: 1", "Seed: 42");
+                await WaitFor(driver, "Exact synthetic scenario imported; complete replay and redo verified.");
+                await driver.ClickAsync("Close");
+                await driver.ActivateAsync("Timeline");
+                await WaitFor(driver, "Check passage.", "Position 2 / 3.", "Rolls: 1", "Seed: 42");
+                await driver.ClickByNameAsync("Files");
+                await driver.ClickMenuItemAsync("Portable author scenarios");
                 await driver.FillAsync("Scenario file path", secondExport);
                 await driver.ClickAsync("Export synthetic scenario");
                 await WaitFor(driver, "Synthetic scenario exported:");
                 Assert.Equal(bytes, await File.ReadAllBytesAsync(secondExport));
+                await driver.ClickAsync("Close");
+                await driver.ActivateAsync("Timeline");
                 await driver.ClickAsync("Forward command");
                 await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 3 / 3.", "Rolls: 1");
                 Assert.Equal(0, await driver.CloseWindowAsync());
@@ -894,13 +934,223 @@ public sealed class DebuggerTests
         }
     }
 
+    [Fact]
+    public async Task Native_debugger_workspace_navigates_tools_and_tracks_the_current_scene()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-workspace-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-workspace", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: workspace-debug\n  title: Workspace Debug\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                A beginning.
+                * [Continue] -> next
+                === next
+                @title Later
+                The next passage.
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await EnsureToolsVisible(driver);
+            var snapshot = await WaitFor(driver, "Scene setup");
+            foreach (var tab in new[] { "Setup", "State", "Source", "Branches", "Timeline", "Events", "Problems" })
+                Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == tab);
+
+            await driver.ClickAsync("Start selected scene");
+            snapshot = await WaitFor(driver, "Beginning");
+            if (!snapshot.Descendants().Any(node =>
+                    node.Role == "separator" && node.Name == "Resize inspector"))
+            {
+                await driver.ClickToggleAsync("Inspector");
+            }
+            snapshot = await WaitFor(driver, "Scene inspector", "Beginning");
+            await driver.ActivateAsync("Resize inspector");
+            await driver.PressAsync("Home");
+            snapshot = await driver.SnapshotAsync();
+            var homeX = snapshot.Descendants().Single(node =>
+                node.Role == "separator" && node.Name == "Resize inspector").Bounds.X;
+            await driver.PressAsync("Right");
+            snapshot = await WaitForSplitterMove(driver, "Resize inspector", homeX);
+            Assert.True(snapshot.Descendants().Single(node =>
+                node.Role == "separator" && node.Name == "Resize inspector").Bounds.X > homeX);
+
+            await driver.ActivateAsync("Setup");
+            await driver.PressAsync("Right");
+            snapshot = await WaitFor(driver, "Live edit values");
+            Assert.Equal("State", Focused(snapshot).Name);
+
+            await driver.ClickToggleAsync("Tools");
+            await WaitForToggle(driver, "Tools", false);
+            await driver.ClickAsync("Source up to date");
+            snapshot = await WaitFor(driver, "Problems");
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "toggle button" && node.Name == "Tools" && node.Pressed);
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Problems");
+            Assert.DoesNotContain("Live edit values", snapshot.Content);
+
+            await driver.ChooseAsync("Continue");
+            snapshot = await WaitFor(driver, "Scene inspector", "Later");
+            Assert.Contains("The next passage.", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Native_debugger_inspect_mode_selects_choices_without_choosing_and_escape_exits()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-inspect-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-inspect", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: inspect-debug\n  title: Inspect Debug\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                A beginning.
+                * [Continue] -> next
+                === next
+                @title Later
+                The next passage.
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await EnsureToolsVisible(driver);
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Beginning", "Continue");
+            if (!snapshot.Descendants().Any(node =>
+                    node.Role == "separator" && node.Name == "Resize inspector"))
+                await driver.ClickToggleAsync("Inspector");
+            snapshot = await WaitFor(driver, "Scene inspector", "Beginning", "Continue");
+            var choice = Assert.Single(snapshot.Descendants(), node =>
+                node.Role == "push button" && node.Name.Contains("Continue", StringComparison.Ordinal));
+            var passage = Assert.Single(snapshot.Descendants(), node => node.Name == "Current passage");
+            Assert.True(choice.Bounds.Width > 0 && choice.Bounds.Height > 0);
+            Assert.True(passage.Bounds.Width > 0 && passage.Bounds.Height > 0);
+
+            await driver.ClickToggleAsync("Inspect");
+            await driver.ClickAtAsync(
+                (int)Math.Round(choice.Bounds.X + choice.Bounds.Width / 2),
+                (int)Math.Round(choice.Bounds.Y + choice.Bounds.Height / 2));
+            snapshot = await WaitFor(driver, "Choice inspector", "Label", "Continue");
+            var sceneViewer = Assert.Single(snapshot.Descendants(), node => node.Name == "Scene viewer");
+            Assert.Contains("Beginning", sceneViewer.Content);
+            Assert.DoesNotContain("Later", sceneViewer.Content);
+
+            await driver.ClickToggleAsync("Inspect");
+            await driver.ClickAtAsync(
+                (int)Math.Round(passage.Bounds.X + passage.Bounds.Width / 2),
+                (int)Math.Round(passage.Bounds.Y + passage.Bounds.Height / 2));
+            snapshot = await WaitFor(driver, "Scene inspector", "Beginning");
+            Assert.DoesNotContain("Choice inspector", snapshot.Content);
+            await driver.ChooseAsync("Continue");
+            await WaitFor(driver, "Scene inspector", "Later");
+            await driver.ClickAsync("Back");
+            await WaitFor(driver, "Scene inspector", "Beginning");
+
+            await driver.ClickToggleAsync("Inspect");
+            await driver.ActivateAsync(choice.Name);
+            snapshot = await WaitFor(driver, "Choice inspector", "Label", "Continue");
+            sceneViewer = Assert.Single(snapshot.Descendants(), node => node.Name == "Scene viewer");
+            Assert.Contains("Beginning", sceneViewer.Content);
+            Assert.DoesNotContain("Later", sceneViewer.Content);
+
+            await driver.ClickToggleAsync("Inspect");
+            await WaitForToggle(driver, "Inspect", true);
+            await driver.PressAsync("Escape");
+            await WaitForToggle(driver, "Inspect", false);
+            await driver.ClickAtAsync(
+                (int)Math.Round(choice.Bounds.X + choice.Bounds.Width / 2),
+                (int)Math.Round(choice.Bounds.Y + choice.Bounds.Height / 2));
+            snapshot = await WaitFor(driver, "Scene inspector", "Later", "The next passage.");
+            Assert.DoesNotContain("Choice inspector", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static async Task WaitForToggle(NativePlayerDriver driver, string name, bool pressed)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (true)
+        {
+            var toggle = (await driver.SnapshotAsync()).Descendants()
+                .Single(node => node.Role == "toggle button" && node.Name == name);
+            if (toggle.Pressed == pressed)
+                return;
+            try
+            {
+                await Task.Delay(100, timeout.Token);
+            }
+            catch (OperationCanceledException error) when (timeout.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"Timed out waiting for toggle '{name}' to be {(pressed ? "pressed" : "released")}.",
+                    error);
+            }
+        }
+    }
+
     private static async Task<AccessibleNode> WaitFor(NativePlayerDriver driver, params string[] texts)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var snapshot = await driver.SnapshotAsync();
+        while (true)
+        {
+            if (texts.All(text => snapshot.Content.Contains(text, StringComparison.Ordinal)))
+            {
+                return snapshot;
+            }
+            try
+            {
+                await Task.Delay(100, timeout.Token);
+            }
+            catch (OperationCanceledException error) when (timeout.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"Timed out waiting for {string.Join(", ", texts)}. Last snapshot: {snapshot.Content}", error);
+            }
+            snapshot = await driver.SnapshotAsync();
+        }
+    }
+
+    private static async Task EnsureToolsVisible(NativePlayerDriver driver)
+    {
+        var snapshot = await WaitFor(driver, "Start a scene from Setup to begin a synthetic playtest.");
+        if (!snapshot.Content.Contains("Scene setup", StringComparison.Ordinal))
+        {
+            await driver.ClickToggleAsync("Tools");
+            await WaitFor(driver, "Scene setup");
+        }
+    }
+
+    private static async Task<AccessibleNode> WaitForSplitterMove(NativePlayerDriver driver, string name, double x)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         while (true)
         {
             var snapshot = await driver.SnapshotAsync();
-            if (texts.All(text => snapshot.Content.Contains(text, StringComparison.Ordinal)))
+            if (snapshot.Descendants().Any(node =>
+                    node.Role == "separator" && node.Name == name && node.Bounds.X > x))
             {
                 return snapshot;
             }

@@ -1,0 +1,128 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<header class="debugger-toolbar">
+    <div class="toolbar-main">
+        <div role="tablist" aria-label="Main view" class="main-view-tabs">
+            <button type="button" role="tab" id="play-tab" aria-controls="play-panel"
+                    aria-selected="@(MapSelected ? "false" : "true")" tabindex="@(MapSelected ? -1 : 0)"
+                    @ref="_sceneTab" @onclick="() => SelectMainView(false)" @onkeydown="MainViewKey">
+                Scene
+            </button>
+            <button type="button" role="tab" id="map-tab"
+                    aria-controls="@(MapOpened ? "map-panel" : null)"
+                    aria-selected="@(MapSelected ? "true" : "false")" tabindex="@(MapSelected ? 0 : -1)"
+                    @ref="_mapTab" @onclick="() => SelectMainView(true)" @onkeydown="MainViewKey">
+                Map
+            </button>
+        </div>
+        <button type="button" disabled="@(Session?.CanBack != true)" @onclick="OnBack">Back</button>
+        <button type="button" disabled="@(Session?.CanForward != true)" @onclick="OnForward">Forward</button>
+        <button type="button" disabled="@(Story is null)" @onclick="OnRestartScene">Restart scene</button>
+        <button type="button" aria-pressed="@(InspectMode ? "true" : "false")" disabled="@MapSelected" @onclick="OnToggleInspect">Inspect</button>
+        <button type="button" disabled="@(!SettingsReady)" @onclick="OnOpenReaderSettings">Reader settings</button>
+        <button type="button" aria-expanded="@_filesOpen" aria-haspopup="menu" @onclick="ToggleFiles">Files</button>
+        <button type="button" @onclick="() => _helpOpen = true">Help</button>
+        <button type="button" class="source-status" @onclick="OnShowProblems">@SourceStatus</button>
+    </div>
+    <div class="toolbar-layout">
+        <button type="button" aria-pressed="@(InspectorVisible ? "true" : "false")" @onclick="OnToggleInspector">Inspector</button>
+        <button type="button" aria-pressed="@(ToolsVisible ? "true" : "false")" @onclick="OnToggleTools">Tools</button>
+    </div>
+    @if (_filesOpen)
+    {
+        <div role="menu" aria-label="Files" class="files-menu">
+            <button type="button" role="menuitem" @onclick="OpenScenarios">Portable author scenarios</button>
+            <button type="button" role="menuitem" @onclick="OpenPlayerSave">Read player save</button>
+            <button type="button" role="menuitem" @onclick="Rescan">Rescan / retry watcher</button>
+            <button type="button" role="menuitem" @onclick="Restart">Restart from source</button>
+        </div>
+    }
+    @if (_helpOpen)
+    {
+        <div class="debugger-dialog-backdrop">
+            <section role="dialog" aria-modal="true" aria-label="Debugger help" class="debugger-dialog">
+                <button type="button" class="dialog-close" @onclick="() => _helpOpen = false">Close</button>
+                <h2>Talewright Author Debugger</h2>
+                <p>Story folder: @Model.Root</p>
+                <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
+                <p>Saved Talemark changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
+            </section>
+        </div>
+    }
+</header>
+
+@code {
+    private bool _filesOpen;
+    private bool _helpOpen;
+    private ElementReference _sceneTab;
+    private ElementReference _mapTab;
+
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter] public StoryDefinition? Story { get; set; }
+    [Parameter] public AuthorSession? Session { get; set; }
+    [Parameter] public bool InspectMode { get; set; }
+    [Parameter] public bool InspectorVisible { get; set; }
+    [Parameter] public bool ToolsVisible { get; set; }
+    [Parameter] public bool MapSelected { get; set; }
+    [Parameter] public bool MapOpened { get; set; }
+    [Parameter] public bool SettingsReady { get; set; }
+    [Parameter] public EventCallback<bool> OnSelectMainView { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback OnForward { get; set; }
+    [Parameter] public EventCallback OnRestartScene { get; set; }
+    [Parameter] public EventCallback OnToggleInspect { get; set; }
+    [Parameter] public EventCallback OnToggleInspector { get; set; }
+    [Parameter] public EventCallback OnToggleTools { get; set; }
+    [Parameter] public EventCallback OnOpenReaderSettings { get; set; }
+    [Parameter] public EventCallback OnOpenScenarios { get; set; }
+    [Parameter] public EventCallback OnOpenPlayerSave { get; set; }
+    [Parameter] public EventCallback OnRescan { get; set; }
+    [Parameter] public EventCallback OnRestart { get; set; }
+    [Parameter] public EventCallback OnShowProblems { get; set; }
+
+    private string SourceStatus => Model.RestartRequired ? "Restart required"
+        : Model.SourceRejected ? "Source not adopted"
+        : Model.SourcePending ? "Source change pending"
+        : "Source up to date";
+
+    private Task SelectMainView(bool map)
+    {
+        _filesOpen = false;
+        return OnSelectMainView.InvokeAsync(map);
+    }
+
+    private async Task MainViewKey(KeyboardEventArgs args)
+    {
+        if (args.Key is not ("ArrowLeft" or "ArrowRight" or "Home" or "End"))
+            return;
+        var map = args.Key switch { "Home" => false, "End" => true, _ => !MapSelected };
+        await OnSelectMainView.InvokeAsync(map);
+        await (map ? _mapTab : _sceneTab).FocusAsync();
+    }
+
+    private void ToggleFiles() => _filesOpen = !_filesOpen;
+
+    private async Task OpenScenarios()
+    {
+        _filesOpen = false;
+        await OnOpenScenarios.InvokeAsync();
+    }
+
+    private async Task OpenPlayerSave()
+    {
+        _filesOpen = false;
+        await OnOpenPlayerSave.InvokeAsync();
+    }
+
+    private async Task Rescan()
+    {
+        _filesOpen = false;
+        await OnRescan.InvokeAsync();
+    }
+
+    private async Task Restart()
+    {
+        _filesOpen = false;
+        await OnRestart.InvokeAsync();
+    }
+}

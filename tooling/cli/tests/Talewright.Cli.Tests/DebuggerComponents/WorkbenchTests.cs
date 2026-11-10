@@ -12,6 +12,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
 {
     Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
     private readonly BunitJSModuleInterop _settingsModule;
+    private readonly BunitJSModuleInterop _layoutModule;
 
     async Task IAsyncLifetime.DisposeAsync()
     {
@@ -28,22 +29,29 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<MapExportDialog>();
         JSInterop.SetupModule("./_content/Talewright.Player/Preferences/PlayerPreferences.js");
         _settingsModule = JSInterop.SetupModule("./_content/Talewright.Player/Components/ReaderSettingsDialog.razor.js");
+        _layoutModule = JSInterop.SetupModule("./debugger/workspace.js");
+        _layoutModule.Setup<DebuggerWorkspace.WorkspaceLayout>("loadLayout")
+            .SetResult(new(70, 68, false, false, 1400, true));
         Services.AddScoped<Talewright.Player.Preferences.PlayerPreferencesStore>();
         ComponentStory.WriteTo(_root.FullName);
     }
 
     [Fact]
-    public void Loads_the_story_from_disk_ready_to_set_up()
+    public async Task Loads_the_story_from_disk_ready_to_set_up()
     {
         var workbench = Show();
 
-        Assert.Equal(_root.FullName, workbench.Find("main > p").TextContent);
-        Assert.Equal("Debugger components", workbench.Find("main > h2").TextContent);
-        Assert.Equal(["Play", "Map"], workbench.FindAll("[role=tab]").Select(tab => tab.TextContent));
+        Assert.NotNull(workbench.Find(".debugger-workspace"));
         Assert.Equal("Debugger components", workbench.FindComponent<SetupTool>().Instance.Story.Title);
-        Assert.NotNull(workbench.FindComponent<ScenarioTransfer>());
+        Assert.Equal(["Scene", "Map"], workbench.FindAll("#play-tab, #map-tab").Select(tab => tab.TextContent.Trim()));
+        Assert.Empty(workbench.FindComponents<ScenarioTransfer>());
         Assert.Empty(workbench.FindAll("section[aria-label='Synthetic playtest']"));
         Assert.Empty(workbench.FindAll("[role=alert]"));
+
+        await Button(workbench, "Files").ClickAsync(new MouseEventArgs());
+        await Button(workbench, "Portable author scenarios").ClickAsync(new MouseEventArgs());
+        Assert.NotNull(workbench.FindComponent<ScenarioTransfer>());
+        Assert.Equal("Portable author scenarios", workbench.Find("[role=dialog]").GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -61,9 +69,77 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Assert.Same(model.Session, workbench.FindComponent<LiveEditTool>().Instance.Session);
         Assert.Same(model.Session, workbench.FindComponent<InitializationEvents>().Instance.Session);
         Assert.Same(model.Session, workbench.FindComponent<SceneViewer>().Instance.Session);
-        Assert.Same(model.Inspection, workbench.FindComponent<InspectionPanel>().Instance.Inspection);
+        Assert.Same(model.Inspection, workbench.FindComponent<BranchesTool>().Instance.Inspection);
+        Assert.Same(model.Inspection, workbench.FindComponent<EventLog>().Instance.Inspection);
         Assert.Contains("Scene hall source range", workbench.FindComponent<SourceTool>().Markup);
         Assert.Equal("hall Great Hall", workbench.Find("h3.debugger-scene-heading").TextContent);
+    }
+
+    [Fact]
+    public async Task Pane_visibility_toggles_restore_and_persist_the_layout()
+    {
+        var workbench = Show();
+        Assert.Equal(2, workbench.FindAll("[role=separator]").Count);
+
+        await Button(workbench, "Inspector").ClickAsync(new MouseEventArgs());
+        Assert.Single(workbench.FindAll("[role=separator]"));
+        await Button(workbench, "Inspector").ClickAsync(new MouseEventArgs());
+        Assert.Equal(2, workbench.FindAll("[role=separator]").Count);
+
+        await Button(workbench, "Tools").ClickAsync(new MouseEventArgs());
+        Assert.Single(workbench.FindAll("[role=separator]"));
+        var savedLayout = Assert.IsType<DebuggerWorkspace.WorkspaceLayout>(
+            _layoutModule.Invocations["saveLayout"].Last().Arguments[0]);
+        Assert.False(savedLayout.InspectorCollapsed);
+        Assert.True(savedLayout.ToolsCollapsed);
+
+        await Button(workbench, "Tools").ClickAsync(new MouseEventArgs());
+        Assert.Equal(2, workbench.FindAll("[role=separator]").Count);
+    }
+
+    [Fact]
+    public async Task Source_status_opens_problems_and_restores_collapsed_tools()
+    {
+        var workbench = Show();
+        await Button(workbench, "Tools").ClickAsync(new MouseEventArgs());
+        Assert.Empty(workbench.FindComponents<ToolTabs>());
+
+        await workbench.Find(".source-status").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("true", Button(workbench, "Tools").GetAttribute("aria-pressed"));
+        Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
+        Assert.False(workbench.Find("#tool-problems-panel").HasAttribute("hidden"));
+        var savedLayout = Assert.IsType<DebuggerWorkspace.WorkspaceLayout>(
+            _layoutModule.Invocations["saveLayout"].Last().Arguments[0]);
+        Assert.False(savedLayout.ToolsCollapsed);
+
+        await workbench.Find("#tool-setup-tab").ClickAsync(new MouseEventArgs());
+        var saveCount = _layoutModule.Invocations["saveLayout"].Count;
+        await workbench.Find(".source-status").ClickAsync(new MouseEventArgs());
+        Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
+        Assert.False(workbench.Find("#tool-problems-panel").HasAttribute("hidden"));
+        Assert.Equal(saveCount, _layoutModule.Invocations["saveLayout"].Count);
+    }
+
+    [Fact]
+    public async Task Switching_tool_tabs_preserves_the_mounted_tool_and_its_pending_edits()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        await workbench.Find("#tool-state-tab").ClickAsync(new MouseEventArgs());
+        var tool = workbench.FindComponent<LiveEditTool>().Instance;
+        await workbench.Find("input[aria-label='Edit var:count']").ChangeAsync(new ChangeEventArgs { Value = true });
+        await workbench.Find("input[aria-label='Edit value var:count']").ChangeAsync(new ChangeEventArgs { Value = "42" });
+
+        await workbench.Find("#tool-source-tab").ClickAsync(new MouseEventArgs());
+        Assert.True(workbench.Find("#tool-state-panel").HasAttribute("hidden"));
+        Assert.Same(tool, workbench.FindComponent<LiveEditTool>().Instance);
+
+        await workbench.Find("#tool-state-tab").ClickAsync(new MouseEventArgs());
+        Assert.False(workbench.Find("#tool-state-panel").HasAttribute("hidden"));
+        Assert.Same(tool, workbench.FindComponent<LiveEditTool>().Instance);
+        Assert.True(workbench.Find("input[aria-label='Edit var:count']").HasAttribute("checked"));
+        Assert.Equal("42", workbench.Find("input[aria-label='Edit value var:count']").GetAttribute("value"));
     }
 
     [Fact]
@@ -188,6 +264,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
 
         File.WriteAllText(Path.Combine(_root.FullName, "main.tale"), ComponentStory.Tale.Replace("-> cave", "-> nowhere"));
+        await Button(workbench, "Files").ClickAsync(new MouseEventArgs());
         await Button(workbench, "Rescan / retry watcher").ClickAsync(new MouseEventArgs());
 
         workbench.WaitForAssertion(() => Assert.Contains(workbench.FindAll("p[role=status]"),
@@ -208,12 +285,13 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
             ComponentStory.Yaml.Replace("title: Debugger components", "title: Renamed story"));
         workbench.WaitForAssertion(() => Assert.Contains(workbench.FindAll("p[role=status]"),
             status => status.TextContent.StartsWith("Restart required.", StringComparison.Ordinal)), Reload);
-        Assert.Equal("Debugger components", workbench.Find("main > h2").TextContent);
+        Assert.Equal("Debugger components", workbench.FindComponent<SetupTool>().Instance.Story.Title);
         Assert.NotEmpty(workbench.FindAll("section[aria-label='Synthetic playtest']"));
 
+        await Button(workbench, "Files").ClickAsync(new MouseEventArgs());
         await Button(workbench, "Restart from source").ClickAsync(new MouseEventArgs());
 
-        workbench.WaitForAssertion(() => Assert.Equal("Renamed story", workbench.Find("main > h2").TextContent), Reload);
+        workbench.WaitForAssertion(() => Assert.Equal("Renamed story", workbench.FindComponent<SetupTool>().Instance.Story.Title), Reload);
         Assert.DoesNotContain(workbench.FindAll("p[role=status]"),
             status => status.TextContent.StartsWith("Restart required.", StringComparison.Ordinal));
         Assert.Empty(workbench.FindAll("section[aria-label='Synthetic playtest']"));
@@ -245,10 +323,10 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
 
     private void AssertFocus(IRenderedComponent<Workbench> workbench, int count, string tabId)
     {
-        var fieldName = tabId == "map-tab" ? "_mapTab" : "_playTab";
+        var fieldName = tabId == "map-tab" ? "_mapTab" : "_sceneTab";
         var reference = Assert.IsType<ElementReference>(
-            typeof(Workbench).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!
-                .GetValue(workbench.Instance));
+            typeof(DebuggerToolbar).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(workbench.FindComponent<DebuggerToolbar>().Instance));
         Assert.Equal(reference, JSInterop.VerifyFocusAsyncInvoke(count).Last().Arguments[0]);
     }
 

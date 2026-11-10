@@ -1,0 +1,14 @@
+.scene-inspector dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: .3rem .8rem;
+}
+
+.scene-inspector dt {
+    font-weight: 600;
+}
+
+.scene-inspector dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}

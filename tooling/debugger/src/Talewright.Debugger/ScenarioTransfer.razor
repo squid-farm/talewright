@@ -7,10 +7,17 @@
     <button type="button" @onclick="OnImport">Import exact scenario</button>
     <p>Adoption is explicit and creates a new synthetic scenario against accepted source, not a migration. It revalidates the full timeline and reports replay differences. Engine/extensions and story ID must still match. Import never rewrites the original file.</p>
     <button type="button" @onclick="OnAdopt">Adopt scenario to accepted source</button>
-    <PlayerSaveFork Model="Model" OnImport="OnPlayerSaveImport" />
+    @if (IncludePlayerSaveFork)
+    {
+        <PlayerSaveFork Model="Model" OnImport="OnPlayerSaveImport" />
+    }
     @if (Model.ScenarioStatus is { } scenarioStatus)
     {
         <p role="status">@scenarioStatus</p>
+    }
+    @if (Model.Error is { } error)
+    {
+        <p role="alert" class="tw-error">@error</p>
     }
 </section>
 
@@ -20,4 +27,5 @@
     [Parameter] public EventCallback OnImport { get; set; }
     [Parameter] public EventCallback OnAdopt { get; set; }
     [Parameter] public EventCallback OnPlayerSaveImport { get; set; }
+    [Parameter] public bool IncludePlayerSaveFork { get; set; } = true;
 }

@@ -1,0 +1,26 @@
+<div class="debugger-status-line" aria-label="Debugger status">
+    @if (Model.RestartRequired)
+    {
+        <p role="status">Restart required. The last good compiled story/run is still displayed. Correct or disable incompatible setup before restarting.</p>
+    }
+    @if (Model.ReloadStatus is { } reloadStatus)
+    {
+        <p role="status">@reloadStatus</p>
+    }
+    @if (Model.RequestedSceneNotice is { } requestedSceneNotice)
+    {
+        <p role="status">@requestedSceneNotice</p>
+    }
+    @if (Model.SourceRejected)
+    {
+        <p role="status">Source not adopted. Displayed story and playtest, if any, use the last successful compilation.</p>
+    }
+    @if (Model.Error is { } error)
+    {
+        <p role="alert" class="tw-error">@error</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+}

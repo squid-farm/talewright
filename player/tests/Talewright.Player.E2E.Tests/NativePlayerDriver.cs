@@ -5,7 +5,8 @@ using System.Text.RegularExpressions;
 namespace Talewright.Player.E2E.Tests;
 
 public sealed record AccessibleNode(
-    string Name, string Role, string Text, bool Focused, bool Enabled, PlayerBounds Bounds, AccessibleNode[] Children)
+    string Name, string Role, string Text, bool Focused, bool Enabled, bool Pressed, PlayerBounds Bounds,
+    AccessibleNode[] Children)
 {
     public IEnumerable<AccessibleNode> Descendants() =>
         new[] { this }.Concat(Children.SelectMany(child => child.Descendants()));
@@ -155,6 +156,13 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task OpenBundledAsync() => await CommandAsync("click", new { pattern = @".* Built-in$", role = "push button" });
     public async Task ClickAsync(string name) =>
         await CommandAsync("click", new { name, role = "push button" });
+    public async Task ClickByNameAsync(string name) =>
+        await CommandAsync("click", new { name });
+    public async Task ClickToggleAsync(string name) =>
+        await CommandAsync("click", new { name, role = "toggle button" });
+    public async Task ClickMenuItemAsync(string name) =>
+        await CommandAsync("click", new { name, role = "menu item" });
+    public async Task ClickAtAsync(int x, int y) => await CommandAsync("click-at", new { x, y });
     public async Task ClickWithinAsync(string name, string within) =>
         await CommandAsync("click", new { name, role = "push button", within });
     public async Task ChooseAsync(string label) =>
