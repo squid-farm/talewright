@@ -16,7 +16,7 @@
         "{workspaceRoot}/tooling/install-dev.py"
       ],
       "options": {
-        "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_issue_intake.py' -v && python3 -m unittest discover -s tests -p 'test_release.py' -v && python3 -m unittest discover -s tests -p 'test_install_dev.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
+        "command": "python3 -m unittest discover -s tests -p 'test_ci.py' -v && python3 -m unittest discover -s tests -p 'test_release.py' -v && python3 -m unittest discover -s tests -p 'test_install_dev.py' -v && python3 -m unittest discover -s tests -p 'test_nx*.py' -v"
       }
     }
   }

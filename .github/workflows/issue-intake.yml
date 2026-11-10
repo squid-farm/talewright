@@ -5,18 +5,19 @@ on:
     types: [opened]
 
 permissions:
-  contents: read
   issues: write
 
 jobs:
   triage:
+    if: >-
+      ${{ !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association)
+          && !contains(github.event.issue.labels.*.name, 'status:triage') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - name: Mark external submissions for triage
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/issue_intake.py
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: gh issue edit "$ISSUE_NUMBER" --add-label status:triage
