@@ -122,6 +122,27 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Switching_tool_tabs_preserves_the_mounted_tool_and_its_pending_edits()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        await workbench.Find("#tool-state-tab").ClickAsync(new MouseEventArgs());
+        var tool = workbench.FindComponent<LiveEditTool>().Instance;
+        await workbench.Find("input[aria-label='Edit var:count']").ChangeAsync(new ChangeEventArgs { Value = true });
+        await workbench.Find("input[aria-label='Edit value var:count']").ChangeAsync(new ChangeEventArgs { Value = "42" });
+
+        await workbench.Find("#tool-source-tab").ClickAsync(new MouseEventArgs());
+        Assert.True(workbench.Find("#tool-state-panel").HasAttribute("hidden"));
+        Assert.Same(tool, workbench.FindComponent<LiveEditTool>().Instance);
+
+        await workbench.Find("#tool-state-tab").ClickAsync(new MouseEventArgs());
+        Assert.False(workbench.Find("#tool-state-panel").HasAttribute("hidden"));
+        Assert.Same(tool, workbench.FindComponent<LiveEditTool>().Instance);
+        Assert.True(workbench.Find("input[aria-label='Edit var:count']").HasAttribute("checked"));
+        Assert.Equal("42", workbench.Find("input[aria-label='Edit value var:count']").GetAttribute("value"));
+    }
+
+    [Fact]
     public async Task Initializes_reader_settings_before_use_without_a_mounted_reader()
     {
         var workbench = Show();
