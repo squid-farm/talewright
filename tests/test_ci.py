@@ -165,7 +165,8 @@ class DebuggerIsolationTests(unittest.TestCase):
                 self.assertIn("<ReaderPresentation>", source)
                 self.assertIn("<StoryStage ", source)
 
-        self.assertIn("<ReaderSettingsDialog ", (self.DEBUGGER / "Workbench.razor").read_text())
+        self.assertIn("<DebuggerWorkspace ", (self.DEBUGGER / "Workbench.razor").read_text())
+        self.assertIn("<ReaderSettingsDialog ", (self.DEBUGGER / "DebuggerWorkspace.razor").read_text())
         self.assertFalse(any(self.DEBUGGER.rglob("ReaderSettingsDialog.razor")))
 
     def test_debugger_styles_are_isolated_and_never_target_player_classes(self):
