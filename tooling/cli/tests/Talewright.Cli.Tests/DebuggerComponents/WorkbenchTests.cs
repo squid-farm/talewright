@@ -98,6 +98,30 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Source_status_opens_problems_and_restores_collapsed_tools()
+    {
+        var workbench = Show();
+        await Button(workbench, "Tools").ClickAsync(new MouseEventArgs());
+        Assert.Empty(workbench.FindComponents<ToolTabs>());
+
+        await workbench.Find(".source-status").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("true", Button(workbench, "Tools").GetAttribute("aria-pressed"));
+        Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
+        Assert.False(workbench.Find("#tool-problems-panel").HasAttribute("hidden"));
+        var savedLayout = Assert.IsType<DebuggerWorkspace.WorkspaceLayout>(
+            _layoutModule.Invocations["saveLayout"].Last().Arguments[0]);
+        Assert.False(savedLayout.ToolsCollapsed);
+
+        await workbench.Find("#tool-setup-tab").ClickAsync(new MouseEventArgs());
+        var saveCount = _layoutModule.Invocations["saveLayout"].Count;
+        await workbench.Find(".source-status").ClickAsync(new MouseEventArgs());
+        Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
+        Assert.False(workbench.Find("#tool-problems-panel").HasAttribute("hidden"));
+        Assert.Equal(saveCount, _layoutModule.Invocations["saveLayout"].Count);
+    }
+
+    [Fact]
     public async Task Initializes_reader_settings_before_use_without_a_mounted_reader()
     {
         var workbench = Show();

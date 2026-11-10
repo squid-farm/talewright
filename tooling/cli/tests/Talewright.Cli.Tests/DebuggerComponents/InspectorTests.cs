@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Talewright.Core.Identity;
 using Talewright.Debugger;
+using Talewright.Rules.Diagnostics;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 
@@ -29,6 +30,39 @@ public sealed class InspectorTests : BunitContext
         Assert.Contains("Visit count", inspector.Markup);
         Assert.Contains("requires", inspector.Markup);
         Assert.Contains("flag:ready", inspector.Markup);
+    }
+
+    [Fact]
+    public void Scene_inspector_shows_the_storylet_requirement_evaluated_at_the_hub()
+    {
+        var files = ComponentStory.Files();
+        files["main.tale"] = """
+            === hall
+            @hub adventure
+            * [Leave] -> END
+            === cave
+            @title Cave
+            @tags adventure
+            @requires flag:ready
+            * [Leave] -> END
+            """;
+        using var model = ComponentStory.Load(files);
+        var ready = model.Flags.Single(flag => flag.Id.Value == "ready");
+        ready.Enabled = true;
+        ready.Value = true;
+        model.Start();
+        ComponentStory.Choose(model, "Cave");
+
+        var decision = Assert.Single(model.Inspection!.Decisions,
+            item => item.Kind == DecisionKind.Storylet && item.Subject == "cave" && item.Expression is not null);
+        Assert.Equal("hall", decision.Scene?.Value);
+        var inspector = Render<SceneInspector>(parameters => parameters
+            .Add(component => component.Scene, model.Story!.GetScene(new SceneId("cave")))
+            .Add(component => component.Inspection, model.Inspection));
+
+        Assert.Contains("flag:ready", inspector.Markup);
+        Assert.Equal("true", inspector.Find("strong").TextContent);
+        Assert.DoesNotContain("Not evaluated in this run.", inspector.Markup);
     }
 
     [Fact]

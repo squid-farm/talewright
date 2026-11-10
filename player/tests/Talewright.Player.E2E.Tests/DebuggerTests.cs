@@ -46,12 +46,14 @@ public sealed class DebuggerTests
             Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Map");
             Assert.DoesNotContain("Scenes on the map", snapshot.Content);
 
+            await driver.ClickToggleAsync("Tools");
             await driver.ActivateAsync("Scene");
             await driver.PressAsync("Right");
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 1 hub offer, 1 unreachable.");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export SVG");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export PNG");
             Assert.Equal("Map", Focused(snapshot).Name);
+            Assert.DoesNotContain("Scene setup", snapshot.Content);
 
             await driver.ActivateAsync("The gate (start), start");
             snapshot = await WaitFor(driver, "Diverts: 2");
@@ -109,6 +111,7 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 0 hub offers, 2 unreachable.");
             Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
 
+            await driver.ClickToggleAsync("Tools");
             await driver.ActivateAsync("Scene");
             snapshot = await WaitFor(driver, "Scene setup");
             Assert.DoesNotContain(snapshot.Descendants(),
@@ -984,6 +987,14 @@ public sealed class DebuggerTests
             await driver.PressAsync("Right");
             snapshot = await WaitFor(driver, "Live edit values");
             Assert.Equal("State", Focused(snapshot).Name);
+
+            await driver.ClickToggleAsync("Tools");
+            await WaitForToggle(driver, "Tools", false);
+            await driver.ClickAsync("Source up to date");
+            snapshot = await WaitFor(driver, "Problems");
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "toggle button" && node.Name == "Tools" && node.Pressed);
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Problems");
+            Assert.DoesNotContain("Live edit values", snapshot.Content);
 
             await driver.ChooseAsync("Continue");
             snapshot = await WaitFor(driver, "Scene inspector", "Later");

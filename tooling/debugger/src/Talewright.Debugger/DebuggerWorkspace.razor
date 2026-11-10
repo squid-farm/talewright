@@ -64,7 +64,7 @@
             <ToolTabs Selected="@_selectedTool" SelectedChanged="SelectTool"
                       Setup="SetupPanel" State="StatePanel" Source="SourcePanel"
                       Branches="BranchesPanel" Timeline="TimelinePanel" Events="EventsPanel"
-                      Problems="ProblemsPanel" @ref="_toolTabs" />
+                      Problems="ProblemsPanel" />
         </SecondPane>
     </SplitPane>
     @if (_settingsMounted)
@@ -111,7 +111,6 @@
     private ReaderSettingsDialog _settingsDialog = default!;
     private IJSObjectReference? _layoutModule;
     private DotNetObjectReference<DebuggerWorkspace>? _reference;
-    private ToolTabs _toolTabs = default!;
     private MapView? _routeMap;
     private StoryDefinition? _routeStory;
 
@@ -285,7 +284,14 @@
         return Task.CompletedTask;
     }
 
-    private void ShowProblems() => _toolTabs.Select("Problems");
+    private Task ShowProblems()
+    {
+        _selectedTool = "Problems";
+        if (!_toolsCollapsed)
+            return Task.CompletedTask;
+        _toolsCollapsed = false;
+        return SaveLayout();
+    }
 
     private void OpenFileDialog(FileDialog dialog) => _fileDialog = dialog;
     private void CloseFileDialog() => _fileDialog = null;

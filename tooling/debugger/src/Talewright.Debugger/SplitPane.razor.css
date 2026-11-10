@@ -13,6 +13,14 @@
     grid-template-rows: minmax(0, var(--split-size)) .35rem minmax(0, 1fr);
 }
 
+.split-horizontal.split-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.split-vertical.split-collapsed {
+    grid-template-rows: minmax(0, 1fr);
+}
+
 .split-first,
 .split-second {
     min-width: 0;

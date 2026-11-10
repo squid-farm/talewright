@@ -50,7 +50,7 @@
     [Parameter] public AuthorInspection? Inspection { get; set; }
 
     private RuleDecision? LatestRequirement => Inspection?.Decisions.LastOrDefault(decision =>
-        decision.Scene == Scene.Id && decision.Kind == DecisionKind.Storylet &&
+        decision.Kind == DecisionKind.Storylet &&
         decision.Subject == Scene.Id.Value && decision.Expression is not null);
     private string HubTags => Scene.Hub is { } hub
         ? $"{(hub.MatchAll ? "all " : "any ")}{string.Join(", ", hub.Tags.Select(tag => $"#{tag}"))}"

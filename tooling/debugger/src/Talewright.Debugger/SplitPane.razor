@@ -3,7 +3,7 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<div @ref="_container" class="split-pane @(Orientation == "Horizontal" ? "split-horizontal" : "split-vertical")"
+<div @ref="_container" class="split-pane @(Orientation == "Horizontal" ? "split-horizontal" : "split-vertical") @(Collapsed ? "split-collapsed" : "")"
      style="--split-size:@($"{Size.ToString(CultureInfo.InvariantCulture)}%")">
     <div class="split-first">@FirstPane</div>
     @if (!Collapsed)
