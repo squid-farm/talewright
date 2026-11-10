@@ -28,34 +28,8 @@ These steps apply to people and coding agents alike.
 6. **Keep GitHub current.** Put scope changes and new tasks in GitHub. Keep the architecture and
    specification docs in this folder in line with what the code actually does.
 
-## Issue intake
-
-The **Issue Intake** workflow applies `status:triage` to new issues from external users,
-including submissions through the API. Owners, organization members, and repository
-collaborators do not need to label their own issues. Having contributed previously does
-not bypass triage. The workflow preserves existing labels and does not relabel an issue
-when it is reopened. After reviewing an external submission, a maintainer removes
-`status:triage` if it is accepted or closes it if it is not.
-
-Issue templates are not the routing mechanism: API-created issues bypass them.
-The workflow uses the repository's built-in token; no additional secret is required.
-The repository label `status:triage` must exist before the workflow runs.
-
-Project membership is handled separately by GitHub's built-in **Auto-add to project**
-workflow. In the Development project's **Workflows** menu, select this repository,
-set the filter to `is:issue is:open`, and save and enable the workflow. Set the
-**Item added to project** workflow's default status to **Backlog**. Auto-add must be
-enabled through GitHub's UI; its configuration is not exposed by the public API.
-Enabling it does not backfill existing issues.
-
-With auto-add enabled, all new open issues belong to the project, including external
-reports awaiting triage. The **Triage** view uses `is:open label:status:triage`;
-**Backlog** and **Current work** exclude `status:triage`. Current work is also
-restricted to Ready, In progress, and In review. Triage is a label and view, not
-an additional project status, so removing the label makes an accepted report
-visible in Backlog without another status change.
-If auto-add is not enabled, add issues explicitly or make them sub-issues of an
-epic already in the project.
+Adding an issue to the repository doesn't always add it to the project. Add it explicitly, or make
+it a sub-issue of an epic that is already in the project.
 
 ```bash
 gh issue list --repo squid-farm/talewright --state open --limit 100
