@@ -155,7 +155,10 @@ whatever its condition.
 in declaration order followed by END; each node includes its id, title, tags and reachability.
 `Diverts` and `HubOffers` reuse the compiler's shared map data and include the conditions described above.
 Reachability follows diverts and hub offers only. It does not evaluate conditions or decide whether a
-player can meet them.
+player can meet them. `Connections(sceneId)` returns both incoming and outgoing connections for a scene:
+outgoing diverts precede hub offers, while incoming connections follow source-scene declaration order and
+then each source's divert and offer order. A self-divert appears in both lists, END remains an outgoing
+target, and an unknown scene id returns empty lists.
 
 ## Scene details (Preview)
 

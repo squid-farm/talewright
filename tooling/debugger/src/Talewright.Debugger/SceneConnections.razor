@@ -1,0 +1,107 @@
+@using Talewright.Runtime
+@using Talewright.Talemark.Model
+
+<section class="scene-connections" aria-label="Scene connections">
+    <h3>Connections</h3>
+    <details open="@_expanded">
+        <summary @onclick="ToggleExpanded" @onclick:preventDefault="true">
+            @_connections.Incoming.Count in · @_connections.Outgoing.Count out
+        </summary>
+        <div class="scene-connections-groups">
+            <section aria-label="Incoming connections">
+                <h4>In</h4>
+                <ul>
+                    @foreach (var connection in _connections.Incoming)
+                    {
+                        <li>
+                            <span class="scene-connection-other">← @OtherScene(connection, incoming: true)</span>
+                            <span>@Name(connection)</span>
+                            @if (IsTaken(connection))
+                            {
+                                <strong>taken</strong>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+            <section aria-label="Outgoing connections">
+                <h4>Out</h4>
+                <ul>
+                    @foreach (var connection in _connections.Outgoing)
+                    {
+                        <li>
+                            <span class="scene-connection-other">→ @OtherScene(connection, incoming: false)</span>
+                            <span>@Name(connection)</span>
+                            @if (IsTaken(connection))
+                            {
+                                <strong>taken</strong>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        </div>
+    </details>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+    [Parameter, EditorRequired] public SceneDefinition Scene { get; set; } = null!;
+    [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public bool Expanded { get; set; } = true;
+    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
+
+    private StoryMap? _storyMap;
+    private StoryDefinition? _indexedStory;
+    private StorySceneConnections _connections = new([], []);
+    private HashSet<string> _takenItemIds = new(StringComparer.Ordinal);
+    private bool _expanded = true;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_indexedStory, Story))
+        {
+            _indexedStory = Story;
+            _storyMap = StoryMap.Build(Story);
+        }
+
+        _connections = _storyMap!.Connections(Scene.Id);
+        _takenItemIds = Run?.Steps
+            .Where(step => step.TakenItemId is not null)
+            .Select(step => step.TakenItemId!)
+            .ToHashSet(StringComparer.Ordinal) ?? new(StringComparer.Ordinal);
+        _expanded = Expanded;
+    }
+
+    private Task ToggleExpanded()
+    {
+        _expanded = !_expanded;
+        return ExpandedChanged.InvokeAsync(_expanded);
+    }
+
+    private static string OtherScene(StoryConnection connection, bool incoming) => connection switch
+    {
+        StoryConnection.DivertConnection divert => incoming
+            ? divert.Divert.From.Value
+            : divert.Divert.Target.ToString(),
+        StoryConnection.HubOfferConnection offer => incoming
+            ? offer.Offer.Hub.Value
+            : offer.Offer.Scene.Value,
+        _ => throw new ArgumentOutOfRangeException(nameof(connection)),
+    };
+
+    private string Name(StoryConnection connection) => connection switch
+    {
+        StoryConnection.DivertConnection divert => MapView.DivertName(divert.Divert),
+        StoryConnection.HubOfferConnection offer =>
+            MapView.HubOfferName(offer.Offer, Story.GetScene(offer.Offer.Scene)),
+        _ => throw new ArgumentOutOfRangeException(nameof(connection)),
+    };
+
+    private bool IsTaken(StoryConnection connection) => connection switch
+    {
+        StoryConnection.DivertConnection divert => _takenItemIds.Contains(divert.Divert.Id),
+        StoryConnection.HubOfferConnection offer => _takenItemIds.Contains(offer.Offer.Id),
+        _ => throw new ArgumentOutOfRangeException(nameof(connection)),
+    };
+}

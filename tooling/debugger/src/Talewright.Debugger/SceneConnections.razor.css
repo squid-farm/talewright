@@ -1,0 +1,35 @@
+.scene-connections {
+    margin-top: 1rem;
+}
+
+.scene-connections summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.scene-connections-groups {
+    display: grid;
+    gap: .75rem;
+}
+
+.scene-connections h4 {
+    margin: .6rem 0 .25rem;
+}
+
+.scene-connections ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.scene-connections li {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    gap: .25rem .5rem;
+    margin: .25rem 0;
+    overflow-wrap: anywhere;
+}
+
+.scene-connection-other {
+    font-family: var(--tw-font-monospace, monospace);
+}

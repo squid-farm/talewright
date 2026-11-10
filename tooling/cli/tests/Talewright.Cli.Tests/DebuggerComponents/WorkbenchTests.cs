@@ -31,7 +31,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         _settingsModule = JSInterop.SetupModule("./_content/Talewright.Player/Components/ReaderSettingsDialog.razor.js");
         _layoutModule = JSInterop.SetupModule("./debugger/workspace.js");
         _layoutModule.Setup<DebuggerWorkspace.WorkspaceLayout>("loadLayout")
-            .SetResult(new(70, 68, false, false, 1400, true));
+            .SetResult(new(70, 68, false, false, 1400, true, true));
         Services.AddScoped<Talewright.Player.Preferences.PlayerPreferencesStore>();
         ComponentStory.WriteTo(_root.FullName);
     }
@@ -73,6 +73,22 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Assert.Same(model.Inspection, workbench.FindComponent<EventLog>().Instance.Inspection);
         Assert.Contains("Scene hall source range", workbench.FindComponent<SourceTool>().Markup);
         Assert.Equal("hall Great Hall", workbench.Find("h3.debugger-scene-heading").TextContent);
+    }
+
+    [Fact]
+    public async Task Scene_connections_expansion_is_saved_with_the_workspace_layout()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+
+        var details = workbench.Find(".scene-connections details");
+        Assert.True(details.HasAttribute("open"));
+        await details.QuerySelector("summary")!.ClickAsync(new MouseEventArgs());
+
+        Assert.False(workbench.Find(".scene-connections details").HasAttribute("open"));
+        var savedLayout = Assert.IsType<DebuggerWorkspace.WorkspaceLayout>(
+            _layoutModule.Invocations["saveLayout"].Last().Arguments[0]);
+        Assert.False(savedLayout.ConnectionsExpanded);
     }
 
     [Fact]

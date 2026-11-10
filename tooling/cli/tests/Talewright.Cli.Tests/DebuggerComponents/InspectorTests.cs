@@ -20,6 +20,7 @@ public sealed class InspectorTests : BunitContext
         var compilation = StoryCompiler.Compile(new StorySource(files));
         var scene = model.Story!.GetScene(new SceneId("hall"));
         var inspector = Render<SceneInspector>(parameters => parameters
+            .Add(component => component.Story, model.Story)
             .Add(component => component.Scene, scene)
             .Add(component => component.SourceMap, compilation.SourceMap)
             .Add(component => component.Session, model.Session)
@@ -57,6 +58,7 @@ public sealed class InspectorTests : BunitContext
             item => item.Kind == DecisionKind.Storylet && item.Subject == "cave" && item.Expression is not null);
         Assert.Equal("hall", decision.Scene?.Value);
         var inspector = Render<SceneInspector>(parameters => parameters
+            .Add(component => component.Story, model.Story)
             .Add(component => component.Scene, model.Story!.GetScene(new SceneId("cave")))
             .Add(component => component.Inspection, model.Inspection));
 

@@ -23,7 +23,8 @@ How it's built:
   restore a normal save before forking into isolated author history.
 - **Workspace.** `DebuggerWorkspace` keeps the scene or map in the main view, with a resizable inspector
   and bottom tool tabs for setup, state, source, branches, timeline, events and problems. Split sizes and
-  collapsed panes persist in `localStorage` under `talewright.debugger.layout`. Inspect mode captures
+  collapsed panes and the scene-connections disclosure persist in `localStorage` under
+  `talewright.debugger.layout`. Inspect mode captures
   scene-viewer clicks and focused-choice keys so selection does not advance the playtest; toggle it from
   the toolbar or with Ctrl+Shift+C, and press Esc to exit.
 - **Reader presentation.** The scene view and map preview use Player's `ReaderPresentation` and
@@ -68,3 +69,5 @@ How it's built:
   same-directory replacement. `wwwroot/map/vendor` pins elkjs 0.12.1 and a d3-zoom bundle (d3-zoom 3.0.0
   and its dependencies), with notices in `THIRD-PARTY-NOTICES.md` and license files beside them, so the map
   works offline. ELK stays an authoring-tool dependency and must not ship in games.
+- **Scene connections.** The scene inspector shows a compact, ordered text list of incoming and outgoing
+  diverts and hub offers. Connections taken in the current playtest are marked in text.
