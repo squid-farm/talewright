@@ -135,14 +135,16 @@ whatever its condition.
 
 - **`StoryDivert`**: from-scene, target (a scene or END), `DivertKind` (scene divert, choice, choice skill
   check outcome, entry check outcome), source order and, for choices, the choice key, label template (none
-  for a textless choice) and `requires`. Its enclosing block `{if}`s are kept as compiled expressions.
+  for a textless choice), `requires` and `shown`. `ChoiceShown` is null for non-choice diverts and choices
+  without `shown`. Its enclosing block `{if}`s are kept as compiled expressions.
   `Condition` exposes their formatted parts, a combined Talemark expression and the state reads in first-use
   order. An `{else}` part is formatted as a negation. Conditions are described, not evaluated.
   The id is the scene, the step id of the divert's line and `success`/`failure` for a skill check outcome,
   e.g. `camp/step:12:1/success`; like step ids, it changes when lines move.
 - **`HubOffer`**: a hub scene to each other scene matching its tags, ignoring `@hub-limit`, with the hub's
-  tag query. `Condition` describes the offered scene's `@requires`; `Once` reports whether it has `@once`.
-  A hub that always diverts before reaching its choices offers nothing. The id is `hub/hub:offered`,
+  tag query. `Condition` describes the offered scene's `@requires`; `Shown` carries its `shown` definition;
+  `Once` reports whether it has `@once`. A hub that always diverts before reaching its choices offers nothing.
+  The id is `hub/hub:offered`,
   e.g. `camp/hub:camp.well`.
 - **`StoryCondition`**, **`StoryStateRead`** and **`StoryStateReadKind`**: `Parts` keeps the conditions
   separate; `Text` combines them with `and` while preserving grouping. `Reads` lists distinct references

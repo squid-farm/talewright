@@ -163,7 +163,7 @@ public static class StoryletSelector
                     showWhenUnavailable = result.ShowWhenUnavailable;
                     trace = result.Trace;
                 }
-                if (!available)
+                if (!available && !showWhenUnavailable)
                 {
                     excluded = DecisionReason.ConditionFalse;
                 }
@@ -222,6 +222,16 @@ public static class StoryletSelector
             else if (!duplicate && (limit is null || selected.Count < limit))
             {
                 selected.Add((storylet, IsAvailable: false));
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Offered, DecisionReason.ConditionFalse, trace, eventIndex, eventIndex,
+                    Priority: storylet.Priority, Limit: limit));
+            }
+            else
+            {
+                var reason = duplicate ? DecisionReason.Duplicate : DecisionReason.HubLimit;
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Excluded, reason, trace, eventIndex, eventIndex,
+                    Priority: storylet.Priority, Limit: limit));
             }
         }
         return selected.AsReadOnly();

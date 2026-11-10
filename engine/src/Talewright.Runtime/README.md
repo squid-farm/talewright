@@ -248,6 +248,11 @@ and limits are included where relevant. Never present a historical condition
 result as a fresh evaluation against later state. A fresh jump replaces the
 timeline; old inspection objects remain unchanged.
 
+For hub offers, an unavailable scene with `shown` records `Offered` /
+`ConditionFalse` when it enters the menu, or `Excluded` / `HubLimit` when the
+limit drops it. Duplicate shown offers are `Excluded` / `Duplicate`. Hidden
+unavailable offers remain `Excluded` / `ConditionFalse`.
+
 The expression tree retains the evaluator's actual operand/results, including
 effective stat values. A null expression result means **not evaluated**, not
 false. Short-circuit branches, later diverts and choices suppressed by an entry
