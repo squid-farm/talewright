@@ -1,9 +1,17 @@
 @inject WorkbenchModel Model
+@inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 @implements IAsyncDisposable
 
 <CascadingValue Value="Model.Images">
 <main class="author-workbench">
-    <h1>Talewright Author Debugger</h1>
+    <header class="debugger-header">
+        <h1>Talewright Author Debugger</h1>
+        <button type="button" disabled="@(!_settingsReady)" @onclick="OpenReaderSettings">Reader settings</button>
+    </header>
+    @if (_preferencesReady)
+    {
+        <ReaderSettingsDialog @ref="_settingsDialog" OnReady="SettingsReady" />
+    }
     <p>@Model.Root</p>
     <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
     <p>Saved Talemark changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
@@ -74,8 +82,22 @@
 
 @code {
     private StoryReloadWatcher _watcher = null!;
+    private ReaderSettingsDialog _settingsDialog = default!;
+    private bool _preferencesReady;
+    private bool _settingsReady;
+
+    private Task SettingsReady()
+    {
+        _settingsReady = true;
+        return Task.CompletedTask;
+    }
+
+    private Task OpenReaderSettings() => _settingsDialog.OpenAsync();
+
     protected override async Task OnInitializedAsync()
     {
+        await Preferences.InitializeAsync();
+        _preferencesReady = true;
         _watcher = new(Model, action => InvokeAsync(action), StateHasChanged);
         await _watcher.RescanAsync(restart: true);
     }

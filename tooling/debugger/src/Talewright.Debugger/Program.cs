@@ -31,8 +31,10 @@ internal static class Program
             var root = Path.GetFullPath(play ? args[1] : args[0]);
             using var files = new PhysicalFileProvider(Path.Combine(AppContext.BaseDirectory,
                 play ? "player-assets" : "debug-assets"));
-            using var playerFiles = play ? new PhysicalFileProvider(Path.GetFullPath(args[2])) : null;
-            IFileProvider fileProvider = playerFiles is null ? files : new PlayerAssetFileProvider(files, playerFiles);
+            using var playerFiles = new PhysicalFileProvider(play
+                ? Path.GetFullPath(args[2])
+                : Path.Combine(AppContext.BaseDirectory, "publish-assets/player"));
+            IFileProvider fileProvider = new PlayerAssetFileProvider(files, playerFiles);
             var builder = PhotinoBlazorAppBuilder.CreateDefault(fileProvider, args);
             PlayerLaunchOptions? player = null;
             MapExportDialog? mapExportDialog = null;
@@ -60,6 +62,8 @@ internal static class Program
             }
             else
             {
+                builder.Services.AddScoped<PlayerDiagnostics>();
+                builder.Services.AddScoped<PlayerPreferencesStore>();
                 builder.Services.AddSingleton(new WorkbenchModel(root, debuggerScene));
                 mapExportDialog = new MapExportDialog();
                 builder.Services.AddSingleton(mapExportDialog);
@@ -85,19 +89,8 @@ internal static class Program
                 app.MainWindow.ShowMessage(play ? "Talewright error" : "Author Debugger error",
                     e.ExceptionObject.ToString());
             };
-            try
-            {
-                app.Run();
-            }
-            finally
-            {
-                // Player components dispose through the webview dispatcher, which has stopped here.
-                // Like the desktop host, the short-lived player process exits without awaiting it.
-                if (!play)
-                {
-                    app.WindowManager.DisposeAsync().AsTask().GetAwaiter().GetResult();
-                }
-            }
+            // Shared player components dispose their JavaScript modules on the WebView dispatcher.
+            app.Run();
             return 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DllNotFoundException

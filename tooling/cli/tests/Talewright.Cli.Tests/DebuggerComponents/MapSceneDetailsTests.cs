@@ -33,12 +33,12 @@ public sealed class MapSceneDetailsTests : BunitContext
         var html = Show("start").Markup;
 
         Assert.Contains("aria-label=\"Scene details\"", html);
-        Assert.Contains("<h3>Start (start)</h3>", html);
-        Assert.Contains("<h4>Diverts: 1</h4>", html);
-        Assert.Contains("<ul aria-label=\"Diverts\">", html);
+        Assert.Matches("<h3\\b[^>]*>Start \\(start\\)</h3>", html);
+        Assert.Matches("<h4\\b[^>]*>Diverts: 1</h4>", html);
+        Assert.Matches("<ul\\b[^>]*aria-label=\"Diverts\"[^>]*>", html);
         Assert.Contains("Divert to road, main.tale line 3", html);
-        Assert.Contains("<h4>Hub offers: 1</h4>", html);
-        Assert.Contains("<ul aria-label=\"Hub offers\">", html);
+        Assert.Matches("<h4\\b[^>]*>Hub offers: 1</h4>", html);
+        Assert.Matches("<ul\\b[^>]*aria-label=\"Hub offers\"[^>]*>", html);
         Assert.Contains("Hub offer of Well (well) via #water", html);
     }
 

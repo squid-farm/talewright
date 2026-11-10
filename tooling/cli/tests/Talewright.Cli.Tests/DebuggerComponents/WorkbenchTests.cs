@@ -8,8 +8,17 @@ using Talewright.Debugger;
 
 namespace Talewright.Cli.Tests.DebuggerComponents;
 
-public sealed class WorkbenchTests : BunitContext
+public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
 {
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+    private readonly BunitJSModuleInterop _settingsModule;
+
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _root.Delete(recursive: true);
+    }
+
     private static readonly TimeSpan Reload = TimeSpan.FromSeconds(10);
     private readonly DirectoryInfo _root = Directory.CreateTempSubdirectory("talewright-workbench-");
 
@@ -17,6 +26,9 @@ public sealed class WorkbenchTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton<MapExportDialog>();
+        JSInterop.SetupModule("./_content/Talewright.Player/Preferences/PlayerPreferences.js");
+        _settingsModule = JSInterop.SetupModule("./_content/Talewright.Player/Components/ReaderSettingsDialog.razor.js");
+        Services.AddScoped<Talewright.Player.Preferences.PlayerPreferencesStore>();
         ComponentStory.WriteTo(_root.FullName);
     }
 
@@ -51,7 +63,22 @@ public sealed class WorkbenchTests : BunitContext
         Assert.Same(model.Session, workbench.FindComponent<SceneViewer>().Instance.Session);
         Assert.Same(model.Inspection, workbench.FindComponent<InspectionPanel>().Instance.Inspection);
         Assert.Contains("Scene hall source range", workbench.FindComponent<SourceTool>().Markup);
-        Assert.Equal("hall Great Hall", workbench.Find("section[aria-label='Current passage'] h3").TextContent);
+        Assert.Equal("hall Great Hall", workbench.Find("h3.debugger-scene-heading").TextContent);
+    }
+
+    [Fact]
+    public async Task Initializes_reader_settings_before_use_without_a_mounted_reader()
+    {
+        var workbench = Show();
+        workbench.WaitForAssertion(() => Assert.False(Button(workbench, "Reader settings").HasAttribute("disabled")));
+        Assert.Empty(workbench.FindAll("[aria-label='Current passage']"));
+
+        await Button(workbench, "Reader settings").ClickAsync(new MouseEventArgs());
+        var dialog = workbench.FindComponent<Talewright.Player.Components.ReaderSettingsDialog>();
+        await dialog.Find("#tw-theme").ChangeAsync(new ChangeEventArgs { Value = "Dark" });
+
+        Assert.Single(_settingsModule.Invocations["open"]);
+        Assert.Equal("Dark", dialog.Find("#tw-theme").GetAttribute("value"));
     }
 
     [Fact]
@@ -192,13 +219,6 @@ public sealed class WorkbenchTests : BunitContext
         Assert.Empty(workbench.FindAll("section[aria-label='Synthetic playtest']"));
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        if (disposing)
-            _root.Delete(recursive: true);
-    }
-
     private IRenderedComponent<Workbench> Show(string? requestedScene = null)
     {
         Services.AddSingleton(new WorkbenchModel(_root.FullName, requestedScene));
@@ -210,7 +230,7 @@ public sealed class WorkbenchTests : BunitContext
     }
 
     private static string Passage(IRenderedComponent<Workbench> workbench) =>
-        workbench.Find("section[aria-label='Current passage'] h3").TextContent;
+        workbench.Find("h3.debugger-scene-heading").TextContent;
 
     private static IElement Tab(IRenderedComponent<Workbench> workbench, string id) => workbench.Find($"#{id}");
 

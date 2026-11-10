@@ -21,6 +21,9 @@ How it's built:
   to UI fields and inspection snapshots. The workbench reuses Player rendering and creation components,
   has its own `debug-assets` root, and never writes player save storage. Explicit file imports
   restore a normal save before forking into isolated author history.
+- **Reader presentation.** The scene view and map preview use Player's `ReaderPresentation` and
+  `StoryStage`, so their rendering and choices match the player. Reader settings are the player's
+  settings and apply at the root of the debugger window.
 - **Reload.** `StoryReloadWatcher` watches saved changes, creates, deletes and renames, debounces editor
   bursts, and compiles one complete source snapshot at a time off the UI thread. Generation checks
   discard superseded results, including at commit after runtime reconstruction. Play and swaps share the
