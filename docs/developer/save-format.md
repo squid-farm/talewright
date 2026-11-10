@@ -33,8 +33,8 @@ The body is an array-keyed MessagePack object. Its positions are the schema:
 | 8 | Replay evidence | nil or a 33-byte binary value: evidence version followed by a SHA-256 digest |
 | 9 | Replay choice identities | nil or an array of binary choice-outcome identities, one per choice |
 
-Replay evidence and replay choice identities are either both present or both `nil`. Missing trailing
-fields are still accepted by the reader, but saves without evidence have no v1 cross-revision guarantee.
+Replay evidence and replay choice identities are either both present or both `nil`. The reader
+accepts missing trailing fields, but saves without evidence can only be loaded by the exact same story revision.
 
 The character array is `[first name, last name, pronouns, preset, stats]`. Optional strings are
 `nil`; `stats` is an array of `[id, value]` arrays, sorted by id before writing. The summary array
@@ -50,8 +50,7 @@ The reader requires the decoded length to equal the declared length and the file
 body's Adler-32 checksum. .NET's `ZLibStream` accepts a truncated stream or one missing its checksum,
 so these checks are done explicitly.
 
-Saves written by earlier players (JSON, format 2), the previous proposed protobuf format 3, and
-unknown format versions are reported as unsupported. There is no migration.
+Any other format version is reported as unsupported. There is no migration between format versions.
 
 ## Array-key rules
 
@@ -131,14 +130,14 @@ means saved evidence would change: keep the old encoding, or deliberately bump t
 and record the compatibility decision. From 1.0.0-preview.1, saves made by a preview must keep loading:
 changing evidence is a compatibility break under the
 [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze), which needs a project-lead decision,
-a version bump and migration notes. The golden save tests
-([#570](https://github.com/squid-farm/talewright/issues/570)) load real saves to prove gameplay is unchanged.
+a version bump and migration notes. The
+[golden save tests](../../engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/README.md) load real saves to prove gameplay is unchanged.
 
 Prose, label, unrelated-choice, ordering, and availability-requirement changes can be compatible.
 Changed starting values or recorded gameplay outcomes are not. This checks a replay path, not a saved
 state snapshot, and does not provide general state mappings or save-format migration.
 
-Saves without evidence have no v1 cross-revision compatibility guarantee. Reopening and re-saving
+Saves without evidence only load against the exact same story revision. Reopening and re-saving
 such a save is not an approved migration path. Stories without a replay/extension identity remain
 exact-revision only. The author-facing guidance is in
 [Sharing your story](../guide/sharing-your-story.md) and

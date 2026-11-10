@@ -2,10 +2,6 @@
 
 Every problem Talewright reports has a code and a location:
 
-Diagnostic codes are defined in assembly-owned catalogs: `CompilerDiagnosticCodes`,
-`AuthoringDiagnosticCodes`, `LanguageServerDiagnosticCodes` and `CliDiagnosticCodes`.
-These catalogs are the source of truth; the reference tables are checked against them.
-
 ```text
 chapters/03-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 └── file ─────────────┘ │  │         └ code ┘ └ message ──────────────┘
@@ -17,6 +13,10 @@ Talewright reports only mistakes it can be certain of from the source. It trusts
 variables to do what you intend; problems that depend on how a playthrough goes, such as a scene
 where no choice is available, show up when you playtest.
 When you see several errors, fix the first one and check again: one mistake can cause others.
+
+For contributors: codes are defined in the `CompilerDiagnosticCodes`, `AuthoringDiagnosticCodes`,
+`LanguageServerDiagnosticCodes` and `CliDiagnosticCodes` catalogs. Tests check the tables on this
+page against them.
 
 ## TW1xxx: writing mistakes in `.tale` files
 

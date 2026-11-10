@@ -1,9 +1,9 @@
 # UI test container image
 
-The browser and Linux Photino UI workflows run in a prebuilt public image:
-
-- `ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1`
-- Definition: [.github/docker/ui-tests/](../../.github/docker/ui-tests)
+The browser and Linux Photino UI workflows run in a prebuilt public image,
+`ghcr.io/squid-farm/talewright-ui-tests`. Its definition is in
+[.github/docker/ui-tests/](../../.github/docker/ui-tests), and the current tag is in
+[image.json](../../.github/docker/ui-tests/image.json).
 
 The image includes:
 
@@ -40,79 +40,31 @@ image is published only when it changes:
 - `workflow_dispatch` on `main` publishes the current tag only if it is missing (for example, to retry
   a failed publish). Existing tags are never overwritten.
 
-Suggested rollout:
+To roll out a new image:
 
 1. Update the image definition and bump the tag in `image.json` (`pw<playwright>-r<revision>`).
 2. Merge; the push to `main` publishes the new tag.
 3. Copy the published immutable digest from the workflow summary.
-4. Update consuming workflow references.
-5. Verify browser and native jobs on a PR.
+4. Update the image references in `tests.yml` and `performance.yml`.
+5. Verify the browser and native jobs on a PR.
 
-The repository layout migration updates the image's verifier to read the player
-test project under `player/tests`, so its candidate definition uses `pw1.63.0-r2`.
-Runtime dependencies are unchanged. Consumer workflows intentionally stay on
-the already-published `r1` image and run the verifier from the checkout; they
-must not point at `r2` until the publisher has validated and published it.
+The consuming workflows can lag behind `image.json`: they keep using the last image they were
+switched to until step 4. The verifier always runs from the checkout.
 
-Do not publish PR code, do not use mutable `latest`, and do not replace an existing version tag with different content.
+Don't publish PR code, don't use a mutable `latest` tag, and never replace an existing tag with
+different content. The package must stay public; a private or missing package stops the UI jobs
+from starting, including on fork PRs. Rebuild under a new revision to pick up distro security
+updates; WebKitGTK inside an existing image never updates itself.
 
-After the first publication, set the package visibility to public and verify an anonymous pull before
-enabling consumer jobs. A private or missing package prevents those jobs from starting, including fork PRs.
-Rebuild under a new revision for distro security updates; installed WebKitGTK packages do not update
-themselves inside an existing image.
+## Running as non-root with Nx
 
-The initial `pw1.63.0-r1` image has been published and its anonymous manifest access verified.
-Its digest is `sha256:d636d1fc9c49ff2eaa65341c1056738b35a2b4dac8e455df2738b8c9da091469`.
-
-## Nx handoff
-
-This change incorporates the `a533824` handoff and subsequent `394d6c6` update (including the `ddee903`
-main/schema integration) from `feature/123-nx-orchestration`. Containerized jobs
-retain its affected-job selection, Nx runner commands, artifact paths, and standalone coverage.
-The image provides Node 22/npm for those commands; it does not replace Nx.
-Image-definition changes select CI contracts plus this workflow's independent candidate build,
-browser story-loading tests and native probe, rather than the entire product suite.
-Changes to the consumer workflow references select their driven groups according to the
-[CI-infrastructure matrix](nx-ci.md#ci-infrastructure-change-matrix).
+The image only provides dependencies (including Node 22/npm for Nx); it doesn't replace Nx. Jobs keep
+their Nx affected-job selection, runner commands and artifact paths. Changes to the image definition
+select the CI contracts plus this workflow's candidate build, browser story-loading tests and native
+probe, not the whole product suite. Changes to the consuming workflow references select the groups
+they drive; see the [CI-infrastructure matrix](nx-ci.md#ci-infrastructure-change-matrix).
 
 Non-root jobs need a writable checkout (including `.nx/installation`), home directory, npm cache,
 and NuGet cache. GitHub-hosted Ubuntu runners and the image user both use UID/GID 1001.
 When reproducing with a local bind mount, run Docker with the checkout owner's UID/GID and supply a
 writable `HOME`; do not make the checkout globally writable or run native tests as root.
-
-## Local validation
-
-The following is historical local rollout evidence, not the current hosted CI status.
-
-The candidate image built successfully. A non-root Chromium run passed 86 tests with one intentionally
-skipped standalone case. The native accessibility/chooser probe passed with Docker's default security
-profiles and without disabling WebKit sandboxing. One earlier probe attempt failed with an AT-SPI
-reply timeout; subsequent probe runs passed. Full Firefox/WebKit, native regression/standalone, and
-GitHub Actions validation remain rollout gates; no net CI speedup is claimed before measuring pulls.
-
-After integrating Nx, the native `e2e-linux-probe` target also passed as non-root inside the published
-image using rootless Podman (the local Docker service was stopped). This verifies the Nx target,
-dependency presence, and writable runtime paths; it does not replace GitHub Actions job-container
-validation or the earlier Docker-default-profile probe.
-
-The merged Nx browser adapter executed the full Chromium regression suite and correctly failed on
-`Overflow_keyboard_modal_and_themed_background_work(dark: False)` at the toolbar assertion (85 passed,
-one failed, one standalone skip). A focused rerun of story-loading and toolbar cases passed all 14
-cases in Firefox and WebKit; Chromium passed the 12 story-loading cases but failed both toolbar
-variants. Both toolbar variants still failed in that local environment after the `394d6c6` update,
-at assertion line 155. Those local failures were not counted as successful validation.
-
-## Hosted validation and included scope
-
-The image rollout from #129 was merged into the Nx branch and is included in #132, not a separate
-pending rollout. This includes the GHCR publisher workflow and container provisioning for both regular
-and performance browser/native jobs. Nx commands, affected gates, artifact handling, and aggregate
-verification remain in place.
-
-[Build run 39897624656](https://github.com/squid-farm/talewright/actions/runs/39897624656)
-at `1b5bc32` passed all three containerized browser matrix jobs (regular regressions and published-web
-smoke), the containerized Linux desktop job (probe, regular regressions, and published-desktop smoke),
-editor verification, unit tests, package verification, checks, and both verification aggregates.
-This satisfies the regular hosted container rollout gates despite the earlier local toolbar failures.
-The separate real-file performance workflow has not been executed as part of this evidence; its
-container changes still need their scheduled/manual performance run. No measured CI speedup is claimed.

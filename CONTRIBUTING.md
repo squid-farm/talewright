@@ -10,26 +10,28 @@ not the casing of their C# implementation.
 
 ## Compatibility freeze
 
-**Compatibility freeze (from 1.0.0-preview.1).** Do not make backward-incompatible changes to Talemark
-syntax or meaning, the manifest schema, the save format, replay evidence, choice identities or gameplay
-behaviour. Additive changes are allowed but must be shown not to change existing stories or saves: no
-character or word that existing prose may already use is reserved, existing stories compile the same
-way, and golden save tests ([#570](https://github.com/squid-farm/talewright/issues/570)) pass
-unchanged. A breaking change needs an explicit project-lead decision, a version bump and migration notes.
+Talewright's compatibility promise starts with **1.0.0-preview.1**, which has not shipped yet. Until
+then the story format can still change. From that release on, these rules apply:
 
-A breaking change is allowed only for a severe defect, such as a security or data-loss bug. Announce it
-in advance, and make the old form produce an error that names its replacement. Author Debugger
-scenario files, tooling, and C# extension/NuGet APIs are not frozen before 1.0.
+- Don't make backward-incompatible changes to Talemark syntax or meaning, the manifest schema, the
+  save format, replay evidence, choice identities or gameplay behaviour.
+- Additive changes are fine if you show they don't change existing stories or saves: no character
+  or word that existing prose may already use becomes reserved, existing stories compile the same
+  way, and the [golden save tests](engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/README.md)
+  pass unchanged.
+- A breaking change is allowed only for a severe defect, such as a security or data-loss bug. It
+  needs a project-lead decision, advance notice, a version bump and migration notes, and the old
+  form must produce an error that names its replacement.
 
-Failed loads must preserve the active session and original stored bytes.
+Author Debugger scenario files, tooling, and the C# extension and NuGet APIs are not frozen before
+1.0. Whatever the release, a failed load must keep the active session and the original stored bytes.
 
 ## Set up
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). On Linux the desktop
 host and Author Debugger also need WebKitGTK 4.1 (`sudo apt install libwebkit2gtk-4.1-0`).
-SDK 10 is a build requirement, not the minimum runtime for a headless engine consumer.
-The [older-runtime compatibility spike](docs/developer/csharp-extensions.md#older-runtime-compatibility-spike)
-describes the .NET 8, 9 and 10 engine targets, scope, and verification.
+SDK 10 is needed to build, but apps that embed the headless engine can run on .NET 8 or later; see
+[supported .NET versions](docs/developer/csharp-extensions.md#supported-net-versions).
 
 ```bash
 dotnet build
@@ -46,7 +48,7 @@ your global CLI while keeping its executable path. See the
 [local development installer](docs/developer/cli-setup.md#install-the-current-checkout-for-local-testing)
 for prerequisites, editor profiles and selecting the development CLI.
 
-The normal test command runs on .NET 10. To compile the five engine test projects and their
+The normal test command runs on .NET 10. To compile the six engine test projects and their
 shared fixtures for the oldest runtime, without retargeting the hosts or tooling:
 
 ```bash

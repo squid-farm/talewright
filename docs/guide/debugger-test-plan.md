@@ -1,15 +1,15 @@
 # Hands-on debugger test plan
 
-This is a review/release checklist for someone new to the debugger. Allow about 20 minutes.
-Use disposable story copies and export paths, not your only copy of a real project.
-The [testing guide](testing-your-story.md) explains the controls; this page supplies one fixture and
-specific expected results.
+A step-by-step walkthrough of every Author Debugger feature, with a small story and the exact results
+to expect. Use it to learn the debugger or to check a release. Allow about 20 minutes, and work on a
+throwaway copy of the story, not your only copy of a real project. The
+[testing guide](testing-your-story.md) explains the controls.
 
 ## 1. Prepare and launch
 
-You need .NET 10 and a graphical desktop. Linux needs WebKitGTK 4.1; Windows uses WebView2 and macOS
-uses WKWebView. Linux x64 has automated native coverage; Windows, macOS and ARM64 remain unverified
-until these steps are executed there.
+You need the Talewright CLI and a graphical desktop. Linux needs WebKitGTK 4.1; Windows uses
+WebView2 and macOS uses WKWebView. Only Linux x64 has been tested so far, so results from other
+systems are especially useful.
 
 Create a folder named `debugger-story` with these two files:
 
@@ -69,7 +69,7 @@ talewright validate /absolute/path/to/debugger-story
 talewright debug /absolute/path/to/debugger-story
 ```
 
-For an unmerged PR checkout, run from the repository/worktree instead:
+To test unreleased changes, run from a checkout of the repository instead (needs the .NET 10 SDK):
 
 ```bash
 dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- validate /absolute/path/to/debugger-story
@@ -172,11 +172,11 @@ Keep a copy of the successful export. Test on copies only:
 2. Click **Restart from source**. Expect the run cleared only after validation, with compatible
    origin scene/seed/setup/character retained. **Start selected scene** starts a fresh run.
 3. Open a normal desktop player on this exact story version and save an ordinary run. Copy its
-   JSON file from the per-user `Talewright/saves` directory (LocalApplicationData; on Linux usually
-   `~/.local/share/Talewright/saves`). Record a checksum/copy before using it in the debugger.
+   save file from the per-user `Talewright/saves` folder (on Linux usually
+   `~/.local/share/Talewright/saves`). Record a checksum or copy before using it in the debugger.
 4. Enter its path in **Player save file path (read only)** and click **Fork compatible player save**.
    Expect normal replay state at the normal cursor, now labeled synthetic. Edit/jump and export to
-   `.twscenario`. The original JSON and player slot must remain byte-for-byte unchanged.
+   `.twscenario`. The original save file and player slot must remain byte-for-byte unchanged.
 5. A save from different source must fail normal compatibility and preserve the active author run.
    Loading `.twscenario` through the ordinary player must fail rather than inject synthetic state.
 
@@ -187,7 +187,7 @@ run; see [measured performance and limitations](../developer/performance.md).
 
 ## 8. Text variables through both declaration paths
 
-Open the repository's `examples/TextVariables` story. It includes explicit `weather`
+Open the repository's [`examples/TextVariables`](../../examples/TextVariables) story. It includes explicit `weather`
 and `remembered-weather` declarations and an implicit `forecast` assignment.
 
 1. Confirm all three appear as text in inspection and setup controls; integer

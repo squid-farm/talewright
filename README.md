@@ -2,160 +2,90 @@
 
 <img width="1584" height="672" alt="A fantasy illustration of a large squid working as a blacksmith at a stone anvil under the ocean. The anvil displays the bold text 'TALEWRIGHT'. The squid holds a stone hammer high, striking down to create an explosion of golden sparks and glowing magical runes. The background is a detailed underwater library filled with towering bookshelves, arches, floating manuscripts, jellyfish, an octopus, and small bioluminescent fish." src="https://github.com/user-attachments/assets/a702c41b-3e51-42c4-9d70-c273be00c98a" />
 
-<sub>Temporary art generated with AI. I’d love to bring a real artist on board to give Talewright the hand-crafted look it deserves once the project gets off the ground.</sub>
+<sub>Temporary AI-generated artwork. I'd love to bring on a real artist as the project grows.</sub>
 
-**Write branching, stat-driven RPG stories in plain text. Play them on the web or the desktop.**
+**Write a story someone can play.**
 
-> **1.0 preview: stories and saves are stable.** From 1.0.0-preview.1, Talemark syntax, story files
-> and saves made by a preview will keep working in later 1.x releases. We will break this only to fix
-> a severe defect, such as a security or data-loss bug, and will announce it in advance, with an error
-> that names the replacement and migration notes. Tooling, debugger scenario files and C# extension
-> APIs may still change before 1.0.
+Talewright is for making text-based RPGs. You write the scenes, the dialogue and the choices. Your
+characters can have skills, carry gear, earn experience and make enemies. What the player did earlier
+decides what happens next.
 
-Talewright is an engine for text-first RPGs and visual novels with skill checks, inventories, factions
-and many branches. **Talemark is the story-authoring language that powers your Talewright stories.**
-Its `.tale` files combine bold and italic formatting, dialogue, choices, conditions, and RPG effects;
-`story.talewright.yaml` defines your characters and rules. No programming required.
+Your story is plain text. Talewright handles the rules, the dice and the saves, and plays it in a browser
+or as a desktop app.
+
+**[Play a story now](https://play.trytalewright.com/)** by picking *The Lost Relic*. Nothing to install.
+
+## What it looks like
+
+Stories are written in **Talemark**. Here's a scene from *The Lost Relic*:
 
 ```tale
-=== temple.entrance
-{player:first-name#possessive} torch gutters as **cold air** spills from the door.
+=== trail.river
+@title The River
 
-* [Climb the collapsed wall] skill-check athletics dc 14
-  success: -> temple.upper
-  failure: { player:hp -= 2 } -> temple.fall
-* [Read the glyphs] (requires player:int >= 12) -> temple.glyphs
+{image("river-crossing.jpg", "A rope stretches across a swollen jungle river toward an ancient green stone stair on the opposite bank.")}
+
+The trail ends at a brown river, swollen with last night's rain. On the far bank, through the trees, you
+can make out a stair of green stone.
+
+* [Tie off the rope and cross carefully] (requires player has rope) { player:xp += 25 } -> trail.far-bank
+* [Swim for it] skill-check athletics dc 12
+  success: -> trail.far-bank
+  failure: { player:hp -= 3 } -> trail.swept
+* [Let {guide:first-name} find a ford] skill-check guide survival dc 13
+  success: -> trail.far-bank
+  failure: { player:hp -= 1 } -> trail.swept
 ```
 
-![The Lost Relic sample story being played in the web player](docs/images/playing.png)
+And here's how it plays:
 
-## Features
+![The River scene from The Lost Relic in the web player, with three choices and Mara's character sheet](docs/images/playing.png)
 
-- **Write in Talemark.** Plain-text stories with bold and italic formatting, dialogue lines, choices, and inline or block `{if}` conditions. Backticks are ordinary text.
-- **Proper RPG rules.** Stats, skills, d20 skill checks, items that modify stats, factions with
-  reputation tiers, XP and levels. Use the default ruleset, tweak it, or replace it.
-- **Big branching stories.** Hubs offer whichever scenes are currently available, so you don't
-  have to wire every path by hand. Benchmarks compile 10,000-scene stories in under a second.
-  See the [performance results](docs/developer/performance.md).
-- **Grammar handled for you.** Names, pronouns (including custom sets), possessives ("Burns's") and a/an.
-- **Errors caught before players see them.** Broken links, unknown items and typo'd stats are reported
-  with file and line number when the story loads.
-- **Saves, Back and Forward.** Named save slots plus full undo and redo, with consistent results.
-- **Optional character creation.** Players can pick names, pronouns, presets and starting stats.
-- **Share it anywhere.** Publish a story file, a static website (works on itch.io), or a desktop app.
+Start with a few scenes and choices. Add skill checks, items and factions when your story needs them.
 
-## Try it now
+## Writing it
 
-Open the **[web player](https://play.trytalewright.com/)** and pick *The Lost Relic*. Nothing
-to install.
+The [VS Code extension](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright) adds
+highlighting and suggestions, and catches mistakes as you type. It also shows a grey preview of what each
+`{...}` placeholder will say, such as a character's name.
 
-## Set up your writing space
+![The same River scene in VS Code, with Talemark highlighting and a grey preview of the guide's name](docs/images/vscode-editor.png)
 
-We recommend **VS Code with the [Talewright extension](https://marketplace.visualstudio.com/items?itemName=squid-farm.talewright)**:
-write Talemark with highlighting, suggestions and live checks. **Linux x64** is runtime-tested;
-Windows x64/ARM64, macOS Intel/Apple Silicon and Linux ARM64 are available with **provisional
-support** (cross-built and inspected, not yet verified in the installed editor).
-Each package includes its language server, with no .NET installation or source build needed.
-See [Getting started](docs/guide/getting-started.md) for installation and platform details.
+Any text editor works too.
 
-![The Lost Relic open in VS Code, with Talemark highlighting and grey previews of each substitution's text](docs/images/vscode-editor.png)
+Ready to try it? The **[first story tutorial](docs/guide/first-story.md)** takes about fifteen minutes, and
+**[Getting started](docs/guide/getting-started.md)** covers setup.
 
-Grey previews show what each `{...}` substitution will say. Hover one to see how it was worked out, and
-mistakes such as an unknown item are underlined as you type.
+## Why I made it
 
-For **Validate Story**, **Publish Story ZIP** and **Open Author Debugger**, run
-**Talewright: Set Up CLI** in the Command Palette (**View > Command Palette**, or **Ctrl+Shift+P**). These actions use the separate story tools,
-which setup helps you select or install with approval. Ready-to-use CLI downloads for Windows,
-Mac and Linux are available from [Releases](https://github.com/squid-farm/talewright/releases).
-See the [setup guide](docs/guide/cli-installation.md) for choosing a download and current testing limits.
+I've been writing software most of my life, and I still love it. I love working out hard problems and
+getting the details right. I wanted to put all of that into something that helps other people make things.
 
-Any plain-text editor also works. Zip your story folder and open it in the web player to check
-and play it, without installing the extension or CLI.
+I wanted a tool that's welcoming on day one and still has room to grow when your story gets ambitious.
+Talewright is free and open source, and it will stay that way.
 
-## Write your first story
+## Where it stands
 
-1. Make a story folder and open it in your editor. Add `story.talewright.yaml` (YAML settings: title, characters and rules)
-   and `story.tale` (Talemark scenes, dialogue and choices).
-   You can also copy the [sample story](samples/LostRelic) and edit it.
-2. Save your changes and run **Talewright: Validate Story**, or check a ZIP in the web player.
-3. Use **Talewright: Publish Story ZIP**, or zip the folder yourself, then choose
-   **Open a story file** in the [web player](https://play.trytalewright.com/).
-4. Fix, check again, and replay.
+Talewright works today. You can write, play, save, check, debug and publish stories. I'm writing a full
+story with it before calling 1.0 ready, so the story format may still change until then. See
+[where it's headed](docs/roadmap.md).
 
-The **[first story tutorial](docs/guide/first-story.md)** walks through this with a complete example.
-The [Talemark syntax reference](docs/reference/talemark-syntax.md) starts with basic examples and
-continues into the full language details.
+Once the first 1.0 preview ships, this promise applies:
 
-## Share your story
+> **1.0 preview: what stays stable.** From 1.0.0-preview.1, Talemark syntax, story files and saves made by
+> a preview will keep working in later 1.x releases. We will break this only to fix a severe defect, such
+> as a security or data-loss bug, and will announce it in advance, with an error that names the replacement
+> and migration notes. Tooling, debugger scenario files and C# extension APIs may still change before 1.0.
 
-```bash
-talewright publish my-story --output my-story.zip                   # story file for any Talewright player
-talewright publish my-story -a --target web --output game-web.zip   # static website, e.g. itch.io
-talewright publish my-story -a --target desktop --output game.zip   # Windows, macOS and Linux app
-```
+**Learn more:** [Author guide](docs/guide/README.md) · [Talemark reference](docs/reference/talemark-syntax.md) ·
+[Developer docs](docs/developer/README.md) · [Contributing](CONTRIBUTING.md)
 
-These examples assume the CLI is installed as `talewright`; portable downloads use
-`Talewright.Cli` (`Talewright.Cli.exe` on Windows). A story ZIP needs no .NET installation.
-Building a standalone website or desktop game still requires the .NET 10 SDK on the author's
-computer; players don't need .NET. See [Sharing your story](docs/guide/sharing-your-story.md).
+## Thanks
 
-Embedding the **headless engine** has different requirements: the
-[older-runtime compatibility spike](docs/developer/csharp-extensions.md#older-runtime-compatibility-spike)
-targets .NET 8, 9 and 10 without downgrading the supplied Blazor player or the build SDK.
-Old runtime compatibility does not imply continued Microsoft security support.
-
-## Documentation
-
-| I want to… | Read |
-|---|---|
-| Learn to write stories | [Author guide](docs/guide/README.md) |
-| Look up syntax or an error code | [Talemark syntax](docs/reference/talemark-syntax.md) · [Error codes](docs/reference/diagnostics.md) · [CLI](docs/reference/cli.md) |
-| Extend the engine in C# or contribute | [Developer docs](docs/developer/README.md) · [Contributing](CONTRIBUTING.md) |
-
-All docs start at the **[documentation home](docs/README.md)**.
-
-## Source layout
-
-This is a monorepo organized by responsibility:
-
-- [engine/](engine/): headless libraries and compiler, with local tests.
-- [player/](player/): reusable Blazor player and UI tests.
-- [apps/](apps/): runnable web and desktop hosts.
-- [tooling/](tooling/): authoring infrastructure, CLI, debugger,
-  [language server](docs/developer/language-server.md), and VS Code extension.
-- [packaging/](packaging/): aggregate engine NuGet packaging.
-- [benchmarks/](benchmarks/): performance workloads and measurement tools.
-
-Tests live with their area; root [tests/](tests/) contains repository-wide CI
-contracts and the verification guide. Shared build settings and the
-[solution](Talewright.slnx) stay at the root. See the
-[contributor layout guide](CONTRIBUTING.md#repository-layout) for details.
-
-## Project status
-
-> **The 1.0 preview is delayed.** Testing with real stories has turned up core authoring issues,
-> starting with inventory and choices, that we want to fix before 1.0.0-preview.1. The latest release
-> is 0.5.0. Until the preview ships, Talemark syntax may still change in breaking ways; the
-> compatibility promise above starts with 1.0.0-preview.1.
-
-Talewright is in **preview**. Writing, playing, saving, validating, debugging and publishing all work.
-The VS Code extension includes completion and live errors; story images are supported
-in the web and desktop players. World simulation and combat remain future work.
-Follow along on the [roadmap](docs/developer/plan.md#6-milestones) and the
-[project board](https://github.com/orgs/squid-farm/projects/1).
-
-## Inspirations
-
-Talewright wouldn't exist without [Twine](https://twinery.org/),
-[Ren'Py](https://www.renpy.org/), and
+Talewright wouldn't exist without [Twine](https://twinery.org/), [Ren'Py](https://www.renpy.org/) and
 [ChoiceScript](https://www.choiceofgames.com/make-your-own-games/choicescript-intro/).
-They are direct inspirations for this work. Thank you to their creators, maintainers,
-contributors, and communities for making interactive storytelling more accessible.
-
-See [Inspirations and choosing your tools](docs/inspirations.md) for what Talewright does
-differently and when one of these established tools may be a better fit for your story.
+[Here's how they compare](docs/inspirations.md), and when one of them might suit your story better.
 
 ## License
 
-[MPL-2.0](LICENSE). Use Talewright for anything, including commercial games. Your stories are yours.
-Changes to Talewright's own source files stay open.
+[MPL-2.0](LICENSE). Use it for anything, including commercial games. Your stories are yours.

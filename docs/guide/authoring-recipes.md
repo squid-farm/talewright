@@ -230,10 +230,7 @@ die result. Grit 15 contributes `floor(2.5) = 2`, so this check totals
 `randomness: off` fixes the die at 10 for this example; normal checks roll a d20.
 Try the same check in the Author Debugger to inspect the recorded total.
 
-`governing-attribute` is optional and available to every `category: skill` stat,
-including replacements for built-in skills.
-The target may appear before or after the skill, but must be an enabled attribute
-after `disable` and all replacements. Unknown, disabled and non-attribute targets
-are errors. The key is not allowed on other stat categories and accepts only one
-attribute, never a list. Inventory modifiers affect the effective values used by
-the unchanged RPG formula.
+`governing-attribute` is optional. You can use it on any `category: skill` stat, including
+built-in skills you redeclare. It names exactly one attribute, which must be declared (before or
+after the skill) with `category: attribute` and not disabled. Item modifiers count towards both
+values in the check.

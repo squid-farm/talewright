@@ -57,8 +57,8 @@ evidence; the UI keys alone are not the cross-revision save/replay contract.
 
 ## Headless author scene playtesting
 
-`AuthorSession` is an author-only foundation, not a runnable debugger UI or a new
-player save format. Start directly at a scene without simulating preceding scenes:
+`AuthorSession` is the headless API behind the Author Debugger. It is for authoring tools only and
+never writes player saves. Start directly at a scene without playing the scenes before it:
 
 ```csharp
 var author = AuthorSession.Create(story, new SceneId("finale"), new AuthorSetup
@@ -121,7 +121,6 @@ The host supplies its trusted compiler/extension compatibility identity (for bui
 `CompilerOptions.Default.CompatibilityId`); compiled stories also need a content fingerprint.
 The scenario stores story ID/version/fingerprint, the explicit extension identity, and the
 `author-replay-v3` protocol plus engine package version (informational version excluding build metadata).
-The protocol changed for ordered scene execution; neither the player-save shape nor scenario JSON shape changed.
 No extension is discovered or loaded from a file. Custom hosts must version extension behavior
 honestly and keep callbacks deterministic and side-effect-free.
 
@@ -176,7 +175,7 @@ The runtime rejects ended-session edits/jumps rather than clearing `IsEnded`.
 validated setup/character/seed/start remain its origin. `Cursor`, `Back()` and `Forward()`
 rebuild the applied prefix. Appending after Back drops redo only after successful reconstruction.
 Every edit, jump and navigation uses a separate candidate; failures preserve state, events,
-frame, decisions, cursor and redo. Player undo policy and choice-only saves are unchanged.
+frame, decisions, cursor and redo. Player undo and saves are not affected.
 
 ### Guarded author reload
 
@@ -207,8 +206,7 @@ repaired and retried. Fresh-jump recipes are replayed as such.
 `ValidateReloadSchema(oldStory, newStory)` exposes the declaration guard before a
 run exists. `AuthorSetup.Validate(story)` returns a copied/revalidated setup without
 scene entry. Hosts remain responsible for whole-source/YAML restart policy and
-serialized candidate adoption. None of this changes normal save fingerprints,
-restoration or migration policy. Checkpoint recipes include applied edit/jump commands
+serialized candidate adoption. None of this affects player saves. Checkpoint recipes include applied edit/jump commands
 and retain the original pre-entry evidence even when live edits follow that entry.
 
 Text modifiers in all compiled bodies/choice labels (including hidden/nested
@@ -279,8 +277,7 @@ diagnostic data, not persisted in player saves or scenario files.
 
 Custom hosts can pass an `Action<RuleDecision>` through the five-argument
 `StorySession` constructor. Callbacks are synchronous, must not mutate/reenter
-the engine, and their exceptions propagate. The normal constructor and
-`IStorySession` contract remain unchanged.
+the engine, and their exceptions propagate.
 
 ## History and saves
 
@@ -293,25 +290,21 @@ navigation, not persistence.
 validates a separate candidate, including redo choices. Only replace an active history after this succeeds.
 The version-4 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices,
 cursor, character selection and compact replay evidence. Fixed-protagonist stories use a null
-character; creation stories require a valid selection. Previous save formats are unsupported.
-Cross-revision verification is an experimental candidate, not an approved supported update path.
-Representative preview-tester evidence and explicit lead approval of the exact contract and
-legacy-save treatment remain outstanding. The candidate requires older format-4 saves without
-evidence to use their original revision before re-saving with evidence; that is a proposal, not an
-approved migration procedure. See
-[Save format](../../../docs/developer/save-format.md#compatibility) for the proposed contract and limits.
+character; creation stories require a valid selection. Older save formats are not supported.
+When the story has changed since the save was made, the save loads only if its replay evidence
+proves the same gameplay. Saves without evidence only load into the exact story revision that
+made them. See [Save format](../../../docs/developer/save-format.md#compatibility) for the rules and limits.
 `Save(CaptureSummary(DateTimeOffset.UtcNow))` embeds optional scene/title, capture time and
 effective character-name metadata in the same atomic payload. `Save()` without metadata omits the
-summary; this is a current optional display feature, not an older-save compatibility contract.
-Malformed summary values do not prevent otherwise-valid replay restoration.
+summary. Malformed summary values do not prevent otherwise-valid replay restoration.
 `SaveCatalog.ListEntriesAsync` parses bounded payloads without replay, returning missing/unreadable
 details explicitly. `StoryHistory.ProgressKey` and each entry's matching key hash the canonical
 full replay payload excluding summary metadata. `RestoredProgressKey` also identifies a successfully
-loaded original slot until the timeline changes, including in the candidate update path. The player
+loaded original slot until the timeline changes, including after loading into a changed story. The player
 checks those keys against actual persisted slots before replacing a session; timestamps do not
 influence load protection.
 The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
-unsupported formats and incompatible stories fail explicitly. General migration is not attempted.
+unsupported formats and incompatible stories fail explicitly. Saves are never migrated.
 
 Built-in compiler options provide a compatibility identity. Custom C# hosts must set
 `CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;
@@ -348,7 +341,7 @@ implementations must provide these methods as well.
 
 For stories with `StoryDefinition.Creation`, supply a validated `CharacterSelection`
 to `StoryHistory` or the `character` argument of `StorySession`. Missing/illegal
-choices throw before creating a session; fixed stories reject unexpected creation
+choices throw before creating a session; fixed-protagonist stories reject unexpected creation
 input. Selections are snapshotted. `CharacterIdentityChanged` and ordered
 `StatChanged` events precede scene entry. The static world stays unchanged;
 `IGameStateView.GetCharacterDefinition` returns the effective identity. Initial

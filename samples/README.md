@@ -12,15 +12,14 @@ on the trail, branching temple routes and consequences on the return journey.
 Optional encounters do useful work in the story rather than sending you to a
 separate workshop.
 
-**Artwork disclosure:** The images used in *The Lost Relic* are AI-generated.
-This version includes eleven JPEG illustrations: the original four plus river,
-night-watch, jaguar and dream-hall scenes and three Sleeper variants.
+**Artwork disclosure:** The eleven JPEG illustrations in *The Lost Relic* are
+AI-generated.
 
 Opening the sample presents **character creation**: editable names, she/they/he
 pronouns, Explorer/Scholar presets and bounded Strength/Courage choices.
 **Start story** keeps the authored Mara defaults. Scholar starts with Lucidity 3;
 solving the journal adds 2 for either preset. Will governs Lucidity using the
-existing RPG formula: **die + Lucidity + floor((Will - 10) / 2)**.
+usual RPG formula: **die + Lucidity + floor((Will - 10) / 2)**.
 Scholar starts with Will 14 (+2); Explorer uses Will 10 (+0).
 
 ### Chapter progression and organization
@@ -112,12 +111,6 @@ split settings, how global IDs work and why triggers stay together.
 8. Close/reopen and load a save. Publish the folder as a story ZIP, standalone
    web site or desktop game; creation remains part of each build.
 
-Version **`0.5.0`** replaces the dream's mirrored `marks` variable with the
-count of glyph marks in the player's inventory. Saves from `0.4.0` are
-incompatible and cannot be migrated; start a new playthrough. Incompatible
-loads report an error without replacing the active playthrough or saved bytes.
-Artwork updates also change the content fingerprint; there is no save migration.
-
 ### Features that cannot all be enabled in one story
 
 - `randomness: checks-only` and `undo: true` are active. A fixed `seed` is
@@ -132,7 +125,7 @@ Artwork updates also change the content fingerprint; there is no save migration.
   and guarded reload operate **on** this sample; they are tools, not directives.
   Try overriding `watchword` and `watch-note`, including empty text.
   See the [CLI guide](../docs/reference/cli.md).
-- Autosave, save migration and point-buy are not implemented or claimed.
+- Save migration and point-buy character creation are not supported.
 
 **Play it** in the [web player](https://play.trytalewright.com/) or with the
 [desktop tools](../docs/guide/getting-started.md#3-get-the-story-checking-tools-cli):
@@ -146,8 +139,7 @@ The [first story tutorial](../docs/guide/first-story.md) and
 
 ## For contributors
 
-Samples are not part of the engine or NuGet packages. The desktop/web hosts embed
-them, and [GitHub Pages](../docs/developer/releasing.md) republishes them after
-Build and tests pass on `main`, checking assets and sample opening at its base path.
-Lost Relic has targeted runtime and player acceptance tests; broader player
-regressions use their own C# story fixtures.
+Samples are not part of the engine or NuGet packages. The desktop and web hosts embed
+them, and each release publishes them to the [web player](https://play.trytalewright.com/)
+(see [releasing](../docs/developer/releasing.md)). Lost Relic has targeted runtime and player
+acceptance tests; broader player regressions use their own C# story fixtures.
