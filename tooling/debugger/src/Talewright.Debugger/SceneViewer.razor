@@ -3,7 +3,7 @@
 @implements IAsyncDisposable
 
 <section class="debugger-scene-viewer" aria-label="Scene viewer">
-<h3 class="debugger-scene-heading">@Session.Current.Scene @Session.Current.Title</h3>
+<h3 class="debugger-scene-heading"><code>@Session.Current.Scene</code>@(" " + Session.Current.Title)</h3>
 <div class="scene-stage" data-tw-scene="@Session.Current.Scene?.Value" @ref="_stage">
     <ReaderPresentation>
         <StoryStage Story="Session.Story" Passages="Passages" PassageWindow="1" Current="Session.Current"

@@ -1,8 +1,10 @@
 <section aria-label="Author timeline">
     <h3>Author timeline</h3>
-    <p>Position @Session.Cursor / @Session.Commands.Count. Setup and character are the origin; new commands discard redo. Author navigation ignores player undo policy.</p>
-    <button type="button" disabled="@(!Session.CanBack)" @onclick="OnBack">Back command</button>
-    <button type="button" disabled="@(!Session.CanForward)" @onclick="OnForward">Forward command</button>
+    <p class="tool-note">Position @Session.Cursor / @Session.Commands.Count. Setup and character are the origin; new commands discard redo. Author navigation ignores player undo policy.</p>
+    <div class="tool-actions">
+        <button type="button" disabled="@(!Session.CanBack)" @onclick="OnBack">Back command</button>
+        <button type="button" disabled="@(!Session.CanForward)" @onclick="OnForward">Forward command</button>
+    </div>
     <CommandList Session="Session" />
 </section>
 

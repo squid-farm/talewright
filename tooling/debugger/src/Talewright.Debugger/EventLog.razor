@@ -1,6 +1,6 @@
-<details>
+<details open="@Open">
     <summary>Events</summary>
-    <p>Zero-based event offsets; showing the most recent 200 matching events.</p>
+    <p class="tool-note">Zero-based event offsets; showing the most recent 200 matching events.</p>
     <ul>@foreach (var entry in Inspection.Events.Select((item, index) => (item, index)).Where(e => Match(e.item.ToString())).TakeLast(200))
     {
         <li>@entry.index: @entry.item</li>
@@ -10,6 +10,7 @@
 @code {
     [Parameter, EditorRequired] public AuthorInspection Inspection { get; set; } = null!;
     [Parameter] public string Filter { get; set; } = "";
+    [Parameter] public bool Open { get; set; }
 
     private bool Match(string? text) => (text ?? "").Contains(Filter, StringComparison.OrdinalIgnoreCase);
 }

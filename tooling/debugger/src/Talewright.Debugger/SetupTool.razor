@@ -1,25 +1,32 @@
-<section aria-label="Scene setup">
-    <h2>Scene setup</h2>
-    <details>
-        <summary>How this works</summary>
-        <p>Start selected scene creates a fresh synthetic world from the setup values below. Jump retaining state enters the target scene with the current run's state, visits, triggers and dice.</p>
-        <p>Seed is empty to use the story seed or a generated seed. Setup values are applied before the selected scene is entered.</p>
-    </details>
-    <ScenePicker Model="Model" OnSelect="SelectTarget" />
-    <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
-    <label>Seed (empty uses story/random default) <input aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
-    @if (Story.Creation is not null)
-    {
-        <CharacterCreator @key="Model.CreationRevision" Story="Story" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" />
-        <button type="button" @onclick="OnClearCharacter">Clear character selection</button>
-        <p role="status">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
-    }
-    <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" Texts="Model.Texts" />
-    <button type="button" @onclick="OnStart">Start selected scene</button>
-    @if (Model.Session is { } session)
-    {
-        <button type="button" disabled="@session.Current.IsEnded" @onclick="OnJumpPreservingState">Jump retaining state</button>
-    }
+<section class="setup-tool" aria-label="Scene setup">
+    <h2 class="visually-hidden">Scene setup</h2>
+    <div class="setup-body">
+        <div class="setup-scenes">
+            <ScenePicker Model="Model" OnSelect="SelectTarget" />
+        </div>
+        <div class="setup-options">
+            @if (Story.Creation is not null)
+            {
+                <div class="setup-character">
+                    <CharacterCreator @key="Model.CreationRevision" Story="Story" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" />
+                    <div class="setup-character-status">
+                        <p role="status" class="@(Model.Character is null ? "setup-character-missing" : "setup-character-ready")">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
+                        <button type="button" @onclick="OnClearCharacter">Clear character selection</button>
+                    </div>
+                </div>
+            }
+            <SetupFields Numbers="Model.Numbers" Flags="Model.Flags" Texts="Model.Texts" />
+        </div>
+    </div>
+    <div class="setup-actions">
+        <label>Target scene ID <input aria-label="Target scene ID" @bind="Model.Target" /></label>
+        <label>Seed (empty uses story/random default) <input class="setup-seed" aria-label="Seed" inputmode="numeric" @bind="Model.Seed" /></label>
+        <button type="button" class="setup-start" @onclick="OnStart">Start selected scene</button>
+        @if (Model.Session is { } session)
+        {
+            <button type="button" disabled="@session.Current.IsEnded" @onclick="OnJumpPreservingState">Jump retaining state</button>
+        }
+    </div>
 </section>
 
 @code {

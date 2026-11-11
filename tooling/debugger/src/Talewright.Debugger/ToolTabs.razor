@@ -1,34 +1,36 @@
 <div class="debugger-tools">
-    <div role="tablist" aria-label="Debugger tools" class="tool-tabs">
-        <button type="button" role="tab" id="tool-setup-tab" aria-controls="tool-setup-panel"
-                aria-selected="@(Selected == "Setup" ? "true" : "false")" tabindex="@(Selected == "Setup" ? 0 : -1)"
-                @ref="_setupTab" @onclick='() => Select("Setup")' @onkeydown='args => HandleKey("Setup", args)'>Setup</button>
-        <button type="button" role="tab" id="tool-state-tab" aria-controls="tool-state-panel"
-                aria-selected="@(Selected == "State" ? "true" : "false")" tabindex="@(Selected == "State" ? 0 : -1)"
-                @ref="_stateTab" @onclick='() => Select("State")' @onkeydown='args => HandleKey("State", args)'>State</button>
-        <button type="button" role="tab" id="tool-source-tab" aria-controls="tool-source-panel"
-                aria-selected="@(Selected == "Source" ? "true" : "false")" tabindex="@(Selected == "Source" ? 0 : -1)"
-                @ref="_sourceTab" @onclick='() => Select("Source")' @onkeydown='args => HandleKey("Source", args)'>Source</button>
-        <button type="button" role="tab" id="tool-branches-tab" aria-controls="tool-branches-panel"
-                aria-selected="@(Selected == "Branches" ? "true" : "false")" tabindex="@(Selected == "Branches" ? 0 : -1)"
-                @ref="_branchesTab" @onclick='() => Select("Branches")' @onkeydown='args => HandleKey("Branches", args)'>Branches</button>
-        <button type="button" role="tab" id="tool-timeline-tab" aria-controls="tool-timeline-panel"
-                aria-selected="@(Selected == "Timeline" ? "true" : "false")" tabindex="@(Selected == "Timeline" ? 0 : -1)"
-                @ref="_timelineTab" @onclick='() => Select("Timeline")' @onkeydown='args => HandleKey("Timeline", args)'>Timeline</button>
-        <button type="button" role="tab" id="tool-events-tab" aria-controls="tool-events-panel"
-                aria-selected="@(Selected == "Events" ? "true" : "false")" tabindex="@(Selected == "Events" ? 0 : -1)"
-                @ref="_eventsTab" @onclick='() => Select("Events")' @onkeydown='args => HandleKey("Events", args)'>Events</button>
-        <button type="button" role="tab" id="tool-problems-tab" aria-controls="tool-problems-panel"
-                aria-selected="@(Selected == "Problems" ? "true" : "false")" tabindex="@(Selected == "Problems" ? 0 : -1)"
-                @ref="_problemsTab" @onclick='() => Select("Problems")' @onkeydown='args => HandleKey("Problems", args)'>Problems</button>
+    <div class="tool-strip">
+        <div role="tablist" aria-label="Debugger tools" class="tool-tabs">
+            <button type="button" role="tab" id="tool-setup-tab" aria-controls="tool-setup-panel"
+                    aria-selected="@(Selected == "Setup" ? "true" : "false")" tabindex="@(Selected == "Setup" ? 0 : -1)"
+                    @ref="_setupTab" @onclick='() => Select("Setup")' @onkeydown='args => HandleKey("Setup", args)'>Setup</button>
+            <button type="button" role="tab" id="tool-state-tab" aria-controls="tool-state-panel"
+                    aria-selected="@(Selected == "State" ? "true" : "false")" tabindex="@(Selected == "State" ? 0 : -1)"
+                    @ref="_stateTab" @onclick='() => Select("State")' @onkeydown='args => HandleKey("State", args)'>State</button>
+            <button type="button" role="tab" id="tool-source-tab" aria-controls="tool-source-panel"
+                    aria-selected="@(Selected == "Source" ? "true" : "false")" tabindex="@(Selected == "Source" ? 0 : -1)"
+                    @ref="_sourceTab" @onclick='() => Select("Source")' @onkeydown='args => HandleKey("Source", args)'>Source</button>
+            <button type="button" role="tab" id="tool-branches-tab" aria-controls="tool-branches-panel"
+                    aria-selected="@(Selected == "Branches" ? "true" : "false")" tabindex="@(Selected == "Branches" ? 0 : -1)"
+                    @ref="_branchesTab" @onclick='() => Select("Branches")' @onkeydown='args => HandleKey("Branches", args)'>Branches</button>
+            <button type="button" role="tab" id="tool-timeline-tab" aria-controls="tool-timeline-panel"
+                    aria-selected="@(Selected == "Timeline" ? "true" : "false")" tabindex="@(Selected == "Timeline" ? 0 : -1)"
+                    @ref="_timelineTab" @onclick='() => Select("Timeline")' @onkeydown='args => HandleKey("Timeline", args)'>Timeline</button>
+            <button type="button" role="tab" id="tool-events-tab" aria-controls="tool-events-panel"
+                    aria-selected="@(Selected == "Events" ? "true" : "false")" tabindex="@(Selected == "Events" ? 0 : -1)"
+                    @ref="_eventsTab" @onclick='() => Select("Events")' @onkeydown='args => HandleKey("Events", args)'>Events</button>
+            <button type="button" role="tab" id="tool-problems-tab" aria-controls="tool-problems-panel"
+                    aria-selected="@(Selected == "Problems" ? "true" : "false")" tabindex="@(Selected == "Problems" ? 0 : -1)"
+                    @ref="_problemsTab" @onclick='() => Select("Problems")' @onkeydown='args => HandleKey("Problems", args)'>Problems</button>
+        </div>
     </div>
-    @Panel("Setup", Setup, "Choose a scene, initial values and seed. Start creates a fresh synthetic playtest; Jump retaining state enters the target without resetting the current run.")
-    @Panel("State", State, "Inspect current state and apply one validated live-edit batch. Edits use normal triggers and leveling without re-entering the current scene.")
-    @Panel("Source", Source, "View the accepted source for the current scene and navigate to its source location.")
-    @Panel("Branches", Branches, "Recorded decisions are historical results at their event offsets, not reevaluations against current state.")
-    @Panel("Timeline", Timeline, "Synthetic history can move backward and forward independently of player undo policy. Seed and rolls are from this run.")
-    @Panel("Events", Events, "The event log contains events emitted during this synthetic playtest.")
-    @Panel("Problems", Problems, "Compiler diagnostics and source-adoption or restart requirements are shown here.")
+    @Panel("Setup", Setup, fill: true)
+    @Panel("State", State, fill: true)
+    @Panel("Source", Source, fill: true)
+    @Panel("Branches", Branches)
+    @Panel("Timeline", Timeline)
+    @Panel("Events", Events)
+    @Panel("Problems", Problems)
 </div>
 
 @code {
@@ -53,13 +55,10 @@
 
     public Task Select(string tab) => SelectedChanged.InvokeAsync(tab);
 
-    private RenderFragment Panel(string tab, RenderFragment? content, string explanation) => @<section
-        role="tabpanel" id="@PanelId(tab)" aria-labelledby="@TabId(tab)" tabindex="0" hidden="@(Selected != tab)">
+    private RenderFragment Panel(string tab, RenderFragment? content, bool fill = false) => @<section
+        role="tabpanel" id="@PanelId(tab)" aria-labelledby="@TabId(tab)" tabindex="0" hidden="@(Selected != tab)"
+        class="@(fill ? "tool-panel tool-panel-fill" : "tool-panel")">
         @content
-        <details>
-            <summary>How this works</summary>
-            <p>@explanation</p>
-        </details>
     </section>;
 
     private async Task HandleKey(string tab, KeyboardEventArgs args)

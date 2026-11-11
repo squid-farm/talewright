@@ -100,7 +100,7 @@ the declaration should be visible again.
 
 ## 3. Edit live state, observe cascades and navigate
 
-1. Open **Live edit values**, enable **Edit var:count**, enter `19`, and apply the batch.
+1. In the **State** tab, set **var:count** to `19` and click **Apply edits**.
    Expect count 19, one applied command, still one visit to scene1000 and zero rolls.
 2. Enable **Edit flag:ready**, untick its value, apply. **Attempt** disappears.
 3. Enable the ready edit again, tick its value and apply. Expect count **29**, **Attempt** restored,

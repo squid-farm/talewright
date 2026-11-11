@@ -1,5 +1,2 @@
-section { margin: 1rem 0; border: 1px solid var(--tw-muted); padding: 1rem; }
 .map-details ul { list-style: none; padding: 0; }
-.map-details li { margin: .25rem 0; }
-.map-item { font: inherit; padding: .35rem; color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); text-align: left; }
-:focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }
+.map-item { white-space: normal; text-align: left; }

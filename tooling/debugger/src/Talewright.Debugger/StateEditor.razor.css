@@ -1,0 +1,128 @@
+.state-editor {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.state-bar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--tw-panel);
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.state-filter {
+    width: 16em;
+    margin-right: auto;
+}
+
+.state-pending {
+    font-size: var(--dbg-small);
+    color: var(--tw-accent);
+}
+
+.state-apply:not(:disabled) {
+    color: var(--tw-bg);
+    background: var(--tw-accent);
+    border-color: var(--tw-accent);
+}
+
+.state-ended {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 4px 10px;
+    font-size: var(--dbg-small);
+    color: var(--tw-muted);
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.state-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 4px 10px 10px;
+}
+
+.state-scroll details {
+    margin: 0 0 4px;
+}
+
+.state-scroll summary {
+    padding: 3px 0;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.state-muted {
+    font-weight: normal;
+    color: var(--tw-muted);
+}
+
+/* Auto-width keeps each value next to its name instead of across the panel. */
+.state-grid {
+    width: auto;
+    margin: 0 0 4px 14px;
+    border-collapse: collapse;
+}
+
+.state-grid th,
+.state-grid td {
+    padding: 1px 12px 1px 0;
+    text-align: left;
+    vertical-align: middle;
+    border: 0;
+    white-space: nowrap;
+}
+
+.state-grid th[scope="row"] {
+    font-weight: normal;
+    border-left: 2px solid transparent;
+    padding-left: 6px;
+}
+
+.state-grid thead th,
+.state-subhead th {
+    padding-left: 6px;
+    font-size: var(--dbg-small);
+    font-weight: normal;
+    color: var(--tw-muted);
+}
+
+.state-grid tbody tr:hover {
+    background: var(--dbg-selected);
+}
+
+.state-edited th[scope="row"] {
+    border-left-color: var(--tw-accent);
+}
+
+.state-edited input {
+    border-color: var(--tw-accent);
+}
+
+.state-number {
+    width: 6em;
+    font-family: var(--dbg-mono, monospace);
+}
+
+.state-grid input[type="text"] {
+    width: 14em;
+}
+
+.state-scroll .tool-note {
+    margin: 0 0 0 20px;
+}
+
+.state-note {
+    margin-left: 8px;
+    font-size: var(--dbg-small);
+    color: var(--tw-muted);
+}
+
+.state-edited .state-note {
+    color: var(--tw-accent);
+}

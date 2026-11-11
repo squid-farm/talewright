@@ -1,5 +1,179 @@
-section { margin: 1rem 0; border: 1px solid var(--tw-muted); padding: 1rem; }
-label { display: inline-block; margin: .4rem; }
-button, input { font: inherit; padding: .35rem; }
-button { color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); }
-:focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }
+.setup-tool {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.setup-body {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+}
+
+.setup-scenes {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--tw-border);
+}
+
+.setup-options {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 6px 10px;
+}
+
+.setup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 4px 10px;
+    background: var(--tw-panel);
+    border-top: 1px solid var(--tw-border);
+}
+
+.setup-actions label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--tw-muted);
+}
+
+.setup-actions input {
+    width: 12em;
+    font-family: var(--dbg-mono);
+}
+
+.setup-actions .setup-seed {
+    width: 7em;
+}
+
+.setup-actions .setup-start {
+    font-weight: 600;
+    color: var(--tw-bg);
+    background: var(--tw-accent);
+    border-color: var(--tw-accent);
+}
+
+.setup-actions .setup-start:hover {
+    background: color-mix(in srgb, var(--tw-accent), var(--tw-fg) 15%);
+}
+
+.setup-character {
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.setup-character-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin-top: 6px;
+}
+
+.setup-character-status p {
+    margin: 0;
+}
+
+.setup-character-missing {
+    color: var(--tw-warning);
+}
+
+.setup-character-ready {
+    color: var(--tw-muted);
+}
+
+/* The player's creation screen is sized for reading; inside the drawer it becomes a compact form. */
+.setup-character ::deep .tw-creation h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.setup-character ::deep .tw-creation h2 {
+    margin: 2px 0 4px;
+    font: 600 var(--dbg-small)/1.3 var(--tw-ui-font);
+    color: var(--tw-muted);
+}
+
+.setup-character ::deep .tw-creation form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    align-items: end;
+    gap: 4px 10px;
+    max-width: none;
+}
+
+.setup-character ::deep .tw-creation label {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    font-size: var(--dbg-small);
+    color: var(--tw-muted);
+}
+
+.setup-character ::deep .tw-creation input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--dbg-control);
+    padding: 1px 6px;
+    font: var(--dbg-size) var(--tw-ui-font);
+    color: var(--tw-fg);
+    background: var(--tw-bg);
+    border: 1px solid var(--tw-border);
+    border-radius: 3px;
+}
+
+.setup-character ::deep .tw-creation select {
+    box-sizing: border-box;
+    width: 100%;
+    font: var(--dbg-size) var(--tw-ui-font);
+    color: var(--tw-fg);
+    background-color: var(--tw-bg);
+    border: 1px solid var(--tw-border);
+    border-radius: 3px;
+}
+
+.setup-character ::deep .tw-creation button {
+    box-sizing: border-box;
+    display: inline-block;
+    justify-self: start;
+    width: auto;
+    min-height: var(--dbg-control);
+    padding: 1px 8px;
+    font: var(--dbg-size)/1.2 var(--tw-ui-font);
+    text-align: center;
+    color: var(--tw-fg);
+    background: var(--tw-panel);
+    border: 1px solid var(--tw-border);
+    border-radius: 3px;
+}
+
+.setup-character ::deep .tw-creation button[type="submit"] {
+    border-color: var(--tw-accent);
+}
+
+.setup-character ::deep .tw-creation .tw-error {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+@media (max-width: 640px) {
+    .setup-body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(120px, 40%) minmax(0, 1fr);
+    }
+
+    .setup-scenes {
+        border-right: 0;
+        border-bottom: 1px solid var(--tw-border);
+    }
+}

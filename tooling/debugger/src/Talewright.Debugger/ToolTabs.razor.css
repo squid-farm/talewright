@@ -1,31 +1,48 @@
 .debugger-tools {
     display: flex;
     flex-direction: column;
+    height: 100%;
     min-height: 0;
+}
+
+.tool-strip {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    background: var(--tw-panel);
+    border-bottom: 1px solid var(--tw-border);
 }
 
 .tool-tabs {
     display: flex;
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-width: 0;
     overflow-x: auto;
-    border-bottom: 1px solid var(--tw-border);
+    scrollbar-width: none;
 }
 
-.tool-tabs button {
-    white-space: nowrap;
-}
-
-.tool-tabs [aria-selected="true"] {
-    border-bottom: 3px solid var(--tw-accent);
-    font-weight: bold;
-}
-
-[role="tabpanel"] {
-    overflow: auto;
-    padding: .5rem 1rem;
-}
-
-section[role="tabpanel"] {
+.tool-panel {
     flex: 1 1 auto;
     min-height: 0;
+    overflow: auto;
+    padding: 6px 10px;
+}
+
+.tool-panel[hidden] {
+    display: none;
+}
+
+/* Fill panels lay out their own scroll regions instead of scrolling as a whole. */
+.tool-panel-fill {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.tool-panel-fill > ::deep * {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }

@@ -1,16 +1,17 @@
 .split-pane {
     display: grid;
+    height: 100%;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
 }
 
 .split-horizontal {
-    grid-template-columns: minmax(0, var(--split-size)) .35rem minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--split-size)) 5px minmax(0, 1fr);
 }
 
 .split-vertical {
-    grid-template-rows: minmax(0, var(--split-size)) .35rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, var(--split-size)) 5px minmax(0, 1fr);
 }
 
 .split-horizontal.split-collapsed {
@@ -28,18 +29,38 @@
     overflow: auto;
 }
 
+/* A wide hit area that draws as a single hairline, brightening while hovered or dragged. */
 .split-separator {
+    position: relative;
     z-index: 1;
-    background: var(--tw-border);
     touch-action: none;
 }
 
-.split-horizontal .split-separator {
+.split-separator::after {
+    content: "";
+    position: absolute;
+    background: var(--tw-border);
+}
+
+.split-separator:hover::after,
+.split-separator:active::after {
+    background: var(--tw-accent);
+}
+
+.split-horizontal > .split-separator {
     cursor: col-resize;
 }
 
-.split-vertical .split-separator {
+.split-horizontal > .split-separator::after {
+    inset: 0 2px;
+}
+
+.split-vertical > .split-separator {
     cursor: row-resize;
+}
+
+.split-vertical > .split-separator::after {
+    inset: 2px 0;
 }
 
 .split-separator:focus-visible {

@@ -1,4 +1,66 @@
-label { display: inline-block; margin: .4rem; }
-button, input { font: inherit; padding: .35rem; }
-button { color: var(--tw-fg); background: var(--tw-panel); border: 1px solid var(--tw-border); }
-:focus-visible { outline: 3px solid var(--tw-accent); outline-offset: 2px; }
+.scene-picker {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.scene-search {
+    display: block;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.scene-search input {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.scene-count {
+    margin: 0;
+    padding: 2px 8px;
+    font-size: var(--dbg-small);
+    color: var(--tw-muted);
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.scene-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+}
+
+.scene-list li {
+    margin: 0;
+}
+
+.scene-list button {
+    display: block;
+    width: 100%;
+    min-height: 20px;
+    padding: 1px 8px;
+    overflow: hidden;
+    text-align: left;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+
+.scene-list button:hover {
+    background: var(--dbg-hover);
+}
+
+.scene-list button.selected {
+    background: var(--dbg-selected);
+    box-shadow: inset 2px 0 var(--tw-accent);
+}
+
+.scene-list code {
+    margin-right: 2px;
+    color: var(--tw-muted);
+}

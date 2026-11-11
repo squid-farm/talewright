@@ -42,9 +42,9 @@
                             </div>
                             @if (_mapOpened)
                             {
-                                <div id="map-panel" role="tabpanel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
+                                <div id="map-panel" class="map-panel" role="tabpanel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
                                     <MapTab Story="story" Session="Model.Session" Inspection="Model.Inspection"
-                                            PreviewState="Model.PreviewState" />
+                                            PreviewState="Model.PreviewState" OnSelectScene="InspectScene" />
                                 </div>
                             }
                         }
@@ -191,19 +191,18 @@
         }
         else
         {
-            <p>Loading story setup…</p>
+            <p class="empty-viewer">Loading story setup…</p>
         }
     </div>;
 
     private RenderFragment StatePanel => @<div>
         @if (Model.Inspection is { } inspection && Model.Session is { } session)
         {
-            <StateTable Inspection="inspection" />
-            <LiveEditTool Model="Model" Session="session" OnApplyEdits="Model.ApplyEdits" />
+            <StateEditor Model="Model" Session="session" Inspection="inspection" OnApplyEdits="Model.ApplyEdits" />
         }
         else
         {
-            <p>Start a scene to inspect state or apply live edits.</p>
+            <p class="empty-viewer">Start a scene to inspect state or apply live edits.</p>
         }
     </div>;
 
@@ -216,7 +215,7 @@
         }
         else
         {
-            <p>Start a scene to inspect branch decisions.</p>
+            <p class="empty-viewer">Start a scene to inspect branch decisions.</p>
         }
     </div>;
 
@@ -224,8 +223,8 @@
         @if (Model.Session is { } session && Model.Inspection is { } inspection)
         {
             <section aria-label="Synthetic playtest">
-                <h2>Synthetic playtest</h2>
-                <p role="status">Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: @inspection.Seed. Rolls: @inspection.RollCount.</p>
+                <h2 class="visually-hidden">Synthetic playtest</h2>
+                <p role="status" class="tool-note">Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: @inspection.Seed. Rolls: @inspection.RollCount.</p>
                 <TimelineTool Session="session" OnBack="Model.Back" OnForward="Model.Forward" />
                 <InitializationEvents Session="session" />
                 <MapRoute Run="CurrentRun" />
@@ -233,18 +232,18 @@
         }
         else
         {
-            <p>Start a scene to view its synthetic timeline.</p>
+            <p class="empty-viewer">Start a scene to view its synthetic timeline.</p>
         }
     </div>;
 
     private RenderFragment EventsPanel => @<div>
         @if (Model.Inspection is { } inspection)
         {
-            <EventLog Inspection="inspection" />
+            <EventLog Inspection="inspection" Open="true" />
         }
         else
         {
-            <p>Start a scene to view its event log.</p>
+            <p class="empty-viewer">Start a scene to view its event log.</p>
         }
     </div>;
 
@@ -278,9 +277,13 @@
 
     private void SelectMainView(bool map)
     {
+        if (_mapSelected && !map)
+            _selection = Model.Session?.Current.Scene is { } scene ? new InspectorSelection(scene) : null;
         _mapSelected = map;
         _mapOpened |= map;
     }
+
+    private void InspectScene(SceneId scene) => _selection = new InspectorSelection(scene);
 
     private Task SelectTool(string tab)
     {
