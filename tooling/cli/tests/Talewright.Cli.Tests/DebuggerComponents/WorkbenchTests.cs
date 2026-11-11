@@ -204,7 +204,8 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     {
         var workbench = Show();
 
-        await workbench.Find("input[aria-label='Target scene ID']").ChangeAsync(new ChangeEventArgs { Value = "nowhere" });
+        await workbench.InvokeAsync(() =>
+            workbench.Find("input[aria-label='Target scene ID']").ChangeAsync(new ChangeEventArgs { Value = "nowhere" }));
         await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
 
         Assert.Contains("nowhere", workbench.Find("p[role=alert]").TextContent);
