@@ -48,12 +48,12 @@ internal static class NativeHostLauncher
     [
         "debug-assets/index.html",
         "debug-assets/debugger.css",
-        "debug-assets/_content/Talewright.Player/talewright.css",
+        "publish-assets/player/talewright.css",
     ],
     [
         "debug-assets/index.html",
         "debug-assets/debugger.css",
-        "debug-assets/_content/Talewright.Player/talewright.css",
+        "publish-assets/player/talewright.css",
     ]);
 
     private static readonly HostDetails Player = new("Talewright Player", "player",

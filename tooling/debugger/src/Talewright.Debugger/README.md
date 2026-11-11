@@ -4,7 +4,7 @@ Native Photino/Blazor workbench for local Talemark story folders. Prefer
 `talewright debug path/to/story`; from source:
 
 ```sh
-dotnet run --project tooling/debugger/src/Talewright.Debugger -- samples/LostRelic
+dotnet run --project tooling/cli/src/Talewright.Cli -- debug samples/LostRelic
 ```
 
 For native prerequisites and platform coverage, see the [CLI reference](../../../../docs/reference/cli.md#debug).
@@ -39,7 +39,11 @@ How it's built:
   Invalidated ids stay visible for correction. Creation forms keep their draft across Talemark reloads and
   initialize from the retained selection on restart, via Player's optional `InitialSelection`.
 - **Tests.** The UI-independent model is covered by CLI tests; native interactions run through the Linux
-  AT-SPI E2E harness, including export/import across two debugger processes.
+  AT-SPI E2E harness, including export/import across two debugger processes. A CLI launch regression
+  test opens a selected scene through `debug`, plays it, and checks the exit code when the window closes,
+  using the actual CLI build output. Focused launcher tests check shared Player CSS in
+  `publish-assets/player` for both source and bundled hosts, including missing-asset errors; the
+  `_content/Talewright.Player` URL is mapped by the host, not a separate debugger asset directory.
 - **Scenario files.** `AuthorScenarioFiles` bounds reads, resolves links and link-target ancestors
   with a 64-link cycle/depth guard before excluding story
   and player-save locations, and uses confirmed, same-directory atomic replacements for `.twscenario`
