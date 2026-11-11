@@ -1,3 +1,4 @@
+using Talewright.Core.Identity;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
@@ -95,5 +96,98 @@ public sealed class StoryMapTests
         Assert.Equal(["start", "camp", "loop", "orphan", "END"], map.Nodes.Select(node => node.Id));
         Assert.Equal([true, true, true, false, false], map.Nodes.Select(node => node.IsReachable));
         Assert.Equal("start/hub:camp", Assert.Single(map.HubOffers).Id);
+    }
+
+    [Fact]
+    public void Public_map_connections_include_ordered_diverts_hub_offers_and_endpoints()
+    {
+        var manifest = TestStories.DefaultManifest();
+        manifest.Flag("ready");
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = manifest.Build(),
+            ["main.tale"] = """
+                === start
+                @hub path
+                {if flag:ready}
+                -> road
+                {/if}
+                ::: skill-check athletics dc 5
+                success: -> road
+                failure: { set flag:ready }
+                :::
+                * [Again] -> start
+                * [Travel] -> road
+                * [Force] skill-check athletics dc 5
+                  success: -> road
+                  failure: -> camp
+                === camp
+                @tags path
+                @hub path
+                * [Travel] -> road
+                === road
+                @tags path
+                -> END
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var map = StoryMap.Build(result.Story!);
+        var startId = new SceneId("start");
+        var roadId = new SceneId("road");
+        var start = map.Connections(startId);
+        var road = map.Connections(roadId);
+
+        Assert.Equal([
+            "Scene:road",
+            "EntryCheck:Success:road",
+            "Choice:start",
+            "Choice:road",
+            "ChoiceSkillCheck:Success:road",
+            "ChoiceSkillCheck:Failure:camp",
+            "HubOffer:camp",
+            "HubOffer:road",
+        ], start.Outgoing.Select(Describe));
+        Assert.Equal([
+            "start:Scene",
+            "start:EntryCheck:Success",
+            "start:Choice",
+            "start:ChoiceSkillCheck:Success",
+            "start:HubOffer",
+            "camp:Choice",
+            "camp:HubOffer",
+        ], road.Incoming.Select(DescribeIncoming));
+
+        var selfDivert = Assert.Single(start.Incoming);
+        var selfDivertItem = Assert.IsType<StoryConnection.DivertConnection>(selfDivert);
+        Assert.Equal(startId, selfDivertItem.Divert.Target.Scene);
+        Assert.Contains(start.Outgoing, connection => connection is StoryConnection.DivertConnection divert
+            && divert.Divert.Target.Scene == startId);
+        Assert.Contains(road.Outgoing, connection => connection is StoryConnection.DivertConnection divert
+            && divert.Divert.Target.IsEnd);
+        Assert.Contains(road.Incoming, connection => connection is StoryConnection.HubOfferConnection);
+        Assert.Same(start, map.Connections(startId));
+
+        // The compiler rejects dead-end scenes, so an unindexed scene id exercises the empty-connection case.
+        var unconnected = map.Connections(new SceneId("unconnected"));
+        Assert.Empty(unconnected.Incoming);
+        Assert.Empty(unconnected.Outgoing);
+        Assert.Same(unconnected, map.Connections(new SceneId("unconnected")));
+
+        static string Describe(StoryConnection connection) => connection switch
+        {
+            StoryConnection.DivertConnection divert =>
+                $"{divert.Divert.Kind}{(divert.Divert.Outcome is { } outcome ? $":{outcome}" : "")}:{divert.Divert.Target}",
+            StoryConnection.HubOfferConnection offer => $"HubOffer:{offer.Offer.Scene}",
+            _ => throw new ArgumentOutOfRangeException(nameof(connection)),
+        };
+
+        static string DescribeIncoming(StoryConnection connection) => connection switch
+        {
+            StoryConnection.DivertConnection divert =>
+                $"{divert.Divert.From}:{divert.Divert.Kind}{(divert.Divert.Outcome is { } outcome ? $":{outcome}" : "")}",
+            StoryConnection.HubOfferConnection offer => $"{offer.Offer.Hub}:HubOffer",
+            _ => throw new ArgumentOutOfRangeException(nameof(connection)),
+        };
     }
 }

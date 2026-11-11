@@ -1007,6 +1007,51 @@ public sealed class DebuggerTests
     }
 
     [Fact]
+    public async Task Native_debugger_scene_connections_mark_the_divert_taken_after_choosing()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-connections-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-connections", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                $"game:\n  id: connections-debug-{Guid.NewGuid():N}\n  title: Connections Debug\n  start: start\ncharacters:\n  player: {{first-name: Tester}}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                * [Continue] -> next
+                === next
+                @title Later
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await EnsureToolsVisible(driver);
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Scene inspector", "Beginning");
+            if (!snapshot.Descendants().Any(node =>
+                    node.Role == "separator" && node.Name == "Resize inspector"))
+                await driver.ClickToggleAsync("Inspector");
+
+            await driver.ChooseAsync("Continue");
+            snapshot = await WaitFor(driver, "Scene inspector", "Later", "1 in · 1 out", "taken");
+
+            Assert.Contains("← start", snapshot.Content);
+            Assert.Contains("Choice c0 “Continue”", snapshot.Content);
+            Assert.Contains("→ END", snapshot.Content);
+            Assert.Contains("taken", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Native_debugger_inspect_mode_selects_choices_without_choosing_and_escape_exits()
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")

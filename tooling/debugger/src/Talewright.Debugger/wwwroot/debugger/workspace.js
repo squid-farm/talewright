@@ -12,6 +12,7 @@ export function loadLayout() {
       mainHeight: 68,
       inspectorCollapsed: false,
       toolsCollapsed: false,
+      connectionsExpanded: true,
       windowWidth: window.innerWidth,
       hasStoredLayout: false,
     };
@@ -20,10 +21,16 @@ export function loadLayout() {
   const layout = JSON.parse(raw);
   if (!Number.isFinite(layout.viewerWidth) || layout.viewerWidth < 20 || layout.viewerWidth > 80 ||
       !Number.isFinite(layout.mainHeight) || layout.mainHeight < 20 || layout.mainHeight > 80 ||
-      typeof layout.inspectorCollapsed !== "boolean" || typeof layout.toolsCollapsed !== "boolean") {
+      typeof layout.inspectorCollapsed !== "boolean" || typeof layout.toolsCollapsed !== "boolean" ||
+      (layout.connectionsExpanded !== undefined && typeof layout.connectionsExpanded !== "boolean")) {
     throw new Error("Stored debugger layout is invalid.");
   }
-  return { ...layout, windowWidth: window.innerWidth, hasStoredLayout: true };
+  return {
+    ...layout,
+    connectionsExpanded: layout.connectionsExpanded ?? true,
+    windowWidth: window.innerWidth,
+    hasStoredLayout: true,
+  };
 }
 
 export function saveLayout(layout) {
@@ -32,6 +39,7 @@ export function saveLayout(layout) {
     mainHeight: layout.mainHeight,
     inspectorCollapsed: layout.inspectorCollapsed,
     toolsCollapsed: layout.toolsCollapsed,
+    connectionsExpanded: layout.connectionsExpanded,
   }));
 }
 

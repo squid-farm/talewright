@@ -20,7 +20,9 @@
         }
         else
         {
-            <SceneInspector Scene="scene" SourceMap="SourceMap" Session="Session" Inspection="Inspection" />
+            <SceneInspector Story="Story" Scene="scene" SourceMap="SourceMap" Session="Session"
+                            Inspection="Inspection" Run="Run" ConnectionsExpanded="ConnectionsExpanded"
+                            ConnectionsExpandedChanged="ConnectionsExpandedChanged" />
         }
     }
 </aside>
@@ -31,4 +33,7 @@
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
     [Parameter] public StorySourceMap? SourceMap { get; set; }
+    [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public bool ConnectionsExpanded { get; set; } = true;
+    [Parameter] public EventCallback<bool> ConnectionsExpandedChanged { get; set; }
 }

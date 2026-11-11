@@ -41,13 +41,19 @@
         <p>@ExpressionFormatter.Format(Scene.Requires)</p>
         <p>Not evaluated in this run.</p>
     }
+    <SceneConnections Story="Story" Scene="Scene" Run="Run"
+                      Expanded="ConnectionsExpanded" ExpandedChanged="ConnectionsExpandedChanged" />
 </section>
 
 @code {
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
     [Parameter, EditorRequired] public SceneDefinition Scene { get; set; } = null!;
     [Parameter] public StorySourceMap? SourceMap { get; set; }
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
+    [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public bool ConnectionsExpanded { get; set; } = true;
+    [Parameter] public EventCallback<bool> ConnectionsExpandedChanged { get; set; }
 
     private RuleDecision? LatestRequirement => Inspection?.Decisions.LastOrDefault(decision =>
         decision.Kind == DecisionKind.Storylet &&

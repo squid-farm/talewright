@@ -56,7 +56,9 @@
                 </FirstPane>
                 <SecondPane>
                     <InspectorPane Story="Model.Story" Selection="_selection" Session="Model.Session"
-                                   Inspection="Model.Inspection" SourceMap="Model.AcceptedSourceMap" />
+                                   Inspection="Model.Inspection" SourceMap="Model.AcceptedSourceMap"
+                                   Run="CurrentRun" ConnectionsExpanded="_connectionsExpanded"
+                                   ConnectionsExpandedChanged="SetConnectionsExpanded" />
                 </SecondPane>
             </SplitPane>
         </FirstPane>
@@ -99,6 +101,7 @@
     private bool _inspectMode;
     private bool _inspectorCollapsed;
     private bool _toolsCollapsed;
+    private bool _connectionsExpanded = true;
     private bool _mapSelected;
     private bool _mapOpened;
     private string _selectedTool = "Setup";
@@ -150,6 +153,7 @@
                 _mainHeight = layout.MainHeight;
                 _inspectorCollapsed = layout.InspectorCollapsed;
                 _toolsCollapsed = layout.ToolsCollapsed;
+                _connectionsExpanded = layout.ConnectionsExpanded;
             }
             else
             {
@@ -315,6 +319,12 @@
         return SaveLayout();
     }
 
+    private Task SetConnectionsExpanded(bool expanded)
+    {
+        _connectionsExpanded = expanded;
+        return SaveLayout();
+    }
+
     private async Task SetViewerWidth(double size)
     {
         _viewerWidth = size;
@@ -330,7 +340,8 @@
     private Task SaveLayout() => _layoutModule is null
         ? Task.CompletedTask
         : _layoutModule.InvokeVoidAsync("saveLayout", new WorkspaceLayout(
-            _viewerWidth, _mainHeight, _inspectorCollapsed, _toolsCollapsed, 0, true)).AsTask();
+            _viewerWidth, _mainHeight, _inspectorCollapsed, _toolsCollapsed, 0, true,
+            _connectionsExpanded)).AsTask();
 
     private void Choose(ChoiceView choice)
     {
@@ -367,5 +378,6 @@
         bool InspectorCollapsed,
         bool ToolsCollapsed,
         int WindowWidth,
-        bool HasStoredLayout);
+        bool HasStoredLayout,
+        bool ConnectionsExpanded);
 }
