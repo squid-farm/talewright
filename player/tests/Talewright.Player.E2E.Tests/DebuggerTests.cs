@@ -363,7 +363,7 @@ public sealed class DebuggerTests
             await driver.FillAsync("Filter decisions", "step:4999:1");
             snapshot = await WaitFor(driver, "ConditionTrue");
             Assert.Contains("Offered", snapshot.Content);
-            await driver.ActivateAsync("Choice scene1000 step:4999:1: Offered (ConditionTrue)");
+            await driver.ActivateAsync("Choice scene1000 step:4999:1: Offered (ConditionTrue) — Available");
             snapshot = await WaitFor(driver, "Events [");
             Assert.Contains("ready", snapshot.Content);
             Assert.Contains("Source: main.tale:4999:1", snapshot.Content);
