@@ -31,26 +31,9 @@
     font-family: var(--tw-font);
     font-size: 1rem;
     line-height: 1.6;
-    container-type: inline-size;
-}
-
-.scene-stage ::deep .tw-scene-title {
-    margin-top: .5rem;
-}
-
-.scene-stage ::deep .tw-choices {
-    margin: 1rem 0;
-}
-
-@container (max-width: 640px) {
-    .scene-stage ::deep .tw-columns {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 1rem;
-    }
-
-    .scene-stage ::deep .tw-sheet {
-        position: static;
-    }
+    container: story-stage / inline-size;
+    --tw-scene-title-margin-top: .5rem;
+    --tw-choices-margin: 1rem 0;
 }
 
 .inspect-overlay {

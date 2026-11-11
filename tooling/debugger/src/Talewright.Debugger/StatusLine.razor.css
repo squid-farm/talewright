@@ -18,7 +18,7 @@
     border-top: 1px solid var(--tw-border);
 }
 
-.debugger-status-line p.tw-error {
+.debugger-status-line p.debugger-error {
     border-left-color: var(--tw-error);
     background: color-mix(in srgb, var(--tw-error) 10%, transparent);
 }

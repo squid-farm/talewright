@@ -4,15 +4,12 @@
 .map-surface canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .map-tooltip { position: absolute; max-width: 420px; padding: 3px 6px; background: var(--tw-panel); border: 1px solid var(--tw-border); font: var(--dbg-small) var(--tw-ui-font); pointer-events: none; }
 .map-side { min-height: 0; overflow: auto; padding: 4px 10px 10px; border-left: 1px solid var(--tw-border); }
-.map-preview { margin: 8px 0; padding-top: 4px; border-top: 1px solid var(--tw-border); }
+.map-preview { margin: 8px 0; padding-top: 4px; border-top: 1px solid var(--tw-border); font-family: var(--tw-font); font-size: 1rem; line-height: 1.6; }
+.map-preview h3, .map-preview .tool-note { font-family: var(--tw-ui-font); font-size: var(--dbg-small); line-height: 1.45; }
 .map-export-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0; padding-top: 6px; border-top: 1px solid var(--tw-border); }
 .map-export-controls p { margin: 0; }
-.map-preview ::deep .tw-columns { font-family: var(--tw-font); font-size: 1rem; line-height: 1.6; }
 
 @media (max-width: 760px) {
     .story-map { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(300px, 60vh) auto; height: auto; }
     .map-side { border-left: 0; border-top: 1px solid var(--tw-border); }
 }
-/* The side column is narrower than the player's viewport breakpoints assume, so the preview shows the passage only. */
-.map-preview ::deep .tw-columns { display: block; }
-.map-preview ::deep .tw-sheet { display: none; }

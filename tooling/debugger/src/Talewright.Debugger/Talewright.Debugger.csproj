@@ -4,6 +4,15 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <None Update="**/*.razor.css" CssScope="debugger-chrome" />
+  </ItemGroup>
+  <!-- Share chrome styles across debugger components, but never across the player boundary. -->
+  <Target Name="SetDebuggerCssScope" AfterTargets="ResolveCssScopes" BeforeTargets="AssignRazorComponentTargetPaths">
+    <ItemGroup>
+      <RazorComponent Update="@(RazorComponent)" CssScope="debugger-chrome" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
     <InternalsVisibleTo Include="Talewright.Cli.Tests" />
     <PackageReference Include="Photino.Blazor" Version="4.0.13" />
     <ProjectReference Include="../../../../player/src/Talewright.Player/Talewright.Player.csproj" />

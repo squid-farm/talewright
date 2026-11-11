@@ -37,11 +37,12 @@
     [Parameter] public bool Busy { get; set; }
     [Parameter] public bool AtChoiceLimit { get; set; }
     [Parameter] public bool Hidden { get; set; }
+    [Parameter] public bool ShowCharacterSheet { get; set; } = true;
     [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
 
     public ElementReference TranscriptElement { get; private set; }
 
     private bool HasCharacterSheet =>
-        CharacterSheet.HasSections(Story.World, Story.CharacterSheet, EntityId.Player);
+        ShowCharacterSheet && CharacterSheet.HasSections(Story.World, Story.CharacterSheet, EntityId.Player);
 }

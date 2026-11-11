@@ -68,6 +68,8 @@ public sealed class SetupToolTests : BunitContext
 
         var creator = tool.FindComponent<CharacterCreator>().Instance;
         Assert.Same(model.Story, creator.Story);
+        Assert.True(creator.Compact);
+        Assert.NotNull(tool.Find(".tw-creation--compact"));
         Assert.Null(creator.InitialSelection);
         Assert.Equal("Create a character before starting the selected scene. Start story above confirms the character only.",
             tool.Find("p[role=status]").TextContent);
@@ -85,6 +87,29 @@ public sealed class SetupToolTests : BunitContext
 
         Assert.Equal("Character selected. Start the selected scene below.", tool.Find("p[role=status]").TextContent);
         Assert.Equal(model.Character, tool.FindComponent<CharacterCreator>().Instance.InitialSelection);
+    }
+
+    [Fact]
+    public void Shared_chrome_scope_stops_at_the_player_component_boundary()
+    {
+        using var model = ComponentStory.Load(creation: true);
+        var tool = Show(model);
+
+        Assert.True(Target(tool).HasAttribute("debugger-chrome"));
+        Assert.True(tool.Find("input[aria-label='Override var:count']").HasAttribute("debugger-chrome"));
+        var creator = tool.FindComponent<CharacterCreator>();
+        Assert.All(creator.FindAll("*"), element => Assert.False(element.HasAttribute("debugger-chrome")));
+    }
+
+    [Fact]
+    public void Standalone_character_creation_does_not_opt_in_to_compact_chrome()
+    {
+        using var model = ComponentStory.Load(creation: true);
+        var creator = Render<CharacterCreator>(parameters => parameters
+            .Add(component => component.Story, model.Story!));
+
+        Assert.False(creator.Instance.Compact);
+        Assert.Empty(creator.FindAll(".tw-creation--compact"));
     }
 
     [Fact]

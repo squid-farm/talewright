@@ -163,6 +163,8 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         var map = Show(model);
         await map.InvokeAsync(() => map.Instance.SelectScene("cave"));
         Assert.NotNull(map.Find("section[aria-label='Scene preview']"));
+        Assert.False(map.FindComponent<Talewright.Player.Components.StoryStage>().Instance.ShowCharacterSheet);
+        Assert.Empty(map.FindAll("[aria-label='Character sheet']"));
 
         await map.InvokeAsync(() => map.Instance.SelectScene("END"));
 
