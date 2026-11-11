@@ -7,6 +7,43 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class DebuggerTests
 {
     [Fact]
+    public async Task Native_cli_debug_launches_selected_scene_plays_and_exits_when_the_window_closes()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_CLI_EXECUTABLE")
+            ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-cli-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "cli-debug", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: cli-debug\n  title: CLI Debug\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                Starting scene.
+                * [Continue] -> next
+                === next
+                Selected scene through the CLI.
+                * [Finish] -> END
+                """);
+            await using var driver = new NativePlayerDriver(artifacts, executable, windowInChildProcess: true);
+            await driver.StartAsync("debug", root, "--scene", "next");
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Selected scene through the CLI.");
+            Assert.DoesNotContain("Starting scene.", snapshot.Content);
+            await driver.ChooseAsync("Finish");
+            await WaitFor(driver, "Play again");
+            Assert.Equal(0, await driver.CloseWindowAsync());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Native_map_tab_exposes_scenes_diverts_and_hub_offers_to_the_keyboard()
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
