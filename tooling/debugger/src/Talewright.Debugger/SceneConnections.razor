@@ -21,10 +21,6 @@
                                 ← @OtherScene(connection, incoming: true)
                             </button>
                             <span>@Name(connection)</span>
-                            @if (Status(connection) is { } status)
-                            {
-                                <span class="scene-connection-status">@status</span>
-                            }
                             @if (IsTaken(connection))
                             {
                                 <strong>taken</strong>

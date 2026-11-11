@@ -100,6 +100,42 @@ public sealed class SceneConnectionsTests : BunitContext
     }
 
     [Fact]
+    public void Incoming_connections_do_not_show_current_entry_status_even_when_step_ids_collide()
+    {
+        var files = ComponentStory.Files();
+        files["main.tale"] = """
+            === hall
+            * [Loop] (requires flag:ready, shown "Need a key") -> hall
+            """;
+        files["other.tale"] = """
+            === other
+            * [Enter] -> hall
+            """;
+        using var model = ComponentStory.Load(files);
+        model.Start();
+        Assert.Null(model.Error);
+
+        var story = model.Story!;
+        var map = StoryMap.Build(story);
+        var loop = Assert.Single(map.Diverts, divert => divert.From.Value == "hall");
+        var enter = Assert.Single(map.Diverts, divert => divert.From.Value == "other");
+        Assert.Equal(loop.StepId, enter.StepId);
+
+        var scene = story.GetScene(new SceneId("hall"));
+        var connections = Render<SceneConnections>(parameters => parameters
+            .Add(component => component.Story, story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, scene.Id));
+        var incoming = connections.FindAll("[aria-label='Incoming connections'] li");
+        Assert.Equal(2, incoming.Count);
+        Assert.Contains(incoming, row => row.TextContent.Contains("“Enter”", StringComparison.Ordinal));
+        Assert.Contains(incoming, row => row.TextContent.Contains("“Loop”", StringComparison.Ordinal));
+        Assert.All(incoming, row => Assert.Null(row.QuerySelector(".scene-connection-status")));
+        AssertStatus(connections.FindAll("[aria-label='Outgoing connections'] li"), "“Loop”", "Shown, unavailable");
+    }
+
+    [Fact]
     public void Does_not_reuse_a_choice_decision_from_an_earlier_scene_entry()
     {
         using var model = DebuggerDecisionStory.Start(DebuggerDecisionStory.ReentryTale);
