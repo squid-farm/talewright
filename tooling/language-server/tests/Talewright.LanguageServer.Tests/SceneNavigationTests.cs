@@ -53,6 +53,25 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Symbols_skip_scene_headers_without_an_id()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        await client.Open("typing.tale", "=== camp.entrance\nText.\n===\nMore.\n===   \n=== camp.exit\n-> END", 1);
+
+        var document = await client.Request("textDocument/documentSymbol", new
+        {
+            textDocument = new { uri = client.UriOf("typing.tale") }
+        });
+        var workspace = await client.Request("workspace/symbol", new { query = "" });
+
+        Assert.Equal(["camp.entrance", "camp.exit"],
+            document.GetProperty("result").EnumerateArray().Select(symbol => symbol.GetProperty("name").GetString()));
+        Assert.All(workspace.GetProperty("result").EnumerateArray(),
+            symbol => Assert.False(string.IsNullOrWhiteSpace(symbol.GetProperty("name").GetString())));
+    }
+
+    [Fact]
     public async Task Workspace_symbols_search_ids_and_titles_across_workspace_stories()
     {
         var secondRoot = Path.Combine(Path.GetTempPath(), $"talewright-lsp-symbols-{Guid.NewGuid():N}");
