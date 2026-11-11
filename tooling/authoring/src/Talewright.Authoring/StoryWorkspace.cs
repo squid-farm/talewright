@@ -304,6 +304,9 @@ public sealed class StoryWorkspace
             for (var index = 0; index < syntax.Scenes.Count; index++)
             {
                 var scene = syntax.Scenes[index];
+                // A header still being typed (`===` with no id) is not navigable; editors reject empty symbol names.
+                if (string.IsNullOrWhiteSpace(scene.Id))
+                    continue;
                 var title = scene.Lines
                     .Where(line => line.MetadataKey == SceneMetadataKey.Title)
                     .Select(line => syntax.Value(scene, line).ToString())
