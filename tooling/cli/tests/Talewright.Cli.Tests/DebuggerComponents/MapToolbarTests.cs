@@ -21,9 +21,30 @@ public sealed class MapToolbarTests : BunitContext
         var fitted = 0;
         var toolbar = Render<MapToolbar>(parameters => parameters.Add(component => component.OnFit, () => fitted++));
 
-        toolbar.Find("button").Click();
+        toolbar.FindAll("button").Single(button => button.TextContent == "Fit map").Click();
 
-        Assert.Equal("Fit map", toolbar.Find("button").TextContent);
         Assert.Equal(1, fitted);
+    }
+
+    [Fact]
+    public void Focus_and_export_actions_are_available_from_the_toolbar()
+    {
+        var focused = 0;
+        var svgExports = 0;
+        var pngExports = 0;
+        var toolbar = Render<MapToolbar>(parameters => parameters
+            .Add(component => component.MapReady, true)
+            .Add(component => component.OnFocusCurrentScene, () => focused++)
+            .Add(component => component.OnExportSvg, () => svgExports++)
+            .Add(component => component.OnExportPng, () => pngExports++));
+
+        toolbar.FindAll("button").Single(button => button.TextContent == "Focus current scene").Click();
+        toolbar.FindAll("button").Single(button => button.TextContent == "Export SVG").Click();
+        toolbar.FindAll("button").Single(button => button.TextContent == "Export PNG").Click();
+
+        Assert.Equal(1, focused);
+        Assert.Equal(1, svgExports);
+        Assert.Equal(1, pngExports);
+        Assert.Equal("Export story map", toolbar.Find(".map-export-controls").GetAttribute("aria-label"));
     }
 }

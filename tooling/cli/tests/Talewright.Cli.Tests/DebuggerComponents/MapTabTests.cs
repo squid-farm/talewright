@@ -31,10 +31,11 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         var render = Assert.Single(JSInterop.Invocations["talewrightMap.render"]);
         var view = Assert.IsType<MapView>(render.Arguments[3]);
         Assert.Equal(["hall", "cave"], view.Nodes.Where(node => node.Scene is not null).Select(node => node.Scene));
-        Assert.Equal(map.FindComponent<MapRoute>().Instance.Run, render.Arguments[4]);
+        Assert.IsType<MapRunView>(render.Arguments[4]);
         Assert.NotNull(render.Arguments[4]);
-        Assert.Null(render.Arguments[5]);
+        Assert.Equal("hall", render.Arguments[5]);
         Assert.IsType<DotNetObjectReference<MapTab>>(render.Arguments[6]);
+        Assert.Equal(true, render.Arguments[7]);
         Assert.Empty(map.FindAll("[role=alert]"));
         Assert.False(Button(map, "Export SVG").HasAttribute("disabled"));
         Assert.False(Button(map, "Export PNG").HasAttribute("disabled"));
@@ -52,7 +53,6 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         var map = Show(model);
 
         Assert.Null(Assert.Single(JSInterop.Invocations["talewrightMap.render"]).Arguments[4]);
-        Assert.Null(map.FindComponent<MapRoute>().Instance.Run);
     }
 
     [Fact]
@@ -66,6 +66,7 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         Assert.Equal("The map could not be drawn: no canvas", map.Find("p[role=alert]").TextContent);
         Assert.True(Button(map, "Export SVG").HasAttribute("disabled"));
         Assert.True(Button(map, "Export PNG").HasAttribute("disabled"));
+        Assert.True(Button(map, "Focus current scene").HasAttribute("disabled"));
     }
 
     [Fact]
@@ -92,7 +93,7 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void Focusing_a_scene_selects_it_and_previews_it_with_the_run_state()
+    public void Focusing_a_scene_selects_and_centers_it()
     {
         using var model = ComponentStory.Start();
         var map = Show(model);
@@ -100,102 +101,37 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         SceneButton(map, "cave").Focus();
 
         Assert.Equal("cave", Assert.Single(JSInterop.Invocations["talewrightMap.setFocused"]).Arguments[1]);
-        Assert.Equal("cave", map.FindComponent<MapSceneDetails>().Instance.SelectedNodeId);
+        Assert.Equal("cave", map.Instance.CurrentSelection);
         Assert.Equal("cave", map.FindComponent<MapSceneNavigator>().Instance.SelectedNodeId);
-        var preview = map.Find("section[aria-label='Scene preview']");
-        Assert.Equal("Scene preview: Cave", preview.QuerySelector("h3")!.TextContent);
-        Assert.Contains("using the current playtest state.", preview.TextContent);
-        Assert.Contains("The cave.", preview.TextContent);
-        var choices = preview.QuerySelectorAll("ol[aria-label='Story choices'] button");
-        Assert.Equal(["1. Return", "2. Leave"], choices.Select(item => Text(item.TextContent)));
-        Assert.All(choices, button => Assert.True(button.HasAttribute("disabled")));
 
         SceneButton(map, "cave").Blur();
 
         Assert.Equal("cave", Assert.Single(JSInterop.Invocations["talewrightMap.clearFocused"]).Arguments[1]);
-        // Leaving the navigator keeps the selection so its details stay readable.
-        Assert.NotNull(map.Find("section[aria-label='Scene preview']"));
     }
 
     [Fact]
-    public void Previews_use_setup_values_without_a_run()
-    {
-        using var model = ComponentStory.Load();
-        var map = Show(model);
-
-        SceneButton(map, "hall").Focus();
-
-        var preview = map.Find("section[aria-label='Scene preview']");
-        Assert.Equal("Scene preview: Great Hall", preview.QuerySelector("h3")!.TextContent);
-        Assert.Contains("using scene setup values.", preview.TextContent);
-        Assert.Contains("Count 0.", preview.TextContent);
-        Assert.Equal(["1. Explore", "2. Wait"],
-            preview.QuerySelectorAll("ol[aria-label='Story choices'] button").Select(item => Text(item.TextContent)));
-    }
-
-    [Fact]
-    public void Preview_lists_shown_but_unavailable_choices()
-    {
-        var files = ComponentStory.Files();
-        files["main.tale"] = """
-            === hall
-            @title Great Hall
-            * [Restricted] (requires false, shown "Not ready") -> cave
-            * [Wait] -> hall
-            === cave
-            * [Leave] -> END
-            """;
-        using var model = ComponentStory.Load(files);
-        var map = Show(model);
-
-        SceneButton(map, "hall").Focus();
-
-        var preview = map.Find("section[aria-label='Scene preview']");
-        var choices = preview.QuerySelectorAll("ol[aria-label='Story choices'] button");
-        Assert.Equal(["1. Not ready (Unavailable)", "2. Wait"], choices.Select(item => Text(item.TextContent)));
-        Assert.All(choices, button => Assert.True(button.HasAttribute("disabled")));
-    }
-
-    [Fact]
-    public async Task Selecting_the_end_or_an_unknown_scene_shows_no_preview()
+    public async Task Selecting_the_end_or_an_unknown_scene_updates_selection()
     {
         using var model = ComponentStory.Start();
         var map = Show(model);
         await map.InvokeAsync(() => map.Instance.SelectScene("cave"));
-        Assert.NotNull(map.Find("section[aria-label='Scene preview']"));
-        Assert.False(map.FindComponent<Talewright.Player.Components.StoryStage>().Instance.ShowCharacterSheet);
-        Assert.Empty(map.FindAll("[aria-label='Character sheet']"));
+        Assert.Equal("cave", map.Instance.CurrentSelection);
 
         await map.InvokeAsync(() => map.Instance.SelectScene("END"));
 
-        Assert.Empty(map.FindAll("section[aria-label='Scene preview']"));
-        Assert.Equal("END", map.FindComponent<MapSceneDetails>().Instance.SelectedNodeId);
+        Assert.Equal("END", map.Instance.CurrentSelection);
         await Assert.ThrowsAsync<ArgumentException>(() => map.InvokeAsync(() => map.Instance.SelectScene("nowhere")));
     }
 
     [Fact]
-    public async Task Scene_details_highlight_lines_and_jump_to_their_targets()
+    public async Task Detail_navigation_focuses_the_requested_scene()
     {
         using var model = ComponentStory.Start();
         var map = Show(model);
-        SceneButton(map, "hall").Focus();
-        IElement Explore() => map.FindAll(".map-details button.map-item")
-            .Single(button => button.TextContent.EndsWith("to cave, main.tale line 5", StringComparison.Ordinal));
-
-        Explore().MouseEnter();
-        var line = Assert.Single(JSInterop.Invocations["talewrightMap.highlight"]).Arguments[1];
-        Assert.StartsWith("d", Assert.IsType<string>(line));
-
-        Explore().Click();
-
-        // The detail's target is focused through the scene navigator, which keeps keyboard order intact.
-        var focused = JSInterop.VerifyFocusAsyncInvoke().Arguments[0];
-        var navigator = map.FindComponent<MapSceneNavigator>();
-        await map.InvokeAsync(() => navigator.Instance.FocusSceneAsync("cave"));
-        await map.InvokeAsync(() => navigator.Instance.FocusSceneAsync("hall"));
-        var focuses = JSInterop.VerifyFocusAsyncInvoke(3);
-        Assert.Equal(focused, focuses[1].Arguments[0]);
-        Assert.NotEqual(focused, focuses[2].Arguments[0]);
+        await map.InvokeAsync(() => map.Instance.SelectDetailTarget("cave"));
+        await map.InvokeAsync(() => map.Instance.SelectDetailTarget("hall"));
+        var focuses = JSInterop.VerifyFocusAsyncInvoke(2);
+        Assert.NotEqual(focuses[0].Arguments[0], focuses[1].Arguments[0]);
     }
 
     [Fact]
@@ -223,7 +159,7 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         map.Render(parameters => Parameters(parameters, model));
 
         var update = Assert.Single(JSInterop.Invocations["talewrightMap.updateRun"]);
-        Assert.Equal(map.FindComponent<MapRoute>().Instance.Run, update.Arguments[1]);
+        Assert.Equal("cave", Assert.IsType<MapRunView>(update.Arguments[1]).CurrentScene);
         Assert.Single(JSInterop.Invocations["talewrightMap.render"]);
     }
 
@@ -251,8 +187,8 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         map.Render(parameters => Parameters(parameters, rooms));
 
         Assert.Equal(2, JSInterop.Invocations["talewrightMap.render"].Count);
-        Assert.Null(map.FindComponent<MapSceneDetails>().Instance.SelectedNodeId);
-        Assert.Empty(map.FindAll("section[aria-label='Scene preview']"));
+        Assert.Null(map.Instance.CurrentSelection);
+        Assert.Null(JSInterop.Invocations["talewrightMap.render"][1].Arguments[5]);
         Assert.Equal(["room001", "room002"],
             Assert.IsType<MapView>(JSInterop.Invocations["talewrightMap.render"][1].Arguments[3]).Nodes
                 .Where(node => node.Scene is not null).Select(node => node.Scene));
@@ -269,8 +205,6 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
         map.Render(parameters => Parameters(parameters, recompiled));
 
         Assert.Equal("cave", Assert.IsType<string>(JSInterop.Invocations["talewrightMap.render"][1].Arguments[5]));
-        Assert.Equal("Scene preview: Cave", map.Find("section[aria-label='Scene preview'] h3").TextContent);
-        Assert.Contains("using scene setup values.", map.Find("section[aria-label='Scene preview']").TextContent);
     }
 
     [Fact]
@@ -317,7 +251,7 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
             .Add(component => component.Story, model.Story!)
             .Add(component => component.Session, model.Session)
             .Add(component => component.Inspection, model.Inspection)
-            .Add(component => component.PreviewState, model.PreviewState);
+            .Add(component => component.Active, true);
 
     private static IElement SceneButton(IRenderedComponent<MapTab> map, string scene)
     {
@@ -328,6 +262,4 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
     private static IElement Button(IRenderedComponent<MapTab> map, string text) =>
         map.FindAll("button").Single(button => button.TextContent == text);
 
-    private static string Text(string value) =>
-        string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }

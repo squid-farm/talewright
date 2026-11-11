@@ -1,9 +1,24 @@
 <div class="map-toolbar">
     <button type="button" @onclick="OnFit">Fit map</button>
+    <button type="button" disabled="@(!MapReady)" @onclick="OnFocusCurrentScene">Focus current scene</button>
+    <div class="map-export-controls" aria-label="Export story map">
+        <button type="button" disabled="@(!MapReady || Exporting)" @onclick="OnExportSvg">Export SVG</button>
+        <button type="button" disabled="@(!MapReady || Exporting)" @onclick="OnExportPng">Export PNG</button>
+        @if (ExportStatus is not null)
+        {
+            <p role="status">@ExportStatus</p>
+        }
+    </div>
     <p class="map-status" role="status">@Status</p>
 </div>
 
 @code {
     [Parameter] public string Status { get; set; } = "Laying out the map…";
+    [Parameter] public bool MapReady { get; set; }
+    [Parameter] public bool Exporting { get; set; }
+    [Parameter] public string? ExportStatus { get; set; }
     [Parameter] public EventCallback OnFit { get; set; }
+    [Parameter] public EventCallback OnFocusCurrentScene { get; set; }
+    [Parameter] public EventCallback OnExportSvg { get; set; }
+    [Parameter] public EventCallback OnExportPng { get; set; }
 }

@@ -60,13 +60,17 @@ How it's built:
   into scenes, END, hub offer groups by tag, and lines that merge diverts and hub offers between the same
   scenes. It omits diverts on lines that cannot run, and keeps scenes the start scene cannot reach in a
   separate area with stubs for reachable targets. `MapTab` rebuilds it whenever the accepted story changes.
-  `wwwroot/map/map.js` lays each area out with ELK in a Web Worker, then paints, hit-tests and pans or zooms
-  one canvas with D3 zoom; it needs no GPU. The canvas is hidden from assistive technology: hidden scene
-  buttons with arrow-key navigation, per-scene divert and hub offer lists, and a status line carry the
-  same names and full conditions that hover shows. Selecting a scene shows a Preview of its prose and
-  eligible choices against either the current playtest state or scene setup values; the preview never runs
-  entry effects or skill checks. During a synthetic playtest, visited scenes and taken diverts or hub offers
-  are highlighted in route order and update with Back and Forward. Export SVG or PNG from the map controls;
+  The map fills the main viewer; `MapInspectorPane` puts the selected scene's details, compact preview and
+  current-run route in the workspace Inspector. Opening Map selects and centers the current playtest scene,
+  or the story start when there is no playtest. `wwwroot/map/map.js` lays each area out with ELK in a Web
+  Worker, then paints, hit-tests and pans or zooms one canvas with D3 zoom; it needs no GPU. The canvas is
+  hidden from assistive technology: scene buttons with arrow-key navigation, per-scene divert and hub offer
+  lists, and a status line carry the same names and full conditions that hover shows. The map follows the
+  current scene until manual panning or zooming suspends it; **Focus current scene** resumes following, and
+  **Fit map** restores the whole-map view. Selecting a scene shows a Preview of its prose and eligible
+  choices against either the current playtest state or scene setup values; the preview never runs entry
+  effects or skill checks. During a synthetic playtest, visited scenes and taken diverts or hub offers are
+  highlighted in route order and update with Back and Forward. Export SVG or PNG from the map toolbar;
   both formats reuse the canvas drawing primitives and preserve the current route presentation. PNG
   allocation is capped at 8192 pixels per side and 16,777,216 total pixels (64 MiB of RGBA pixels); use
   SVG for larger maps. The native save dialog writes the image to the selected path using a streamed,

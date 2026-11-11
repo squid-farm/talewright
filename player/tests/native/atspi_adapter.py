@@ -131,6 +131,22 @@ class Desktop:
         self.activate_window()
         pyatspi.Registry.generateMouseEvent(x, y, "b1c")
 
+    def drag(self, from_x, from_y, to_x, to_y):
+        self.activate_window()
+        pyatspi.Registry.generateMouseEvent(from_x, from_y, "b1p")
+        try:
+            time.sleep(0.05)
+            pyatspi.Registry.generateMouseEvent(to_x, to_y, "abs")
+            time.sleep(0.05)
+        finally:
+            pyatspi.Registry.generateMouseEvent(to_x, to_y, "b1r")
+
+    def scroll_at(self, x, y, direction):
+        if direction not in (-1, 1):
+            raise ValueError(f"Scroll direction must be -1 or 1, got {direction}")
+        self.activate_window()
+        pyatspi.Registry.generateMouseEvent(x, y, "b4c" if direction > 0 else "b5c")
+
     def key(self, key, event=pyatspi.KEY_PRESSRELEASE):
         key = {"Enter": "Return", "Space": "space"}.get(key, key)
         found, entries = Gdk.Keymap.get_for_display(Gdk.Display.get_default()).get_entries_for_keyval(
@@ -318,6 +334,10 @@ def serve(args):
                     app.click(**arguments)
                 elif command == "click-at":
                     app.click_at(arguments["x"], arguments["y"])
+                elif command == "drag":
+                    app.drag(**arguments)
+                elif command == "scroll-at":
+                    app.scroll_at(**arguments)
                 elif command == "activate":
                     app.wait(lambda: app.find(name=arguments["name"]), "keyboard activation target")
                     app.activate_window()

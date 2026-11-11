@@ -43,8 +43,9 @@
                             @if (_mapOpened)
                             {
                                 <div id="map-panel" class="map-panel" role="tabpanel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
-                                    <MapTab Story="story" Session="Model.Session" Inspection="Model.Inspection"
-                                            PreviewState="Model.PreviewState" OnSelectScene="InspectScene" />
+                                    <MapTab @ref="_mapTab" Story="story" View="_routeMap" Session="Model.Session"
+                                            Inspection="Model.Inspection" SelectedNodeId="@_mapSelectedNodeId"
+                                            Active="_mapSelected" OnSelectScene="MapSelectionChanged" />
                                 </div>
                             }
                         }
@@ -58,7 +59,16 @@
                     <InspectorPane Story="Model.Story" Selection="_selection" Session="Model.Session"
                                    Inspection="Model.Inspection" SourceMap="Model.AcceptedSourceMap"
                                    Run="CurrentRun" ConnectionsExpanded="_connectionsExpanded"
-                                   ConnectionsExpandedChanged="SetConnectionsExpanded" />
+                                   ConnectionsExpandedChanged="SetConnectionsExpanded" MapSelected="_mapSelected">
+                        @if (_mapSelected && Model.Story is { } mapStory && _routeMap is { } mapView)
+                        {
+                            <MapInspectorPane Story="mapStory" View="mapView" SelectedNodeId="@MapSelection"
+                                              PreviewState="Model.PreviewState" Session="Model.Session"
+                                              Run="CurrentRun" OnHighlight="HighlightMapLine"
+                                              OnSelectScene="SelectMapDetailTarget"
+                                              OnFocusedItemRemoved="FocusSelectedMapScene" />
+                        }
+                    </InspectorPane>
                 </SecondPane>
             </SplitPane>
         </FirstPane>
@@ -108,6 +118,8 @@
     private double _viewerWidth = 70;
     private double _mainHeight = 68;
     private InspectorSelection? _selection;
+    private string? _mapSelectedNodeId;
+    private MapTab? _mapTab;
     private AuthorSession? _lastSession;
     private StoryFrame? _lastFrame;
     private StoryDefinition? _lastSelectionStory;
@@ -263,6 +275,8 @@
         ? MapRunView.Build(story, map, session)
         : null;
 
+    private string? MapSelection => _mapSelectedNodeId;
+
     private Task SettingsReady()
     {
         _settingsReady = true;
@@ -277,13 +291,40 @@
 
     private void SelectMainView(bool map)
     {
-        if (_mapSelected && !map)
+        if (map && !_mapSelected)
+        {
+            _mapSelectedNodeId ??= CurrentRun?.CurrentScene ?? Model.Story?.Start.Value;
+        }
+        else if (!map && _mapSelected)
+        {
             _selection = Model.Session?.Current.Scene is { } scene ? new InspectorSelection(scene) : null;
+        }
+
         _mapSelected = map;
         _mapOpened |= map;
     }
 
-    private void InspectScene(SceneId scene) => _selection = new InspectorSelection(scene);
+    private void MapSelectionChanged(string? scene)
+    {
+        _mapSelectedNodeId = scene;
+        if (scene is not null && scene != "END")
+            _selection = new InspectorSelection(new SceneId(scene));
+    }
+
+    private Task SelectMapDetailTarget(string scene) =>
+        _mapTab is { } map
+            ? map.SelectDetailTarget(scene)
+            : throw new InvalidOperationException("The map scene navigator is not available.");
+
+    private Task HighlightMapLine(string? line) =>
+        _mapTab is { } map
+            ? map.HighlightLine(line)
+            : throw new InvalidOperationException("The story map is not available.");
+
+    private Task FocusSelectedMapScene() =>
+        _mapTab is { } map
+            ? map.FocusSelectedScene()
+            : throw new InvalidOperationException("The map scene navigator is not available.");
 
     private Task SelectTool(string tab)
     {

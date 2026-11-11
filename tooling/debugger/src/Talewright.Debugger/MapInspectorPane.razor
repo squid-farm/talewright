@@ -1,0 +1,65 @@
+@using Talewright.Core.State
+@using Talewright.Runtime
+@using Talewright.Talemark.Model
+
+@if (View is not null)
+{
+    <MapSceneDetails View="View" SelectedNodeId="@SelectedNodeId"
+                     OnHighlight="OnHighlight" OnSelectScene="OnSelectScene"
+                     OnFocusedItemRemoved="OnFocusedItemRemoved" />
+}
+@if (_previewError is not null)
+{
+    <p role="alert" class="tw-error">@_previewError</p>
+}
+@if (_preview is { } preview)
+{
+    <section class="map-preview" aria-label="Scene preview">
+        <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
+        <p class="tool-note">Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
+        <ReaderPresentation>
+            <StoryStage Story="Story" Passages="PreviewPassages" PassageWindow="1" Current="preview.Frame"
+                        State="PreviewState" Identity="preview.Frame" Busy="true" ShowCharacterSheet="false" />
+        </ReaderPresentation>
+    </section>
+}
+<MapRoute Run="Run" />
+
+@code {
+    [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+    [Parameter] public MapView? View { get; set; }
+    [Parameter] public string? SelectedNodeId { get; set; }
+    [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
+    [Parameter] public AuthorSession? Session { get; set; }
+    [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public EventCallback<string?> OnHighlight { get; set; }
+    [Parameter] public EventCallback<string> OnSelectScene { get; set; }
+    [Parameter] public EventCallback OnFocusedItemRemoved { get; set; }
+
+    private MapScenePreview? _preview;
+    private string? _previewError;
+    private IReadOnlyList<HistoryFrame> PreviewPassages => _preview is { } preview
+        ? [new(preview.Frame)]
+        : [];
+
+    protected override void OnParametersSet()
+    {
+        _preview = null;
+        _previewError = null;
+        if (SelectedNodeId is not { } selected || View is null)
+            return;
+
+        var scene = Story.Scenes.SingleOrDefault(candidate => candidate.Id.Value == selected);
+        if (scene is null)
+            return;
+
+        try
+        {
+            _preview = MapScenePreviewBuilder.Build(Story, scene.Id, PreviewState, Session is not null);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException or ArithmeticException)
+        {
+            _previewError = $"The scene preview could not be rendered: {ex.Message}";
+        }
+    }
+}
