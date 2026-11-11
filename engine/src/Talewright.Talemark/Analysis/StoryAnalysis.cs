@@ -89,13 +89,14 @@ public sealed class StoryAnalysis
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
-        : this(source, collector, diagnostics, null, null, false) { }
+        : this(source, collector, diagnostics, null, null, false, null) { }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
-        StoryAnalysis? snapshot, string currentFile)
-        : this(source, collector, diagnostics, snapshot, currentFile, true) { }
+        StoryAnalysis? snapshot, string currentFile, IReadOnlyList<string>? additionalTagNames = null)
+        : this(source, collector, diagnostics, snapshot, currentFile, true, additionalTagNames) { }
 
     private StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
-        StoryAnalysis? snapshot, string? currentFile, bool currentFileAnalysis)
+        StoryAnalysis? snapshot, string? currentFile, bool currentFileAnalysis,
+        IReadOnlyList<string>? additionalTagNames)
     {
         Source = source;
         _currentFile = currentFileAnalysis ? currentFile : null;
@@ -116,6 +117,8 @@ public sealed class StoryAnalysis
                 .ToHashSet(StringComparer.Ordinal);
             if (currentFileAnalysis && snapshot is not null)
                 tagNames.UnionWith(snapshot.Names.DeclaredNames(AuthoringSymbolKind.Tag, currentFile!));
+            if (currentFileAnalysis && additionalTagNames is not null)
+                tagNames.UnionWith(additionalTagNames);
             tagCandidates = tagNames.OrderBy(name => name, StringComparer.Ordinal)
                 .Select(name => new AuthoringSymbol(name, AuthoringSymbolKind.Tag, "tag", null)).ToArray();
         }
@@ -246,7 +249,8 @@ public static class StoryAnalyzer
     }
 
     internal static StoryAnalysis AnalyzeCurrentFile(StorySource source, string file, TaleFileSyntax? syntax,
-        StoryAnalysis? snapshot, CompilerOptions options, CancellationToken cancellationToken)
+        StoryAnalysis? snapshot, CompilerOptions options, CancellationToken cancellationToken,
+        IReadOnlyList<string>? additionalTagNames = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var collector = new AnalysisCollector(source, options);
@@ -368,7 +372,7 @@ public static class StoryAnalyzer
 
         cancellationToken.ThrowIfCancellationRequested();
         return new StoryAnalysis(source, collector, inheritedDiagnostics.Concat(diagnostics.Items).ToArray(),
-            snapshot, file);
+            snapshot, file, additionalTagNames);
     }
 
     private static void RemovePreviousFileSymbols(string file, IReadOnlyList<AuthoringSymbol> previousSymbols,

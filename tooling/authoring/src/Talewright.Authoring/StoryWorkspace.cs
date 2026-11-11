@@ -266,7 +266,16 @@ public sealed class StoryWorkspace
             var syntax = path.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase)
                 ? GetSyntax(path, text, cancellationToken)
                 : null;
-            var analysis = StoryAnalyzer.AnalyzeCurrentFile(source, path, syntax, snapshot, _options, cancellationToken);
+            var additionalTagNames = snapshot is null && syntax is not null &&
+                syntax.Scenes.Any(scene => scene.Lines.Any(line =>
+                    line.MetadataKey is SceneMetadataKey.Tags or SceneMetadataKey.Hub))
+                ? files.Where(pair => pair.Key != path &&
+                        pair.Key.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase))
+                    .SelectMany(pair => DeclaredTags(GetSyntax(pair.Key, pair.Value, cancellationToken)))
+                    .Distinct(StringComparer.Ordinal).ToArray()
+                : null;
+            var analysis = StoryAnalyzer.AnalyzeCurrentFile(source, path, syntax, snapshot, _options,
+                cancellationToken, additionalTagNames);
             if (_missingMetadata && !analysis.Diagnostics.Any(diagnostic =>
                     diagnostic.Code == AuthoringDiagnosticCodes.CustomFeaturesUnavailable))
                 analysis = analysis.WithDiagnostic(new Diagnostic(DiagnosticSeverity.Error,
@@ -402,6 +411,15 @@ public sealed class StoryWorkspace
                 _syntax[path] = syntax;
         }
         return syntax;
+    }
+
+    private static IEnumerable<string> DeclaredTags(TaleFileSyntax syntax)
+    {
+        foreach (var scene in syntax.Scenes)
+        foreach (var line in scene.Lines)
+            if (!line.IsInvalid && line.MetadataKey == SceneMetadataKey.Tags)
+                foreach (var tag in TaleSyntaxParser.ReadTags(syntax.Value(scene, line).ToString()))
+                    yield return tag;
     }
 
     private static SourceLocation EndLocation(string path, TaleFileSyntax syntax)
