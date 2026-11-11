@@ -432,7 +432,7 @@ the [reader-text grammar](../reference/talemark-operators.md#reader-text-grammar
 - `StorySession`: the engine loop (§5).
 - `StoryFrame(Scene, Title, Document, Choices, IsEnded)`: `Choices` contains available choices only; `Menu` carries all shown entries in order with stable numbers and availability.
 - `EventNarrator.Describe(events, state)`: turns the events produced by an action into `RenderedNote`s
-  ("Athletics check: 10 +2 = 12 vs DC 12 — success", "Gained: rope", "Explorers' Guild −20 (now Unfriendly)",
+  ("Athletics check: 10 + 2 = 12 vs DC 12 — success", "Gained: rope", "Explorers' Guild − 20 (now Unfriendly)",
   "Level 2!"). This is why authors never write "you lost 3 HP" by hand.
 
 ### 3.7 `Talewright.Player` — the shared Blazor UI (Razor Class Library)

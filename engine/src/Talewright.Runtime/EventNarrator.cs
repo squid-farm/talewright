@@ -63,5 +63,5 @@ public static class EventNarrator
         return quantity == 1 ? name : $"{name} ×{quantity}";
     }
 
-    private static string Signed(int value) => value < 0 ? $"−{-value}" : $"+{value}";
+    private static string Signed(int value) => value < 0 ? $"− {-value}" : $"+ {value}";
 }

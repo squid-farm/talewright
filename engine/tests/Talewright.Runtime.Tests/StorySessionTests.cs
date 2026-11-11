@@ -96,7 +96,7 @@ public class StorySessionTests
 
         Assert.Equal(new SceneId("cursed"), frame.Scene);
         Assert.Equal(
-            "[Gained: Relic of Ysh]\n\n[Explorers' Guild −20 (now Unfriendly)]\n\nThe relic hums. Outcast: yes.",
+            "[Gained: Relic of Ysh]\n\n[Explorers' Guild − 20 (now Unfriendly)]\n\nThe relic hums. Outcast: yes.",
             Text(frame));
         Assert.Equal(12, session.State.GetStat(EntityId.Player, new StatId("wis")));
         Assert.Contains(session.Events, e => e is TriggerFired { TriggerId: "outcast" });
@@ -114,7 +114,7 @@ public class StorySessionTests
             """));
 
         var frame = session.Start();
-        Assert.Equal("[Hit Points −3 (7)]\n\nFires: 1. HP: 7.", Text(frame));
+        Assert.Equal("[Hit Points − 3 (7)]\n\nFires: 1. HP: 7.", Text(frame));
     }
 
     [Theory]
@@ -140,7 +140,7 @@ public class StorySessionTests
         Assert.Equal(new SceneId(scene), frame.Scene);
         var note = Assert.IsType<RenderedNote>(frame.Document.Blocks[0]);
         Assert.Equal(NoteKind.Check, note.Kind);
-        Assert.Equal($"Athletics check: 10 +2 = 12 vs DC {dc} — {outcome}", note.Text);
+        Assert.Equal($"Athletics check: 10 + 2 = 12 vs DC {dc} — {outcome}", note.Text);
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public class StorySessionTests
             """));
 
         var frame = session.Start();
-        Assert.Equal("You look around.\n\n[Perception check: 10 +0 = 10 vs DC 5 — success]\n\n[Gained: coil of rope]", Text(frame));
+        Assert.Equal("You look around.\n\n[Perception check: 10 + 0 = 10 vs DC 5 — success]\n\n[Gained: coil of rope]", Text(frame));
         Assert.Equal([StorySession.ContinueKey], frame.Choices.Select(c => c.Key));
         Assert.Equal("A rope!", Text(session.Choose(StorySession.ContinueKey)));
     }
@@ -232,7 +232,7 @@ public class StorySessionTests
         // Nerve is a custom stat, so its value (3) is added to the fixed 10.
         Assert.Equal(new SceneId(scene), frame.Scene);
         var note = Assert.IsType<RenderedNote>(frame.Document.Blocks[0]);
-        Assert.Equal($"Nerve check: 10 +3 = 13 vs DC {dc} — {outcome}", note.Text);
+        Assert.Equal($"Nerve check: 10 + 3 = 13 vs DC {dc} — {outcome}", note.Text);
         Assert.Empty(session.Events.OfType<DiceRolled>());
     }
 
@@ -333,7 +333,7 @@ public class StorySessionTests
             """));
 
         var frame = session.Start();
-        Assert.Equal("[Experience +150 (150)]\n\n[Level 2!]\n\nLevel 2.", Text(frame));
+        Assert.Equal("[Experience + 150 (150)]\n\n[Level 2!]\n\nLevel 2.", Text(frame));
     }
 
     [Fact]
