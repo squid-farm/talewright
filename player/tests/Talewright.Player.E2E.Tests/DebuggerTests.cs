@@ -917,13 +917,16 @@ public sealed class DebuggerTests
             var snapshot = await WaitFor(driver, "Current scene: next.");
             Assert.Contains("Scene preview: The road", snapshot.Content);
 
+            await driver.ActivateAsync("The gate (start), start");
+            snapshot = await WaitFor(driver, "Scene preview: The gate");
+
             await driver.ActivateAsync("Timeline");
             await driver.ClickAsync("Back command");
             snapshot = await WaitFor(driver, "Current scene: start.");
             Assert.Contains("Scene preview: The gate", snapshot.Content);
             await driver.ClickAsync("Forward command");
             snapshot = await WaitFor(driver, "Current scene: next.");
-            Assert.Contains("Scene preview: The road", snapshot.Content);
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
 
             var fit = snapshot.Descendants().Single(node => node.Role == "push button" && node.Name == "Fit map").Bounds;
             var x = (int)fit.X + 150;
@@ -937,10 +940,15 @@ public sealed class DebuggerTests
             await driver.ClickAsync("Back command");
             snapshot = await WaitFor(driver, "Current scene: start.");
             Assert.Contains("Following is paused", snapshot.Content);
-            Assert.Contains("Scene preview: The road", snapshot.Content);
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+            await driver.ClickAsync("Forward command");
+            snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Following is paused", snapshot.Content);
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
 
             await driver.ClickAsync("Focus current scene");
-            snapshot = await WaitFor(driver, "Scene preview: The gate");
+            snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
             Assert.DoesNotContain("Following is paused", snapshot.Content);
         }
         finally

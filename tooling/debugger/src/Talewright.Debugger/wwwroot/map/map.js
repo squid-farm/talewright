@@ -554,7 +554,6 @@ window.talewrightMap = (() => {
 
   function followCurrent(state, scene) {
     if (!scene || !state.nodes?.has(scene)) return;
-    select(state, scene);
     center(state, scene, Math.max(state.transform.k, 0.8));
   }
 
