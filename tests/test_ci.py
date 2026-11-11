@@ -159,7 +159,7 @@ class DebuggerIsolationTests(unittest.TestCase):
             with self.subTest(component=component.relative_to(self.ROOT)):
                 self.assertNotRegex(component.read_text(), forbidden_components)
 
-        for name in ("SceneViewer.razor", "MapTab.razor"):
+        for name in ("SceneViewer.razor", "MapInspectorPane.razor"):
             with self.subTest(component=name):
                 source = (self.DEBUGGER / name).read_text()
                 self.assertIn("<ReaderPresentation>", source)
