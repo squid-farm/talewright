@@ -4,30 +4,43 @@
 
 @foreach (var decision in Inspection.FindDecisions(Filter, Kind).TakeLast(100))
 {
-    <details open="@ReferenceEquals(decision, ExpandedDecision)">
-        <summary>@decision.Kind @decision.Scene @decision.Subject: @decision.Outcome (@decision.Reason)</summary>
-        @if (SelectionFor(decision) is { } selection)
+    var status = DebuggerDecisionStatus.ForDecision(decision);
+    <div class="decision-list-entry">
+        <details open="@ReferenceEquals(decision, ExpandedDecision)">
+            <summary>@decision.Kind @decision.Scene @decision.Subject: @decision.Outcome (@decision.Reason)@if (status is not null) { <text> — @status</text> }</summary>
+            @if (SelectionFor(decision) is { } selection)
+            {
+                <button type="button" @onclick="() => OnInspectSelection.InvokeAsync(selection)">
+                    @(selection.ChoiceKey is null ? "Inspect scene" : "Inspect choice")
+                </button>
+            }
+            @if (Inspection.SourceFor(decision) is { } source)
+            {
+                <p>Source: @source.Start.File:@source.Start.Line:@source.Start.Column</p>
+            }
+            <p>Events [@decision.EventStart, @decision.EventEnd).
+                @if (decision.Pass is { } pass) { <text> Pass: @pass.</text> }
+                @if (decision.Priority is { } priority) { <text> Priority: @priority.</text> }
+                @if (decision.Rank is { } rank) { <text> Rank: @rank.</text> }
+                @if (decision.Limit is { } limit) { <text> Limit: @limit.</text> }
+            </p>
+            @if (decision.Expression is { } expression && status != DebuggerDecisionStatus.ShownUnavailable)
+            {
+                <ul><ExpressionView Trace="expression" /></ul>
+            }
+            @if (decision.EventStart is { } start && decision.EventEnd is { } end && end > start)
+            {
+                <ul>@foreach (var item in Inspection.Events.Skip(start).Take(end - start)) { <li>@item</li> }</ul>
+            }
+        </details>
+        @if (status == DebuggerDecisionStatus.ShownUnavailable && decision.Expression is { } trace)
         {
-            <button type="button" @onclick="() => OnInspectSelection.InvokeAsync(selection)">
-                @(selection.ChoiceKey is null ? "Inspect scene" : "Inspect choice")
-            </button>
+            <div class="decision-failing-requirement" aria-label="Failing requires">
+                <strong>Failing requires</strong>
+                <ul><ExpressionView Trace="trace" /></ul>
+            </div>
         }
-        @if (Inspection.SourceFor(decision) is { } source)
-        {
-            <p>Source: @source.Start.File:@source.Start.Line:@source.Start.Column</p>
-        }
-        <p>Events [@decision.EventStart, @decision.EventEnd).
-            @if (decision.Pass is { } pass) { <text> Pass: @pass.</text> }
-            @if (decision.Priority is { } priority) { <text> Priority: @priority.</text> }
-            @if (decision.Rank is { } rank) { <text> Rank: @rank.</text> }
-            @if (decision.Limit is { } limit) { <text> Limit: @limit.</text> }
-        </p>
-        @if (decision.Expression is { } expression) { <ul><ExpressionView Trace="expression" /></ul> }
-        @if (decision.EventStart is { } start && decision.EventEnd is { } end && end > start)
-        {
-            <ul>@foreach (var item in Inspection.Events.Skip(start).Take(end - start)) { <li>@item</li> }</ul>
-        }
-    </details>
+    </div>
 }
 
 @code {

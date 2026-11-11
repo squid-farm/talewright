@@ -200,6 +200,32 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Branch_decision_inspects_a_shown_unavailable_choice_without_advancing_or_changing_events()
+    {
+        File.WriteAllText(Path.Combine(_root.FullName, "main.tale"), DebuggerDecisionStory.Tale);
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        var session = model.Session!;
+        var inspection = model.Inspection!;
+        var current = session.Current;
+        var eventCount = inspection.Events.Count;
+
+        await workbench.Find("#tool-branches-tab").ClickAsync(new MouseEventArgs());
+        var decision = workbench.FindAll("#tool-branches-panel details")
+            .Single(details => details.QuerySelector("summary")!.TextContent.Contains("Choice hall step:9:1", StringComparison.Ordinal));
+        Assert.Contains("Shown, unavailable", decision.QuerySelector("summary")!.TextContent);
+        await decision.QuerySelector("button")!.ClickAsync(new MouseEventArgs());
+
+        var inspector = workbench.FindComponent<ChoiceInspector>();
+        Assert.Contains("Shown, unavailable", inspector.Markup);
+        Assert.Contains("Need 0 keys", inspector.Markup);
+        Assert.Contains("flag:ready", inspector.Markup);
+        Assert.Same(current, session.Current);
+        Assert.Equal(eventCount, inspection.Events.Count);
+    }
+
+    [Fact]
     public async Task Pane_visibility_toggles_restore_and_persist_the_layout()
     {
         var workbench = Show();

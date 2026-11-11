@@ -105,6 +105,29 @@ public sealed class InspectorTests : BunitContext
     }
 
     [Fact]
+    public void Choice_inspector_distinguishes_available_shown_hidden_and_unreached_choices()
+    {
+        using var model = DebuggerDecisionStory.Start();
+
+        var available = ShowChoice(model, "c1");
+        Assert.Equal("Available", Status(available));
+        Assert.Equal("Alternate 0", Value(available, "shown text"));
+
+        var shown = ShowChoice(model, "c2");
+        Assert.Equal("Shown, unavailable", Status(shown));
+        Assert.Equal("Need 0 keys", Value(shown, "shown text"));
+        Assert.Contains("flag:ready", shown.Markup);
+
+        var hidden = ShowChoice(model, "c3");
+        Assert.Equal("Hidden", Status(hidden));
+        Assert.Contains("flag:ready", hidden.Markup);
+
+        var unreached = ShowChoice(model, "c0");
+        Assert.Equal("Not reached", Status(unreached));
+        Assert.Contains("Not evaluated in this run.", unreached.Markup);
+    }
+
+    [Fact]
     public void Inspector_pane_renders_the_selected_choice()
     {
         using var model = ComponentStory.Load();
@@ -157,5 +180,28 @@ public sealed class InspectorTests : BunitContext
             decision.Kind == DecisionKind.Choice && decision.Subject == "step:4:1"), branchDecision);
         Assert.Equal(originalScene, model.Session.Current.Scene);
         Assert.Equal(originalEvents, model.Inspection.Events.Count);
+    }
+
+    private IRenderedComponent<ChoiceInspector> ShowChoice(WorkbenchModel model, string key)
+    {
+        var scene = model.Story!.GetScene(new SceneId("hall"));
+        var choice = model.Session!.Current.Choices.FirstOrDefault(item => item.Key == key);
+        return Render<ChoiceInspector>(parameters => parameters
+            .Add(component => component.Story, model.Story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.ChoiceKey, key)
+            .Add(component => component.Choice, choice)
+            .Add(component => component.Session, model.Session)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, model.Session.Current.Scene));
+    }
+
+    private static string Status(IRenderedComponent<ChoiceInspector> inspector) =>
+        Value(inspector, "Status");
+
+    private static string Value(IRenderedComponent<ChoiceInspector> inspector, string label)
+    {
+        var term = inspector.FindAll("dt").Single(item => item.TextContent == label);
+        return term.NextElementSibling!.TextContent;
     }
 }

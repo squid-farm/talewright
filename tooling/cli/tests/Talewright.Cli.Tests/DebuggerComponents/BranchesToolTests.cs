@@ -36,7 +36,7 @@ public sealed class BranchesToolTests : BunitContext
 
         tool.Find("select[aria-label='Decision kind']").Change("Choice");
         Assert.Equal(DecisionKind.Choice, tool.FindComponent<DecisionList>().Instance.Kind);
-        Assert.Equal(["Choice cave step:11:1: Offered (Unconditional)", "Choice cave step:12:1: Offered (Unconditional)"],
+        Assert.Equal(["Choice cave step:11:1: Offered (Unconditional) — Available", "Choice cave step:12:1: Offered (Unconditional) — Available"],
             DecisionListTests.Summaries(tool));
 
         tool.Find("select[aria-label='Decision kind']").Change("");

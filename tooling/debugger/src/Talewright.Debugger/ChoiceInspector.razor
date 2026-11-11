@@ -1,5 +1,8 @@
 @using Talewright.Core.Events
 @using Talewright.Core.Identity
+@using Talewright.Narrative.Grammar
+@using Talewright.Narrative.Rendering
+@using Talewright.Narrative.Templates
 @using Talewright.Rules.Diagnostics
 @using Talewright.Runtime
 @using Talewright.Talemark.Formatting
@@ -13,8 +16,13 @@
     <dl>
         <dt>Choice key</dt><dd>@ChoiceKey</dd>
         <dt>Label</dt><dd>@(Choice?.Text ?? "Choice is not currently available")</dd>
+        @if (ShownText is { } shownText)
+        {
+            <dt>shown text</dt><dd>@shownText</dd>
+        }
         <dt>Target or targets</dt><dd>@Targets</dd>
         <dt>Chosen in this run</dt><dd>@(WasChosen ? "Yes" : "No")</dd>
+        <dt>Status</dt><dd>@DebuggerDecisionStatus.ForDecision(LatestDecision)</dd>
         <dt>Latest decision</dt>
         <dd>@(LatestDecision is { } latest ? $"{latest.Outcome} ({latest.Reason})" : "No recorded decision")</dd>
     </dl>
@@ -23,7 +31,7 @@
     {
         <p>None</p>
     }
-    else if (LatestDecision?.Expression is { } trace)
+    else if (LatestDecision is { Outcome: not DecisionOutcome.NotEvaluated, Expression: { } trace })
     {
         <ul><ExpressionView Trace="trace" /></ul>
     }
@@ -60,6 +68,24 @@
         ? Story.GetScene(new SceneId(ChoiceKey[StorySession.StoryletKeyPrefix.Length..]))
         : null;
     private Expr? Requirement => Definition?.Requires ?? HubTarget?.Requires;
+    private string? ShownText
+    {
+        get
+        {
+            var shown = Definition?.Shown ?? HubTarget?.Shown;
+            if (shown is null)
+                return null;
+
+            var text = shown.Text ?? Definition?.Label;
+            if (text is null)
+                return Choice?.Text ?? HubTarget?.Title ?? HubTarget?.Id.Value;
+
+            return Session is { } session
+                ? RenderedInline.ToPlainText(new TemplateRenderer(EnglishGrammar.Instance, Story.Predicates)
+                    .RenderInlines(text, session.State))
+                : MapView.PlainText(text);
+        }
+    }
     private string Targets
     {
         get
@@ -76,7 +102,7 @@
     private string? StepId => Definition is null ? null : SceneSteps.Walk(Scene.Steps).OfType<ChoiceStep>()
         .Single(step => step.Choice.Key == ChoiceKey).Id;
 
-    private RuleDecision? LatestDecision => Inspection?.Decisions.LastOrDefault(decision =>
+    private RuleDecision? LatestDecision => DebuggerDecisionStatus.ForLatestSceneEntry(Inspection, Scene.Id).LastOrDefault(decision =>
         decision.Scene == Scene.Id && (Definition is not null
             ? decision.Kind == DecisionKind.Choice && decision.Subject == StepId
             : decision.Kind == DecisionKind.Storylet && decision.Subject == HubTarget?.Id.Value));

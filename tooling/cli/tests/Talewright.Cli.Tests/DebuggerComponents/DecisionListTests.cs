@@ -20,16 +20,16 @@ public sealed class DecisionListTests : BunitContext
         [
             "Trigger counted: Primed (InitialCondition)",
             "Trigger hall counted: Suppressed (ConditionFalse)",
-            "Choice hall step:4:1: Excluded (ConditionFalse)",
-            "Choice hall step:5:1: Offered (Unconditional)",
-            "Choice hall step:6:1: Offered (Unconditional)",
+            "Choice hall step:4:1: Excluded (ConditionFalse) — Hidden",
+            "Choice hall step:5:1: Offered (Unconditional) — Available",
+            "Choice hall step:6:1: Offered (Unconditional) — Available",
             "Trigger hall counted: Suppressed (ConditionFalse)",
             "Trigger cave counted: Suppressed (ConditionFalse)",
             "Trigger cave counted: Fired (RisingEdge)",
             "Trigger cave counted: Suppressed (NotRising)",
             "EntryEffect cave step:9:1: Applied (Unconditional)",
-            "Choice cave step:11:1: Offered (Unconditional)",
-            "Choice cave step:12:1: Offered (Unconditional)",
+            "Choice cave step:11:1: Offered (Unconditional) — Available",
+            "Choice cave step:12:1: Offered (Unconditional) — Available",
         ], Summaries(list));
     }
 
@@ -77,11 +77,43 @@ public sealed class DecisionListTests : BunitContext
         var inspection = model.Inspection!;
 
         Assert.Equal(6, Summaries(Show(inspection, "CAVE")).Count);
-        Assert.Equal(["Choice hall step:4:1: Excluded (ConditionFalse)"], Summaries(Show(inspection, "step:4")));
+        Assert.Equal(["Choice hall step:4:1: Excluded (ConditionFalse) — Hidden"], Summaries(Show(inspection, "step:4")));
         Assert.Equal(5, Summaries(Show(inspection, kind: DecisionKind.Choice)).Count);
-        Assert.Equal(["Choice cave step:11:1: Offered (Unconditional)", "Choice cave step:12:1: Offered (Unconditional)"],
+        Assert.Equal(["Choice cave step:11:1: Offered (Unconditional) — Available", "Choice cave step:12:1: Offered (Unconditional) — Available"],
             Summaries(Show(inspection, "cave", DecisionKind.Choice)));
         Assert.Empty(Summaries(Show(inspection, kind: DecisionKind.Check)));
+    }
+
+    [Fact]
+    public void Shows_choice_and_hub_offer_statuses_with_shown_requirements_visible_when_collapsed()
+    {
+        using var model = DebuggerDecisionStory.Start();
+
+        var list = Show(model.Inspection!);
+        var summaries = Summaries(list);
+
+        Assert.Contains(summaries, summary => summary.Contains("Choice hall", StringComparison.Ordinal)
+            && summary.EndsWith("— Available", StringComparison.Ordinal));
+        Assert.Contains(summaries, summary => summary.Contains("Choice hall", StringComparison.Ordinal)
+            && summary.EndsWith("— Shown, unavailable", StringComparison.Ordinal));
+        Assert.Contains(summaries, summary => summary.Contains("Choice hall", StringComparison.Ordinal)
+            && summary.EndsWith("— Hidden", StringComparison.Ordinal));
+        Assert.Contains("Choice hall step:6:1: NotEvaluated (ConditionFalse) — Not reached", summaries);
+        Assert.Contains(summaries, summary => summary.Contains("Storylet hall available-offer", StringComparison.Ordinal)
+            && summary.EndsWith("— Available", StringComparison.Ordinal));
+        Assert.Contains(summaries, summary => summary.Contains("Storylet hall shown-offer", StringComparison.Ordinal)
+            && summary.EndsWith("— Shown, unavailable", StringComparison.Ordinal));
+        Assert.Contains(summaries, summary => summary.Contains("Storylet hall limited-offer", StringComparison.Ordinal)
+            && summary.EndsWith("— Dropped by hub limit", StringComparison.Ordinal));
+        Assert.Contains(summaries, summary => summary.Contains("Storylet hall hidden-offer", StringComparison.Ordinal)
+            && summary.EndsWith("— Hidden", StringComparison.Ordinal));
+
+        var shownRow = list.FindAll(".decision-list-entry")
+            .Single(row => row.QuerySelector("summary")!.TextContent.Contains("Choice hall step:9:1", StringComparison.Ordinal)
+                && row.QuerySelector("summary")!.TextContent.Contains("Shown, unavailable", StringComparison.Ordinal));
+        Assert.False(shownRow.QuerySelector("details")!.HasAttribute("open"));
+        Assert.Contains("Failing requires", shownRow.TextContent);
+        Assert.Contains("flag:ready", shownRow.TextContent);
     }
 
     [Fact]
@@ -102,8 +134,23 @@ public sealed class DecisionListTests : BunitContext
             .Add(component => component.Filter, filter)
             .Add(component => component.Kind, kind));
 
-    private static string Summary(RuleDecision decision) =>
-        Normalize($"{decision.Kind} {decision.Scene} {decision.Subject}: {decision.Outcome} ({decision.Reason})");
+    private static string Summary(RuleDecision decision)
+    {
+        var status = decision.Kind is DecisionKind.Choice or DecisionKind.Storylet
+            ? decision switch
+            {
+                { Outcome: DecisionOutcome.Offered, Reason: DecisionReason.ConditionTrue or DecisionReason.Unconditional } => "Available",
+                { Kind: DecisionKind.Storylet, Outcome: DecisionOutcome.Selected } => "Available",
+                { Outcome: DecisionOutcome.Offered, Reason: DecisionReason.ConditionFalse } => "Shown, unavailable",
+                { Outcome: DecisionOutcome.Excluded, Reason: DecisionReason.ConditionFalse } => "Hidden",
+                { Outcome: DecisionOutcome.Excluded, Reason: DecisionReason.HubLimit } => "Dropped by hub limit",
+                { Outcome: DecisionOutcome.NotEvaluated } => "Not reached",
+                _ => null,
+            }
+            : null;
+        return Normalize($"{decision.Kind} {decision.Scene} {decision.Subject}: {decision.Outcome} ({decision.Reason})" +
+            (status is null ? "" : $" — {status}"));
+    }
 
     internal static List<string> Summaries<T>(IRenderedComponent<T> list) where T : Microsoft.AspNetCore.Components.IComponent =>
         list.FindAll("details > summary").Select(summary => Normalize(summary.TextContent)).ToList();

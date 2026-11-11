@@ -69,8 +69,12 @@ How it's built:
   current scene until manual panning or zooming suspends it; **Focus current scene** resumes following, and
   **Fit map** restores the whole-map view. Selecting a scene shows a Preview of its prose and eligible
   choices against either the current playtest state or scene setup values; the preview never runs entry
-  effects or skill checks. During a synthetic playtest, visited scenes and taken diverts or hub offers are
-  highlighted in route order and update with Back and Forward. Export SVG or PNG from the map toolbar;
+  effects or skill checks. Choices and hub offers written with `shown` have dotted lines and their accessible
+  names, map details and tooltips say “shown when unavailable”; SVG and PNG exports use the same line styling.
+  During a synthetic playtest, visited scenes and taken diverts or hub offers are highlighted in route order
+  and update with Back and Forward. The Inspector and Branches show the shared choice and hub-offer statuses;
+  Branches also shows the failing `requires` trace for shown-but-unavailable choices without requiring expansion.
+  Export SVG or PNG from the map toolbar;
   both formats reuse the canvas drawing primitives and preserve the current route presentation. PNG
   allocation is capped at 8192 pixels per side and 16,777,216 total pixels (64 MiB of RGBA pixels); use
   SVG for larger maps. The native save dialog writes the image to the selected path using a streamed,
@@ -78,4 +82,6 @@ How it's built:
   and its dependencies), with notices in `THIRD-PARTY-NOTICES.md` and license files beside them, so the map
   works offline. ELK stays an authoring-tool dependency and must not ship in games.
 - **Scene connections.** The scene inspector shows a compact, ordered text list of incoming and outgoing
-  diverts and hub offers. Connections taken in the current playtest are marked in text.
+  diverts and hub offers. Connections taken in the current playtest are marked in text. Outgoing choices
+  and hub offers for the current scene show their status from that scene's latest entry; other scenes do not
+  show current-entry status.

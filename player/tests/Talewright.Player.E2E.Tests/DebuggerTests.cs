@@ -811,6 +811,7 @@ public sealed class DebuggerTests
                 === start
                 @title Beginning
                 * [Continue] -> next
+                * [Restricted] (requires false, shown "Need a key") -> next
                 === next
                 @title Ending
                 @hub fire
@@ -857,6 +858,8 @@ public sealed class DebuggerTests
             Assert.Contains(labels, label => label.Contains("CURRENT", StringComparison.Ordinal));
             Assert.Contains(labels, label => label.Contains("SELECTED", StringComparison.Ordinal));
             Assert.Contains(labels, label => label.Contains("#fire", StringComparison.Ordinal));
+            Assert.Contains("2 3", svg.Descendants(svgNamespace + "path")
+                .Select(path => (string?)path.Attribute("stroke-dasharray")));
             Assert.All(svg.Descendants().Attributes().Where(attribute => attribute.Name is { LocalName: "fill" or "stroke" }),
                 attribute => Assert.DoesNotContain("light-dark(", attribute.Value));
             Assert.Equal($"rgb({red}, {green}, {blue})", svg.Root!.Elements(svgNamespace + "rect").Single().Attribute("fill")!.Value);
@@ -1303,6 +1306,67 @@ public sealed class DebuggerTests
                 (int)Math.Round(choice.Bounds.Y + choice.Bounds.Height / 2));
             snapshot = await WaitFor(driver, "Scene inspector", "Later", "The next passage.");
             Assert.DoesNotContain("Choice inspector", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Native_debugger_keyboard_inspects_a_shown_unavailable_choice_without_advancing()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-shown-choice-debug-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-shown-choice", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: shown-choice-debug\n  title: Shown Choice Debug\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                A beginning.
+                * [Restricted] (requires flag:ready, shown "Need a key") -> next
+                === next
+                @title Later
+                The next passage.
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await EnsureToolsVisible(driver);
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Beginning", "Need a key");
+            const string choiceName = "1. Need a key (Unavailable)";
+            var choice = Assert.Single(snapshot.Descendants(),
+                node => node.Role == "push button" && node.Name == choiceName);
+            Assert.False(choice.Enabled);
+
+            await driver.ActivateAsync("Branches");
+            snapshot = await WaitFor(driver, "Shown, unavailable", "Failing requires");
+            await driver.FillAsync("Filter decisions", "");
+            await WaitForFocus(driver, "Decision kind");
+            await driver.PressAsync("Tab");
+            const string decision = "Choice start step:4:1: Offered (ConditionFalse) — Shown, unavailable";
+            snapshot = await WaitForFocus(driver, decision);
+            Assert.Contains("Failing requires", snapshot.Content);
+
+            await driver.PressAsync("Enter");
+            await driver.PressAsync("Tab");
+            await WaitForFocus(driver, "Inspect choice");
+            await driver.PressAsync("Enter");
+            snapshot = await WaitFor(driver, "Choice inspector", "Shown, unavailable", "Need a key");
+            Assert.Contains("flag:ready", snapshot.Content);
+            Assert.Contains("A beginning.", snapshot.Content);
+            Assert.DoesNotContain("The next passage.", snapshot.Content);
+            choice = Assert.Single(snapshot.Descendants(),
+                node => node.Role == "push button" && node.Name == choiceName);
+            Assert.False(choice.Enabled);
         }
         finally
         {
