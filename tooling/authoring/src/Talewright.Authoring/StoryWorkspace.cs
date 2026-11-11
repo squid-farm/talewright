@@ -79,8 +79,10 @@ public sealed class StoryWorkspace
     private SharedAnalysis? _shared;
     private CurrentFileAnalysis? _currentFileAnalysis;
     private int _syntaxParseCount;
+    private long _tagRevision;
 
-    private sealed record CurrentFileAnalysis(string File, string Text, StoryAnalysis? Snapshot, StoryAnalysis Analysis);
+    private sealed record CurrentFileAnalysis(string File, string Text, StoryAnalysis? Snapshot, long TagRevision,
+        StoryAnalysis Analysis);
 
     public StoryWorkspace(StorySource source, CompilerOptions? options = null, bool requiresProjectMetadata = false)
         : this(source, options, requiresProjectMetadata, null, null)
@@ -247,12 +249,14 @@ public sealed class StoryWorkspace
             lock (_gate)
             {
                 if (_currentFileAnalysis is { } cached &&
-                    cached.File == path && cached.Text == text && ReferenceEquals(cached.Snapshot, snapshot))
+                    cached.File == path && cached.Text == text && ReferenceEquals(cached.Snapshot, snapshot) &&
+                    cached.TagRevision == _tagRevision)
                     return cached.Analysis;
             }
 
             Dictionary<string, string> files;
             string[] images;
+            long tagRevision;
             lock (_gate)
             {
                 files = snapshot?.Source.Files.ToDictionary(StringComparer.Ordinal) ?? new(_disk, StringComparer.Ordinal);
@@ -260,6 +264,7 @@ public sealed class StoryWorkspace
                     foreach (var (openPath, document) in _open)
                         files[openPath] = document.Text;
                 images = _imagePaths.ToArray();
+                tagRevision = _tagRevision;
             }
             files[path] = text;
             var source = new StorySource(files, images);
@@ -285,8 +290,9 @@ public sealed class StoryWorkspace
 
             lock (_gate)
             {
-                if (TryGetText(path, out var current) && string.Equals(current, text, StringComparison.Ordinal))
-                    _currentFileAnalysis = new(path, text, snapshot, analysis);
+                if (_tagRevision == tagRevision && TryGetText(path, out var current) &&
+                    string.Equals(current, text, StringComparison.Ordinal))
+                    _currentFileAnalysis = new(path, text, snapshot, tagRevision, analysis);
             }
             return analysis;
         }
@@ -440,6 +446,8 @@ public sealed class StoryWorkspace
 
     private void Invalidate(string? path = null)
     {
+        if (path?.EndsWith(StorySource.TaleExtension, StringComparison.OrdinalIgnoreCase) == true)
+            _tagRevision++;
         if (path is null || _currentFileAnalysis?.File == path)
             _currentFileAnalysis = null;
         if (path is not null && _syntax.TryGetValue(path, out var syntax) &&

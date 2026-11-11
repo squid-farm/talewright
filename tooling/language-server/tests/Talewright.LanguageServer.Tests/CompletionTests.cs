@@ -102,11 +102,16 @@ public sealed partial class ServerTests
 
         Assert.Equal(["local", "opened", "remote"], labels);
 
+        await client.Change("open.tale", "=== open\n-> END", 2);
+        labels = Items(await Completion(client, "start.tale", marked, ensureAnalyzed: false))
+            .Select(item => item.GetProperty("label").GetString()!).ToArray();
+        Assert.Equal(["local", "remote"], labels);
+
         const string changed = "=== start\n-> END\n=== completion\n@hub |";
         await client.Change("start.tale", changed.Replace("|", ""), 2);
         labels = Items(await Completion(client, "start.tale", changed))
             .Select(item => item.GetProperty("label").GetString()!).ToArray();
-        Assert.Equal(["opened", "remote"], labels);
+        Assert.Equal(["remote"], labels);
     }
 
     [Fact]
