@@ -33,3 +33,13 @@
 .scene-connection-other {
     font-family: var(--tw-font-monospace, monospace);
 }
+
+button.scene-connection-other {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--tw-accent);
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
+}

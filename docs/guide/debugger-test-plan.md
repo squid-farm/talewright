@@ -211,30 +211,40 @@ remain YAML or Talemark, not JSON.
 
 ## 9. Inspect and export the story map
 
-1. Open **Map** and expect it to select and center the current playtest scene, or the story start when
+1. In Scene view, select an incoming or outgoing connection. Confirm the Inspector changes to the
+   other scene while the playtest passage and history stay unchanged. **Back to current scene** returns
+   to the running scene. A divert to `END` is plain text, with no inspection or target action.
+2. Select a different scene and try **Show on map**, **Use as target** and **Show source**. Confirm
+   each action changes only its intended view or Setup value, and that **Use as target** does not
+   start or jump. In Source, **Follow current scene** restores tracking after a pinned source
+   selection; a choice source marks the choice line.
+3. In **Branches**, use the keyboard to focus **Inspect choice** for a disabled player choice and
+   activate it. Confirm the player choice remains unchosen, its decision can be opened with
+   **Show branch explanation**, and the Inspector's **Show source** marks that choice line.
+4. Open **Map** and expect it to select and center the current playtest scene, or the story start when
    no playtest exists. Confirm the map occupies the main viewer and the one workspace Inspector shows
    the selected scene's details and compact preview. Select another scene and confirm its diverts,
    hub offers and preview follow the selection. The unreachable area follows diverts and hub offers
    only; it does not evaluate whether their conditions are satisfiable. Check both light and dark
    system themes: the canvas background must match the debugger theme, with readable scene and divert
    labels. Repeat these color checks on SVG and PNG exports.
-2. With a playtest active, move to another scene while Map is open and confirm the map follows it.
+5. With a playtest active, move to another scene while Map is open and confirm the map follows it.
    Pan and zoom separately; each must pause following while the current scene continues to update.
    Activate **Focus current scene** and confirm the map re-centers and follows again. While the current
    and selected scenes differ, confirm their canvas markers have distinct text labels, not just colors.
-3. With a synthetic playtest active, choose a divert, then use **Back command** and **Forward command**.
+6. With a synthetic playtest active, choose a divert, then use **Back command** and **Forward command**.
    Expect visited scenes and taken diverts or hub offers to remain highlighted in route order and track
    the command cursor.
-4. Click **Export SVG**, choose a destination, and open the saved file. Expect the full map, labels,
+7. Click **Export SVG**, choose a destination, and open the saved file. Expect the full map, labels,
    hub-offer group and the current route presentation. Repeat with **Export PNG** and confirm the image
    includes the whole layout rather than only the visible/panned area. This is the only check of the
    native save dialog: automated native tests bypass it with a test-only override, because UI automation
    cannot accept a system save dialog. Also confirm **Cancel** leaves no file, and a name typed without
    an extension saves with `.svg` or `.png`.
-5. In a disposable copy of a sufficiently large story, attempt a PNG export whose layout exceeds the
+8. In a disposable copy of a sufficiently large story, attempt a PNG export whose layout exceeds the
    documented 8192-pixel edge or 16,777,216-pixel total limit. Expect an explicit error before canvas
    allocation that recommends SVG; SVG export remains available.
-6. In a packaged debugger, confirm
+9. In a packaged debugger, confirm
    `debug-assets/map/vendor/THIRD-PARTY-NOTICES.md` and all files under
    `debug-assets/map/vendor/licenses` are present. Disconnect network access and repeat the map checks;
    no external map resources should be requested.

@@ -1170,6 +1170,65 @@ public sealed class DebuggerTests
     }
 
     [Fact]
+    public async Task Native_debugger_inspector_links_source_and_setup_without_advancing_the_playtest()
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-inspector-links-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-inspector-links", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                $"game:\n  id: inspector-links-{Guid.NewGuid():N}\n  title: Inspector Links\n  start: start\ncharacters:\n  player: {{first-name: Tester}}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title Beginning
+                A beginning.
+                * [Continue] -> next
+                === next
+                @title Later
+                The next passage.
+                * [Finish] -> END
+                """);
+
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await EnsureToolsVisible(driver);
+            await driver.ClickAsync("Start selected scene");
+            var snapshot = await WaitFor(driver, "Scene inspector", "Beginning");
+            if (!snapshot.Descendants().Any(node =>
+                    node.Role == "separator" && node.Name == "Resize inspector"))
+                await driver.ClickToggleAsync("Inspector");
+
+            await driver.ClickAsync("→ next");
+            snapshot = await WaitFor(driver, "Scene inspector", "Later");
+            Assert.Contains("A beginning.", snapshot.Content);
+            Assert.DoesNotContain("The next passage.", snapshot.Content);
+
+            await driver.ClickAsync("Show source");
+            snapshot = await WaitFor(driver, "Scene next source range: lines 5 to 8 (inclusive).");
+            Assert.Contains("A beginning.", snapshot.Content);
+            Assert.Contains("The next passage.", snapshot.Content);
+
+            await driver.ClickAsync("Use as target");
+            snapshot = await WaitFor(driver, "Start selected scene");
+            Assert.Contains("A beginning.", snapshot.Content);
+            Assert.DoesNotContain("The next passage.", snapshot.Content);
+
+            await driver.ClickAsync("Start selected scene");
+            snapshot = await WaitFor(driver, "The next passage.");
+            Assert.Contains("Scene inspector", snapshot.Content);
+            Assert.Contains("Later", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Native_debugger_inspect_mode_selects_choices_without_choosing_and_escape_exits()
     {
         var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")

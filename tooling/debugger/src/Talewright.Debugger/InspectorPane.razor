@@ -1,3 +1,5 @@
+@using Talewright.Core.Identity
+@using Talewright.Rules.Diagnostics
 @using Talewright.Runtime
 @using Talewright.Talemark.Compilation
 @using Talewright.Talemark.Model
@@ -20,13 +22,18 @@
                 ? Session.Current.Choices.FirstOrDefault(item => item.Key == choiceKey)
                 : null;
             <ChoiceInspector Story="Story" Scene="scene" ChoiceKey="@choiceKey" Choice="choice"
-                             Session="Session" Inspection="Inspection" />
+                             Session="Session" Inspection="Inspection" CurrentScene="Session?.Current.Scene"
+                             OnBackToCurrentScene="OnBackToCurrentScene" OnShowSource="OnShowChoiceSource"
+                             OnShowBranchExplanation="OnShowBranchExplanation" />
         }
         else
         {
             <SceneInspector Story="Story" Scene="scene" SourceMap="SourceMap" Session="Session"
                             Inspection="Inspection" Run="Run" ConnectionsExpanded="ConnectionsExpanded"
-                            ConnectionsExpandedChanged="ConnectionsExpandedChanged" />
+                            ConnectionsExpandedChanged="ConnectionsExpandedChanged"
+                            CurrentScene="Session?.Current.Scene" OnBackToCurrentScene="OnBackToCurrentScene"
+                            OnShowOnMap="OnShowOnMap" OnUseAsTarget="OnUseAsTarget" OnShowSource="OnShowSceneSource"
+                            OnInspectScene="OnInspectScene" />
         }
     }
 </aside>
@@ -40,6 +47,13 @@
     [Parameter] public MapRunView? Run { get; set; }
     [Parameter] public bool ConnectionsExpanded { get; set; } = true;
     [Parameter] public EventCallback<bool> ConnectionsExpandedChanged { get; set; }
+    [Parameter] public EventCallback OnBackToCurrentScene { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowOnMap { get; set; }
+    [Parameter] public EventCallback<SceneId> OnUseAsTarget { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowSceneSource { get; set; }
+    [Parameter] public EventCallback<InspectorSelection> OnShowChoiceSource { get; set; }
+    [Parameter] public EventCallback<RuleDecision> OnShowBranchExplanation { get; set; }
+    [Parameter] public EventCallback<SceneId> OnInspectScene { get; set; }
     [Parameter] public bool MapSelected { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

@@ -1,3 +1,4 @@
+@using Talewright.Core.Identity
 @using Talewright.Rules.Diagnostics
 @using Talewright.Runtime
 @using Talewright.Talemark.Compilation
@@ -6,6 +7,9 @@
 
 <section class="scene-inspector" aria-label="Scene inspector">
     <h2>@(Scene.Title ?? Scene.Id.Value)</h2>
+    <SceneNavigationActions Scene="Scene.Id" CurrentScene="CurrentScene"
+                            OnBackToCurrentScene="OnBackToCurrentScene" OnShowOnMap="OnShowOnMap"
+                            OnUseAsTarget="OnUseAsTarget" OnShowSource="OnShowSource" />
     <dl>
         <dt>Scene ID</dt><dd>@Scene.Id</dd>
         <dt>Title</dt><dd>@(Scene.Title ?? "None")</dd>
@@ -42,7 +46,8 @@
         <p>Not evaluated in this run.</p>
     }
     <SceneConnections Story="Story" Scene="Scene" Run="Run"
-                      Expanded="ConnectionsExpanded" ExpandedChanged="ConnectionsExpandedChanged" />
+                      Expanded="ConnectionsExpanded" ExpandedChanged="ConnectionsExpandedChanged"
+                      OnInspectScene="OnInspectScene" />
 </section>
 
 @code {
@@ -52,8 +57,14 @@
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
     [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public SceneId? CurrentScene { get; set; }
     [Parameter] public bool ConnectionsExpanded { get; set; } = true;
     [Parameter] public EventCallback<bool> ConnectionsExpandedChanged { get; set; }
+    [Parameter] public EventCallback OnBackToCurrentScene { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowOnMap { get; set; }
+    [Parameter] public EventCallback<SceneId> OnUseAsTarget { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowSource { get; set; }
+    [Parameter] public EventCallback<SceneId> OnInspectScene { get; set; }
 
     private RuleDecision? LatestRequirement => Inspection?.Decisions.LastOrDefault(decision =>
         decision.Kind == DecisionKind.Storylet &&

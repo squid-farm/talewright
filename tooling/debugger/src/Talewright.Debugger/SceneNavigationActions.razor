@@ -1,0 +1,32 @@
+@using Talewright.Core.Identity
+
+<nav class="scene-navigation-actions" aria-label="Scene navigation">
+    @if (CurrentScene is { } current && current != Scene)
+    {
+        <button type="button" @onclick="OnBackToCurrentScene">Back to current scene</button>
+    }
+    @if (ShowOnMap)
+    {
+        <button type="button" @onclick="() => OnShowOnMap.InvokeAsync(Scene)">Show on map</button>
+    }
+    @if (UseAsTarget)
+    {
+        <button type="button" @onclick="() => OnUseAsTarget.InvokeAsync(Scene)">Use as target</button>
+    }
+    @if (ShowSource)
+    {
+        <button type="button" @onclick="() => OnShowSource.InvokeAsync(Scene)">Show source</button>
+    }
+</nav>
+
+@code {
+    [Parameter, EditorRequired] public SceneId Scene { get; set; }
+    [Parameter] public SceneId? CurrentScene { get; set; }
+    [Parameter] public bool ShowOnMap { get; set; } = true;
+    [Parameter] public bool UseAsTarget { get; set; } = true;
+    [Parameter] public bool ShowSource { get; set; } = true;
+    [Parameter] public EventCallback OnBackToCurrentScene { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowOnMap { get; set; }
+    [Parameter] public EventCallback<SceneId> OnUseAsTarget { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowSource { get; set; }
+}

@@ -1,4 +1,5 @@
 @using Talewright.Core.State
+@using Talewright.Core.Identity
 @using Talewright.Runtime
 @using Talewright.Talemark.Model
 
@@ -7,6 +8,13 @@
     <MapSceneDetails View="View" SelectedNodeId="@SelectedNodeId"
                      OnHighlight="OnHighlight" OnSelectScene="OnSelectScene"
                      OnFocusedItemRemoved="OnFocusedItemRemoved" />
+}
+@if (SelectedScene is { } scene)
+{
+    <SceneNavigationActions Scene="scene.Id" CurrentScene="CurrentScene"
+                            OnBackToCurrentScene="OnBackToCurrentScene" OnShowOnMap="OnShowOnMap"
+                            OnUseAsTarget="OnUseAsTarget" OnShowSource="OnShowSource" />
+    <SceneConnections Story="Story" Scene="scene" Run="Run" OnInspectScene="OnInspectScene" />
 }
 @if (_previewError is not null)
 {
@@ -32,8 +40,14 @@
     [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public SceneId? CurrentScene { get; set; }
     [Parameter] public EventCallback<string?> OnHighlight { get; set; }
     [Parameter] public EventCallback<string> OnSelectScene { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowOnMap { get; set; }
+    [Parameter] public EventCallback<SceneId> OnUseAsTarget { get; set; }
+    [Parameter] public EventCallback<SceneId> OnShowSource { get; set; }
+    [Parameter] public EventCallback OnBackToCurrentScene { get; set; }
+    [Parameter] public EventCallback<SceneId> OnInspectScene { get; set; }
     [Parameter] public EventCallback OnFocusedItemRemoved { get; set; }
 
     private MapScenePreview? _preview;
@@ -41,6 +55,9 @@
     private IReadOnlyList<HistoryFrame> PreviewPassages => _preview is { } preview
         ? [new(preview.Frame)]
         : [];
+    private SceneDefinition? SelectedScene => SelectedNodeId is { } selected
+        ? Story.Scenes.FirstOrDefault(scene => scene.Id.Value == selected)
+        : null;
 
     protected override void OnParametersSet()
     {

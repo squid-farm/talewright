@@ -1,4 +1,6 @@
 using Bunit;
+using Microsoft.AspNetCore.Components;
+using Talewright.Core.Identity;
 using Talewright.Debugger;
 
 namespace Talewright.Cli.Tests.DebuggerComponents;
@@ -63,5 +65,33 @@ public sealed class SourceToolTests : BunitContext
         Assert.Null(tool.FindComponent<SourceView>().Instance.Source);
         Assert.StartsWith("Source mapping unavailable for this passage", tool.Find("p[role=status]").TextContent);
         Assert.Empty(tool.FindAll("table"));
+    }
+
+    [Fact]
+    public async Task Explicit_source_selection_stays_pinned_until_follow_current_scene()
+    {
+        using var model = ComponentStory.Start();
+        var selection = new InspectorSelection(new SceneId("hall"), "c1");
+        var followed = false;
+        var tool = Render<SourceTool>(parameters => parameters
+            .Add(component => component.Model, model)
+            .Add(component => component.Selection, selection)
+            .Add(component => component.OnFollowCurrentScene,
+                EventCallback.Factory.Create(this, () => followed = true)));
+
+        var source = tool.FindComponent<SourceView>().Instance.Source!;
+        Assert.Equal(5, source.HighlightLine);
+        Assert.Contains("source-choice", tool.Find("tr.source-choice").ClassName);
+        Assert.Equal("true", tool.Find("tr.source-choice").GetAttribute("aria-current"));
+        Assert.Contains("Follow current scene", tool.Markup);
+
+        ComponentStory.Choose(model, "Explore");
+        tool.Render();
+        Assert.Equal(new SceneId("cave"), model.Session!.Current.Scene!.Value);
+        Assert.Equal(new SceneId("hall"), tool.FindComponent<SourceView>().Instance.Source!.Scene);
+
+        await tool.FindAll("button").Single(button => button.TextContent.Trim() == "Follow current scene")
+            .ClickAsync(new());
+        Assert.True(followed);
     }
 }

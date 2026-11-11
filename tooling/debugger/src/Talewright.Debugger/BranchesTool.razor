@@ -13,12 +13,30 @@
         <p>Decision recording unavailable for this run.</p>
     }
     <p class="tool-note">Showing the most recent 100 matching decisions. Filter by subject or scene ID.</p>
-    <DecisionList Inspection="Inspection" Filter="@_decisionFilter" Kind="SelectedKind" />
+    <DecisionList Inspection="Inspection" Filter="@_decisionFilter" Kind="SelectedKind"
+                  Story="Story" ExpandedDecision="FocusedDecision" OnInspectSelection="OnInspectSelection" />
 </section>
 
 @code {
     [Parameter, EditorRequired] public AuthorInspection Inspection { get; set; } = null!;
+    [Parameter] public StoryDefinition? Story { get; set; }
+    [Parameter] public RuleDecision? FocusedDecision { get; set; }
+    [Parameter] public int FocusRevision { get; set; }
+    [Parameter] public EventCallback<InspectorSelection> OnInspectSelection { get; set; }
     private string _decisionFilter = "";
     private string _kind = "";
     private DecisionKind? SelectedKind => Enum.TryParse<DecisionKind>(_kind, out var kind) ? kind : null;
+    private RuleDecision? _previousDecision;
+    private int _previousFocusRevision;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_previousDecision, FocusedDecision) || _previousFocusRevision != FocusRevision)
+        {
+            _previousDecision = FocusedDecision;
+            _previousFocusRevision = FocusRevision;
+            if (FocusedDecision is { } decision)
+                _decisionFilter = decision.Subject;
+        }
+    }
 }

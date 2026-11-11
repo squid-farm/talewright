@@ -1,7 +1,17 @@
+@using Talewright.Core.Identity
+@using Talewright.Rules.Diagnostics
+@using Talewright.Talemark.Model
+
 @foreach (var decision in Inspection.FindDecisions(Filter, Kind).TakeLast(100))
 {
-    <details>
+    <details open="@ReferenceEquals(decision, ExpandedDecision)">
         <summary>@decision.Kind @decision.Scene @decision.Subject: @decision.Outcome (@decision.Reason)</summary>
+        @if (SelectionFor(decision) is { } selection)
+        {
+            <button type="button" @onclick="() => OnInspectSelection.InvokeAsync(selection)">
+                @(selection.ChoiceKey is null ? "Inspect scene" : "Inspect choice")
+            </button>
+        }
         @if (Inspection.SourceFor(decision) is { } source)
         {
             <p>Source: @source.Start.File:@source.Start.Line:@source.Start.Column</p>
@@ -24,4 +34,30 @@
     [Parameter, EditorRequired] public AuthorInspection Inspection { get; set; } = null!;
     [Parameter] public string Filter { get; set; } = "";
     [Parameter] public DecisionKind? Kind { get; set; }
+    [Parameter] public StoryDefinition? Story { get; set; }
+    [Parameter] public RuleDecision? ExpandedDecision { get; set; }
+    [Parameter] public EventCallback<InspectorSelection> OnInspectSelection { get; set; }
+
+    private InspectorSelection? SelectionFor(RuleDecision decision)
+    {
+        if (Story is null)
+            return null;
+
+        if (decision.Kind == DecisionKind.Storylet &&
+            Story.Scenes.Any(scene => scene.Id.Value == decision.Subject))
+        {
+            return new(new SceneId(decision.Subject));
+        }
+
+        if (decision.Kind == DecisionKind.Choice && decision.Scene is { } choiceScene)
+        {
+            var choiceStep = SceneSteps.Walk(Story.GetScene(choiceScene).Steps)
+                .OfType<ChoiceStep>().FirstOrDefault(step => step.Id == decision.Subject);
+            return choiceStep is null ? null : new(choiceScene, choiceStep.Choice.Key);
+        }
+
+        return decision.Scene is { } scene && Story.Scenes.Any(candidate => candidate.Id == scene)
+            ? new(scene)
+            : null;
+    }
 }

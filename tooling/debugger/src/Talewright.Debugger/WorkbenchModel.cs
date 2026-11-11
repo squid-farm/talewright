@@ -60,7 +60,7 @@ public sealed class SetupText(VarId id, string value)
     }
 }
 
-public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text);
+public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text, int? HighlightLine = null);
 
 /// <summary>UI-independent orchestration; every replacement is prepared before adoption.</summary>
 public sealed class WorkbenchModel(string root, string? requestedScene = null) : IDisposable
@@ -80,13 +80,29 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     {
         get
         {
-            if (Session?.Current.Scene is not { } scene || AcceptedSourceMap is not { } map
-                || !map.Scenes.TryGetValue(scene, out var range))
-            {
-                return null;
-            }
-            return new(scene, range, map.Source.Files[range.File]);
+            return Session?.Current.Scene is { } scene ? AcceptedSourceFor(scene) : null;
         }
+    }
+
+    public AcceptedSceneSource? AcceptedSourceFor(SceneId scene, string? choiceKey = null)
+    {
+        if (Story is not { } story || AcceptedSourceMap is not { } map ||
+            !map.Scenes.TryGetValue(scene, out var range))
+        {
+            return null;
+        }
+
+        int? highlightLine = null;
+        if (choiceKey is not null)
+        {
+            var choiceStep = SceneSteps.Walk(story.GetScene(scene).Steps).OfType<ChoiceStep>()
+                .SingleOrDefault(step => step.Choice.Key == choiceKey);
+            if (choiceStep is null)
+                return null;
+            highlightLine = choiceStep.Source.Start.Line;
+        }
+
+        return new(scene, range, map.Source.Files[range.File], highlightLine);
     }
     public bool RestartRequired { get; private set; }
     public string? ReloadStatus { get; private set; }

@@ -17,7 +17,9 @@
         <div class="source-bar">
             <p class="source-location" title="@source.Range.File">Accepted file: @source.Range.File. Scene @source.Scene source range: lines @source.Range.StartLine to @source.Range.EndLine (inclusive).</p>
             <span class="source-page" aria-hidden="true">@_firstLine–@LastLine of @_lines.Length</span>
-            <button type="button" @onclick="ShowScene">Go to current scene source</button>
+            <button type="button" @onclick="ShowScene">
+                @(FollowingCurrentScene ? "Go to current scene source" : "Go to selected scene source")
+            </button>
             <button type="button" disabled="@(_firstLine == 1)" @onclick="Previous">Previous source lines</button>
             <button type="button" disabled="@(LastLine == _lines.Length)" @onclick="Next">Next source lines</button>
         </div>
@@ -28,7 +30,8 @@
                 <tbody>
                     @for (var line = _firstLine; line <= LastLine; line++)
                     {
-                        <tr class="@(line >= source.Range.StartLine && line <= source.Range.EndLine ? "source-scene" : null)">
+                        <tr class="@LineClass(source, line)"
+                            aria-current="@(line == source.HighlightLine ? "true" : null)">
                             <th scope="row">@line</th><td><code>@_lines[line - 1]</code></td>
                         </tr>
                     }
@@ -43,6 +46,7 @@
     [Parameter] public bool Pending { get; set; }
     [Parameter] public bool Rejected { get; set; }
     [Parameter] public bool RestartRequired { get; set; }
+    [Parameter] public bool FollowingCurrentScene { get; set; } = true;
     private const int PageSize = 100;
     private AcceptedSceneSource? _displayed;
     private string[] _lines = [];
@@ -69,5 +73,18 @@
     {
         _firstLine = firstLine;
         ++_navigationRevision;
+    }
+
+    private static string? LineClass(AcceptedSceneSource source, int line)
+    {
+        var isScene = line >= source.Range.StartLine && line <= source.Range.EndLine;
+        var isChoice = line == source.HighlightLine;
+        return (isScene, isChoice) switch
+        {
+            (true, true) => "source-scene source-choice",
+            (true, false) => "source-scene",
+            (false, true) => "source-choice",
+            _ => null,
+        };
     }
 }

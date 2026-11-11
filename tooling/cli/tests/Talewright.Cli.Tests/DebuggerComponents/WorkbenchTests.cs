@@ -4,6 +4,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Talewright.Core.Identity;
 using Talewright.Debugger;
 
 namespace Talewright.Cli.Tests.DebuggerComponents;
@@ -89,6 +90,113 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         var savedLayout = Assert.IsType<DebuggerWorkspace.WorkspaceLayout>(
             _layoutModule.Invocations["saveLayout"].Last().Arguments[0]);
         Assert.False(savedLayout.ConnectionsExpanded);
+    }
+
+    [Fact]
+    public async Task Inspector_navigation_shows_source_and_sets_a_target_without_advancing_the_run()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        var current = model.Session!.Current;
+        var eventCount = model.Inspection!.Events.Count;
+
+        var outgoing = workbench.FindAll("[aria-label='Outgoing connections'] li")
+            .Single(row => row.TextContent.Contains("Choice c1 “Explore”", StringComparison.Ordinal));
+        await outgoing.QuerySelector("button")!.ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(new SceneId("cave"), workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene);
+        Assert.Same(current, model.Session.Current);
+        Assert.Equal(eventCount, model.Inspection.Events.Count);
+
+        await Button(workbench, "Back to current scene").ClickAsync(new MouseEventArgs());
+        Assert.Equal(new SceneId("hall"), workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene);
+        Assert.Same(current, model.Session.Current);
+
+        outgoing = workbench.FindAll("[aria-label='Outgoing connections'] li")
+            .Single(row => row.TextContent.Contains("Choice c1 “Explore”", StringComparison.Ordinal));
+        await outgoing.QuerySelector("button")!.ClickAsync(new MouseEventArgs());
+        await Button(workbench, "Show source").ClickAsync(new MouseEventArgs());
+        Assert.False(workbench.Find("#tool-source-panel").HasAttribute("hidden"));
+        Assert.Contains("Scene cave source range", workbench.FindComponent<SourceTool>().Markup);
+        Assert.Same(current, model.Session.Current);
+        Assert.Equal(eventCount, model.Inspection.Events.Count);
+
+        ComponentStory.Choose(model, "Wait");
+        workbench.Render();
+        Assert.Equal(new SceneId("cave"), workbench.FindComponent<SourceTool>().FindComponent<SourceView>().Instance.Source!.Scene);
+        await workbench.FindAll("button").Single(button => button.TextContent.Trim() == "Follow current scene")
+            .ClickAsync(new MouseEventArgs());
+        Assert.Equal(new SceneId("hall"), workbench.FindComponent<SourceTool>().FindComponent<SourceView>().Instance.Source!.Scene);
+
+        outgoing = workbench.FindAll("[aria-label='Outgoing connections'] li")
+            .Single(row => row.TextContent.Contains("Choice c1 “Explore”", StringComparison.Ordinal));
+        await outgoing.QuerySelector("button")!.ClickAsync(new MouseEventArgs());
+        await Button(workbench, "Use as target").ClickAsync(new MouseEventArgs());
+        Assert.Equal("cave", model.Target);
+        Assert.False(workbench.Find("#tool-setup-panel").HasAttribute("hidden"));
+        var beforeStart = model.Session!.Current;
+
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        Assert.Equal(new SceneId("cave"), model.Session!.Current.Scene);
+        Assert.NotSame(beforeStart, model.Session.Current);
+    }
+
+    [Fact]
+    public async Task Map_connection_selection_updates_and_centers_the_shared_inspector_selection()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        var current = model.Session!.Current;
+
+        await Button(workbench, "Show on map").ClickAsync(new MouseEventArgs());
+        Assert.False(workbench.Find("#map-panel").HasAttribute("hidden"));
+        Assert.Equal(new SceneId("hall"), workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene);
+
+        var outgoing = workbench.FindAll("[aria-label='Outgoing connections'] li")
+            .Single(row => row.TextContent.Contains("Choice c1 “Explore”", StringComparison.Ordinal));
+        await outgoing.QuerySelector("button")!.ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("cave", workbench.FindComponent<MapInspectorPane>().Instance.SelectedNodeId);
+        Assert.Equal("cave", workbench.FindComponent<MapTab>().Instance.CurrentSelection);
+        Assert.Equal(new SceneId("cave"), workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene);
+        Assert.Same(current, model.Session.Current);
+        Assert.Equal("cave", JSInterop.Invocations["talewrightMap.setFocused"].Last().Arguments[1]);
+    }
+
+    [Fact]
+    public async Task Branch_decision_inspects_a_disabled_choice_and_opens_its_explanation()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        var session = model.Session!;
+        var inspection = model.Inspection!;
+        var current = session.Current;
+        var eventCount = inspection.Events.Count;
+        Assert.DoesNotContain(session.Current.Choices, choice => choice.Text == "Prepared");
+
+        await workbench.Find("#tool-branches-tab").ClickAsync(new MouseEventArgs());
+        var decision = workbench.FindAll("#tool-branches-panel details")
+            .Single(details => details.QuerySelector("summary")!.TextContent.Contains("Choice hall step:4:1", StringComparison.Ordinal));
+        var inspectChoice = decision.QuerySelector("button")!;
+        Assert.Equal("button", inspectChoice.LocalName);
+        Assert.Equal("Inspect choice", inspectChoice.TextContent.Trim());
+        await inspectChoice.ClickAsync(new MouseEventArgs());
+
+        var selection = workbench.FindComponent<InspectorPane>().Instance.Selection!;
+        Assert.Equal(new SceneId("hall"), selection.Scene);
+        Assert.Equal("c0", selection.ChoiceKey);
+        Assert.Contains("Choice c0", workbench.FindComponent<ChoiceInspector>().Markup);
+        Assert.Same(current, session.Current);
+        Assert.Equal(eventCount, inspection.Events.Count);
+
+        await workbench.FindAll("button").Single(button => button.TextContent.Trim() == "Show branch explanation")
+            .ClickAsync(new MouseEventArgs());
+        Assert.False(workbench.Find("#tool-branches-panel").HasAttribute("hidden"));
+        var expanded = Assert.Single(workbench.FindAll("#tool-branches-panel details[open]"));
+        Assert.Contains("Choice hall step:4:1", expanded.QuerySelector("summary")!.TextContent);
     }
 
     [Fact]
