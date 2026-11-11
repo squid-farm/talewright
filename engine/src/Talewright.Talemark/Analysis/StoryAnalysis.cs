@@ -107,7 +107,23 @@ public sealed class StoryAnalysis
         _symbolsByIdentity = new(() => Symbols.GroupBy(symbol => (symbol.Kind, symbol.Name))
             .ToDictionary(group => group.Key, group => group.ToArray()));
         Expressions = Array.AsReadOnly(collector.Expressions.Distinct().ToArray());
-        var siteSources = collector.CompletionSites.ToArray();
+        var tagCandidates = Array.Empty<AuthoringSymbol>();
+        if (collector.CompletionSites.Any(source => source.Site?.Kinds.Contains(AuthoringSymbolKind.Tag) == true))
+        {
+            var tagNames = collector.Names
+                .Where(name => name.Kind == AuthoringSymbolKind.Tag && name.IsDeclaration)
+                .Select(name => name.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            if (currentFileAnalysis && snapshot is not null)
+                tagNames.UnionWith(snapshot.Names.DeclaredNames(AuthoringSymbolKind.Tag, currentFile!));
+            tagCandidates = tagNames.OrderBy(name => name, StringComparer.Ordinal)
+                .Select(name => new AuthoringSymbol(name, AuthoringSymbolKind.Tag, "tag", null)).ToArray();
+        }
+        var readOnlyTagCandidates = Array.AsReadOnly(tagCandidates);
+        var siteSources = collector.CompletionSites.Select(source =>
+            source.Site is { } site && site.Kinds.Contains(AuthoringSymbolKind.Tag)
+                ? source with { Site = site with { Candidates = readOnlyTagCandidates } }
+                : source).ToArray();
         _sites = new CompletionSiteIndex(siteSources);
         var names = collector.Names.ToArray();
         _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources));
@@ -456,6 +472,12 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
 
         var keywords = new[] { ExpressionVocabulary.And, ExpressionVocabulary.Or };
         var details = AuthoringSyntaxVocabulary.KeywordDetails(keywords);
+        if (words.Count == 0)
+        {
+            ReferenceCore("", location, AuthoringSymbolKind.Tag, []);
+            return;
+        }
+
         for (var index = 0; index < words.Count; index++)
         {
             var word = words[index];
@@ -466,9 +488,19 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 AddSite(new(text, Range(start, text), [], keywords,
                     Enumerable.Range(0, text.Length + 1).Select(start.Offset).ToArray(),
                     KeywordDetails: details));
+                var operatorAfterWord = word.Start + word.Length;
+                while (operatorAfterWord < value.Length && char.IsWhiteSpace(value[operatorAfterWord]))
+                    operatorAfterWord++;
+                if (operatorAfterWord > word.Start + word.Length)
+                    ReferenceCore("", location.Offset(operatorAfterWord), AuthoringSymbolKind.Tag, []);
+                else if (index == words.Count - 1 &&
+                         TrailingWhitespaceEnd(location, value) is { } tagPosition)
+                    ReferenceCore("", tagPosition, AuthoringSymbolKind.Tag, []);
                 continue;
             }
 
+            var tag = value.Substring(word.Start, word.Length);
+            ReferenceCore(tag, location.Offset(word.Start), AuthoringSymbolKind.Tag, []);
             var afterWord = word.Start + word.Length;
             while (afterWord < value.Length && char.IsWhiteSpace(value[afterWord]))
                 afterWord++;
@@ -478,38 +510,37 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 continue;
             }
 
-            if (index == words.Count - 1 && source.Files.TryGetValue(location.File, out var content))
-            {
-                if (!_lines.TryGetValue(location.File, out var lines))
-                    _lines.Add(location.File, lines = content.ReplaceLineEndings("\n").Split('\n'));
-                var line = lines[location.Line - 1];
-                var trailing = location.Column - 1 + value.Length;
-                var end = trailing;
-                while (end < line.Length && char.IsWhiteSpace(line[end]))
-                    end++;
-                if (end > trailing)
-                    AddKeywordPoint(location with { Column = end + 1 }, keywords, details);
-            }
+            if (index == words.Count - 1 &&
+                TrailingWhitespaceEnd(location, value) is { } keywordPosition)
+                AddKeywordPoint(keywordPosition, keywords, details);
         }
+    }
+
+    private SourceLocation? TrailingWhitespaceEnd(SourceLocation location, string value)
+    {
+        if (!source.Files.TryGetValue(location.File, out var content)) return null;
+        if (!_lines.TryGetValue(location.File, out var lines))
+            _lines.Add(location.File, lines = content.ReplaceLineEndings("\n").Split('\n'));
+        var line = lines[location.Line - 1];
+        var end = location.Column - 1 + value.Length;
+        var trailing = end;
+        while (end < line.Length && char.IsWhiteSpace(line[end]))
+            end++;
+        return end > trailing ? location with { Column = end + 1 } : null;
+    }
+
+    internal void TagSelector(string value, SourceLocation location)
+    {
+        foreach (var (name, at) in TagSegments(value, location))
+            ReferenceCore(name, at, AuthoringSymbolKind.Tag, []);
     }
 
     /// <summary>Records each comma-separated <c>@tags</c> entry as a tag declaration.</summary>
     internal void Tags(string value, SourceLocation location)
     {
-        for (var start = 0; start <= value.Length;)
-        {
-            var comma = value.IndexOf(ExpressionVocabulary.ArgumentSeparator, start);
-            var end = comma < 0 ? value.Length : comma;
-            var segment = value.AsSpan(start, end - start);
-            var name = segment.Trim();
+        foreach (var (name, at) in TagSegments(value, location))
             if (name.Length > 0)
-            {
-                var at = location.Offset(start + segment.Length - segment.TrimStart().Length);
-                Names.Add(new(AuthoringSymbolKind.Tag, name.ToString(), new(at, at.Offset(name.Length)), true));
-            }
-            if (comma < 0) break;
-            start = comma + 1;
-        }
+                Names.Add(new(AuthoringSymbolKind.Tag, name, new(at, at.Offset(name.Length)), true));
     }
 
     /// <summary>Records the tag words of a valid <c>@hub</c> selector, which alternate with and/or.</summary>
@@ -528,6 +559,24 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 Names.Add(new(AuthoringSymbolKind.Tag, value[start..index], new(at, at.Offset(index - start)), false));
             }
         }
+    }
+
+    private static List<(string Name, SourceLocation Location)> TagSegments(string value, SourceLocation location)
+    {
+        var segments = new List<(string, SourceLocation)>();
+        for (var start = 0; start <= value.Length;)
+        {
+            var comma = value.IndexOf(ExpressionVocabulary.ArgumentSeparator, start);
+            var end = comma < 0 ? value.Length : comma;
+            var segment = value[start..end];
+            var name = segment.Trim();
+            var leadingWhitespace = segment.Length - segment.TrimStart().Length;
+            var offset = name.Length == 0 ? start : start + leadingWhitespace;
+            segments.Add((name, location.Offset(offset)));
+            if (comma < 0) break;
+            start = comma + 1;
+        }
+        return segments;
     }
 
     /// <summary>Records a configuration scalar as the declaration of a name that has no symbol, such as a trigger ID.</summary>

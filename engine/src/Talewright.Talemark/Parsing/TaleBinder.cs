@@ -260,11 +260,17 @@ internal sealed partial class TaleBinder
             SceneVocabulary.MetadataSpellings);
         if (syntax.MetadataKey is not { } key)
             return false;
+        var metadataPart = Part(syntax);
+        var value = Value(syntax);
+        var valueLocation = At(value.Length == 0
+            ? metadataPart.HeadStart + metadataPart.HeadLength
+            : metadataPart.MetadataValueColumn(syntax));
         if (key == SceneMetadataKey.Hub)
-            _symbols.Analysis?.HubSelector(Value(syntax), At(Part(syntax).MetadataValueColumn(syntax)));
+            _symbols.Analysis?.HubSelector(value, valueLocation);
+        if (key == SceneMetadataKey.Tags)
+            _symbols.Analysis?.TagSelector(value, valueLocation);
         if (syntax.IsInvalid)
             return true;
-        var value = Value(syntax);
         var scene = _scene!;
         switch (key)
         {
@@ -279,7 +285,7 @@ internal sealed partial class TaleBinder
                 scene.Shown = shown;
                 return true;
             case SceneMetadataKey.Tags:
-                _symbols.Analysis?.Tags(value, At(Part(syntax).MetadataValueColumn(syntax)));
+                _symbols.Analysis?.Tags(value, valueLocation);
                 foreach (var tag in TaleSyntaxParser.ReadTags(value))
                 {
                     scene.Tags.Add(tag);
@@ -295,7 +301,7 @@ internal sealed partial class TaleBinder
                 return true;
             case SceneMetadataKey.Hub:
                 TaleSyntaxParser.TryReadHub(value, out var tags, out var all);
-                _symbols.Analysis?.HubTags(value, At(Part(syntax).MetadataValueColumn(syntax)));
+                _symbols.Analysis?.HubTags(value, valueLocation);
                 scene.Hub = new Talewright.Rules.Storylets.StoryletTags(tags, all);
                 return true;
             case SceneMetadataKey.HubLimit:

@@ -88,6 +88,27 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Tag_completion_uses_declarations_across_story_files()
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        const string marked = "=== start\n@tags local\n-> END\n=== completion\n@hub |";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        await client.Open("other.tale", "=== other\n@tags remote\n-> END", 1);
+
+        var labels = Items(await Completion(client, "start.tale", marked))
+            .Select(item => item.GetProperty("label").GetString()!).ToArray();
+
+        Assert.Equal(["local", "remote"], labels);
+
+        const string changed = "=== start\n-> END\n=== completion\n@hub |";
+        await client.Change("start.tale", changed.Replace("|", ""), 2);
+        labels = Items(await Completion(client, "start.tale", changed))
+            .Select(item => item.GetProperty("label").GetString()!).ToArray();
+        Assert.Equal(["remote"], labels);
+    }
+
+    [Fact]
     public async Task Default_item_name_helpers_are_offered_by_the_stdio_server()
     {
         await using var client = new Client();
