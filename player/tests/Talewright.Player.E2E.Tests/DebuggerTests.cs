@@ -417,9 +417,9 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "Seed: 42");
             Assert.Contains("Seed: 42", snapshot.Content);
             await driver.ActivateAsync("State");
-            await driver.ActivateAsync("Flags, variables, factions, visits and triggers");
-            snapshot = await WaitFor(driver, "var:count (integer) = 2");
-            Assert.Contains("current visits: 1", snapshot.Content);
+            snapshot = await WaitFor(driver, "Edit var:count 2");
+            await driver.ActivateAsync("Scene visits");
+            snapshot = await WaitFor(driver, "current 1");
             await File.WriteAllTextAsync(manifest, yaml.Replace("Native reload", "Restarted title"));
             snapshot = await WaitFor(driver, "Restart required.", "After reload.");
             Assert.Contains("After reload.", snapshot.Content);
@@ -497,12 +497,10 @@ public sealed class DebuggerTests
             await driver.ClickAsync("Start selected scene");
             await WaitFor(driver, "Live count 1.");
             await driver.ActivateAsync("State");
-            await driver.ActivateAsync("Live edit values");
             await driver.ActivateAsync("Edit flag:ready");
-            await driver.ActivateAsync("Edit value flag:ready");
-            await driver.ActivateAsync("Edit var:count");
-            await driver.FillAsync("Edit value var:count", "7");
-            await driver.ClickAsync("Apply live edit batch");
+            await driver.FillAsync("Edit var:count", "7");
+            await WaitFor(driver, "2 edits pending");
+            await driver.ClickAsync("Apply edits");
             await driver.ActivateAsync("Timeline");
             var snapshot = await WaitFor(driver, "Live count 17.", "Position 1 / 1.");
             Assert.Contains("Prepared", snapshot.Content);
@@ -720,10 +718,9 @@ public sealed class DebuggerTests
                 await File.WriteAllTextAsync(tale, source);
                 await WaitFor(driver, "After scene1000. Count 7. Robin.", "Reload boundary: scene1000");
                 await driver.ActivateAsync("State");
-                await driver.ActivateAsync("Live edit values");
-                await driver.ActivateAsync("Edit var:count");
-                await driver.FillAsync("Edit value var:count", "19");
-                await driver.ClickAsync("Apply live edit batch");
+                await driver.FillAsync("Edit var:count", "19");
+                await WaitFor(driver, "1 edit pending");
+                await driver.ClickAsync("Apply edits");
                 await driver.ActivateAsync("Timeline");
                 await WaitFor(driver, "After scene1000. Count 19. Robin.", "Position 1 / 1.");
                 await driver.ChooseAsync("Prepared");
@@ -1022,7 +1019,7 @@ public sealed class DebuggerTests
 
             await driver.ActivateAsync("Setup");
             await driver.PressAsync("Right");
-            snapshot = await WaitFor(driver, "Live edit values");
+            snapshot = await WaitFor(driver, "Filter state");
             Assert.Equal("State", Focused(snapshot).Name);
 
             await driver.ClickToggleAsync("Tools");
@@ -1031,7 +1028,7 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "Problems");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "toggle button" && node.Name == "Tools" && node.Pressed);
             Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Problems");
-            Assert.DoesNotContain("Live edit values", snapshot.Content);
+            Assert.DoesNotContain("Filter state", snapshot.Content);
 
             await driver.ChooseAsync("Continue");
             snapshot = await WaitFor(driver, "Scene inspector", "Later");

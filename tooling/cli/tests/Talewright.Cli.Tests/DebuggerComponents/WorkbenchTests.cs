@@ -66,7 +66,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Assert.Equal($"Synthetic history: skipped scenes are unvisited. This does not prove normal reachability. Seed: {model.Session!.Seed}. Rolls: 0.",
             playtest.QuerySelector("p[role=status]")!.TextContent);
         Assert.Same(model.Session, workbench.FindComponent<TimelineTool>().Instance.Session);
-        Assert.Same(model.Session, workbench.FindComponent<LiveEditTool>().Instance.Session);
+        Assert.Same(model.Session, workbench.FindComponent<StateEditor>().Instance.Session);
         Assert.Same(model.Session, workbench.FindComponent<InitializationEvents>().Instance.Session);
         Assert.Same(model.Session, workbench.FindComponent<SceneViewer>().Instance.Session);
         Assert.Same(model.Inspection, workbench.FindComponent<BranchesTool>().Instance.Inspection);
@@ -143,19 +143,18 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         var workbench = Show();
         await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
         await workbench.Find("#tool-state-tab").ClickAsync(new MouseEventArgs());
-        var tool = workbench.FindComponent<LiveEditTool>().Instance;
-        await workbench.Find("input[aria-label='Edit var:count']").ChangeAsync(new ChangeEventArgs { Value = true });
-        await workbench.Find("input[aria-label='Edit value var:count']").ChangeAsync(new ChangeEventArgs { Value = "42" });
+        var tool = workbench.FindComponent<StateEditor>().Instance;
+        await workbench.Find("input[aria-label='Edit var:count']").InputAsync(new ChangeEventArgs { Value = "42" });
 
         await workbench.Find("#tool-source-tab").ClickAsync(new MouseEventArgs());
         Assert.True(workbench.Find("#tool-state-panel").HasAttribute("hidden"));
-        Assert.Same(tool, workbench.FindComponent<LiveEditTool>().Instance);
+        Assert.Same(tool, workbench.FindComponent<StateEditor>().Instance);
 
         await workbench.Find("#tool-state-tab").ClickAsync(new MouseEventArgs());
         Assert.False(workbench.Find("#tool-state-panel").HasAttribute("hidden"));
-        Assert.Same(tool, workbench.FindComponent<LiveEditTool>().Instance);
-        Assert.True(workbench.Find("input[aria-label='Edit var:count']").HasAttribute("checked"));
-        Assert.Equal("42", workbench.Find("input[aria-label='Edit value var:count']").GetAttribute("value"));
+        Assert.Same(tool, workbench.FindComponent<StateEditor>().Instance);
+        Assert.Equal("42", workbench.Find("input[aria-label='Edit var:count']").GetAttribute("value"));
+        Assert.Contains("1 edit pending", workbench.Find("#tool-state-panel").TextContent);
     }
 
     [Fact]
@@ -182,7 +181,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         await Choice(workbench, "Explore").ClickAsync(new MouseEventArgs());
         Assert.Equal("cave Cave", Passage(workbench));
         Assert.Contains("Scene cave source range", workbench.FindComponent<SourceTool>().Markup);
-        Assert.Contains("cave visits: 1", workbench.FindComponent<StateTable>().Markup);
+        Assert.Contains(workbench.FindComponent<StateEditor>().FindAll("tr"), row => row.TextContent == "cave1");
 
         await Button(workbench, "Back command").ClickAsync(new MouseEventArgs());
         Assert.Equal("hall Great Hall", Passage(workbench));
@@ -190,13 +189,12 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         await Button(workbench, "Forward command").ClickAsync(new MouseEventArgs());
         Assert.Equal("cave Cave", Passage(workbench));
 
-        await workbench.Find("input[aria-label='Edit var:count']").ChangeAsync(new ChangeEventArgs { Value = true });
-        await workbench.Find("input[aria-label='Edit value var:count']").ChangeAsync(new ChangeEventArgs { Value = "5" });
-        await Button(workbench, "Apply live edit batch").ClickAsync(new MouseEventArgs());
-        Assert.Contains("var:count (integer) = 5", workbench.FindComponent<StateTable>().Markup);
+        await workbench.Find("input[aria-label='Edit var:count']").InputAsync(new ChangeEventArgs { Value = "5" });
+        await Button(workbench, "Apply edits").ClickAsync(new MouseEventArgs());
+        Assert.Equal("5", workbench.Find("input[aria-label='Edit var:count']").GetAttribute("value"));
 
         await Choice(workbench, "Leave").ClickAsync(new MouseEventArgs());
-        Assert.True(Button(workbench, "Apply live edit batch").HasAttribute("disabled"));
+        Assert.True(Button(workbench, "Apply edits").HasAttribute("disabled"));
         await Button(workbench, "Play again").ClickAsync(new MouseEventArgs());
         Assert.Equal("hall Great Hall", Passage(workbench));
     }
@@ -232,6 +230,21 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Assert.Same(map, workbench.FindComponent<MapTab>().Instance);
         Assert.True(workbench.Find("#map-panel").HasAttribute("hidden"));
         Assert.Single(JSInterop.Invocations["talewrightMap.render"]);
+    }
+
+    [Fact]
+    public async Task Selecting_a_map_scene_inspects_it_until_returning_to_the_scene_tab()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        await Tab(workbench, "map-tab").ClickAsync(new MouseEventArgs());
+
+        var map = workbench.FindComponent<MapTab>();
+        await map.InvokeAsync(() => map.Instance.SelectScene("cave"));
+        Assert.Equal("cave", workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene.Value);
+
+        await Tab(workbench, "play-tab").ClickAsync(new MouseEventArgs());
+        Assert.Equal("hall", workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene.Value);
     }
 
     [Fact]

@@ -1,6 +1,24 @@
 .debugger-status-line {
     overflow: auto;
-    max-height: 7rem;
-    padding: 0 .75rem;
+    max-height: 84px;
+}
+
+.debugger-status-line:has(p) {
     border-bottom: 1px solid var(--tw-border);
+}
+
+.debugger-status-line p {
+    margin: 0;
+    padding: 3px 10px;
+    border-left: 3px solid var(--tw-accent);
+    background: var(--tw-panel);
+}
+
+.debugger-status-line p + p {
+    border-top: 1px solid var(--tw-border);
+}
+
+.debugger-status-line p.debugger-error {
+    border-left-color: var(--tw-error);
+    background: color-mix(in srgb, var(--tw-error) 10%, transparent);
 }

@@ -67,8 +67,9 @@ needs the [desktop setup](getting-started.md#linux-desktop-setup).
 
 ![The Author Debugger playing The Lost Relic's temple.altar scene directly, showing its artwork and opening text](../images/author-debugger-scene.jpg)
 
-The **State inspection** panel shows the current stats, inventory, flags and variables, the events
-that led there, and **Branch explanations**: why each condition passed or failed.
+The **State** tab shows and edits the current flags, variables, faction standing, and every
+character's stats and inventory. **Events** lists what happened to get there, and **Branches**
+explains why each condition passed or failed.
 
 Starting at a scene skips everything before it, so earlier scenes count as unvisited. If a scene
 checks `player visited ...`, start at an earlier scene and play forward, or use
@@ -86,9 +87,11 @@ running, which may be behind unsaved or rejected edits.
 
 ### Explore and export the story map
 
-The **Map** tab lays out every scene, divert and hub offer. Select a scene to see where it leads and
-a preview of its text and choices. The map also marks scenes that can't be reached from the start.
-It follows diverts and hubs, but doesn't check whether their conditions can ever be met.
+The **Map** tab lays out every scene, divert and hub offer from the last successful compilation.
+Click a scene to see where it leads and a preview of its text and choices; the Inspector shows its
+details too. Scenes the start scene can't reach are drawn in a separate area on the right.
+Reachability follows diverts and hubs, but doesn't check whether their conditions can ever be met.
+The preview doesn't run entry effects or skill checks.
 
 While you play in the debugger, the scenes you've visited and the choices you've taken are
 highlighted in order. Use **Export SVG** or **Export PNG** to save the whole map. SVG stays sharp at
@@ -98,10 +101,15 @@ any size; a very large map may be too big for PNG, and the debugger will suggest
 
 ### Change state without starting over
 
-Open **Live edit values**, turn on the fields you want to change, and click
-**Apply live edit batch**. You can change flags, variables (numbers or text), faction standing, and
-every character's stats and inventory. Item quantities are the new totals; zero removes an item.
-Normal triggers and leveling run afterwards. **Command history and consequences** shows what changed,
+Open the **State** tab and change values in place: tick flags, and type new numbers, text, faction
+standing, base stats or item quantities. Changed rows are marked, show what they were, and are
+counted as pending. Click **Apply edits** to apply them all as one batch, or **Revert edits** to put
+the current values back. Use **Filter state** to find a value quickly, and **Add item…** to give a
+character an item they don't hold yet.
+
+Item quantities are the new totals; zero removes an item. Base stats are clamped by your ruleset.
+The batch is checked as a whole, then normal triggers and leveling run. The scene isn't entered
+again and its skill checks aren't rerolled. **Command history and consequences** shows what changed,
 including any triggers that fired.
 
 The edit applies to the passage you're on. Text and effects that already ran stay as they were;
@@ -116,8 +124,7 @@ dice. **Start selected scene**, by contrast, throws progress away and starts fre
 turns off Back and Forward for players. Doing something new after going back discards the steps
 you went back over. Remember that edited states may not be reachable in real play.
 
-Text variables appear as text, in quotes, so you can tell an empty value from a missing one.
-Type text without quotes. To set empty text, turn the override on and leave the field empty.
+Type text values without quotes; clear the field to set empty text.
 
 ### Editing while you test
 
@@ -156,6 +163,25 @@ To start from a player's save, enter its path in **Player save file path (read o
 player saves.
 
 Scenario files are a testing aid. A later version of Talewright may not open older ones.
+
+### Debugger tabs at a glance
+
+- **Setup:** choose a scene, prerequisite overrides, character and seed. **Start selected scene**
+  creates a fresh world from those values before entering the scene; leave **Seed** empty to use
+  the story's seed or a generated one. **Jump retaining state** enters a target scene with the
+  current run's state, visits, triggers and dice.
+- **State:** current values, edited in place and applied as one batch (see above). Scene visits and
+  triggers are shown read-only.
+- **Source:** the accepted source of the current scene. Highlighting shows which scene you're in,
+  not which line is running.
+- **Branches:** recorded decisions at the point they were made, not re-evaluated against the
+  current state.
+- **Timeline:** move backward and forward through your debugging run, whatever your story's player
+  undo setting. The seed and dice rolls belong to this run.
+- **Events:** everything this debugging run has emitted.
+- **Problems:** compiler errors, and changes that need **Restart from source**.
+
+The debugger never writes player saves. Player saves are read only when you import one.
 
 New to the debugger? The [hands-on debugger test plan](debugger-test-plan.md) walks through every
 feature with a small story and the results to expect.

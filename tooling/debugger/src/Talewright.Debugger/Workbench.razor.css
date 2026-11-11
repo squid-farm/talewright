@@ -1,0 +1,286 @@
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/*
+ * The shared debugger scope applies only to debugger-owned elements. Player components keep their
+ * own typography and controls, without exclusions based on their implementation classes.
+ */
+.debugger-workspace {
+    --dbg-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --dbg-size: 12px;
+    --dbg-small: 11px;
+    --dbg-control: 22px;
+    --dbg-hover: color-mix(in srgb, var(--tw-fg) 8%, transparent);
+    --dbg-selected: color-mix(in srgb, var(--tw-accent) 18%, transparent);
+    font-family: var(--tw-ui-font);
+    font-size: var(--dbg-size);
+    line-height: 1.45;
+    color: var(--tw-fg);
+    background: var(--tw-bg);
+}
+
+:where(.debugger-workspace :is(h1, h2, h3, h4)) {
+    margin: 10px 0 4px;
+    font-family: var(--tw-ui-font);
+    font-size: var(--dbg-small);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--tw-muted);
+}
+
+:where(.debugger-workspace :is(p, dl, ul, ol)) {
+    margin: 4px 0;
+}
+
+:where(.debugger-workspace :is(ul, ol)) {
+    padding-left: 18px;
+}
+
+:where(.debugger-workspace li) {
+    margin: 1px 0;
+}
+
+:where(.debugger-workspace code) {
+    font-family: var(--dbg-mono);
+    font-size: var(--dbg-small);
+}
+
+:where(.debugger-workspace label) {
+    margin: 0;
+}
+
+:where(.debugger-workspace button:not([role="tab"], [role="menuitem"])) {
+    box-sizing: border-box;
+    min-height: var(--dbg-control);
+    margin: 0;
+    padding: 1px 8px;
+    font: inherit;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: var(--tw-fg);
+    background: var(--tw-panel);
+    border: 1px solid var(--tw-border);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+:where(.debugger-workspace button:not(:disabled):hover) {
+    background: color-mix(in srgb, var(--tw-panel), var(--tw-fg) 8%);
+}
+
+:where(.debugger-workspace button:disabled) {
+    opacity: .45;
+    cursor: default;
+}
+
+:where(.debugger-workspace button[aria-pressed="true"]) {
+    background: var(--dbg-selected);
+    border-color: var(--tw-accent);
+}
+
+:where(.debugger-workspace :is(input:not([type="checkbox"], [type="radio"]), select, textarea)) {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-height: var(--dbg-control);
+    padding: 1px 6px;
+    font: inherit;
+    color: var(--tw-fg);
+    background: var(--tw-bg);
+    border: 1px solid var(--tw-border);
+    border-radius: 3px;
+}
+
+:where(.debugger-workspace textarea) {
+    min-height: 40px;
+    vertical-align: top;
+    resize: vertical;
+}
+
+:where(.debugger-workspace :is(input[type="checkbox"], input[type="radio"])) {
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+}
+
+:where(.debugger-workspace details) {
+    margin: 0;
+    padding: 0 0 0 14px;
+    border: 0;
+}
+
+:where(.debugger-workspace summary) {
+    margin-left: -14px;
+    padding: 2px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+:where(.debugger-workspace summary:hover) {
+    background: var(--dbg-hover);
+}
+
+:where(.debugger-workspace fieldset) {
+    min-width: 0;
+    margin: 6px 0;
+    padding: 0;
+    border: 0;
+}
+
+:where(.debugger-workspace legend) {
+    padding: 0;
+    margin-bottom: 2px;
+    font-size: var(--dbg-small);
+    font-weight: 600;
+    color: var(--tw-muted);
+}
+
+:where(.debugger-workspace table) {
+    border-collapse: collapse;
+}
+
+:where(.debugger-workspace :is(th, td)) {
+    padding: 1px 12px 1px 0;
+    text-align: left;
+    vertical-align: top;
+}
+
+:where(.debugger-workspace thead th) {
+    font-weight: 600;
+    color: var(--tw-muted);
+    border-bottom: 1px solid var(--tw-border);
+}
+
+:where(.debugger-workspace caption) {
+    padding: 2px 0;
+    text-align: left;
+    font-size: var(--dbg-small);
+    color: var(--tw-muted);
+}
+
+:where(.debugger-workspace section) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.debugger-workspace :focus-visible {
+    outline: 2px solid var(--tw-accent);
+    outline-offset: -2px;
+}
+
+/* Tabs share one style in the main toolbar and the tool drawer. */
+.debugger-workspace [role="tab"] {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    min-height: 26px;
+    margin: 0;
+    padding: 0 10px;
+    font: inherit;
+    white-space: nowrap;
+    color: var(--tw-muted);
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    cursor: pointer;
+}
+
+.debugger-workspace [role="tab"]:hover {
+    color: var(--tw-fg);
+    background: var(--dbg-hover);
+}
+
+.debugger-workspace [role="tab"][aria-selected="true"] {
+    color: var(--tw-fg);
+    border-bottom-color: var(--tw-accent);
+}
+
+/* Small shared pieces used by several tools. */
+.debugger-workspace .tool-note {
+    margin: 0 0 6px;
+    font-size: var(--dbg-small);
+    color: var(--tw-muted);
+}
+
+.debugger-workspace .tool-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    margin: 0 0 6px;
+}
+
+.debugger-workspace .tool-filters label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--tw-muted);
+}
+
+.debugger-workspace .tool-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 0;
+}
+
+/* Dialogs are opened from both the toolbar and the workspace. */
+.debugger-dialog-backdrop {
+    position: fixed;
+    z-index: 10;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: #0008;
+}
+
+.debugger-dialog {
+    box-sizing: border-box;
+    max-width: min(720px, 100%);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 10px 14px;
+    color: var(--tw-fg);
+    background: var(--tw-panel);
+    border: 1px solid var(--tw-border);
+    border-radius: 4px;
+    box-shadow: 0 6px 20px #0005;
+}
+
+.dialog-close {
+    float: right;
+}
+
+/* Native GTK selects ignore compact sizing; draw a flat control with a small chevron instead. */
+.debugger-workspace select {
+    appearance: none;
+    -webkit-appearance: none;
+    height: var(--dbg-control);
+    padding: 0 20px 0 6px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--tw-muted) 50%),
+        linear-gradient(135deg, var(--tw-muted) 50%, transparent 50%);
+    background-position: calc(100% - 11px) 50%, calc(100% - 7px) 50%;
+    background-size: 4px 4px;
+    background-repeat: no-repeat;
+}
+
+.help-url {
+    margin-left: 6px;
+    font-size: var(--dbg-small);
+    word-break: break-all;
+    user-select: all;
+}

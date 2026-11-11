@@ -1,6 +1,6 @@
 <details>
     <summary>Initialization before target entry</summary>
-    <p>Setup applies before trigger priming. Base stats may be clamped; inspect actual initialization events below. Scene entry effects are separate.</p>
+    <p class="tool-note">Setup applies before trigger priming. Base stats may be clamped; inspect actual initialization events below. Scene entry effects are separate.</p>
     <ul>
         @foreach (var item in Session.Events.TakeWhile(e => e is not Talewright.Core.Events.SceneEntered))
         {

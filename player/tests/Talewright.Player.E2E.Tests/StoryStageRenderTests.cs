@@ -48,8 +48,22 @@ public sealed class StoryStageRenderTests
         Assert.Contains("Finish", choice.Groups["body"].Value);
     }
 
+    [Fact]
+    public async Task Passage_only_presentation_omits_the_character_sheet()
+    {
+        var story = TestStories.Linear.Compile();
+        var history = new StoryHistory(story, 42);
+
+        var html = await RenderStageAsync(story, history, showCharacterSheet: false);
+
+        Assert.Contains("class=\"tw-columns tw-columns--full\"", html);
+        Assert.Contains("aria-label=\"Current passage\"", html);
+        Assert.Contains("aria-label=\"Story choices\"", html);
+        Assert.DoesNotContain("aria-label=\"Character sheet\"", html);
+    }
+
     private static async Task<string> RenderStageAsync(Talewright.Talemark.Model.StoryDefinition story,
-        StoryHistory history)
+        StoryHistory history, bool showCharacterSheet = true)
     {
         await using var services = new ServiceCollection()
             .AddLogging()
@@ -67,6 +81,7 @@ public sealed class StoryStageRenderTests
                 [nameof(StoryStage.Current)] = history.Current,
                 [nameof(StoryStage.State)] = history.State,
                 [nameof(StoryStage.Identity)] = history,
+                [nameof(StoryStage.ShowCharacterSheet)] = showCharacterSheet,
             });
             var component = await renderer.RenderComponentAsync<StoryStage>(parameters);
             return component.ToHtmlString();

@@ -3,20 +3,44 @@
     min-width: 0;
 }
 
+/* A sticky breadcrumb keeps the current scene visible without spending a heading's height. */
 .debugger-scene-heading {
-    padding: .5rem 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 3px 10px;
+    font: 600 var(--dbg-small)/1.4 var(--tw-ui-font);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--tw-fg);
+    background: var(--tw-panel);
+    border-bottom: 1px solid var(--tw-border);
+}
+
+.debugger-scene-heading code {
+    margin-right: 4px;
+    font-weight: normal;
+    color: var(--tw-muted);
 }
 
 .scene-stage {
     position: relative;
     min-height: 0;
+    padding: 4px 16px 16px;
+    font-family: var(--tw-font);
+    font-size: 1rem;
+    line-height: 1.6;
+    container: story-stage / inline-size;
+    --tw-scene-title-margin-top: .5rem;
+    --tw-choices-margin: 1rem 0;
 }
 
 .inspect-overlay {
     position: absolute;
     z-index: 20;
     pointer-events: none;
-    border: 3px solid var(--tw-accent);
-    border-radius: .2rem;
+    border: 2px solid var(--tw-accent);
+    border-radius: 3px;
     box-shadow: 0 0 0 2px var(--tw-bg);
 }

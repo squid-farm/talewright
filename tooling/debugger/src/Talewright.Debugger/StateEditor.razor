@@ -1,0 +1,195 @@
+<section class="state-editor" aria-label="Game state">
+    <h2 class="visually-hidden">Game state</h2>
+    <div class="state-bar">
+        <input type="search" class="state-filter" aria-label="Filter state" placeholder="Filter state"
+               @bind="_filter" @bind:event="oninput" />
+        @if (Model.PendingEdits is var pending and > 0)
+        {
+            <span class="state-pending" role="status">@pending @(pending == 1 ? "edit" : "edits") pending</span>
+        }
+        <button type="button" disabled="@(Model.PendingEdits == 0)" @onclick="Model.RevertEdits">Revert edits</button>
+        <button type="button" class="state-apply" disabled="@(Session.Current.IsEnded || Model.PendingEdits == 0)"
+                @onclick="OnApplyEdits">Apply edits</button>
+    </div>
+    @if (Session.Current.IsEnded)
+    {
+        <p class="state-ended">Ended runs cannot be edited. Go Back, or use Start selected scene for a fresh-world jump.</p>
+    }
+    <div class="state-scroll">
+        @if (WorldRows() is { Count: > 0 } world)
+        {
+            <details open>
+                <summary>World</summary>
+                <table class="state-grid">
+                    <tbody>
+                        @foreach (var row in world)
+                        {
+                            @row
+                        }
+                    </tbody>
+                </table>
+            </details>
+        }
+        @foreach (var character in Inspection.Characters)
+        {
+            var nameMatches = Match($"{character.Id} {character.FirstName} {character.LastName}");
+            var stats = character.Stats.Where(stat => nameMatches || Match($"{character.Id}:{stat.Id} {stat.Name}")).ToList();
+            var items = Items(character).Where(item => nameMatches || Match($"{item.Field.Label} {item.Name}")).ToList();
+            if (!nameMatches && stats.Count == 0 && items.Count == 0)
+                continue;
+            <details open="@(character == Inspection.Characters[0])" @key="character.Id">
+                <summary>@character.Id: @character.FirstName @character.LastName <span class="state-muted">@($"{character.Pronouns.Subject}/{character.Pronouns.Object}/{character.Pronouns.Reflexive}")</span></summary>
+                <table class="state-grid">
+                    <thead><tr><th scope="col">Stat</th><th scope="col">Base</th><th scope="col">Effective</th></tr></thead>
+                    <tbody>
+                        @foreach (var stat in stats)
+                        {
+                            var field = Number(SetupNumberKind.Stat, stat.Id.Value, character.Id.Value);
+                            <tr class="@RowClass(field?.Enabled)">
+                                <th scope="row"><code>@stat.Id</code> @stat.Name</th>
+                                <td>@NumberInput(field, $"{character.Id}:{stat.Id}")@(field?.Enabled == true ? Was(true, field.Initial) : null)</td>
+                                <td class="state-muted">@stat.EffectiveValue</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tbody>
+                        <tr class="state-subhead"><th scope="col" colspan="3">Inventory</th></tr>
+                        @foreach (var item in items)
+                        {
+                            <tr class="@RowClass(item.Field.Enabled)">
+                                <th scope="row"><code>@item.Field.Id</code> @item.Name</th>
+                                <td>@NumberInput(item.Field, item.Field.Label)@Was(item.Field.Enabled, item.Field.Initial)</td>
+                                <td></td>
+                            </tr>
+                        }
+                        @if (UnheldItems(character).ToList() is { Count: > 0 } unheld && !Session.Current.IsEnded)
+                        {
+                            <tr>
+                                <td colspan="3">
+                                    <select aria-label="@($"Add item to {character.Id}")" value=""
+                                            @onchange="args => Reveal(character.Id.Value, args.Value?.ToString())">
+                                        <option value="">Add item…</option>
+                                        @foreach (var item in unheld)
+                                        {
+                                            <option value="@item.Field.Id">@item.Name</option>
+                                        }
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+        }
+        @if (Inspection.Scenes.Where(scene => Match(scene.Id.Value)).Take(100).ToList() is { Count: > 0 } scenes)
+        {
+            <details>
+                <summary>Scene visits</summary>
+                <table class="state-grid state-readonly">
+                    <tbody>
+                        @foreach (var scene in scenes)
+                        {
+                            <tr><th scope="row"><code>@scene.Id</code></th><td>@scene.Visits</td></tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="tool-note">Showing at most 100 scenes. Filter to find others.</p>
+            </details>
+        }
+        @if (Inspection.Triggers.Where(trigger => Match(trigger.Id)).ToList() is { Count: > 0 } triggers)
+        {
+            <details>
+                <summary>Triggers</summary>
+                <table class="state-grid state-readonly">
+                    <tbody>
+                        @foreach (var trigger in triggers)
+                        {
+                            <tr><th scope="row"><code>@trigger.Id</code></th><td>@(trigger.HasFired ? "Fired" : "Not fired")</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter, EditorRequired] public AuthorSession Session { get; set; } = null!;
+    [Parameter, EditorRequired] public AuthorInspection Inspection { get; set; } = null!;
+    [Parameter] public EventCallback OnApplyEdits { get; set; }
+
+    private string _filter = "";
+    private readonly HashSet<(string Character, string Item)> _revealed = [];
+
+    private sealed record ItemRow(SetupNumber Field, string Name);
+
+    private bool Match(string text) => text.Contains(_filter, StringComparison.OrdinalIgnoreCase);
+
+    private static string? RowClass(bool? edited) => edited == true ? "state-edited" : null;
+
+    private SetupNumber? Number(SetupNumberKind kind, string id, string? character = null) =>
+        Model.EditNumbers.FirstOrDefault(field => field.Kind == kind && field.Id == id && field.Character == character);
+
+    private IEnumerable<ItemRow> AllItems(AuthorCharacterInspection character) => Model.EditNumbers
+        .Where(field => field.Kind == SetupNumberKind.Inventory && field.Character == character.Id.Value)
+        .Select(field => new ItemRow(field, Model.Story?.World.Items.GetValueOrDefault(new(field.Id))?.Name ?? field.Id));
+
+    private IEnumerable<ItemRow> Items(AuthorCharacterInspection character) => AllItems(character)
+        .Where(item => item.Field.Initial != "0" || item.Field.Enabled || _revealed.Contains((character.Id.Value, item.Field.Id)));
+
+    private IEnumerable<ItemRow> UnheldItems(AuthorCharacterInspection character) => AllItems(character)
+        .Except(Items(character));
+
+    private void Reveal(string character, string? item)
+    {
+        if (!string.IsNullOrEmpty(item))
+            _revealed.Add((character, item));
+    }
+
+    private List<RenderFragment> WorldRows()
+    {
+        var rows = new List<RenderFragment>();
+        foreach (var flag in Model.EditFlags.Where(flag => Match($"flag:{flag.Id}")))
+        {
+            rows.Add(@<tr class="@RowClass(flag.Enabled)" @key="flag">
+                <th scope="row"><code>flag:@flag.Id</code></th>
+                <td><input type="checkbox" aria-label="@($"Edit flag:{flag.Id}")" checked="@flag.Value"
+                           disabled="@Session.Current.IsEnded" @onchange="args => flag.Edit(args.Value is true)" />@Was(flag.Enabled, flag.Initial ? "true" : "false")</td>
+            </tr>);
+        }
+        foreach (var variable in Model.EditNumbers.Where(field => field.Kind == SetupNumberKind.Variable && Match(field.Label)))
+        {
+            rows.Add(@<tr class="@RowClass(variable.Enabled)" @key="variable">
+                <th scope="row"><code>@variable.Label</code></th>
+                <td>@NumberInput(variable, variable.Label)@Was(variable.Enabled, variable.Initial)</td>
+            </tr>);
+        }
+        foreach (var text in Model.EditTexts.Where(field => Match(field.Label)))
+        {
+            rows.Add(@<tr class="@RowClass(text.Enabled)" @key="text">
+                <th scope="row"><code>@text.Label</code></th>
+                <td><input type="text" aria-label="@($"Edit {text.Label}")" value="@text.Value" placeholder="(empty)"
+                           disabled="@Session.Current.IsEnded" @oninput="args => text.Edit(args.Value?.ToString() ?? string.Empty)" />@Was(text.Enabled, System.Text.Json.JsonSerializer.Serialize(text.Initial))</td>
+            </tr>);
+        }
+        foreach (var faction in Inspection.Factions.Where(faction => Match($"faction:{faction.Id} {faction.Name}")))
+        {
+            var field = Number(SetupNumberKind.Standing, faction.Id.Value);
+            rows.Add(@<tr class="@RowClass(field?.Enabled)" @key="faction.Id">
+                <th scope="row" title="@faction.Name"><code>faction:@faction.Id</code></th>
+                <td>@NumberInput(field, $"faction:{faction.Id}")@(field?.Enabled == true ? Was(true, field.Initial) : Note(faction.Tier))</td>
+            </tr>);
+        }
+        return rows;
+    }
+
+    private static RenderFragment? Was(bool edited, string initial) => edited ? Note($"was {initial}") : null;
+
+    private static RenderFragment? Note(string? text) => text is null ? null : @<span class="state-note">@text</span>;
+
+    private RenderFragment NumberInput(SetupNumber? field, string label) => field is null
+        ? @<span class="state-muted">—</span>
+        : @<input class="state-number" aria-label="@($"Edit {label}")" inputmode="numeric" value="@field.Value"
+                  disabled="@Session.Current.IsEnded" @oninput="args => field.Edit(args.Value?.ToString() ?? string.Empty)" />;
+}

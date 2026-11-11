@@ -4,49 +4,52 @@
 @inject MapExportDialog ExportDialog
 @implements IDisposable
 
-<p>Every scene, divert and hub offer from the last successful compilation. Scenes the start scene can't reach through diverts and hub offers are drawn in a separate area on the right; reachability doesn't check whether conditions can be met.</p>
-@if (_error is not null)
-{
-    <p role="alert" class="tw-error">@_error</p>
-}
 <div class="story-map" @ref="_host">
-    <MapToolbar Status="@_mapStatus" OnFit="FitMap" />
-    <div class="map-surface">
-        <canvas @ref="_canvas" aria-hidden="true"></canvas>
-        <div class="map-tooltip" @ref="_tooltip" aria-hidden="true" hidden></div>
+    <div class="map-canvas-column">
+        <MapToolbar Status="@_mapStatus" OnFit="FitMap" />
+        @if (_error is not null)
+        {
+            <p role="alert" class="tw-error">@_error</p>
+        }
+        <div class="map-surface">
+            <canvas @ref="_canvas" aria-hidden="true"></canvas>
+            <div class="map-tooltip" @ref="_tooltip" aria-hidden="true" hidden></div>
+        </div>
     </div>
-    @if (_view is not null)
-    {
-        <MapSceneNavigator @ref="_sceneNavigator" View="_view" SelectedNodeId="@_selectedNodeId"
-                           OnFocus="FocusScene" OnBlur="BlurScene" />
-        <MapSceneDetails View="_view" SelectedNodeId="@_selectedNodeId"
-                         OnHighlight="HighlightLine" OnSelectScene="SelectDetailTarget"
-                         OnFocusedItemRemoved="FocusSelectedScene" />
-    }
-    <MapRoute Run="@_run" />
-</div>
-@if (_previewError is not null)
-{
-    <p role="alert" class="tw-error">@_previewError</p>
-}
-@if (_preview is { } preview)
-{
-    <section class="map-preview" aria-label="Scene preview">
-        <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
-        <p>Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
-        <ReaderPresentation>
-            <StoryStage Story="Story" Passages="PreviewPassages" PassageWindow="1" Current="preview.Frame"
-                        State="PreviewState" Identity="preview.Frame" Busy="true" />
-        </ReaderPresentation>
-    </section>
-}
-<div class="map-export-controls" aria-label="Export story map">
-    <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("svg")'>Export SVG</button>
-    <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("png")'>Export PNG</button>
-    @if (_exportStatus is not null)
-    {
-        <p role="status">@_exportStatus</p>
-    }
+    <div class="map-side">
+        @if (_view is not null)
+        {
+            <MapSceneNavigator @ref="_sceneNavigator" View="_view" SelectedNodeId="@_selectedNodeId"
+                               OnFocus="FocusScene" OnBlur="BlurScene" />
+            <MapSceneDetails View="_view" SelectedNodeId="@_selectedNodeId"
+                             OnHighlight="HighlightLine" OnSelectScene="SelectDetailTarget"
+                             OnFocusedItemRemoved="FocusSelectedScene" />
+        }
+        @if (_previewError is not null)
+        {
+            <p role="alert" class="tw-error">@_previewError</p>
+        }
+        @if (_preview is { } preview)
+        {
+            <section class="map-preview" aria-label="Scene preview">
+                <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
+                <p class="tool-note">Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
+                <ReaderPresentation>
+                    <StoryStage Story="Story" Passages="PreviewPassages" PassageWindow="1" Current="preview.Frame"
+                                State="PreviewState" Identity="preview.Frame" Busy="true" ShowCharacterSheet="false" />
+                </ReaderPresentation>
+            </section>
+        }
+        <MapRoute Run="@_run" />
+        <div class="map-export-controls" aria-label="Export story map">
+            <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("svg")'>Export SVG</button>
+            <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("png")'>Export PNG</button>
+            @if (_exportStatus is not null)
+            {
+                <p role="status">@_exportStatus</p>
+            }
+        </div>
+    </div>
 </div>
 
 @code {
@@ -54,6 +57,7 @@
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
     [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
+    [Parameter] public EventCallback<SceneId> OnSelectScene { get; set; }
     private IReadOnlyList<HistoryFrame> PreviewPassages => _preview is { } preview
         ? [new(preview.Frame)]
         : [];
@@ -215,6 +219,7 @@
         _selectedScene = definition.Id;
         BuildPreview(definition.Id);
         await InvokeAsync(StateHasChanged);
+        await InvokeAsync(() => OnSelectScene.InvokeAsync(definition.Id));
     }
 
     private async Task FocusScene(string scene)

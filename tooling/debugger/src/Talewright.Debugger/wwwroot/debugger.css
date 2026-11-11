@@ -1,2 +1,2 @@
-html, body { height: 100%; margin: 0; }
-app { display: block; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+app { display: block; height: 100%; }

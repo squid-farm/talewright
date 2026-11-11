@@ -20,14 +20,29 @@ public sealed class SetupNumber(SetupNumberKind kind, string id, string label, i
     public string? Character { get; } = character;
     public string Label { get; } = label;
     public bool Enabled { get; set; }
+    public string Initial { get; } = value.ToString(CultureInfo.InvariantCulture);
     public string Value { get; set; } = value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Sets the value and enables the field only while it differs from its initial value.</summary>
+    public void Edit(string value)
+    {
+        Value = value;
+        Enabled = value.Trim() != Initial;
+    }
 }
 
-public sealed class SetupFlag(FlagId id)
+public sealed class SetupFlag(FlagId id, bool value = false)
 {
     public FlagId Id { get; } = id;
     public bool Enabled { get; set; }
-    public bool Value { get; set; }
+    public bool Initial { get; } = value;
+    public bool Value { get; set; } = value;
+
+    public void Edit(bool value)
+    {
+        Value = value;
+        Enabled = value != Initial;
+    }
 }
 
 public sealed class SetupText(VarId id, string value)
@@ -35,7 +50,14 @@ public sealed class SetupText(VarId id, string value)
     public VarId Id { get; } = id;
     public string Label => $"var:{Id}";
     public bool Enabled { get; set; }
+    public string Initial { get; } = value;
     public string Value { get; set; } = value;
+
+    public void Edit(string value)
+    {
+        Value = value;
+        Enabled = value != Initial;
+    }
 }
 
 public sealed record AcceptedSceneSource(SceneId Scene, SceneSourceRange Range, string Text);
@@ -591,6 +613,11 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     }
 
     public void Choose(string key) => RunCommand(session => session.Choose(key));
+    public int PendingEdits =>
+        EditNumbers.Count(number => number.Enabled) + EditFlags.Count(flag => flag.Enabled) + EditTexts.Count(text => text.Enabled);
+
+    public void RevertEdits() => RefreshEdits();
+
     public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags, EditTexts)));
     public void JumpPreservingState() => RunCommand(session => session.Jump(new SceneId(Target)));
     public void Back() => RunCommand(session => session.Back());
@@ -622,7 +649,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             SetupNumberKind.Inventory => state.GetItemCount(new(field.Character!), new(field.Id)),
             _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
         }, field.Character)).ToArray();
-        EditFlags = Flags.Select(flag => new SetupFlag(flag.Id) { Value = state.GetFlag(flag.Id) }).ToArray();
+        EditFlags = Flags.Select(flag => new SetupFlag(flag.Id, state.GetFlag(flag.Id))).ToArray();
         EditTexts = Texts.Select(field => new SetupText(field.Id, state.GetTextVariable(field.Id))).ToArray();
     }
 

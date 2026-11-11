@@ -1,4 +1,4 @@
-<section class="tw-creation" aria-label="Character creation">
+<section class="@(Compact ? "tw-creation tw-creation--compact" : "tw-creation")" aria-label="Character creation">
     <h1>@Story.Title</h1>
     <h2>Create your character</h2>
     <form @onsubmit="Start" @onsubmit:preventDefault>
@@ -51,6 +51,7 @@
 </section>
 
 @code {
+    [Parameter] public bool Compact { get; set; }
     [Parameter, EditorRequired]
     public StoryDefinition Story { get; set; } = default!;
     [Parameter]

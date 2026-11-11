@@ -1,27 +1,29 @@
-<section aria-label="Accepted Talemark source">
-    <h3>Accepted Talemark source</h3>
-    <p>Read-only accepted compilation snapshot, not newer disk text. Highlighting is scene provenance, not a statement-level instruction pointer.</p>
+<section class="source-view" aria-label="Accepted Talemark source">
+    <h3 class="visually-hidden">Accepted Talemark source</h3>
     @if (Pending)
     {
-        <p role="status">Disk changes pending compilation/adoption. Accepted source remains displayed.</p>
+        <p role="status" class="source-notice">Disk changes pending compilation/adoption. Accepted source remains displayed.</p>
     }
     @if (Rejected || RestartRequired)
     {
-        <p role="status">Disk source is stale or restart-required, not adopted. This view still shows accepted source.</p>
+        <p role="status" class="source-notice">Disk source is stale or restart-required, not adopted. This view still shows accepted source.</p>
     }
     @if (Source is not { } source)
     {
-        <p role="status">Source mapping unavailable for this passage (for example, a C#-defined scene or no scene). No source is guessed.</p>
+        <p role="status" class="source-empty">Source mapping unavailable for this passage (for example, a C#-defined scene or no scene). No source is guessed.</p>
     }
     else
     {
-        <p>Accepted file: @source.Range.File. Scene @source.Scene source range: lines @source.Range.StartLine to @source.Range.EndLine (inclusive).</p>
-        <button type="button" @onclick="ShowScene">Go to current scene source</button>
-        <button type="button" disabled="@(_firstLine == 1)" @onclick="Previous">Previous source lines</button>
-        <button type="button" disabled="@(LastLine == _lines.Length)" @onclick="Next">Next source lines</button>
+        <div class="source-bar">
+            <p class="source-location" title="@source.Range.File">Accepted file: @source.Range.File. Scene @source.Scene source range: lines @source.Range.StartLine to @source.Range.EndLine (inclusive).</p>
+            <span class="source-page" aria-hidden="true">@_firstLine–@LastLine of @_lines.Length</span>
+            <button type="button" @onclick="ShowScene">Go to current scene source</button>
+            <button type="button" disabled="@(_firstLine == 1)" @onclick="Previous">Previous source lines</button>
+            <button type="button" disabled="@(LastLine == _lines.Length)" @onclick="Next">Next source lines</button>
+        </div>
         <div @key="_navigationRevision" class="source-window" tabindex="0" aria-label="Read-only accepted source lines">
             <table class="source-lines">
-                <caption>Showing accepted lines @_firstLine to @LastLine of @_lines.Length</caption>
+                <caption class="visually-hidden">Showing accepted lines @_firstLine to @LastLine of @_lines.Length</caption>
                 <thead><tr><th scope="col">Line</th><th scope="col">Talemark source</th></tr></thead>
                 <tbody>
                     @for (var line = _firstLine; line <= LastLine; line++)

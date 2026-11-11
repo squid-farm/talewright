@@ -472,6 +472,14 @@ the [reader-text grammar](../reference/talemark-operators.md#reader-text-grammar
   The folder debugger replaces this capability only on accepted refresh, including image-content edits.
 - `wwwroot/talewright.css`: all player styles, driven by CSS variables (`--tw-bg`, `--tw-accent`…), with a dark
   mode via `prefers-color-scheme`. Hosts link it as `_content/Talewright.Player/talewright.css`.
+  Embedded hosts can opt into `CharacterCreator.Compact` or disable `StoryStage.ShowCharacterSheet`;
+  player-owned styles implement those presentations. A named `story-stage` inline-size container
+  makes the stage responsive to an embedded pane, and `--tw-scene-title-margin-top` /
+  `--tw-choices-margin` customize passage spacing without targeting player classes.
+  Debugger chrome uses a shared `debugger-chrome` Razor CSS scope, assigned to every debugger
+  component in its project file. Shared defaults live in `Workbench.razor.css`; player-rendered
+  elements never receive that scope. Keep `wwwroot/debugger.css` limited to host sizing and do not
+  use deep selectors or target player classes from debugger styles.
 
 ### 3.8 The hosts
 

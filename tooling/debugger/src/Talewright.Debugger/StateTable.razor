@@ -1,4 +1,6 @@
-<label>Filter inspection <input aria-label="Filter inspection" value="@Filter" @oninput="OnFilterInput" /></label>
+<div class="tool-filters">
+    <label>Filter inspection <input aria-label="Filter inspection" value="@Filter" @oninput="OnFilterInput" /></label>
+</div>
 @foreach (var character in Inspection.FindCharacters(Filter))
 {
     <details>
@@ -26,7 +28,7 @@
         @foreach (var scene in Inspection.Scenes.Where(v => Match(v.Id.Value)).Take(100)) { <li>@scene.Id visits: @scene.Visits</li> }
         @foreach (var trigger in Inspection.Triggers.Where(v => Match(v.Id))) { <li>@trigger.Id fired: @trigger.HasFired</li> }
     </ul>
-    <p>Showing at most 100 scene visit rows. Narrow the inspection filter to find other scenes.</p>
+    <p class="tool-note">Showing at most 100 scene visit rows. Narrow the inspection filter to find other scenes.</p>
 </details>
 
 @code {

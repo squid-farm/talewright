@@ -15,28 +15,33 @@
                 Map
             </button>
         </div>
+        <span class="toolbar-separator" aria-hidden="true"></span>
         <button type="button" disabled="@(Session?.CanBack != true)" @onclick="OnBack">Back</button>
         <button type="button" disabled="@(Session?.CanForward != true)" @onclick="OnForward">Forward</button>
         <button type="button" disabled="@(Story is null)" @onclick="OnRestartScene">Restart scene</button>
+        <span class="toolbar-separator" aria-hidden="true"></span>
         <button type="button" aria-pressed="@(InspectMode ? "true" : "false")" disabled="@MapSelected" @onclick="OnToggleInspect">Inspect</button>
-        <button type="button" disabled="@(!SettingsReady)" @onclick="OnOpenReaderSettings">Reader settings</button>
-        <button type="button" aria-expanded="@_filesOpen" aria-haspopup="menu" @onclick="ToggleFiles">Files</button>
-        <button type="button" @onclick="() => _helpOpen = true">Help</button>
-        <button type="button" class="source-status" @onclick="OnShowProblems">@SourceStatus</button>
+        <button type="button" class="source-status @SourceStatusClass" @onclick="OnShowProblems">@SourceStatus</button>
     </div>
     <div class="toolbar-layout">
+        <button type="button" disabled="@(!SettingsReady)" @onclick="OnOpenReaderSettings">Reader settings</button>
+        <div class="files-anchor">
+            <button type="button" aria-expanded="@_filesOpen" aria-haspopup="menu" @onclick="ToggleFiles">Files</button>
+            @if (_filesOpen)
+            {
+                <div role="menu" aria-label="Files" class="files-menu">
+                    <button type="button" role="menuitem" @onclick="OpenScenarios">Portable author scenarios</button>
+                    <button type="button" role="menuitem" @onclick="OpenPlayerSave">Read player save</button>
+                    <button type="button" role="menuitem" @onclick="Rescan">Rescan / retry watcher</button>
+                    <button type="button" role="menuitem" @onclick="Restart">Restart from source</button>
+                </div>
+            }
+        </div>
+        <button type="button" @onclick="() => _helpOpen = true">Help</button>
+        <span class="toolbar-separator" aria-hidden="true"></span>
         <button type="button" aria-pressed="@(InspectorVisible ? "true" : "false")" @onclick="OnToggleInspector">Inspector</button>
         <button type="button" aria-pressed="@(ToolsVisible ? "true" : "false")" @onclick="OnToggleTools">Tools</button>
     </div>
-    @if (_filesOpen)
-    {
-        <div role="menu" aria-label="Files" class="files-menu">
-            <button type="button" role="menuitem" @onclick="OpenScenarios">Portable author scenarios</button>
-            <button type="button" role="menuitem" @onclick="OpenPlayerSave">Read player save</button>
-            <button type="button" role="menuitem" @onclick="Rescan">Rescan / retry watcher</button>
-            <button type="button" role="menuitem" @onclick="Restart">Restart from source</button>
-        </div>
-    }
     @if (_helpOpen)
     {
         <div class="debugger-dialog-backdrop">
@@ -46,14 +51,25 @@
                 <p>Story folder: @Model.Root</p>
                 <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
                 <p>Saved Talemark changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
+                <p>
+                    <button type="button" @onclick="OpenGuide">Open debugger guide</button>
+                    <code class="help-url">@DebuggerGuide.Url</code>
+                </p>
+                @if (_guideError is not null)
+                {
+                    <p role="alert" class="tw-error">@_guideError</p>
+                }
             </section>
         </div>
     }
 </header>
 
 @code {
+    private void OpenGuide() => _guideError = DebuggerGuide.Open();
+
     private bool _filesOpen;
     private bool _helpOpen;
+    private string? _guideError;
     private ElementReference _sceneTab;
     private ElementReference _mapTab;
 
@@ -84,6 +100,10 @@
         : Model.SourceRejected ? "Source not adopted"
         : Model.SourcePending ? "Source change pending"
         : "Source up to date";
+
+    private string SourceStatusClass => Model.RestartRequired || Model.SourceRejected ? "source-status-error"
+        : Model.SourcePending ? "source-status-pending"
+        : "source-status-ok";
 
     private Task SelectMainView(bool map)
     {
