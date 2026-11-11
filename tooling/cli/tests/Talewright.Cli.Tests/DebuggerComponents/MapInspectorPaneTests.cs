@@ -78,6 +78,30 @@ public sealed class MapInspectorPaneTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void Map_details_accessible_names_mark_shown_choices_and_hub_offers()
+    {
+        var files = ComponentStory.Files();
+        files["main.tale"] = """
+            === hall
+            @hub shop
+            * [Restricted] (requires false, shown "Need a key") -> cave
+            === cave
+            @title Cave
+            @tags shop
+            @requires false, shown "Need a key"
+            -> END
+            """;
+        using var model = ComponentStory.Load(files);
+        var inspector = Show(model, MapView.Build(model.Story!), null, "hall");
+        var itemNames = inspector.FindAll("button.map-item").Select(button => Text(button.TextContent)).ToArray();
+
+        Assert.Contains(itemNames, name => name.Contains("Choice c0 “Restricted”", StringComparison.Ordinal)
+            && name.EndsWith(", shown when unavailable", StringComparison.Ordinal));
+        Assert.Contains(itemNames, name => name.Contains("Hub offer of Cave (cave)", StringComparison.Ordinal)
+            && name.EndsWith(", shown when unavailable", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void End_selection_has_details_but_no_scene_preview()
     {
         using var model = ComponentStory.Start();

@@ -1,4 +1,5 @@
 @using Talewright.Core.Identity
+@using Talewright.Rules.Diagnostics
 @using Talewright.Runtime
 @using Talewright.Talemark.Model
 
@@ -46,6 +47,10 @@
                                 </button>
                             }
                             <span>@Name(connection)</span>
+                            @if (Status(connection) is { } status)
+                            {
+                                <span class="scene-connection-status">@status</span>
+                            }
                             @if (IsTaken(connection))
                             {
                                 <strong>taken</strong>
@@ -62,6 +67,8 @@
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
     [Parameter, EditorRequired] public SceneDefinition Scene { get; set; } = null!;
     [Parameter] public MapRunView? Run { get; set; }
+    [Parameter] public AuthorInspection? Inspection { get; set; }
+    [Parameter] public SceneId? CurrentScene { get; set; }
     [Parameter] public bool Expanded { get; set; } = true;
     [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
     [Parameter] public EventCallback<SceneId> OnInspectScene { get; set; }
@@ -69,6 +76,7 @@
     private StoryMap? _storyMap;
     private StoryDefinition? _indexedStory;
     private StorySceneConnections _connections = new([], []);
+    private IReadOnlyList<RuleDecision> _entryDecisions = [];
     private HashSet<string> _takenItemIds = new(StringComparer.Ordinal);
     private bool _expanded = true;
 
@@ -81,6 +89,9 @@
         }
 
         _connections = _storyMap!.Connections(Scene.Id);
+        _entryDecisions = CurrentScene == Scene.Id
+            ? DebuggerDecisionStatus.ForLatestSceneEntry(Inspection, Scene.Id)
+            : [];
         _takenItemIds = Run?.Steps
             .Where(step => step.TakenItemId is not null)
             .Select(step => step.TakenItemId!)
@@ -132,6 +143,27 @@
             MapView.HubOfferName(offer.Offer, Story.GetScene(offer.Offer.Scene)),
         _ => throw new ArgumentOutOfRangeException(nameof(connection)),
     };
+
+    private string? Status(StoryConnection connection)
+    {
+        if (CurrentScene != Scene.Id)
+            return null;
+
+        RuleDecision? decision = connection switch
+        {
+            StoryConnection.DivertConnection { Divert.ChoiceKey: not null } divert =>
+                _entryDecisions.LastOrDefault(item =>
+                    item.Kind == DecisionKind.Choice && item.Subject == divert.Divert.StepId),
+            StoryConnection.HubOfferConnection offer =>
+                _entryDecisions.LastOrDefault(item =>
+                    item.Kind == DecisionKind.Storylet && item.Subject == offer.Offer.Scene.Value),
+            _ => null,
+        };
+        return connection is StoryConnection.DivertConnection { Divert.ChoiceKey: not null }
+            or StoryConnection.HubOfferConnection
+            ? DebuggerDecisionStatus.ForDecision(decision)
+            : null;
+    }
 
     private bool IsTaken(StoryConnection connection) => connection switch
     {

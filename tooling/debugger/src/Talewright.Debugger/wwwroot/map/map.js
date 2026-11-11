@@ -136,7 +136,8 @@ window.talewrightMap = (() => {
   }
 
   const lineColor = line => kindColors[line.kind === "HubOffer" ? "HubOffer" : line.outcome || (line.kind === "Scene" || line.kind === "EntryCheck" ? "Scene" : "Choice")];
-  const lineDash = line => line.kind === "HubOffer" ? [6, 4] : line.kind === "EntryCheck" ? [5, 3] : [];
+  const lineDash = line => line.shownWhenUnavailable ? [2, 3]
+    : line.kind === "HubOffer" ? [6, 4] : line.kind === "EntryCheck" ? [5, 3] : [];
 
   function create(host, canvas, tooltip) {
     const state = {
@@ -261,7 +262,7 @@ window.talewrightMap = (() => {
       const color = highlighted ? colors.accent : taken ? kindColors.Success : lineColor(line);
       ctx.strokeStyle = color;
       ctx.lineWidth = width(highlighted ? 4 : taken ? 3 : line.kind === "HubOffer" ? 1.4 : 1.2);
-      ctx.setLineDash(highlighted || taken ? [] : lineDash(line));
+      ctx.setLineDash((highlighted || taken) && !line.shownWhenUnavailable ? [] : lineDash(line));
       for (const section of sections) {
         ctx.beginPath();
         section.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));

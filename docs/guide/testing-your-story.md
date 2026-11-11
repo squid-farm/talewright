@@ -74,6 +74,9 @@ connection to inspect the other scene without moving the playtest. **Back to cur
 returns to the playtest scene. **Show on map** selects and centers that scene in Map;
 **Use as target** fills Setup's target without starting or jumping; **Show source** opens its
 accepted source. A divert to `END` is shown as `END` but cannot be inspected or used as a target.
+The current scene's connections show whether each choice or hub offer is available, shown but
+unavailable, hidden, dropped by `@hub-limit`, or not reached at this scene entry. Other scenes'
+connections have no current-entry status.
 
 Starting at a scene skips everything before it, so earlier scenes count as unvisited. If a scene
 checks `player visited ...`, start at an earlier scene and play forward, or use
@@ -99,7 +102,8 @@ playtest. Click a scene to see its details and a compact preview of its text and
 workspace Inspector. Selecting a connection there also selects and centers its destination. Scenes
 the start scene can't reach are drawn in a separate area on the right.
 Reachability follows diverts and hubs, but doesn't check whether their conditions can ever be met.
-The preview doesn't run entry effects or skill checks.
+The preview doesn't run entry effects or skill checks. Choices and hub offers written with `shown`
+use dotted lines; their map details and hover text say “shown when unavailable.”
 
 While you play in the debugger, the scenes you've visited and the choices you've taken are
 highlighted in order, and the map follows the current scene. Manually pan or zoom to pause following;
@@ -185,9 +189,11 @@ Scenario files are a testing aid. A later version of Talewright may not open old
 - **Source:** the accepted source of the current scene by default. **Show source** pins another scene
   (or a selected choice line); **Follow current scene** resumes tracking the playtest.
 - **Branches:** recorded decisions at the point they were made, not re-evaluated against the
-  current state. **Inspect choice** opens a choice in the Inspector without choosing it, including
-  choices whose player buttons are disabled. **Show branch explanation** opens that choice's
-  recorded decision.
+  current state. Choice and hub-offer decisions show **Available**, **Shown, unavailable**,
+  **Hidden**, **Dropped by hub limit**, or **Not reached**. Shown-but-unavailable rows include
+  their failing `requires` trace without expanding. **Inspect choice** opens a choice in the
+  Inspector without choosing it, including choices whose player buttons are disabled.
+  **Show branch explanation** opens that choice's recorded decision.
 - **Timeline:** move backward and forward through your debugging run, whatever your story's player
   undo setting. The seed and dice rolls belong to this run.
 - **Events:** everything this debugging run has emitted.

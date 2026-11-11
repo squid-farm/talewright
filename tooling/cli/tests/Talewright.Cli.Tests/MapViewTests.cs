@@ -154,6 +154,47 @@ public sealed class MapViewTests
     }
 
     [Fact]
+    public void Marks_shown_choices_and_hub_offers_in_lines_and_accessible_item_names()
+    {
+        var view = Build("""
+            === start
+            @hub shop
+            @hub-limit 1
+            * [Restricted] (requires false, shown "Need a key") -> cave
+            * [Other] (requires false) -> cave
+            * [Wait] -> END
+            === cave
+            @title Cave
+            @tags shop
+            @requires false, shown "Need a key"
+            -> END
+            === garden
+            @title Garden
+            @tags shop
+            @requires true
+            -> END
+            """);
+
+        var start = Assert.Single(view.Nodes, node => node.Id == "start");
+        var shownChoice = Assert.Single(start.Items, item => item.Id == "start/step:4:1");
+        Assert.Contains(", shown when unavailable", shownChoice.Name);
+        Assert.True(Assert.Single(view.Lines, line => line.Id == shownChoice.Line).ShownWhenUnavailable);
+
+        var plainChoice = Assert.Single(start.Items, item => item.Name.Contains("“Other”", StringComparison.Ordinal));
+        Assert.DoesNotContain(", shown when unavailable", plainChoice.Name);
+        Assert.NotEqual(shownChoice.Line, plainChoice.Line);
+        Assert.False(Assert.Single(view.Lines, line => line.Id == plainChoice.Line).ShownWhenUnavailable);
+
+        var shownOffer = Assert.Single(start.Items, item => item.HubOffer && item.Target == "cave");
+        Assert.Contains(", shown when unavailable", shownOffer.Name);
+        Assert.True(Assert.Single(view.Lines, line => line.Id == shownOffer.Line).ShownWhenUnavailable);
+
+        var availableOffer = Assert.Single(start.Items, item => item.HubOffer && item.Target == "garden");
+        Assert.DoesNotContain(", shown when unavailable", availableOffer.Name);
+        Assert.False(Assert.Single(view.Lines, line => line.Id == availableOffer.Line).ShownWhenUnavailable);
+    }
+
+    [Fact]
     public void Puts_unreachable_scenes_in_their_own_area_with_stubs_for_reachable_targets()
     {
         var view = Build();

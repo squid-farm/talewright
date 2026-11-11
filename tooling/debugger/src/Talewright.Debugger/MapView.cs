@@ -58,8 +58,9 @@ public sealed record MapView(
             var target = divert.Target.ToString();
             var to = Endpoint(from, target);
             var label = DivertLabel(divert);
-            var key = $"{from}\n{to}\n{divert.Kind}\n{label}";
-            var name = DivertName(divert);
+            var shownWhenUnavailable = divert.ChoiceShown is not null;
+            var key = $"{from}\n{to}\n{divert.Kind}\n{label}\n{shownWhenUnavailable}";
+            var name = DivertName(divert) + (shownWhenUnavailable ? DebuggerDecisionStatus.ShownItemSuffix : "");
             if (divertLines.TryGetValue(key, out var index))
             {
                 var line = lines[index];
@@ -69,7 +70,7 @@ public sealed record MapView(
             {
                 divertLines[key] = lines.Count;
                 lines.Add(new MapLine($"d{lines.Count}", from, to, areas[from], divert.Kind.ToString(),
-                    divert.Outcome?.ToString(), label, [name]));
+                    divert.Outcome?.ToString(), label, [name], shownWhenUnavailable));
             }
 
             items[from].Add(new MapItem(divert.Id, lines[divertLines[key]].Id, target, name, false));
@@ -103,8 +104,10 @@ public sealed record MapView(
             var group = $"group:{areas[hub]}:{tag}";
             var toGroup = groupOf.GetValueOrDefault(scene) == group;
             var to = toGroup ? group : Endpoint(hub, scene);
-            var name = HubOfferName(offer, scenes[scene]);
-            var key = $"{hub}\n{to}";
+            var shownWhenUnavailable = offer.Shown is not null;
+            var name = HubOfferName(offer, scenes[scene]) +
+                (shownWhenUnavailable ? DebuggerDecisionStatus.ShownItemSuffix : "");
+            var key = $"{hub}\n{to}\n{shownWhenUnavailable}";
             if (offerLines.TryGetValue(key, out var index))
             {
                 var line = lines[index];
@@ -113,7 +116,8 @@ public sealed record MapView(
             else
             {
                 offerLines[key] = lines.Count;
-                lines.Add(new MapLine($"o{lines.Count}", hub, to, areas[hub], HubOfferKind, null, $"offers #{tag}", [name]));
+                lines.Add(new MapLine($"o{lines.Count}", hub, to, areas[hub], HubOfferKind, null, $"offers #{tag}", [name],
+                    shownWhenUnavailable));
             }
 
             items[hub].Add(new MapItem(offer.Id, lines[offerLines[key]].Id, scene, name, true));
@@ -208,7 +212,7 @@ public sealed record MapView(
     private static string ChoiceLabel(StoryDivert divert) =>
         divert.ChoiceLabel is null ? " (textless)" : $" “{PlainText(divert.ChoiceLabel)}”";
 
-    private static string PlainText(IReadOnlyList<TemplateInline> inlines) => string.Concat(inlines.Select(inline => inline switch
+    internal static string PlainText(IReadOnlyList<TemplateInline> inlines) => string.Concat(inlines.Select(inline => inline switch
     {
         TextTemplate text => text.Text,
         StyledTemplate styled => PlainText(styled.Children),
@@ -264,7 +268,8 @@ public sealed record MapLine(
     string Kind,
     string? Outcome,
     string Label,
-    IReadOnlyList<string> Items);
+    IReadOnlyList<string> Items,
+    bool ShownWhenUnavailable = false);
 
 /// <summary>One divert or hub offer listed in a scene's details.</summary>
 /// <param name="Id">The divert or hub offer id.</param>

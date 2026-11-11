@@ -66,4 +66,104 @@ public sealed class SceneConnectionsTests : BunitContext
         await incoming[0].QuerySelector("button")!.ClickAsync(new());
         Assert.Equal(new SceneId("start"), inspected);
     }
+
+    [Fact]
+    public void Shows_status_for_current_entry_choices_and_hub_offers_only()
+    {
+        using var model = DebuggerDecisionStory.Start();
+        var scene = model.Story!.GetScene(new SceneId("hall"));
+        var run = MapRunView.Build(model.Story, MapView.Build(model.Story), model.Session!);
+        var connections = Render<SceneConnections>(parameters => parameters
+            .Add(component => component.Story, model.Story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.Run, run)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, scene.Id));
+        var outgoing = connections.FindAll("[aria-label='Outgoing connections'] li");
+
+        AssertStatus(outgoing, "“Available”", "Available");
+        AssertStatus(outgoing, "“Shown”", "Shown, unavailable");
+        AssertStatus(outgoing, "“Hidden”", "Hidden");
+        var checkRows = outgoing.Where(row => row.TextContent.Contains("Climb", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(2, checkRows.Length);
+        Assert.All(checkRows, row => Assert.Contains("Shown, unavailable", row.TextContent));
+        AssertStatus(outgoing, "Shown offer", "Shown, unavailable");
+        AssertStatus(outgoing, "Limited offer", "Dropped by hub limit");
+        AssertStatus(outgoing, "Hidden offer", "Hidden");
+
+        var otherScene = Render<SceneConnections>(parameters => parameters
+            .Add(component => component.Story, model.Story)
+            .Add(component => component.Scene, model.Story.GetScene(new SceneId("cave")))
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, scene.Id));
+        Assert.Empty(otherScene.FindAll(".scene-connection-status"));
+    }
+
+    [Fact]
+    public void Incoming_connections_do_not_show_current_entry_status_even_when_step_ids_collide()
+    {
+        var files = ComponentStory.Files();
+        files["main.tale"] = """
+            === hall
+            * [Loop] (requires flag:ready, shown "Need a key") -> hall
+            """;
+        files["other.tale"] = """
+            === other
+            * [Enter] -> hall
+            """;
+        using var model = ComponentStory.Load(files);
+        model.Start();
+        Assert.Null(model.Error);
+
+        var story = model.Story!;
+        var map = StoryMap.Build(story);
+        var loop = Assert.Single(map.Diverts, divert => divert.From.Value == "hall");
+        var enter = Assert.Single(map.Diverts, divert => divert.From.Value == "other");
+        Assert.Equal(loop.StepId, enter.StepId);
+
+        var scene = story.GetScene(new SceneId("hall"));
+        var connections = Render<SceneConnections>(parameters => parameters
+            .Add(component => component.Story, story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, scene.Id));
+        var incoming = connections.FindAll("[aria-label='Incoming connections'] li");
+        Assert.Equal(2, incoming.Count);
+        Assert.Contains(incoming, row => row.TextContent.Contains("“Enter”", StringComparison.Ordinal));
+        Assert.Contains(incoming, row => row.TextContent.Contains("“Loop”", StringComparison.Ordinal));
+        Assert.All(incoming, row => Assert.Null(row.QuerySelector(".scene-connection-status")));
+        AssertStatus(connections.FindAll("[aria-label='Outgoing connections'] li"), "“Loop”", "Shown, unavailable");
+    }
+
+    [Fact]
+    public void Does_not_reuse_a_choice_decision_from_an_earlier_scene_entry()
+    {
+        using var model = DebuggerDecisionStory.Start(DebuggerDecisionStory.ReentryTale);
+        var scene = model.Story!.GetScene(new SceneId("hall"));
+
+        var firstEntry = Render<SceneConnections>(parameters => parameters
+            .Add(component => component.Story, model.Story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, scene.Id));
+        AssertStatus(firstEntry.FindAll("[aria-label='Outgoing connections'] li"), "Shown", "Shown, unavailable");
+
+        var loop = model.Session!.Current.Choices.Single(choice => choice.Text == "Loop");
+        model.Choose(loop.Key);
+        Assert.Null(model.Error);
+        Assert.Equal("hall", model.Session.Current.Scene!.Value.Value);
+
+        var latestEntry = Render<SceneConnections>(parameters => parameters
+            .Add(component => component.Story, model.Story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.CurrentScene, model.Session.Current.Scene));
+        AssertStatus(latestEntry.FindAll("[aria-label='Outgoing connections'] li"), "Shown", "Not reached");
+    }
+
+    private static void AssertStatus(IReadOnlyList<AngleSharp.Dom.IElement> rows, string rowText, string status)
+    {
+        var row = rows.Single(item => item.TextContent.Contains(rowText, StringComparison.Ordinal));
+        Assert.Equal(status, row.QuerySelector(".scene-connection-status")?.TextContent);
+    }
 }
