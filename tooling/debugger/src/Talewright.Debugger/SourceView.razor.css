@@ -117,3 +117,8 @@
     color: var(--tw-accent);
     box-shadow: inset 2px 0 var(--tw-accent);
 }
+
+.source-lines .source-choice td {
+    box-shadow: inset 3px 0 var(--tw-accent);
+    font-weight: 700;
+}

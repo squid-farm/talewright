@@ -1,3 +1,4 @@
+@using Talewright.Core.Identity
 @using Talewright.Runtime
 @using Talewright.Talemark.Model
 
@@ -14,7 +15,10 @@
                     @foreach (var connection in _connections.Incoming)
                     {
                         <li>
-                            <span class="scene-connection-other">← @OtherScene(connection, incoming: true)</span>
+                            <button type="button" class="scene-connection-other"
+                                    @onclick="() => InspectScene(connection, incoming: true)">
+                                ← @OtherScene(connection, incoming: true)
+                            </button>
                             <span>@Name(connection)</span>
                             @if (IsTaken(connection))
                             {
@@ -30,7 +34,17 @@
                     @foreach (var connection in _connections.Outgoing)
                     {
                         <li>
-                            <span class="scene-connection-other">→ @OtherScene(connection, incoming: false)</span>
+                            @if (IsEnd(connection))
+                            {
+                                <span class="scene-connection-other">→ END</span>
+                            }
+                            else
+                            {
+                                <button type="button" class="scene-connection-other"
+                                        @onclick="() => InspectScene(connection, incoming: false)">
+                                    → @OtherScene(connection, incoming: false)
+                                </button>
+                            }
                             <span>@Name(connection)</span>
                             @if (IsTaken(connection))
                             {
@@ -50,6 +64,7 @@
     [Parameter] public MapRunView? Run { get; set; }
     [Parameter] public bool Expanded { get; set; } = true;
     [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
+    [Parameter] public EventCallback<SceneId> OnInspectScene { get; set; }
 
     private StoryMap? _storyMap;
     private StoryDefinition? _indexedStory;
@@ -89,6 +104,26 @@
             : offer.Offer.Scene.Value,
         _ => throw new ArgumentOutOfRangeException(nameof(connection)),
     };
+
+    private static bool IsEnd(StoryConnection connection) =>
+        connection is StoryConnection.DivertConnection { Divert.Target.IsEnd: true };
+
+    private Task InspectScene(StoryConnection connection, bool incoming)
+    {
+        var scene = connection switch
+        {
+            StoryConnection.DivertConnection divert => incoming
+                ? divert.Divert.From
+                : divert.Divert.Target.Scene,
+            StoryConnection.HubOfferConnection offer => incoming
+                ? offer.Offer.Hub
+                : offer.Offer.Scene,
+            _ => throw new ArgumentOutOfRangeException(nameof(connection)),
+        };
+        if (scene is null)
+            throw new InvalidOperationException("END does not identify a scene to inspect.");
+        return OnInspectScene.InvokeAsync(scene.Value);
+    }
 
     private string Name(StoryConnection connection) => connection switch
     {

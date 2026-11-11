@@ -220,6 +220,8 @@
         await _sceneNavigator.FocusSceneAsync(scene);
     }
 
+    public Task SelectAndCenterScene(string scene) => FocusScene(scene);
+
     public Task FocusSelectedScene() =>
         _selectedNodeId is { } scene && _sceneNavigator is not null
             ? _sceneNavigator.FocusSceneAsync(scene)

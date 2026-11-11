@@ -1,4 +1,5 @@
 @using Talewright.Core.Events
+@using Talewright.Core.Identity
 @using Talewright.Rules.Diagnostics
 @using Talewright.Runtime
 @using Talewright.Talemark.Formatting
@@ -6,13 +7,16 @@
 
 <section class="choice-inspector" aria-label="Choice inspector">
     <h2>Choice @ChoiceKey</h2>
+    <SceneNavigationActions Scene="Scene.Id" CurrentScene="CurrentScene" ShowOnMap="false"
+                            UseAsTarget="false" ShowSource="false"
+                            OnBackToCurrentScene="OnBackToCurrentScene" />
     <dl>
         <dt>Choice key</dt><dd>@ChoiceKey</dd>
         <dt>Label</dt><dd>@(Choice?.Text ?? "Choice is not currently available")</dd>
         <dt>Target or targets</dt><dd>@Targets</dd>
         <dt>Chosen in this run</dt><dd>@(WasChosen ? "Yes" : "No")</dd>
         <dt>Latest decision</dt>
-        <dd>@(LatestDecision is { } decision ? $"{decision.Outcome} ({decision.Reason})" : "No recorded decision")</dd>
+        <dd>@(LatestDecision is { } latest ? $"{latest.Outcome} ({latest.Reason})" : "No recorded decision")</dd>
     </dl>
     <h3>requires</h3>
     @if (Requirement is null)
@@ -28,6 +32,15 @@
         <p>@ExpressionFormatter.Format(Requirement)</p>
         <p>Not evaluated in this run.</p>
     }
+    <div class="choice-inspector-actions">
+        <button type="button" @onclick="ShowSource">Show source</button>
+        @if (LatestDecision is { } explanationDecision)
+        {
+            <button type="button" @onclick="() => OnShowBranchExplanation.InvokeAsync(explanationDecision)">
+                Show branch explanation
+            </button>
+        }
+    </div>
 </section>
 
 @code {
@@ -37,6 +50,10 @@
     [Parameter] public ChoiceView? Choice { get; set; }
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
+    [Parameter] public SceneId? CurrentScene { get; set; }
+    [Parameter] public EventCallback OnBackToCurrentScene { get; set; }
+    [Parameter] public EventCallback<InspectorSelection> OnShowSource { get; set; }
+    [Parameter] public EventCallback<RuleDecision> OnShowBranchExplanation { get; set; }
 
     private ChoiceDefinition? Definition => Scene.Choices.FirstOrDefault(choice => choice.Key == ChoiceKey);
     private SceneDefinition? HubTarget => ChoiceKey.StartsWith(StorySession.StoryletKeyPrefix, StringComparison.Ordinal)
@@ -66,4 +83,7 @@
 
     private bool WasChosen => Inspection?.Events.OfType<ChoiceMade>()
         .Any(item => item.Scene == Scene.Id && item.ChoiceKey == ChoiceKey) == true;
+
+    private Task ShowSource() => OnShowSource.InvokeAsync(new InspectorSelection(
+        HubTarget?.Id ?? Scene.Id, Definition is null ? null : ChoiceKey));
 }

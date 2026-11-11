@@ -1,6 +1,19 @@
-<SourceView Source="Model.CurrentSource" Pending="Model.SourcePending"
-            Rejected="Model.SourceRejected" RestartRequired="Model.RestartRequired" />
+@if (Selection is not null)
+{
+    <button type="button" class="source-follow" @onclick="OnFollowCurrentScene">
+        Follow current scene
+    </button>
+}
+<SourceView Source="DisplayedSource" Pending="Model.SourcePending"
+            Rejected="Model.SourceRejected" RestartRequired="Model.RestartRequired"
+            FollowingCurrentScene="@(Selection is null)" />
 
 @code {
     [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+    [Parameter] public InspectorSelection? Selection { get; set; }
+    [Parameter] public EventCallback OnFollowCurrentScene { get; set; }
+
+    private AcceptedSceneSource? DisplayedSource => Selection is { } selection
+        ? Model.AcceptedSourceFor(selection.Scene, selection.ChoiceKey)
+        : Model.CurrentSource;
 }

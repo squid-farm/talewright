@@ -1,4 +1,5 @@
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Talewright.Core.Identity;
 using Talewright.Debugger;
 using Talewright.Talemark.Model;
@@ -8,7 +9,7 @@ namespace Talewright.Cli.Tests.DebuggerComponents;
 public sealed class SceneConnectionsTests : BunitContext
 {
     [Fact]
-    public void Renders_ordered_incoming_and_outgoing_connections_with_the_taken_marker()
+    public async Task Renders_ordered_incoming_and_outgoing_connections_with_the_taken_marker()
     {
         var files = ComponentStory.Files();
         files[Talewright.Talemark.Compilation.StorySource.ManifestFileName] =
@@ -35,10 +36,13 @@ public sealed class SceneConnectionsTests : BunitContext
 
         var story = model.Story!;
         var run = MapRunView.Build(story, MapView.Build(story), model.Session!);
+        SceneId? inspected = null;
         var connections = Render<SceneConnections>(parameters => parameters
             .Add(component => component.Story, story)
             .Add(component => component.Scene, story.GetScene(new SceneId("cave")))
-            .Add(component => component.Run, run));
+            .Add(component => component.Run, run)
+            .Add(component => component.OnInspectScene,
+                EventCallback.Factory.Create<SceneId>(this, scene => inspected = scene)));
 
         Assert.Equal("4 in · 1 out", connections.Find("summary").TextContent.Trim());
         Assert.True(connections.Find("details").HasAttribute("open"));
@@ -57,5 +61,9 @@ public sealed class SceneConnectionsTests : BunitContext
         Assert.Contains("→ END", outgoing.TextContent);
         Assert.Contains("Choice c0 “Finish” to END", outgoing.TextContent);
         Assert.Null(outgoing.QuerySelector("strong"));
+        Assert.Null(outgoing.QuerySelector("button"));
+
+        await incoming[0].QuerySelector("button")!.ClickAsync(new());
+        Assert.Equal(new SceneId("start"), inspected);
     }
 }

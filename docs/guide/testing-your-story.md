@@ -69,7 +69,11 @@ needs the [desktop setup](getting-started.md#linux-desktop-setup).
 
 The **State** tab shows and edits the current flags, variables, faction standing, and every
 character's stats and inventory. **Events** lists what happened to get there, and **Branches**
-explains why each condition passed or failed.
+explains why each condition passed or failed. In the Inspector, select an incoming or outgoing
+connection to inspect the other scene without moving the playtest. **Back to current scene**
+returns to the playtest scene. **Show on map** selects and centers that scene in Map;
+**Use as target** fills Setup's target without starting or jumping; **Show source** opens its
+accepted source. A divert to `END` is shown as `END` but cannot be inspected or used as a target.
 
 Starting at a scene skips everything before it, so earlier scenes count as unvisited. If a scene
 checks `player visited ...`, start at an earlier scene and play forward, or use
@@ -78,10 +82,12 @@ checks `player visited ...`, start at an earlier scene and play forward, or use
 ### See the source being tested
 
 **Accepted Talemark source** shows the source file of the scene you're on, with the scene's lines
-highlighted. It follows you as you choose, jump or go Back and Forward. Use
-**Previous source lines** / **Next source lines** to browse, and **Go to current scene source** to
-return to the scene. This view is read-only, and shows the version of your story the debugger is
-running, which may be behind unsaved or rejected edits.
+highlighted. It follows you as you choose, jump or go Back and Forward. **Show source** in the
+Inspector pins the selected scene (and marks a selected choice line) while you inspect it;
+**Follow current scene** resumes following the playtest. Use **Previous source lines** /
+**Next source lines** to browse, and **Go to current scene source** or **Go to selected scene source**
+to return to the displayed scene's range. This view is read-only and shows the last accepted
+compilation, preserving pending, rejected and restart-required notices.
 
 ![Accepted Talemark source with the temple.altar scene's lines highlighted, starting at its === declaration on line 44](../images/author-debugger-source.png)
 
@@ -90,7 +96,8 @@ running, which may be behind unsaved or rejected edits.
 The **Map** tab fills the main viewer with every scene, divert and hub offer from the last successful
 compilation. It opens focused on the current playtest scene, or the story's start scene before a
 playtest. Click a scene to see its details and a compact preview of its text and choices in the
-workspace Inspector. Scenes the start scene can't reach are drawn in a separate area on the right.
+workspace Inspector. Selecting a connection there also selects and centers its destination. Scenes
+the start scene can't reach are drawn in a separate area on the right.
 Reachability follows diverts and hubs, but doesn't check whether their conditions can ever be met.
 The preview doesn't run entry effects or skill checks.
 
@@ -175,10 +182,12 @@ Scenario files are a testing aid. A later version of Talewright may not open old
   current run's state, visits, triggers and dice.
 - **State:** current values, edited in place and applied as one batch (see above). Scene visits and
   triggers are shown read-only.
-- **Source:** the accepted source of the current scene. Highlighting shows which scene you're in,
-  not which line is running.
+- **Source:** the accepted source of the current scene by default. **Show source** pins another scene
+  (or a selected choice line); **Follow current scene** resumes tracking the playtest.
 - **Branches:** recorded decisions at the point they were made, not re-evaluated against the
-  current state.
+  current state. **Inspect choice** opens a choice in the Inspector without choosing it, including
+  choices whose player buttons are disabled. **Show branch explanation** opens that choice's
+  recorded decision.
 - **Timeline:** move backward and forward through your debugging run, whatever your story's player
   undo setting. The seed and dice rolls belong to this run.
 - **Events:** everything this debugging run has emitted.

@@ -125,4 +125,37 @@ public sealed class InspectorTests : BunitContext
         Assert.Contains("Prepared", inspector.Markup);
         Assert.DoesNotContain("Scene inspector", inspector.Markup);
     }
+
+    [Fact]
+    public async Task Choice_inspector_links_to_its_source_and_recorded_branch_explanation()
+    {
+        using var model = ComponentStory.Start();
+        var scene = model.Story!.GetScene(new SceneId("hall"));
+        var choice = scene.Choices.Single(item => item.Key == "c0");
+        InspectorSelection? sourceSelection = null;
+        RuleDecision? branchDecision = null;
+        var inspector = Render<ChoiceInspector>(parameters => parameters
+            .Add(component => component.Story, model.Story)
+            .Add(component => component.Scene, scene)
+            .Add(component => component.ChoiceKey, choice.Key)
+            .Add(component => component.Session, model.Session)
+            .Add(component => component.Inspection, model.Inspection)
+            .Add(component => component.OnShowSource,
+                EventCallback.Factory.Create<InspectorSelection>(this, selection => sourceSelection = selection))
+            .Add(component => component.OnShowBranchExplanation,
+                EventCallback.Factory.Create<RuleDecision>(this, decision => branchDecision = decision)));
+
+        var originalScene = model.Session!.Current.Scene;
+        var originalEvents = model.Inspection!.Events.Count;
+        await inspector.FindAll("button").Single(button => button.TextContent.Trim() == "Show source")
+            .ClickAsync(new());
+        await inspector.FindAll("button").Single(button => button.TextContent.Trim() == "Show branch explanation")
+            .ClickAsync(new());
+
+        Assert.Equal(new InspectorSelection(new SceneId("hall"), choice.Key), sourceSelection);
+        Assert.Equal(model.Inspection.Decisions.Single(decision =>
+            decision.Kind == DecisionKind.Choice && decision.Subject == "step:4:1"), branchDecision);
+        Assert.Equal(originalScene, model.Session.Current.Scene);
+        Assert.Equal(originalEvents, model.Inspection.Events.Count);
+    }
 }
