@@ -3,7 +3,11 @@
 @using Talewright.Talemark.Model
 
 <aside class="inspector-pane" aria-label="Inspector">
-    @if (Story is null || Selection is null)
+    @if (MapSelected)
+    {
+        @ChildContent
+    }
+    else if (Story is null || Selection is null)
     {
         <p>Start a scene to inspect its details.</p>
     }
@@ -36,4 +40,6 @@
     [Parameter] public MapRunView? Run { get; set; }
     [Parameter] public bool ConnectionsExpanded { get; set; } = true;
     [Parameter] public EventCallback<bool> ConnectionsExpandedChanged { get; set; }
+    [Parameter] public bool MapSelected { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
 }

@@ -163,6 +163,10 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
     public async Task ClickMenuItemAsync(string name) =>
         await CommandAsync("click", new { name, role = "menu item" });
     public async Task ClickAtAsync(int x, int y) => await CommandAsync("click-at", new { x, y });
+    public async Task DragAsync(int fromX, int fromY, int toX, int toY) =>
+        await CommandAsync("drag", new { from_x = fromX, from_y = fromY, to_x = toX, to_y = toY });
+    public async Task ScrollAtAsync(int x, int y, int direction = 1) =>
+        await CommandAsync("scroll-at", new { x, y, direction });
     public async Task ClickWithinAsync(string name, string within) =>
         await CommandAsync("click", new { name, role = "push button", within });
     public async Task ChooseAsync(string label) =>

@@ -89,8 +89,10 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 1 hub offer, 1 unreachable.");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export SVG");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Export PNG");
+            Assert.Contains(snapshot.Descendants(), node => node.Role == "push button" && node.Name == "Focus current scene");
             Assert.Equal("Map", Focused(snapshot).Name);
             Assert.DoesNotContain("Scene setup", snapshot.Content);
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
 
             await driver.ActivateAsync("The gate (start), start");
             snapshot = await WaitFor(driver, "Diverts: 2");
@@ -104,8 +106,11 @@ public sealed class DebuggerTests
             const string hubOffer = "Hub offer of Well (well) via #fire, once, if flag:lit";
             Assert.Contains(hubOffer, snapshot.Content);
             await driver.PressAsync("Tab");
+            await WaitForFocus(driver, "Resize inspector");
             await driver.PressAsync("Tab");
-            snapshot = await WaitFor(driver, hubOffer);
+            await WaitForFocus(driver, "Choice c0 “Leave” to END, main.tale line 10");
+            await driver.PressAsync("Tab");
+            snapshot = await WaitForFocus(driver, hubOffer);
             Assert.Equal(hubOffer, Focused(snapshot).Name);
 
             var tale = Path.Combine(root, "main.tale");
@@ -141,8 +146,11 @@ public sealed class DebuggerTests
             snapshot = await WaitFor(driver, "Hub offers: 1");
             Assert.Equal("Camp (camp), hub", Focused(snapshot).Name);
             await driver.PressAsync("Tab");
+            await WaitForFocus(driver, "Resize inspector");
             await driver.PressAsync("Tab");
-            snapshot = await WaitFor(driver, hubOffer);
+            await WaitForFocus(driver, "Choice c0 “Leave” to END, main.tale line 10");
+            await driver.PressAsync("Tab");
+            snapshot = await WaitForFocus(driver, hubOffer);
             Assert.Equal(hubOffer, Focused(snapshot).Name);
             await File.WriteAllTextAsync(tale, source.Replace("@tags fire", "@tags frost"));
             snapshot = await WaitFor(driver, "4 scenes, 5 diverts, 0 hub offers, 2 unreachable.");
@@ -824,6 +832,8 @@ public sealed class DebuggerTests
             await WaitFor(driver, "Ending");
             await driver.ActivateAsync("Map");
             var snapshot = await WaitFor(driver, "Current scene: next");
+            await driver.ActivateAsync("Beginning (start), start");
+            snapshot = await WaitFor(driver, "Scene preview: Beginning");
             var fit = snapshot.Descendants().Single(node => node.Role == "push button" && node.Name == "Fit map").Bounds;
             var canvasX = (int)fit.X + 10;
             var canvasY = (int)(fit.Y + fit.Height) + 30;
@@ -845,6 +855,7 @@ public sealed class DebuggerTests
             Assert.Contains("orphan", labels);
             Assert.Contains("END", labels);
             Assert.Contains(labels, label => label.Contains("CURRENT", StringComparison.Ordinal));
+            Assert.Contains(labels, label => label.Contains("SELECTED", StringComparison.Ordinal));
             Assert.Contains(labels, label => label.Contains("#fire", StringComparison.Ordinal));
             Assert.All(svg.Descendants().Attributes().Where(attribute => attribute.Name is { LocalName: "fill" or "stroke" }),
                 attribute => Assert.DoesNotContain("light-dark(", attribute.Value));
@@ -873,6 +884,79 @@ public sealed class DebuggerTests
         }
     }
 
+    [Theory]
+    [InlineData("pan")]
+    [InlineData("zoom")]
+    public async Task Native_map_follows_until_manual_navigation_then_focus_restores_following(string gesture)
+    {
+        var executable = Environment.GetEnvironmentVariable("TALEWRIGHT_DEBUGGER_EXECUTABLE")
+            ?? throw new InvalidOperationException("Set TALEWRIGHT_DEBUGGER_EXECUTABLE.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-map-follow-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "debugger-map-follow", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                "game:\n  id: map-follow\n  title: Map Follow\n  start: start\ncharacters:\n  player: {first-name: Tester}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"), """
+                === start
+                @title The gate
+                * [Continue] -> next
+                === next
+                @title The road
+                * [Return] -> start
+                """);
+            await using var driver = new NativePlayerDriver(artifacts, executable);
+            await driver.StartAsync(root);
+            await WaitFor(driver, "Scene setup");
+            await driver.ClickAsync("Start selected scene");
+            await driver.ChooseAsync("Continue");
+            await WaitFor(driver, "The road");
+            await driver.ActivateAsync("Map");
+            var snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Scene preview: The road", snapshot.Content);
+
+            await driver.ActivateAsync("The gate (start), start");
+            snapshot = await WaitFor(driver, "Scene preview: The gate");
+
+            await driver.ActivateAsync("Timeline");
+            await driver.ClickAsync("Back command");
+            snapshot = await WaitFor(driver, "Current scene: start.");
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+            await driver.ClickAsync("Forward command");
+            snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+
+            var fit = snapshot.Descendants().Single(node => node.Role == "push button" && node.Name == "Fit map").Bounds;
+            var x = (int)fit.X + 150;
+            var y = (int)(fit.Y + fit.Height) + 100;
+            if (gesture == "pan")
+                await driver.DragAsync(x, y, x + 70, y + 50);
+            else
+                await driver.ScrollAtAsync(x, y);
+
+            snapshot = await WaitFor(driver, "Following is paused; activate Focus current scene to resume.");
+            await driver.ClickAsync("Back command");
+            snapshot = await WaitFor(driver, "Current scene: start.");
+            Assert.Contains("Following is paused", snapshot.Content);
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+            await driver.ClickAsync("Forward command");
+            snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Following is paused", snapshot.Content);
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+
+            await driver.ClickAsync("Focus current scene");
+            snapshot = await WaitFor(driver, "Current scene: next.");
+            Assert.Contains("Scene preview: The gate", snapshot.Content);
+            Assert.DoesNotContain("Following is paused", snapshot.Content);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Native_map_rejects_oversized_png_and_can_export_the_same_map_as_svg()
     {
@@ -893,7 +977,7 @@ public sealed class DebuggerTests
                     $"=== scene{index}\n* [Continue] -> {(index == 119 ? "END" : $"scene{index + 1}")}\n")));
             await using var driver = new NativePlayerDriver(artifacts, executable);
             await driver.StartAsync(root);
-            await WaitFor(driver, "Scene setup");
+            await EnsureToolsVisible(driver);
             await driver.ActivateAsync("Map");
             await WaitFor(driver, "120 scenes, 120 diverts");
             await driver.ClickAsync("Export PNG");
@@ -1210,6 +1294,27 @@ public sealed class DebuggerTests
             }
             snapshot = await driver.SnapshotAsync();
         }
+    }
+
+    private static async Task<AccessibleNode> WaitForFocus(NativePlayerDriver driver, string name)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        AccessibleNode snapshot;
+        do
+        {
+            snapshot = await driver.SnapshotAsync();
+            if (Focused(snapshot).Name == name)
+                return snapshot;
+            try
+            {
+                await Task.Delay(100, timeout.Token);
+            }
+            catch (OperationCanceledException error) when (timeout.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Timed out waiting for focus on '{name}'. Last focus: '{Focused(snapshot).Name}'.",
+                    error);
+            }
+        } while (true);
     }
 
     private static async Task EnsureToolsVisible(NativePlayerDriver driver)

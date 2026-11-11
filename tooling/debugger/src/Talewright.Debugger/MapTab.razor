@@ -1,12 +1,15 @@
 @using Microsoft.JSInterop
 @using Talewright.Core.State
+@using Talewright.Talemark.Model
 @inject IJSRuntime JS
 @inject MapExportDialog ExportDialog
 @implements IDisposable
 
 <div class="story-map" @ref="_host">
     <div class="map-canvas-column">
-        <MapToolbar Status="@_mapStatus" OnFit="FitMap" />
+        <MapToolbar Status="@_mapStatus" MapReady="_mapReady" Exporting="_exporting"
+                    ExportStatus="@_exportStatus" OnFit="FitMap" OnFocusCurrentScene="FocusCurrentScene"
+                    OnExportSvg='() => ExportAsync("svg")' OnExportPng='() => ExportAsync("png")' />
         @if (_error is not null)
         {
             <p role="alert" class="tw-error">@_error</p>
@@ -15,52 +18,22 @@
             <canvas @ref="_canvas" aria-hidden="true"></canvas>
             <div class="map-tooltip" @ref="_tooltip" aria-hidden="true" hidden></div>
         </div>
-    </div>
-    <div class="map-side">
         @if (_view is not null)
         {
             <MapSceneNavigator @ref="_sceneNavigator" View="_view" SelectedNodeId="@_selectedNodeId"
                                OnFocus="FocusScene" OnBlur="BlurScene" />
-            <MapSceneDetails View="_view" SelectedNodeId="@_selectedNodeId"
-                             OnHighlight="HighlightLine" OnSelectScene="SelectDetailTarget"
-                             OnFocusedItemRemoved="FocusSelectedScene" />
         }
-        @if (_previewError is not null)
-        {
-            <p role="alert" class="tw-error">@_previewError</p>
-        }
-        @if (_preview is { } preview)
-        {
-            <section class="map-preview" aria-label="Scene preview">
-                <h3>Scene preview: @(preview.Title ?? preview.Scene)</h3>
-                <p class="tool-note">Preview only, using @(preview.UsesCurrentRunState ? "the current playtest state" : "scene setup values"). Entry effects and skill checks are not run.</p>
-                <ReaderPresentation>
-                    <StoryStage Story="Story" Passages="PreviewPassages" PassageWindow="1" Current="preview.Frame"
-                                State="PreviewState" Identity="preview.Frame" Busy="true" ShowCharacterSheet="false" />
-                </ReaderPresentation>
-            </section>
-        }
-        <MapRoute Run="@_run" />
-        <div class="map-export-controls" aria-label="Export story map">
-            <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("svg")'>Export SVG</button>
-            <button type="button" disabled="@(!_mapReady || _exporting)" @onclick='() => ExportAsync("png")'>Export PNG</button>
-            @if (_exportStatus is not null)
-            {
-                <p role="status">@_exportStatus</p>
-            }
-        </div>
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = null!;
+    [Parameter] public MapView? View { get; set; }
     [Parameter] public AuthorSession? Session { get; set; }
     [Parameter] public AuthorInspection? Inspection { get; set; }
-    [Parameter, EditorRequired] public IGameStateView PreviewState { get; set; } = null!;
-    [Parameter] public EventCallback<SceneId> OnSelectScene { get; set; }
-    private IReadOnlyList<HistoryFrame> PreviewPassages => _preview is { } preview
-        ? [new(preview.Frame)]
-        : [];
+    [Parameter] public string? SelectedNodeId { get; set; }
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback<string?> OnSelectScene { get; set; }
 
     private ElementReference _host;
     private ElementReference _canvas;
@@ -72,36 +45,36 @@
     private DotNetObjectReference<MapTab>? _reference;
     private MapSceneNavigator? _sceneNavigator;
     private string? _selectedNodeId;
-    private SceneId? _selectedScene;
-    private MapScenePreview? _preview;
     private string? _error;
     private string _mapStatus = "Laying out the map…";
-    private string? _previewError;
     private string? _pendingExportPath;
     private string? _pendingExportFormat;
     private string? _exportStatus;
     private bool _mapReady;
     private bool _exporting;
+    private bool _renderedActive;
+    private bool _selectionNeedsPublishing;
 
     protected override void OnParametersSet()
     {
-        if (!ReferenceEquals(Story, _rendered))
+        var storyChanged = !ReferenceEquals(Story, _rendered);
+        if (storyChanged)
         {
             _mapReady = false;
-            _view = MapView.Build(Story);
-            if (_selectedNodeId is { } selected && selected != "END"
-                && !Story.Scenes.Any(scene => scene.Id.Value == selected))
-            {
-                _selectedNodeId = null;
-                _selectedScene = null;
-                _preview = null;
-                _previewError = null;
-            }
+            _view = View ?? MapView.Build(Story);
         }
 
-        if (_selectedScene is { } sceneId)
-            BuildPreview(sceneId);
         _run = Session is null || _view is null ? null : MapRunView.Build(Story, _view, Session);
+        var selected = SelectedNodeId ?? _selectedNodeId;
+        if (_rendered is null && selected is null)
+            selected = _run?.CurrentScene ?? Story.Start.Value;
+        if (selected is not null && (_view is null || !_view.Nodes.Any(node => node.Id == selected)))
+            selected = null;
+        if (_selectedNodeId != selected)
+        {
+            _selectedNodeId = selected;
+            _selectionNeedsPublishing = true;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -114,9 +87,10 @@
             try
             {
                 await JS.InvokeVoidAsync("talewrightMap.render", _host, _canvas, _tooltip, _view, _run,
-                    _selectedNodeId, _reference);
+                    _selectedNodeId, _reference, Active);
                 _error = null;
                 _mapReady = true;
+                _renderedActive = Active;
                 StateHasChanged();
             }
             catch (JSException ex)
@@ -124,21 +98,35 @@
                 _error = $"The map could not be drawn: {ex.Message}";
                 StateHasChanged();
             }
+            await PublishSelectionAsync();
             return;
         }
 
-        if (ReferenceEquals(Inspection, _renderedInspection) || _view is null)
+        if (_view is null)
             return;
-        _renderedInspection = Inspection;
-        try
+
+        if (_renderedActive != Active)
         {
-            await JS.InvokeVoidAsync("talewrightMap.updateRun", _host, _run);
+            _renderedActive = Active;
+            await InvokeMapAsync("talewrightMap.setActive", "The map focus could not be updated",
+                Active, _run?.CurrentScene ?? Story.Start.Value);
         }
-        catch (JSException ex)
+
+        if (!ReferenceEquals(Inspection, _renderedInspection))
         {
-            _error = $"The map route could not be updated: {ex.Message}";
-            StateHasChanged();
+            _renderedInspection = Inspection;
+            try
+            {
+                await JS.InvokeVoidAsync("talewrightMap.updateRun", _host, _run);
+            }
+            catch (JSException ex)
+            {
+                _error = $"The map route could not be updated: {ex.Message}";
+                StateHasChanged();
+            }
         }
+
+        await PublishSelectionAsync();
     }
 
     private async Task ExportAsync(string format)
@@ -204,58 +192,53 @@
 
     private async Task SelectNode(string scene)
     {
-        _selectedNodeId = scene;
-        if (scene == "END")
-        {
-            _selectedScene = null;
-            _preview = null;
-            _previewError = null;
-            await InvokeAsync(StateHasChanged);
-            return;
-        }
+        if (scene != "END" && !Story.Scenes.Any(candidate => candidate.Id.Value == scene))
+            throw new ArgumentException($"Unknown scene '{scene}'.", nameof(scene));
 
-        var definition = Story.Scenes.SingleOrDefault(candidate => candidate.Id.Value == scene)
-            ?? throw new ArgumentException($"Unknown scene '{scene}'.", nameof(scene));
-        _selectedScene = definition.Id;
-        BuildPreview(definition.Id);
+        _selectedNodeId = scene;
+        _selectionNeedsPublishing = false;
         await InvokeAsync(StateHasChanged);
-        await InvokeAsync(() => OnSelectScene.InvokeAsync(definition.Id));
+        await InvokeAsync(() => OnSelectScene.InvokeAsync(scene));
     }
 
     private async Task FocusScene(string scene)
     {
         await SelectNode(scene);
-        await InvokeMapAsync("talewrightMap.setFocused", scene, "The focused map scene could not be updated");
+        await InvokeMapAsync("talewrightMap.setFocused", "The focused map scene could not be updated", scene);
     }
 
     private Task BlurScene(string scene) =>
-        InvokeMapAsync("talewrightMap.clearFocused", scene, "The focused map scene could not be updated");
+        InvokeMapAsync("talewrightMap.clearFocused", "The focused map scene could not be updated", scene);
 
-    private Task HighlightLine(string? line) =>
-        InvokeMapAsync("talewrightMap.highlight", line, "The highlighted map line could not be updated");
+    public Task HighlightLine(string? line) =>
+        InvokeMapAsync("talewrightMap.highlight", "The highlighted map line could not be updated", line);
 
-    private async Task SelectDetailTarget(string scene)
+    public async Task SelectDetailTarget(string scene)
     {
         if (_sceneNavigator is null)
             throw new InvalidOperationException("The map scene navigator is not available.");
         await _sceneNavigator.FocusSceneAsync(scene);
     }
 
-    private Task FocusSelectedScene() =>
+    public Task FocusSelectedScene() =>
         _selectedNodeId is { } scene && _sceneNavigator is not null
             ? _sceneNavigator.FocusSceneAsync(scene)
             : Task.CompletedTask;
 
-    private Task FitMap() => InvokeMapAsync("talewrightMap.fit", null, "The map could not be fitted");
+    private Task FitMap() => InvokeMapAsync("talewrightMap.fit", "The map could not be fitted");
 
-    private async Task InvokeMapAsync(string identifier, object? argument, string error)
+    private Task FocusCurrentScene() =>
+        InvokeMapAsync("talewrightMap.focusCurrent", "The current map scene could not be focused",
+            _run?.CurrentScene ?? Story.Start.Value);
+
+    private async Task InvokeMapAsync(string identifier, string error, params object?[] arguments)
     {
         try
         {
-            if (argument is null)
-                await JS.InvokeVoidAsync(identifier, _host);
-            else
-                await JS.InvokeVoidAsync(identifier, _host, argument);
+            var jsArguments = new object?[arguments.Length + 1];
+            jsArguments[0] = _host;
+            Array.Copy(arguments, 0, jsArguments, 1, arguments.Length);
+            await JS.InvokeVoidAsync(identifier, jsArguments);
         }
         catch (JSException ex)
         {
@@ -264,19 +247,16 @@
         }
     }
 
-    private void BuildPreview(SceneId scene)
+    private async Task PublishSelectionAsync()
     {
-        try
-        {
-            _preview = MapScenePreviewBuilder.Build(Story, scene, PreviewState, Session is not null);
-            _previewError = null;
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException or ArithmeticException)
-        {
-            _preview = null;
-            _previewError = $"The scene preview could not be rendered: {ex.Message}";
-        }
+        if (!_selectionNeedsPublishing)
+            return;
+
+        _selectionNeedsPublishing = false;
+        await OnSelectScene.InvokeAsync(_selectedNodeId);
     }
+
+    public string? CurrentSelection => _selectedNodeId;
 
     public void Dispose()
     {

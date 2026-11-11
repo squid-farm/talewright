@@ -1,0 +1,2 @@
+.map-preview { margin: 8px 0; padding-top: 4px; border-top: 1px solid var(--tw-border); font-family: var(--tw-font); font-size: 1rem; line-height: 1.6; }
+.map-preview h3, .map-preview .tool-note { font-family: var(--tw-ui-font); font-size: var(--dbg-small); line-height: 1.45; }

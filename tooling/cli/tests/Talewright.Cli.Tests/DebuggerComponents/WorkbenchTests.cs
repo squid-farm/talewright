@@ -204,7 +204,8 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     {
         var workbench = Show();
 
-        await workbench.Find("input[aria-label='Target scene ID']").ChangeAsync(new ChangeEventArgs { Value = "nowhere" });
+        await workbench.InvokeAsync(() =>
+            workbench.Find("input[aria-label='Target scene ID']").ChangeAsync(new ChangeEventArgs { Value = "nowhere" }));
         await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
 
         Assert.Contains("nowhere", workbench.Find("p[role=alert]").TextContent);
@@ -224,11 +225,15 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Assert.Equal("map-panel", Tab(workbench, "map-tab").GetAttribute("aria-controls"));
         var map = workbench.FindComponent<MapTab>().Instance;
         Assert.Single(JSInterop.Invocations["talewrightMap.render"]);
+        Assert.Single(workbench.FindAll("aside.inspector-pane"));
+        Assert.Empty(workbench.FindAll("#map-panel .map-side"));
+        Assert.Contains("Scene details", workbench.FindComponent<MapInspectorPane>().Markup);
 
         await Tab(workbench, "play-tab").ClickAsync(new MouseEventArgs());
         AssertSelected(workbench, map: false);
         Assert.Same(map, workbench.FindComponent<MapTab>().Instance);
         Assert.True(workbench.Find("#map-panel").HasAttribute("hidden"));
+        Assert.Empty(workbench.FindComponents<MapInspectorPane>());
         Assert.Single(JSInterop.Invocations["talewrightMap.render"]);
     }
 
@@ -241,10 +246,12 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
 
         var map = workbench.FindComponent<MapTab>();
         await map.InvokeAsync(() => map.Instance.SelectScene("cave"));
-        Assert.Equal("cave", workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene.Value);
+        Assert.Equal("cave", workbench.FindComponent<MapInspectorPane>().Instance.SelectedNodeId);
+        Assert.Contains("Scene preview: Cave", workbench.FindComponent<MapInspectorPane>().Markup);
 
         await Tab(workbench, "play-tab").ClickAsync(new MouseEventArgs());
         Assert.Equal("hall", workbench.FindComponent<InspectorPane>().Instance.Selection!.Scene.Value);
+        Assert.Empty(workbench.FindComponents<MapInspectorPane>());
     }
 
     [Fact]

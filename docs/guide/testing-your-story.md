@@ -87,15 +87,18 @@ running, which may be behind unsaved or rejected edits.
 
 ### Explore and export the story map
 
-The **Map** tab lays out every scene, divert and hub offer from the last successful compilation.
-Click a scene to see where it leads and a preview of its text and choices; the Inspector shows its
-details too. Scenes the start scene can't reach are drawn in a separate area on the right.
+The **Map** tab fills the main viewer with every scene, divert and hub offer from the last successful
+compilation. It opens focused on the current playtest scene, or the story's start scene before a
+playtest. Click a scene to see its details and a compact preview of its text and choices in the
+workspace Inspector. Scenes the start scene can't reach are drawn in a separate area on the right.
 Reachability follows diverts and hubs, but doesn't check whether their conditions can ever be met.
 The preview doesn't run entry effects or skill checks.
 
 While you play in the debugger, the scenes you've visited and the choices you've taken are
-highlighted in order. Use **Export SVG** or **Export PNG** to save the whole map. SVG stays sharp at
-any size; a very large map may be too big for PNG, and the debugger will suggest SVG instead.
+highlighted in order, and the map follows the current scene. Manually pan or zoom to pause following;
+choose **Focus current scene** to resume. Use **Fit map** to see the whole map, and **Export SVG** or
+**Export PNG** in the map toolbar to save it. SVG stays sharp at any size; a very large map may be too
+big for PNG, and the debugger will suggest SVG instead.
 
 ![The Lost Relic's full story map, with the route from camp.arrival through camp.hub to trail.river highlighted](../images/author-debugger-map.png)
 

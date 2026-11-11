@@ -144,10 +144,16 @@ window.talewrightMap = (() => {
       view: null, laid: null, colors: palette(tooltip), transform: d3.zoomIdentity, fitted: false, queued: false,
       selected: null, focused: null, highlighted: null, generation: 0,
       run: null, routeVisits: new Map(), routeLines: new Map(), dotnet: null, summary: "",
+      active: false, followsCurrent: true,
     };
 
     state.zoom = d3.zoom().scaleExtent([0.02, 4]).on("zoom", event => {
       state.transform = event.transform;
+      if (event.sourceEvent && state.followsCurrent) {
+        state.followsCurrent = false;
+        reportStatus(state, statusText(state, state.run))
+          ?.catch(error => console.error("Could not update map status.", error));
+      }
       redraw(state);
     });
     state.selection = d3.select(canvas).call(state.zoom).on("dblclick.zoom", null);
@@ -342,6 +348,7 @@ window.talewrightMap = (() => {
         node.start && "START",
         state.run?.startedMidStory && state.run.startScene === node.id && "RUN START",
         state.run?.currentScene === node.id && "CURRENT",
+        node.id === state.selected && state.run?.currentScene !== node.id && "SELECTED",
         node.hub && "HUB",
         node.once && "ONCE",
         !node.reachable && "UNREACHABLE",
@@ -538,16 +545,29 @@ window.talewrightMap = (() => {
   }
 
   function statusText(state, run) {
-    if (!run) return state.summary;
-    const start = run.startedMidStory ? ` Started at mid-story scene ${run.startScene} from Scene setup.` : "";
-    const current = run.currentScene ? ` Current scene: ${run.currentScene}.` : "";
-    const ended = run.isEnded ? " The playtest has ended." : "";
-    return `${state.summary}${start}${current}${ended}`;
+    const start = run?.startedMidStory ? ` Started at mid-story scene ${run.startScene} from Scene setup.` : "";
+    const current = run?.currentScene ? ` Current scene: ${run.currentScene}.` : "";
+    const ended = run?.isEnded ? " The playtest has ended." : "";
+    const paused = state.followsCurrent ? "" : " Following is paused; activate Focus current scene to resume.";
+    return `${state.summary}${start}${current}${ended}${paused}`;
+  }
+
+  function followCurrent(state, scene) {
+    if (!scene || !state.nodes?.has(scene)) return;
+    center(state, scene, Math.max(state.transform.k, 0.8));
+  }
+
+  function focusCurrent(state, scene) {
+    state.followsCurrent = true;
+    followCurrent(state, scene || state.run?.currentScene);
+    reportStatus(state, statusText(state, state.run))
+      ?.catch(error => console.error("Could not update map status.", error));
   }
 
   async function updateRun(host, run) {
     const state = host.talewrightMap;
     if (!state) throw new Error("The story map has not been rendered.");
+    const previousCurrent = state.run?.currentScene;
     state.run = run;
     state.routeVisits = new Map();
     state.routeLines = new Map();
@@ -563,15 +583,18 @@ window.talewrightMap = (() => {
         state.routeLines.set(step.lineId, orders);
       }
     }
+    if (state.active && state.followsCurrent && run?.currentScene !== previousCurrent)
+      followCurrent(state, run?.currentScene);
     await reportStatus(state, statusText(state, run));
     redraw(state);
   }
 
   // Renders map data from MapTab.razor; all accessible controls are owned by Razor.
-  async function render(host, canvas, tooltip, view, run, selected, dotnet) {
+  async function render(host, canvas, tooltip, view, run, selected, dotnet, active) {
     const state = host.talewrightMap || (host.talewrightMap = create(host, canvas, tooltip));
     const generation = ++state.generation;
     state.dotnet = dotnet;
+    state.active = active;
     if (selected) state.selected = selected;
     await reportStatus(state, "Laying out the map…");
     let laid;
@@ -597,7 +620,18 @@ window.talewrightMap = (() => {
     const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     state.summary = `${count(scenes, "scene", "scenes")}, ${count(diverts, "divert", "diverts")}, ` +
       `${count(offers, "hub offer", "hub offers")}, ${view.unreachableScenes} unreachable.`;
-    if (!state.fitted) fit(state);
+    if (!state.fitted) {
+      const current = run?.currentScene || selected;
+      if (active && state.followsCurrent && current && state.nodes.has(current)) {
+        state.selected = current;
+        center(state, current, 0.8);
+        state.fitted = true;
+      } else {
+        fit(state);
+      }
+    } else if (active && state.followsCurrent && run?.currentScene) {
+      followCurrent(state, run.currentScene);
+    }
     await updateRun(host, run);
     redraw(state);
   }
@@ -632,9 +666,20 @@ window.talewrightMap = (() => {
     if (state) fit(state);
   }
 
+  function setActive(host, active, scene) {
+    const state = host.talewrightMap;
+    if (!state) return;
+    state.active = active;
+    if (active && state.followsCurrent)
+      followCurrent(state, scene || state.run?.currentScene);
+    reportStatus(state, statusText(state, state.run))
+      ?.catch(error => console.error("Could not update map status.", error));
+  }
+
   return {
     render, updateRun, exportMap,
     select: (host, id) => select(host.talewrightMap, id),
-    setFocused, clearFocused, highlight, fit: fitHost,
+    setFocused, clearFocused, highlight, fit: fitHost, setActive,
+    focusCurrent: (host, scene) => focusCurrent(host.talewrightMap, scene),
   };
 })();
