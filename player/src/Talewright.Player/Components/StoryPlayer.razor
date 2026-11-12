@@ -66,7 +66,8 @@
 
     @if (SaveStore is not null)
     {
-        <SavedGamesPanel Open="_showSaves" Busy="_busy" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
+        <SavedGamesPanel Open="_showSaves" Busy="_busy" RestoreFocusOnClose="_restoreFocusAfterSaveClose"
+                         OnFocusAfterLoad="FocusAfterLoadAsync" @bind-Slot="_slot" PendingOverwrite="@_pendingOverwrite" Slots="_slots"
                          Message="@_saveMessage" Error="_saveError" PendingLoad="@_pendingLoad" PendingImport="@(_pendingImport?.Slot)"
                          ImportKey="_importKey" CanExport="@(SaveExporter is not null)"
                          OnSave="SaveAsync" OnRetry="RefreshSlotsAsync" OnCancelOverwrite="() => _pendingOverwrite = null"
@@ -145,6 +146,7 @@
     private bool _restoreReadingPosition;
     private IReadOnlyList<HistoryFrame> _historyFrames = [];
     private bool _saveError;
+    private bool _restoreFocusAfterSaveClose = true;
     private int _generation;
     private string _slot = "My save";
     private string? _pendingOverwrite;
@@ -210,6 +212,7 @@
         _generation++;
         _busy = false;
         _showSaves = false;
+        _restoreFocusAfterSaveClose = true;
         _showHistory = false;
         _historyFrames = [];
         _restoreReadingPosition = false;
@@ -548,6 +551,7 @@
     {
         CloseHistory();
         _showSaves = true;
+        _restoreFocusAfterSaveClose = true;
         _pendingLoad = null;
         _pendingImport = null;
         await RefreshSlotsAsync();
@@ -556,6 +560,7 @@
     private void CloseSaves()
     {
         _showSaves = false;
+        _restoreFocusAfterSaveClose = true;
         _pendingLoad = null;
         _pendingImport = null;
         _pendingOverwrite = null;
@@ -673,9 +678,18 @@
             _pendingOverwrite = null;
             _pendingLoad = null;
             _showSaves = false;
+            _restoreFocusAfterSaveClose = false;
             _saveMessage = $"Loaded '{SaveEntry.DisplayNameFor(slot)}'.";
             RequestReveal();
         }
+    }
+
+    private async Task FocusAfterLoadAsync()
+    {
+        _restoreFocusAfterSaveClose = true;
+        _module ??= await JS.InvokeAsync<IJSObjectReference>("import",
+            "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
+        await _module.InvokeVoidAsync("revealLatest", TranscriptElement, _transcript.Count == 1);
     }
 
     private Task ExportAsync(string slot) => SaveOperationAsync(PlayerDiagnosticOperation.SaveExport, async generation =>

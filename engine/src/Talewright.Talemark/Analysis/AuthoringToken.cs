@@ -18,6 +18,7 @@ public enum AuthoringTokenKind
     Else,
     EndIf,
     Title,
+    Continues,
     Requires,
     Shown,
     Tags,

@@ -430,6 +430,7 @@ public sealed class StorySession : IStorySession
         Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks),
             menu.AvailableChoices, IsEnded: false)
         {
+            ContinuesPrevious = scene.ContinuesPrevious,
             Menu = menu.Entries,
         };
         return Current;
@@ -443,7 +444,11 @@ public sealed class StorySession : IStorySession
         }
 
         _actions.Clear();
-        Current = new StoryFrame(scene?.Id ?? Current?.Scene, scene?.Title ?? Current?.Title, new RenderedDocument(blocks), [], IsEnded: true);
+        Current = new StoryFrame(scene?.Id ?? Current?.Scene, scene?.Title ?? Current?.Title,
+            new RenderedDocument(blocks), [], IsEnded: true)
+        {
+            ContinuesPrevious = scene?.ContinuesPrevious ?? Current?.ContinuesPrevious ?? false,
+        };
         return Current;
     }
 }

@@ -54,6 +54,9 @@ public sealed record StoryFrame(
     IReadOnlyList<ChoiceView> Choices,
     bool IsEnded)
 {
+    /// <summary>Whether this scene joins the preceding passage on screen.</summary>
+    public bool ContinuesPrevious { get; init; }
+
     /// <summary>
     /// The complete visible menu, in display order. Numbers remain stable across available and unavailable entries.
     /// </summary>

@@ -64,6 +64,8 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
             ?? throw new InvalidOperationException("Cannot choose without a current passage.");
         try
         {
+            var previousIndex = await previous.GetAttributeAsync("data-tw-passage-index")
+                ?? throw new InvalidOperationException("Current passage is missing its history index.");
             var choice = page.GetByRole(AriaRole.List, new() { Name = "Story choices" })
                 .GetByRole(AriaRole.Button).Filter(new()
                 {
@@ -75,9 +77,10 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
             await page.WaitForFunctionAsync("""
                 previous => {
                     const current = document.querySelector('[aria-label="Current passage"]');
-                    return current !== null && current !== previous;
+                    return current !== null &&
+                        current.getAttribute('data-tw-passage-index') !== previous.index;
                 }
-                """, previous);
+                """, new { index = previousIndex });
         }
         finally
         {

@@ -3,6 +3,7 @@ namespace Talewright.Talemark.Vocabulary;
 internal enum SceneMetadataKey
 {
     Title,
+    Continues,
     Requires,
     Tags,
     Priority,
@@ -40,6 +41,8 @@ public static class SceneVocabulary
     internal const string EndIf = "/if";
 
     internal const string Title = "title";
+    internal const string Continues = "continues";
+    internal const string Clear = "clear";
     internal const string Requires = "requires";
     internal const string Shown = "shown";
     internal const string Tags = "tags";
@@ -67,7 +70,7 @@ public static class SceneVocabulary
     internal const char LegacyImageQuote = '"';
     internal const char EmphasisMarker = '_';
 
-    internal static readonly string[] MetadataSpellings = [Title, Requires, Tags, Priority, Once, Hub, HubLimit];
+    internal static readonly string[] MetadataSpellings = [Title, Continues, Requires, Tags, Priority, Once, Hub, HubLimit];
 
     internal static bool TryGetMetadataKey(ReadOnlySpan<char> text, out SceneMetadataKey key)
     {
@@ -75,6 +78,9 @@ public static class SceneVocabulary
         {
             case Title:
                 key = SceneMetadataKey.Title;
+                return true;
+            case Continues:
+                key = SceneMetadataKey.Continues;
                 return true;
             case Requires:
                 key = SceneMetadataKey.Requires;
@@ -128,6 +134,7 @@ public static class SceneVocabulary
     internal static string Spelling(SceneMetadataKey key) => key switch
     {
         SceneMetadataKey.Title => Title,
+        SceneMetadataKey.Continues => Continues,
         SceneMetadataKey.Requires => Requires,
         SceneMetadataKey.Tags => Tags,
         SceneMetadataKey.Priority => Priority,
@@ -136,4 +143,16 @@ public static class SceneVocabulary
         SceneMetadataKey.HubLimit => HubLimit,
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
     };
+
+    internal static bool IsClearMetadata(ReadOnlySpan<char> content)
+    {
+        if (content.Length == 0 || content[0] != MetadataMarker)
+            return false;
+
+        var keyword = content[1..].TrimStart();
+        var separator = keyword.IndexOfAny(' ', '\t');
+        if (separator >= 0)
+            keyword = keyword[..separator];
+        return keyword.SequenceEqual(Clear);
+    }
 }

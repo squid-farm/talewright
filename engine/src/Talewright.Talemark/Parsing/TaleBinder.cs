@@ -277,6 +277,9 @@ internal sealed partial class TaleBinder
             case SceneMetadataKey.Title:
                 scene.Title = value;
                 return true;
+            case SceneMetadataKey.Continues:
+                scene.ContinuesPrevious = true;
+                return true;
             case SceneMetadataKey.Requires:
                 var part = Part(syntax);
                 var (requirement, shown) = BindRequirement(value, At(part.MetadataValueColumn(syntax)),
@@ -825,6 +828,7 @@ internal sealed partial class TaleBinder
         public SceneId Id { get; } = id;
         public SourceLocation Location { get; } = location;
         public string? Title { get; set; }
+        public bool ContinuesPrevious { get; set; }
         public Expr? Requires { get; set; }
         public ShownDefinition? Shown { get; set; }
         public HashSet<string> Tags { get; } = [];
@@ -846,6 +850,7 @@ internal sealed partial class TaleBinder
         {
             Id = Id,
             Title = Title,
+            ContinuesPrevious = ContinuesPrevious,
             Requires = Requires,
             Shown = Shown,
             Tags = Tags,

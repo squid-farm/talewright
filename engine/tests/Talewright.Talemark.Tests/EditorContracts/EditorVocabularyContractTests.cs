@@ -70,6 +70,7 @@ public sealed class EditorVocabularyContractTests
             nameof(SceneVocabulary.IfPrefix), nameof(SceneVocabulary.ChoiceProseQuote),
             nameof(SceneVocabulary.LegacyHubAllPrefix), nameof(SceneVocabulary.LegacyHubAnyPrefix),
             nameof(SceneVocabulary.LegacyImageEscape), nameof(SceneVocabulary.LegacyImageQuote),
+            nameof(SceneVocabulary.Clear),
         };
         Assert.Equal(Constants(typeof(SceneVocabulary)).Except(sceneExemptions).Order(StringComparer.Ordinal),
             seen["scene"].Order(StringComparer.Ordinal));

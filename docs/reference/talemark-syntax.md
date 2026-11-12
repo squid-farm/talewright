@@ -337,6 +337,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Display title (used for hub choices).                                                          |
+| `@continues`                                       | Add this scene's text to the previous passage, without a heading or section break.              |
 | `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces `@title` while unavailable. |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
@@ -358,6 +359,28 @@ Hub selectors use one operator throughout: `and` requires every tag, and `or` re
 them or use either word as a tag name.
 
 Metadata lines are only recognized directly after the `===` header. Lines starting with `//` are comments.
+
+**Branching conversations.** Mark reply scenes with `@continues` to keep a branching exchange together.
+The selected choice still appears as the player's line, and every visited scene remains a separate history
+step. A continued scene cannot also use `@title` or `@clear`.
+
+```tale
+=== interview
+@title Interview
+> guide: What brings you here?
+* [I need a job.] -> work
+* [I need shelter.] -> shelter
+
+=== work
+@continues
+> guide: What can you do?
+* [I can mend boats.] -> next
+
+=== next
+@continues
+> guide: We can use that.
+* [Thank you.] -> END
+```
 
 **Scenes run top to bottom.** Each line sees the state produced by the lines above it, never by
 lines below it. Prose and substitutions render when reached. For example:

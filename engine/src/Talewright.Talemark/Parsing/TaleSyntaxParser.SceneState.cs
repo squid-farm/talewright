@@ -22,6 +22,9 @@ internal static partial class TaleSyntaxParser
         private (int Line, int Column) _suppressedAt;
         private bool _hasHub;
         private bool _hasHubLimit;
+        private bool _hasTitle;
+        private bool _hasContinues;
+        private bool _hasClear;
         // The skill check whose outcome lines are being attached: its line and column, and the outcomes seen so far.
         private (int Line, int Column, bool InsideBlock, bool Success, bool Failure)? _check;
 

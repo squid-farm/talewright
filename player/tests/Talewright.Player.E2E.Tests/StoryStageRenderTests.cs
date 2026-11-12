@@ -62,8 +62,41 @@ public sealed class StoryStageRenderTests
         Assert.DoesNotContain("aria-label=\"Character sheet\"", html);
     }
 
+    [Fact]
+    public async Task Continued_scenes_render_in_the_previous_passage_without_a_section_break()
+    {
+        var story = new StoryFixture("continued-stage", TestStories.DefaultYaml, """
+            === start
+            @title Interview
+            > guide: What brings you here?
+            * [I need a job.] -> work
+            === work
+            @continues
+            > guide: What can you do?
+            * [I can mend boats.] -> answer
+            === answer
+            @continues
+            > guide: We can use that.
+            * [Thank you.] -> END
+            """).Compile();
+        var history = new StoryHistory(story, 42);
+        history.Choose(history.Current.Choices.Single().Key);
+        history.Choose(history.Current.Choices.Single().Key);
+
+        var html = await RenderStageAsync(story, history, passageWindow: 3);
+
+        Assert.Single(Regex.Matches(html, "<section\\b").Cast<Match>());
+        Assert.Contains("data-tw-passage-index=\"2\"", html);
+        Assert.Contains("Interview", html);
+        Assert.Contains("What brings you here?", html);
+        Assert.Contains("What can you do?", html);
+        Assert.Contains("We can use that.", html);
+        Assert.Contains("I can mend boats.", html);
+        Assert.DoesNotContain("tw-past", html);
+    }
+
     private static async Task<string> RenderStageAsync(Talewright.Talemark.Model.StoryDefinition story,
-        StoryHistory history, bool showCharacterSheet = true)
+        StoryHistory history, bool showCharacterSheet = true, int passageWindow = 2)
     {
         await using var services = new ServiceCollection()
             .AddLogging()
@@ -77,7 +110,7 @@ public sealed class StoryStageRenderTests
             {
                 [nameof(StoryStage.Story)] = story,
                 [nameof(StoryStage.Passages)] = history.Transcript,
-                [nameof(StoryStage.PassageWindow)] = 2,
+                [nameof(StoryStage.PassageWindow)] = passageWindow,
                 [nameof(StoryStage.Current)] = history.Current,
                 [nameof(StoryStage.State)] = history.State,
                 [nameof(StoryStage.Identity)] = history,
