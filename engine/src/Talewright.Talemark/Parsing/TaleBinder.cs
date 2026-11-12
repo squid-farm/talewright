@@ -285,6 +285,10 @@ internal sealed partial class TaleBinder
             case SceneMetadataKey.Title:
                 scene.Title = value;
                 return true;
+            case SceneMetadataKey.ChoiceLabel:
+                scene.ChoiceLabel = InlineParser.Parse(SourceText.Single(value, valueLocation), _symbols,
+                    _diagnostics, cancellationToken: _cancellationToken);
+                return true;
             case SceneMetadataKey.Continues:
                 scene.ContinuesPrevious = true;
                 return true;
@@ -836,6 +840,7 @@ internal sealed partial class TaleBinder
         public SceneId Id { get; } = id;
         public SourceLocation Location { get; } = location;
         public string? Title { get; set; }
+        public IReadOnlyList<TemplateInline>? ChoiceLabel { get; set; }
         public bool ContinuesPrevious { get; set; }
         public bool ClearsPrevious { get; set; }
         public Expr? Requires { get; set; }
@@ -859,6 +864,7 @@ internal sealed partial class TaleBinder
         {
             Id = Id,
             Title = Title,
+            ChoiceLabel = ChoiceLabel,
             ContinuesPrevious = ContinuesPrevious,
             ClearsPrevious = ClearsPrevious,
             Requires = Requires,

@@ -13,6 +13,10 @@
       "captures": {"1": {"name": "keyword.control.metadata.tale"}}
     },
     {
+      "match": "^\\s*(@choice-label)(?=\\s|$)",
+      "captures": {"1": {"name": "keyword.control.metadata.tale"}}
+    },
+    {
       "match": "^\\s*(===)\\s*(.*)$",
       "captures": {
         "1": {"name": "punctuation.definition.heading.tale"},

@@ -346,8 +346,10 @@ public sealed class StorySession : IStorySession
             _replayIdentities.ForDivert(scene.Id, target));
     }
 
-    private static Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
-        () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
+    private Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
+        storylet.ChoiceLabel is { } choiceLabel
+            ? () => _executor.Render(choiceLabel)
+            : () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
 
     private List<VisibleChoice> ContinueTo(
         SceneDefinition source, DivertTarget target)
@@ -445,7 +447,8 @@ public sealed class StorySession : IStorySession
         }
 
         _actions.Clear();
-        Current = new StoryFrame(scene?.Id ?? Current?.Scene, scene?.Title ?? Current?.Title,
+        var title = scene is { ChoiceLabel: not null } ? scene.Title : scene?.Title ?? Current?.Title;
+        Current = new StoryFrame(scene?.Id ?? Current?.Scene, title,
             new RenderedDocument(blocks), [], IsEnded: true)
         {
             ContinuesPrevious = scene?.ContinuesPrevious ?? Current?.ContinuesPrevious ?? false,

@@ -40,6 +40,7 @@ public sealed partial class ServerTests
     [InlineData("-> sta|", "start")]
     [InlineData("> pla|", "player")]
     [InlineData("@req|", "requires")]
+    [InlineData("@choice-lab|", "choice-label")]
     [InlineData("@requires player:h|", "hp")]
     [InlineData("@requires flag:re|", "ready")]
     [InlineData("@requires var:co|", "coins")]

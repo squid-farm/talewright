@@ -323,6 +323,104 @@ public class StorySessionTests
     }
 
     [Fact]
+    public void Hub_labels_prefer_choice_label_then_title_then_scene_id_and_shown_text()
+    {
+        var session = new StorySession(Compile("""
+            === camp
+            @hub destination
+            * [Wait] -> END
+
+            === both
+            @title The conversation
+            @choice-label Speak to {player:first-name}
+            @tags destination
+            * [Wait] -> END
+
+            === title-only
+            @title The old label
+            @tags destination
+            * [Wait] -> END
+
+            === no-label
+            @tags destination
+            * [Wait] -> END
+
+            === unavailable
+            @title The hidden title
+            @choice-label The hidden label
+            @tags destination
+            @requires false, shown "Need a key"
+            * [Wait] -> END
+            """));
+
+        var frame = session.Start();
+        var entries = frame.Menu.ToDictionary(entry => entry.Key, entry => (entry.Text, entry.IsAvailable));
+        Assert.Equal(("Speak to Mara", true), entries["storylet:both"]);
+        Assert.Equal(("The old label", true), entries["storylet:title-only"]);
+        Assert.Equal(("no-label", true), entries["storylet:no-label"]);
+        Assert.Equal(("Need a key", false), entries["storylet:unavailable"]);
+
+        frame = session.Choose("storylet:both");
+        Assert.Equal("The conversation", frame.Title);
+    }
+
+    [Fact]
+    public void Bare_scene_diverts_use_destination_choice_labels_but_other_continuations_stay_continue()
+    {
+        var session = new StorySession(Compile("""
+            === camp
+            * -> labeled
+            * -> both
+            * -> title-only
+            * -> no-label
+            * -> END
+
+            === labeled
+            @choice-label Ask {player:first-name}
+            * [Wait] -> END
+
+            === both
+            @title The meeting
+            @choice-label Speak to the guide
+            * [Wait] -> END
+
+            === title-only
+            @title The old title
+            * [Wait] -> END
+
+            === no-label
+            * [Wait] -> END
+            """));
+
+        var frame = session.Start();
+        Assert.Equal(["Ask Mara", "Speak to the guide", "Continue", "Continue", "Continue"],
+            frame.Choices.Select(choice => choice.Text));
+
+        frame = session.Choose("c0");
+        Assert.Null(frame.Title);
+    }
+
+    [Fact]
+    public void Choice_labeled_scene_without_title_does_not_inherit_a_heading_when_it_ends()
+    {
+        var session = new StorySession(Compile("""
+            === camp
+            @title The opening
+            * -> ending
+
+            === ending
+            @choice-label Goodbye
+            -> END
+            """));
+
+        session.Start();
+        var frame = session.Choose("c0");
+
+        Assert.True(frame.IsEnded);
+        Assert.Null(frame.Title);
+    }
+
+    [Fact]
     public void Experience_triggers_level_ups()
     {
         var session = new StorySession(Compile("""

@@ -44,9 +44,21 @@ public static class ScenePreview
                     case ChoiceStep choiceStep:
                     {
                         var choice = choiceStep.Choice;
-                        Func<IReadOnlyList<RenderedInline>> label = () => choice.Label is { } text
-                            ? renderer.RenderInlines(text, state)
-                            : ChoiceView.ContinueLabel;
+                        Func<IReadOnlyList<RenderedInline>> label;
+                        if (choice.Label is { } text)
+                        {
+                            label = () => renderer.RenderInlines(text, state);
+                        }
+                        else if (choice.Check is null && choice.Divert?.Scene is { } target &&
+                                 story.GetScene(target).ChoiceLabel is { } choiceLabel)
+                        {
+                            label = () => renderer.RenderInlines(choiceLabel, state);
+                        }
+                        else
+                        {
+                            label = static () => ChoiceView.ContinueLabel;
+                        }
+
                         var candidate = new ChoiceCandidate(
                             choice.Key,
                             choice.Requires,
@@ -88,8 +100,9 @@ public static class ScenePreview
     {
         var key = StorySession.StoryletKeyPrefix + storylet.Id.Value;
         var target = new DivertTarget(storylet.Id);
-        Func<IReadOnlyList<RenderedInline>> label =
-            () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
+        Func<IReadOnlyList<RenderedInline>> label = storylet.ChoiceLabel is { } choiceLabel
+            ? () => renderer.RenderInlines(choiceLabel, state)
+            : () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
         return new ChoiceCandidate(key, storylet.Requires, label,
             ChoiceAvailability.ShownLabelSource(storylet.Shown, label,
                 text => renderer.RenderInlines(text, state)),

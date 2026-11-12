@@ -233,6 +233,29 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Compiles_choice_label_separately_from_scene_heading()
+    {
+        var story = Ok("""
+            === a
+            @title The Camp
+            @choice-label Speak to the guide
+            -> END
+
+            === no-heading
+            @choice-label Ask about the map
+            -> END
+            """);
+
+        var labeled = story.GetScene(new SceneId("a"));
+        Assert.Equal("The Camp", labeled.Title);
+        Assert.NotNull(labeled.ChoiceLabel);
+
+        var noHeading = story.GetScene(new SceneId("no-heading"));
+        Assert.Null(noHeading.Title);
+        Assert.NotNull(noHeading.ChoiceLabel);
+    }
+
+    [Fact]
     public void Compiles_scene_continuation_metadata()
     {
         var story = Ok("""

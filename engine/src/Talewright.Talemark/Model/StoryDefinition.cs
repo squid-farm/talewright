@@ -124,6 +124,7 @@ public sealed class SceneDefinition : IStorylet
 {
     public required SceneId Id { get; init; }
     public string? Title { get; init; }
+    public IReadOnlyList<TemplateInline>? ChoiceLabel { get; init; }
     public bool ContinuesPrevious { get; init; }
     public bool ClearsPrevious { get; init; }
     public Expr? Requires { get; init; }
