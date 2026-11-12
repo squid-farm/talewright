@@ -118,7 +118,8 @@ public static class StoryCompiler
         var unresolved = VariableDiscovery.Resolve(manifest.World, flags, scenes.Keys.ToHashSet(),
             declarations, variables, textVariables, options, diagnostics);
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
-            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, textVariables);
+            manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, textVariables,
+            manifest.World.InitialFlags);
         analysis?.World(world, unresolved);
         var symbols = new StorySymbols
         {

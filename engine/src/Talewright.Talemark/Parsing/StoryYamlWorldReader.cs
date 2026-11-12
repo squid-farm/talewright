@@ -378,13 +378,18 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return inventory;
     }
 
-    internal List<FlagId> ReadFlags(YamlNode? node)
+    internal Dictionary<FlagId, bool> ReadFlags(YamlNode? node)
     {
-        var flags = new List<FlagId>();
-        if (node is null) return flags;
-        foreach (var item in _yaml.Sequence(node, ManifestVocabulary.Flags))
+        var flags = new Dictionary<FlagId, bool>();
+        if (node is not YamlMappingNode map) return flags;
+        foreach (var (key, value) in map.Children)
         {
-            if (_yaml.Identifier(item, "flag id") is { } id) flags.Add(new FlagId(id));
+            if (_yaml.Identifier(key, "flag id") is not { } id) continue;
+            var flag = new FlagId(id);
+            flags[flag] = bool.TryParse(Scalar(value), out var initialValue)
+                ? initialValue
+                : _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"Flag '{id}' must be true or false.", false);
         }
 
         return flags;

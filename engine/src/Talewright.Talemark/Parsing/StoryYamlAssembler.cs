@@ -17,12 +17,28 @@ internal static class StoryYamlAssembler
         analysis?.Manifest(root);
         var sections = new Dictionary<string, YamlMappingNode>(StringComparer.Ordinal);
         var declarations = new Dictionary<string, Dictionary<string, SourceLocation>>(StringComparer.Ordinal);
-        var flags = new YamlSequenceNode();
+        var flags = new YamlMappingNode();
         var flagLocations = new Dictionary<string, SourceLocation>(StringComparer.Ordinal);
         YamlNode? triggers = null;
         SourceLocation? triggerLocation = null;
         void Duplicate(string kind, string id, YamlNode node, SourceLocation first) =>
             yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"{kind} '{id}' is declared more than once (first at {first}).", yaml.At(node));
+        void AddFlag(YamlNode key, YamlNode value)
+        {
+            if (Scalar(key) is not { } id)
+            {
+                yaml.Identifier(key, "flag id");
+                return;
+            }
+
+            if (!flagLocations.TryAdd(id, yaml.At(key)))
+            {
+                Duplicate("Flag", id, key, flagLocations[id]);
+                return;
+            }
+
+            flags.Add(key, value);
+        }
         void Collect(YamlMappingNode document)
         {
             yaml.CheckKeys(document, ManifestVocabulary.Game, ManifestVocabulary.Characters, ManifestVocabulary.Factions, ManifestVocabulary.Items, ManifestVocabulary.Flags, ManifestVocabulary.Vars, ManifestVocabulary.Triggers);
@@ -45,13 +61,20 @@ internal static class StoryYamlAssembler
             }
             if (Get(document, ManifestVocabulary.Flags) is { } flagNode)
             {
-                foreach (var flag in yaml.Sequence(flagNode, ManifestVocabulary.Flags))
+                if (flagNode is YamlSequenceNode sequence)
                 {
-                    var id = Scalar(flag);
-                    if (id is not null && !flagLocations.TryAdd(id, yaml.At(flag)))
-                        Duplicate("Flag", id, flag, flagLocations[id]);
-                    else
-                        flags.Add(flag);
+                    foreach (var flag in sequence.Children)
+                        AddFlag(flag, new YamlScalarNode("false"));
+                }
+                else if (flagNode is YamlMappingNode map)
+                {
+                    foreach (var (key, value) in map.Children)
+                        AddFlag(key, value);
+                }
+                else
+                {
+                    yaml.Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue,
+                        "'flags' must be a list or mapping.", yaml.At(flagNode));
                 }
             }
             if (Get(document, ManifestVocabulary.Triggers) is { } triggerNode)

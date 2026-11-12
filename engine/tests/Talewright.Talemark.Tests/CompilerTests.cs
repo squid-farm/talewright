@@ -182,6 +182,48 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Flag_mapping_sets_initial_values_and_effect_declared_flags_default_false()
+    {
+        var yaml = Yaml.Replace("vars: { torches: 1 }",
+            "flags: { open: true, closed: false }\nvars: { torches: 1 }", StringComparison.Ordinal);
+
+        var story = Ok("=== a\n-> END", yaml);
+
+        Assert.True(story.World.InitialFlags[new FlagId("open")]);
+        Assert.False(story.World.InitialFlags[new FlagId("closed")]);
+        Assert.False(story.World.InitialFlags[new FlagId("outcast")]);
+    }
+
+    [Theory]
+    [InlineData("yes")]
+    [InlineData("2")]
+    [InlineData("null")]
+    [InlineData("[]")]
+    public void Flag_mapping_rejects_non_boolean_values(string value)
+    {
+        var yaml = $"""
+            game:
+              id: invalid-flags
+              title: Invalid flags
+              start: a
+            characters:
+              player:
+                first-name: Ada
+            flags:
+              open: {value}
+            """;
+
+        var result = Compile("=== a\n-> END", yaml);
+
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(CompilerDiagnosticCodes.InvalidConfigurationValue, error.Code);
+        Assert.Contains("must be true or false", error.Message);
+        AssertYamlKeyLocation(error, yaml, value);
+        Assert.Null(result.Story);
+    }
+
+    [Fact]
     public void Negative_starting_inventory_quantity_is_reported_at_the_value_and_prevents_story_compilation()
     {
         var yaml = Yaml.Replace("inventory: [rope]", "inventory: { rope: -50 }", StringComparison.Ordinal);

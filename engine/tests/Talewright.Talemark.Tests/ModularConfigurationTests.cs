@@ -59,6 +59,22 @@ public sealed class ModularConfigurationTests
     }
 
     [Fact]
+    public void Flag_lists_and_mappings_merge_across_supporting_configuration_files()
+    {
+        var files = Files();
+        files["a/flags.talewright.yaml"] = "flags: [list-default]\n";
+        files["z/mixed.talewright.yaml"] = World.Replace("flags: [ready]",
+            "flags: { ready: false, guide-trusts-you: true }", StringComparison.Ordinal);
+
+        var story = Compile(files);
+
+        Assert.False(story.World.InitialFlags[new("list-default")]);
+        Assert.False(story.World.InitialFlags[new("ready")]);
+        Assert.True(story.World.InitialFlags[new("guide-trusts-you")]);
+        Assert.False(story.World.InitialFlags[new("done")]);
+    }
+
+    [Fact]
     public void Unknown_keys_in_root_and_supporting_files_are_errors_at_the_authored_keys()
     {
         var files = Files();

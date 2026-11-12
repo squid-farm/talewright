@@ -182,6 +182,7 @@ test('schema validates complete and contextual documented manifest examples', as
   const writingGuide = await read('docs/guide/writing-stories.md');
   for (const [property, snippet] of [
     ['flags', '[alarm-raised]'],
+    ['flags', '{ alarm-raised: false, guide-trusts-you: true }'],
     ['vars', '{ bribes: 0 }'],
   ]) {
     const value = parsedYaml(`${property}: ${snippet}`, `documented ${property} shorthand`)[property];
@@ -196,6 +197,7 @@ test('schema validates complete and contextual documented manifest examples', as
     }, `documented ${property} shorthand`);
   }
   assert.ok(writingGuide.includes('`flags: [alarm-raised]`'));
+  assert.ok(writingGuide.includes('`flags: { alarm-raised: false, guide-trusts-you: true }`'));
   assert.ok(writingGuide.includes('`vars: { bribes: 0 }`'));
 });
 

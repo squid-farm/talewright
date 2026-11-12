@@ -246,6 +246,8 @@ creates it.
 
 Checking a flag or variable that nothing ever sets is reported as a mistake (usually a typo). If it's
 intentional, declare it in `story.talewright.yaml`: `flags: [alarm-raised]` or `vars: { bribes: 0 }`.
+Flags in a list start as false. Use a mapping to choose starting values, such as
+`flags: { alarm-raised: false, guide-trusts-you: true }`. Flags set by effects but not declared also start false.
 
 Variables can also hold text. Declare a quoted initial value in the manifest, then
 assign and display it in Talemark:

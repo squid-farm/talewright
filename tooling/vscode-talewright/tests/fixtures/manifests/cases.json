@@ -1,5 +1,7 @@
 [
   { "file": "defaults.yaml", "schemaValid": true, "compilerCodes": [], "autosaveValue": true },
+  { "file": "flag-mapping.yaml", "schemaValid": true, "compilerCodes": [] },
+  { "file": "flag-invalid-values.yaml", "schemaValid": false, "compilerCodes": ["TW4003", "TW4003", "TW4003", "TW4003"], "diagnosticLocations": [{ "line": 9, "column": 14 }, { "line": 10, "column": 17 }, { "line": 11, "column": 15 }, { "line": 12, "column": 19 }] },
   { "file": "supported-forms.yaml", "schemaValid": true, "compilerCodes": [], "autosaveValue": false },
   { "file": "empty-optional-containers.yaml", "schemaValid": true, "compilerCodes": [] },
   { "file": "ruleset-rpg-shorthand.yaml", "schemaValid": true, "compilerCodes": [] },
