@@ -348,6 +348,14 @@ internal sealed partial class TaleBinder
                 return;
         }
 
+        var clauses = Clauses(syntax);
+        if (!clauses.IsEmpty)
+        {
+            var check = BindCheckSpec(syntax, clauses);
+            scene.Frames.Push(new Frame(new BoolLiteral(false), At(syntax.Indent), check));
+            return;
+        }
+
         var condition = ExpressionParser.ParseCondition(Value(syntax),
             At(syntax.Indent + 1 + SceneVocabulary.IfPrefix.Length), _symbols, _diagnostics, At(Part(syntax).ValueStart))
             ?? new BoolLiteral(false);
@@ -358,8 +366,12 @@ internal sealed partial class TaleBinder
     {
         var scene = _scene!;
         var frame = scene.Frames.Pop();
-        scene.CurrentSteps.Add(new ConditionalStep(StepId(frame.Location), SpanFrom(frame.Location),
-            frame.Condition, frame.Then, frame.Else));
+        if (frame.Check is { } check)
+            scene.CurrentSteps.Add(new CheckConditionalStep(StepId(frame.Location), SpanFrom(frame.Location),
+                check, frame.Then, frame.Else));
+        else
+            scene.CurrentSteps.Add(new ConditionalStep(StepId(frame.Location), SpanFrom(frame.Location),
+                frame.Condition, frame.Then, frame.Else));
     }
 
     // ---- prose -----------------------------------------------------------------------------------------------------
@@ -631,6 +643,7 @@ internal sealed partial class TaleBinder
         var words = new List<string>(2);
         var wordClauses = new List<TaleClause>(2);
         TaleClause? difficultyClause = null;
+        TaleClause? hiddenClause = null;
         foreach (var clause in clauses[1..])
         {
             if (clause.Kind == TaleClauseKind.CheckWord)
@@ -640,9 +653,12 @@ internal sealed partial class TaleBinder
             }
             else if (clause.Kind == TaleClauseKind.Difficulty)
                 difficultyClause = clause;
+            else if (clause.Kind == TaleClauseKind.Hidden)
+                hiddenClause = clause;
         }
 
         var difficultyText = difficultyClause is { } found ? Value(syntax, found) : null;
+        var hiddenText = hiddenClause is { } hiddenModifier ? Value(syntax, hiddenModifier) : null;
         if (_symbols.Analysis is { } analysis)
         {
             analysis.Tokens.Add(new(SceneVocabulary.SkillCheck,
@@ -686,6 +702,20 @@ internal sealed partial class TaleBinder
             if (difficultyClause is { } difficulty)
                 analysis.Expression(ExpressionContextKind.Number, difficultyText!, At(difficulty.ValueStart),
                     cacheForReuse: difficulty.ValueLength > 0);
+            if (hiddenClause is { } modifier)
+            {
+                if (modifier.IsHidden)
+                {
+                    analysis.Tokens.Add(new(SceneVocabulary.Hidden,
+                        AnalysisCollector.Range(At(modifier.ValueStart), SceneVocabulary.Hidden))
+                        { Kind = AuthoringTokenKind.Hidden });
+                }
+                else if (hiddenText is not null &&
+                         SceneVocabulary.Hidden.StartsWith(hiddenText, StringComparison.Ordinal))
+                {
+                    analysis.KeywordPrefix(hiddenText, At(modifier.ValueStart), SceneVocabulary.Hidden);
+                }
+            }
         }
 
         if (_symbols.World.Ruleset.SkillCheckRule is null)
@@ -719,7 +749,7 @@ internal sealed partial class TaleBinder
 
         var dc = ExpressionParser.ParseNumber(difficultyText!, At(difficultyClause!.Value.ValueStart), _symbols,
             _diagnostics);
-        return bound && dc is not null ? new SkillCheck(actor, skill, dc) : null;
+        return bound && dc is not null ? new SkillCheck(actor, skill, dc, hiddenClause?.IsHidden == true) : null;
     }
 
     /// <summary>
@@ -826,10 +856,11 @@ internal sealed partial class TaleBinder
         return (requirement, new ShownDefinition(text));
     }
 
-    private sealed class Frame(Expr condition, SourceLocation location)
+    private sealed class Frame(Expr condition, SourceLocation location, SkillCheck? check = null)
     {
         public Expr Condition { get; } = condition;
         public SourceLocation Location { get; } = location;
+        public SkillCheck? Check { get; } = check;
         public List<SceneStep> Then { get; } = [];
         public List<SceneStep> Else { get; } = [];
         public bool InElse { get; set; }

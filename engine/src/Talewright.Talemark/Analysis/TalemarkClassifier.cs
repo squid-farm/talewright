@@ -312,7 +312,12 @@ public static class TalemarkClassifier
             Add(scene.FileLine(line.Line) + 1, part.HeadStart, part.HeadLength,
                 TalemarkClassificationKind.Keyword);
             if (line.Kind == TaleLineKind.BlockIf)
-                ClassifyExpression(syntax.Value(scene, line), At(scene, line, part.ValueStart));
+            {
+                if (line.ClauseCount > 0)
+                    ClassifyClauses(scene, line, raw);
+                else
+                    ClassifyExpression(syntax.Value(scene, line), At(scene, line, part.ValueStart));
+            }
 
             var close = raw.LastIndexOf(SceneVocabulary.InlineClose);
             if (close >= 0)
@@ -421,6 +426,12 @@ public static class TalemarkClassifier
                         break;
                     case TaleClauseKind.Difficulty:
                         ClassifyDifficulty(scene, line, clause);
+                        break;
+                    case TaleClauseKind.Hidden:
+                        AddAt(scene, line, clause.Start, 1, TalemarkClassificationKind.Punctuation);
+                        if (clause.ValueLength > 0)
+                            AddAt(scene, line, clause.ValueStart, clause.ValueLength,
+                                TalemarkClassificationKind.Keyword);
                         break;
                 }
             }

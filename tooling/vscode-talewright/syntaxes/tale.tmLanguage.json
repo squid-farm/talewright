@@ -55,6 +55,17 @@
         {"include": "#string"},
         {"include": "#template"},
         {
+          "match": "(?<![\\p{L}\\p{N}_-])(skill-check)(?=\\s)",
+          "captures": {"1": {"name": "keyword.control.skill-check.tale"}}
+        },
+        {
+          "match": "(,\\s*)(hidden)(?![\\p{L}\\p{N}_-])",
+          "captures": {
+            "1": {"name": "punctuation.separator.sequence.tale"},
+            "2": {"name": "keyword.control.hidden.tale"}
+          }
+        },
+        {
           "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=\\S)",
           "end": "(?<!\\s)\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.bold.markdown",

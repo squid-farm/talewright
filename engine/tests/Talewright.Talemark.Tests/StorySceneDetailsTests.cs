@@ -127,6 +127,27 @@ public sealed class StorySceneDetailsTests
     }
 
     [Fact]
+    public void Details_keep_skill_check_outcomes_for_conditional_prose()
+    {
+        var details = Details(Compile("""
+            === start
+            {if skill-check athletics dc 12}
+            The passage opens.
+            {else}
+            The wall holds.
+            {/if}
+            * [Continue] -> END
+            """), "start");
+
+        var branches = details.Prose.Where(prose => prose.CheckBlockConditions.Count > 0).ToArray();
+        Assert.Equal(2, branches.Length);
+        Assert.Equal(SkillCheckOutcome.Success, Assert.Single(branches[0].CheckBlockConditions).Outcome);
+        Assert.Equal(SkillCheckOutcome.Failure, Assert.Single(branches[1].CheckBlockConditions).Outcome);
+        Assert.All(branches, prose =>
+            Assert.Equal("athletics", Assert.Single(prose.CheckBlockConditions).Check.Skill.Value));
+    }
+
+    [Fact]
     public void Details_walk_long_flat_conditions_without_recursion()
     {
         var source = $"=== start\n@requires {string.Join(" and ", Enumerable.Repeat("true", 10_000))}\n-> END";

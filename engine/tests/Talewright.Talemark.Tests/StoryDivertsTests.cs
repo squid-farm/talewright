@@ -1,3 +1,4 @@
+using Talewright.Core.Identity;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
@@ -99,6 +100,39 @@ public sealed class StoryDivertsTests
         Assert.Equal(diverts.Count, diverts.Select(divert => divert.Id).Distinct().Count());
         Assert.Equal(SceneSteps.Targets(result.Story!.Scenes[0].Steps), diverts.Where(divert => divert.From.Value == "start")
             .Select(divert => divert.Target));
+    }
+
+    [Fact]
+    public void Diverts_keep_the_skill_check_outcome_of_enclosing_block_conditions()
+    {
+        var result = Compile("""
+            === start
+            {if skill-check athletics dc 12}
+            -> success
+            {else}
+            -> failure
+            {/if}
+            === success
+            -> END
+            === failure
+            -> END
+            """);
+
+        var diverts = StoryDiverts.From(result.Story!).Diverts
+            .Where(divert => divert.From.Value == "start")
+            .ToArray();
+
+        Assert.Equal(2, diverts.Length);
+        Assert.Equal(new SceneId("success"), diverts[0].Target.Scene);
+        Assert.Equal(new SceneId("failure"), diverts[1].Target.Scene);
+        Assert.Equal(SkillCheckOutcome.Success, Assert.Single(diverts[0].CheckBlockConditions).Outcome);
+        Assert.Equal(SkillCheckOutcome.Failure, Assert.Single(diverts[1].CheckBlockConditions).Outcome);
+        Assert.All(diverts, divert =>
+        {
+            var condition = Assert.Single(divert.CheckBlockConditions);
+            Assert.Equal("athletics", condition.Check.Skill.Value);
+            Assert.Empty(divert.Condition.Parts);
+        });
     }
 
     [Fact]

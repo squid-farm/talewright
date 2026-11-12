@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
+using Talewright.Rules.Checks;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Talemark.Analysis;
@@ -27,6 +28,9 @@ public enum SkillCheckOutcome { Success, Failure }
 
 /// <summary>Preview. A block <c>{if}</c> enclosing a divert; <see cref="InElse"/> is true in its <c>{else}</c> branch.</summary>
 public sealed record DivertBlockCondition(Expr Condition, bool InElse);
+
+/// <summary>Preview. A skill-check block <c>{if}</c> enclosing a divert and the outcome that admits it.</summary>
+public sealed record StoryCheckBlockCondition(SkillCheck Check, SkillCheckOutcome Outcome);
 
 /// <summary>
 /// Preview. One divert (<c>-&gt;</c>) in a compiled story.
@@ -62,7 +66,11 @@ public sealed record StoryDivert(
     Expr? ChoiceRequires,
     ShownDefinition? ChoiceShown,
     IReadOnlyList<DivertBlockCondition> BlockConditions,
-    StoryCondition Condition);
+    StoryCondition Condition)
+{
+    /// <summary>Enclosing skill-check block conditions, outermost first.</summary>
+    public IReadOnlyList<StoryCheckBlockCondition> CheckBlockConditions { get; init; } = [];
+}
 
 /// <summary>
 /// Preview. A hub offer: a scene matching a hub's tags, ignoring <c>@hub-limit</c>.

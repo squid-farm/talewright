@@ -172,6 +172,8 @@ public sealed record MapView(
             parts.Add("entry");
         if (divert.Outcome is { } outcome)
             parts.Add(outcome == SkillCheckOutcome.Success ? "✓" : "✗");
+        parts.AddRange(divert.CheckBlockConditions.Select(condition =>
+            condition.Outcome == SkillCheckOutcome.Success ? "check ✓" : "check ✗"));
         if (divert.Condition.Text.Length > 0)
             parts.Add(Shorten(divert.Condition.Text, LabelConditionLength));
         return string.Join(" ", parts);
@@ -194,9 +196,21 @@ public sealed record MapView(
             SkillCheckOutcome.Failure => " on failure",
             _ => "",
         };
-        var condition = divert.Condition.Text.Length > 0 ? $", if {divert.Condition.Text}" : "";
+        var conditions = new List<string>();
+        if (divert.Condition.Text.Length > 0)
+            conditions.Add(divert.Condition.Text);
+        conditions.AddRange(divert.CheckBlockConditions.Select(CheckBlockCondition));
+        var condition = conditions.Count > 0 ? $", if {string.Join(" and ", conditions)}" : "";
         var start = divert.Source.Start;
         return $"{line}{outcome} to {divert.Target}{condition}, {Path.GetFileName(start.File)} line {start.Line}";
+    }
+
+    private static string CheckBlockCondition(StoryCheckBlockCondition condition)
+    {
+        var outcome = condition.Outcome == SkillCheckOutcome.Success ? "success" : "failure";
+        var actor = condition.Check.Actor == EntityId.Player ? "player" : condition.Check.Actor.Value;
+        var difficulty = ExpressionFormatter.Format(condition.Check.Difficulty);
+        return $"{outcome} branch of {actor} {condition.Check.Skill.Value} check (DC {difficulty})";
     }
 
     /// <summary>The full description of one hub offer, used for its accessible name and hover text.</summary>

@@ -60,6 +60,8 @@ public sealed partial class ServerTests
     [InlineData("{item:rope#one-|}", "one-many")]
     [InlineData("{player:pronoun:possessive-pronoun:|}", "independent")]
     [InlineData("{if (player:pronoun:ob| == \"them\")}yes{/if}", "object")]
+    [InlineData("{if skill-check pe| dc 12}\n{/if}", "perception")]
+    [InlineData("{if skill-check perception dc 12, h|}\n{/if}", "hidden")]
     [InlineData("~ var:word = (player:pronoun:possessive-pronoun:in|)", "independent")]
     [InlineData("{player:inventory:|}", "first-name")]
     [InlineData("{player:inventory:first-name:|}", "count")]

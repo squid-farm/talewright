@@ -43,6 +43,12 @@ test('fallback keeps lightweight structural scopes', () => {
     token.scopes.includes('keyword.control.divert.tale')));
 });
 
+test('fallback highlights skill checks and hidden modifiers', () => {
+  hasScope('* [Climb] skill-check athletics dc 12', 'skill-check', 'keyword.control.skill-check.tale');
+  hasScope('{if skill-check perception dc 12, hidden}', 'hidden', 'keyword.control.hidden.tale');
+  hasScope('::: skill-check perception dc 12, hidden', ',', 'punctuation.separator.sequence.tale');
+});
+
 test('fallback highlights templates, quoted strings, and escaped braces', () => {
   hasScope('{player:first-name}', 'first-name', 'meta.template.tale');
   hasScope('{image("camp", "A camp")}', 'camp', 'string.quoted.double.tale');

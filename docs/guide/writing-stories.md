@@ -334,7 +334,29 @@ succeeds when the total is at least the DC. The modifier depends on the stat's c
 For stats on a small scale, keep the default `custom` category; see
 [your own stats with skill checks](authoring-recipes.md#your-own-stats-with-skill-checks).
 Another character can make the check: `skill-check guide survival dc 10`. Results are shown to the
-player in the story. Dice are only rolled for checks.
+player in the story by default. Dice are only rolled for checks.
+
+### Check a skill in a block condition
+
+Use a skill check as the whole condition of a block `{if}` to show different story content on success
+or failure. The check rolls once when the line is reached, and the `{else}` branch is optional:
+
+```tale
+{if skill-check perception dc 12, hidden}
+You hear a faint noise behind you.
+{else}
+The corridor is quiet.
+{/if}
+The corridor narrows ahead.
+```
+
+Both branches can contain the same prose, speech, images, effects and nested conditions as other
+block `{if}`s. A skill check cannot be mixed with `and`, `or` or `not`, or used in an inline `{if}`,
+`requires`, `@requires` or trigger `when:` condition.
+
+Checks normally add a result note for the player. Add `, hidden` to a choice check or `::: skill-check`
+block to suppress that note. Hidden checks still appear in the Author Debugger, marked as hidden.
+Effects inside either branch keep their usual change notes.
 
 Want the same rolls every time? Set `seed: 1234` in `story.talewright.yaml`. For no dice at all, set
 `randomness: off`, which treats every roll as a 10.

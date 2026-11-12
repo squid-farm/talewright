@@ -28,6 +28,7 @@ public static class SceneVocabulary
     internal const string SkillCheckFence = ":::";
     internal const string SkillCheck = "skill-check";
     internal const string SkillCheckBlock = SkillCheckFence + " " + SkillCheck;
+    internal const string Hidden = "hidden";
     internal const string Difficulty = "dc";
     internal const string DifficultyPrefix = " " + Difficulty;
     internal const string DifficultySeparator = DifficultyPrefix + " ";

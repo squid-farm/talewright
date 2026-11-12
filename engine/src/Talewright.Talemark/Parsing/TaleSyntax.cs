@@ -55,11 +55,10 @@ internal readonly record struct TaleLineSyntax(
     private readonly byte _detail;
     private readonly byte _flags;
 
-    // One-based index into the scene's parts, or for choice, skill-check block and outcome lines its first clause;
-    // zero when the line has none.
+    // Positive: one-based part index. Negative: one-based clause index for lines without a part. Zero: neither.
     internal int PartIndex { get; init; }
 
-    /// <summary>Number of clauses on a choice, skill-check block or outcome line.</summary>
+    /// <summary>Number of clauses on a choice, skill check, outcome or check conditional line.</summary>
     internal int ClauseCount { get; init; }
 
     /// <summary>The line is inside a block condition nested past the limit; binding ignores it.</summary>
@@ -122,6 +121,8 @@ internal readonly record struct TaleLineSyntax(
 /// <param name="ValueLength">Length of the value.</param>
 internal readonly record struct TaleLinePart(int HeadStart, int HeadLength, int ValueStart, int ValueLength)
 {
+    internal int ClauseIndex { get; init; }
+
     /// <summary>
     /// Column where a metadata value begins before trimming: just after the first space, or the line indent when
     /// there is no value.
@@ -173,9 +174,12 @@ internal enum TaleClauseKind : byte
 
     /// <summary>The difficulty expression after <c>dc</c>; empty at the spec end when <c>dc</c> has no value.</summary>
     Difficulty,
+
+    /// <summary>The optional <c>, hidden</c> modifier on a skill check.</summary>
+    Hidden,
 }
 
-/// <summary>A clause on a choice, skill-check block or outcome line. Columns are relative to the raw line start.</summary>
+/// <summary>A clause on a choice, skill check, outcome or check conditional line. Columns are relative to the raw line start.</summary>
 /// <param name="Kind">What the clause is.</param>
 /// <param name="Start">Column of the clause marker, or of the value when it has none.</param>
 /// <param name="ValueStart">Column of the value; see <see cref="TaleClauseKind"/> for what each kind's value is.</param>
@@ -184,6 +188,7 @@ internal enum TaleClauseKind : byte
 internal readonly record struct TaleClause(TaleClauseKind Kind, int Start, int ValueStart, int ValueLength)
 {
     private const byte InvalidFlag = 0x80;
+    private const byte HiddenFlag = 0x40;
     private readonly byte _detail;
 
     /// <summary>
@@ -196,14 +201,21 @@ internal readonly record struct TaleClause(TaleClauseKind Kind, int Start, int V
         init => _detail = value ? (byte)(_detail | InvalidFlag) : (byte)(_detail & ~InvalidFlag);
     }
 
+    /// <summary>The clause is the optional <c>hidden</c> skill-check modifier.</summary>
+    public bool IsHidden
+    {
+        get => (_detail & HiddenFlag) != 0;
+        init => _detail = value ? (byte)(_detail | HiddenFlag) : (byte)(_detail & ~HiddenFlag);
+    }
+
     /// <summary>
     /// For <see cref="TaleClauseKind.SkillCheck"/>, the index of the <c>dc</c> word when it is 1 (stat) or 2 (actor
     /// and stat); otherwise 0.
     /// </summary>
     public int DifficultyWord
     {
-        get => _detail & ~InvalidFlag;
-        init => _detail = (byte)((_detail & InvalidFlag) | (value is 1 or 2 ? value : 0));
+        get => _detail & ~(InvalidFlag | HiddenFlag);
+        init => _detail = (byte)((_detail & (InvalidFlag | HiddenFlag)) | (value is 1 or 2 ? value : 0));
     }
 }
 
@@ -262,11 +274,19 @@ internal sealed class TaleSceneSyntax
 
     /// <summary>The parts of a body line, or default when its kind has none.</summary>
     public TaleLinePart Part(TaleLineSyntax line) =>
-        line.PartIndex == 0 || line.ClauseCount > 0 ? default : _parts[line.PartIndex - 1];
+        line.PartIndex <= 0 ? default : _parts[line.PartIndex - 1];
 
-    /// <summary>The clauses of a choice, skill-check block or outcome line, in source order.</summary>
-    public ReadOnlySpan<TaleClause> Clauses(TaleLineSyntax line) =>
-        line.ClauseCount == 0 ? default : _clauses.AsSpan(line.PartIndex - 1, line.ClauseCount);
+    /// <summary>The clauses of a choice, skill check, outcome or check conditional line, in source order.</summary>
+    public ReadOnlySpan<TaleClause> Clauses(TaleLineSyntax line)
+    {
+        if (line.ClauseCount == 0)
+            return default;
+
+        var index = line.PartIndex < 0 ? -line.PartIndex
+            : line.PartIndex > 0 ? _parts[line.PartIndex - 1].ClauseIndex
+            : 0;
+        return index == 0 ? default : _clauses.AsSpan(index - 1, line.ClauseCount);
+    }
 
     public int FileOffset(int relativeOffset) => Start + relativeOffset;
 

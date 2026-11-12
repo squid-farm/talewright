@@ -14,6 +14,7 @@ public enum AuthoringTokenKind
     Divert,
     SkillCheckBlock,
     SkillCheck,
+    Hidden,
     If,
     Else,
     EndIf,

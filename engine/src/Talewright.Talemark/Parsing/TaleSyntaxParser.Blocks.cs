@@ -30,9 +30,25 @@ internal static partial class TaleSyntaxParser
 
             _blocks.Add((line.Line, line.Indent, false));
             var inner = content[1..^1];
-            return WithPart(line, new(head, keyword.Length,
-                line.Indent + 1 + Lead(inner) + SceneVocabulary.IfPrefix.Length,
-                inner.Trim().Length - SceneVocabulary.IfPrefix.Length));
+            var trimmed = inner.Trim();
+            var valueStart = line.Indent + 1 + Lead(inner) + SceneVocabulary.IfPrefix.Length;
+            line = WithPart(line, new(head, keyword.Length, valueStart,
+                trimmed.Length - SceneVocabulary.IfPrefix.Length));
+            var condition = trimmed[SceneVocabulary.IfPrefix.Length..];
+            var conditionLead = Lead(condition);
+            condition = condition[conditionLead..];
+            if (condition.StartsWith(SceneVocabulary.SkillCheck, StringComparison.Ordinal) &&
+                (condition.Length == SceneVocabulary.SkillCheck.Length ||
+                 char.IsWhiteSpace(condition[SceneVocabulary.SkillCheck.Length])))
+            {
+                var first = _clauses.Count;
+                var checkStart = valueStart + conditionLead;
+                SkillCheck(line, checkStart, condition[SceneVocabulary.SkillCheck.Length..].ToString(),
+                    null, 0, insideBlock: true);
+                line = WithClauses(line, first, invalid: false);
+            }
+
+            return line;
         }
 
         private TaleLineSyntax Balance(TaleLineSyntax line)

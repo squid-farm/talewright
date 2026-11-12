@@ -883,6 +883,29 @@ failure: -> temple.hall
 :::
 ```
 
+Append `, hidden` to suppress the player's check note:
+
+```tale
+* [Listen] skill-check perception dc 12, hidden
+  success: -> temple.hidden-door
+  failure: -> temple.hall
+```
+
+Use a skill check as the whole condition of a block `{if}` to branch prose or other scene content.
+It rolls once when reached, and `{else}` is optional:
+
+```tale
+{if skill-check perception dc 12, hidden}
+You hear a faint noise behind you.
+{else}
+The corridor is quiet.
+{/if}
+```
+
+Both branches can contain any block-condition content, including nested conditions. Do not combine a
+check condition with `and`, `or` or `not`, or use it in inline `{if}`, `requires`, `@requires` or a
+trigger `when:` condition. Hidden checks still appear, marked as hidden, in the Author Debugger.
+
 An outcome's effects run there as one batch. An outcome with `->` leaves immediately; without it,
 an entry check continues with the next line. Multiple checks and checks inside block conditions
 are allowed, but all must precede the final choices. Choice-check outcomes always require targets.

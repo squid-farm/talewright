@@ -137,6 +137,31 @@ public sealed class MapViewTests
     }
 
     [Fact]
+    public void Diverts_show_the_enclosing_skill_check_outcome()
+    {
+        var view = Build("""
+            === start
+            {if skill-check athletics dc 12}
+            -> road
+            {else}
+            -> river
+            {/if}
+            === road
+            -> END
+            === river
+            -> END
+            """);
+
+        var start = Assert.Single(view.Nodes, node => node.Id == "start");
+        Assert.Equal([
+            "Divert to road, if success branch of player athletics check (DC 12), main.tale line 3",
+            "Divert to river, if failure branch of player athletics check (DC 12), main.tale line 5",
+        ], start.Items.Select(item => item.Name));
+        Assert.Contains(view.Lines, line => line.Label == "check ✓");
+        Assert.Contains(view.Lines, line => line.Label == "check ✗");
+    }
+
+    [Fact]
     public void Groups_hub_offered_scenes_by_tag_and_describes_each_hub_offer()
     {
         var view = Build();

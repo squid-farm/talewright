@@ -462,6 +462,21 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             KeywordDetails: details));
     }
 
+    internal void KeywordPrefix(string text, SourceLocation location, params string[] keywords)
+    {
+        var details = AuthoringSyntaxVocabulary.KeywordDetails(keywords);
+        if (text.Length == 0)
+        {
+            AddKeywordPoint(location, keywords, details);
+            return;
+        }
+
+        var start = location;
+        AddSite(new(text, Range(start, text), [], keywords,
+            Enumerable.Range(0, text.Length + 1).Select(start.Offset).ToArray(),
+            KeywordDetails: details));
+    }
+
     internal void HubSelector(string value, SourceLocation location)
     {
         var words = new List<(int Start, int Length)>();

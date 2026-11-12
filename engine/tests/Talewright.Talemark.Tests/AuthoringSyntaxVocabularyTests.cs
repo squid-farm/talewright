@@ -33,6 +33,7 @@ public sealed class AuthoringSyntaxVocabularyTests
     [InlineData("scene:", AuthoringTokenKind.SceneContext)]
     [InlineData("player:", AuthoringTokenKind.Visits)]
     [InlineData("image(", AuthoringTokenKind.Image)]
+    [InlineData("hidden", AuthoringTokenKind.Hidden)]
     public void Completion_prefixes_share_their_syntax_entry(string completion, AuthoringTokenKind kind)
     {
         Assert.True(AuthoringSyntaxVocabulary.TryGetHelp(kind, out var expected));
@@ -56,6 +57,7 @@ public sealed class AuthoringSyntaxVocabularyTests
             (AuthoringTokenKind.Hub, $"camp {ExpressionVocabulary.And} night"),
             (AuthoringTokenKind.Choice, $"{SceneVocabulary.ChoiceMarker} {SceneVocabulary.Divert} target"),
             (AuthoringTokenKind.SkillCheckBlock, $"{SceneVocabulary.SkillCheckBlock} {SceneVocabulary.OpenBracket}actor{SceneVocabulary.CloseBracket} stat {SceneVocabulary.Difficulty} number"),
+            (AuthoringTokenKind.Hidden, $", {SceneVocabulary.Hidden}"),
             (AuthoringTokenKind.If, $"{SceneVocabulary.InlineOpen}{SceneVocabulary.EndIf}{SceneVocabulary.InlineClose}"),
             (AuthoringTokenKind.Visited, $"{ExpressionVocabulary.Player} {ExpressionVocabulary.Visited} scene"),
             (AuthoringTokenKind.SceneContext, $"{ExpressionVocabulary.ScenePrefix}{ExpressionVocabulary.Player}:{ExpressionVocabulary.Visits}"),
@@ -109,7 +111,7 @@ public sealed class AuthoringSyntaxVocabularyTests
         Assert.Equal("camp and records", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], true));
         Assert.Equal("camp or records", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], false));
         Assert.Equal("camp", AuthoringSyntaxVocabulary.FormatHubSelector(["camp"], true));
-        Assert.Equal([":", "@", "#", ">", "(", "\"", "/"], AuthoringSyntaxVocabulary.CompletionTriggerCharacters);
+        Assert.Equal([":", "@", "#", ">", ",", "(", "\"", "/"], AuthoringSyntaxVocabulary.CompletionTriggerCharacters);
     }
 
     [Theory]

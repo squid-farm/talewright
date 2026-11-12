@@ -34,7 +34,7 @@ page against them.
 | TW1010 | `->` without a target. | `-> scene.id` or `-> END`. |
 | TW1011 | Malformed choice or misplaced choice clause. | Use `* [label] (requires ...[, shown ["reader text"]]) { effects } -> target` or `* -> target` for **Continue**. Textless choices only allow a divert; wrap a conditional one in `{if}` or add a label to use requirements or effects. Use at most one requirement and one effect block, in either order before the divert or check. Spell `(requires ` exactly and close `]`, `)` and `}`. `shown` requires a requirement; after its comma use `shown` once, with optional double-quoted reader text. An empty `shown ""` is allowed but warns that no text will be shown. |
 | TW1012 | Unknown or unclosed `:::` block. | Only `::: skill-check` is supported, and it ends with `:::`. |
-| TW1013 | Malformed skill check. | `skill-check [character] skill dc 12`. |
+| TW1013 | Malformed skill check. | `skill-check [character] skill dc 12[, hidden]`. |
 | TW1014 | Malformed image call, image path escape, unsupported image manipulator, or an image nested inside alt text. | Write `{image("path", "alt text")}` or `{image("path")#decorative}`. Quote each supplied argument; separate path and alt text with a comma. Paths use only `\"` or `\\`; alt text uses `\"` and the reader-text punctuation escape rule. Describe a picture in words instead of nesting `{image(...)}`. |
 | TW1015 | Unexpected syntax in reader text, including the simple `![alt](path)` image form. | Use `{image("path", "alt")}` for an image. |
 | TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |

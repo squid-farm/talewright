@@ -140,7 +140,7 @@ New callables follow this guideline. Existing exceptions are listed below.
 | `tag or tag [or tag…]` | Hub union; at least one listed tag. | Two or more distinct tags. | `@hub` only. | Do not mix with `and`. |
 | `set flag:id`, `clear flag:id` | Effect. | One flag reference. | Effects. | Word command. |
 | `give`/`take character item [n]` | Effect. | Character name, item name, optional number expression (default 1). | Effects. | Space-separated arguments. |
-| `skill-check [actor] skill dc n` | Clause. | Optional character name, skill name, number expression. | Choices and `:::` blocks. | Keyword sequence. |
+| `skill-check [actor] skill dc n[, hidden]` | Clause. | Optional character name, skill name, number expression, optional hidden modifier. | Choices, `:::` blocks and as the whole condition of a block `{if}`. | Keyword sequence. |
 
 Known inconsistencies (see [planned changes](#planned-changes)):
 
@@ -170,18 +170,21 @@ handled as reader text, so `\* [Go] -> hall` is prose rather than a choice.
 | `[` `]` | Bound a choice label; its contents are reader text with substitutions and formatting. Balanced inner brackets are literal text; the scanner skips backslash-escaped brackets and inline constructs. | `* [Open [the] door] -> hall` | TW1011 missing closing bracket. |
 | `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
 | `~` | Effect batch at the start of a line; executes in source order. Triggers settle after the whole semicolon-separated batch. | `~ var:coins += 1` | TW1003 malformed effect; TW3011 after choices; name/type errors. |
-| `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed choice effect; TW1009 unclosed outcome effect. |
+| `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines and accept either a boolean expression or a whole skill-check condition. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` or `{if skill-check perception dc 12, hidden}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed choice effect; TW1009 unclosed outcome effect. |
 | `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted literal path and optional quoted alt, comma-separated. Alt uses the prose template language and cannot contain a nested image. Append `#decorative` only when the image has no descriptive alt text. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "{guide:first-name} at the camp")}` or `{image("ornament.png")#decorative}` | TW1014 malformed call/escape, unsupported manipulator or nested image; TW2015 contradictory alt; TW2016 inaccessible choice label. Asset validation uses TW2010–TW2014. |
-| `:::` | Delimit a skill check executed at this line. Opening takes `skill-check [actor] skill dc number-expression`; closing line has only `:::`. Both outcomes are required; an entry outcome without a target continues at the next line. | `::: skill-check perception dc 12` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3011 after choices. |
+| `:::` | Delimit a skill check executed at this line. Opening takes `skill-check [actor] skill dc number-expression[, hidden]`; closing line has only `:::`. Both outcomes are required; an entry outcome without a target continues at the next line. | `::: skill-check perception dc 12, hidden` (close with `:::`) | TW1012 unknown/unclosed block; TW1009 missing outcomes; TW3011 after choices. |
 | `:` in labels | Separates skill-check outcome labels from their contents: `success:`, `failure:`. Not a property read in this context. | `success: -> hall` | TW1009 misplaced/missing outcomes. |
 | `//` | Comment when it begins a trimmed line; the rest of the line is ignored. It is not a trailing-comment operator. | `// The guard remembers this.` | None for comment contents. |
 
 `END` is the reserved divert destination that ends the story, not a scene declaration.
-`skill-check` and `dc` are words, not new sigils. On a choice, write
+`skill-check`, `dc` and `hidden` are words, not new sigils. A hidden check records its roll for
+replay and the Author Debugger but does not add a player check note. On a choice, write
 `* [Climb] skill-check athletics dc 14` and follow it with `success:` and `failure:` lines.
 Choices form the final block, optionally nested in conditions. Every choice and choice-check outcome
 requires an explicit target (TW3003). Block conditions select a branch once; inline conditions evaluate
-at their prose line. Unreachable steps after a guaranteed exit produce warning TW3012.
+at their prose line. A block `{if}` can use a skill check as its whole condition, but checks cannot be
+used in inline conditions, requirements or trigger conditions, and cannot be combined with `and`,
+`or` or `not`. Unreachable steps after a guaranteed exit produce warning TW3012.
 Unknown names, incorrect types and malformed expressions can also produce the expression diagnostics
 below. See [error codes](diagnostics.md) for the complete messages.
 

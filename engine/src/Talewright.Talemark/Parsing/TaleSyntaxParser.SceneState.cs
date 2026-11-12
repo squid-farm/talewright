@@ -141,13 +141,24 @@ internal static partial class TaleSyntaxParser
         private void Clause(TaleClause clause) => _clauses.Add(clause);
 
         /// <summary>Points the line at the clauses added from <paramref name="first"/>.</summary>
-        private TaleLineSyntax WithClauses(TaleLineSyntax line, int first, bool invalid) =>
-            line with
+        private TaleLineSyntax WithClauses(TaleLineSyntax line, int first, bool invalid)
+        {
+            var clauseIndex = _clauses.Count > first ? first + 1 : 0;
+            if (line.PartIndex > 0)
             {
-                PartIndex = _clauses.Count > first ? first + 1 : 0,
+                _parts[line.PartIndex - 1] = _parts[line.PartIndex - 1] with { ClauseIndex = clauseIndex };
+            }
+            else if (clauseIndex > 0)
+            {
+                line = line with { PartIndex = -clauseIndex };
+            }
+
+            return line with
+            {
                 ClauseCount = _clauses.Count - first,
                 IsInvalid = invalid,
             };
+        }
 
         private TaleLineSyntax WithPart(TaleLineSyntax line, TaleLinePart part)
         {

@@ -33,6 +33,35 @@ internal static partial class TaleSyntaxParser
             bool insideBlock)
         {
             var column = keyword + SceneVocabulary.SkillCheck.Length;
+            TaleClause? hiddenClause = null;
+            if (text.IndexOf(ExpressionVocabulary.ArgumentSeparator) >= 0)
+            {
+                var suffixScan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup,
+                    cancellationToken: _cancellationToken);
+                var commas = suffixScan.FindTopLevel(text, ExpressionVocabulary.ArgumentSeparator, _cancellationToken);
+                if (commas.Count > 0)
+                {
+                    var comma = commas[^1];
+                    var suffix = text.AsSpan(comma + 1);
+                    var leading = Lead(suffix);
+                    suffix = suffix[leading..];
+                    var spelling = suffix.TrimEnd();
+                    if (SceneVocabulary.Hidden.StartsWith(spelling, StringComparison.Ordinal))
+                    {
+                        var valueStart = column + comma + 1 + leading;
+                        var isComplete = spelling.SequenceEqual(SceneVocabulary.Hidden);
+                        hiddenClause = new TaleClause(TaleClauseKind.Hidden, column + comma, valueStart,
+                            spelling.Length) { IsHidden = isComplete };
+                        if (!isComplete)
+                        {
+                            Error(line, CompilerDiagnosticCodes.MalformedSkillCheck,
+                                $"The only skill-check modifier is ', {SceneVocabulary.Hidden}'.", column + comma);
+                        }
+                        text = text[..comma].TrimEnd();
+                    }
+                }
+            }
+
             var separator = text.IndexOf(SceneVocabulary.DifficultySeparator, StringComparison.Ordinal);
             if (separator >= 0)
             {
@@ -85,6 +114,9 @@ internal static partial class TaleSyntaxParser
                 Clause(new(TaleClauseKind.Difficulty, column + text.Length - SceneVocabulary.Difficulty.Length,
                     column + text.Length, 0));
             }
+
+            if (hiddenClause is { } hidden)
+                Clause(hidden);
 
             var malformed = difficultyWord is < 1 or > 2 || difficultyWord == words - 1;
             _clauses[checkIndex] = new(TaleClauseKind.SkillCheck, keyword, column, text.Length)

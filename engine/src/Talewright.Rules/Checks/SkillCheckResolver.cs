@@ -19,7 +19,7 @@ public enum RandomnessMode
 }
 
 /// <summary>A skill check as declared in a story.</summary>
-public sealed record SkillCheck(EntityId Actor, StatId Skill, Expr Difficulty);
+public sealed record SkillCheck(EntityId Actor, StatId Skill, Expr Difficulty, bool IsHidden = false);
 
 /// <summary>
 /// Resolves skill checks through the ruleset's <see cref="ISkillCheckRule"/>, rolling seeded dice and recording
@@ -48,7 +48,8 @@ public static class SkillCheckResolver
         var context = new EvaluationContext(log.State, predicates);
         var difficulty = RuleObservation.Evaluate(check.Difficulty, context, observer is not null, out var trace).Number;
         var result = rule.Resolve(log.State, new SkillCheckRequest(check.Actor, check.Skill, difficulty, roll));
-        log.Append(new SkillCheckResolved(check.Actor, check.Skill, difficulty, result.Roll, result.Modifier, result.Total, result.Success));
+        log.Append(new SkillCheckResolved(check.Actor, check.Skill, difficulty, result.Roll, result.Modifier,
+            result.Total, result.Success, check.IsHidden));
         observer?.Invoke(new RuleDecision(DecisionKind.Check, $"{check.Actor}:{check.Skill}", state.CurrentScene,
             result.Success ? DecisionOutcome.Passed : DecisionOutcome.Failed,
             result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, trace, start, log.Events.Count));

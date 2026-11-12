@@ -1,4 +1,5 @@
 using Talewright.Narrative.Templates;
+using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
@@ -12,6 +13,8 @@ public sealed record ProseStep(string Id, SourceRange Source, TemplateBlock Bloc
 public sealed record EffectStep(string Id, SourceRange Source, IReadOnlyList<Effect> Effects) : SceneStep(Id, Source);
 public sealed record ConditionalStep(string Id, SourceRange Source, Expr Condition,
     IReadOnlyList<SceneStep> Then, IReadOnlyList<SceneStep> Else) : SceneStep(Id, Source);
+public sealed record CheckConditionalStep(string Id, SourceRange Source, SkillCheck Check,
+    IReadOnlyList<SceneStep> Then, IReadOnlyList<SceneStep> Else) : SceneStep(Id, Source);
 public sealed record ChoiceStep(string Id, SourceRange Source, ChoiceDefinition Choice) : SceneStep(Id, Source);
 public sealed record DivertStep(string Id, SourceRange Source, DivertTarget Target) : SceneStep(Id, Source);
 public sealed record CheckStep(string Id, SourceRange Source, CheckBranch Check) : SceneStep(Id, Source);
@@ -22,18 +25,30 @@ public static class SceneSteps
     public static IEnumerable<SceneStep> Walk(IEnumerable<SceneStep> steps) =>
         WalkWithBlocks(steps).Select(entry => entry.Step);
 
-    internal static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks)> WalkWithBlocks(
-        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition>? blocks = null)
+    internal static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks,
+        IReadOnlyList<StoryCheckBlockCondition> CheckBlocks)> WalkWithBlocks(
+        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition>? blocks = null,
+        IReadOnlyList<StoryCheckBlockCondition>? checkBlocks = null)
     {
         blocks ??= [];
+        checkBlocks ??= [];
         foreach (var step in steps)
         {
-            yield return (step, blocks);
+            yield return (step, blocks, checkBlocks);
             if (step is ConditionalStep branch)
             {
-                foreach (var child in WalkWithBlocks(branch.Then, [.. blocks, new(branch.Condition, false)]))
+                foreach (var child in WalkWithBlocks(branch.Then, [.. blocks, new(branch.Condition, false)], checkBlocks))
                     yield return child;
-                foreach (var child in WalkWithBlocks(branch.Else, [.. blocks, new(branch.Condition, true)]))
+                foreach (var child in WalkWithBlocks(branch.Else, [.. blocks, new(branch.Condition, true)], checkBlocks))
+                    yield return child;
+            }
+            else if (step is CheckConditionalStep check)
+            {
+                foreach (var child in WalkWithBlocks(check.Then,
+                    blocks, [.. checkBlocks, new(check.Check, SkillCheckOutcome.Success)]))
+                    yield return child;
+                foreach (var child in WalkWithBlocks(check.Else,
+                    blocks, [.. checkBlocks, new(check.Check, SkillCheckOutcome.Failure)]))
                     yield return child;
             }
         }
@@ -44,23 +59,36 @@ public static class SceneSteps
         Reachable(steps, null);
 
     internal static IEnumerable<SceneStep> Reachable(IEnumerable<SceneStep> steps, CancellationCheckpoint? checkpoint) =>
-        ReachableWithBlocks(steps, [], checkpoint).Select(entry => entry.Step);
+        ReachableWithBlocks(steps, [], [], checkpoint).Select(entry => entry.Step);
 
-    private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks)> ReachableWithBlocks(
-        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition> blocks, CancellationCheckpoint? checkpoint)
+    private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks,
+        IReadOnlyList<StoryCheckBlockCondition> CheckBlocks)> ReachableWithBlocks(
+        IEnumerable<SceneStep> steps, IReadOnlyList<DivertBlockCondition> blocks,
+        IReadOnlyList<StoryCheckBlockCondition> checkBlocks, CancellationCheckpoint? checkpoint)
     {
         foreach (var step in steps)
         {
             checkpoint?.Check();
-            yield return (step, blocks);
+            yield return (step, blocks, checkBlocks);
             if (step is ConditionalStep branch)
             {
                 if (branch.Condition is not BoolLiteral { Value: false })
-                    foreach (var child in ReachableWithBlocks(branch.Then, [.. blocks, new(branch.Condition, false)], checkpoint))
+                    foreach (var child in ReachableWithBlocks(branch.Then,
+                        [.. blocks, new(branch.Condition, false)], checkBlocks, checkpoint))
                         yield return child;
                 if (branch.Condition is not BoolLiteral { Value: true })
-                    foreach (var child in ReachableWithBlocks(branch.Else, [.. blocks, new(branch.Condition, true)], checkpoint))
+                    foreach (var child in ReachableWithBlocks(branch.Else,
+                        [.. blocks, new(branch.Condition, true)], checkBlocks, checkpoint))
                         yield return child;
+            }
+            else if (step is CheckConditionalStep check)
+            {
+                foreach (var child in ReachableWithBlocks(check.Then, blocks,
+                    [.. checkBlocks, new(check.Check, SkillCheckOutcome.Success)], checkpoint))
+                    yield return child;
+                foreach (var child in ReachableWithBlocks(check.Else, blocks,
+                    [.. checkBlocks, new(check.Check, SkillCheckOutcome.Failure)], checkpoint))
+                    yield return child;
             }
             if (!CanContinue(step, checkpoint))
                 yield break;
@@ -88,6 +116,7 @@ public static class SceneSteps
             ConditionalStep { Condition: BoolLiteral literal } branch =>
                 CanContinue(literal.Value ? branch.Then : branch.Else, checkpoint),
             ConditionalStep branch => CanContinue(branch.Then, checkpoint) || CanContinue(branch.Else, checkpoint),
+            CheckConditionalStep branch => CanContinue(branch.Then, checkpoint) || CanContinue(branch.Else, checkpoint),
             ProseStep or EffectStep or ChoiceStep => true,
             _ => throw new NotSupportedException($"Unknown scene step '{step.GetType().Name}'."),
         };
@@ -134,37 +163,41 @@ public static class SceneSteps
             return new StoryDivert(id, scene.Id, line.Target, line.Kind, line.Outcome, line.Step.Id, line.Step.Source,
                 order, choice?.Key, choice?.Label, choice?.Requires,
                 line.Kind is DivertKind.Choice or DivertKind.ChoiceSkillCheck ? choice?.Shown : null,
-                line.Blocks, condition);
+                line.Blocks, condition)
+            {
+                CheckBlockConditions = line.CheckBlocks,
+            };
         });
     }
 
-    private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks, DivertKind Kind,
+    private static IEnumerable<(SceneStep Step, IReadOnlyList<DivertBlockCondition> Blocks,
+        IReadOnlyList<StoryCheckBlockCondition> CheckBlocks, DivertKind Kind,
         SkillCheckOutcome? Outcome, DivertTarget Target)> DivertLines(IEnumerable<SceneStep> steps,
         CancellationCheckpoint? checkpoint)
     {
-        foreach (var (step, blocks) in ReachableWithBlocks(steps, [], checkpoint))
+        foreach (var (step, blocks, checkBlocks) in ReachableWithBlocks(steps, [], [], checkpoint))
         {
             switch (step)
             {
                 case DivertStep divert:
-                    yield return (step, blocks, DivertKind.Scene, null, divert.Target);
+                    yield return (step, blocks, checkBlocks, DivertKind.Scene, null, divert.Target);
                     break;
                 case ChoiceStep choice:
                     if (choice.Choice.Divert is { } target)
-                        yield return (step, blocks, DivertKind.Choice, null, target);
+                        yield return (step, blocks, checkBlocks, DivertKind.Choice, null, target);
                     if (choice.Choice.Check is { } choiceCheck)
                     {
                         if (choiceCheck.Success.Divert is { } success)
-                            yield return (step, blocks, DivertKind.ChoiceSkillCheck, SkillCheckOutcome.Success, success);
+                            yield return (step, blocks, checkBlocks, DivertKind.ChoiceSkillCheck, SkillCheckOutcome.Success, success);
                         if (choiceCheck.Failure.Divert is { } failure)
-                            yield return (step, blocks, DivertKind.ChoiceSkillCheck, SkillCheckOutcome.Failure, failure);
+                            yield return (step, blocks, checkBlocks, DivertKind.ChoiceSkillCheck, SkillCheckOutcome.Failure, failure);
                     }
                     break;
                 case CheckStep check:
                     if (check.Check.Success.Divert is { } passed)
-                        yield return (step, blocks, DivertKind.EntryCheck, SkillCheckOutcome.Success, passed);
+                        yield return (step, blocks, checkBlocks, DivertKind.EntryCheck, SkillCheckOutcome.Success, passed);
                     if (check.Check.Failure.Divert is { } failed)
-                        yield return (step, blocks, DivertKind.EntryCheck, SkillCheckOutcome.Failure, failed);
+                        yield return (step, blocks, checkBlocks, DivertKind.EntryCheck, SkillCheckOutcome.Failure, failed);
                     break;
             }
         }

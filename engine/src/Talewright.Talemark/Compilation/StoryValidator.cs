@@ -112,7 +112,7 @@ internal static class StoryValidator
             {
                 diagnostics.Warning(CompilerDiagnosticCodes.UnreachableStep, "This line cannot run: an earlier step always leaves this block.", step.Source.Start);
             }
-            if (seenChoice && step is not (ChoiceStep or ConditionalStep))
+            if (seenChoice && step is not (ChoiceStep or ConditionalStep or CheckConditionalStep))
             {
                 diagnostics.Error(CompilerDiagnosticCodes.StepAfterChoice, "Choices must be the final block of a scene. Move prose, effects, diverts and checks before the first choice.", step.Source.Start);
             }
@@ -120,6 +120,11 @@ internal static class StoryValidator
             {
                 CheckSteps(branch.Then, ref seenChoice, diagnostics, checkpoint);
                 CheckSteps(branch.Else, ref seenChoice, diagnostics, checkpoint);
+            }
+            if (step is CheckConditionalStep checkBranch)
+            {
+                CheckSteps(checkBranch.Then, ref seenChoice, diagnostics, checkpoint);
+                CheckSteps(checkBranch.Else, ref seenChoice, diagnostics, checkpoint);
             }
             if (step is ChoiceStep choice)
             {

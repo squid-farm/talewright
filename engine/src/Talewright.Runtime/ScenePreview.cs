@@ -38,6 +38,8 @@ public static class ScenePreview
                     case ConditionalStep branch:
                         Walk(ExpressionEvaluator.IsTrue(branch.Condition, context) ? branch.Then : branch.Else);
                         break;
+                    case CheckConditionalStep:
+                        break;
                     case ProseStep prose:
                         blocks.Add(prose.Block);
                         break;

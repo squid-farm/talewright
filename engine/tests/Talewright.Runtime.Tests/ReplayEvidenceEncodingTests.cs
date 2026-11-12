@@ -47,6 +47,8 @@ public sealed class ReplayEvidenceEncodingTests
             """["DiceRolled",{"sides":20,"result":17}]""" },
         { "check", new SkillCheckResolved(Player, new StatId("athletics"), 12, 17, 3, 20, true),
             """["SkillCheckResolved",{"actor":{"value":"player"},"skill":{"value":"athletics"},"difficulty":12,"roll":17,"modifier":3,"total":20,"success":true}]""" },
+        { "hidden check", new SkillCheckResolved(Player, new StatId("athletics"), 12, 17, 3, 20, true, true),
+            """["SkillCheckResolved",{"actor":{"value":"player"},"skill":{"value":"athletics"},"difficulty":12,"roll":17,"modifier":3,"total":20,"success":true,"isHidden":true}]""" },
         { "level", new LevelChanged(Player, 1, 2),
             """["LevelChanged",{"character":{"value":"player"},"oldLevel":1,"newLevel":2}]""" },
         { "trigger", new TriggerFired("outcast"),

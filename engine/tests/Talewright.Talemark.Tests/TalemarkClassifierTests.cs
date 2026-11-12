@@ -28,13 +28,16 @@ public sealed class TalemarkClassifierTests
             ~ take player key; clear flag:ready
             * [Open {item:key#the}] (requires player:strength > 0, shown "Need {var:count}") { give player key } -> unresolved-scene-id
             * -> END
-            * [Climb] skill-check strength dc 12
+            * [Climb] skill-check strength dc 12, hidden
               success: -> exit
               failure: -> exit
-            ::: skill-check [player] strength dc 10
+            ::: skill-check [player] strength dc 10, hidden
             success: { set flag:passed }
             failure: { clear flag:passed }
             :::
+            {if skill-check strength dc 12, hidden}
+            The passage opens.
+            {/if}
             === exit
             @continues
             @continues
@@ -65,6 +68,7 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Keyword, "and");
         Has(TalemarkClassificationKind.Keyword, "or");
         Has(TalemarkClassificationKind.Keyword, "once");
+        Has(TalemarkClassificationKind.Keyword, "hidden");
         Has(TalemarkClassificationKind.Keyword, "continues");
         Has(TalemarkClassificationKind.Keyword, "if");
         Has(TalemarkClassificationKind.Keyword, "else");

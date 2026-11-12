@@ -1,3 +1,4 @@
+using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
@@ -119,6 +120,29 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     target = Execute(scene, applies ? branch.Then : branch.Else, blocks, choices, replayChoices,
                         refresh, out stopReason);
                     break;
+                case CheckConditionalStep branch:
+                    if (refresh)
+                    {
+                        RequireSettled(settled);
+                        applies = _branches[step.Id];
+                        blocks.AddRange(_notes[step.Id]);
+                    }
+                    else
+                    {
+                        var mark = log.Events.Count;
+                        var result = ResolveCheck(branch.Check, step.Id);
+                        applies = result.Success;
+                        if (rememberEntry) _branches[step.Id] = applies;
+                        Observe(DecisionKind.Branch, step.Id,
+                            applies ? DecisionOutcome.Passed : DecisionOutcome.Failed,
+                            applies ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
+                        foreach (var skipped in applies ? branch.Else : branch.Then)
+                            Skip(skipped, DecisionReason.ConditionFalse);
+                        AppendNotes(step.Id, mark, blocks);
+                    }
+                    target = Execute(scene, applies ? branch.Then : branch.Else, blocks, choices, replayChoices,
+                        refresh, out stopReason);
+                    break;
                 case ChoiceStep choice:
                     replayChoices.Add(choice);
                     var candidate = CreateCandidate(scene, choice);
@@ -191,8 +215,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     public DivertTarget? ResolveCheck(CheckBranch check, string stepId)
     {
-        var result = SkillCheckResolver.Resolve(check.Check, log, story.Randomness, story.Predicates,
-            observer is null ? null : decision => observer(decision with { Subject = stepId }));
+        var result = ResolveCheck(check.Check, stepId);
         var outcome = result.Success ? check.Success : check.Failure;
         var mark = log.Events.Count;
         ApplyBatch(outcome.Effects);
@@ -200,6 +223,10 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
         return outcome.Divert;
     }
+
+    private SkillCheckResult ResolveCheck(SkillCheck check, string stepId) =>
+        SkillCheckResolver.Resolve(check, log, story.Randomness, story.Predicates,
+            observer is null ? null : decision => observer(decision with { Subject = stepId }));
 
     public ChoiceView View(ChoiceDefinition choice) =>
         ChoiceAvailability.CreateView(choice.Key, LabelSource(choice), _replayIdentities.For(choice));
@@ -254,6 +281,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         {
             EffectStep => DecisionKind.EntryEffect,
             ConditionalStep => DecisionKind.Branch,
+            CheckConditionalStep => DecisionKind.Branch,
             ChoiceStep => DecisionKind.Choice,
             DivertStep => DecisionKind.Divert,
             CheckStep => DecisionKind.Check,
@@ -271,6 +299,8 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 condition is null ? null : ExpressionTrace.NotEvaluated(condition), log.Events.Count);
         if (step is ConditionalStep nested)
             foreach (var child in nested.Then.Concat(nested.Else)) Skip(child, reason);
+        if (step is CheckConditionalStep check)
+            foreach (var child in check.Then.Concat(check.Else)) Skip(child, reason);
     }
 
     private void AppendNotes(string stepId, int mark, List<RenderedBlock> blocks)

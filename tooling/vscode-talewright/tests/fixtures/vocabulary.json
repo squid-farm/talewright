@@ -59,6 +59,7 @@
   {"owner":"scene","member":"SkillCheckFence","spelling":":::","line":"::: skill-check athletics dc 12","reference":"::: skill-check perception dc 12"},
   {"owner":"scene","member":"SkillCheck","spelling":"skill-check","line":"* [Climb] skill-check athletics dc 12","reference":"skill-check athletics dc 14"},
   {"owner":"scene","member":"SkillCheckBlock","spelling":"::: skill-check","line":"::: skill-check athletics dc 12","reference":"::: skill-check perception dc 12"},
+  {"owner":"scene","member":"Hidden","spelling":"hidden","line":"{if skill-check perception dc 12, hidden}","reference":"skill-check perception dc 12, hidden"},
   {"owner":"scene","member":"Difficulty","spelling":"dc","line":"::: skill-check athletics dc 12","reference":"skill-check athletics dc 14"},
   {"owner":"scene","member":"SuccessOutcome","spelling":"success:","line":"success: -> END","reference":"success: -> temple.upper"},
   {"owner":"scene","member":"FailureOutcome","spelling":"failure:","line":"failure: -> END","reference":"failure: -> temple.hall"},

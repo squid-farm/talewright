@@ -36,19 +36,25 @@ public sealed record StorySceneDetails(
             .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
 
         var order = 0;
-        foreach (var (step, blocks) in SceneSteps.WalkWithBlocks(scene.Steps))
+        foreach (var (step, blocks, checkBlocks) in SceneSteps.WalkWithBlocks(scene.Steps))
         {
             var stepOrder = order++;
             var blockCondition = StoryCondition.FromExpressions(blocks.Select(BlockExpression));
             switch (step)
             {
                 case ProseStep prose:
-                    proseTemplates.Add(new StorySceneProse(step.Id, stepOrder, prose.Block, blockCondition));
+                    proseTemplates.Add(new StorySceneProse(step.Id, stepOrder, prose.Block, blockCondition)
+                    {
+                        CheckBlockConditions = checkBlocks,
+                    });
                     AddSpeakers(prose.Block, speakers, seenSpeakers);
                     break;
                 case EffectStep effect:
                     if (effect.Effects.Count > 0)
-                        effects.Add(new StorySceneEffect(step.Id, stepOrder, effect.Effects, blockCondition, null, null));
+                        effects.Add(new StorySceneEffect(step.Id, stepOrder, effect.Effects, blockCondition, null, null)
+                        {
+                            CheckBlockConditions = checkBlocks,
+                        });
                     break;
                 case ChoiceStep choiceStep:
                 {
@@ -59,15 +65,18 @@ public sealed record StorySceneDetails(
                     var condition = StoryCondition.FromExpressions(conditionParts);
                     divertsByStep.TryGetValue(step.Id, out var diverts);
                     if (choice.Effects.Count > 0)
-                        effects.Add(new StorySceneEffect(step.Id, stepOrder, choice.Effects, condition, null, choice.Key));
+                        effects.Add(new StorySceneEffect(step.Id, stepOrder, choice.Effects, condition, null, choice.Key)
+                        {
+                            CheckBlockConditions = checkBlocks,
+                        });
                     StorySceneCheckOutcome? success = null;
                     StorySceneCheckOutcome? failure = null;
                     if (choice.Check is { } choiceCheck)
                     {
                         success = CheckOutcome(choiceCheck.Success, SkillCheckOutcome.Success, step.Id, stepOrder,
-                            condition, diverts ?? [], effects, choice.Key);
+                            condition, checkBlocks, diverts ?? [], effects, choice.Key);
                         failure = CheckOutcome(choiceCheck.Failure, SkillCheckOutcome.Failure, step.Id, stepOrder,
-                            condition, diverts ?? [], effects, choice.Key);
+                            condition, checkBlocks, diverts ?? [], effects, choice.Key);
                     }
                     choices.Add(new StorySceneChoice(
                         step.Id,
@@ -79,7 +88,10 @@ public sealed record StorySceneDetails(
                         diverts?.Select(divert => divert.Id).ToArray() ?? [],
                         choice.Check?.Check,
                         success,
-                        failure));
+                        failure)
+                    {
+                        CheckBlockConditions = checkBlocks,
+                    });
                     break;
                 }
                 case CheckStep checkStep:
@@ -87,12 +99,23 @@ public sealed record StorySceneDetails(
                     var check = checkStep.Check;
                     var diverts = divertsByStep.GetValueOrDefault(step.Id) ?? [];
                     var success = CheckOutcome(check.Success, SkillCheckOutcome.Success, step.Id, stepOrder,
-                        blockCondition, diverts, effects, null);
+                        blockCondition, checkBlocks, diverts, effects, null);
                     var failure = CheckOutcome(check.Failure, SkillCheckOutcome.Failure, step.Id, stepOrder,
-                        blockCondition, diverts, effects, null);
-                    entryChecks.Add(new StorySceneEntryCheck(step.Id, stepOrder, check.Check, blockCondition, success, failure));
+                        blockCondition, checkBlocks, diverts, effects, null);
+                    entryChecks.Add(new StorySceneEntryCheck(step.Id, stepOrder, check.Check, blockCondition, success, failure)
+                    {
+                        CheckBlockConditions = checkBlocks,
+                    });
                     break;
                 }
+                case CheckConditionalStep checkStep:
+                    entryChecks.Add(new StorySceneEntryCheck(step.Id, stepOrder, checkStep.Check, blockCondition,
+                        new StorySceneCheckOutcome(SkillCheckOutcome.Success, [], null),
+                        new StorySceneCheckOutcome(SkillCheckOutcome.Failure, [], null))
+                    {
+                        CheckBlockConditions = checkBlocks,
+                    });
+                    break;
             }
         }
 
@@ -118,13 +141,17 @@ public sealed record StorySceneDetails(
         string stepId,
         int stepOrder,
         StoryCondition condition,
+        IReadOnlyList<StoryCheckBlockCondition> checkBlocks,
         IReadOnlyList<StoryDivert> diverts,
         List<StorySceneEffect> effects,
         string? choiceKey)
     {
         var divertId = diverts.FirstOrDefault(divert => divert.Outcome == kind)?.Id;
         if (outcome.Effects.Count > 0)
-            effects.Add(new StorySceneEffect(stepId, stepOrder, outcome.Effects, condition, kind, choiceKey));
+            effects.Add(new StorySceneEffect(stepId, stepOrder, outcome.Effects, condition, kind, choiceKey)
+            {
+                CheckBlockConditions = checkBlocks,
+            });
         return new StorySceneCheckOutcome(kind, outcome.Effects, divertId);
     }
 
@@ -147,7 +174,11 @@ public sealed record StorySceneDetails(
 }
 
 /// <summary>Preview. A prose template and its enclosing block conditions, kept compiled and unrendered.</summary>
-public sealed record StorySceneProse(string StepId, int Order, TemplateBlock Template, StoryCondition Condition);
+public sealed record StorySceneProse(string StepId, int Order, TemplateBlock Template, StoryCondition Condition)
+{
+    /// <summary>Enclosing skill-check block conditions, outermost first.</summary>
+    public IReadOnlyList<StoryCheckBlockCondition> CheckBlockConditions { get; init; } = [];
+}
 
 /// <summary>Preview. An ordered scene effect batch, choice effect batch or check outcome effect batch.</summary>
 /// <param name="StepId">The source step containing the effects.</param>
@@ -162,7 +193,11 @@ public sealed record StorySceneEffect(
     IReadOnlyList<Effect> Effects,
     StoryCondition Condition,
     SkillCheckOutcome? Outcome,
-    string? ChoiceKey);
+    string? ChoiceKey)
+{
+    /// <summary>Enclosing skill-check block conditions, outermost first.</summary>
+    public IReadOnlyList<StoryCheckBlockCondition> CheckBlockConditions { get; init; } = [];
+}
 
 /// <summary>Preview. A choice, including its compiled label, conditions, effects, divert ids and optional choice skill check.</summary>
 public sealed record StorySceneChoice(
@@ -175,7 +210,11 @@ public sealed record StorySceneChoice(
     IReadOnlyList<string> DivertIds,
     SkillCheck? SkillCheck,
     StorySceneCheckOutcome? Success,
-    StorySceneCheckOutcome? Failure);
+    StorySceneCheckOutcome? Failure)
+{
+    /// <summary>Enclosing skill-check block conditions, outermost first.</summary>
+    public IReadOnlyList<StoryCheckBlockCondition> CheckBlockConditions { get; init; } = [];
+}
 
 /// <summary>Preview. An entry check, its enclosing conditions and effects and optional diverts for each outcome.</summary>
 public sealed record StorySceneEntryCheck(
@@ -184,7 +223,11 @@ public sealed record StorySceneEntryCheck(
     SkillCheck Check,
     StoryCondition Condition,
     StorySceneCheckOutcome Success,
-    StorySceneCheckOutcome Failure);
+    StorySceneCheckOutcome Failure)
+{
+    /// <summary>Enclosing skill-check block conditions, outermost first.</summary>
+    public IReadOnlyList<StoryCheckBlockCondition> CheckBlockConditions { get; init; } = [];
+}
 
 /// <summary>Preview. One entry check or choice skill check outcome, including its effects and optional divert id.</summary>
 public sealed record StorySceneCheckOutcome(
