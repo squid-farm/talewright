@@ -27,7 +27,7 @@ internal static class StoryYamlAssembler
         {
             if (Scalar(key) is not { } id)
             {
-                yaml.Identifier(key, "flag id");
+                yaml.Identifier(key, IdentifierLabels.Flag);
                 return;
             }
 

@@ -55,7 +55,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         {
             foreach (var (key, value) in statMap.Children)
             {
-                var rawId = _yaml.Identifier(key, "creation stat id");
+                var rawId = _yaml.Identifier(key, IdentifierLabels.CreationStat);
                 if (rawId is null) continue;
                 var id = new StatId(rawId);
                 if (!ruleset.StatsById.TryGetValue(id, out var definition))
@@ -103,7 +103,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                 }
 
                 _yaml.CheckKeys(preset, ManifestVocabulary.Label, ManifestVocabulary.Stats);
-                var id = _yaml.Identifier(key, "preset id");
+                var id = _yaml.Identifier(key, IdentifierLabels.Preset);
                 if (id is null)
                 {
                     continue;
@@ -146,7 +146,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
 
         foreach (var (key, value) in map.Children)
         {
-            var rawId = _yaml.Identifier(key, "item id");
+            var rawId = _yaml.Identifier(key, IdentifierLabels.Item);
             if (rawId is null) continue;
             // Item counts are read as character:inventory:item:count, where an item named inventory is ambiguous.
             if (rawId == ExpressionVocabulary.Inventory)
@@ -194,7 +194,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
 
         foreach (var (key, value) in map.Children)
         {
-            var id = _yaml.Identifier(key, "faction id");
+            var id = _yaml.Identifier(key, IdentifierLabels.Faction);
             if (id is null) continue;
             if (value is not YamlMappingNode body)
             {
@@ -223,7 +223,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
 
         foreach (var (key, value) in map?.Children ?? Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>())
         {
-            var id = _yaml.Identifier(key, "character id");
+            var id = _yaml.Identifier(key, IdentifierLabels.Character);
             if (id is null) continue;
             if (id == ExpressionVocabulary.Scene)
             {
@@ -321,7 +321,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
 
         foreach (var (key, value) in map.Children)
         {
-            var rawId = _yaml.Identifier(key, "stat id");
+            var rawId = _yaml.Identifier(key, IdentifierLabels.Stat);
             if (rawId is null) continue;
             var id = new StatId(rawId);
             if (!ruleset.HasStat(id))
@@ -356,7 +356,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
 
         foreach (var (key, quantityNode, quantity) in entries)
         {
-            var rawId = _yaml.Identifier(key, "item id");
+            var rawId = _yaml.Identifier(key, IdentifierLabels.Item);
             if (rawId is null) continue;
             var id = new ItemId(rawId);
             if (!items.ContainsKey(id))
@@ -384,7 +384,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         if (node is not YamlMappingNode map) return flags;
         foreach (var (key, value) in map.Children)
         {
-            if (_yaml.Identifier(key, "flag id") is not { } id) continue;
+            if (_yaml.Identifier(key, IdentifierLabels.Flag) is not { } id) continue;
             var flag = new FlagId(id);
             flags[flag] = bool.TryParse(Scalar(value), out var initialValue)
                 ? initialValue
@@ -406,7 +406,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
 
         foreach (var (key, value) in map.Children)
         {
-            if (_yaml.Identifier(key, "variable id") is not { } id) continue;
+            if (_yaml.Identifier(key, IdentifierLabels.Variable) is not { } id) continue;
             if (value is YamlScalarNode { Style: ScalarStyle.DoubleQuoted or ScalarStyle.SingleQuoted } text)
             {
                 textVars.Add(new VarId(id), text.Value ?? "");

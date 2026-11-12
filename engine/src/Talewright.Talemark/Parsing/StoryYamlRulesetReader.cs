@@ -47,7 +47,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
             _analysis?.DisabledStats(disable, baseRuleset);
             foreach (var item in _yaml.Sequence(disable, "ruleset.disable"))
             {
-                var rawId = _yaml.Identifier(item, "stat id");
+                var rawId = _yaml.Identifier(item, IdentifierLabels.Stat);
                 if (rawId is null) continue;
                 var id = new StatId(rawId);
                 if (builder.HasStat(id))
@@ -97,7 +97,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                 }
 
                 var attributeNode = Get(stat, ManifestVocabulary.GoverningAttribute);
-                var attribute = attributeNode is null ? null : _yaml.Identifier(attributeNode, "governing attribute stat id");
+                var attribute = attributeNode is null ? null : _yaml.Identifier(attributeNode, IdentifierLabels.GoverningAttribute);
                 var definition = new StatDefinition(new StatId(id), Scalar(Get(stat, ManifestVocabulary.Name)) ?? id, parsedCategory,
                     min, max, _yaml.Int(Get(stat, ManifestVocabulary.Default)) ?? min, attribute is null ? null : new StatId(attribute));
                 governingAttributes.Remove(definition.Id);
@@ -147,7 +147,7 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
     private Ruleset Named(YamlNode node)
     {
         // Unknown names recover with the RPG ruleset so stat references keep resolving while the author fixes the name.
-        var id = _yaml.Identifier(node, "ruleset id") ?? Rulesets.Generic.GenericRuleset.Id;
+        var id = _yaml.Identifier(node, IdentifierLabels.Ruleset) ?? Rulesets.Generic.GenericRuleset.Id;
         if (!_options.Rulesets.TryGetValue(id, out var factory))
         {
             _yaml.Error(node, CompilerDiagnosticCodes.UnknownRuleset, $"Unknown ruleset '{id}'. Available: {string.Join(", ", _options.Rulesets.Keys)}.", 0);
