@@ -57,6 +57,16 @@ internal static class ManifestListEditor
         };
     }
 
+    internal static ManifestEditResult AppendFlag(string text, string file, string flag)
+    {
+        if (TryLoadRoot(text, file, out var root, out _) &&
+            root.Children.TryGetValue(new YamlScalarNode(ManifestVocabulary.Flags), out var node) &&
+            node is YamlMappingNode)
+            return AppendMappingEntry(text, file, ManifestVocabulary.Flags, flag, ExpressionVocabulary.False, ExpressionVocabulary.False);
+
+        return Append(text, file, ManifestVocabulary.Flags, flag);
+    }
+
     internal static ManifestEditResult AppendMappingEntry(
         string text, string file, string section, string key, string blockValue, string flowValue)
     {

@@ -40,7 +40,7 @@ public static class StoryQuickFixes
         if (!analysis.Source.Files.TryGetValue(StorySource.ManifestFileName, out var manifest))
             return new([], $"Cannot declare '{flag}' because the root story manifest is unavailable.", title);
 
-        var edit = ManifestListEditor.Append(manifest, StorySource.ManifestFileName, ManifestVocabulary.Flags, flag);
+        var edit = ManifestListEditor.AppendFlag(manifest, StorySource.ManifestFileName, flag);
         if (edit.Edit is not { } textEdit)
             return new([], edit.Reason ?? $"Cannot safely declare '{flag}' in the root story manifest.", title);
 
