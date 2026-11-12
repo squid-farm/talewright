@@ -339,7 +339,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Scene heading; fallback text for hub choices without `@choice-label`.                           |
-| `@choice-label reader text`                        | Reader text for hub choices and bare `* -> scene` choices targeting this scene. Does not add a heading; otherwise hub choices fall back to `@title`, then the scene ID, and bare scene diverts show **Continue**. |
+| `@choice-label text`                               | Reader text for hub choices and bare `* -> scene` choices targeting this scene. Does not add a heading; otherwise hub choices fall back to `@title`, then the scene ID, and bare scene diverts show **Continue**. |
 | `@continues`                                       | Add this scene's text to the previous passage, without a heading or section break.              |
 | `@clear`                                           | Start this scene on a cleared play screen; earlier passages remain in History and saves.        |
 | `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces the normal choice text while unavailable. |
