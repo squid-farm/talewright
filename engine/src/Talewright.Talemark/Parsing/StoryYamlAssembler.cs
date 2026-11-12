@@ -64,7 +64,7 @@ internal static class StoryYamlAssembler
                 if (flagNode is YamlSequenceNode sequence)
                 {
                     foreach (var flag in sequence.Children)
-                        AddFlag(flag, new YamlScalarNode("false"));
+                        AddFlag(flag, new YamlScalarNode(ExpressionVocabulary.False));
                 }
                 else if (flagNode is YamlMappingNode map)
                 {
