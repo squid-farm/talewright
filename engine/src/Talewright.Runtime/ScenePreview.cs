@@ -73,6 +73,7 @@ public static class ScenePreview
         return new StoryFrame(definition.Id, definition.Title, renderer.Render(blocks, state),
             menu.AvailableChoices, IsEnded: false)
         {
+            ContinuesPrevious = definition.ContinuesPrevious,
             Menu = menu.Entries,
         };
     }

@@ -92,7 +92,21 @@ internal static partial class TaleSyntaxParser
             line = WithPart(line, new(line.Indent + 1, space < 0 ? rest.Length : space,
                 space < 0 ? line.Indent + content.Length : line.Indent + space + 2 + Lead(value), value.Trim().Length));
             if (line.MetadataKey is not { } key)
+            {
+                if (!SceneVocabulary.IsClearMetadata(content))
+                    return line;
+
+                if (_hasContinues)
+                {
+                    Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' cannot be used with " +
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Clear}' in the same scene.");
+                    return line with { IsInvalid = true };
+                }
+
+                _hasClear = true;
                 return line;
+            }
 
             if (key is SceneMetadataKey.Hub or SceneMetadataKey.HubLimit)
             {
@@ -105,6 +119,53 @@ internal static partial class TaleSyntaxParser
                 }
 
                 seen = true;
+            }
+
+            if (key == SceneMetadataKey.Title)
+            {
+                _hasTitle = true;
+                if (_hasContinues)
+                {
+                    Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' cannot be used with " +
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}'; use " +
+                        $"'{SceneVocabulary.MetadataMarker}choice-label' for choice text.");
+                    return line with { IsInvalid = true };
+                }
+            }
+            else if (key == SceneMetadataKey.Continues)
+            {
+                if (_hasContinues)
+                {
+                    Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"Duplicate '{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' directive.");
+                    return line with { IsInvalid = true };
+                }
+
+                _hasContinues = true;
+                if (_hasTitle)
+                {
+                    Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' cannot be used with " +
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}'; use " +
+                        $"'{SceneVocabulary.MetadataMarker}choice-label' for choice text.");
+                    return line with { IsInvalid = true };
+                }
+
+                if (!value.Trim().IsEmpty)
+                {
+                    Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' does not take a value.");
+                    return line with { IsInvalid = true };
+                }
+
+                if (_hasClear)
+                {
+                    Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' cannot be used with " +
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Clear}' in the same scene.");
+                    return line with { IsInvalid = true };
+                }
             }
 
             value = value.Trim();

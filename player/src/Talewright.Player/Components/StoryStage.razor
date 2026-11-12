@@ -2,15 +2,19 @@
 
 <div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@Hidden">
     <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="TranscriptElement">
-        @{ var passages = Passages; }
-        @for (var i = Math.Max(0, passages.Count - PassageWindow); i < passages.Count; i++)
+        @{ var groups = TranscriptPresentation.Group(Passages, PassageWindow); }
+        @for (var i = 0; i < groups.Count; i++)
         {
-            var entry = passages[i];
-            var isLatest = i == passages.Count - 1;
-            <section @key="(Identity, i)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
-                     data-tw-scene="@entry.Frame.Scene?.Value"
+            var group = groups[i];
+            var latest = group.Passages[^1];
+            var isLatest = i == groups.Count - 1;
+            <section @key="(Identity, group.StartIndex)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
+                     data-tw-scene="@latest.Entry.Frame.Scene?.Value" data-tw-passage-index="@latest.Index"
                      aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
-                <StoryPassage Entry="entry" />
+                @foreach (var passage in group.Passages)
+                {
+                    <StoryPassage @key="(Identity, passage.Index)" Entry="passage.Entry" />
+                }
             </section>
         }
 

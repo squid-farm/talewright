@@ -35,6 +35,7 @@ public sealed class StoryCompletionTests
     [InlineData("-> |", "END")]
     [InlineData("> gu|", "guide")]
     [InlineData("@req|", "requires")]
+    [InlineData("@con|", "continues")]
     [InlineData("@requires player:h|", "hp")]
     [InlineData("@requires flag:re|", "ready")]
     [InlineData("@requires flag:ready, sh|", "shown")]

@@ -100,6 +100,7 @@
 @code {
     [Parameter] public bool Open { get; set; }
     [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool RestoreFocusOnClose { get; set; } = true;
     [Parameter] public string? Message { get; set; }
     [Parameter] public bool Error { get; set; }
     [Parameter, EditorRequired] public string Slot { get; set; } = "";
@@ -120,6 +121,7 @@
     [Parameter] public EventCallback OnConfirmImport { get; set; }
     [Parameter] public EventCallback OnCancelImport { get; set; }
     [Parameter] public EventCallback<string> OnExport { get; set; }
+    [Parameter] public EventCallback OnFocusAfterLoad { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     private ElementReference _dialog;
     private IJSObjectReference? _module;
@@ -130,6 +132,9 @@
 
     [JSInvokable]
     public Task DismissAsync() => OnClose.InvokeAsync();
+
+    [JSInvokable]
+    public Task FocusAfterLoadAsync() => OnFocusAfterLoad.InvokeAsync();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -143,7 +148,7 @@
         if (_initialized)
         {
             var pending = PendingLoad is not null ? "load" : PendingImport is not null ? "import" : null;
-            await _module!.InvokeVoidAsync("synchronize", _dialog, Open, pending);
+            await _module!.InvokeVoidAsync("synchronize", _dialog, Open, pending, RestoreFocusOnClose);
         }
     }
 

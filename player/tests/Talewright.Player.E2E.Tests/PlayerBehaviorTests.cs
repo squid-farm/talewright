@@ -109,6 +109,92 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     }
 
     [Fact]
+    public async Task Continued_conversation_keeps_branch_history_save_navigation_and_focus()
+    {
+        var id = $"continues-{Guid.NewGuid():N}";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), """
+            === start
+            @title Interview
+            > guide: What brings you here?
+            * [Path A] -> left
+            * [Path B] -> right
+            === left
+            @continues
+            From path A.
+            * [Continue A] -> shared
+            === right
+            @continues
+            From path B.
+            * [Continue B] -> shared
+            === shared
+            @continues
+            > guide: What can you do?
+            * [Continue] -> final
+            === final
+            @continues
+            > guide: We can use that.
+            * [Continue] -> END
+            """));
+
+        await Choose("Path A");
+        await Choose("Continue A");
+        await Choose("Continue");
+        await AssertState(state =>
+        {
+            Assert.Contains("Interview", state.Passage);
+            Assert.Contains("From path A.", state.Passage);
+            Assert.Contains("Continue A", state.Passage);
+            Assert.Contains("What can you do?", state.Passage);
+            Assert.Contains("We can use that.", state.Passage);
+            Assert.True(state.PassageFocused);
+        });
+
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+        await Driver.ClickAsync("Back");
+        await AssertState(state =>
+        {
+            Assert.Contains("What can you do?", state.Passage);
+            Assert.DoesNotContain("We can use that.", state.Passage);
+            Assert.True(state.PassageFocused);
+        });
+        await Driver.ClickAsync("Forward");
+        await AssertState(state =>
+        {
+            Assert.Contains("We can use that.", state.Passage);
+            Assert.True(state.PassageFocused);
+        });
+        await Driver.ClickAsync("Back");
+        await AssertState(state => Assert.DoesNotContain("We can use that.", state.Passage));
+
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await AssertState(state =>
+        {
+            Assert.Contains("We can use that.", state.Passage);
+            Assert.True(state.PassageFocused);
+        });
+
+        for (var index = 0; index < 3; index++)
+        {
+            await Driver.ClickAsync("Back");
+            await AssertState(state => Assert.True(state.PassageFocused));
+        }
+
+        await Choose("Path B");
+        await Choose("Continue B");
+        await AssertState(state =>
+        {
+            Assert.Contains("From path B.", state.Passage);
+            Assert.Contains("What can you do?", state.Passage);
+            Assert.DoesNotContain("From path A.", state.Passage);
+            Assert.True(state.PassageFocused);
+        });
+    }
+
+    [Fact]
     public async Task Textless_choices_keep_order_effects_history_and_save_navigation()
     {
         await Upload(new StoryFixture("textless-choices",

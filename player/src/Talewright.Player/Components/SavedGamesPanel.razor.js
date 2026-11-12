@@ -20,10 +20,10 @@ export function initialize(dialog, reference) {
     };
     dialog.addEventListener("cancel", cancel);
     dialog.addEventListener("keydown", keydown);
-    dialogs.set(dialog, { cancel, keydown, pending: null });
+    dialogs.set(dialog, { cancel, keydown, pending: null, reference });
 }
 
-export function synchronize(dialog, open, pending) {
+export function synchronize(dialog, open, pending, restoreFocusOnClose) {
     const state = dialogs.get(dialog);
     for (const time of dialog.querySelectorAll("time[datetime]")) {
         const date = new Date(time.dateTime);
@@ -37,7 +37,11 @@ export function synchronize(dialog, open, pending) {
         dialog.focus();
     } else if (!open && dialog.open) {
         dialog.close();
-        document.querySelector(".tw-saves-trigger")?.focus();
+        if (restoreFocusOnClose) {
+            document.querySelector(".tw-saves-trigger")?.focus();
+        } else {
+            state.reference.invokeMethodAsync("FocusAfterLoadAsync");
+        }
     }
     if (open && dialog.dataset.busy !== "true" && document.activeElement === dialog) {
         dialog.querySelector("button").focus();

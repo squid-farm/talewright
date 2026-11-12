@@ -223,12 +223,45 @@ public class CompilerTests
 
         var scene = story.GetScene(new SceneId("a"));
         Assert.Equal("The Camp", scene.Title);
+        Assert.False(scene.ContinuesPrevious);
         Assert.Equal(["camp", "start"], scene.Tags.Order());
         Assert.Equal(5, scene.Priority);
         Assert.True(scene.Once);
         Assert.Equal(["camp"], scene.Hub!.Tags);
         Assert.False(scene.Hub.MatchAll);
         Assert.Equal(new BinaryExpr(BinaryOp.GreaterOrEqual, new StatRef(EntityId.Player, new StatId("dex")), new NumberLiteral(12)), scene.Requires);
+    }
+
+    [Fact]
+    public void Compiles_scene_continuation_metadata()
+    {
+        var story = Ok("""
+            === a
+            @continues
+            Hello.
+            -> END
+            """);
+
+        Assert.True(story.GetScene(new SceneId("a")).ContinuesPrevious);
+    }
+
+    [Fact]
+    public void Continues_cannot_be_combined_with_a_title()
+    {
+        var error = Error("=== a\n@title Interview\n@continues\n-> END", "TW1006");
+
+        Assert.Contains("@choice-label", error.Message);
+    }
+
+    [Theory]
+    [InlineData("@continues\n@clear")]
+    [InlineData("@clear\n@continues")]
+    public void Continues_cannot_be_combined_with_clear(string metadata)
+    {
+        var error = Error($"=== a\n{metadata}\n-> END", "TW1006");
+
+        Assert.Contains("@continues", error.Message);
+        Assert.Contains("@clear", error.Message);
     }
 
     [Theory]

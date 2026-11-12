@@ -36,6 +36,8 @@ public sealed class TalemarkClassifierTests
             failure: { clear flag:passed }
             :::
             === exit
+            @continues
+            @continues
             @once
             -> END
             """;
@@ -63,6 +65,7 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Keyword, "and");
         Has(TalemarkClassificationKind.Keyword, "or");
         Has(TalemarkClassificationKind.Keyword, "once");
+        Has(TalemarkClassificationKind.Keyword, "continues");
         Has(TalemarkClassificationKind.Keyword, "if");
         Has(TalemarkClassificationKind.Keyword, "else");
         Has(TalemarkClassificationKind.Keyword, "/if");

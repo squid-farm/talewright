@@ -90,6 +90,64 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Continued_scenes_keep_individual_history_and_restore_the_same_presentation_data()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            Interview.
+            * [Path A] -> left
+            * [Path B] -> right
+            === left
+            @continues
+            From path A.
+            * [Continue A] -> shared
+            === right
+            @continues
+            From path B.
+            * [Continue B] -> shared
+            === shared
+            @continues
+            Shared response.
+            * [Continue] -> final
+            === final
+            @continues
+            Final response.
+            * [Finish] -> END
+            """);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        history.Choose("c0");
+        history.Choose("c0");
+
+        Assert.Equal(["a", "left", "shared", "final"],
+            history.Transcript.Select(frame => frame.Frame.Scene!.Value.Value));
+        Assert.Equal([false, true, true, true],
+            history.Transcript.Select(frame => frame.Frame.ContinuesPrevious));
+        Assert.Equal("Continue", Assert.Single(history.Transcript[2].Frame.Choices).Text);
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(history.Transcript.Select(frame => frame.Frame.Document.ToPlainText()),
+            restored.Transcript.Select(frame => frame.Frame.Document.ToPlainText()));
+        Assert.Equal(history.Transcript.Select(frame => frame.Frame.ContinuesPrevious),
+            restored.Transcript.Select(frame => frame.Frame.ContinuesPrevious));
+
+        history.Back();
+        Assert.Equal("shared", history.Current.Scene!.Value.Value);
+        Assert.DoesNotContain("Final response.", history.Transcript.SelectMany(frame =>
+            frame.Frame.Document.ToPlainText().Split('\n')));
+        history.Forward();
+        Assert.Equal("final", history.Current.Scene!.Value.Value);
+
+        while (history.CanBack)
+            history.Back();
+        history.Choose("c1");
+        history.Choose("c0");
+        Assert.Equal("right", history.Transcript[1].Frame.Scene!.Value.Value);
+        Assert.Equal("shared", history.Current.Scene!.Value.Value);
+        Assert.True(history.Current.ContinuesPrevious);
+    }
+
+    [Fact]
     public void Saving_triggers_coalesce_per_step_and_restore_without_repeating_the_save_request()
     {
         var story = Compile(BuildManifest(declareVariables: true, saveTrigger: true, multipleSavingTriggers: true).Build());

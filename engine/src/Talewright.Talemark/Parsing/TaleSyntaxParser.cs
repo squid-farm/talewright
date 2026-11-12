@@ -88,7 +88,7 @@ internal static partial class TaleSyntaxParser
         if (line[0] == SceneVocabulary.MetadataMarker && !headerDone)
         {
             metadataKey = MetadataKey(line, trimKeyword: true);
-            headerDone = metadataKey is null;
+            headerDone = metadataKey is null && !SceneVocabulary.IsClearMetadata(line);
             return TaleLineKind.Metadata;
         }
 
