@@ -33,7 +33,7 @@ internal static class StoryYamlAssembler
 
             if (!flagLocations.TryAdd(id, yaml.At(key)))
             {
-                Duplicate("Flag", id, key, flagLocations[id]);
+                Duplicate(ManifestVocabulary.Flags, id, key, flagLocations[id]);
                 return;
             }
 
