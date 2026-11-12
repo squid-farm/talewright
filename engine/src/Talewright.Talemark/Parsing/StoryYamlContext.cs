@@ -1,6 +1,7 @@
 using System.Globalization;
 using Talewright.Core.Identity;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
@@ -104,6 +105,11 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
         Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"Expected a whole number but found '{Scalar(node) ?? node.NodeType.ToString()}'.", At(node));
         return null;
     }
+
+    internal bool Boolean(YamlNode node, string subject, bool fallback) =>
+        bool.TryParse(Scalar(node), out var value)
+            ? value
+            : Error(node, CompilerDiagnosticCodes.InvalidConfigurationValue, $"{subject} must be {ExpressionVocabulary.True} or {ExpressionVocabulary.False}.", fallback);
 
     internal YamlMappingNode? Mapping(YamlNode node, string what)
     {

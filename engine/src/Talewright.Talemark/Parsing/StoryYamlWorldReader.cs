@@ -26,11 +26,8 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         }
 
         _yaml.CheckKeys(map, ManifestVocabulary.Name, ManifestVocabulary.Pronouns, ManifestVocabulary.Presets, ManifestVocabulary.Stats);
-        var editName = false;
-        if (Get(map, ManifestVocabulary.Name) is { } name && !bool.TryParse(Scalar(name), out editName))
-        {
-            _yaml.Error(name, CompilerDiagnosticCodes.InvalidConfigurationValue, "creation.name must be true or false.", 0);
-        }
+        var editName = Get(map, ManifestVocabulary.Name) is { } name
+            && _yaml.Boolean(name, $"{ManifestVocabulary.Creation}.{ManifestVocabulary.Name}", false);
 
         var pronouns = new List<string>();
         if (Get(map, ManifestVocabulary.Pronouns) is { } pronounNode)
@@ -169,9 +166,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                 if (Get(body, ManifestVocabulary.NameAgreement) is { } number)
                     nameAgreement = ReadGrammaticalNumber(number, ManifestVocabulary.NameAgreement);
                 if (Get(body, ManifestVocabulary.Uncountable) is { } mass)
-                    uncountable = bool.TryParse(Scalar(mass), out var parsed)
-                        ? parsed
-                        : _yaml.Error(mass, CompilerDiagnosticCodes.InvalidConfigurationValue, "'uncountable' must be true or false.", false);
+                    uncountable = _yaml.Boolean(mass, ManifestVocabulary.Uncountable, false);
             }
             else if (Scalar(value) is { Length: > 0 } shortName)
             {
@@ -386,10 +381,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         {
             if (_yaml.Identifier(key, IdentifierLabels.Flag) is not { } id) continue;
             var flag = new FlagId(id);
-            flags[flag] = bool.TryParse(Scalar(value), out var initialValue)
-                ? initialValue
-                : _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
-                    $"Flag '{id}' must be true or false.", false);
+            flags[flag] = _yaml.Boolean(value, $"{ManifestVocabulary.Flags}.{id}", false);
         }
 
         return flags;

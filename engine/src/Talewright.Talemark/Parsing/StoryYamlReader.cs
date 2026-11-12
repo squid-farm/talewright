@@ -82,16 +82,12 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
 
         if (Get(game, ManifestVocabulary.Undo) is { } undo)
         {
-            manifest.UndoEnabled = bool.TryParse(Scalar(undo), out var enabled)
-                ? enabled
-                : _yaml.Error(undo, CompilerDiagnosticCodes.InvalidConfigurationValue, "undo must be true or false.", true);
+            manifest.UndoEnabled = _yaml.Boolean(undo, ManifestVocabulary.Undo, true);
         }
 
         if (Get(game, ManifestVocabulary.Autosave) is { } autosave)
         {
-            manifest.AutosaveEnabled = bool.TryParse(Scalar(autosave), out var enabled)
-                ? enabled
-                : _yaml.Error(autosave, CompilerDiagnosticCodes.InvalidConfigurationValue, "autosave must be true or false.", true);
+            manifest.AutosaveEnabled = _yaml.Boolean(autosave, ManifestVocabulary.Autosave, true);
         }
 
         if (Get(game, ManifestVocabulary.CharacterSheet) is { } characterSheet)
@@ -125,10 +121,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
 
         bool Section(string key) => Get(map, key) is not { } value
             ? true
-            : bool.TryParse(Scalar(value), out var sectionShown)
-                ? sectionShown
-                : _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
-                    $"{ManifestVocabulary.CharacterSheet}.{key} must be true or false.", true);
+            : _yaml.Boolean(value, $"{ManifestVocabulary.CharacterSheet}.{key}", true);
     }
 
     private void ReadTriggers(YamlNode? node, List<RawTrigger> triggers)
@@ -180,14 +173,10 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             }
 
             var once = Get(map, ManifestVocabulary.Once) is { } onceNode
-                ? bool.TryParse(Scalar(onceNode), out var onceValue)
-                    ? onceValue
-                    : _yaml.Error(onceNode, CompilerDiagnosticCodes.InvalidConfigurationValue, "once must be true or false.", false)
+                ? _yaml.Boolean(onceNode, ManifestVocabulary.Once, false)
                 : false;
             var save = Get(map, ManifestVocabulary.Save) is { } saveNode
-                ? bool.TryParse(Scalar(saveNode), out var saveValue)
-                    ? saveValue
-                    : _yaml.Error(saveNode, CompilerDiagnosticCodes.InvalidConfigurationValue, "save must be true or false.", false)
+                ? _yaml.Boolean(saveNode, ManifestVocabulary.Save, false)
                 : false;
             triggers.Add(new RawTrigger(id, when, _yaml.At(Get(map, ManifestVocabulary.When)!), effects, _yaml.At(Get(map, ManifestVocabulary.Do)!), once, save));
         }
