@@ -62,6 +62,42 @@ public sealed class OrderedSceneTests
         Assert.Single(session.Events.OfType<TriggerFired>());
     }
 
+    [Fact]
+    public void First_scene_uses_manifest_flag_starting_values()
+    {
+        const string manifest = """
+            game:
+              id: initial-flags
+              title: Initial flags
+              start: start
+            characters:
+              player:
+                first-name: Ada
+            flags:
+              open: true
+              closed: false
+            """;
+        var session = new StorySession(Compile("""
+            === start
+            {if flag:open}open-true{else}open-false{/if}
+            {if flag:closed}closed-true{else}closed-false{/if}
+            {if flag:effect-created}effect-true{else}effect-false{/if}
+            ~ set flag:effect-created
+            {if flag:effect-created}effect-set{/if}
+            -> END
+            """, manifest));
+
+        var text = Text(session.Start());
+
+        Assert.Contains("open-true", text);
+        Assert.DoesNotContain("open-false", text);
+        Assert.Contains("closed-false", text);
+        Assert.DoesNotContain("closed-true", text);
+        Assert.Contains("effect-false", text);
+        Assert.Contains("effect-set", text);
+        Assert.DoesNotContain("effect-true", text);
+    }
+
     [Theory]
     [InlineData(false, 17)]
     [InlineData(true, 13)]

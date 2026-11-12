@@ -60,6 +60,11 @@ public sealed class GameState : IGameStateView
             state._standings[faction.Id] = faction.InitialStanding;
         }
 
+        foreach (var (id, value) in world.InitialFlags)
+        {
+            if (value) state._flags.Add(id);
+        }
+
         foreach (var (id, value) in world.Variables)
         {
             state._variables[id] = value;

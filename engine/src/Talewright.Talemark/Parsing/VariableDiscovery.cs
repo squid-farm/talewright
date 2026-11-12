@@ -19,7 +19,7 @@ internal static class VariableDiscovery
             .Where(declaration => !numbers.ContainsKey(declaration.Id) && !text.ContainsKey(declaration.Id)).ToArray();
         var unresolved = first.Select(declaration => declaration.Id).ToHashSet();
         var world = new WorldDefinition(manifest.Ruleset, manifest.Characters.Values, manifest.Items.Values,
-            manifest.Factions.Values, flags, numbers, text);
+            manifest.Factions.Values, flags, numbers, text, manifest.InitialFlags);
         var symbols = new StorySymbols
         {
             World = world, Flags = flags, Scenes = scenes,

@@ -113,11 +113,24 @@
       }
     },
     "flags": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/identifier"
-      },
-      "description": "Optional flags to declare before any Talemark effect sets them."
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/identifier"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/definitions/identifier"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "description": "Optional flags to declare before any Talemark effect sets them. Lists start every flag as false; mappings set each flag's initial value."
     },
     "vars": {
       "type": "object",

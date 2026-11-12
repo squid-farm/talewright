@@ -180,6 +180,10 @@ triggers:
     once: true
 ```
 
+List-form flags start as false. Use a mapping to set their starting values:
+`flags: { door-open: false, guide-trusts-you: true }`. A flag declared by an effect
+without a manifest entry also starts as false.
+
 RPG stats are opt-in. Without `game.ruleset`, a story uses the `none` ruleset:
 no stats and no levelling, but faction tiers work and `skill-check` works on
 any stat the story declares (see [skill checks](#6-skill-checks)).

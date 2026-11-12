@@ -60,6 +60,21 @@ public sealed class CompletionSiteQueryTests
         Assert.Equal(position.Column - 1, site.Range.Start.Column);
     }
 
+    [Fact]
+    public void Mapping_flag_declarations_are_exposed_to_authoring_analysis()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest.Replace("flags: [met]", "flags: { met: true }", StringComparison.Ordinal),
+            ["main.tale"] = "=== start\n{if flag:met}Met{/if}\n-> END",
+        });
+
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        Assert.Contains(analysis.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Flag && symbol.Name == "met");
+        Assert.True(analysis.World!.InitialFlags[new("met")]);
+    }
+
     [Theory]
     [InlineData("@requires @Can.|", "Can.")]
     [InlineData("@requires @Can.Op|", "Can.Op")]

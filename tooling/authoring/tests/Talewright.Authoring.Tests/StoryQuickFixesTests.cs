@@ -17,6 +17,15 @@ public sealed class StoryQuickFixesTests
     [InlineData(
         "game:\n  id: quick-fix\n  title: Quick Fix\n  version: 1\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n",
         ", missing")]
+    [InlineData(
+        "game:\n  id: quick-fix\n  title: Quick Fix\n  version: 1\n  start: start\nflags: {ready: true}\ncharacters:\n  player: {first-name: Ada}\n",
+        ", missing: false")]
+    [InlineData(
+        "game:\n  id: quick-fix\n  title: Quick Fix\n  version: 1\n  start: start\nflags:\n  ready: true\ncharacters:\n  player: {first-name: Ada}\n",
+        "  missing: false\n")]
+    [InlineData(
+        "game:\n  id: quick-fix\n  title: Quick Fix\n  version: 1\n  start: start\nflags: {}\ncharacters:\n  player: {first-name: Ada}\n",
+        "missing: false")]
     public void Missing_flag_adds_a_declaration_to_the_root_manifest(string manifest, string newText)
     {
         var analysis = AnalyzeFlag(manifest, "=== start\n{if flag:missing}Never.{/if}\n-> END\n");

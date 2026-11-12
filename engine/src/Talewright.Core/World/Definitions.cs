@@ -48,13 +48,15 @@ public sealed class WorldDefinition
         IEnumerable<FactionDefinition> factions,
         IEnumerable<FlagId> flags,
         IReadOnlyDictionary<VarId, int> variables,
-        IReadOnlyDictionary<VarId, string>? textVariables = null)
+        IReadOnlyDictionary<VarId, string>? textVariables = null,
+        IReadOnlyDictionary<FlagId, bool>? initialFlags = null)
     {
         Ruleset = ruleset;
         Characters = characters.ToDictionary(c => c.Id);
         Items = items.ToDictionary(i => i.Id);
         Factions = factions.ToDictionary(f => f.Id);
         Flags = flags.ToHashSet();
+        InitialFlags = Flags.ToDictionary(id => id, id => initialFlags?.GetValueOrDefault(id) ?? false);
         Variables = variables;
         TextVariables = textVariables ?? new Dictionary<VarId, string>();
         if (Variables.Keys.Any(TextVariables.ContainsKey))
@@ -72,6 +74,9 @@ public sealed class WorldDefinition
     public IReadOnlyDictionary<ItemId, ItemDefinition> Items { get; }
     public IReadOnlyDictionary<FactionId, FactionDefinition> Factions { get; }
     public IReadOnlySet<FlagId> Flags { get; }
+
+    /// <summary>Declared flags and their values before any events are applied.</summary>
+    public IReadOnlyDictionary<FlagId, bool> InitialFlags { get; }
 
     /// <summary>Declared variables with their initial values.</summary>
     public IReadOnlyDictionary<VarId, int> Variables { get; }

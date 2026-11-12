@@ -35,7 +35,7 @@ public sealed class ManifestNullContainerTests
             ("items.modifiers", Game + Player + $"items:\n  coin:\n    modifiers: {Marker}\n", "must be a mapping"),
             ("factions", Game + Player + $"factions: {Marker}\n", "must be a mapping"),
             ("vars", Game + Player + $"vars: {Marker}\n", "must be a mapping"),
-            ("flags", Game + Player + $"flags: {Marker}\n", "must be a list"),
+            ("flags", Game + Player + $"flags: {Marker}\n", "must be a list or mapping"),
             ("triggers", Game + Player + $"triggers: {Marker}\n", "must be a list"),
             ("triggers entry", Game + Player + $"triggers:\n  - {Marker}\n", "must be a mapping"),
         };

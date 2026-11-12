@@ -1,0 +1,10 @@
+game:
+  id: flag-mapping
+  title: Flag mapping
+  start: beginning
+characters:
+  player:
+    first-name: Ada
+flags:
+  door-open: false
+  guide-trusts-you: true

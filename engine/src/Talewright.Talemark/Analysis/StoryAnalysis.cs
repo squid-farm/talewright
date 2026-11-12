@@ -269,7 +269,8 @@ public static class StoryAnalyzer
             var unresolved = context?.UnresolvedVariables.ToHashSet() ?? [];
             RemovePreviousFileSymbols(file, previousSymbols, snapshot, flags, numbers, textVariables, unresolved, null);
             var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
-                previousWorld.Items.Values, previousWorld.Factions.Values, flags, numbers, textVariables);
+                previousWorld.Items.Values, previousWorld.Factions.Values, flags, numbers, textVariables,
+                previousWorld.InitialFlags.Where(pair => flags.Contains(pair.Key)).ToDictionary());
             collector.World(baseWorld, unresolved);
             var root = new StoryYamlContext(file, diagnostics).Parse(file, source.Files[file]);
             if (root is not null) collector.Manifest(root, file);
@@ -334,12 +335,14 @@ public static class StoryAnalyzer
                 mutableFlags.UnionWith(localFlags);
                 mutableScenes.UnionWith(currentScenes);
                 var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
-                    previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables);
+                    previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
+                    previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary());
                 var localUnresolved = VariableDiscovery.Resolve(baseWorld, mutableFlags, mutableScenes,
                     declarations, numbers, textVariables, options, diagnostics);
                 mutableUnresolved.UnionWith(localUnresolved);
                 world = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
-                    previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables);
+                    previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
+                    previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary());
                 collector.World(world, mutableUnresolved);
                 flags = mutableFlags;
                 variables = numbers.Keys.Concat(textVariables.Keys).Concat(mutableUnresolved).ToHashSet();
@@ -849,6 +852,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
         if (Get(root, ManifestVocabulary.Flags) is YamlSequenceNode flags)
             foreach (var flag in flags.Children) Add(flag, AuthoringSymbolKind.Flag, ManifestVocabulary.SymbolBoolean);
+        else if (Get(root, ManifestVocabulary.Flags) is YamlMappingNode flagMap)
+            foreach (var flag in flagMap.Children.Keys) Add(flag, AuthoringSymbolKind.Flag, ManifestVocabulary.SymbolBoolean);
         if (file == StorySource.ManifestFileName && Get(root, ManifestVocabulary.Game) is YamlMappingNode gameConfig &&
             Get(gameConfig, ManifestVocabulary.Ruleset) is YamlMappingNode ruleset &&
             Get(ruleset, ManifestVocabulary.Stats) is YamlSequenceNode stats)

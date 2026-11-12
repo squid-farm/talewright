@@ -1,0 +1,12 @@
+game:
+  id: invalid-flags
+  title: Invalid flags
+  start: beginning
+characters:
+  player:
+    first-name: Ada
+flags:
+  yes-value: yes
+  number-value: 2
+  null-value: null
+  sequence-value: []

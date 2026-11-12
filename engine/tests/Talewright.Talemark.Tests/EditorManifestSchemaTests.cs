@@ -252,6 +252,10 @@ public class EditorManifestSchemaTests
                 case "empty-optional-containers.yaml":
                     AssertNoRpgMechanics(story.World.Ruleset);
                     break;
+                case "flag-mapping.yaml":
+                    Assert.False(story.World.InitialFlags[new FlagId("door-open")]);
+                    Assert.True(story.World.InitialFlags[new FlagId("guide-trusts-you")]);
+                    break;
                 case "ruleset-none-shorthand.yaml":
                     AssertNoRpgMechanics(story.World.Ruleset);
                     Assert.Equal("neutral", story.World.Ruleset.TierFor(0)!.Id);
@@ -291,6 +295,8 @@ public class EditorManifestSchemaTests
                     Assert.Equal(new StatId("grit"), story.World.Ruleset.StatsById[new("tracking")].GoverningAttribute);
                     Assert.Contains(new FlagId("ready"), story.World.Flags);
                     Assert.Contains(new FlagId("done"), story.World.Flags);
+                    Assert.False(story.World.InitialFlags[new FlagId("ready")]);
+                    Assert.False(story.World.InitialFlags[new FlagId("done")]);
                     Assert.Equal(0, story.World.Variables[new VarId("attempts")]);
                     Assert.True(Assert.Single(story.Triggers).Once);
                     Assert.True(story.Creation!.EditName);
