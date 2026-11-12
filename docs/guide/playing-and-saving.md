@@ -8,9 +8,10 @@ what your players see and what they can do.
 ## The screen
 
 - **Story text** builds up as you play. Earlier scenes stay visible above the current one, and past
-  choices are shown as `→ Choice`. Images stay visible for the current scene; pictures from earlier
-  scenes collapse into **Reveal image** controls. A scene marked `@continues` counts as part of the
-  scene it continues.
+  choices are shown as `→ Choice`. A scene marked `@clear` starts a fresh screen, but earlier
+  passages remain available in **History** and saves. Images stay visible for the current scene;
+  pictures from earlier scenes collapse into **Reveal image** controls. A scene marked `@continues`
+  counts as part of the scene it continues.
 - **Choices** are the numbered buttons at the bottom. Choices whose requirements aren't met are hidden,
   unless the author chose to show them.
 - **Notes** appear in the story when something happens to the player: skill check rolls, stat and

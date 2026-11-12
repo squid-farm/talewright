@@ -246,6 +246,19 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Compiles_scene_clear_metadata()
+    {
+        var story = Ok("""
+            === a
+            @clear
+            Fresh start.
+            -> END
+            """);
+
+        Assert.True(story.GetScene(new SceneId("a")).ClearsPrevious);
+    }
+
+    [Fact]
     public void Continues_cannot_be_combined_with_a_title()
     {
         var error = Error("=== a\n@title Interview\n@continues\n-> END", "TW1006");

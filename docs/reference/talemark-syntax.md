@@ -338,6 +338,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Display title (used for hub choices).                                                          |
 | `@continues`                                       | Add this scene's text to the previous passage, without a heading or section break.              |
+| `@clear`                                           | Start this scene on a cleared play screen; earlier passages remain in History and saves.        |
 | `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces `@title` while unavailable. |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
@@ -363,6 +364,10 @@ Metadata lines are only recognized directly after the `===` header. Lines starti
 **Branching conversations.** Mark reply scenes with `@continues` to keep a branching exchange together.
 The selected choice still appears as the player's line, and every visited scene remains a separate history
 step. A continued scene cannot also use `@title` or `@clear`.
+
+**Clearing the play screen.** Mark a scene with `@clear` to hide earlier passages from the play screen.
+Those passages remain in History and in saves. Back restores the earlier screen, and Forward or loading a
+save rebuilds the screen from the recorded passages.
 
 ```tale
 === interview

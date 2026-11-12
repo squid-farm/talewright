@@ -74,6 +74,7 @@ public static class ScenePreview
             menu.AvailableChoices, IsEnded: false)
         {
             ContinuesPrevious = definition.ContinuesPrevious,
+            ClearsPrevious = definition.ClearsPrevious,
             Menu = menu.Entries,
         };
     }

@@ -125,6 +125,7 @@ public sealed class SceneDefinition : IStorylet
     public required SceneId Id { get; init; }
     public string? Title { get; init; }
     public bool ContinuesPrevious { get; init; }
+    public bool ClearsPrevious { get; init; }
     public Expr? Requires { get; init; }
     public ShownDefinition? Shown { get; init; }
     public IReadOnlySet<string> Tags { get; init; } = new HashSet<string>();

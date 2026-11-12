@@ -11,6 +11,24 @@ namespace Talewright.Runtime.Tests;
 public sealed class ScenePreviewTests
 {
     [Fact]
+    public void Preview_preserves_clear_metadata()
+    {
+        var story = Compile("""
+            === start
+            @clear
+            A fresh screen.
+            * [Stay] -> END
+            """, CreateManifest());
+        var session = new StorySession(story, 42);
+        var live = session.Start();
+
+        var preview = ScenePreview.Build(story, new SceneId("start"), session.State);
+
+        Assert.True(live.ClearsPrevious);
+        Assert.True(preview.ClearsPrevious);
+    }
+
+    [Fact]
     public void Preview_menu_matches_live_menu_for_choices_and_limited_hub_offers()
     {
         var manifest = CreateManifest();

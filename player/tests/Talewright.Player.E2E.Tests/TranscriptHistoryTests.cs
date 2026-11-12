@@ -13,6 +13,85 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
     private ILocator History => Page.GetByRole(AriaRole.Main, new() { Name = "Recorded history" });
 
     [Fact]
+    public async Task Ending_from_a_cleared_scene_keeps_its_text_on_screen()
+    {
+        var id = $"clear-ending-{Guid.NewGuid():N}";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), """
+            === start
+            @clear
+            Final scene stays visible.
+            * [Finish] -> END
+            """));
+
+        await Choices.GetByText("Finish").ClickAsync();
+
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(2);
+        await Expect(Page.Locator(".tw-past")).ToContainTextAsync("Final scene stays visible.");
+        await Expect(Latest).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public async Task Clear_starts_a_new_screen_but_keeps_history_and_replays_across_navigation_and_saves()
+    {
+        var id = $"clear-{Guid.NewGuid():N}";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), """
+            === start
+            Before the break.
+            * [Continue] -> next
+            === next
+            Before the clear.
+            * [Begin again] -> reset
+            === reset
+            @clear
+            After the clear.
+            * [Continue] -> finish
+            === finish
+            Finished.
+            -> END
+            """));
+        await Choices.GetByText("Continue").ClickAsync();
+        await Choices.GetByText("Begin again").ClickAsync();
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
+        await Expect(Latest).ToContainTextAsync("After the clear.");
+        await Expect(Latest).Not.ToContainTextAsync("Before the break.");
+        await Expect(Latest).Not.ToContainTextAsync("Before the clear.");
+        await Expect(Latest).ToBeFocusedAsync();
+
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+
+        await Driver.ClickAsync("History");
+        await Expect(History.Locator(".tw-history-frame")).ToHaveCountAsync(3);
+        await Expect(History).ToContainTextAsync("Before the break.");
+        await Expect(History).ToContainTextAsync("Before the clear.");
+        await Expect(History).ToContainTextAsync("After the clear.");
+        await Driver.ClickAsync("Return to play");
+
+        await Driver.ClickAsync("Back");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(2);
+        await Expect(Latest).ToContainTextAsync("Before the clear.");
+        await Expect(Latest).Not.ToContainTextAsync("After the clear.");
+        await Expect(Latest).ToBeFocusedAsync();
+
+        await Driver.ClickAsync("Forward");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
+        await Expect(Latest).ToContainTextAsync("After the clear.");
+        await Expect(Latest).ToBeFocusedAsync();
+
+        await Choices.GetByText("Continue").ClickAsync();
+        await Expect(Latest).ToContainTextAsync("Finished.");
+
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
+        await Expect(Latest).ToContainTextAsync("After the clear.");
+        await Expect(Latest).Not.ToContainTextAsync("Before the break.");
+        await Expect(Latest).ToBeFocusedAsync();
+    }
+
+    [Fact]
     public async Task Paging_is_bounded_read_only_and_returns_to_play_with_keyboard_focus()
     {
         await Page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.Reduce });
