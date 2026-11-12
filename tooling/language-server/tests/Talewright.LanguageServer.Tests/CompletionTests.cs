@@ -88,6 +88,33 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Tag_completion_uses_declarations_across_story_files()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf("other.tale"), "=== other\n@tags remote\n-> END");
+        await client.Initialize();
+        const string marked = "=== start\n@tags local\n-> END\n=== completion\n@hub |";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        await client.Open("open.tale", "=== open\n@tags opened\n-> END", 1);
+
+        var labels = Items(await Completion(client, "start.tale", marked, ensureAnalyzed: false))
+            .Select(item => item.GetProperty("label").GetString()!).ToArray();
+
+        Assert.Equal(["local", "opened", "remote"], labels);
+
+        await client.Change("open.tale", "=== open\n-> END", 2);
+        labels = Items(await Completion(client, "start.tale", marked, ensureAnalyzed: false))
+            .Select(item => item.GetProperty("label").GetString()!).ToArray();
+        Assert.Equal(["local", "remote"], labels);
+
+        const string changed = "=== start\n-> END\n=== completion\n@hub |";
+        await client.Change("start.tale", changed.Replace("|", ""), 2);
+        labels = Items(await Completion(client, "start.tale", changed))
+            .Select(item => item.GetProperty("label").GetString()!).ToArray();
+        Assert.Equal(["remote"], labels);
+    }
+
+    [Fact]
     public async Task Default_item_name_helpers_are_offered_by_the_stdio_server()
     {
         await using var client = new Client();
@@ -344,9 +371,10 @@ public sealed partial class ServerTests
 
     private static Predicate<JsonElement> HasLabel(string label) => item => item.GetProperty("label").GetString() == label;
     private static JsonElement[] Items(JsonElement response) => response.GetProperty("result").GetProperty("items").EnumerateArray().ToArray();
-    private static async Task<JsonElement> Completion(Client client, string file, string marked)
+    private static async Task<JsonElement> Completion(Client client, string file, string marked,
+        bool ensureAnalyzed = true)
     {
-        await client.EnsureAnalyzed(file);
+        if (ensureAnalyzed) await client.EnsureAnalyzed(file);
         var prefix = marked[..marked.IndexOf('|')].ReplaceLineEndings("\n").Split('\n');
         return await client.Request("textDocument/completion", new
         {

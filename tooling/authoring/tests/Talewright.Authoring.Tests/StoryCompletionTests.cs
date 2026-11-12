@@ -166,6 +166,32 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("@hub |", "camp,forest")]
+    [InlineData("@hub camp and |", "camp,forest")]
+    [InlineData("@hub camp or |", "camp,forest")]
+    [InlineData("@tags |", "camp,forest")]
+    [InlineData("@tags camp, |", "camp,forest")]
+    [InlineData("@hub fo|", "forest")]
+    public void Tag_completion_suggests_only_story_tags_in_tag_slots(string marked, string expected)
+    {
+        var prefix = "=== first\n@tags camp\n-> END\n=== completion\n" + marked;
+        var caret = prefix.IndexOf('|');
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["main.tale"] = prefix.Remove(caret, 1) + "\n-> END",
+            ["other.tale"] = "=== other\n@tags forest\n-> END",
+        });
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        var completions = StoryCompletion.Complete(analysis,
+            Position("main.tale", prefix[..caret]));
+
+        Assert.Equal(expected.Split(','), completions.Select(item => item.Label));
+        Assert.All(completions, item => Assert.Equal(item.Label, item.NewText));
+    }
+
+    [Theory]
     [InlineData("bold", "bold formatting")]
     [InlineData("italic", "italic formatting")]
     public void Formatting_modifier_completion_and_hover_explain_the_style(string modifier, string expected)

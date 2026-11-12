@@ -62,6 +62,15 @@ public sealed class NameIndex
     public IReadOnlyList<NameOccurrence> Occurrences(AuthoringSymbolKind kind, string name) =>
         _identities.TryGetValue((kind, name), out var occurrences) ? occurrences : [];
 
+    internal IReadOnlyList<string> DeclaredNames(AuthoringSymbolKind kind, string? exceptFile = null) =>
+        _identities
+            .Where(identity => identity.Key.Kind == kind &&
+                identity.Value.Any(occurrence => occurrence.IsDeclaration &&
+                    (exceptFile is null || occurrence.Range.Start.File != exceptFile)))
+            .Select(identity => identity.Key.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
     internal static NameIndex Build(IReadOnlyList<AuthoringSymbol> symbols, IReadOnlyList<NameOccurrence> names,
         IReadOnlyList<CompletionSiteSource> sources)
     {
@@ -70,7 +79,8 @@ public sealed class NameIndex
         // Incomplete skill checks record one word as both an actor and a stat; such a word names neither yet.
         foreach (var group in sources
                      .Select(source => source.Site)
-                     .Where(site => site is { Text.Length: > 0, Kinds.Count: 1 } && DeclaredKinds.Contains(site.Kinds[0]))
+                     .Where(site => site is { Text.Length: > 0, Kinds.Count: 1 } &&
+                         site.Kinds[0] != AuthoringSymbolKind.Tag && DeclaredKinds.Contains(site.Kinds[0]))
                      .GroupBy(site => site!.Range))
         {
             var kinds = group.Select(site => site!.Kinds[0]).Distinct().ToArray();
