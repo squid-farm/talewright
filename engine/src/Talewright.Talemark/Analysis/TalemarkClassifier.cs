@@ -272,6 +272,9 @@ public static class TalemarkClassifier
                         if (!value.IsEmpty)
                             Add(location, location.Offset(value.Length), TalemarkClassificationKind.String);
                         break;
+                    case SceneMetadataKey.ChoiceLabel:
+                        AddInline(SourceText.Single(value.ToString(), location));
+                        break;
                     case SceneMetadataKey.Continues:
                         break;
                     case SceneMetadataKey.Requires:

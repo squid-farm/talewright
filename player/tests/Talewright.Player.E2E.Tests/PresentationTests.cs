@@ -49,6 +49,37 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
     }
 
     [Fact]
+    public async Task Choice_label_is_separate_from_scene_heading()
+    {
+        var id = $"choice-label-{Guid.NewGuid():N}";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), """
+            === start
+            * -> conversation
+            * -> title-only
+            * -> END
+
+            === conversation
+            @title The conversation
+            @choice-label Speak to {player:first-name}
+            The guide looks up.
+            * [Back] -> start
+
+            === title-only
+            @title The old choice text
+            * [Back] -> start
+            """));
+
+        await Expect(Latest.Locator(".tw-scene-title")).ToHaveCountAsync(0);
+        await Expect(Choices).ToHaveCountAsync(3);
+        await Expect(Choices.Nth(0)).ToContainTextAsync("Speak to Mara");
+        await Expect(Choices.Nth(1)).ToContainTextAsync("Continue");
+        await Expect(Choices.Nth(2)).ToContainTextAsync("Continue");
+
+        await Choices.Nth(0).ClickAsync();
+        await Expect(Latest.Locator(".tw-scene-title")).ToHaveTextAsync("The conversation");
+    }
+
+    [Fact]
     public async Task Shown_unavailable_choices_are_marked_and_available_choices_still_work()
     {
         await Upload(new StoryFixture("shown-choices", TestStories.DefaultYaml, """

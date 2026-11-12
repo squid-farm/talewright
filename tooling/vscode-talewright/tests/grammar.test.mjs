@@ -34,6 +34,8 @@ function hasScope(line, text, scope) {
 test('fallback keeps lightweight structural scopes', () => {
   hasScope('  // comment', '//', 'comment.line.double-slash.tale');
   hasScope('@continues', '@continues', 'keyword.control.metadata.tale');
+  hasScope('@choice-label', '@choice-label', 'keyword.control.metadata.tale');
+  hasScope('@choice-label Speak to the guide', '@choice-label', 'keyword.control.metadata.tale');
   hasScope('=== temple.hall', 'temple.hall', 'entity.name.section.tale');
   hasScope('-> temple.hall', '->', 'keyword.control.divert.tale');
   hasScope('* [Go] -> temple.hall', '->', 'keyword.control.divert.tale');

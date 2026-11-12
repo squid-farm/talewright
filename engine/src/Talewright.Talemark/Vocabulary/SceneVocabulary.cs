@@ -3,6 +3,7 @@ namespace Talewright.Talemark.Vocabulary;
 internal enum SceneMetadataKey
 {
     Title,
+    ChoiceLabel,
     Continues,
     Requires,
     Tags,
@@ -41,6 +42,7 @@ public static class SceneVocabulary
     internal const string EndIf = "/if";
 
     internal const string Title = "title";
+    internal const string ChoiceLabel = "choice-label";
     internal const string Continues = "continues";
     internal const string Clear = "clear";
     internal const string Requires = "requires";
@@ -70,7 +72,7 @@ public static class SceneVocabulary
     internal const char LegacyImageQuote = '"';
     internal const char EmphasisMarker = '_';
 
-    internal static readonly string[] MetadataSpellings = [Title, Continues, Requires, Tags, Priority, Once, Hub, HubLimit];
+    internal static readonly string[] MetadataSpellings = [Title, ChoiceLabel, Continues, Requires, Tags, Priority, Once, Hub, HubLimit];
 
     internal static bool TryGetMetadataKey(ReadOnlySpan<char> text, out SceneMetadataKey key)
     {
@@ -78,6 +80,9 @@ public static class SceneVocabulary
         {
             case Title:
                 key = SceneMetadataKey.Title;
+                return true;
+            case ChoiceLabel:
+                key = SceneMetadataKey.ChoiceLabel;
                 return true;
             case Continues:
                 key = SceneMetadataKey.Continues;
@@ -134,6 +139,7 @@ public static class SceneVocabulary
     internal static string Spelling(SceneMetadataKey key) => key switch
     {
         SceneMetadataKey.Title => Title,
+        SceneMetadataKey.ChoiceLabel => ChoiceLabel,
         SceneMetadataKey.Continues => Continues,
         SceneMetadataKey.Requires => Requires,
         SceneMetadataKey.Tags => Tags,

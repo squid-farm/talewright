@@ -82,6 +82,53 @@ public sealed class ScenePreviewTests
     }
 
     [Fact]
+    public void Preview_uses_choice_labels_for_bare_diverts_and_hub_choices()
+    {
+        var story = Compile("""
+            === start
+            @hub destination
+            * -> labeled
+            * -> title-only
+            * -> END
+
+            === labeled
+            @choice-label Ask {player:first-name}
+            @tags destination
+            * [Wait] -> END
+
+            === title-only
+            @title The old title
+            @tags destination
+            * [Wait] -> END
+
+            === fallback
+            @tags destination
+            * [Wait] -> END
+
+            === unavailable
+            @choice-label Hidden label
+            @tags destination
+            @requires false, shown "Need a key"
+            * [Wait] -> END
+            """, CreateManifest());
+        var session = new StorySession(story, 42);
+        var live = session.Start();
+
+        var preview = ScenePreview.Build(story, new SceneId("start"), session.State);
+
+        Assert.Equal(live.Menu.Select(entry => (entry.Key, entry.Text, entry.Number, entry.IsAvailable)),
+            preview.Menu.Select(entry => (entry.Key, entry.Text, entry.Number, entry.IsAvailable)));
+        var entries = preview.Menu.ToDictionary(entry => entry.Key, entry => (entry.Text, entry.IsAvailable));
+        Assert.Equal(("Ask Ada", true), entries["c0"]);
+        Assert.Equal(("Continue", true), entries["c1"]);
+        Assert.Equal(("Continue", true), entries["c2"]);
+        Assert.Equal(("Ask Ada", true), entries["storylet:labeled"]);
+        Assert.Equal(("The old title", true), entries["storylet:title-only"]);
+        Assert.Equal(("fallback", true), entries["storylet:fallback"]);
+        Assert.Equal(("Need a key", false), entries["storylet:unavailable"]);
+    }
+
+    [Fact]
     public void Preview_does_not_change_state_or_run_entry_effects_or_checks()
     {
         var story = Compile("""

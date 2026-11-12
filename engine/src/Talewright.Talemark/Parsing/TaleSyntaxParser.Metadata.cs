@@ -129,7 +129,7 @@ internal static partial class TaleSyntaxParser
                     Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
                         $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' cannot be used with " +
                         $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}'; use " +
-                        $"'{SceneVocabulary.MetadataMarker}choice-label' for choice text.");
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.ChoiceLabel}' for choice text.");
                     return line with { IsInvalid = true };
                 }
             }
@@ -148,7 +148,7 @@ internal static partial class TaleSyntaxParser
                     Error(line, CompilerDiagnosticCodes.InvalidSceneMetadata,
                         $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Continues}' cannot be used with " +
                         $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.Title}'; use " +
-                        $"'{SceneVocabulary.MetadataMarker}choice-label' for choice text.");
+                        $"'{SceneVocabulary.MetadataMarker}{SceneVocabulary.ChoiceLabel}' for choice text.");
                     return line with { IsInvalid = true };
                 }
 

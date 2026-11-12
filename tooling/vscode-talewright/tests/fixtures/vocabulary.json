@@ -67,6 +67,7 @@
   {"owner":"scene","member":"Else","spelling":"else","line":"{if true}yes{else}no{/if}","reference":"{else}"},
   {"owner":"scene","member":"EndIf","spelling":"/if","line":"{if true}yes{/if}","reference":"{/if}"},
   {"owner":"scene","member":"Title","spelling":"title","line":"@title Sample","reference":"@title text"},
+  {"owner":"scene","member":"ChoiceLabel","spelling":"choice-label","line":"@choice-label Speak to the guide","reference":"@choice-label text"},
   {"owner":"scene","member":"Continues","spelling":"continues","line":"@continues","reference":"@continues"},
   {"owner":"scene","member":"Requires","spelling":"requires","line":"@requires true","reference":"@requires expr"},
   {"owner":"scene","member":"Shown","spelling":"shown","line":"@requires true, shown \"Unavailable\"","reference":"@requires player:dex >= 12, shown"},

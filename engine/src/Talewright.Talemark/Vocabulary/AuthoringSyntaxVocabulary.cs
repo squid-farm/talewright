@@ -141,6 +141,8 @@ public static class AuthoringSyntaxVocabulary
         return
         [
             new(AuthoringTokenKind.Title, SceneVocabulary.Title, "Scene title shown to players."),
+            new(AuthoringTokenKind.ChoiceLabel, SceneVocabulary.ChoiceLabel,
+                "Reader text used for hub choices and bare choices diverting to this scene; it does not create a heading."),
             new(AuthoringTokenKind.Continues, SceneVocabulary.Continues,
                 "Adds this scene's text to the previous passage without a heading or section break."),
             new(AuthoringTokenKind.Requires, SceneVocabulary.Requires, "Boolean condition controlling whether this scene is available."),

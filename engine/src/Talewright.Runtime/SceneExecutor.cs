@@ -216,8 +216,21 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             _replayIdentities.For(step.Choice));
     }
 
-    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice) =>
-        () => choice.Label is { } label ? renderer.RenderInlines(label, log.State) : ChoiceView.ContinueLabel;
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice)
+    {
+        if (choice.Label is { } label)
+        {
+            return () => renderer.RenderInlines(label, log.State);
+        }
+
+        if (choice.Check is null && choice.Divert?.Scene is { } target &&
+            story.GetScene(target).ChoiceLabel is { } choiceLabel)
+        {
+            return () => renderer.RenderInlines(choiceLabel, log.State);
+        }
+
+        return static () => ChoiceView.ContinueLabel;
+    }
 
     private static void RequireSettled(bool settled)
     {

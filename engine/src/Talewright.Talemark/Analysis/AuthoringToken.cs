@@ -26,6 +26,7 @@ public enum AuthoringTokenKind
     Once,
     Hub,
     HubLimit,
+    ChoiceLabel,
     End,
     Visited,
     SceneContext,

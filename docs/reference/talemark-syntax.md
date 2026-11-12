@@ -55,9 +55,11 @@ The trees close behind you.
 ```
 
 `=== crossroads` starts a **scene** (one part or place in your story); its name is the scene ID.
-`@title` is the heading players see. Write ordinary story text on its own lines. A line beginning
-with `*` makes a **choice**; the words in brackets are what players click, and `->` says where that
-choice goes. `-> END` finishes the story.
+`@title` is the heading players see. `@choice-label` sets choice text independently, without adding
+a heading; its value is reader text, so it can include substitutions and formatting. Write ordinary
+story text on its own lines. A line beginning with `*` makes a **choice**; the words in brackets
+are what players click, and `->` says where that choice goes. A bare `* -> scene` uses that scene's
+`@choice-label` when present; `* -> END` still shows **Continue**.
 
 To check or play your story without installing the desktop tools, zip its folder and open the zip in
 the [web player](https://play.trytalewright.com/). For the full walkthrough, see
@@ -336,10 +338,11 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | Element                                            | Meaning                                                                                        |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
-| `@title text`                                      | Display title (used for hub choices).                                                          |
+| `@title text`                                      | Scene heading; fallback text for hub choices without `@choice-label`.                           |
+| `@choice-label text`                               | Reader text for hub choices and bare `* -> scene` choices targeting this scene. Does not add a heading; otherwise hub choices fall back to `@title`, then the scene ID, and bare scene diverts show **Continue**. |
 | `@continues`                                       | Add this scene's text to the previous passage, without a heading or section break.              |
 | `@clear`                                           | Start this scene on a cleared play screen; earlier passages remain in History and saves.        |
-| `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces `@title` while unavailable. |
+| `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces the normal choice text while unavailable. |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
 | `@once`                                            | A scene offered by a hub disappears after the player visits it once.                          |
@@ -352,7 +355,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires expr[, shown ["reader text"]]) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false unless `shown` is present; its optional reader text replaces the label while unavailable. |
-| `* -> target`                                      | Textless choice displayed as **Continue**. It only supports a divert.                           |
+| `* -> target`                                      | Textless choice; uses the destination's `@choice-label` when present, otherwise **Continue**. `* -> END` always shows **Continue**. It only supports a divert. |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
