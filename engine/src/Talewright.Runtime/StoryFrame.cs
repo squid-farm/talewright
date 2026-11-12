@@ -57,6 +57,9 @@ public sealed record StoryFrame(
     /// <summary>Whether this scene joins the preceding passage on screen.</summary>
     public bool ContinuesPrevious { get; init; }
 
+    /// <summary>Whether this scene starts on a cleared screen.</summary>
+    public bool ClearsPrevious { get; init; }
+
     /// <summary>
     /// The complete visible menu, in display order. Numbers remain stable across available and unavailable entries.
     /// </summary>

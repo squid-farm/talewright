@@ -148,6 +148,45 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Cleared_scenes_keep_full_history_and_restore_the_clear_flag()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            Before the break.
+            * [Continue] -> next
+            === next
+            Before the clear.
+            * [Begin again] -> reset
+            === reset
+            @clear
+            After the clear.
+            * [Continue] -> finish
+            === finish
+            Finished.
+            -> END
+            """);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        history.Choose("c0");
+
+        Assert.Equal(3, history.Transcript.Count);
+        Assert.Equal([false, false, true], history.Transcript.Select(frame => frame.Frame.ClearsPrevious));
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(history.Transcript.Select(frame => frame.Frame.ClearsPrevious),
+            restored.Transcript.Select(frame => frame.Frame.ClearsPrevious));
+        Assert.Equal(history.Transcript.Select(frame => frame.Frame.Document.ToPlainText()),
+            restored.Transcript.Select(frame => frame.Frame.Document.ToPlainText()));
+
+        history.Back();
+        Assert.Equal("next", history.Current.Scene!.Value.Value);
+        Assert.False(history.Current.ClearsPrevious);
+        history.Forward();
+        Assert.Equal("reset", history.Current.Scene!.Value.Value);
+        Assert.True(history.Current.ClearsPrevious);
+    }
+
+    [Fact]
     public void Saving_triggers_coalesce_per_step_and_restore_without_repeating_the_save_request()
     {
         var story = Compile(BuildManifest(declareVariables: true, saveTrigger: true, multipleSavingTriggers: true).Build());

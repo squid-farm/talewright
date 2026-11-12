@@ -13,6 +13,9 @@ internal static class TranscriptPresentation
         for (var index = start; index < passages.Count; index++)
         {
             var passage = new PresentedPassage(index, passages[index]);
+            if (passage.Entry.Frame.ClearsPrevious)
+                groups.Clear();
+
             if (passage.Entry.Frame.ContinuesPrevious && groups.Count > 0)
                 groups[^1].Add(passage);
             else

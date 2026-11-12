@@ -259,7 +259,15 @@ internal sealed partial class TaleBinder
         _symbols.Analysis?.Reference(Head(syntax), At(Part(syntax).HeadStart), AuthoringSymbolKind.Directive,
             SceneVocabulary.MetadataSpellings);
         if (syntax.MetadataKey is not { } key)
-            return false;
+        {
+            if (Head(syntax) != SceneVocabulary.Clear)
+                return false;
+
+            if (!syntax.IsInvalid)
+                _scene!.ClearsPrevious = true;
+            return true;
+        }
+
         var metadataPart = Part(syntax);
         var value = Value(syntax);
         var valueLocation = At(value.Length == 0
@@ -829,6 +837,7 @@ internal sealed partial class TaleBinder
         public SourceLocation Location { get; } = location;
         public string? Title { get; set; }
         public bool ContinuesPrevious { get; set; }
+        public bool ClearsPrevious { get; set; }
         public Expr? Requires { get; set; }
         public ShownDefinition? Shown { get; set; }
         public HashSet<string> Tags { get; } = [];
@@ -851,6 +860,7 @@ internal sealed partial class TaleBinder
             Id = Id,
             Title = Title,
             ContinuesPrevious = ContinuesPrevious,
+            ClearsPrevious = ClearsPrevious,
             Requires = Requires,
             Shown = Shown,
             Tags = Tags,

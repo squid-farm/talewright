@@ -431,6 +431,7 @@ public sealed class StorySession : IStorySession
             menu.AvailableChoices, IsEnded: false)
         {
             ContinuesPrevious = scene.ContinuesPrevious,
+            ClearsPrevious = scene.ClearsPrevious,
             Menu = menu.Entries,
         };
         return Current;
@@ -448,6 +449,7 @@ public sealed class StorySession : IStorySession
             new RenderedDocument(blocks), [], IsEnded: true)
         {
             ContinuesPrevious = scene?.ContinuesPrevious ?? Current?.ContinuesPrevious ?? false,
+            ClearsPrevious = scene?.ClearsPrevious ?? Current?.ClearsPrevious ?? false,
         };
         return Current;
     }

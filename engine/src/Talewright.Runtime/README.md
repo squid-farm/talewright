@@ -27,7 +27,7 @@ An active frame may have no available choices.
 | `IStorySession.cs` | `Start()`, `Choose(key)`, `Current`, `State` (`IGameStateView`), `Events`, `Seed`, `Story`. |
 | `StorySession.cs` | The loop: entering scenes, building choices, resolving choices. The class doc comment is the spec. |
 | `SceneExecutor.cs` | Source-order step execution, branch decisions, effect batches, checks and inline notes; reached choices become candidates for the shared availability path. |
-| `StoryFrame.cs` | `StoryFrame(Scene, Title, Document, Choices, IsEnded)`; `ContinuesPrevious` tells a presentation layer to join this passage to the previous one. `Choices` contains available choices, while `Menu` preserves the full numbered menu, including shown-but-unavailable entries. |
+| `StoryFrame.cs` | `StoryFrame(Scene, Title, Document, Choices, IsEnded)`; `ContinuesPrevious` tells a presentation layer to join this passage to the previous one, and `ClearsPrevious` marks a new screen. `Choices` contains available choices, while `Menu` preserves the full numbered menu, including shown-but-unavailable entries. |
 | `EventNarrator.cs` | Events → `RenderedNote`s ("Gained: rope", "Hit Points −3 (7)", "Athletics check: 10 +2 = 12 vs DC 12 — success", "Explorers' Guild −20 (now Unfriendly)", "Level 2!"). Other characters' changes are prefixed with their name. |
 
 ## The loop, briefly
