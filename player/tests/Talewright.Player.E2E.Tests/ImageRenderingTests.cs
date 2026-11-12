@@ -9,7 +9,7 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
     [Fact]
-    public async Task Embedded_images_decode_remain_in_history_and_release_only_after_successful_replacement()
+    public async Task Embedded_images_collapse_on_departure_and_survive_rejected_replacement()
     {
         await Page.EvaluateAsync("""
             () => {
@@ -38,23 +38,27 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         Assert.StartsWith("blob:", url);
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
-        await Expect(Page.Locator(".tw-past img")).ToHaveAttributeAsync("src", url!);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.", Exact = true })).ToBeVisibleAsync();
+        await Page.WaitForFunctionAsync("url => window.imageRevocations.includes(url)", url);
         await Driver.ClickAsync("Back");
-        await Expect(image).ToHaveAttributeAsync("src", url!);
+        await image.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await image.ElementHandleAsync());
+        var restoredUrl = await image.GetAttributeAsync("src");
+        Assert.StartsWith("blob:", restoredUrl);
         await Library();
-        Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", restoredUrl));
         var invalid = new StoryFixture("bad-images", "game:\n  id: bad\n  title: Bad\n  start: missing\n", "=== start\n-> END");
         await UploadBytes(invalid.Id + ".zip", invalid.Zip());
         await Expect(Page.Locator(".tw-library .tw-diagnostics")).ToBeVisibleAsync();
         await Page.Locator(".tw-resume").ClickAsync();
-        await Expect(image).ToHaveAttributeAsync("src", url!);
+        await Expect(image).ToHaveAttributeAsync("src", restoredUrl!);
         await Library();
         var text = new StoryFixture("replacement",
             "game:\n  id: replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             "=== start\nReplacement text.\n-> END");
         await Upload(text);
         await Expect(Latest).ToContainTextAsync("Replacement text.");
-        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.imageRevocations.filter(value => value === url).length", url));
+        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.imageRevocations.filter(value => value === url).length", restoredUrl));
     }
 
     [Fact]
@@ -82,8 +86,11 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Make camp before the climb");
         await images.First.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await images.First.ElementHandleAsync());
-        var url = await images.First.GetAttributeAsync("src");
         await Choose("Eat a ration");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: " + alt, Exact = true }).ClickAsync();
+        await images.First.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await images.First.ElementHandleAsync());
+        var url = await images.First.GetAttributeAsync("src");
         await Choose("Share supper by the fire");
         await Choose("Continue");
         await Expect(images).ToHaveCountAsync(2);
@@ -153,23 +160,31 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Latest).ToContainTextAsync("Next passage.");
+        await Page.WaitForFunctionAsync("url => window.archiveRevoked.includes(url)", url);
         var next = Page.GetByAltText("Next camp", new() { Exact = true });
         await next.ScrollIntoViewIfNeededAsync();
-        await Expect(next).ToHaveAttributeAsync("src", url!);
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await next.ElementHandleAsync());
+        var nextUrl = await next.GetAttributeAsync("src");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A camp", Exact = true }).ClickAsync();
+        await image.ScrollIntoViewIfNeededAsync();
+        await Expect(image).ToHaveAttributeAsync("src", nextUrl!);
         await Driver.ClickAsync("Back");
-        await Expect(image).ToHaveAttributeAsync("src", url!);
+        await image.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await image.ElementHandleAsync());
+        var restoredUrl = await image.GetAttributeAsync("src");
+        Assert.StartsWith("blob:", restoredUrl);
         await Library();
         await UploadBytes("bad.zip", [1, 2, 3]);
         await Expect(Page.Locator(".tw-library")).ToContainTextAsync("Couldn't read");
         await Page.Locator(".tw-resume").ClickAsync();
-        await Expect(image).ToHaveAttributeAsync("src", url!);
-        Assert.False(await Page.EvaluateAsync<bool>("url => window.archiveRevoked.includes(url)", url));
+        await Expect(image).ToHaveAttributeAsync("src", restoredUrl!);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.archiveRevoked.includes(url)", restoredUrl));
         await Library();
         await Upload(new StoryFixture("text-replacement",
             "game:\n  id: replacement\n  title: Replacement\n  start: start\ncharacters:\n  player: {first-name: Tester}\n",
             "=== start\nReplacement text.\n-> END"));
         await Expect(Latest).ToContainTextAsync("Replacement text.");
-        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.archiveRevoked.filter(value => value === url).length", url));
+        Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.archiveRevoked.filter(value => value === url).length", restoredUrl));
     }
 
     [Fact]
@@ -191,7 +206,12 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Latest).ToContainTextAsync("Next passage.");
         var next = Page.GetByAltText("Next camp", new() { Exact = true });
         await next.ScrollIntoViewIfNeededAsync();
-        await Expect(next).ToHaveAttributeAsync("src", (await image.GetAttributeAsync("src"))!);
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth === 1376 && image.naturalHeight === 768",
+            await next.ElementHandleAsync());
+        var nextUrl = await next.GetAttributeAsync("src");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A camp", Exact = true }).ClickAsync();
+        await image.ScrollIntoViewIfNeededAsync();
+        await Expect(image).ToHaveAttributeAsync("src", nextUrl!);
     }
 
     [Fact]
