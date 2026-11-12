@@ -165,6 +165,112 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Page.EvaluateAsync<bool>("url => window.historyUrls.revoked.includes(url)", url);
 
     [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Play_screen_only_keeps_images_from_the_current_scene_group()
+    {
+        await Page.EvaluateAsync("""
+            () => {
+                window.sceneImageUrls = { created: [], revoked: [] };
+                const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
+                URL.createObjectURL = blob => { const url = create(blob); window.sceneImageUrls.created.push(url); return url; };
+                URL.revokeObjectURL = url => { window.sceneImageUrls.revoked.push(url); revoke(url); };
+            }
+            """);
+        using var files = new ImageStoryFiles();
+        await File.WriteAllTextAsync(files.TalePath, """
+            === start
+            {image("photo.jpeg", "First camp")}
+            {image("pixel.png", "First map")}
+            * [Next] -> second
+            === second
+            {image("pixel.webp", "Second camp")}
+            * [Continue] -> continued
+            === continued
+            @continues
+            {image("photo.jpeg", "Conversation camp")}
+            * [Move on] -> quiet
+            === quiet
+            A quiet scene.
+            * [Finish] -> END
+            """);
+        await UploadBytes("scene-images.zip", files.Zip());
+
+        async Task<string> LoadedImageUrl(string alt)
+        {
+            var image = Page.GetByAltText(alt, new() { Exact = true });
+            await image.ScrollIntoViewIfNeededAsync();
+            await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                await image.ElementHandleAsync());
+            return (await image.GetAttributeAsync("src"))!;
+        }
+
+        var firstUrls = new[]
+        {
+            await LoadedImageUrl("First camp"),
+            await LoadedImageUrl("First map"),
+        };
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
+        await Choices.First.ClickAsync();
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "second");
+        await Expect(Latest.GetByAltText("Second camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true }))
+            .ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First map", Exact = true }))
+            .ToBeVisibleAsync();
+        Assert.Equal(0, await Page.Locator(".tw-past img").CountAsync());
+        await Page.WaitForFunctionAsync("urls => urls.every(url => window.sceneImageUrls.revoked.includes(url))", firstUrls);
+
+        var secondUrl = await LoadedImageUrl("Second camp");
+        await Choices.First.ClickAsync();
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "continued");
+        await Expect(Latest.GetByAltText("Second camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Latest.GetByAltText("Conversation camp", new() { Exact = true })).ToBeVisibleAsync();
+        var conversationUrl = await LoadedImageUrl("Conversation camp");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
+        await Driver.ClickAsync("Quick Save");
+        await Expect(SaveStatus).ToContainTextAsync("Quick Save checkpoint saved.");
+
+        await Choices.First.ClickAsync();
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "quiet");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Second camp", Exact = true }))
+            .ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Conversation camp", Exact = true }))
+            .ToBeVisibleAsync();
+        await Page.WaitForFunctionAsync("urls => urls.every(url => window.sceneImageUrls.revoked.includes(url))",
+            new[] { secondUrl, conversationUrl });
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Conversation camp", Exact = true })
+            .ClickAsync();
+        await Expect(Page.GetByAltText("Conversation camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "quiet");
+        await Expect(Latest).ToContainTextAsync("A quiet scene.");
+
+        await Driver.ClickAsync("Back");
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "continued");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
+        await Driver.ClickAsync("Back");
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "second");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(1);
+        await Expect(Latest.GetByAltText("Second camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Driver.ClickAsync("Forward");
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "continued");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
+        await Driver.ClickAsync("Forward");
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "quiet");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(0);
+
+        await Driver.ClickAsync("Saves");
+        await Page.Locator("[data-save-kind=quick]")
+            .GetByRole(AriaRole.Button, new() { Name = "Load Quick Save checkpoint", Exact = true }).ClickAsync();
+        await Driver.ClickAsync("Load save");
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "continued");
+        await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true }))
+            .ToBeVisibleAsync();
+    }
+
+    [Fact]
     public async Task History_remains_available_when_the_author_disables_undo()
     {
         using var files = CreateStory();

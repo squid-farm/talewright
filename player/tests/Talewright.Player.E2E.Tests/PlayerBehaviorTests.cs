@@ -424,7 +424,9 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Walk onward");
         await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(1);
         await Expect(Page.Locator(".tw-past .tw-chosen")).ToContainTextAsync("Walk onward");
-        await Expect(Page.Locator(".tw-past button")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(".tw-past").GetByRole(AriaRole.Button,
+            new() { Name = "Reveal image: Reserved artwork", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".tw-past .tw-chosen button")).ToHaveCountAsync(0);
         await Choose("Continue");
         await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(2);
         await Expect(Choices).ToHaveCountAsync(0);

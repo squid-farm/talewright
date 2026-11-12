@@ -13,7 +13,10 @@
                      aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
                 @foreach (var passage in group.Passages)
                 {
-                    <StoryPassage @key="(Identity, passage.Index)" Entry="passage.Entry" />
+                    <CascadingValue @key="(Identity, passage.Index, isLatest)"
+                                    Name="HistoryReading" Value="@(!isLatest)">
+                        <StoryPassage Entry="passage.Entry" />
+                    </CascadingValue>
                 }
             </section>
         }
