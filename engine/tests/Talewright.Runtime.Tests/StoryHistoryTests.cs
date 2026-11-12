@@ -187,6 +187,23 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Ending_from_a_cleared_scene_does_not_repeat_the_clear()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            @clear
+            Final scene.
+            * [Finish] -> END
+            """);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+
+        Assert.True(history.Transcript[0].Frame.ClearsPrevious);
+        Assert.False(history.Current.ClearsPrevious);
+        Assert.True(history.Current.IsEnded);
+    }
+
+    [Fact]
     public void Saving_triggers_coalesce_per_step_and_restore_without_repeating_the_save_request()
     {
         var story = Compile(BuildManifest(declareVariables: true, saveTrigger: true, multipleSavingTriggers: true).Build());

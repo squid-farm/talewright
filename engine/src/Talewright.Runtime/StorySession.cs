@@ -449,7 +449,7 @@ public sealed class StorySession : IStorySession
             new RenderedDocument(blocks), [], IsEnded: true)
         {
             ContinuesPrevious = scene?.ContinuesPrevious ?? Current?.ContinuesPrevious ?? false,
-            ClearsPrevious = scene?.ClearsPrevious ?? Current?.ClearsPrevious ?? false,
+            ClearsPrevious = scene?.ClearsPrevious ?? false,
         };
         return Current;
     }

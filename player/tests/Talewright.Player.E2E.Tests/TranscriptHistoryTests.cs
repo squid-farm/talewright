@@ -13,6 +13,24 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
     private ILocator History => Page.GetByRole(AriaRole.Main, new() { Name = "Recorded history" });
 
     [Fact]
+    public async Task Ending_from_a_cleared_scene_keeps_its_text_on_screen()
+    {
+        var id = $"clear-ending-{Guid.NewGuid():N}";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), """
+            === start
+            @clear
+            Final scene stays visible.
+            * [Finish] -> END
+            """));
+
+        await Choices.GetByText("Finish").ClickAsync();
+
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(2);
+        await Expect(Page.Locator(".tw-past")).ToContainTextAsync("Final scene stays visible.");
+        await Expect(Latest).ToBeFocusedAsync();
+    }
+
+    [Fact]
     public async Task Clear_starts_a_new_screen_but_keeps_history_and_replays_across_navigation_and_saves()
     {
         var id = $"clear-{Guid.NewGuid():N}";
