@@ -36,9 +36,7 @@ public static class SkillCheckResolver
 
         var executionScene = state.CurrentScene ?? identity.Scene;
         var visit = state.VisitCount(executionScene);
-        var existing = log.Events.OfType<SkillCheckResolved>().LastOrDefault(resolved =>
-            resolved.Identity == identity && resolved.ExecutionScene == executionScene && resolved.Visit == visit);
-        if (existing is not null)
+        if (FindInCurrentVisit(log.Events, identity) is { } existing)
         {
             var cached = new SkillCheckResult(existing.Roll, existing.Modifier, existing.Total,
                 existing.Difficulty, existing.Success);
@@ -73,6 +71,22 @@ public static class SkillCheckResolver
         var result = new SkillCheckResult(total.Roll, total.Modifier, total.Total, difficulty, success);
         Observe(result, check, executionScene, observer, start, log.Events.Count, trace);
         return result;
+    }
+
+    // Every event of the current visit follows its SceneEntered, so the search stops there instead of scanning the log.
+    private static SkillCheckResolved? FindInCurrentVisit(IReadOnlyList<GameEvent> events, SkillCheckIdentity identity)
+    {
+        for (var i = events.Count - 1; i >= 0; i--)
+        {
+            switch (events[i])
+            {
+                case SceneEntered:
+                    return null;
+                case SkillCheckResolved resolved when resolved.Identity == identity:
+                    return resolved;
+            }
+        }
+        return null;
     }
 
     private static void Observe(SkillCheckResult result, SkillCheck check, SceneId executionScene,
